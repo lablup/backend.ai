@@ -5,6 +5,7 @@ import hashlib
 import io
 import ipaddress
 import logging
+import os
 import platform
 import re
 import resource
@@ -37,6 +38,7 @@ from ai.backend.common.cgroup import (
     get_container_pids,
 )
 from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.files import open_dir_beneath
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import PID, ContainerId, ContainerPID, HostPID, KernelId
 from ai.backend.logging.structured import StructuredLogger
@@ -74,6 +76,42 @@ class closing_async(AbstractAsyncContextManager[_SupportsAsyncCloseT]):
     @override
     async def __aexit__(self, *exc_info: Any) -> None:
         await self.obj.close()
+
+
+class ContainerSSHFileWriter:
+    """Writes the SSH files of a kernel work directory, replacing symlinks instead of following them."""
+
+    _work_dir: Path
+    _public_key: bytes
+    _private_key: bytes
+
+    def __init__(self, work_dir: Path, public_key: bytes, private_key: bytes) -> None:
+        self._work_dir = work_dir
+        self._public_key = public_key
+        self._private_key = private_key
+
+    def write(self) -> list[Path]:
+        """Returns the directory and files under the work directory, ready for chown."""
+        ssh_dir = self._work_dir / ".ssh"
+        if ssh_dir.is_symlink():
+            ssh_dir.unlink()
+        ssh_dir.mkdir(parents=True, exist_ok=True)
+        ssh_dir.chmod(0o700)
+
+        authorized_keys = ssh_dir / "authorized_keys"
+        self._replace_file(authorized_keys, self._public_key)
+        id_rsa = ssh_dir / "id_rsa"
+        if id_rsa.is_symlink() or not id_rsa.is_file():
+            self._replace_file(id_rsa, self._private_key)
+        id_container = self._work_dir / "id_container"
+        self._replace_file(id_container, self._private_key)
+        return [ssh_dir, authorized_keys, id_rsa, id_container]
+
+    def _replace_file(self, path: Path, content: bytes) -> None:
+        path.unlink(missing_ok=True)
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "wb") as f:
+            f.write(content)
 
 
 def generate_local_instance_id(hint: str) -> str:
@@ -453,3 +491,19 @@ def get_safe_ulimit(name: str, desired_soft: int, desired_hard: int) -> DockerUl
         # If we can't get system limits, log and use desired values
         log.warning("system ulimit read failed", ulimit_name=name, error_repr=repr(e))
         return {"Name": name, "Soft": desired_soft, "Hard": desired_hard}
+
+
+def write_file_beneath(root: Path, target: Path, data: bytes) -> None:
+    """Write ``data`` to ``target`` inside ``root``, creating parents and refusing any symlink."""
+    parts = target.relative_to(root).parts
+    if not parts:
+        raise IsADirectoryError(target)
+    with open_dir_beneath(root, parts[:-1], mkdir_mode=0o777) as dir_fd:
+        fd = os.open(
+            parts[-1],
+            os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW,
+            0o666,
+            dir_fd=dir_fd,
+        )
+    with os.fdopen(fd, "wb") as f:
+        f.write(data)

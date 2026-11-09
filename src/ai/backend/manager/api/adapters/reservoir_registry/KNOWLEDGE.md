@@ -1,26 +1,32 @@
 ---
 name: reservoir-registry-adapter-scenarios
 type: reference
-description: TODO - what the reservoir registry adapter guarantees, as scenarios; nobody has written these yet
+description: what the reservoir registry adapter guarantees for update, purge and their partial bulk forms
 scope: src/ai/backend/manager/api/adapters/reservoir_registry
-keywords: [reservoir registry, scenario, adapter, todo]
+keywords: [reservoir registry, artifact registry, scenario, adapter, rbac, partial bulk, purge]
 generated:
   by: claude-code/opus-5
-  at: 2026-09-10
+  at: 2026-10-16
 status: draft
 ---
-# reservoir_registry 어댑터 — 시나리오
+# Reservoir registry adapter: Knowledge
 
-TODO. 아직 아무도 적지 않았다.
+The rules are in `AGENTS.md` in the parent directory. When this document and a run result disagree, doubt the sentence first.
 
-규칙은 상위 디렉터리의 `AGENTS.md`에 있다. 이 파일이 이 모양으로 남아 있는 동안, 이 엔티티는
-시나리오 테스트가 없다.
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
-## 적는 법
+A Reservoir registry is created in the global scope. One Reservoir registry is two rows, one carrying the connection settings and one the name, created together and deleted together in one operation. The permission graph checks the calls that update and delete one registry. A user with a granted permission receives the artifact registry permission through a role granted in the global scope.
 
-1. `adapter.py`가 내놓는 호출을 전부 훑는다.
-2. 호출마다 무엇을 보장하는지 한 문장으로 적는다. 권한이 있는 경우와 없는 경우를 짝으로 둔다.
-3. 동작별로 표를 나눈다. 각 줄은 상황, 요청, 결과 셋을 갖는다.
-4. 어느 시나리오도 부르지 않는 호출은 "아직 적지 않은 것"에 남긴다.
+## Update
 
-먼저 적힌 것을 보려면 `../domain/KNOWLEDGE.md`를 참고한다.
+## purge
+
+Both the single purge and the bulk purge check the purge permission.
+
+## Bulk update
+
+## Bulk purge
+
+A bulk operation does not reject the whole call. Processed registries go into the processed list, and failures are recorded in the failure list with the id and the reason. Each Reservoir registry is written separately, so one failure does not stop the rest. The processed list of the bulk purge carries only the ids of deleted registries.
+
+The requester of the missing id row is superadmin because superadmin passes every check and the target-not-found result appears as is. To a user with a granted permission, a missing id is a target absent from the permission graph.

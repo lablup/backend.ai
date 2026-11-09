@@ -6,21 +6,28 @@ import logging
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
 
-from ai.backend.common.api_handlers import APIResponse, BodyParam
+from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
+from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.dto.manager.v2.image.request import (
     AdminSearchImageAliasesInput,
     AdminSearchImagesInput,
     AliasImageInput,
     DealiasImageInput,
     ForgetImageInput,
+    PartialBulkDeleteImagesInput,
+    PartialBulkRestoreImagesInput,
+    PartialBulkUpdateImagesInput,
     PurgeImageInput,
     RestoreImageInput,
     ScopedSearchImagesInput,
+    UpdateImageBody,
     UpdateImageInput,
 )
+from ai.backend.common.dto.manager.v2.image.response import ForgetImagePayload
 from ai.backend.common.dto.manager.v2.image.types import ImageScope
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.api.rest.v2.path_params import ImageIdPathParam
 from ai.backend.manager.dto.context import UserContext
 
 if TYPE_CHECKING:
@@ -81,14 +88,56 @@ class V2ImageHandler:
         result = await self._adapter.admin_search_image_aliases(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
-    async def admin_forget(self, body: BodyParam[ForgetImageInput]) -> APIResponse:
-        """Forget (soft-delete) an image."""
-        result = await self._adapter.admin_forget(body.parsed)
+    async def update(
+        self,
+        path: PathParam[ImageIdPathParam],
+        body: BodyParam[UpdateImageBody],
+    ) -> APIResponse:
+        """Update an image."""
+        result = await self._adapter.update(ImageID(path.parsed.image_id), body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
-    async def admin_restore(self, body: BodyParam[RestoreImageInput]) -> APIResponse:
+    async def delete(self, path: PathParam[ImageIdPathParam]) -> APIResponse:
+        """Forget (soft-delete) an image."""
+        result = await self._adapter.delete(ImageID(path.parsed.image_id))
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def restore(self, path: PathParam[ImageIdPathParam]) -> APIResponse:
         """Restore a forgotten (soft-deleted) image."""
-        result = await self._adapter.admin_restore(body.parsed)
+        result = await self._adapter.restore(ImageID(path.parsed.image_id))
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_update(
+        self, body: BodyParam[PartialBulkUpdateImagesInput]
+    ) -> APIResponse:
+        """Update several images, answering for each one."""
+        result = await self._adapter.partial_bulk_update(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_delete(
+        self, body: BodyParam[PartialBulkDeleteImagesInput]
+    ) -> APIResponse:
+        """Forget several images, answering for each one."""
+        result = await self._adapter.partial_bulk_delete(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_restore(
+        self, body: BodyParam[PartialBulkRestoreImagesInput]
+    ) -> APIResponse:
+        """Restore several forgotten images, answering for each one."""
+        result = await self._adapter.partial_bulk_restore(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def admin_forget(self, body: BodyParam[ForgetImageInput]) -> APIResponse:
+        """Deprecated. Use `POST /v2/images/{image_id}/delete`."""
+        result = await self._adapter.delete(ImageID(body.parsed.image_id))
+        return APIResponse.build(
+            status_code=HTTPStatus.OK, response_model=ForgetImagePayload(item=result.item)
+        )
+
+    async def admin_restore(self, body: BodyParam[RestoreImageInput]) -> APIResponse:
+        """Deprecated. Use `POST /v2/images/{image_id}/restore`."""
+        result = await self._adapter.restore(ImageID(body.parsed.image_id))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def admin_purge(self, body: BodyParam[PurgeImageInput]) -> APIResponse:
@@ -107,6 +156,6 @@ class V2ImageHandler:
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def admin_update(self, body: BodyParam[UpdateImageInput]) -> APIResponse:
-        """Update an image by ID."""
-        result = await self._adapter.admin_update(body.parsed)
+        """Deprecated. Use `PATCH /v2/images/{image_id}`."""
+        result = await self._adapter.update(ImageID(body.parsed.image_id), body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)

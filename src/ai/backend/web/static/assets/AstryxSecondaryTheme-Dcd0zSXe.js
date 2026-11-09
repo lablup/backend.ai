@@ -1,0 +1,2 @@
+import{c as l,J as h,A as u,K as x,n as p,M as T}from"./index-CwWAznqi.js";const y=i=>{"use memo";const e=l.c(7),{children:o}=i,{rawThemeConfig:m,activeThemeFamily:c}=h(),{mode:n}=u(),r=m==null?void 0:m.theme;let s;e[0]!==c||e[1]!==r?(s=x(r,"secondary",c),e[0]=c,e[1]=r,e[2]=s):s=e[2];const a=s;let t;return e[3]!==o||e[4]!==n||e[5]!==a?(t=p.jsx(T,{theme:a,mode:n,children:o}),e[3]=o,e[4]=n,e[5]=a,e[6]=t):t=e[6],t};export{y as A};
+//# sourceMappingURL=AstryxSecondaryTheme-Dcd0zSXe.js.map

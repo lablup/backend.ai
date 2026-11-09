@@ -14,12 +14,17 @@ from ai.backend.common.dto.manager.v2.runtime_variant_preset.request import (
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     RuntimeVariantPresetOrderField,
 )
-from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.base import encode_cursor, to_global_id
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_mutation, gql_root_field
 from ai.backend.manager.api.gql.runtime_variant_preset.types import (
     CreateRuntimeVariantPresetInputGQL,
     CreateRuntimeVariantPresetPayloadGQL,
     DeleteRuntimeVariantPresetPayloadGQL,
+    PartialBulkPurgeRuntimeVariantPresetsInputGQL,
+    PartialBulkRuntimeVariantPresetsPayloadGQL,
+    PartialBulkUpdateRuntimeVariantPresetsInputGQL,
+    PurgeRuntimeVariantPresetPayloadGQL,
     RuntimeVariantPresetConnection,
     RuntimeVariantPresetEdge,
     RuntimeVariantPresetFilterGQL,
@@ -123,9 +128,72 @@ async def admin_create_runtime_variant_preset(
 
 @gql_mutation(
     BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Update a runtime variant preset. Only provided fields will be updated.",
+    )
+)
+async def update_runtime_variant_preset(
+    info: Info[StrawberryGQLContext],
+    input: UpdateRuntimeVariantPresetInputGQL,
+) -> UpdateRuntimeVariantPresetPayloadGQL:
+    payload = await info.context.adapters.runtime_variant_preset.update(input.to_pydantic())
+    return UpdateRuntimeVariantPresetPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Purge a runtime variant preset.",
+    )
+)
+async def purge_runtime_variant_preset(
+    info: Info[StrawberryGQLContext],
+    id: UUID,
+) -> PurgeRuntimeVariantPresetPayloadGQL:
+    payload = await info.context.adapters.runtime_variant_preset.purge(id)
+    return PurgeRuntimeVariantPresetPayloadGQL.from_pydantic(
+        payload, extra={"purged_id": to_global_id(RuntimeVariantPresetGQL, payload.entity_id)}
+    )
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Update several runtime variant presets, answering for each one.",
+    )
+)
+async def partial_bulk_update_runtime_variant_presets(
+    info: Info[StrawberryGQLContext],
+    input: PartialBulkUpdateRuntimeVariantPresetsInputGQL,
+) -> PartialBulkRuntimeVariantPresetsPayloadGQL:
+    adapter = info.context.adapters.runtime_variant_preset
+    payload = await adapter.partial_bulk_update(input.to_pydantic())
+    return PartialBulkRuntimeVariantPresetsPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Purge several runtime variant presets, answering for each one.",
+    )
+)
+async def partial_bulk_purge_runtime_variant_presets(
+    info: Info[StrawberryGQLContext],
+    input: PartialBulkPurgeRuntimeVariantPresetsInputGQL,
+) -> PartialBulkRuntimeVariantPresetsPayloadGQL:
+    adapter = info.context.adapters.runtime_variant_preset
+    payload = await adapter.partial_bulk_purge(input.to_pydantic())
+    return PartialBulkRuntimeVariantPresetsPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
         added_version="26.4.2",
         description="Update a runtime variant preset (superadmin only).",
-    )
+    ),
+    deprecation_reason=(
+        f"Deprecated since {NEXT_RELEASE_VERSION}. Use `updateRuntimeVariantPreset`."
+    ),
 )
 async def admin_update_runtime_variant_preset(
     info: Info[StrawberryGQLContext],
@@ -141,12 +209,13 @@ async def admin_update_runtime_variant_preset(
     BackendAIGQLMeta(
         added_version="26.4.2",
         description="Delete a runtime variant preset (superadmin only).",
-    )
+    ),
+    deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `purgeRuntimeVariantPreset`.",
 )
 async def admin_delete_runtime_variant_preset(
     info: Info[StrawberryGQLContext],
     id: UUID,
 ) -> DeleteRuntimeVariantPresetPayloadGQL | None:
     check_admin_only()
-    payload = await info.context.adapters.runtime_variant_preset.delete(id)
+    payload = await info.context.adapters.runtime_variant_preset.purge(id)
     return DeleteRuntimeVariantPresetPayloadGQL.from_pydantic(payload)

@@ -218,6 +218,7 @@ def _ctx(
             policy=policy,
             container_user=ContainerUserInfo(),
             dotfiles=dotfiles or DotfileBundle(),
+            default_bootstrap_script=None,
             pending_session_count=pending_session_count,
             pending_session_resource_slots=pending_session_resource_slots or {},
             vfolder_mounts_by_role={},
@@ -545,6 +546,19 @@ class TestMountNameValidationRule:
             usage_mode=VFolderUsageMode.GENERAL,
         )
         spec = _spec((_kernel(img),), vfolder_mounts=(reserved,))
+        with pytest.raises(InvalidAPIParameters):
+            MountNameValidationRule().validate(spec, _ctx())
+
+    @pytest.mark.parametrize(
+        "kernel_path",
+        ["/opt/container", "/opt/backend.ai/bin", "/home/work/../../opt/container"],
+    )
+    def test_rejects_path_under_reserved_path(self, kernel_path: str) -> None:
+        img = ImageID(uuid.uuid4())
+        spec = _spec(
+            (_kernel(img),),
+            vfolder_mounts=(_vfolder_mount("data", kernel_path=kernel_path),),
+        )
         with pytest.raises(InvalidAPIParameters):
             MountNameValidationRule().validate(spec, _ctx())
 

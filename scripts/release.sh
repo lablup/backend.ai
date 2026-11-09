@@ -29,14 +29,6 @@ fi
 TARGET_VERSION=$1
 WEBUI_VERSION=$2
 
-# An alpha is an internal build: the release PR's CI runs the same checks, so the
-# local dependency and BUILD-file checks below are skipped for it.
-if [[ "$TARGET_VERSION" =~ a[0-9]+$ ]]; then
-    IS_ALPHA=true
-else
-    IS_ALPHA=false
-fi
-
 if [ "$#" -eq 1 ]; then
     echo "Preparing release for version ${TARGET_VERSION} (skipping WebUI update)"
     git checkout -b "release/$TARGET_VERSION"
@@ -68,13 +60,23 @@ if [[ "$TARGET_VERSION" =~ (rc|a|b|dev)[0-9]+ ]]; then
     echo "Skipping NEXT_RELEASE_VERSION freeze for pre-release version ${TARGET_VERSION}"
 else
     echo "Freezing NEXT_RELEASE_VERSION to ${TARGET_VERSION}..."
-    python3 scripts/freeze_release_version.py "${TARGET_VERSION}"
-    pants fix ::
-    pants fmt ::
+    python3 scripts/freeze_release_version.py "${TARGET_VERSION}" || exit 1
+    RUFF_VERSION=$(scripts/pyscript.sh scripts/tomltool.py -f pants.toml get 'ruff.version')
+    FROZEN=()
+    while IFS= read -r -d '' f; do
+        FROZEN+=("$f")
+    done < <(git diff --name-only -z -- 'src/*.py')
+    if [ ${#FROZEN[@]} -gt 0 ]; then
+        uvx "ruff@${RUFF_VERSION}" check --fix --exit-zero --quiet --force-exclude "${FROZEN[@]}"
+        uvx "ruff@${RUFF_VERSION}" format --quiet --force-exclude "${FROZEN[@]}"
+    fi
 fi
 
+# Give the news fragments named without a PR number their PR number
+python3 scripts/rename-changelog-fragments.py || exit 1
+
 # Update the version-branch changelog (consumes news fragments without an interactive prompt)
-python3 scripts/run-towncrier.py "${TARGET_VERSION}"
+python3 scripts/run-towncrier.py "${TARGET_VERSION}" || exit 1
 
 # Update sample config files (unmask secrets to show actual default values)
 ./backend.ai mgr config generate-sample --overwrite --unmask-secrets
@@ -90,23 +92,5 @@ python3 scripts/run-towncrier.py "${TARGET_VERSION}"
 # the lines that are due.
 .github/scripts/update-maintained-versions.sh "${TARGET_VERSION}" "${LTS_ARG[@]}"
 
-# Check dependencies
-if [ "$IS_ALPHA" = "true" ]; then
-    echo "Skipping the dependency and BUILD-file checks for alpha version ${TARGET_VERSION}"
-else
-    pants tailor --check update-build-files --check '::'
-    pants check ::
-fi
-
 git add -A
 git commit -m "release: $TARGET_VERSION"
-
-# Advance NEXT_RELEASE_VERSION to the next sprint development cycle.
-# Only for sprint releases (patch == 0); the regex also excludes patch
-# releases and PEP 440 pre-releases (rc/a/b/dev/post). Override the computed
-# sprint+1 default with NEXT_DEV_VERSION (e.g. for year rollover: 27.1.0).
-if [[ "$TARGET_VERSION" =~ ^[0-9]+\.[0-9]+\.0$ ]]; then
-    next_dev=$(python3 scripts/bump_next_release_version.py ${NEXT_DEV_VERSION:+"$NEXT_DEV_VERSION"})
-    git add src/ai/backend/common/meta/meta.py
-    git commit -m "chore: bump NEXT_RELEASE_VERSION to $next_dev"
-fi

@@ -1,206 +1,513 @@
 ## notification
 
-[무엇을 보장하는가](/src/ai/backend/manager/api/adapters/notification/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/notification/adapter.py)
+[background](/src/ai/backend/manager/api/adapters/notification/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/notification/adapter.py)
 
-시나리오: 미완 2 / 14
+Scenario: incomplete 3 / 18
 
-- ops 로 구성 (12)
-  - batch_load_channels_by_ids — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - batch_load_rules_by_ids — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - create_channel — 대표 성공 ✓ · 대표 실패 ✓
-  - create_rule — 대표 성공 ✓ · 대표 실패 ✓
-  - delete_channel — 대표 성공 ✓ · 대표 실패 ✓
-  - delete_rule — 대표 성공 ✓ · 대표 실패 ✓
-  - get_channel — 대표 성공 ✓ · 대표 실패 ✓
-  - get_rule — 대표 성공 ✓ · 대표 실패 ✓
-  - search_channels — 대표 성공 ✓ · 대표 실패 ✓
-  - search_rules — 대표 성공 ✓ · 대표 실패 ✓
-  - update_channel — 대표 성공 ✓ · 대표 실패 ✓
-  - update_rule — 대표 성공 ✓ · 대표 실패 ✓
-- 직접 구현 (2)
-  - validate_channel — 성공 있음 1 · 실패 있음 2 (single_entity)
-  - validate_rule — 성공 있음 1 · 실패 있음 3 (single_entity)
+- built from ops (16)
+  - batch_load_channels_by_ids: representative success ✓ · representative rejection ✓
+  - batch_load_rules_by_ids: representative success ✓ · representative rejection ✓
+  - create_channel: representative success ✓ · representative rejection ✓
+  - create_rule: representative success ✓ · representative rejection ✓
+  - get_channel: representative success ✓ · representative rejection ✓
+  - get_rule: representative success ✓ · representative rejection ✓
+  - partial_bulk_purge_channels: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - partial_bulk_purge_rules: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - partial_bulk_update_channels: representative success ✓ · representative rejection ✓
+  - partial_bulk_update_rules: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - purge_channel: representative success ✓ · representative rejection ✓
+  - purge_rule: representative success ✓ · representative rejection ✓
+  - search_channels: representative success ✓ · representative rejection ✓
+  - search_rules: representative success ✓ · representative rejection ✓
+  - update_channel: representative success ✓ · representative rejection ✓
+  - update_rule: representative success ✓ · representative rejection ✓
+- direct implementation (2)
+  - validate_channel: success present 1 · rejection present 2 (single_entity)
+  - validate_rule: success present 1 · rejection present 3 (single_entity)
 
-### creating_channels
+**batch_load_channels_by_ids**
 
-#### [a-channel-made-disabled-answers-disabled](/tests/scenario/bai_scenario/manager/notification/test_creating_channels.py) — pass
+| scenario | verdict |
+|---|---|
+| [a batch load with an empty id list brings an empty response without calling the lower layer](#reading_channels-a-batch-load-of-no-channel-ids-answers-an-empty-list) | answered |
+| [when the superadmin batch-loads two channels created in advance and one unknown id, they come back in the order asked and the item for the unknown id is empty](#reading_channels-the-superadmin-batch-load-leaves-a-missing-id-empty) | answered |
+| [when a user granted nothing batch-loads two channels, the call is not rejected and each item carries a rejection for not enough permission](#reading_channels-a-user-granted-nothing-batch-loading-channels-is-refused-per-item) | rejected |
 
-슈퍼관리자가 비활성으로 지정해 채널을 만들면 비활성인 채널이 반환된다
+**batch_load_rules_by_ids**
+
+| scenario | verdict |
+|---|---|
+| [a batch load with an empty id list brings an empty response without calling the lower layer](#reading_rules-a-batch-load-of-no-rule-ids-answers-an-empty-list) | answered |
+| [when the superadmin batch-loads two rules created in advance and one unknown id, they come back in the order asked and the item for the unknown id is empty](#reading_rules-the-superadmin-batch-load-leaves-a-missing-rule-id-empty) | answered |
+| [when a user granted nothing batch-loads two rules, the call is not rejected and each item carries a rejection for not enough permission](#reading_rules-a-user-granted-nothing-batch-loading-rules-is-refused-per-item) | rejected |
+
+**create_channel**
+
+| scenario | verdict |
+|---|---|
+| [when the superadmin creates a channel marked disabled, a disabled channel comes back](#creating_channels-a-channel-made-disabled-answers-disabled) | answered |
+| [when the superadmin creates a webhook channel with only a name and a URL, the whole channel comes back active with an empty description](#creating_channels-the-superadmin-makes-a-webhook-channel) | answered |
+| [when the superadmin creates an email channel with the SMTP connection, the sender, the recipients and the auth credentials, the whole channel comes back with the auth username and without the password](#creating_channels-the-superadmin-makes-an-email-channel) | answered |
+| [when a channel is created as the email type with a webhook spec, reading the written row back rejects it because the spec does not match the type, and the write is rolled back](#creating_channels-a-channel-type-and-a-spec-that-disagree-are-refused) | rejected |
+| [creating a channel with a spec naming neither webhook nor email is rejected as invalid input](#creating_channels-a-spec-naming-neither-webhook-nor-email-is-refused) | rejected |
+| [when a user who is not the superadmin creates a channel, it is rejected for an insufficient role](#creating_channels-a-user-who-is-not-the-superadmin-may-not-make-a-channel) | rejected |
+| [when the monitor creates a channel, it is rejected for an insufficient role. The monitor passes reads only](#creating_channels-the-monitor-may-not-make-a-channel) | rejected |
+
+**create_rule**
+
+| scenario | verdict |
+|---|---|
+| [when the superadmin creates a rule marked disabled, a disabled rule comes back](#creating_rules-a-rule-made-disabled-answers-disabled) | answered |
+| [a rule created against a channel id no row answers to is created anyway. There is no foreign key between the two tables](#creating_rules-a-rule-pointing-at-a-channel-id-nothing-answers-to-is-made-all-the-same) | answered |
+| [when the superadmin creates a rule with a type, a channel and a template, the whole rule comes back active with an empty description](#creating_rules-the-superadmin-makes-a-rule-through-a-channel) | answered |
+| [when a user who is not the superadmin creates a rule, it is rejected for an insufficient role](#creating_rules-a-user-who-is-not-the-superadmin-may-not-make-a-rule) | rejected |
+| [when the monitor creates a rule, it is rejected for an insufficient role. The monitor passes reads only](#creating_rules-the-monitor-may-not-make-a-rule) | rejected |
+
+**get_channel**
+
+| scenario | verdict |
+|---|---|
+| [with one channel, when the superadmin gets it by id, the whole channel comes back](#reading_channels-the-superadmin-reads-a-channel-by-id) | answered |
+| [when a user granted nothing gets a channel by id, it is rejected for not enough permission, even when the channel records that user as its creator](#reading_channels-a-user-granted-nothing-may-not-read-a-channel) | rejected |
+| [when a user granted nothing gets an unknown id, it is rejected for not enough permission rather than for a missing target, because the permission check runs first and a missing row holds no grant either](#reading_channels-a-user-granted-nothing-reading-an-unknown-channel-id-is-refused-for-permission) | rejected |
+| [when the monitor gets a channel by id, it is rejected for not enough permission. Search passes, but a get by id is a permission check and the monitor holds no permission for it either](#reading_channels-the-monitor-may-not-read-a-channel-by-id) | rejected |
+| [when the superadmin gets an id nothing answers to, it is rejected because no target is found](#reading_channels-the-superadmin-reading-a-channel-id-nothing-answers-to-is-not-found) | rejected |
+
+**get_rule**
+
+| scenario | verdict |
+|---|---|
+| [with one rule, when the superadmin gets it by id, the whole rule comes back](#reading_rules-the-superadmin-reads-a-rule-by-id) | answered |
+| [when a user granted nothing gets a rule by id, it is rejected for not enough permission](#reading_rules-a-user-granted-nothing-may-not-read-a-rule) | rejected |
+| [when the superadmin gets an id nothing answers to, it is rejected because no target is found](#reading_rules-the-superadmin-reading-a-rule-id-nothing-answers-to-is-not-found) | rejected |
+
+**partial_bulk_purge_channels**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted nothing purges several channels at once, nothing is purged and every one comes back in the failed list because permission is not enough](#partial_bulk_purging_channels-a-user-granted-nothing-purges-none-of-several-channels) | answered |
+| [when the superadmin purges two channels and one unknown id at once, the two come back as they were before the purge and the unknown id comes back in the failed list because no target answers to it](#partial_bulk_purging_channels-purging-several-channels-answers-for-the-missing-one) | answered |
+
+**partial_bulk_purge_rules**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted nothing purges several rules at once, nothing is purged and every one comes back in the failed list because permission is not enough](#partial_bulk_purging_rules-a-user-granted-nothing-purges-none-of-several-rules) | answered |
+| [when the superadmin purges two rules and one unknown id at once, the two come back as they were before the purge and the unknown id comes back in the failed list because no target answers to it](#partial_bulk_purging_rules-purging-several-rules-answers-for-the-missing-one) | answered |
+
+**partial_bulk_update_channels**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted nothing edits several channels at once, nothing is edited and every one comes back in the failed list because permission is not enough](#partial_bulk_editing_channels-a-user-granted-nothing-edits-none-of-several-channels) | answered |
+| [when the superadmin changes the description of two channels at once, both come back with the new description and nothing failed](#partial_bulk_editing_channels-the-superadmin-describes-several-channels-at-once) | answered |
+| [when the superadmin edits two channels at once and one carries a spec naming neither webhook nor email, the call is rejected](#partial_bulk_editing_channels-a-spec-naming-neither-webhook-nor-email-refuses-the-bulk-edit) | rejected |
+
+**partial_bulk_update_rules**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted nothing edits several rules at once, nothing is edited and every one comes back in the failed list because permission is not enough](#partial_bulk_editing_rules-a-user-granted-nothing-edits-none-of-several-rules) | answered |
+| [when the superadmin changes the description of two rules at once, both come back with the new description and nothing failed](#partial_bulk_editing_rules-the-superadmin-describes-several-rules-at-once) | answered |
+
+**purge_channel**
+
+| scenario | verdict |
+|---|---|
+| [when the superadmin deletes a channel a rule points at, it is deleted all the same and the id of the deleted channel comes back. There is no foreign key between the two tables, so the rule stays](#retiring_channels-a-channel-a-rule-points-at-is-deleted-all-the-same) | answered |
+| [with one channel, when the superadmin deletes it, the id of the deleted channel comes back](#retiring_channels-the-superadmin-deletes-a-channel) | answered |
+| [when a user granted nothing deletes a channel, it is rejected for not enough permission](#retiring_channels-a-user-granted-nothing-may-not-delete-a-channel) | rejected |
+| [when the superadmin deletes an id nothing answers to, it is rejected because no target is found](#retiring_channels-the-superadmin-deleting-a-channel-id-nothing-answers-to-is-not-found) | rejected |
+
+**purge_rule**
+
+| scenario | verdict |
+|---|---|
+| [with one rule, when the superadmin deletes it, the id of the deleted rule comes back](#retiring_rules-the-superadmin-deletes-a-rule) | answered |
+| [when a user granted nothing deletes a rule, it is rejected for not enough permission](#retiring_rules-a-user-granted-nothing-may-not-delete-a-rule) | rejected |
+| [when the superadmin deletes an id nothing answers to, it is rejected because no target is found](#retiring_rules-the-superadmin-deleting-a-rule-id-nothing-answers-to-is-not-found) | rejected |
+
+**search_channels**
+
+| scenario | verdict |
+|---|---|
+| [with a webhook channel and an email channel, a get filtered by the email type brings back only the email channel](#searching_channels-a-channel-type-filter-narrows-the-answer-to-that-kind) | answered |
+| [a get filtered by the name of one of two channels brings back only that channel](#searching_channels-a-name-filter-narrows-the-answer-to-that-channel) | answered |
+| [with active and inactive channels mixed, a get filtered by enabled brings back only the active ones](#searching_channels-an-enabled-filter-leaves-only-the-enabled-channels) | answered |
+| [with two channels, asking for only the first item brings one item back and the response says there is a next page](#searching_channels-asking-for-the-first-channel-only-says-there-is-a-next-page) | answered |
+| [when the monitor gets without a filter, it receives the same response as the superadmin](#searching_channels-the-monitor-searches-channels-like-the-superadmin) | answered |
+| [with two channels, a get without a filter brings both of them back](#searching_channels-the-superadmin-counts-every-channel-laid) | answered |
+| [when a user who is not the superadmin gets without a filter, it is rejected for an insufficient role](#searching_channels-a-user-who-is-not-the-superadmin-may-not-search-channels) | rejected |
+
+**search_rules**
+
+| scenario | verdict |
+|---|---|
+| [a get filtered by the name of one of two rules brings back only that rule](#searching_rules-a-name-filter-narrows-the-answer-to-that-rule) | answered |
+| [a get filtered by the type of one of two rules with different types brings back only that rule](#searching_rules-a-rule-type-filter-narrows-the-answer-to-that-kind) | answered |
+| [with active and inactive rules mixed, a get filtered by enabled brings back only the active ones](#searching_rules-an-enabled-filter-leaves-only-the-enabled-rules) | answered |
+| [when the monitor gets without a filter, it receives the same response as the superadmin](#searching_rules-the-monitor-searches-rules-like-the-superadmin) | answered |
+| [with two rules, a get without a filter brings both of them back](#searching_rules-the-superadmin-counts-every-rule-laid) | answered |
+| [when a user who is not the superadmin gets without a filter, it is rejected for an insufficient role](#searching_rules-a-user-who-is-not-the-superadmin-may-not-search-rules) | rejected |
+
+**update_channel**
+
+| scenario | verdict |
+|---|---|
+| [editing without naming any field brings the channel back unchanged](#editing_channels-an-edit-naming-no-field-changes-nothing) | answered |
+| [when the spec of a webhook channel moves to another URL, the channel comes back with the new URL](#editing_channels-changing-a-webhook-spec-moves-the-channel-to-the-new-url) | answered |
+| [when the description of a channel that has one is cleared, the channel comes back with an empty description](#editing_channels-clearing-a-channel-description-leaves-it-empty) | answered |
+| [when an active channel is changed to disabled, a disabled channel comes back](#editing_channels-disabling-a-channel-answers-it-disabled) | answered |
+| [when the superadmin changes only the name, the whole channel comes back with the new name and everything else unchanged](#editing_channels-the-superadmin-renaming-a-channel-leaves-the-rest) | answered |
+| [when a user granted nothing changes the name, it is rejected for not enough permission](#editing_channels-a-user-granted-nothing-may-not-edit-a-channel) | rejected |
+| [editing a channel with a spec naming neither webhook nor email is rejected as invalid input](#editing_channels-an-edit-with-a-spec-naming-neither-webhook-nor-email-is-refused) | rejected |
+| [when the superadmin edits an id nothing answers to, it is rejected because no target is found](#editing_channels-the-superadmin-editing-a-channel-id-nothing-answers-to-is-not-found) | rejected |
+
+**update_rule**
+
+| scenario | verdict |
+|---|---|
+| [editing without naming any field brings the rule back unchanged](#editing_rules-a-rule-edit-naming-no-field-changes-nothing) | answered |
+| [when the template of a rule changes, the rule comes back with the new template](#editing_rules-changing-a-rule-template-answers-the-new-template) | answered |
+| [when the description of a rule that has one is cleared, the rule comes back with an empty description](#editing_rules-clearing-a-rule-description-leaves-it-empty) | answered |
+| [when an active rule is changed to disabled, a disabled rule comes back](#editing_rules-disabling-a-rule-answers-it-disabled) | answered |
+| [when the superadmin changes only the name, the whole rule comes back with the new name and everything else unchanged](#editing_rules-the-superadmin-renaming-a-rule-leaves-the-rest) | answered |
+| [when a user granted nothing changes the name, it is rejected for not enough permission](#editing_rules-a-user-granted-nothing-may-not-edit-a-rule) | rejected |
+| [when the superadmin edits an id nothing answers to, it is rejected because no target is found](#editing_rules-the-superadmin-editing-a-rule-id-nothing-answers-to-is-not-found) | rejected |
+
+**validate_channel**
+
+| scenario | verdict |
+|---|---|
+| [with one webhook channel, when the superadmin validates it with a test message, the id of the validated channel comes back](#validating_channels-the-superadmin-validates-a-webhook-channel) | answered |
+| [when a user granted nothing validates a channel, it is rejected for not enough permission](#validating_channels-a-user-granted-nothing-may-not-validate-a-channel) | rejected |
+| [when the superadmin validates an id nothing answers to, it is rejected because no target is found](#validating_channels-the-superadmin-validating-a-channel-id-nothing-answers-to-is-not-found) | rejected |
+
+**validate_rule**
+
+| scenario | verdict |
+|---|---|
+| [with one session-started rule, when the superadmin validates it with test data of that type, the string made by putting the data into the template comes back](#validating_rules-the-superadmin-validates-a-rule-with-test-data) | answered |
+| [validating a rule pointing at an unknown channel id is rejected because no channel is found](#validating_rules-a-rule-pointing-at-a-channel-id-nothing-answers-to-is-refused) | rejected |
+| [when a user granted nothing validates a rule, it is rejected for not enough permission](#validating_rules-a-user-granted-nothing-may-not-validate-a-rule) | rejected |
+| [when the superadmin validates an id nothing answers to, it is rejected because no target is found](#validating_rules-the-superadmin-validating-a-rule-id-nothing-answers-to-is-not-found) | rejected |
+
+### batch_load_channels_by_ids
+
+<a id="reading_channels-a-batch-load-of-no-channel-ids-answers-an-empty-list"></a>
+
+#### [a-batch-load-of-no-channel-ids-answers-an-empty-list](/tests/scenario/bai_scenario/manager/notification/test_reading_channels.py): pass
+
+a batch load with an empty id list brings an empty response without calling the lower layer
 
 Given
 
-- 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- two webhook channels and one regular user
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Webhook channel wanted-1: sends to https://hooks.example.test/notify
+  - Webhook channel other-1: sends to https://hooks.example.test/notify
 
 When
 
-- NotificationAdapter.create_channel — user-1이 webhook 채널 muted을 생성
+- NotificationAdapter.batch_load_channels_by_ids: user-1 batch-loads with an empty id list
 
 Then
 
-- 생성한 채널 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+- an empty response comes back
+  - items = []
+
+<a id="reading_channels-the-superadmin-batch-load-leaves-a-missing-id-empty"></a>
+
+#### [the-superadmin-batch-load-leaves-a-missing-id-empty](/tests/scenario/bai_scenario/manager/notification/test_reading_channels.py): pass
+
+when the superadmin batch-loads two channels created in advance and one unknown id, they come back in the order asked and the item for the unknown id is empty
+
+Given
+
+- two webhook channels and one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Webhook channel wanted-1: sends to https://hooks.example.test/notify
+  - Webhook channel other-1: sends to https://hooks.example.test/notify
+
+When
+
+- NotificationAdapter.batch_load_channels_by_ids: user-1 batch-loads the 2 channels created in advance and one unknown id
+
+Then
+
+- they come back in the order asked and the item for an unknown id is empty
+  - len(items) = 3
+  - items[0].id: skipped: the database generates it
+  - items[0].entity_id: same as the id of the channel created in advance
+  - items[0].name = 'wanted-1'
+  - items[0].description = None
+  - items[0].channel_type = 'webhook'
+  - items[0].spec.channel_type = <NotificationChannelTypeDTO.WEBHOOK: 'webhook'>
+  - items[0].spec.url = 'https://hooks.example.test/notify'
+  - items[0].enabled = True
+  - items[0].created_by: same as the user who created it
+  - items[0].created_at: the time this run wrote
+  - items[0].updated_at: the time this run wrote
+  - items[1].id: skipped: the database generates it
+  - items[1].entity_id: same as the id of the channel created in advance
+  - items[1].name = 'other-1'
+  - items[1].description = None
+  - items[1].channel_type = 'webhook'
+  - items[1].spec.channel_type = <NotificationChannelTypeDTO.WEBHOOK: 'webhook'>
+  - items[1].spec.url = 'https://hooks.example.test/notify'
+  - items[1].enabled = True
+  - items[1].created_by: same as the user who created it
+  - items[1].created_at: the time this run wrote
+  - items[1].updated_at: the time this run wrote
+  - items[2] = None
+
+<a id="reading_channels-a-user-granted-nothing-batch-loading-channels-is-refused-per-item"></a>
+
+#### [a-user-granted-nothing-batch-loading-channels-is-refused-per-item](/tests/scenario/bai_scenario/manager/notification/test_reading_channels.py): pass
+
+when a user granted nothing batch-loads two channels, the call is not rejected and each item carries a rejection for not enough permission
+
+Given
+
+- two webhook channels and one regular user
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Webhook channel wanted-1: sends to https://hooks.example.test/notify
+  - Webhook channel other-1: sends to https://hooks.example.test/notify
+
+When
+
+- NotificationAdapter.batch_load_channels_by_ids: user-1 batch-loads the 2 channels created in advance
+
+Then
+
+- each item carries a rejection for not enough permission
+  - len(items) = 2
+  - rejected: NotEnoughPermission
+  - rejected: NotEnoughPermission
+
+### batch_load_rules_by_ids
+
+<a id="reading_rules-a-batch-load-of-no-rule-ids-answers-an-empty-list"></a>
+
+#### [a-batch-load-of-no-rule-ids-answers-an-empty-list](/tests/scenario/bai_scenario/manager/notification/test_reading_rules.py): pass
+
+a batch load with an empty id list brings an empty response without calling the lower layer
+
+Given
+
+- two rules pointing at the same webhook channel and one regular user
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
+  - Rule wanted-1: announces session.started events
+  - Rule other-1: announces session.started events
+
+When
+
+- NotificationAdapter.batch_load_rules_by_ids: user-1 batch-loads with an empty id list
+
+Then
+
+- an empty response comes back
+  - items = []
+
+<a id="reading_rules-the-superadmin-batch-load-leaves-a-missing-rule-id-empty"></a>
+
+#### [the-superadmin-batch-load-leaves-a-missing-rule-id-empty](/tests/scenario/bai_scenario/manager/notification/test_reading_rules.py): pass
+
+when the superadmin batch-loads two rules created in advance and one unknown id, they come back in the order asked and the item for the unknown id is empty
+
+Given
+
+- two rules pointing at the same webhook channel and one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
+  - Rule wanted-1: announces session.started events
+  - Rule other-1: announces session.started events
+
+When
+
+- NotificationAdapter.batch_load_rules_by_ids: user-1 batch-loads the 2 rules created in advance and one unknown id
+
+Then
+
+- they come back in the order asked and the item for an unknown id is empty
+  - len(items) = 3
+  - items[0].id: skipped: the database generates it
+  - items[0].entity_id: same as the id of the rule created in advance
+  - items[0].name = 'wanted-1'
+  - items[0].description = None
+  - items[0].rule_type = 'session.started'
+  - items[0].channel_id: same as the channel it points at
+  - items[0].message_template = 'Session {{ session_name }} is {{ status }}'
+  - items[0].enabled = True
+  - items[0].created_by: same as the user who created it
+  - items[0].created_at: the time this run wrote
+  - items[0].updated_at: the time this run wrote
+  - items[1].id: skipped: the database generates it
+  - items[1].entity_id: same as the id of the rule created in advance
+  - items[1].name = 'other-1'
+  - items[1].description = None
+  - items[1].rule_type = 'session.started'
+  - items[1].channel_id: same as the channel it points at
+  - items[1].message_template = 'Session {{ session_name }} is {{ status }}'
+  - items[1].enabled = True
+  - items[1].created_by: same as the user who created it
+  - items[1].created_at: the time this run wrote
+  - items[1].updated_at: the time this run wrote
+  - items[2] = None
+
+<a id="reading_rules-a-user-granted-nothing-batch-loading-rules-is-refused-per-item"></a>
+
+#### [a-user-granted-nothing-batch-loading-rules-is-refused-per-item](/tests/scenario/bai_scenario/manager/notification/test_reading_rules.py): pass
+
+when a user granted nothing batch-loads two rules, the call is not rejected and each item carries a rejection for not enough permission
+
+Given
+
+- two rules pointing at the same webhook channel and one regular user
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
+  - Rule wanted-1: announces session.started events
+  - Rule other-1: announces session.started events
+
+When
+
+- NotificationAdapter.batch_load_rules_by_ids: user-1 batch-loads the 2 rules created in advance
+
+Then
+
+- each item carries a rejection for not enough permission
+  - len(items) = 2
+  - rejected: NotEnoughPermission
+  - rejected: NotEnoughPermission
+
+### create_channel
+
+<a id="creating_channels-a-channel-made-disabled-answers-disabled"></a>
+
+#### [a-channel-made-disabled-answers-disabled](/tests/scenario/bai_scenario/manager/notification/test_creating_channels.py): pass
+
+when the superadmin creates a channel marked disabled, a disabled channel comes back
+
+Given
+
+- one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- NotificationAdapter.create_channel: user-1 creates the webhook channel muted
+
+Then
+
+- the whole channel just created comes back
+  - id: skipped: the database generates it
+  - entity_id: same as the node's own id
   - name = 'muted'
   - description = None
   - channel_type = 'webhook'
   - spec.channel_type = <NotificationChannelTypeDTO.WEBHOOK: 'webhook'>
   - spec.url = 'https://hooks.example.test/notify'
   - enabled = False
-  - created_by: 만든 사람와 같다
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_by: same as the user who created it
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
-#### [a-channel-type-and-a-spec-that-disagree-are-refused](/tests/scenario/bai_scenario/manager/notification/test_creating_channels.py) — pass
+<a id="creating_channels-the-superadmin-makes-a-webhook-channel"></a>
 
-email 종류라고 하면서 webhook 명세를 주고 만들려 하면, 쓴 행을 읽어 돌려주는 자리에서 명세가 종류에 맞지 않아 거부되고 쓴 것은 되돌려진다
+#### [the-superadmin-makes-a-webhook-channel](/tests/scenario/bai_scenario/manager/notification/test_creating_channels.py): pass
 
-Given
-
-- 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- NotificationAdapter.create_channel — user-1이 email 채널 mismatched을 생성
-
-Then
-
-- 거부된다
-  - 거부: BackendAISchemaValidationFailed
-
-#### [a-spec-naming-neither-webhook-nor-email-is-refused](/tests/scenario/bai_scenario/manager/notification/test_creating_channels.py) — pass
-
-webhook도 email도 주지 않은 명세로 만들려 하면 잘못된 입력으로 거부된다
+when the superadmin creates a webhook channel with only a name and a URL, the whole channel comes back active with an empty description
 
 Given
 
-- 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- NotificationAdapter.create_channel — user-1이 webhook 채널 empty을 생성
+- NotificationAdapter.create_channel: user-1 creates the webhook channel alerts
 
 Then
 
-- 거부된다
-  - 거부: InvalidNotificationSpec
-
-#### [a-user-who-is-not-the-superadmin-may-not-make-a-channel](/tests/scenario/bai_scenario/manager/notification/test_creating_channels.py) — pass
-
-슈퍼관리자가 아닌 사용자가 채널을 만들려 하면 역할 부족으로 거부된다
-
-Given
-
-- 일반 사용자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- NotificationAdapter.create_channel — user-1이 webhook 채널 by-a-user을 생성
-
-Then
-
-- 거부된다
-  - 거부: InsufficientPrivilege
-
-#### [the-monitor-may-not-make-a-channel](/tests/scenario/bai_scenario/manager/notification/test_creating_channels.py) — pass
-
-모니터가 채널을 만들려 하면 역할 부족으로 거부된다. 모니터는 읽기만 통과한다
-
-Given
-
-- 모니터 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 모니터 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- NotificationAdapter.create_channel — user-1이 webhook 채널 by-the-monitor을 생성
-
-Then
-
-- 거부된다
-  - 거부: InsufficientPrivilege
-
-#### [the-superadmin-makes-a-webhook-channel](/tests/scenario/bai_scenario/manager/notification/test_creating_channels.py) — pass
-
-슈퍼관리자가 이름과 주소만 주고 webhook 채널을 만들면, 활성 상태이고 설명이 비어 있는 채널 전체가 반환된다
-
-Given
-
-- 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- NotificationAdapter.create_channel — user-1이 webhook 채널 alerts을 생성
-
-Then
-
-- 생성한 채널 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+- the whole channel just created comes back
+  - id: skipped: the database generates it
+  - entity_id: same as the node's own id
   - name = 'alerts'
   - description = None
   - channel_type = 'webhook'
   - spec.channel_type = <NotificationChannelTypeDTO.WEBHOOK: 'webhook'>
   - spec.url = 'https://hooks.example.test/notify'
   - enabled = True
-  - created_by: 만든 사람와 같다
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_by: same as the user who created it
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
-#### [the-superadmin-makes-an-email-channel](/tests/scenario/bai_scenario/manager/notification/test_creating_channels.py) — pass
+<a id="creating_channels-the-superadmin-makes-an-email-channel"></a>
 
-슈퍼관리자가 SMTP 접속과 보내는 사람, 받는 사람, 인증 계정을 주고 email 채널을 만들면, 인증 계정의 이름은 있고 비밀번호는 없는 채널 전체가 반환된다
+#### [the-superadmin-makes-an-email-channel](/tests/scenario/bai_scenario/manager/notification/test_creating_channels.py): pass
+
+when the superadmin creates an email channel with the SMTP connection, the sender, the recipients and the auth credentials, the whole channel comes back with the auth username and without the password
 
 Given
 
-- 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- NotificationAdapter.create_channel — user-1이 email 채널 mail을 생성
+- NotificationAdapter.create_channel: user-1 creates the email channel mail
 
 Then
 
-- 생성한 채널 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+- the whole channel just created comes back
+  - id: skipped: the database generates it
+  - entity_id: same as the node's own id
   - name = 'mail'
   - description = None
   - channel_type = 'email'
@@ -213,1755 +520,2155 @@ Then
   - spec.message.to_emails = ['ops@example.test']
   - spec.message.subject_template = None
   - spec.auth.username = 'mailer'
-  - spec.auth.password: 무시함 — 응답 타입에 그 자리가 없다
+  - spec.auth.password: skipped: the response type has no such place
   - enabled = True
-  - created_by: 만든 사람와 같다
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_by: same as the user who created it
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
-### creating_rules
+<a id="creating_channels-a-channel-type-and-a-spec-that-disagree-are-refused"></a>
 
-#### [a-rule-made-disabled-answers-disabled](/tests/scenario/bai_scenario/manager/notification/test_creating_rules.py) — pass
+#### [a-channel-type-and-a-spec-that-disagree-are-refused](/tests/scenario/bai_scenario/manager/notification/test_creating_channels.py): pass
 
-슈퍼관리자가 비활성으로 지정해 규칙을 만들면 비활성인 규칙이 반환된다
+when a channel is created as the email type with a webhook spec, reading the written row back rejects it because the spec does not match the type, and the write is rolled back
 
 Given
 
-- webhook 채널 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
+- one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- NotificationAdapter.create_rule — user-1이 채널 channel-1를 가리키는 규칙 muted을 생성
+- NotificationAdapter.create_channel: user-1 creates the email channel mismatched
 
 Then
 
-- 생성한 규칙 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+- the call is rejected
+  - rejected: BackendAISchemaValidationFailed
+
+<a id="creating_channels-a-spec-naming-neither-webhook-nor-email-is-refused"></a>
+
+#### [a-spec-naming-neither-webhook-nor-email-is-refused](/tests/scenario/bai_scenario/manager/notification/test_creating_channels.py): pass
+
+creating a channel with a spec naming neither webhook nor email is rejected as invalid input
+
+Given
+
+- one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- NotificationAdapter.create_channel: user-1 creates the webhook channel empty
+
+Then
+
+- the call is rejected
+  - rejected: InvalidNotificationSpec
+
+<a id="creating_channels-a-user-who-is-not-the-superadmin-may-not-make-a-channel"></a>
+
+#### [a-user-who-is-not-the-superadmin-may-not-make-a-channel](/tests/scenario/bai_scenario/manager/notification/test_creating_channels.py): pass
+
+when a user who is not the superadmin creates a channel, it is rejected for an insufficient role
+
+Given
+
+- one regular user
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- NotificationAdapter.create_channel: user-1 creates the webhook channel by-a-user
+
+Then
+
+- the call is rejected
+  - rejected: InsufficientPrivilege
+
+<a id="creating_channels-the-monitor-may-not-make-a-channel"></a>
+
+#### [the-monitor-may-not-make-a-channel](/tests/scenario/bai_scenario/manager/notification/test_creating_channels.py): pass
+
+when the monitor creates a channel, it is rejected for an insufficient role. The monitor passes reads only
+
+Given
+
+- one monitor
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - monitor user-1: has their own keypair and personal project
+
+When
+
+- NotificationAdapter.create_channel: user-1 creates the webhook channel by-the-monitor
+
+Then
+
+- the call is rejected
+  - rejected: InsufficientPrivilege
+
+### create_rule
+
+<a id="creating_rules-a-rule-made-disabled-answers-disabled"></a>
+
+#### [a-rule-made-disabled-answers-disabled](/tests/scenario/bai_scenario/manager/notification/test_creating_rules.py): pass
+
+when the superadmin creates a rule marked disabled, a disabled rule comes back
+
+Given
+
+- one webhook channel and one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
+
+When
+
+- NotificationAdapter.create_rule: user-1 creates the rule muted pointing at the channel channel-1
+
+Then
+
+- the whole rule just created comes back
+  - id: skipped: the database generates it
+  - entity_id: same as the node's own id
   - name = 'muted'
   - description = None
   - rule_type = 'session.started'
-  - channel_id: 가리키는 채널와 같다
+  - channel_id: same as the channel it points at
   - message_template = 'Session {{ session_name }} is {{ status }}'
   - enabled = False
-  - created_by: 만든 사람와 같다
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_by: same as the user who created it
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
-#### [a-rule-pointing-at-a-channel-id-nothing-answers-to-is-made-all-the-same](/tests/scenario/bai_scenario/manager/notification/test_creating_rules.py) — pass
+<a id="creating_rules-a-rule-pointing-at-a-channel-id-nothing-answers-to-is-made-all-the-same"></a>
 
-어느 행에도 없는 채널 id를 가리켜 규칙을 만들면 막히지 않고 그대로 만들어진다. 두 테이블 사이에 외래 키가 없다
+#### [a-rule-pointing-at-a-channel-id-nothing-answers-to-is-made-all-the-same](/tests/scenario/bai_scenario/manager/notification/test_creating_rules.py): pass
+
+a rule created against a channel id no row answers to is created anyway. There is no foreign key between the two tables
 
 Given
 
-- webhook 채널 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
+- one webhook channel and one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
 
 When
 
-- NotificationAdapter.create_rule — user-1이 없는 채널 id를 가리키는 규칙 orphan을 생성
+- NotificationAdapter.create_rule: user-1 creates the rule orphan pointing at an unknown channel id
 
 Then
 
-- 생성한 규칙 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+- the whole rule just created comes back
+  - id: skipped: the database generates it
+  - entity_id: same as the node's own id
   - name = 'orphan'
   - description = None
   - rule_type = 'session.started'
-  - channel_id: 가리키는 채널와 같다
+  - channel_id: same as the channel it points at
   - message_template = 'Session {{ session_name }} is {{ status }}'
   - enabled = True
-  - created_by: 만든 사람와 같다
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_by: same as the user who created it
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
-#### [a-user-who-is-not-the-superadmin-may-not-make-a-rule](/tests/scenario/bai_scenario/manager/notification/test_creating_rules.py) — pass
+<a id="creating_rules-the-superadmin-makes-a-rule-through-a-channel"></a>
 
-슈퍼관리자가 아닌 사용자가 규칙을 만들려 하면 역할 부족으로 거부된다
+#### [the-superadmin-makes-a-rule-through-a-channel](/tests/scenario/bai_scenario/manager/notification/test_creating_rules.py): pass
 
-Given
-
-- webhook 채널 하나와, 일반 사용자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
-
-When
-
-- NotificationAdapter.create_rule — user-1이 채널 channel-1를 가리키는 규칙 by-a-user을 생성
-
-Then
-
-- 거부된다
-  - 거부: InsufficientPrivilege
-
-#### [the-monitor-may-not-make-a-rule](/tests/scenario/bai_scenario/manager/notification/test_creating_rules.py) — pass
-
-모니터가 규칙을 만들려 하면 역할 부족으로 거부된다. 모니터는 읽기만 통과한다
+when the superadmin creates a rule with a type, a channel and a template, the whole rule comes back active with an empty description
 
 Given
 
-- webhook 채널 하나와, 모니터 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 모니터 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
+- one webhook channel and one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
 
 When
 
-- NotificationAdapter.create_rule — user-1이 채널 channel-1를 가리키는 규칙 by-the-monitor을 생성
+- NotificationAdapter.create_rule: user-1 creates the rule on-start pointing at the channel channel-1
 
 Then
 
-- 거부된다
-  - 거부: InsufficientPrivilege
-
-#### [the-superadmin-makes-a-rule-through-a-channel](/tests/scenario/bai_scenario/manager/notification/test_creating_rules.py) — pass
-
-슈퍼관리자가 종류와 채널과 템플릿을 주고 규칙을 만들면, 활성 상태이고 설명이 비어 있는 규칙 전체가 반환된다
-
-Given
-
-- webhook 채널 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
-
-When
-
-- NotificationAdapter.create_rule — user-1이 채널 channel-1를 가리키는 규칙 on-start을 생성
-
-Then
-
-- 생성한 규칙 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+- the whole rule just created comes back
+  - id: skipped: the database generates it
+  - entity_id: same as the node's own id
   - name = 'on-start'
   - description = None
   - rule_type = 'session.started'
-  - channel_id: 가리키는 채널와 같다
+  - channel_id: same as the channel it points at
   - message_template = 'Session {{ session_name }} is {{ status }}'
   - enabled = True
-  - created_by: 만든 사람와 같다
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_by: same as the user who created it
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
-### editing_channels
+<a id="creating_rules-a-user-who-is-not-the-superadmin-may-not-make-a-rule"></a>
 
-#### [a-user-granted-nothing-may-not-edit-a-channel](/tests/scenario/bai_scenario/manager/notification/test_editing_channels.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-make-a-rule](/tests/scenario/bai_scenario/manager/notification/test_creating_rules.py): pass
 
-아무 권한도 없는 사용자가 이름을 바꾸려 하면 권한 부족으로 거부된다
-
-Given
-
-- webhook 채널 하나와, 일반 사용자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
-
-When
-
-- NotificationAdapter.update_channel — user-1이 채널 channel-1을 이름을 by-a-user으로 수정
-
-Then
-
-- 거부된다
-  - 거부: NotEnoughPermission
-
-#### [an-edit-naming-no-field-changes-nothing](/tests/scenario/bai_scenario/manager/notification/test_editing_channels.py) — pass
-
-아무 필드도 지정하지 않고 수정하면 아무것도 바뀌지 않은 채널이 반환된다
+when a user who is not the superadmin creates a rule, it is rejected for an insufficient role
 
 Given
 
-- webhook 채널 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
+- one webhook channel and one regular user
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
 
 When
 
-- NotificationAdapter.update_channel — user-1이 채널 channel-1을 아무것도 지정하지 않고 수정
+- NotificationAdapter.create_rule: user-1 creates the rule by-a-user pointing at the channel channel-1
 
 Then
 
-- 미리 만들어 둔 채널 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+- the call is rejected
+  - rejected: InsufficientPrivilege
+
+<a id="creating_rules-the-monitor-may-not-make-a-rule"></a>
+
+#### [the-monitor-may-not-make-a-rule](/tests/scenario/bai_scenario/manager/notification/test_creating_rules.py): pass
+
+when the monitor creates a rule, it is rejected for an insufficient role. The monitor passes reads only
+
+Given
+
+- one webhook channel and one monitor
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - monitor user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
+
+When
+
+- NotificationAdapter.create_rule: user-1 creates the rule by-the-monitor pointing at the channel channel-1
+
+Then
+
+- the call is rejected
+  - rejected: InsufficientPrivilege
+
+### get_channel
+
+<a id="reading_channels-the-superadmin-reads-a-channel-by-id"></a>
+
+#### [the-superadmin-reads-a-channel-by-id](/tests/scenario/bai_scenario/manager/notification/test_reading_channels.py): pass
+
+with one channel, when the superadmin gets it by id, the whole channel comes back
+
+Given
+
+- one webhook channel and one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
+
+When
+
+- NotificationAdapter.get_channel: user-1 gets the channel channel-1
+
+Then
+
+- the whole channel created in advance comes back
+  - id: skipped: the database generates it
+  - entity_id: same as the id of the channel created in advance
   - name = 'channel-1'
   - description = None
   - channel_type = 'webhook'
   - spec.channel_type = <NotificationChannelTypeDTO.WEBHOOK: 'webhook'>
   - spec.url = 'https://hooks.example.test/notify'
   - enabled = True
-  - created_by: 만든 사람와 같다
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_by: same as the user who created it
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
-#### [an-edit-with-a-spec-naming-neither-webhook-nor-email-is-refused](/tests/scenario/bai_scenario/manager/notification/test_editing_channels.py) — pass
+<a id="reading_channels-a-user-granted-nothing-may-not-read-a-channel"></a>
 
-webhook도 email도 주지 않은 명세로 수정하려 하면 잘못된 입력으로 거부된다
+#### [a-user-granted-nothing-may-not-read-a-channel](/tests/scenario/bai_scenario/manager/notification/test_reading_channels.py): pass
 
-Given
-
-- webhook 채널 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
-
-When
-
-- NotificationAdapter.update_channel — user-1이 채널 channel-1을 빈 명세로 수정
-
-Then
-
-- 거부된다
-  - 거부: InvalidNotificationSpec
-
-#### [changing-a-webhook-spec-moves-the-channel-to-the-new-url](/tests/scenario/bai_scenario/manager/notification/test_editing_channels.py) — pass
-
-webhook 채널의 명세를 다른 주소로 바꾸면 주소가 새 값인 채널이 반환된다
+when a user granted nothing gets a channel by id, it is rejected for not enough permission, even when the channel records that user as its creator
 
 Given
 
-- webhook 채널 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
+- one webhook channel and one regular user
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
 
 When
 
-- NotificationAdapter.update_channel — user-1이 채널 channel-1을 주소를 https://hooks.example.test/elsewhere로 수정
+- NotificationAdapter.get_channel: user-1 gets the channel channel-1
 
 Then
 
-- 미리 만들어 둔 채널 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+<a id="reading_channels-a-user-granted-nothing-reading-an-unknown-channel-id-is-refused-for-permission"></a>
+
+#### [a-user-granted-nothing-reading-an-unknown-channel-id-is-refused-for-permission](/tests/scenario/bai_scenario/manager/notification/test_reading_channels.py): pass
+
+when a user granted nothing gets an unknown id, it is rejected for not enough permission rather than for a missing target, because the permission check runs first and a missing row holds no grant either
+
+Given
+
+- one webhook channel and one regular user
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
+
+When
+
+- NotificationAdapter.get_channel: user-1 gets an unknown id
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+<a id="reading_channels-the-monitor-may-not-read-a-channel-by-id"></a>
+
+#### [the-monitor-may-not-read-a-channel-by-id](/tests/scenario/bai_scenario/manager/notification/test_reading_channels.py): pass
+
+when the monitor gets a channel by id, it is rejected for not enough permission. Search passes, but a get by id is a permission check and the monitor holds no permission for it either
+
+Given
+
+- one webhook channel and one monitor
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - monitor user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
+
+When
+
+- NotificationAdapter.get_channel: user-1 gets the channel channel-1
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+<a id="reading_channels-the-superadmin-reading-a-channel-id-nothing-answers-to-is-not-found"></a>
+
+#### [the-superadmin-reading-a-channel-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/notification/test_reading_channels.py): pass
+
+when the superadmin gets an id nothing answers to, it is rejected because no target is found
+
+Given
+
+- one webhook channel and one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
+
+When
+
+- NotificationAdapter.get_channel: user-1 gets an unknown id
+
+Then
+
+- the call is rejected
+  - rejected: EntityNotFoundError
+
+### get_rule
+
+<a id="reading_rules-the-superadmin-reads-a-rule-by-id"></a>
+
+#### [the-superadmin-reads-a-rule-by-id](/tests/scenario/bai_scenario/manager/notification/test_reading_rules.py): pass
+
+with one rule, when the superadmin gets it by id, the whole rule comes back
+
+Given
+
+- one rule and the webhook channel it points at, and one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
+  - Rule rule-1: announces session.started events
+
+When
+
+- NotificationAdapter.get_rule: user-1 gets the rule rule-1
+
+Then
+
+- the whole rule created in advance comes back
+  - id: skipped: the database generates it
+  - entity_id: same as the id of the rule created in advance
+  - name = 'rule-1'
+  - description = None
+  - rule_type = 'session.started'
+  - channel_id: same as the channel it points at
+  - message_template = 'Session {{ session_name }} is {{ status }}'
+  - enabled = True
+  - created_by: same as the user who created it
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
+
+<a id="reading_rules-a-user-granted-nothing-may-not-read-a-rule"></a>
+
+#### [a-user-granted-nothing-may-not-read-a-rule](/tests/scenario/bai_scenario/manager/notification/test_reading_rules.py): pass
+
+when a user granted nothing gets a rule by id, it is rejected for not enough permission
+
+Given
+
+- one rule and the webhook channel it points at, and one regular user
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
+  - Rule rule-1: announces session.started events
+
+When
+
+- NotificationAdapter.get_rule: user-1 gets the rule rule-1
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+<a id="reading_rules-the-superadmin-reading-a-rule-id-nothing-answers-to-is-not-found"></a>
+
+#### [the-superadmin-reading-a-rule-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/notification/test_reading_rules.py): pass
+
+when the superadmin gets an id nothing answers to, it is rejected because no target is found
+
+Given
+
+- one rule and the webhook channel it points at, and one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
+  - Rule rule-1: announces session.started events
+
+When
+
+- NotificationAdapter.get_rule: user-1 gets an unknown id
+
+Then
+
+- the call is rejected
+  - rejected: EntityNotFoundError
+
+### partial_bulk_purge_channels
+
+<a id="partial_bulk_purging_channels-a-user-granted-nothing-purges-none-of-several-channels"></a>
+
+#### [a-user-granted-nothing-purges-none-of-several-channels](/tests/scenario/bai_scenario/manager/notification/test_partial_bulk_purging_channels.py): pass
+
+when a user granted nothing purges several channels at once, nothing is purged and every one comes back in the failed list because permission is not enough
+
+Given
+
+- two webhook channels and one regular user
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Webhook channel wanted-1: sends to https://hooks.example.test/notify
+  - Webhook channel other-1: sends to https://hooks.example.test/notify
+
+When
+
+- NotificationAdapter.partial_bulk_purge_channels: user-1 purges 2 channels at once
+
+Then
+
+- nothing is processed and everything created in advance comes back in the failed list
+  - successes = []
+  - failed count = 2
+  - failed[0].id: same as the id of the thing created in advance
+  - failed[0].message: a reason containing 'Insufficient permission'
+  - failed[1].id: same as the id of the thing created in advance
+  - failed[1].message: a reason containing 'Insufficient permission'
+
+<a id="partial_bulk_purging_channels-purging-several-channels-answers-for-the-missing-one"></a>
+
+#### [purging-several-channels-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/notification/test_partial_bulk_purging_channels.py): pass
+
+when the superadmin purges two channels and one unknown id at once, the two come back as they were before the purge and the unknown id comes back in the failed list because no target answers to it
+
+Given
+
+- two webhook channels and one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Webhook channel wanted-1: sends to https://hooks.example.test/notify
+  - Webhook channel other-1: sends to https://hooks.example.test/notify
+
+When
+
+- NotificationAdapter.partial_bulk_purge_channels: user-1 purges 2 channels and one unknown id at once
+
+Then
+
+- every channel created in advance comes back in the processed list and an unknown id comes back in the failed list because no target answers to it
+  - successes count = 2
+  - successes[0].id: skipped: the database generates it
+  - successes[0].entity_id: same as the id of the channel created in advance
+  - successes[0].name = 'wanted-1'
+  - successes[0].description = None
+  - successes[0].channel_type = 'webhook'
+  - successes[0].spec.channel_type = <NotificationChannelTypeDTO.WEBHOOK: 'webhook'>
+  - successes[0].spec.url = 'https://hooks.example.test/notify'
+  - successes[0].enabled = True
+  - successes[0].created_by: same as the user who created it
+  - successes[0].created_at: the time this run wrote
+  - successes[0].updated_at: the time this run wrote
+  - successes[1].id: skipped: the database generates it
+  - successes[1].entity_id: same as the id of the channel created in advance
+  - successes[1].name = 'other-1'
+  - successes[1].description = None
+  - successes[1].channel_type = 'webhook'
+  - successes[1].spec.channel_type = <NotificationChannelTypeDTO.WEBHOOK: 'webhook'>
+  - successes[1].spec.url = 'https://hooks.example.test/notify'
+  - successes[1].enabled = True
+  - successes[1].created_by: same as the user who created it
+  - successes[1].created_at: the time this run wrote
+  - successes[1].updated_at: the time this run wrote
+  - failed count = 1
+  - failed[0].id: same as the unknown id put in the request
+  - failed[0].message: a reason containing 'not found'
+
+### partial_bulk_purge_rules
+
+<a id="partial_bulk_purging_rules-a-user-granted-nothing-purges-none-of-several-rules"></a>
+
+#### [a-user-granted-nothing-purges-none-of-several-rules](/tests/scenario/bai_scenario/manager/notification/test_partial_bulk_purging_rules.py): pass
+
+when a user granted nothing purges several rules at once, nothing is purged and every one comes back in the failed list because permission is not enough
+
+Given
+
+- two rules pointing at the same webhook channel and one regular user
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
+  - Rule wanted-1: announces session.started events
+  - Rule other-1: announces session.started events
+
+When
+
+- NotificationAdapter.partial_bulk_purge_rules: user-1 purges 2 rules at once
+
+Then
+
+- nothing is processed and everything created in advance comes back in the failed list
+  - successes = []
+  - failed count = 2
+  - failed[0].id: same as the id of the thing created in advance
+  - failed[0].message: a reason containing 'Insufficient permission'
+  - failed[1].id: same as the id of the thing created in advance
+  - failed[1].message: a reason containing 'Insufficient permission'
+
+<a id="partial_bulk_purging_rules-purging-several-rules-answers-for-the-missing-one"></a>
+
+#### [purging-several-rules-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/notification/test_partial_bulk_purging_rules.py): pass
+
+when the superadmin purges two rules and one unknown id at once, the two come back as they were before the purge and the unknown id comes back in the failed list because no target answers to it
+
+Given
+
+- two rules pointing at the same webhook channel and one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
+  - Rule wanted-1: announces session.started events
+  - Rule other-1: announces session.started events
+
+When
+
+- NotificationAdapter.partial_bulk_purge_rules: user-1 purges 2 rules and one unknown id at once
+
+Then
+
+- every rule created in advance comes back in the processed list and an unknown id comes back in the failed list because no target answers to it
+  - successes count = 2
+  - successes[0].id: skipped: the database generates it
+  - successes[0].entity_id: same as the id of the rule created in advance
+  - successes[0].name = 'wanted-1'
+  - successes[0].description = None
+  - successes[0].rule_type = 'session.started'
+  - successes[0].channel_id: same as the channel it points at
+  - successes[0].message_template = 'Session {{ session_name }} is {{ status }}'
+  - successes[0].enabled = True
+  - successes[0].created_by: same as the user who created it
+  - successes[0].created_at: the time this run wrote
+  - successes[0].updated_at: the time this run wrote
+  - successes[1].id: skipped: the database generates it
+  - successes[1].entity_id: same as the id of the rule created in advance
+  - successes[1].name = 'other-1'
+  - successes[1].description = None
+  - successes[1].rule_type = 'session.started'
+  - successes[1].channel_id: same as the channel it points at
+  - successes[1].message_template = 'Session {{ session_name }} is {{ status }}'
+  - successes[1].enabled = True
+  - successes[1].created_by: same as the user who created it
+  - successes[1].created_at: the time this run wrote
+  - successes[1].updated_at: the time this run wrote
+  - failed count = 1
+  - failed[0].id: same as the unknown id put in the request
+  - failed[0].message: a reason containing 'not found'
+
+### partial_bulk_update_channels
+
+<a id="partial_bulk_editing_channels-a-user-granted-nothing-edits-none-of-several-channels"></a>
+
+#### [a-user-granted-nothing-edits-none-of-several-channels](/tests/scenario/bai_scenario/manager/notification/test_partial_bulk_editing_channels.py): pass
+
+when a user granted nothing edits several channels at once, nothing is edited and every one comes back in the failed list because permission is not enough
+
+Given
+
+- two webhook channels and one regular user
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Webhook channel wanted-1: sends to https://hooks.example.test/notify
+  - Webhook channel other-1: sends to https://hooks.example.test/notify
+
+When
+
+- NotificationAdapter.partial_bulk_update_channels: user-1 edits the description of 2 channels at once
+
+Then
+
+- nothing is processed and everything created in advance comes back in the failed list
+  - successes = []
+  - failed count = 2
+  - failed[0].id: same as the id of the thing created in advance
+  - failed[0].message: a reason containing 'Insufficient permission'
+  - failed[1].id: same as the id of the thing created in advance
+  - failed[1].message: a reason containing 'Insufficient permission'
+
+<a id="partial_bulk_editing_channels-the-superadmin-describes-several-channels-at-once"></a>
+
+#### [the-superadmin-describes-several-channels-at-once](/tests/scenario/bai_scenario/manager/notification/test_partial_bulk_editing_channels.py): pass
+
+when the superadmin changes the description of two channels at once, both come back with the new description and nothing failed
+
+Given
+
+- two webhook channels and one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Webhook channel wanted-1: sends to https://hooks.example.test/notify
+  - Webhook channel other-1: sends to https://hooks.example.test/notify
+
+When
+
+- NotificationAdapter.partial_bulk_update_channels: user-1 edits the description of 2 channels at once
+
+Then
+
+- every channel created in advance comes back in the processed list and nothing failed
+  - successes count = 2
+  - successes[0].id: skipped: the database generates it
+  - successes[0].entity_id: same as the id of the channel created in advance
+  - successes[0].name = 'wanted-1'
+  - successes[0].description = 'the description changed all at once'
+  - successes[0].channel_type = 'webhook'
+  - successes[0].spec.channel_type = <NotificationChannelTypeDTO.WEBHOOK: 'webhook'>
+  - successes[0].spec.url = 'https://hooks.example.test/notify'
+  - successes[0].enabled = True
+  - successes[0].created_by: same as the user who created it
+  - successes[0].created_at: the time this run wrote
+  - successes[0].updated_at: the time this run wrote
+  - successes[1].id: skipped: the database generates it
+  - successes[1].entity_id: same as the id of the channel created in advance
+  - successes[1].name = 'other-1'
+  - successes[1].description = 'the description changed all at once'
+  - successes[1].channel_type = 'webhook'
+  - successes[1].spec.channel_type = <NotificationChannelTypeDTO.WEBHOOK: 'webhook'>
+  - successes[1].spec.url = 'https://hooks.example.test/notify'
+  - successes[1].enabled = True
+  - successes[1].created_by: same as the user who created it
+  - successes[1].created_at: the time this run wrote
+  - successes[1].updated_at: the time this run wrote
+  - failed = []
+
+<a id="partial_bulk_editing_channels-a-spec-naming-neither-webhook-nor-email-refuses-the-bulk-edit"></a>
+
+#### [a-spec-naming-neither-webhook-nor-email-refuses-the-bulk-edit](/tests/scenario/bai_scenario/manager/notification/test_partial_bulk_editing_channels.py): pass
+
+when the superadmin edits two channels at once and one carries a spec naming neither webhook nor email, the call is rejected
+
+Given
+
+- two webhook channels and one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Webhook channel wanted-1: sends to https://hooks.example.test/notify
+  - Webhook channel other-1: sends to https://hooks.example.test/notify
+
+When
+
+- NotificationAdapter.partial_bulk_update_channels: user-1 edits 2 channels at once and puts a spec naming neither webhook nor email on the second
+
+Then
+
+- the call is rejected
+  - rejected: InvalidNotificationSpec
+
+### partial_bulk_update_rules
+
+<a id="partial_bulk_editing_rules-a-user-granted-nothing-edits-none-of-several-rules"></a>
+
+#### [a-user-granted-nothing-edits-none-of-several-rules](/tests/scenario/bai_scenario/manager/notification/test_partial_bulk_editing_rules.py): pass
+
+when a user granted nothing edits several rules at once, nothing is edited and every one comes back in the failed list because permission is not enough
+
+Given
+
+- two rules pointing at the same webhook channel and one regular user
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
+  - Rule wanted-1: announces session.started events
+  - Rule other-1: announces session.started events
+
+When
+
+- NotificationAdapter.partial_bulk_update_rules: user-1 edits the description of 2 rules at once
+
+Then
+
+- nothing is processed and everything created in advance comes back in the failed list
+  - successes = []
+  - failed count = 2
+  - failed[0].id: same as the id of the thing created in advance
+  - failed[0].message: a reason containing 'Insufficient permission'
+  - failed[1].id: same as the id of the thing created in advance
+  - failed[1].message: a reason containing 'Insufficient permission'
+
+<a id="partial_bulk_editing_rules-the-superadmin-describes-several-rules-at-once"></a>
+
+#### [the-superadmin-describes-several-rules-at-once](/tests/scenario/bai_scenario/manager/notification/test_partial_bulk_editing_rules.py): pass
+
+when the superadmin changes the description of two rules at once, both come back with the new description and nothing failed
+
+Given
+
+- two rules pointing at the same webhook channel and one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
+  - Rule wanted-1: announces session.started events
+  - Rule other-1: announces session.started events
+
+When
+
+- NotificationAdapter.partial_bulk_update_rules: user-1 edits the description of 2 rules at once
+
+Then
+
+- every rule created in advance comes back in the processed list and nothing failed
+  - successes count = 2
+  - successes[0].id: skipped: the database generates it
+  - successes[0].entity_id: same as the id of the rule created in advance
+  - successes[0].name = 'wanted-1'
+  - successes[0].description = 'the description changed all at once'
+  - successes[0].rule_type = 'session.started'
+  - successes[0].channel_id: same as the channel it points at
+  - successes[0].message_template = 'Session {{ session_name }} is {{ status }}'
+  - successes[0].enabled = True
+  - successes[0].created_by: same as the user who created it
+  - successes[0].created_at: the time this run wrote
+  - successes[0].updated_at: the time this run wrote
+  - successes[1].id: skipped: the database generates it
+  - successes[1].entity_id: same as the id of the rule created in advance
+  - successes[1].name = 'other-1'
+  - successes[1].description = 'the description changed all at once'
+  - successes[1].rule_type = 'session.started'
+  - successes[1].channel_id: same as the channel it points at
+  - successes[1].message_template = 'Session {{ session_name }} is {{ status }}'
+  - successes[1].enabled = True
+  - successes[1].created_by: same as the user who created it
+  - successes[1].created_at: the time this run wrote
+  - successes[1].updated_at: the time this run wrote
+  - failed = []
+
+### purge_channel
+
+<a id="retiring_channels-a-channel-a-rule-points-at-is-deleted-all-the-same"></a>
+
+#### [a-channel-a-rule-points-at-is-deleted-all-the-same](/tests/scenario/bai_scenario/manager/notification/test_retiring_channels.py): pass
+
+when the superadmin deletes a channel a rule points at, it is deleted all the same and the id of the deleted channel comes back. There is no foreign key between the two tables, so the rule stays
+
+Given
+
+- one channel and one rule pointing at it, and one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
+  - Rule rule-1: announces session.started events
+
+When
+
+- NotificationAdapter.purge_channel: user-1 deletes the channel channel-1
+
+Then
+
+- the id of the deleted channel comes back
+  - id: same as the channel created in advance
+  - entity_id: same as the channel created in advance
+
+<a id="retiring_channels-the-superadmin-deletes-a-channel"></a>
+
+#### [the-superadmin-deletes-a-channel](/tests/scenario/bai_scenario/manager/notification/test_retiring_channels.py): pass
+
+with one channel, when the superadmin deletes it, the id of the deleted channel comes back
+
+Given
+
+- one webhook channel and one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
+
+When
+
+- NotificationAdapter.purge_channel: user-1 deletes the channel channel-1
+
+Then
+
+- the id of the deleted channel comes back
+  - id: same as the channel created in advance
+  - entity_id: same as the channel created in advance
+
+<a id="retiring_channels-a-user-granted-nothing-may-not-delete-a-channel"></a>
+
+#### [a-user-granted-nothing-may-not-delete-a-channel](/tests/scenario/bai_scenario/manager/notification/test_retiring_channels.py): pass
+
+when a user granted nothing deletes a channel, it is rejected for not enough permission
+
+Given
+
+- one webhook channel and one regular user
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
+
+When
+
+- NotificationAdapter.purge_channel: user-1 deletes the channel channel-1
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+<a id="retiring_channels-the-superadmin-deleting-a-channel-id-nothing-answers-to-is-not-found"></a>
+
+#### [the-superadmin-deleting-a-channel-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/notification/test_retiring_channels.py): pass
+
+when the superadmin deletes an id nothing answers to, it is rejected because no target is found
+
+Given
+
+- one webhook channel and one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
+
+When
+
+- NotificationAdapter.purge_channel: user-1 deletes an unknown id
+
+Then
+
+- the call is rejected
+  - rejected: EntityNotFoundError
+
+### purge_rule
+
+<a id="retiring_rules-the-superadmin-deletes-a-rule"></a>
+
+#### [the-superadmin-deletes-a-rule](/tests/scenario/bai_scenario/manager/notification/test_retiring_rules.py): pass
+
+with one rule, when the superadmin deletes it, the id of the deleted rule comes back
+
+Given
+
+- one rule and the webhook channel it points at, and one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
+  - Rule rule-1: announces session.started events
+
+When
+
+- NotificationAdapter.purge_rule: user-1 deletes the rule rule-1
+
+Then
+
+- the id of the deleted rule comes back
+  - id: same as the rule created in advance
+  - entity_id: same as the rule created in advance
+
+<a id="retiring_rules-a-user-granted-nothing-may-not-delete-a-rule"></a>
+
+#### [a-user-granted-nothing-may-not-delete-a-rule](/tests/scenario/bai_scenario/manager/notification/test_retiring_rules.py): pass
+
+when a user granted nothing deletes a rule, it is rejected for not enough permission
+
+Given
+
+- one rule and the webhook channel it points at, and one regular user
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
+  - Rule rule-1: announces session.started events
+
+When
+
+- NotificationAdapter.purge_rule: user-1 deletes the rule rule-1
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+<a id="retiring_rules-the-superadmin-deleting-a-rule-id-nothing-answers-to-is-not-found"></a>
+
+#### [the-superadmin-deleting-a-rule-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/notification/test_retiring_rules.py): pass
+
+when the superadmin deletes an id nothing answers to, it is rejected because no target is found
+
+Given
+
+- one rule and the webhook channel it points at, and one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
+  - Rule rule-1: announces session.started events
+
+When
+
+- NotificationAdapter.purge_rule: user-1 deletes an unknown id
+
+Then
+
+- the call is rejected
+  - rejected: EntityNotFoundError
+
+### search_channels
+
+<a id="searching_channels-a-channel-type-filter-narrows-the-answer-to-that-kind"></a>
+
+#### [a-channel-type-filter-narrows-the-answer-to-that-kind](/tests/scenario/bai_scenario/manager/notification/test_searching_channels.py): pass
+
+with a webhook channel and an email channel, a get filtered by the email type brings back only the email channel
+
+Given
+
+- one webhook channel and one email channel, and one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
+  - Email channel mail-channel-1: sends to ops@example.test through smtp.example.test
+
+When
+
+- NotificationAdapter.search_channels: user-1 gets channels filtered by the email type
+
+Then
+
+- only the one channel matching the filter comes back
+  - items = ['mail-channel-1']
+  - total_count = 1
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="searching_channels-a-name-filter-narrows-the-answer-to-that-channel"></a>
+
+#### [a-name-filter-narrows-the-answer-to-that-channel](/tests/scenario/bai_scenario/manager/notification/test_searching_channels.py): pass
+
+a get filtered by the name of one of two channels brings back only that channel
+
+Given
+
+- two webhook channels and one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Webhook channel wanted-1: sends to https://hooks.example.test/notify
+  - Webhook channel other-1: sends to https://hooks.example.test/notify
+
+When
+
+- NotificationAdapter.search_channels: user-1 gets channels filtered by the name wanted-1
+
+Then
+
+- only the one channel matching the filter comes back
+  - items = ['wanted-1']
+  - total_count = 1
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="searching_channels-an-enabled-filter-leaves-only-the-enabled-channels"></a>
+
+#### [an-enabled-filter-leaves-only-the-enabled-channels](/tests/scenario/bai_scenario/manager/notification/test_searching_channels.py): pass
+
+with active and inactive channels mixed, a get filtered by enabled brings back only the active ones
+
+Given
+
+- one active webhook channel and one inactive channel, and one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
+  - Webhook channel channel-2: sends to https://hooks.example.test/notify, inactive
+
+When
+
+- NotificationAdapter.search_channels: user-1 gets channels filtered by enabled
+
+Then
+
+- only the channels that must appear in the response come back
+  - items = ['channel-1']
+  - total_count = 1
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="searching_channels-asking-for-the-first-channel-only-says-there-is-a-next-page"></a>
+
+#### [asking-for-the-first-channel-only-says-there-is-a-next-page](/tests/scenario/bai_scenario/manager/notification/test_searching_channels.py): pass
+
+with two channels, asking for only the first item brings one item back and the response says there is a next page
+
+Given
+
+- two webhook channels and one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Webhook channel wanted-1: sends to https://hooks.example.test/notify
+  - Webhook channel other-1: sends to https://hooks.example.test/notify
+
+When
+
+- NotificationAdapter.search_channels: user-1 gets only the first item
+
+Then
+
+- the first page holding one item comes back
+  - len(items) = 1
+  - total_count = 2
+  - has_next_page = True
+  - has_previous_page = False
+
+<a id="searching_channels-the-monitor-searches-channels-like-the-superadmin"></a>
+
+#### [the-monitor-searches-channels-like-the-superadmin](/tests/scenario/bai_scenario/manager/notification/test_searching_channels.py): pass
+
+when the monitor gets without a filter, it receives the same response as the superadmin
+
+Given
+
+- two webhook channels and one monitor
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - monitor user-1: has their own keypair and personal project
+  - Webhook channel wanted-1: sends to https://hooks.example.test/notify
+  - Webhook channel other-1: sends to https://hooks.example.test/notify
+
+When
+
+- NotificationAdapter.search_channels: user-1 gets every channel without a filter
+
+Then
+
+- only the channels that must appear in the response come back
+  - items = ['other-1', 'wanted-1']
+  - total_count = 2
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="searching_channels-the-superadmin-counts-every-channel-laid"></a>
+
+#### [the-superadmin-counts-every-channel-laid](/tests/scenario/bai_scenario/manager/notification/test_searching_channels.py): pass
+
+with two channels, a get without a filter brings both of them back
+
+Given
+
+- two webhook channels and one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Webhook channel wanted-1: sends to https://hooks.example.test/notify
+  - Webhook channel other-1: sends to https://hooks.example.test/notify
+
+When
+
+- NotificationAdapter.search_channels: user-1 gets every channel without a filter
+
+Then
+
+- only the channels that must appear in the response come back
+  - items = ['other-1', 'wanted-1']
+  - total_count = 2
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="searching_channels-a-user-who-is-not-the-superadmin-may-not-search-channels"></a>
+
+#### [a-user-who-is-not-the-superadmin-may-not-search-channels](/tests/scenario/bai_scenario/manager/notification/test_searching_channels.py): pass
+
+when a user who is not the superadmin gets without a filter, it is rejected for an insufficient role
+
+Given
+
+- two webhook channels and one regular user
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Webhook channel wanted-1: sends to https://hooks.example.test/notify
+  - Webhook channel other-1: sends to https://hooks.example.test/notify
+
+When
+
+- NotificationAdapter.search_channels: user-1 gets every channel without a filter
+
+Then
+
+- the call is rejected
+  - rejected: InsufficientPrivilege
+
+### search_rules
+
+<a id="searching_rules-a-name-filter-narrows-the-answer-to-that-rule"></a>
+
+#### [a-name-filter-narrows-the-answer-to-that-rule](/tests/scenario/bai_scenario/manager/notification/test_searching_rules.py): pass
+
+a get filtered by the name of one of two rules brings back only that rule
+
+Given
+
+- two rules pointing at the same webhook channel and one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
+  - Rule wanted-1: announces session.started events
+  - Rule other-1: announces session.started events
+
+When
+
+- NotificationAdapter.search_rules: user-1 gets rules filtered by the name wanted-1
+
+Then
+
+- only the one rule matching the filter comes back
+  - items = ['wanted-1']
+  - total_count = 1
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="searching_rules-a-rule-type-filter-narrows-the-answer-to-that-kind"></a>
+
+#### [a-rule-type-filter-narrows-the-answer-to-that-kind](/tests/scenario/bai_scenario/manager/notification/test_searching_rules.py): pass
+
+a get filtered by the type of one of two rules with different types brings back only that rule
+
+Given
+
+- two rules pointing at the same webhook channel and one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
+  - Rule wanted-1: announces session.started events
+  - Rule other-1: announces session.terminated events
+
+When
+
+- NotificationAdapter.search_rules: user-1 gets rules filtered by the type session.started
+
+Then
+
+- only the one rule matching the filter comes back
+  - items = ['wanted-1']
+  - total_count = 1
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="searching_rules-an-enabled-filter-leaves-only-the-enabled-rules"></a>
+
+#### [an-enabled-filter-leaves-only-the-enabled-rules](/tests/scenario/bai_scenario/manager/notification/test_searching_rules.py): pass
+
+with active and inactive rules mixed, a get filtered by enabled brings back only the active ones
+
+Given
+
+- one active rule and one inactive rule, and one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
+  - Rule rule-1: announces session.started events
+  - Rule rule-2: announces session.started events, inactive
+
+When
+
+- NotificationAdapter.search_rules: user-1 gets rules filtered by enabled
+
+Then
+
+- only the rules that must appear in the response come back
+  - items = ['rule-1']
+  - total_count = 1
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="searching_rules-the-monitor-searches-rules-like-the-superadmin"></a>
+
+#### [the-monitor-searches-rules-like-the-superadmin](/tests/scenario/bai_scenario/manager/notification/test_searching_rules.py): pass
+
+when the monitor gets without a filter, it receives the same response as the superadmin
+
+Given
+
+- two rules pointing at the same webhook channel and one monitor
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - monitor user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
+  - Rule wanted-1: announces session.started events
+  - Rule other-1: announces session.started events
+
+When
+
+- NotificationAdapter.search_rules: user-1 gets every rule without a filter
+
+Then
+
+- only the rules that must appear in the response come back
+  - items = ['other-1', 'wanted-1']
+  - total_count = 2
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="searching_rules-the-superadmin-counts-every-rule-laid"></a>
+
+#### [the-superadmin-counts-every-rule-laid](/tests/scenario/bai_scenario/manager/notification/test_searching_rules.py): pass
+
+with two rules, a get without a filter brings both of them back
+
+Given
+
+- two rules pointing at the same webhook channel and one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
+  - Rule wanted-1: announces session.started events
+  - Rule other-1: announces session.started events
+
+When
+
+- NotificationAdapter.search_rules: user-1 gets every rule without a filter
+
+Then
+
+- only the rules that must appear in the response come back
+  - items = ['other-1', 'wanted-1']
+  - total_count = 2
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="searching_rules-a-user-who-is-not-the-superadmin-may-not-search-rules"></a>
+
+#### [a-user-who-is-not-the-superadmin-may-not-search-rules](/tests/scenario/bai_scenario/manager/notification/test_searching_rules.py): pass
+
+when a user who is not the superadmin gets without a filter, it is rejected for an insufficient role
+
+Given
+
+- two rules pointing at the same webhook channel and one regular user
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
+  - Rule wanted-1: announces session.started events
+  - Rule other-1: announces session.started events
+
+When
+
+- NotificationAdapter.search_rules: user-1 gets every rule without a filter
+
+Then
+
+- the call is rejected
+  - rejected: InsufficientPrivilege
+
+### update_channel
+
+<a id="editing_channels-an-edit-naming-no-field-changes-nothing"></a>
+
+#### [an-edit-naming-no-field-changes-nothing](/tests/scenario/bai_scenario/manager/notification/test_editing_channels.py): pass
+
+editing without naming any field brings the channel back unchanged
+
+Given
+
+- one webhook channel and one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
+
+When
+
+- NotificationAdapter.update_channel: user-1 edits the channel channel-1, naming no field
+
+Then
+
+- the whole channel created in advance comes back
+  - id: skipped: the database generates it
+  - entity_id: same as the id of the channel created in advance
+  - name = 'channel-1'
+  - description = None
+  - channel_type = 'webhook'
+  - spec.channel_type = <NotificationChannelTypeDTO.WEBHOOK: 'webhook'>
+  - spec.url = 'https://hooks.example.test/notify'
+  - enabled = True
+  - created_by: same as the user who created it
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
+
+<a id="editing_channels-changing-a-webhook-spec-moves-the-channel-to-the-new-url"></a>
+
+#### [changing-a-webhook-spec-moves-the-channel-to-the-new-url](/tests/scenario/bai_scenario/manager/notification/test_editing_channels.py): pass
+
+when the spec of a webhook channel moves to another URL, the channel comes back with the new URL
+
+Given
+
+- one webhook channel and one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
+
+When
+
+- NotificationAdapter.update_channel: user-1 edits the channel channel-1, moving the URL to https://hooks.example.test/elsewhere
+
+Then
+
+- the whole channel created in advance comes back
+  - id: skipped: the database generates it
+  - entity_id: same as the id of the channel created in advance
   - name = 'channel-1'
   - description = None
   - channel_type = 'webhook'
   - spec.channel_type = <NotificationChannelTypeDTO.WEBHOOK: 'webhook'>
   - spec.url = 'https://hooks.example.test/elsewhere'
   - enabled = True
-  - created_by: 만든 사람와 같다
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_by: same as the user who created it
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
-#### [clearing-a-channel-description-leaves-it-empty](/tests/scenario/bai_scenario/manager/notification/test_editing_channels.py) — pass
+<a id="editing_channels-clearing-a-channel-description-leaves-it-empty"></a>
 
-설명이 있는 채널의 설명을 비우면 설명이 비어 있는 채널이 반환된다
+#### [clearing-a-channel-description-leaves-it-empty](/tests/scenario/bai_scenario/manager/notification/test_editing_channels.py): pass
+
+when the description of a channel that has one is cleared, the channel comes back with an empty description
 
 Given
 
-- webhook 채널 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
+- one webhook channel and one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
 
 When
 
-- NotificationAdapter.update_channel — user-1이 채널 channel-1을 설명을 비움 수정
+- NotificationAdapter.update_channel: user-1 edits the channel channel-1, clearing the description
 
 Then
 
-- 미리 만들어 둔 채널 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+- the whole channel created in advance comes back
+  - id: skipped: the database generates it
+  - entity_id: same as the id of the channel created in advance
   - name = 'channel-1'
   - description = None
   - channel_type = 'webhook'
   - spec.channel_type = <NotificationChannelTypeDTO.WEBHOOK: 'webhook'>
   - spec.url = 'https://hooks.example.test/notify'
   - enabled = True
-  - created_by: 만든 사람와 같다
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_by: same as the user who created it
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
-#### [disabling-a-channel-answers-it-disabled](/tests/scenario/bai_scenario/manager/notification/test_editing_channels.py) — pass
+<a id="editing_channels-disabling-a-channel-answers-it-disabled"></a>
 
-활성 채널을 비활성으로 바꾸면 비활성인 채널이 반환된다
+#### [disabling-a-channel-answers-it-disabled](/tests/scenario/bai_scenario/manager/notification/test_editing_channels.py): pass
+
+when an active channel is changed to disabled, a disabled channel comes back
 
 Given
 
-- webhook 채널 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
+- one webhook channel and one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
 
 When
 
-- NotificationAdapter.update_channel — user-1이 채널 channel-1을 활성을 False로 수정
+- NotificationAdapter.update_channel: user-1 edits the channel channel-1, setting enabled to False
 
 Then
 
-- 미리 만들어 둔 채널 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+- the whole channel created in advance comes back
+  - id: skipped: the database generates it
+  - entity_id: same as the id of the channel created in advance
   - name = 'channel-1'
   - description = None
   - channel_type = 'webhook'
   - spec.channel_type = <NotificationChannelTypeDTO.WEBHOOK: 'webhook'>
   - spec.url = 'https://hooks.example.test/notify'
   - enabled = False
-  - created_by: 만든 사람와 같다
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_by: same as the user who created it
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
-#### [the-superadmin-editing-a-channel-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/notification/test_editing_channels.py) — pass
+<a id="editing_channels-the-superadmin-renaming-a-channel-leaves-the-rest"></a>
 
-슈퍼관리자가 존재하지 않는 id를 수정하면 대상을 찾을 수 없다는 이유로 거부된다
+#### [the-superadmin-renaming-a-channel-leaves-the-rest](/tests/scenario/bai_scenario/manager/notification/test_editing_channels.py): pass
 
-Given
-
-- webhook 채널 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
-
-When
-
-- NotificationAdapter.update_channel — user-1이 존재하지 않는 id을 이름을 nowhere으로 수정
-
-Then
-
-- 거부된다
-  - 거부: EntityNotFoundError
-
-#### [the-superadmin-renaming-a-channel-leaves-the-rest](/tests/scenario/bai_scenario/manager/notification/test_editing_channels.py) — pass
-
-슈퍼관리자가 이름만 바꾸면 이름은 새 값이고 나머지는 그대로인 채널 전체가 반환된다
+when the superadmin changes only the name, the whole channel comes back with the new name and everything else unchanged
 
 Given
 
-- webhook 채널 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
+- one webhook channel and one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
 
 When
 
-- NotificationAdapter.update_channel — user-1이 채널 channel-1을 이름을 renamed으로 수정
+- NotificationAdapter.update_channel: user-1 edits the channel channel-1, renaming it to renamed
 
 Then
 
-- 미리 만들어 둔 채널 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+- the whole channel created in advance comes back
+  - id: skipped: the database generates it
+  - entity_id: same as the id of the channel created in advance
   - name = 'renamed'
   - description = None
   - channel_type = 'webhook'
   - spec.channel_type = <NotificationChannelTypeDTO.WEBHOOK: 'webhook'>
   - spec.url = 'https://hooks.example.test/notify'
   - enabled = True
-  - created_by: 만든 사람와 같다
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_by: same as the user who created it
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
-### editing_rules
+<a id="editing_channels-a-user-granted-nothing-may-not-edit-a-channel"></a>
 
-#### [a-rule-edit-naming-no-field-changes-nothing](/tests/scenario/bai_scenario/manager/notification/test_editing_rules.py) — pass
+#### [a-user-granted-nothing-may-not-edit-a-channel](/tests/scenario/bai_scenario/manager/notification/test_editing_channels.py): pass
 
-아무 필드도 지정하지 않고 수정하면 아무것도 바뀌지 않은 규칙이 반환된다
+when a user granted nothing changes the name, it is rejected for not enough permission
 
 Given
 
-- 규칙 하나와 그것이 가리키는 webhook 채널, 그리고 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
-  - 규칙 rule-1: session.started 이벤트를 알린다
+- one webhook channel and one regular user
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
 
 When
 
-- NotificationAdapter.update_rule — user-1이 규칙 rule-1을 아무것도 지정하지 않고 수정
+- NotificationAdapter.update_channel: user-1 edits the channel channel-1, renaming it to by-a-user
 
 Then
 
-- 미리 만들어 둔 규칙 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+<a id="editing_channels-an-edit-with-a-spec-naming-neither-webhook-nor-email-is-refused"></a>
+
+#### [an-edit-with-a-spec-naming-neither-webhook-nor-email-is-refused](/tests/scenario/bai_scenario/manager/notification/test_editing_channels.py): pass
+
+editing a channel with a spec naming neither webhook nor email is rejected as invalid input
+
+Given
+
+- one webhook channel and one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
+
+When
+
+- NotificationAdapter.update_channel: user-1 edits the channel channel-1, giving an empty spec
+
+Then
+
+- the call is rejected
+  - rejected: InvalidNotificationSpec
+
+<a id="editing_channels-the-superadmin-editing-a-channel-id-nothing-answers-to-is-not-found"></a>
+
+#### [the-superadmin-editing-a-channel-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/notification/test_editing_channels.py): pass
+
+when the superadmin edits an id nothing answers to, it is rejected because no target is found
+
+Given
+
+- one webhook channel and one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
+
+When
+
+- NotificationAdapter.update_channel: user-1 edits an unknown id, renaming it to nowhere
+
+Then
+
+- the call is rejected
+  - rejected: EntityNotFoundError
+
+### update_rule
+
+<a id="editing_rules-a-rule-edit-naming-no-field-changes-nothing"></a>
+
+#### [a-rule-edit-naming-no-field-changes-nothing](/tests/scenario/bai_scenario/manager/notification/test_editing_rules.py): pass
+
+editing without naming any field brings the rule back unchanged
+
+Given
+
+- one rule and the webhook channel it points at, and one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
+  - Rule rule-1: announces session.started events
+
+When
+
+- NotificationAdapter.update_rule: user-1 edits the rule rule-1, naming no field
+
+Then
+
+- the whole rule created in advance comes back
+  - id: skipped: the database generates it
+  - entity_id: same as the id of the rule created in advance
   - name = 'rule-1'
   - description = None
   - rule_type = 'session.started'
-  - channel_id: 가리키는 채널와 같다
+  - channel_id: same as the channel it points at
   - message_template = 'Session {{ session_name }} is {{ status }}'
   - enabled = True
-  - created_by: 만든 사람와 같다
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_by: same as the user who created it
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
-#### [a-user-granted-nothing-may-not-edit-a-rule](/tests/scenario/bai_scenario/manager/notification/test_editing_rules.py) — pass
+<a id="editing_rules-changing-a-rule-template-answers-the-new-template"></a>
 
-아무 권한도 없는 사용자가 이름을 바꾸려 하면 권한 부족으로 거부된다
+#### [changing-a-rule-template-answers-the-new-template](/tests/scenario/bai_scenario/manager/notification/test_editing_rules.py): pass
 
-Given
-
-- 규칙 하나와 그것이 가리키는 webhook 채널, 그리고 일반 사용자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
-  - 규칙 rule-1: session.started 이벤트를 알린다
-
-When
-
-- NotificationAdapter.update_rule — user-1이 규칙 rule-1을 이름을 by-a-user으로 수정
-
-Then
-
-- 거부된다
-  - 거부: NotEnoughPermission
-
-#### [changing-a-rule-template-answers-the-new-template](/tests/scenario/bai_scenario/manager/notification/test_editing_rules.py) — pass
-
-규칙의 템플릿을 바꾸면 템플릿이 새 값인 규칙이 반환된다
+when the template of a rule changes, the rule comes back with the new template
 
 Given
 
-- 규칙 하나와 그것이 가리키는 webhook 채널, 그리고 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
-  - 규칙 rule-1: session.started 이벤트를 알린다
+- one rule and the webhook channel it points at, and one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
+  - Rule rule-1: announces session.started events
 
 When
 
-- NotificationAdapter.update_rule — user-1이 규칙 rule-1을 템플릿을 새것으로 수정
+- NotificationAdapter.update_rule: user-1 edits the rule rule-1, giving a new template
 
 Then
 
-- 미리 만들어 둔 규칙 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+- the whole rule created in advance comes back
+  - id: skipped: the database generates it
+  - entity_id: same as the id of the rule created in advance
   - name = 'rule-1'
   - description = None
   - rule_type = 'session.started'
-  - channel_id: 가리키는 채널와 같다
+  - channel_id: same as the channel it points at
   - message_template = '{{ session_id }} started'
   - enabled = True
-  - created_by: 만든 사람와 같다
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_by: same as the user who created it
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
-#### [clearing-a-rule-description-leaves-it-empty](/tests/scenario/bai_scenario/manager/notification/test_editing_rules.py) — pass
+<a id="editing_rules-clearing-a-rule-description-leaves-it-empty"></a>
 
-설명이 있는 규칙의 설명을 비우면 설명이 비어 있는 규칙이 반환된다
+#### [clearing-a-rule-description-leaves-it-empty](/tests/scenario/bai_scenario/manager/notification/test_editing_rules.py): pass
+
+when the description of a rule that has one is cleared, the rule comes back with an empty description
 
 Given
 
-- 규칙 하나와 그것이 가리키는 webhook 채널, 그리고 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
-  - 규칙 rule-1: session.started 이벤트를 알린다
+- one rule and the webhook channel it points at, and one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
+  - Rule rule-1: announces session.started events
 
 When
 
-- NotificationAdapter.update_rule — user-1이 규칙 rule-1을 설명을 비움 수정
+- NotificationAdapter.update_rule: user-1 edits the rule rule-1, clearing the description
 
 Then
 
-- 미리 만들어 둔 규칙 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+- the whole rule created in advance comes back
+  - id: skipped: the database generates it
+  - entity_id: same as the id of the rule created in advance
   - name = 'rule-1'
   - description = None
   - rule_type = 'session.started'
-  - channel_id: 가리키는 채널와 같다
+  - channel_id: same as the channel it points at
   - message_template = 'Session {{ session_name }} is {{ status }}'
   - enabled = True
-  - created_by: 만든 사람와 같다
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_by: same as the user who created it
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
-#### [disabling-a-rule-answers-it-disabled](/tests/scenario/bai_scenario/manager/notification/test_editing_rules.py) — pass
+<a id="editing_rules-disabling-a-rule-answers-it-disabled"></a>
 
-활성 규칙을 비활성으로 바꾸면 비활성인 규칙이 반환된다
+#### [disabling-a-rule-answers-it-disabled](/tests/scenario/bai_scenario/manager/notification/test_editing_rules.py): pass
+
+when an active rule is changed to disabled, a disabled rule comes back
 
 Given
 
-- 규칙 하나와 그것이 가리키는 webhook 채널, 그리고 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
-  - 규칙 rule-1: session.started 이벤트를 알린다
+- one rule and the webhook channel it points at, and one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
+  - Rule rule-1: announces session.started events
 
 When
 
-- NotificationAdapter.update_rule — user-1이 규칙 rule-1을 활성을 False로 수정
+- NotificationAdapter.update_rule: user-1 edits the rule rule-1, setting enabled to False
 
 Then
 
-- 미리 만들어 둔 규칙 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+- the whole rule created in advance comes back
+  - id: skipped: the database generates it
+  - entity_id: same as the id of the rule created in advance
   - name = 'rule-1'
   - description = None
   - rule_type = 'session.started'
-  - channel_id: 가리키는 채널와 같다
+  - channel_id: same as the channel it points at
   - message_template = 'Session {{ session_name }} is {{ status }}'
   - enabled = False
-  - created_by: 만든 사람와 같다
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_by: same as the user who created it
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
-#### [the-superadmin-editing-a-rule-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/notification/test_editing_rules.py) — pass
+<a id="editing_rules-the-superadmin-renaming-a-rule-leaves-the-rest"></a>
 
-슈퍼관리자가 존재하지 않는 id를 수정하면 대상을 찾을 수 없다는 이유로 거부된다
+#### [the-superadmin-renaming-a-rule-leaves-the-rest](/tests/scenario/bai_scenario/manager/notification/test_editing_rules.py): pass
 
-Given
-
-- 규칙 하나와 그것이 가리키는 webhook 채널, 그리고 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
-  - 규칙 rule-1: session.started 이벤트를 알린다
-
-When
-
-- NotificationAdapter.update_rule — user-1이 존재하지 않는 id을 이름을 nowhere으로 수정
-
-Then
-
-- 거부된다
-  - 거부: EntityNotFoundError
-
-#### [the-superadmin-renaming-a-rule-leaves-the-rest](/tests/scenario/bai_scenario/manager/notification/test_editing_rules.py) — pass
-
-슈퍼관리자가 이름만 바꾸면 이름은 새 값이고 나머지는 그대로인 규칙 전체가 반환된다
+when the superadmin changes only the name, the whole rule comes back with the new name and everything else unchanged
 
 Given
 
-- 규칙 하나와 그것이 가리키는 webhook 채널, 그리고 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
-  - 규칙 rule-1: session.started 이벤트를 알린다
+- one rule and the webhook channel it points at, and one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
+  - Rule rule-1: announces session.started events
 
 When
 
-- NotificationAdapter.update_rule — user-1이 규칙 rule-1을 이름을 renamed으로 수정
+- NotificationAdapter.update_rule: user-1 edits the rule rule-1, renaming it to renamed
 
 Then
 
-- 미리 만들어 둔 규칙 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+- the whole rule created in advance comes back
+  - id: skipped: the database generates it
+  - entity_id: same as the id of the rule created in advance
   - name = 'renamed'
   - description = None
   - rule_type = 'session.started'
-  - channel_id: 가리키는 채널와 같다
+  - channel_id: same as the channel it points at
   - message_template = 'Session {{ session_name }} is {{ status }}'
   - enabled = True
-  - created_by: 만든 사람와 같다
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_by: same as the user who created it
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
-### reading_channels
+<a id="editing_rules-a-user-granted-nothing-may-not-edit-a-rule"></a>
 
-#### [a-batch-load-of-no-channel-ids-answers-an-empty-list](/tests/scenario/bai_scenario/manager/notification/test_reading_channels.py) — pass
+#### [a-user-granted-nothing-may-not-edit-a-rule](/tests/scenario/bai_scenario/manager/notification/test_editing_rules.py): pass
 
-빈 id 목록으로 조회하면 하위 계층을 부르지 않고 빈 응답이 반환된다
-
-Given
-
-- webhook 채널 둘과, 일반 사용자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 wanted-1: https://hooks.example.test/notify로 보낸다
-  - webhook 채널 other-1: https://hooks.example.test/notify로 보낸다
-
-When
-
-- NotificationAdapter.batch_load_channels_by_ids — user-1이 빈 id 목록으로 조회
-
-Then
-
-- 빈 응답이 반환된다
-  - items = []
-
-#### [a-user-granted-nothing-batch-loading-channels-is-refused-per-item](/tests/scenario/bai_scenario/manager/notification/test_reading_channels.py) — pass
-
-아무 권한도 없는 사용자가 채널 둘을 한 번에 조회하면, 호출은 거부되지 않고 항목마다 권한 부족 거부가 담긴다
+when a user granted nothing changes the name, it is rejected for not enough permission
 
 Given
 
-- webhook 채널 둘과, 일반 사용자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 wanted-1: https://hooks.example.test/notify로 보낸다
-  - webhook 채널 other-1: https://hooks.example.test/notify로 보낸다
+- one rule and the webhook channel it points at, and one regular user
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
+  - Rule rule-1: announces session.started events
 
 When
 
-- NotificationAdapter.batch_load_channels_by_ids — user-1이 미리 만들어 둔 2개를 한 번에 조회
+- NotificationAdapter.update_rule: user-1 edits the rule rule-1, renaming it to by-a-user
 
 Then
 
-- 항목마다 권한 부족 거부가 담긴다
-  - len(items) = 2
-  - items[0] = 'NotEnoughPermission'
-  - items[1] = 'NotEnoughPermission'
+- the call is rejected
+  - rejected: NotEnoughPermission
 
-#### [a-user-granted-nothing-may-not-read-a-channel](/tests/scenario/bai_scenario/manager/notification/test_reading_channels.py) — pass
+<a id="editing_rules-the-superadmin-editing-a-rule-id-nothing-answers-to-is-not-found"></a>
 
-아무 권한도 없는 사용자가 id로 조회하면 권한 부족으로 거부된다. 만든 사람으로 기록되어 있어도 같다
+#### [the-superadmin-editing-a-rule-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/notification/test_editing_rules.py): pass
+
+when the superadmin edits an id nothing answers to, it is rejected because no target is found
 
 Given
 
-- webhook 채널 하나와, 일반 사용자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
+- one rule and the webhook channel it points at, and one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
+  - Rule rule-1: announces session.started events
 
 When
 
-- NotificationAdapter.get_channel — user-1이 채널 channel-1 조회
+- NotificationAdapter.update_rule: user-1 edits an unknown id, renaming it to nowhere
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: EntityNotFoundError
 
-#### [a-user-granted-nothing-reading-an-unknown-channel-id-is-refused-for-permission](/tests/scenario/bai_scenario/manager/notification/test_reading_channels.py) — pass
+### validate_channel
 
-아무 권한도 없는 사용자가 존재하지 않는 id로 조회하면 대상 없음이 아니라 권한 부족으로 거부된다. 권한 검사가 먼저 실행되고 없는 행에는 부여된 권한도 없기 때문이다
+<a id="validating_channels-the-superadmin-validates-a-webhook-channel"></a>
+
+#### [the-superadmin-validates-a-webhook-channel](/tests/scenario/bai_scenario/manager/notification/test_validating_channels.py): pass
+
+with one webhook channel, when the superadmin validates it with a test message, the id of the validated channel comes back
 
 Given
 
-- webhook 채널 하나와, 일반 사용자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
+- one webhook channel and one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
 
 When
 
-- NotificationAdapter.get_channel — user-1이 존재하지 않는 id 조회
+- NotificationAdapter.validate_channel: user-1 validates the channel channel-1 with a test message
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the id of the validated channel comes back
+  - id: same as the channel created in advance
 
-#### [the-monitor-may-not-read-a-channel-by-id](/tests/scenario/bai_scenario/manager/notification/test_reading_channels.py) — pass
+<a id="validating_channels-a-user-granted-nothing-may-not-validate-a-channel"></a>
 
-모니터가 id로 조회하면 권한 부족으로 거부된다. 검색은 통과하지만 id 조회는 권한 검사이고 모니터에게도 부여된 권한이 없다
+#### [a-user-granted-nothing-may-not-validate-a-channel](/tests/scenario/bai_scenario/manager/notification/test_validating_channels.py): pass
+
+when a user granted nothing validates a channel, it is rejected for not enough permission
 
 Given
 
-- webhook 채널 하나와, 모니터 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 모니터 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
+- one webhook channel and one regular user
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
 
 When
 
-- NotificationAdapter.get_channel — user-1이 채널 channel-1 조회
+- NotificationAdapter.validate_channel: user-1 validates the channel channel-1 with a test message
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
-#### [the-superadmin-batch-load-leaves-a-missing-id-empty](/tests/scenario/bai_scenario/manager/notification/test_reading_channels.py) — pass
+<a id="validating_channels-the-superadmin-validating-a-channel-id-nothing-answers-to-is-not-found"></a>
 
-슈퍼관리자가 미리 만들어 둔 채널 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id에 해당하는 항목은 비어 있다
+#### [the-superadmin-validating-a-channel-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/notification/test_validating_channels.py): pass
+
+when the superadmin validates an id nothing answers to, it is rejected because no target is found
 
 Given
 
-- webhook 채널 둘과, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 wanted-1: https://hooks.example.test/notify로 보낸다
-  - webhook 채널 other-1: https://hooks.example.test/notify로 보낸다
+- one webhook channel and one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
 
 When
 
-- NotificationAdapter.batch_load_channels_by_ids — user-1이 미리 만들어 둔 2개와 없는 id 하나를 한 번에 조회
+- NotificationAdapter.validate_channel: user-1 validates an unknown id with a test message
 
 Then
 
-- 요청한 순서대로 반환되고, 없는 id에 해당하는 항목은 비어 있다
-  - len(items) = 3
-  - items[0].id: 무시함 — 데이터베이스가 만든다
-  - items[0].name = 'wanted-1'
-  - items[0].description = None
-  - items[0].channel_type = 'webhook'
-  - items[0].spec.channel_type = <NotificationChannelTypeDTO.WEBHOOK: 'webhook'>
-  - items[0].spec.url = 'https://hooks.example.test/notify'
-  - items[0].enabled = True
-  - items[0].created_by: 만든 사람와 같다
-  - items[0].created_at: 이 실행이 쓴 시각
-  - items[0].updated_at: 이 실행이 쓴 시각
-  - items[1].id: 무시함 — 데이터베이스가 만든다
-  - items[1].name = 'other-1'
-  - items[1].description = None
-  - items[1].channel_type = 'webhook'
-  - items[1].spec.channel_type = <NotificationChannelTypeDTO.WEBHOOK: 'webhook'>
-  - items[1].spec.url = 'https://hooks.example.test/notify'
-  - items[1].enabled = True
-  - items[1].created_by: 만든 사람와 같다
-  - items[1].created_at: 이 실행이 쓴 시각
-  - items[1].updated_at: 이 실행이 쓴 시각
-  - items[2] = None
+- the call is rejected
+  - rejected: NotificationChannelNotFound
 
-#### [the-superadmin-reading-a-channel-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/notification/test_reading_channels.py) — pass
+### validate_rule
 
-슈퍼관리자가 존재하지 않는 id로 조회하면 대상을 찾을 수 없다는 이유로 거부된다
+<a id="validating_rules-the-superadmin-validates-a-rule-with-test-data"></a>
+
+#### [the-superadmin-validates-a-rule-with-test-data](/tests/scenario/bai_scenario/manager/notification/test_validating_rules.py): pass
+
+with one session-started rule, when the superadmin validates it with test data of that type, the string made by putting the data into the template comes back
 
 Given
 
-- webhook 채널 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
+- one rule and the webhook channel it points at, and one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
+  - Rule rule-1: announces session.started events
 
 When
 
-- NotificationAdapter.get_channel — user-1이 존재하지 않는 id 조회
+- NotificationAdapter.validate_rule: user-1 validates the rule rule-1 with test data
 
 Then
 
-- 거부된다
-  - 거부: EntityNotFoundError
-
-#### [the-superadmin-reads-a-channel-by-id](/tests/scenario/bai_scenario/manager/notification/test_reading_channels.py) — pass
-
-채널 하나가 있고 슈퍼관리자가 id로 조회하면, 그 채널 전체가 반환된다
-
-Given
-
-- webhook 채널 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
-
-When
-
-- NotificationAdapter.get_channel — user-1이 채널 channel-1 조회
-
-Then
-
-- 미리 만들어 둔 채널 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
-  - name = 'channel-1'
-  - description = None
-  - channel_type = 'webhook'
-  - spec.channel_type = <NotificationChannelTypeDTO.WEBHOOK: 'webhook'>
-  - spec.url = 'https://hooks.example.test/notify'
-  - enabled = True
-  - created_by: 만든 사람와 같다
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
-
-### reading_rules
-
-#### [a-batch-load-of-no-rule-ids-answers-an-empty-list](/tests/scenario/bai_scenario/manager/notification/test_reading_rules.py) — pass
-
-빈 id 목록으로 조회하면 하위 계층을 부르지 않고 빈 응답이 반환된다
-
-Given
-
-- 같은 webhook 채널을 가리키는 규칙 둘과, 일반 사용자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
-  - 규칙 wanted-1: session.started 이벤트를 알린다
-  - 규칙 other-1: session.started 이벤트를 알린다
-
-When
-
-- NotificationAdapter.batch_load_rules_by_ids — user-1이 빈 id 목록으로 조회
-
-Then
-
-- 빈 응답이 반환된다
-  - items = []
-
-#### [a-user-granted-nothing-batch-loading-rules-is-refused-per-item](/tests/scenario/bai_scenario/manager/notification/test_reading_rules.py) — pass
-
-아무 권한도 없는 사용자가 규칙 둘을 한 번에 조회하면, 호출은 거부되지 않고 항목마다 권한 부족 거부가 담긴다
-
-Given
-
-- 같은 webhook 채널을 가리키는 규칙 둘과, 일반 사용자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
-  - 규칙 wanted-1: session.started 이벤트를 알린다
-  - 규칙 other-1: session.started 이벤트를 알린다
-
-When
-
-- NotificationAdapter.batch_load_rules_by_ids — user-1이 미리 만들어 둔 2개를 한 번에 조회
-
-Then
-
-- 항목마다 권한 부족 거부가 담긴다
-  - len(items) = 2
-  - items[0] = 'NotEnoughPermission'
-  - items[1] = 'NotEnoughPermission'
-
-#### [a-user-granted-nothing-may-not-read-a-rule](/tests/scenario/bai_scenario/manager/notification/test_reading_rules.py) — pass
-
-아무 권한도 없는 사용자가 id로 조회하면 권한 부족으로 거부된다
-
-Given
-
-- 규칙 하나와 그것이 가리키는 webhook 채널, 그리고 일반 사용자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
-  - 규칙 rule-1: session.started 이벤트를 알린다
-
-When
-
-- NotificationAdapter.get_rule — user-1이 규칙 rule-1 조회
-
-Then
-
-- 거부된다
-  - 거부: NotEnoughPermission
-
-#### [the-superadmin-batch-load-leaves-a-missing-rule-id-empty](/tests/scenario/bai_scenario/manager/notification/test_reading_rules.py) — pass
-
-슈퍼관리자가 미리 만들어 둔 규칙 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id에 해당하는 항목은 비어 있다
-
-Given
-
-- 같은 webhook 채널을 가리키는 규칙 둘과, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
-  - 규칙 wanted-1: session.started 이벤트를 알린다
-  - 규칙 other-1: session.started 이벤트를 알린다
-
-When
-
-- NotificationAdapter.batch_load_rules_by_ids — user-1이 미리 만들어 둔 2개와 없는 id 하나를 한 번에 조회
-
-Then
-
-- 요청한 순서대로 반환되고, 없는 id에 해당하는 항목은 비어 있다
-  - len(items) = 3
-  - items[0].id: 무시함 — 데이터베이스가 만든다
-  - items[0].name = 'wanted-1'
-  - items[0].description = None
-  - items[0].rule_type = 'session.started'
-  - items[0].channel_id: 가리키는 채널와 같다
-  - items[0].message_template = 'Session {{ session_name }} is {{ status }}'
-  - items[0].enabled = True
-  - items[0].created_by: 만든 사람와 같다
-  - items[0].created_at: 이 실행이 쓴 시각
-  - items[0].updated_at: 이 실행이 쓴 시각
-  - items[1].id: 무시함 — 데이터베이스가 만든다
-  - items[1].name = 'other-1'
-  - items[1].description = None
-  - items[1].rule_type = 'session.started'
-  - items[1].channel_id: 가리키는 채널와 같다
-  - items[1].message_template = 'Session {{ session_name }} is {{ status }}'
-  - items[1].enabled = True
-  - items[1].created_by: 만든 사람와 같다
-  - items[1].created_at: 이 실행이 쓴 시각
-  - items[1].updated_at: 이 실행이 쓴 시각
-  - items[2] = None
-
-#### [the-superadmin-reading-a-rule-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/notification/test_reading_rules.py) — pass
-
-슈퍼관리자가 존재하지 않는 id로 조회하면 대상을 찾을 수 없다는 이유로 거부된다
-
-Given
-
-- 규칙 하나와 그것이 가리키는 webhook 채널, 그리고 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
-  - 규칙 rule-1: session.started 이벤트를 알린다
-
-When
-
-- NotificationAdapter.get_rule — user-1이 존재하지 않는 id 조회
-
-Then
-
-- 거부된다
-  - 거부: EntityNotFoundError
-
-#### [the-superadmin-reads-a-rule-by-id](/tests/scenario/bai_scenario/manager/notification/test_reading_rules.py) — pass
-
-규칙 하나가 있고 슈퍼관리자가 id로 조회하면, 그 규칙 전체가 반환된다
-
-Given
-
-- 규칙 하나와 그것이 가리키는 webhook 채널, 그리고 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
-  - 규칙 rule-1: session.started 이벤트를 알린다
-
-When
-
-- NotificationAdapter.get_rule — user-1이 규칙 rule-1 조회
-
-Then
-
-- 미리 만들어 둔 규칙 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
-  - name = 'rule-1'
-  - description = None
-  - rule_type = 'session.started'
-  - channel_id: 가리키는 채널와 같다
-  - message_template = 'Session {{ session_name }} is {{ status }}'
-  - enabled = True
-  - created_by: 만든 사람와 같다
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
-
-### retiring_channels
-
-#### [a-channel-a-rule-points-at-is-deleted-all-the-same](/tests/scenario/bai_scenario/manager/notification/test_retiring_channels.py) — pass
-
-규칙이 가리키는 채널을 슈퍼관리자가 삭제하면 막히지 않고 삭제한 채널의 id가 반환된다. 두 테이블 사이에 외래 키가 없어 규칙은 남는다
-
-Given
-
-- 채널 하나와 그것을 가리키는 규칙 하나, 그리고 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
-  - 규칙 rule-1: session.started 이벤트를 알린다
-
-When
-
-- NotificationAdapter.delete_channel — user-1이 채널 channel-1 삭제
-
-Then
-
-- 삭제한 채널의 id가 반환된다
-  - id: 미리 만들어 둔 채널와 같다
-
-#### [a-user-granted-nothing-may-not-delete-a-channel](/tests/scenario/bai_scenario/manager/notification/test_retiring_channels.py) — pass
-
-아무 권한도 없는 사용자가 삭제하려 하면 권한 부족으로 거부된다
-
-Given
-
-- webhook 채널 하나와, 일반 사용자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
-
-When
-
-- NotificationAdapter.delete_channel — user-1이 채널 channel-1 삭제
-
-Then
-
-- 거부된다
-  - 거부: NotEnoughPermission
-
-#### [the-superadmin-deletes-a-channel](/tests/scenario/bai_scenario/manager/notification/test_retiring_channels.py) — pass
-
-채널 하나가 있고 슈퍼관리자가 삭제하면 삭제한 채널의 id가 반환된다
-
-Given
-
-- webhook 채널 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
-
-When
-
-- NotificationAdapter.delete_channel — user-1이 채널 channel-1 삭제
-
-Then
-
-- 삭제한 채널의 id가 반환된다
-  - id: 미리 만들어 둔 채널와 같다
-
-#### [the-superadmin-deleting-a-channel-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/notification/test_retiring_channels.py) — pass
-
-슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다
-
-Given
-
-- webhook 채널 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
-
-When
-
-- NotificationAdapter.delete_channel — user-1이 존재하지 않는 id 삭제
-
-Then
-
-- 거부된다
-  - 거부: EntityNotFoundError
-
-### retiring_rules
-
-#### [a-user-granted-nothing-may-not-delete-a-rule](/tests/scenario/bai_scenario/manager/notification/test_retiring_rules.py) — pass
-
-아무 권한도 없는 사용자가 삭제하려 하면 권한 부족으로 거부된다
-
-Given
-
-- 규칙 하나와 그것이 가리키는 webhook 채널, 그리고 일반 사용자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
-  - 규칙 rule-1: session.started 이벤트를 알린다
-
-When
-
-- NotificationAdapter.delete_rule — user-1이 규칙 rule-1 삭제
-
-Then
-
-- 거부된다
-  - 거부: NotEnoughPermission
-
-#### [the-superadmin-deletes-a-rule](/tests/scenario/bai_scenario/manager/notification/test_retiring_rules.py) — pass
-
-규칙 하나가 있고 슈퍼관리자가 삭제하면 삭제한 규칙의 id가 반환된다
-
-Given
-
-- 규칙 하나와 그것이 가리키는 webhook 채널, 그리고 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
-  - 규칙 rule-1: session.started 이벤트를 알린다
-
-When
-
-- NotificationAdapter.delete_rule — user-1이 규칙 rule-1 삭제
-
-Then
-
-- 삭제한 규칙의 id가 반환된다
-  - id: 미리 만들어 둔 규칙와 같다
-
-#### [the-superadmin-deleting-a-rule-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/notification/test_retiring_rules.py) — pass
-
-슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다
-
-Given
-
-- 규칙 하나와 그것이 가리키는 webhook 채널, 그리고 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
-  - 규칙 rule-1: session.started 이벤트를 알린다
-
-When
-
-- NotificationAdapter.delete_rule — user-1이 존재하지 않는 id 삭제
-
-Then
-
-- 거부된다
-  - 거부: EntityNotFoundError
-
-### searching_channels
-
-#### [a-channel-type-filter-narrows-the-answer-to-that-kind](/tests/scenario/bai_scenario/manager/notification/test_searching_channels.py) — pass
-
-webhook 채널과 email 채널이 있을 때 email 종류를 필터로 조회하면 email 채널 하나만 반환된다
-
-Given
-
-- webhook 채널 하나와 email 채널 하나, 그리고 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
-  - email 채널 mail-channel-1: smtp.example.test를 거쳐 ops@example.test에게 보낸다
-
-When
-
-- NotificationAdapter.search_channels — user-1이 email 종류 필터로 조회
-
-Then
-
-- 필터에 맞는 채널 하나만 반환된다
-  - items = ['mail-channel-1']
-  - total_count = 1
-  - has_next_page = False
-  - has_previous_page = False
-
-#### [a-name-filter-narrows-the-answer-to-that-channel](/tests/scenario/bai_scenario/manager/notification/test_searching_channels.py) — pass
-
-채널 둘 중 한쪽 이름을 필터로 조회하면 그 채널 하나만 반환된다
-
-Given
-
-- webhook 채널 둘과, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 wanted-1: https://hooks.example.test/notify로 보낸다
-  - webhook 채널 other-1: https://hooks.example.test/notify로 보낸다
-
-When
-
-- NotificationAdapter.search_channels — user-1이 이름 wanted-1 필터로 조회
-
-Then
-
-- 필터에 맞는 채널 하나만 반환된다
-  - items = ['wanted-1']
-  - total_count = 1
-  - has_next_page = False
-  - has_previous_page = False
-
-#### [a-user-who-is-not-the-superadmin-may-not-search-channels](/tests/scenario/bai_scenario/manager/notification/test_searching_channels.py) — pass
-
-슈퍼관리자가 아닌 사용자가 필터 없이 조회하면 역할 부족으로 거부된다
-
-Given
-
-- webhook 채널 둘과, 일반 사용자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 wanted-1: https://hooks.example.test/notify로 보낸다
-  - webhook 채널 other-1: https://hooks.example.test/notify로 보낸다
-
-When
-
-- NotificationAdapter.search_channels — user-1이 필터 없이 전체 조회
-
-Then
-
-- 거부된다
-  - 거부: InsufficientPrivilege
-
-#### [an-enabled-filter-leaves-only-the-enabled-channels](/tests/scenario/bai_scenario/manager/notification/test_searching_channels.py) — pass
-
-활성 채널과 비활성 채널이 섞여 있을 때 활성 필터로 조회하면 활성인 것만 반환된다
-
-Given
-
-- 활성 webhook 채널 하나와 비활성 하나, 그리고 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
-  - webhook 채널 channel-2: https://hooks.example.test/notify로 보낸다, 비활성
-
-When
-
-- NotificationAdapter.search_channels — user-1이 활성 필터로 조회
-
-Then
-
-- 응답에 나와야 하는 채널만 반환된다
-  - items = ['channel-1']
-  - total_count = 1
-  - has_next_page = False
-  - has_previous_page = False
-
-#### [asking-for-the-first-channel-only-says-there-is-a-next-page](/tests/scenario/bai_scenario/manager/notification/test_searching_channels.py) — pass
-
-채널 둘이 있을 때 앞에서 한 건만 요청하면 한 건이 반환되고 다음 페이지가 있다고 응답한다
-
-Given
-
-- webhook 채널 둘과, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 wanted-1: https://hooks.example.test/notify로 보낸다
-  - webhook 채널 other-1: https://hooks.example.test/notify로 보낸다
-
-When
-
-- NotificationAdapter.search_channels — user-1이 앞에서 한 건만 조회
-
-Then
-
-- 한 건짜리 첫 페이지가 반환된다
-  - len(items) = 1
-  - total_count = 2
-  - has_next_page = True
-  - has_previous_page = False
-
-#### [the-monitor-searches-channels-like-the-superadmin](/tests/scenario/bai_scenario/manager/notification/test_searching_channels.py) — pass
-
-모니터가 필터 없이 조회하면 슈퍼관리자와 같은 응답을 받는다
-
-Given
-
-- webhook 채널 둘과, 모니터 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 모니터 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 wanted-1: https://hooks.example.test/notify로 보낸다
-  - webhook 채널 other-1: https://hooks.example.test/notify로 보낸다
-
-When
-
-- NotificationAdapter.search_channels — user-1이 필터 없이 전체 조회
-
-Then
-
-- 응답에 나와야 하는 채널만 반환된다
-  - items = ['other-1', 'wanted-1']
-  - total_count = 2
-  - has_next_page = False
-  - has_previous_page = False
-
-#### [the-superadmin-counts-every-channel-laid](/tests/scenario/bai_scenario/manager/notification/test_searching_channels.py) — pass
-
-채널 둘이 있을 때 슈퍼관리자가 필터 없이 조회하면 둘 다 반환된다
-
-Given
-
-- webhook 채널 둘과, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 wanted-1: https://hooks.example.test/notify로 보낸다
-  - webhook 채널 other-1: https://hooks.example.test/notify로 보낸다
-
-When
-
-- NotificationAdapter.search_channels — user-1이 필터 없이 전체 조회
-
-Then
-
-- 응답에 나와야 하는 채널만 반환된다
-  - items = ['other-1', 'wanted-1']
-  - total_count = 2
-  - has_next_page = False
-  - has_previous_page = False
-
-### searching_rules
-
-#### [a-name-filter-narrows-the-answer-to-that-rule](/tests/scenario/bai_scenario/manager/notification/test_searching_rules.py) — pass
-
-규칙 둘 중 한쪽 이름을 필터로 조회하면 그 규칙 하나만 반환된다
-
-Given
-
-- 같은 webhook 채널을 가리키는 규칙 둘과, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
-  - 규칙 wanted-1: session.started 이벤트를 알린다
-  - 규칙 other-1: session.started 이벤트를 알린다
-
-When
-
-- NotificationAdapter.search_rules — user-1이 이름 wanted-1 필터로 조회
-
-Then
-
-- 필터에 맞는 규칙 하나만 반환된다
-  - items = ['wanted-1']
-  - total_count = 1
-  - has_next_page = False
-  - has_previous_page = False
-
-#### [a-rule-type-filter-narrows-the-answer-to-that-kind](/tests/scenario/bai_scenario/manager/notification/test_searching_rules.py) — pass
-
-종류가 다른 규칙 둘 중 한쪽 종류를 필터로 조회하면 그 규칙 하나만 반환된다
-
-Given
-
-- 같은 webhook 채널을 가리키는 규칙 둘과, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
-  - 규칙 wanted-1: session.started 이벤트를 알린다
-  - 규칙 other-1: session.terminated 이벤트를 알린다
-
-When
-
-- NotificationAdapter.search_rules — user-1이 종류 session.started 필터로 조회
-
-Then
-
-- 필터에 맞는 규칙 하나만 반환된다
-  - items = ['wanted-1']
-  - total_count = 1
-  - has_next_page = False
-  - has_previous_page = False
-
-#### [a-user-who-is-not-the-superadmin-may-not-search-rules](/tests/scenario/bai_scenario/manager/notification/test_searching_rules.py) — pass
-
-슈퍼관리자가 아닌 사용자가 필터 없이 조회하면 역할 부족으로 거부된다
-
-Given
-
-- 같은 webhook 채널을 가리키는 규칙 둘과, 일반 사용자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
-  - 규칙 wanted-1: session.started 이벤트를 알린다
-  - 규칙 other-1: session.started 이벤트를 알린다
-
-When
-
-- NotificationAdapter.search_rules — user-1이 필터 없이 전체 조회
-
-Then
-
-- 거부된다
-  - 거부: InsufficientPrivilege
-
-#### [an-enabled-filter-leaves-only-the-enabled-rules](/tests/scenario/bai_scenario/manager/notification/test_searching_rules.py) — pass
-
-활성 규칙과 비활성 규칙이 섞여 있을 때 활성 필터로 조회하면 활성인 것만 반환된다
-
-Given
-
-- 활성 규칙 하나와 비활성 하나, 그리고 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
-  - 규칙 rule-1: session.started 이벤트를 알린다
-  - 규칙 rule-2: session.started 이벤트를 알린다, 비활성
-
-When
-
-- NotificationAdapter.search_rules — user-1이 활성 필터로 조회
-
-Then
-
-- 응답에 나와야 하는 규칙만 반환된다
-  - items = ['rule-1']
-  - total_count = 1
-  - has_next_page = False
-  - has_previous_page = False
-
-#### [the-monitor-searches-rules-like-the-superadmin](/tests/scenario/bai_scenario/manager/notification/test_searching_rules.py) — pass
-
-모니터가 필터 없이 조회하면 슈퍼관리자와 같은 응답을 받는다
-
-Given
-
-- 같은 webhook 채널을 가리키는 규칙 둘과, 모니터 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 모니터 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
-  - 규칙 wanted-1: session.started 이벤트를 알린다
-  - 규칙 other-1: session.started 이벤트를 알린다
-
-When
-
-- NotificationAdapter.search_rules — user-1이 필터 없이 전체 조회
-
-Then
-
-- 응답에 나와야 하는 규칙만 반환된다
-  - items = ['other-1', 'wanted-1']
-  - total_count = 2
-  - has_next_page = False
-  - has_previous_page = False
-
-#### [the-superadmin-counts-every-rule-laid](/tests/scenario/bai_scenario/manager/notification/test_searching_rules.py) — pass
-
-규칙 둘이 있을 때 슈퍼관리자가 필터 없이 조회하면 둘 다 반환된다
-
-Given
-
-- 같은 webhook 채널을 가리키는 규칙 둘과, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
-  - 규칙 wanted-1: session.started 이벤트를 알린다
-  - 규칙 other-1: session.started 이벤트를 알린다
-
-When
-
-- NotificationAdapter.search_rules — user-1이 필터 없이 전체 조회
-
-Then
-
-- 응답에 나와야 하는 규칙만 반환된다
-  - items = ['other-1', 'wanted-1']
-  - total_count = 2
-  - has_next_page = False
-  - has_previous_page = False
-
-### validating_channels
-
-#### [a-user-granted-nothing-may-not-validate-a-channel](/tests/scenario/bai_scenario/manager/notification/test_validating_channels.py) — pass
-
-아무 권한도 없는 사용자가 검증하려 하면 권한 부족으로 거부된다
-
-Given
-
-- webhook 채널 하나와, 일반 사용자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
-
-When
-
-- NotificationAdapter.validate_channel — user-1이 채널 channel-1을 시험 메시지로 검증
-
-Then
-
-- 거부된다
-  - 거부: NotEnoughPermission
-
-#### [the-superadmin-validates-a-webhook-channel](/tests/scenario/bai_scenario/manager/notification/test_validating_channels.py) — pass
-
-webhook 채널 하나가 있고 슈퍼관리자가 시험 메시지로 검증하면 검증한 채널의 id가 반환된다
-
-Given
-
-- webhook 채널 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
-
-When
-
-- NotificationAdapter.validate_channel — user-1이 채널 channel-1을 시험 메시지로 검증
-
-Then
-
-- 검증한 채널의 id가 반환된다
-  - id: 미리 만들어 둔 채널와 같다
-
-#### [the-superadmin-validating-a-channel-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/notification/test_validating_channels.py) — pass
-
-슈퍼관리자가 존재하지 않는 id를 검증하면 대상을 찾을 수 없다는 이유로 거부된다
-
-Given
-
-- webhook 채널 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
-
-When
-
-- NotificationAdapter.validate_channel — user-1이 존재하지 않는 id을 시험 메시지로 검증
-
-Then
-
-- 거부된다
-  - 거부: NotificationChannelNotFound
-
-### validating_rules
-
-#### [a-rule-pointing-at-a-channel-id-nothing-answers-to-is-refused](/tests/scenario/bai_scenario/manager/notification/test_validating_rules.py) — pass
-
-없는 채널 id를 가리키는 규칙을 검증하면 채널을 찾을 수 없다는 이유로 거부된다
-
-Given
-
-- 없는 채널 id를 가리키는 규칙 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
-  - 규칙 orphan-rule-1: 없는 채널 id를 가리킨다
-
-When
-
-- NotificationAdapter.validate_rule — user-1이 규칙 orphan-rule-1을 시험 데이터로 검증
-
-Then
-
-- 거부된다
-  - 거부: NotificationChannelNotFound
-
-#### [a-user-granted-nothing-may-not-validate-a-rule](/tests/scenario/bai_scenario/manager/notification/test_validating_rules.py) — pass
-
-아무 권한도 없는 사용자가 검증하려 하면 권한 부족으로 거부된다
-
-Given
-
-- 규칙 하나와 그것이 가리키는 webhook 채널, 그리고 일반 사용자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
-  - 규칙 rule-1: session.started 이벤트를 알린다
-
-When
-
-- NotificationAdapter.validate_rule — user-1이 규칙 rule-1을 시험 데이터로 검증
-
-Then
-
-- 거부된다
-  - 거부: NotEnoughPermission
-
-#### [the-superadmin-validates-a-rule-with-test-data](/tests/scenario/bai_scenario/manager/notification/test_validating_rules.py) — pass
-
-세션 시작 규칙 하나가 있고 슈퍼관리자가 그 종류에 맞는 시험 데이터로 검증하면, 템플릿에 데이터를 넣어 만든 문자열이 반환된다
-
-Given
-
-- 규칙 하나와 그것이 가리키는 webhook 채널, 그리고 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
-  - 규칙 rule-1: session.started 이벤트를 알린다
-
-When
-
-- NotificationAdapter.validate_rule — user-1이 규칙 rule-1을 시험 데이터로 검증
-
-Then
-
-- 템플릿에 데이터를 넣어 만든 문자열이 반환된다
+- the string made by putting the data into the template comes back
   - message = 'Session train is running'
 
-#### [the-superadmin-validating-a-rule-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/notification/test_validating_rules.py) — pass
+<a id="validating_rules-a-rule-pointing-at-a-channel-id-nothing-answers-to-is-refused"></a>
 
-슈퍼관리자가 존재하지 않는 id를 검증하면 대상을 찾을 수 없다는 이유로 거부된다
+#### [a-rule-pointing-at-a-channel-id-nothing-answers-to-is-refused](/tests/scenario/bai_scenario/manager/notification/test_validating_rules.py): pass
+
+validating a rule pointing at an unknown channel id is rejected because no channel is found
 
 Given
 
-- 규칙 하나와 그것이 가리키는 webhook 채널, 그리고 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - webhook 채널 channel-1: https://hooks.example.test/notify로 보낸다
-  - 규칙 rule-1: session.started 이벤트를 알린다
+- one rule pointing at an unknown channel id and one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
+  - Rule orphan-rule-1: refers to a channel id no row answers to
 
 When
 
-- NotificationAdapter.validate_rule — user-1이 존재하지 않는 id을 시험 데이터로 검증
+- NotificationAdapter.validate_rule: user-1 validates the rule orphan-rule-1 with test data
 
 Then
 
-- 거부된다
-  - 거부: NotificationRuleNotFound
+- the call is rejected
+  - rejected: NotificationChannelNotFound
+
+<a id="validating_rules-a-user-granted-nothing-may-not-validate-a-rule"></a>
+
+#### [a-user-granted-nothing-may-not-validate-a-rule](/tests/scenario/bai_scenario/manager/notification/test_validating_rules.py): pass
+
+when a user granted nothing validates a rule, it is rejected for not enough permission
+
+Given
+
+- one rule and the webhook channel it points at, and one regular user
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
+  - Rule rule-1: announces session.started events
+
+When
+
+- NotificationAdapter.validate_rule: user-1 validates the rule rule-1 with test data
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+<a id="validating_rules-the-superadmin-validating-a-rule-id-nothing-answers-to-is-not-found"></a>
+
+#### [the-superadmin-validating-a-rule-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/notification/test_validating_rules.py): pass
+
+when the superadmin validates an id nothing answers to, it is rejected because no target is found
+
+Given
+
+- one rule and the webhook channel it points at, and one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
+  - Rule rule-1: announces session.started events
+
+When
+
+- NotificationAdapter.validate_rule: user-1 validates an unknown id with test data
+
+Then
+
+- the call is rejected
+  - rejected: NotificationRuleNotFound
 

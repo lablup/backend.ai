@@ -3,22 +3,27 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import Any
 from uuid import UUID
 
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
+from ai.backend.common.dto.manager.v2.common import PartialBulkFailure, PartialBulkPayload
 from ai.backend.common.dto.manager.v2.huggingface_registry.request import (
     AdminSearchHuggingFaceRegistriesInput,
     CreateHuggingFaceRegistryInput,
-    DeleteHuggingFaceRegistryInput,
+    PartialBulkPurgeHuggingFaceRegistriesInput,
+    PartialBulkUpdateHuggingFaceRegistriesInput,
+    UpdateHuggingFaceRegistryBody,
     UpdateHuggingFaceRegistryInput,
 )
 from ai.backend.common.dto.manager.v2.huggingface_registry.response import (
     AdminSearchHuggingFaceRegistriesPayload,
     CreateHuggingFaceRegistryPayload,
-    DeleteHuggingFaceRegistryPayload,
     HuggingFaceRegistryNode,
+    PurgeHuggingFaceRegistryPayload,
     UpdateHuggingFaceRegistryPayload,
 )
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkResult
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.artifact_registries.types import (
     ArtifactRegistryCreatorMeta,
@@ -50,6 +55,13 @@ from ai.backend.manager.services.artifact_registry.actions.huggingface.get impor
 )
 from ai.backend.manager.services.artifact_registry.actions.huggingface.get_multi import (
     GetHuggingFaceRegistriesAction,
+)
+from ai.backend.manager.services.artifact_registry.actions.huggingface.partial_bulk_purge import (
+    PartialBulkPurgeHuggingFaceRegistriesAction,
+)
+from ai.backend.manager.services.artifact_registry.actions.huggingface.partial_bulk_update import (
+    PartialBulkUpdateHuggingFaceRegistriesAction,
+    PartialBulkUpdateHuggingFaceRegistryItem,
 )
 from ai.backend.manager.services.artifact_registry.actions.huggingface.search import (
     SearchHuggingFaceRegistriesAction,
@@ -117,29 +129,64 @@ class HuggingFaceRegistryAdapter(BaseAdapter):
         self, input: UpdateHuggingFaceRegistryInput
     ) -> UpdateHuggingFaceRegistryPayload:
         """Update an existing HuggingFace registry."""
-        updater = HuggingFaceRegistryUpdater(
-            registry_id=ArtifactRegistryID(input.id),
-            url=OptionalState.update(input.url) if input.url is not None else OptionalState.nop(),
-            token=(
-                OptionalState.update(input.token)
-                if input.token is not None
-                else OptionalState.nop()
-            ),
-        )
-        meta = ArtifactRegistryModifierMeta(
-            name=(
-                OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
-            ),
-        )
+        registry_id = ArtifactRegistryID(input.id)
+        item = self._to_update_item(registry_id, input)
         action_result = await self._artifact_registry.update_huggingface_registry.run(
             UpdateHuggingFaceRegistryAction(
-                registry_id=ArtifactRegistryID(input.id),
-                updater=updater,
-                meta=meta,
+                registry_id=registry_id,
+                updater=item.updater,
+                meta=item.meta,
             )
         )
         return UpdateHuggingFaceRegistryPayload(
             huggingface_registry=self._huggingface_registry_data_to_dto(action_result.result)
+        )
+
+    async def partial_bulk_update(
+        self, input: PartialBulkUpdateHuggingFaceRegistriesInput
+    ) -> PartialBulkPayload[HuggingFaceRegistryNode]:
+        """Update several HuggingFace registries, answering for each one."""
+        result = await self._artifact_registry.partial_bulk_update_huggingface_registries.run(
+            PartialBulkUpdateHuggingFaceRegistriesAction(
+                items=[
+                    self._to_update_item(ArtifactRegistryID(item.id), item.input)
+                    for item in input.items
+                ]
+            )
+        )
+        return PartialBulkPayload[HuggingFaceRegistryNode](
+            successes=[
+                self._huggingface_registry_data_to_dto(item.value)
+                for item in result.items
+                if item.value is not None
+            ],
+            failed=self._to_failures(result),
+        )
+
+    def _to_update_item(
+        self, registry_id: ArtifactRegistryID, input: UpdateHuggingFaceRegistryBody
+    ) -> PartialBulkUpdateHuggingFaceRegistryItem:
+        return PartialBulkUpdateHuggingFaceRegistryItem(
+            updater=HuggingFaceRegistryUpdater(
+                registry_id=registry_id,
+                url=(
+                    OptionalState.update(input.url)
+                    if input.url is not None
+                    else OptionalState.nop()
+                ),
+                token=(
+                    OptionalState.update(input.token)
+                    if input.token is not None
+                    else OptionalState.nop()
+                ),
+            ),
+            meta=ArtifactRegistryModifierMeta(
+                name=(
+                    OptionalState.update(input.name)
+                    if input.name is not None
+                    else OptionalState.nop()
+                ),
+            ),
         )
 
     async def get_many(self, registry_ids: list[UUID]) -> list[HuggingFaceRegistryNode]:
@@ -188,14 +235,39 @@ class HuggingFaceRegistryAdapter(BaseAdapter):
             token=connection.token,
         )
 
-    async def delete(
-        self, input: DeleteHuggingFaceRegistryInput
-    ) -> DeleteHuggingFaceRegistryPayload:
-        """Delete a HuggingFace registry."""
+    async def purge(self, registry_id: UUID) -> PurgeHuggingFaceRegistryPayload:
+        """Permanently delete a HuggingFace registry."""
         action_result = await self._artifact_registry.delete_huggingface_registry.run(
-            DeleteHuggingFaceRegistryAction(registry_id=ArtifactRegistryID(input.id))
+            DeleteHuggingFaceRegistryAction(registry_id=ArtifactRegistryID(registry_id))
         )
-        return DeleteHuggingFaceRegistryPayload(id=action_result.deleted_registry_id)
+        return PurgeHuggingFaceRegistryPayload(
+            id=action_result.deleted_registry_id, entity_id=action_result.deleted_registry_id
+        )
+
+    async def partial_bulk_purge(
+        self, input: PartialBulkPurgeHuggingFaceRegistriesInput
+    ) -> PartialBulkPayload[PurgeHuggingFaceRegistryPayload]:
+        """Permanently delete several HuggingFace registries, answering for each one."""
+        result = await self._artifact_registry.partial_bulk_purge_huggingface_registries.run(
+            PartialBulkPurgeHuggingFaceRegistriesAction(
+                ids=[ArtifactRegistryID(registry_id) for registry_id in input.ids]
+            )
+        )
+        return PartialBulkPayload[PurgeHuggingFaceRegistryPayload](
+            successes=[
+                PurgeHuggingFaceRegistryPayload(id=item.value, entity_id=item.value)
+                for item in result.items
+                if item.value is not None
+            ],
+            failed=self._to_failures(result),
+        )
+
+    def _to_failures(self, result: PartialBulkResult[Any]) -> list[PartialBulkFailure]:
+        return [
+            PartialBulkFailure(id=item.entity_id, message=str(item.error))
+            for item in result.items
+            if item.error is not None
+        ]
 
     @staticmethod
     def _huggingface_registry_data_to_dto(

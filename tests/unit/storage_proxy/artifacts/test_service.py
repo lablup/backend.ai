@@ -3,11 +3,11 @@
 import uuid
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
+from pathlib import Path, PurePosixPath
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 from aiohttp import ClientError, ClientResponseError
-from aioresponses import aioresponses
 from huggingface_hub.hf_api import RepoFile
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
@@ -38,6 +38,7 @@ from ai.backend.storage.errors import (
     ReservoirStorageConfigInvalidError,
     StorageNotFoundError,
 )
+from ai.backend.storage.errors.object import ReservoirFilePathInvalidError
 from ai.backend.storage.services.artifacts.huggingface import (
     HuggingFaceDownloadStep,
     HuggingFaceFileDownloadStreamReader,
@@ -649,17 +650,21 @@ class TestHuggingFaceDownloadStep:
             async for chunk in download_stream.read():
                 pass
 
+    @patch("aiohttp.ClientSession")
     async def test_probe_head_raises_on_http_error(
         self,
+        mock_client_session: MagicMock,
         hf_stream_reader: HuggingFaceFileDownloadStreamReader,
     ) -> None:
         """Test _probe_head raises ClientResponseError on HTTP error status."""
-        with aioresponses() as mocked:
-            mocked.head("http://test.com/file", status=401)
+        mock_session, _ = create_mock_aiohttp_session()
+        # `raise_for_status=True` turns the 401 into a ClientResponseError.
+        mock_session.head.side_effect = ClientResponseError(Mock(), (), status=401)
+        mock_client_session.return_value = mock_session
 
-            with pytest.raises(ClientResponseError):
-                async for _ in hf_stream_reader.read():
-                    pass
+        with pytest.raises(ClientResponseError):
+            async for _ in hf_stream_reader.read():
+                pass
 
     async def test_upload_model_file_success(
         self,
@@ -1076,3 +1081,70 @@ class TestReservoirDownloadStep:
 
             with pytest.raises(ArtifactStorageEmptyError):
                 await reservoir_download_step.execute(mock_import_step_context, None)
+
+
+class TestReservoirDownloadPathCheck:
+    """Reservoir file paths that would be written outside the download path."""
+
+    @pytest.mark.parametrize(
+        "remote_path",
+        ["m/r/../x.bin", "m/r/./x.bin", "../x.bin", "/etc/passwd", "m/r"],
+    )
+    def test_model_relative_path_rejects(
+        self, reservoir_download_step: ReservoirDownloadStep, remote_path: str
+    ) -> None:
+        with pytest.raises(ReservoirFilePathInvalidError):
+            reservoir_download_step._model_relative_path(remote_path, "m/r")
+
+    @pytest.mark.parametrize(
+        ("remote_path", "model_prefix", "expected"),
+        [
+            ("m/r/a/b.bin", "m/r", "a/b.bin"),
+            ("/a/b.bin", "/", "a/b.bin"),
+            ("m/r2/x.bin", "m/r", "m/r2/x.bin"),
+        ],
+    )
+    def test_model_relative_path_strips_prefix(
+        self,
+        reservoir_download_step: ReservoirDownloadStep,
+        remote_path: str,
+        model_prefix: str,
+        expected: str,
+    ) -> None:
+        relative = reservoir_download_step._model_relative_path(remote_path, model_prefix)
+        assert relative == PurePosixPath(expected)
+
+    def test_prepare_local_path_creates_parent(
+        self, reservoir_download_step: ReservoirDownloadStep, tmp_path: Path
+    ) -> None:
+        dest_path = tmp_path / "dest"
+        local_path = reservoir_download_step._prepare_local_path(
+            dest_path, PurePosixPath("a/b.bin")
+        )
+        assert local_path == dest_path / "a" / "b.bin"
+        assert local_path.parent.is_dir()
+
+    def test_prepare_local_path_rejects_symlinked_parent(
+        self, reservoir_download_step: ReservoirDownloadStep, tmp_path: Path
+    ) -> None:
+        dest_path = tmp_path / "dest"
+        dest_path.mkdir()
+        outside = tmp_path / "outside"
+        (dest_path / "link").symlink_to(outside, target_is_directory=True)
+
+        with pytest.raises(ReservoirFilePathInvalidError):
+            reservoir_download_step._prepare_local_path(dest_path, PurePosixPath("link/sub/x.bin"))
+        assert not outside.exists()
+
+    def test_prepare_local_path_rejects_symlinked_file(
+        self, reservoir_download_step: ReservoirDownloadStep, tmp_path: Path
+    ) -> None:
+        dest_path = tmp_path / "dest"
+        dest_path.mkdir()
+        target = tmp_path / "target.bin"
+        target.write_text("keep")
+        (dest_path / "x.bin").symlink_to(target)
+
+        with pytest.raises(ReservoirFilePathInvalidError):
+            reservoir_download_step._prepare_local_path(dest_path, PurePosixPath("x.bin"))
+        assert target.read_text() == "keep"

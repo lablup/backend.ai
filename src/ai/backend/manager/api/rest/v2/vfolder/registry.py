@@ -63,8 +63,14 @@ def register_v2_vfolder_routes(
         middlewares=[auth_required],
     )
     registry.add(
-        "DELETE",
+        "PATCH",
         "/{vfolder_id}",
+        handler.update,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
+        "/{vfolder_id}/delete",
         handler.delete,
         middlewares=[auth_required],
     )
@@ -148,14 +154,39 @@ def register_v2_vfolder_routes(
     )
     registry.add(
         "POST",
-        "/delete",
-        handler.bulk_delete,
+        "/partial-bulk-update",
+        handler.partial_bulk_update,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
+        "/partial-bulk-delete",
+        handler.partial_bulk_delete,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
+        "/partial-bulk-restore",
+        handler.partial_bulk_restore,
         middlewares=[auth_required],
     )
     registry.add(
         "POST",
         "/purge",
         handler.bulk_purge,
+        middlewares=[auth_required],
+    )
+    # Deprecated since NEXT_RELEASE_VERSION.
+    registry.add(
+        "DELETE",
+        "/{vfolder_id}",
+        handler.deprecated_delete,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
+        "/delete",
+        handler.bulk_delete,
         middlewares=[auth_required],
     )
 

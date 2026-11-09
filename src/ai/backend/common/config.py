@@ -21,7 +21,6 @@ from pydantic import (
 from ai.backend.logging.structured import StructuredLogger
 
 from . import validators as tx
-from .etcd import AsyncEtcd, ConfigScopes
 from .exception import BackendAIError, ConfigurationError, ModelDefinitionValidationError
 from .model_service_start_command_compat import resolve_model_service_start_command
 from .types import BackendAISchema, RedisHelperConfig, SchemaValidationFailureInfo
@@ -35,7 +34,6 @@ __all__ = (
     "merge",
     "override_key",
     "override_with_env",
-    "read_from_etcd",
     "read_from_file",
     "redis_config_iv",
     "redis_helper_config_iv",
@@ -95,13 +93,24 @@ class BaseConfigModel(BackendAISchema):
     )
 
 
+def _align_etcd_addr_and_addrs(etcd: dict[str, Any]) -> dict[str, Any]:
+    if etcd.get("addrs") is not None:
+        return {**etcd, "addr": etcd["addrs"]}
+    addr = etcd["addr"]
+    return {**etcd, "addrs": addr if isinstance(addr, list) else [addr]}
+
+
 etcd_config_iv = t.Dict({
     t.Key("etcd"): t.Dict({
         t.Key("namespace"): t.String,
         t.Key("addr", default=("127.0.0.1", 2379)): tx.HostPortPair | t.List(tx.HostPortPair),
+        t.Key("addrs", optional=True): t.List(tx.HostPortPair, min_length=1),
         t.Key("user", default=""): t.Null | t.String(allow_blank=True),
         t.Key("password", default=""): t.Null | t.String(allow_blank=True),
-    }).allow_extra("*"),
+        t.Key("keep-alive-interval", default=5.0): t.ToFloat(gt=0),
+        t.Key("keep-alive-timeout", default=3.0): t.ToFloat(gt=0),
+    }).allow_extra("*")
+    & _align_etcd_addr_and_addrs,
 }).allow_extra("*")
 
 redis_helper_default_config: RedisHelperConfig = {
@@ -1033,18 +1042,6 @@ def read_from_file(toml_path: Path | str | None, daemon_name: str) -> tuple[dict
         }) from e
     else:
         return config, discovered_path
-
-
-async def read_from_etcd(
-    etcd_config: Mapping[str, Any], scope_prefix_map: Mapping[ConfigScopes, str]
-) -> dict[str, Any] | None:
-    async with AsyncEtcd(etcd_config["addr"], etcd_config["namespace"], scope_prefix_map) as etcd:
-        raw_value = await etcd.get("daemon/config")
-    if raw_value is None:
-        return None
-    config: dict[str, Any]
-    config = tomli.loads(raw_value)
-    return config
 
 
 def override_key(table: MutableMapping[str, Any], key_path: tuple[str, ...], value: Any) -> None:

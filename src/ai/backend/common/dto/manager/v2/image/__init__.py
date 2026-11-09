@@ -13,8 +13,8 @@ from ai.backend.common.dto.manager.v2.image.request import (
     ImageOrder,
     ImageOrderByInputDTO,
     PurgeImageInput,
-    RescanImagesInput,
     RestoreImageInput,
+    ScanImageInput,
     SearchImagesInput,
 )
 from ai.backend.common.dto.manager.v2.image.response import (
@@ -27,8 +27,8 @@ from ai.backend.common.dto.manager.v2.image.response import (
     ImageNode,
     ImagePermissionInfoDTO,
     PurgeImagePayload,
-    RescanImagesPayload,
     RestoreImagePayload,
+    ScanImagePayload,
     SearchImagesPayload,
 )
 from ai.backend.common.dto.manager.v2.image.types import (
@@ -62,7 +62,7 @@ __all__ = (
     "ImageOrder",
     "ImageOrderByInputDTO",
     "PurgeImageInput",
-    "RescanImagesInput",
+    "ScanImageInput",
     "SearchImagesInput",
     # Response models
     "AdminSearchImageAliasesPayload",
@@ -75,6 +75,6 @@ __all__ = (
     "ImageNode",
     "ImagePermissionInfoDTO",
     "PurgeImagePayload",
-    "RescanImagesPayload",
+    "ScanImagePayload",
     "SearchImagesPayload",
 )

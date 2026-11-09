@@ -4,6 +4,7 @@ from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 from typing import Self, override
 
+from ai.backend.common.clients.valkey_client.sentinel_monitor.base import AbstractSentinelMonitor
 from ai.backend.common.message_queue.abc import (
     AbstractAnycaster,
     AbstractBroadcaster,
@@ -71,15 +72,24 @@ class RedisQueue(AbstractMessageQueue):
         self._subscriber = subscriber
 
     @classmethod
-    async def create(cls, redis_target: RedisTarget, args: RedisMQArgs) -> Self:
+    async def create(
+        cls,
+        redis_target: RedisTarget,
+        args: RedisMQArgs,
+        sentinel_monitor: AbstractSentinelMonitor | None = None,
+    ) -> Self:
         """
         Create a RedisQueue instance with all four components.
         """
         # Create anycaster
-        anycaster = await RedisAnycaster.create(redis_target, args.anycast_stream_key, args.db)
+        anycaster = await RedisAnycaster.create(
+            redis_target, args.anycast_stream_key, args.db, sentinel_monitor
+        )
 
         # Create broadcaster
-        broadcaster = await RedisBroadcaster.create(redis_target, args.broadcast_channel, args.db)
+        broadcaster = await RedisBroadcaster.create(
+            redis_target, args.broadcast_channel, args.db, sentinel_monitor
+        )
 
         # Create consumer
         consume_stream_keys = args.consume_stream_keys or set()
@@ -93,11 +103,14 @@ class RedisQueue(AbstractMessageQueue):
                 args.autoclaim_idle_timeout,
                 args.autoclaim_start_id,
             ),
+            sentinel_monitor,
         )
 
         # Create subscriber
         subscribe_channels = args.subscribe_channels or set()
-        subscriber = await RedisSubscriber.create(redis_target, subscribe_channels, args.db)
+        subscriber = await RedisSubscriber.create(
+            redis_target, subscribe_channels, args.db, sentinel_monitor
+        )
 
         return cls(anycaster, broadcaster, consumer, subscriber)
 

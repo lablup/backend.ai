@@ -55,7 +55,10 @@ from ai.backend.manager.models.specs.conditions.datetime import DateTimeConditio
 from ai.backend.manager.models.specs.conditions.enum import EnumConditions
 from ai.backend.manager.models.specs.conditions.integer import IntConditions
 from ai.backend.manager.models.specs.conditions.number import DecimalConditions
-from ai.backend.manager.models.specs.conditions.string import StringConditions
+from ai.backend.manager.models.specs.conditions.string import (
+    DelimitedStringConditions,
+    StringConditions,
+)
 from ai.backend.manager.models.specs.conditions.uuid import UUIDConditions
 from ai.backend.manager.models.specs.orders.column import ColumnOrder
 from ai.backend.manager.models.specs.search.converter import RowDataConverter
@@ -90,8 +93,8 @@ class _DeploymentOwnFields(RowDataConverter[EndpointRow, ModelDeploymentData]):
     )
     desired_replicas = SearchableField(
         EndpointRow.desired_replicas,
-        IntConditions(EndpointRow.desired_replicas),
-        ColumnOrder(EndpointRow.desired_replicas),
+        IntConditions(sa.func.coalesce(EndpointRow.desired_replicas, EndpointRow.replicas)),
+        ColumnOrder(sa.func.coalesce(EndpointRow.desired_replicas, EndpointRow.replicas)),
     )
     domain = SearchableField(
         EndpointRow.domain, StringConditions(EndpointRow.domain), ColumnOrder(EndpointRow.domain)
@@ -115,7 +118,9 @@ class _DeploymentOwnFields(RowDataConverter[EndpointRow, ModelDeploymentData]):
         ColumnOrder(EndpointRow.scaling_state),
     )
     tag = SearchableField(
-        EndpointRow.tag, StringConditions(EndpointRow.tag), ColumnOrder(EndpointRow.tag)
+        EndpointRow.tag,
+        DelimitedStringConditions(EndpointRow.tag),
+        ColumnOrder(EndpointRow.tag),
     )
     open_to_public = SearchableField(
         EndpointRow.open_to_public,
@@ -175,6 +180,7 @@ class _DeploymentOwnFields(RowDataConverter[EndpointRow, ModelDeploymentData]):
         open_to_public = self.open_to_public.read(row)
         tag = self.tag.read(row)
         desired_replicas = self.desired_replicas.read(row)
+        replicas = self.replicas.read(row)
         return ModelDeploymentData(
             id=self.entity_id.read(row),
             metadata=ModelDeploymentMetadataInfo(
@@ -198,9 +204,10 @@ class _DeploymentOwnFields(RowDataConverter[EndpointRow, ModelDeploymentData]):
             revision_history_ids=[],
             scaling_rule_ids=[],
             replica_state=ReplicaStateData(
+                replica_count=replicas,
                 desired_replica_count=desired_replicas
                 if desired_replicas is not None
-                else self.replicas.read(row),
+                else replicas,
                 replica_ids=[],
             ),
             default_deployment_strategy=DeploymentStrategy.ROLLING,

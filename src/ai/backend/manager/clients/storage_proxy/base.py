@@ -8,6 +8,7 @@ from typing import Any, Final, cast
 import aiohttp
 import yarl
 from aiohttp import ClientTimeout
+from opentelemetry.propagate import inject
 
 from ai.backend.common.contexts.request_id import current_request_id
 from ai.backend.common.exception import (
@@ -166,6 +167,8 @@ class StorageProxyHTTPClient:
         }
         if (request_id := current_request_id()) is not None:
             headers[REQUEST_ID_HEADER] = request_id
+        # The session predates client instrumentation, so the trace context is set here.
+        inject(headers)
         async with self._client_session.request(
             method,
             yarl.URL(endpoint) / url,

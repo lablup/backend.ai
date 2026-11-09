@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+from uuid import UUID
+
 from pydantic import Field, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
-from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.query import DecimalFilter, StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.v2.common import NonEmptyList
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import SlotTypes
 
 from .types import (
@@ -29,6 +33,7 @@ __all__ = (
     "AllocatedResourceSlotFilter",
     "AllocatedResourceSlotOrder",
     "CreateResourceSlotTypeInput",
+    "PartialBulkPurgeResourceSlotTypesInput",
     "PurgeResourceSlotTypeInput",
     "ResourceAllocationFilter",
     "ResourceAllocationOrder",
@@ -48,6 +53,10 @@ class ResourceSlotTypeFilter(BaseRequestModel):
     slot_name: StringFilter | None = Field(default=None, description="Filter by slot name.")
     slot_type: StringFilter | None = Field(default=None, description="Filter by slot type.")
     display_name: StringFilter | None = Field(default=None, description="Filter by display name.")
+    entity_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by resource slot type ID.",
+    )
     AND: list[ResourceSlotTypeFilter] | None = Field(
         default=None, description="Logical AND of multiple filter conditions."
     )
@@ -161,6 +170,12 @@ class PurgeResourceSlotTypeInput(BaseRequestModel):
     slot_name: str = Field(description="Slot name identifying the slot type to remove.")
 
 
+class PartialBulkPurgeResourceSlotTypesInput(BaseRequestModel):
+    """Input for purging several resource slot types, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the resource slot types to purge.")
+
+
 # ========== AgentResource ==========
 
 
@@ -169,6 +184,14 @@ class AgentResourceFilter(BaseRequestModel):
 
     slot_name: StringFilter | None = Field(default=None, description="Filter by slot name.")
     agent_id: StringFilter | None = Field(default=None, description="Filter by agent ID.")
+    reserved: DecimalFilter | None = Field(default=None, description="Filter by reserved amount.")
+    prereserved: DecimalFilter | None = Field(
+        default=None, description="Filter by pre-reserved amount."
+    )
+    field_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by agent resource slot ID.",
+    )
     AND: list[AgentResourceFilter] | None = Field(
         default=None, description="Logical AND of multiple filter conditions."
     )
@@ -249,6 +272,10 @@ class ResourceAllocationFilter(BaseRequestModel):
 
     slot_name: StringFilter | None = Field(default=None, description="Filter by slot name.")
     kernel_id: UUIDFilter | None = Field(default=None, description="Filter by kernel ID.")
+    field_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by resource allocation ID.",
+    )
     AND: list[ResourceAllocationFilter] | None = Field(
         default=None, description="Logical AND of multiple filter conditions."
     )

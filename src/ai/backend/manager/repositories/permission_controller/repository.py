@@ -14,6 +14,7 @@ from ai.backend.manager.data.permission.permission import (
     PermissionData,
 )
 from ai.backend.manager.data.permission.role import (
+    AssignedUserData,
     AssignedUserListResult,
     BulkRoleAssignmentResultData,
     BulkRolePermissionReplaceResultData,
@@ -22,7 +23,6 @@ from ai.backend.manager.data.permission.role import (
     RoleData,
     RoleDetailData,
     RoleRevocationResult,
-    UserRoleAssignmentData,
     UserRoleAssignmentInput,
     UserRoleRevocationInput,
 )
@@ -120,9 +120,9 @@ class PermissionControllerRepository:
         return BulkRolePermissionReplaceResultData(role_id=role_id, successes=successes)
 
     @permission_controller_repository_resilience.apply()
-    async def assign_role(self, data: UserRoleAssignmentInput) -> UserRoleAssignmentData:
+    async def assign_role(self, data: UserRoleAssignmentInput) -> AssignedUserData:
         result = await self._db_source.assign_role(data)
-        return RoleAssignmentSearchableFields.own.to_assignment_data(result)
+        return RoleAssignmentSearchableFields.own.to_data(result)
 
     @permission_controller_repository_resilience.apply()
     async def revoke_role(self, data: UserRoleRevocationInput) -> RoleRevocationResult:
@@ -133,12 +133,9 @@ class PermissionControllerRepository:
         self,
         role_id: RoleID,
         user_ids: Sequence[UserID],
-        granted_by: UserID | None = None,
+        granted_by: UserID,
     ) -> BulkRoleAssignmentResultData:
-        rows = await self._db_source.bulk_assign_role(role_id, user_ids, granted_by)
-        return BulkRoleAssignmentResultData(
-            successes=[RoleAssignmentSearchableFields.own.to_assignment_data(row) for row in rows]
-        )
+        return await self._db_source.bulk_assign_role(role_id, user_ids, granted_by)
 
     @permission_controller_repository_resilience.apply()
     async def bulk_revoke_role(

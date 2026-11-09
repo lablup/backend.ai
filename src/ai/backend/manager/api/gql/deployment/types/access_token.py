@@ -11,6 +11,7 @@ from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.deployment.request import (
     AccessTokenFilter as AccessTokenFilterDTO,
 )
@@ -22,6 +23,9 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
     DeleteAccessTokenInput as DeleteAccessTokenInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    PartialBulkPurgeAccessTokensInput as PartialBulkPurgeAccessTokensInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.response import (
     AccessTokenNode as AccessTokenNodeDTO,
@@ -41,6 +45,7 @@ from ai.backend.manager.api.gql.base import (
     OrderDirection,
     UUIDFilter,
 )
+from ai.backend.manager.api.gql.common_types import PartialBulkFailureGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -51,7 +56,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_input,
     gql_pydantic_type,
 )
-from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 
@@ -66,9 +71,7 @@ class AccessTokenFilter(PydanticInputMixin[AccessTokenFilterDTO]):
     created_at: DateTimeFilter | None = None
 
     field_id: UUIDFilter | None = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION, description="Filter by access token ID."
-        ),
+        BackendAIGQLMeta(added_version="26.9.0", description="Filter by access token ID."),
         default=None,
     )
     AND: list[Self] | None = None
@@ -91,7 +94,7 @@ class AccessToken(PydanticNodeMixin[AccessTokenNodeDTO]):
     id: NodeID[str]
     field_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the access token.",
         ),
     )
@@ -172,3 +175,48 @@ class DeleteAccessTokenInput(PydanticInputMixin[DeleteAccessTokenInputDTO]):
 )
 class DeleteAccessTokenPayload:
     id: UUID
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION, description="Payload for access token purge."
+    ),
+    model=DeleteAccessTokenPayloadDTO,
+    name="PurgeAccessTokenPayload",
+)
+class PurgeAccessTokenPayload(PydanticOutputMixin[DeleteAccessTokenPayloadDTO]):
+    purged_id: ID = gql_field(description="Global ID of the purged access token.")
+    field_id: UUID = gql_field(description="UUID of the purged access token.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Input for permanently removing several access tokens, each answered for separately."
+        ),
+    ),
+    name="PartialBulkPurgeAccessTokensInput",
+)
+class PartialBulkPurgeAccessTokensInput(PydanticInputMixin[PartialBulkPurgeAccessTokensInputDTO]):
+    ids: list[UUID] = gql_field(description="IDs of the access tokens to purge.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Result of a partial bulk access token operation: the tokens processed and the ones "
+            "that failed."
+        ),
+    ),
+    model=PartialBulkPayload[AccessTokenNodeDTO],
+    name="PartialBulkAccessTokensPayload",
+)
+class PartialBulkAccessTokensPayload(PydanticOutputMixin[PartialBulkPayload[AccessTokenNodeDTO]]):
+    successes: list[AccessToken] = gql_field(
+        description="The tokens processed, as they stood before removal."
+    )
+    failed: list[PartialBulkFailureGQL] = gql_field(
+        description="The tokens not processed, each with the reason."
+    )

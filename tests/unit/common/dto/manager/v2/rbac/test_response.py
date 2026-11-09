@@ -266,32 +266,41 @@ class TestUpdateRolePayload:
 class TestDeleteRolePayload:
     """Tests for DeleteRolePayload model."""
 
-    def test_creation_with_uuid(self) -> None:
+    @pytest.fixture
+    def deleted_role(self) -> RoleNode:
         role_id = uuid.uuid4()
-        payload = DeleteRolePayload(id=role_id)
-        assert payload.id == role_id
+        now = datetime.now(tz=UTC)
+        return RoleNode(
+            id=role_id,
+            entity_id=role_id,
+            name="Admin",
+            source=RoleSourceDTO.CUSTOM,
+            status=RoleStatusDTO.DELETED,
+            created_at=now,
+            updated_at=now,
+            scope_type=EntityType("project"),
+            scope_id=_SCOPE_ID,
+        )
 
-    def test_id_is_uuid_instance(self) -> None:
-        role_id = uuid.uuid4()
-        payload = DeleteRolePayload(id=role_id)
-        assert isinstance(payload.id, uuid.UUID)
+    def test_creation_with_role_node(self, deleted_role: RoleNode) -> None:
+        payload = DeleteRolePayload(id=deleted_role.id, role=deleted_role)
+        assert payload.id == deleted_role.id
+        assert payload.role.status == RoleStatusDTO.DELETED
 
-    def test_creation_from_uuid_string(self) -> None:
-        role_id = uuid.uuid4()
-        payload = DeleteRolePayload.model_validate({"id": str(role_id)})
-        assert payload.id == role_id
+    def test_creation_from_uuid_string(self, deleted_role: RoleNode) -> None:
+        payload = DeleteRolePayload.model_validate({
+            "id": str(deleted_role.id),
+            "role": deleted_role.model_dump(mode="json"),
+        })
+        assert payload.id == deleted_role.id
+        assert payload.role.entity_id == deleted_role.entity_id
 
-    def test_round_trip_serialization(self) -> None:
-        role_id = uuid.uuid4()
-        payload = DeleteRolePayload(id=role_id)
+    def test_round_trip_serialization(self, deleted_role: RoleNode) -> None:
+        payload = DeleteRolePayload(id=deleted_role.id, role=deleted_role)
         json_str = payload.model_dump_json()
         restored = DeleteRolePayload.model_validate_json(json_str)
-        assert restored.id == role_id
-
-    def test_id_matches_input(self) -> None:
-        role_id = uuid.uuid4()
-        payload = DeleteRolePayload(id=role_id)
-        assert payload.id == role_id
+        assert restored.id == deleted_role.id
+        assert restored.role == deleted_role
 
 
 class TestPurgeRolePayload:
@@ -299,22 +308,22 @@ class TestPurgeRolePayload:
 
     def test_creation_with_uuid(self) -> None:
         role_id = uuid.uuid4()
-        payload = PurgeRolePayload(id=role_id)
+        payload = PurgeRolePayload(id=role_id, entity_id=role_id)
         assert payload.id == role_id
 
     def test_id_is_uuid_instance(self) -> None:
         role_id = uuid.uuid4()
-        payload = PurgeRolePayload(id=role_id)
+        payload = PurgeRolePayload(id=role_id, entity_id=role_id)
         assert isinstance(payload.id, uuid.UUID)
 
     def test_creation_from_uuid_string(self) -> None:
         role_id = uuid.uuid4()
-        payload = PurgeRolePayload.model_validate({"id": str(role_id)})
+        payload = PurgeRolePayload.model_validate({"id": str(role_id), "entity_id": str(role_id)})
         assert payload.id == role_id
 
     def test_round_trip_serialization(self) -> None:
         role_id = uuid.uuid4()
-        payload = PurgeRolePayload(id=role_id)
+        payload = PurgeRolePayload(id=role_id, entity_id=role_id)
         json_str = payload.model_dump_json()
         restored = PurgeRolePayload.model_validate_json(json_str)
         assert restored.id == role_id

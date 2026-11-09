@@ -34,7 +34,7 @@ from ai.backend.common.types import SlotQuantity
 from ai.backend.manager.actions.v2.ops.result import LookupOpsResult
 from ai.backend.manager.api.rest.resource.handler import ResourceHandler
 from ai.backend.manager.data.manager_status.types import ManagerStatus
-from ai.backend.manager.dto.context import RequestCtx, UserContext
+from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.models.user.row import UserRole
 
 # ---------------------------------------------------------------------------
@@ -282,7 +282,7 @@ class TestCheckPresets:
         handler: ResourceHandler,
         mock_processors: MagicMock,
     ) -> None:
-        """Verify group, scaling_group, access_key etc. are passed to Action and response is returned."""
+        """Verify group, scaling_group, user etc. are passed to Action and response is returned."""
         user_uuid = uuid.uuid4()
         body: BodyParam[CheckPresetsRequest] = BodyParam(CheckPresetsRequest)
         body.from_body({"scaling_group": "sg-test", "group": "test-group"})
@@ -295,21 +295,13 @@ class TestCheckPresets:
             is_admin=False,
             is_superadmin=False,
         )
-        mock_req = MagicMock(spec=web.Request)
-        storage: dict[str, Any] = {
-            "keypair": {"access_key": "AKTEST", "resource_policy": "default"},
-        }
-        mock_req.__getitem__ = lambda _, key: storage[key]
-        req_ctx = RequestCtx(request=mock_req)
         mock_result, _ = self._create_mock_result()
         mock_processors.resource_preset.check_presets.run = AsyncMock(return_value=mock_result)
 
-        response = await handler.check_presets(body, user_context, req_ctx)
+        response = await handler.check_presets(body, user_context)
 
         call_args = mock_processors.resource_preset.check_presets.run.call_args
         action = call_args[0][0]
-        assert action.access_key == "AKTEST"
-        assert action.resource_policy == "default"
         assert action.domain_name == "default"
         assert action.user_id == user_uuid
         assert action.group == "test-group"
@@ -346,16 +338,10 @@ class TestCheckPresets:
             is_admin=False,
             is_superadmin=False,
         )
-        mock_req = MagicMock(spec=web.Request)
-        storage: dict[str, Any] = {
-            "keypair": {"access_key": "AKTEST", "resource_policy": "default"},
-        }
-        mock_req.__getitem__ = lambda _, key: storage[key]
-        req_ctx = RequestCtx(request=mock_req)
         mock_result, _ = self._create_mock_result()
         mock_processors.resource_preset.check_presets.run = AsyncMock(return_value=mock_result)
 
-        response = await handler.check_presets(body, user_context, req_ctx)
+        response = await handler.check_presets(body, user_context)
 
         response_body = response.to_json
         assert response_body is not None

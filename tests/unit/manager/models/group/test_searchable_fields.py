@@ -9,11 +9,11 @@ from typing import Any
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.agent.row import AgentRow
@@ -28,7 +28,6 @@ from ai.backend.manager.models.deployment_revision_preset.row import DeploymentR
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.domain.searchable_fields import DomainSearchableFields
 from ai.backend.manager.models.endpoint.row import EndpointRow
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.keypair.row import KeyPairRow

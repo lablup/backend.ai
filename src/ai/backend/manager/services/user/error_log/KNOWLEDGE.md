@@ -14,13 +14,15 @@ generated:
 status: stable
 ---
 
-# Error log service — Knowledge
+# Error log service: Knowledge
 
 > Rules: `../AGENTS.md`. Spec selection: `../../models/specs/KNOWLEDGE.md`.
 
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
+
 This package records the errors users and components hit, and answers who may
 read them back. It exists as its own domain because the table has two kinds of
-row — one owned by a user, one owned by nobody — and only the first goes through
+row (one owned by a user, one owned by nobody), and only the first goes through
 the action layer.
 
 ## The processor fields
@@ -41,7 +43,7 @@ the entity type, shape, operation, gate and backing.
 
 - A super admin reads the whole table; everyone else reads inside their own
   scope. The REST handler picks between them.
-- Keeping them separate is what lets each carry its own gate — one action that
+- Keeping them separate is what lets each carry its own gate: one action that
   widened itself would have to be authorized for the narrow case and then
   return the wide result.
 
@@ -50,7 +52,7 @@ the entity type, shape, operation, gate and backing.
 - `is_cleared` is the lifecycle column: the owner's read excludes cleared rows
   while the admin read still returns them.
 - It is therefore a `DELETE` carrying `ErrorLogSoftDeleteUpdater`, whose
-  `build_values()` is a constant — a transition taken as an argument can be
+  `build_values()` is a constant. A transition taken as an argument can be
   passed backwards.
 - The action is single-entity because by then the row exists to name; the scope
   shape would authorize the caller's own scope rather than the row being cleared.
@@ -60,6 +62,6 @@ the entity type, shape, operation, gate and backing.
 - Ownership used to be enforced by a WHERE clause in the repository; it now
   rests on the RBAC validators.
 - No `migrate_error_log_data_to_rbac` exists, so until the permission rows land
-  a non-super-admin caller is refused.
+  a non-super-admin caller is rejected.
 - The component suite cannot see either state: it replaces the virtual-entity
   validators with mocks, so its fixtures admit every caller.

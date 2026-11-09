@@ -17,6 +17,7 @@ from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.common import (
     EnvironmentVariableEntryInput,
+    NonEmptyList,
     OrderDirection,
     ResourceSlotEntryInput,
 )
@@ -28,8 +29,11 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.types import (
     DeploymentRevisionPresetOrderField,
     DeploymentRevisionPresetUsage,
 )
+from ai.backend.common.dto.manager.v2.entity_label.request import EntityLabelNestedFilter
 from ai.backend.common.dto.manager.v2.resource_slot.types import ResourceOptsEntryDTO
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.tristate.unset import UNSET, Unset
+from ai.backend.common.typed_validators import HealthCheckPath
 
 
 class PresetModelHealthCheckInput(BaseRequestModel):
@@ -39,7 +43,7 @@ class PresetModelHealthCheckInput(BaseRequestModel):
         "immediately and the remaining fields are ignored.",
     )
     interval: float = Field(default=10.0, description="Interval in seconds between health checks.")
-    path: str = Field(default="/health", description="Path to check for health status.")
+    path: HealthCheckPath = Field(default="/health", description="Path to check for health status.")
     max_retries: int = Field(default=10, description="Maximum number of retries for health check.")
     max_wait_time: float = Field(
         default=15.0, description="Maximum time in seconds to wait for a health check response."
@@ -185,7 +189,7 @@ class UpdatePresetModelHealthCheckInput(BaseRequestModel):
 
     enable: bool | None | Unset = Field(default=UNSET)
     interval: float | None | Unset = Field(default=UNSET)
-    path: str | None | Unset = Field(default=UNSET)
+    path: HealthCheckPath | None | Unset = Field(default=UNSET)
     max_retries: int | None | Unset = Field(default=UNSET)
     max_wait_time: float | None | Unset = Field(default=UNSET)
     expected_status_code: Annotated[int, Field(gt=100)] | None | Unset = Field(default=UNSET)
@@ -281,10 +285,35 @@ class UpdateDeploymentRevisionPresetInput(BaseRequestModel):
     deployment_strategy: DeploymentStrategyInput | None | Unset = Field(default=UNSET)
 
 
+class PartialBulkUpdateDeploymentRevisionPresetsInput(BaseRequestModel):
+    """Input for updating several presets, each answered for separately."""
+
+    items: NonEmptyList[UpdateDeploymentRevisionPresetInput] = Field(
+        description="The presets to update, each naming its preset by `id`."
+    )
+
+
+class PartialBulkPurgeDeploymentRevisionPresetsInput(BaseRequestModel):
+    """Input for permanently removing several presets, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the presets to purge.")
+
+
 class DeploymentRevisionPresetFilter(BaseRequestModel):
-    id: UUIDFilter | None = Field(default=None, description="Filter by preset ID.")
+    id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `entity_id`.",
+        deprecated=True,
+    )
+    entity_id: UUIDFilter | None = Field(
+        default=None, description=f"Added in {NEXT_RELEASE_VERSION}. Filter by preset ID."
+    )
     name: StringFilter | None = Field(default=None)
     runtime_variant_id: UUIDFilter | None = Field(default=None)
+    labels: EntityLabelNestedFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by the labels on the entity.",
+    )
     AND: list[DeploymentRevisionPresetFilter] | None = Field(default=None)
     OR: list[DeploymentRevisionPresetFilter] | None = Field(default=None)
     NOT: list[DeploymentRevisionPresetFilter] | None = Field(default=None)

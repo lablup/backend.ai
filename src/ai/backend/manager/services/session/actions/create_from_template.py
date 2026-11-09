@@ -7,6 +7,7 @@ from typing import Any, override
 import yarl
 
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.defs.session import JOB_PRIORITY_DEFAULT
 from ai.backend.common.types import AccessKey, ClusterMode, SessionTypes
@@ -87,3 +88,7 @@ class CreateFromTemplateActionResult(SessionScopeActionResult):
 
     # TODO: Add proper type
     result: Mapping[str, Any]
+
+    @override
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
+        return (SessionID(self.session_id),)

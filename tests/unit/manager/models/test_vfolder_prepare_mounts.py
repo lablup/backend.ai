@@ -11,6 +11,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.types import EntityIdentifier
@@ -26,7 +27,6 @@ from ai.backend.common.types import (
     VFolderMountPolicy,
     VFolderMountRequest,
 )
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
 from ai.backend.manager.errors.api import InvalidAPIParameters
@@ -41,7 +41,6 @@ from ai.backend.manager.models.deployment_revision.row import DeploymentRevision
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.endpoint.row import EndpointRow
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.keypair.row import KeyPairRow

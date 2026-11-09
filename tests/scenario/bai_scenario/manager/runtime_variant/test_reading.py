@@ -24,6 +24,7 @@ from ai.backend.testutils.scenario_steps import (
     Refused,
     Same,
     SameAs,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -39,11 +40,11 @@ from bai_scenario.components.runtime_variant import (
     TheVariantsInTheOrderAsked,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Loaded = list[RuntimeVariantNode | Exception | None]
-type ReadingStep = Scenario[SeedingSession, Any, RuntimeVariantAdapter, Any]
+type ReadingStep = Scenario[TestSeedingSession, Any, RuntimeVariantAdapter, Any]
 
 
 @dataclass(frozen=True)
@@ -59,7 +60,15 @@ class ReadingById(When[AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariant
     @override
     def describe(self, laid: AVariantAndACaller) -> str:
         target = "존재하지 않는 id" if self.unknown else laid.variant.name
-        return f"{laid.caller.username}이 {target}(으)로 조회"
+        if self.unknown:
+            return Says(
+                f"{laid.caller.username}이 존재하지 않는 id 로 조회합니다",
+                english=f"{laid.caller.username} reads a runtime variant by an unknown id",
+            )
+        return Says(
+            f"{laid.caller.username}이 {target}(으)로 조회합니다",
+            english=f"{laid.caller.username} reads the runtime variant {target}",
+        )
 
     @override
     async def call(
@@ -81,7 +90,13 @@ class ResolvingByName(When[AVariantAndACaller, RuntimeVariantAdapter, RuntimeVar
 
     @override
     def describe(self, laid: AVariantAndACaller) -> str:
-        return f"{laid.caller.username}이 이름 {self.named or laid.variant.name}(을)를 id로 변환"
+        return Says(
+            f"{laid.caller.username}이 이름 {self.named or laid.variant.name}(을)를 id 로 변환합니다",
+            english=(
+                f"{laid.caller.username} resolves the name {self.named or laid.variant.name} "
+                "to an id"
+            ),
+        )
 
     @override
     async def call(
@@ -101,7 +116,14 @@ class ReadingManyByIds(When[ManyVariantsAndACaller, RuntimeVariantAdapter, Loade
 
     @override
     def describe(self, laid: ManyVariantsAndACaller) -> str:
-        return f"{laid.caller.username}이 미리 만들어 둔 {len(laid.laid)}개와 없는 id 하나를 한 번에 조회"
+        return Says(
+            f"{laid.caller.username}이 미리 저장한 {len(laid.laid)}개와 없는 id 하나를 한 번에 "
+            "조회합니다",
+            english=(
+                f"{laid.caller.username} reads {len(laid.laid)} runtime variants seeded in "
+                "advance and one unknown id in one call"
+            ),
+        )
 
     @override
     async def call(self, adapter: RuntimeVariantAdapter, laid: ManyVariantsAndACaller) -> Loaded:
@@ -123,7 +145,10 @@ class ReadingNoIds(When[AVariantAndACaller, RuntimeVariantAdapter, Loaded]):
 
     @override
     def describe(self, laid: AVariantAndACaller) -> str:
-        return f"{laid.caller.username}이 빈 id 목록으로 조회"
+        return Says(
+            f"{laid.caller.username}이 빈 id 목록으로 조회합니다",
+            english=f"{laid.caller.username} reads with an empty id list",
+        )
 
     @override
     async def call(self, adapter: RuntimeVariantAdapter, laid: AVariantAndACaller) -> Loaded:
@@ -137,14 +162,29 @@ class TheLaidVariantsId(Then[AVariantAndACaller, RuntimeVariantID]):
 
     @override
     def says(self) -> str:
-        return "미리 만들어 둔 변형의 id가 반환된다"
+        return Says(
+            "미리 저장한 인퍼런스 런타임 종류의 id 가 반환됩니다",
+            english="the id of the runtime variant seeded in advance comes back",
+        )
 
     @override
     def look(self, laid: AVariantAndACaller, answered: Answered[RuntimeVariantID]) -> list[Verdict]:
         resolved = answered.response
         if resolved is None:
             return [Refused(EntityNotFoundError, answered.raised)]
-        return [Held[UUID]("id", resolved, SameAs[UUID](laid.variant.id, "미리 만들어 둔 변형"))]
+        return [
+            Held[UUID](
+                "id",
+                resolved,
+                SameAs[UUID](
+                    laid.variant.id,
+                    Says(
+                        "미리 저장한 인퍼런스 런타임 종류",
+                        english="the runtime variant seeded in advance",
+                    ),
+                ),
+            )
+        ]
 
 
 @dataclass(frozen=True)
@@ -153,7 +193,7 @@ class NothingComesBack(Then[Any, Loaded]):
 
     @override
     def says(self) -> str:
-        return "빈 응답이 반환된다"
+        return Says("빈 응답이 반환됩니다", english="an empty response comes back")
 
     @override
     def look(self, laid: Any, answered: Answered[Loaded]) -> list[Verdict]:
@@ -165,7 +205,7 @@ class NothingComesBack(Then[Any, Loaded]):
 
 @dataclass(frozen=True)
 class AUserGrantedNothingReadsById(
-    Scenario[SeedingSession, AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]
+    Scenario[TestSeedingSession, AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]
 ):
     started: datetime
 
@@ -175,10 +215,17 @@ class AUserGrantedNothingReadsById(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 없는 사용자가 id로 조회하면, 그 변형 전체가 반환된다. 이 조회는 인증만 확인한다"
+        return Says(
+            "아무 권한도 없는 사용자가 id 로 조회하면, 그 인퍼런스 런타임 종류 전체가 반환됩니다. "
+            "이 조회는 인증만 확인합니다",
+            english=(
+                "when a user granted nothing reads a runtime variant by id, the whole runtime "
+                "variant comes back. This read checks authentication only"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AVariantAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AVariantAndACaller]:
         return AVariantAndSomeone()
 
     @override
@@ -192,7 +239,7 @@ class AUserGrantedNothingReadsById(
 
 @dataclass(frozen=True)
 class AnIdNothingAnswersToIsNotFound(
-    Scenario[SeedingSession, AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]
+    Scenario[TestSeedingSession, AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode]
 ):
     @override
     def summary(self) -> str:
@@ -200,13 +247,18 @@ class AnIdNothingAnswersToIsNotFound(
 
     @override
     def describe(self) -> str:
-        return (
-            "존재하지 않는 id로 조회하면 거부된다. 권한을 물을 대상이 없으므로, 없는 것인지 "
-            "닿지 못하는 것인지는 응답으로 드러나지 않는다"
+        return Says(
+            "존재하지 않는 id 로 조회하면 거부됩니다. 권한을 요구할 대상이 없으므로, 없는 것인지 "
+            "접근하지 못하는 것인지는 응답으로 드러나지 않습니다",
+            english=(
+                "when a read names an id that nothing answers to, it is rejected. There is no "
+                "target to ask for permission on, so the response does not show whether it does "
+                "not exist or cannot be reached"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AVariantAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AVariantAndACaller]:
         return AVariantAndSomeone()
 
     @override
@@ -220,7 +272,7 @@ class AnIdNothingAnswersToIsNotFound(
 
 @dataclass(frozen=True)
 class ANameResolvesToItsId(
-    Scenario[SeedingSession, AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantID]
+    Scenario[TestSeedingSession, AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantID]
 ):
     @override
     def summary(self) -> str:
@@ -228,10 +280,16 @@ class ANameResolvesToItsId(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 없는 사용자가 이름을 id로 변환하면 그 변형의 id가 반환된다"
+        return Says(
+            "아무 권한도 없는 사용자가 이름을 id 로 변환하면 그 인퍼런스 런타임 종류의 id 가 반환됩니다",
+            english=(
+                "when a user granted nothing resolves a name to an id, the id of that runtime "
+                "variant comes back"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AVariantAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AVariantAndACaller]:
         return AVariantAndSomeone()
 
     @override
@@ -245,7 +303,7 @@ class ANameResolvesToItsId(
 
 @dataclass(frozen=True)
 class ANameNothingAnswersToIsNotFound(
-    Scenario[SeedingSession, AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantID]
+    Scenario[TestSeedingSession, AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantID]
 ):
     @override
     def summary(self) -> str:
@@ -253,13 +311,18 @@ class ANameNothingAnswersToIsNotFound(
 
     @override
     def describe(self) -> str:
-        return (
-            "존재하지 않는 이름을 id로 변환하면 거부된다. 변환한 대상에 권한 검사가 뒤따르므로 "
-            "존재하지 않는 이름과 닿지 못하는 이름이 같은 이름으로 거부된다"
+        return Says(
+            "존재하지 않는 이름을 id 로 변환하면 거부됩니다. 변환한 대상에 권한 검사가 뒤따르므로 "
+            "존재하지 않는 이름과 접근하지 못하는 이름이 같은 방식으로 거부됩니다",
+            english=(
+                "when a name that nothing answers to is resolved to an id, it is rejected. A "
+                "permission check follows on the resolved target, so a name that does not exist "
+                "and a name that cannot be reached are rejected the same way"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AVariantAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AVariantAndACaller]:
         return AVariantAndSomeone()
 
     @override
@@ -273,7 +336,7 @@ class ANameNothingAnswersToIsNotFound(
 
 @dataclass(frozen=True)
 class MixedIdsComeBackInOrder(
-    Scenario[SeedingSession, ManyVariantsAndACaller, RuntimeVariantAdapter, Loaded]
+    Scenario[TestSeedingSession, ManyVariantsAndACaller, RuntimeVariantAdapter, Loaded]
 ):
     started: datetime
 
@@ -283,10 +346,17 @@ class MixedIdsComeBackInOrder(
 
     @override
     def describe(self) -> str:
-        return "있는 id 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id에 해당하는 항목은 비어 있다"
+        return Says(
+            "있는 id 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id 에 "
+            "해당하는 항목은 비어 있습니다",
+            english=(
+                "when two existing ids and one unknown id are read in one call, the items come "
+                "back in the order asked and the item for the unknown id is empty"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyVariantsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyVariantsAndACaller]:
         return ManyVariantsAndSomeone(besides=1)
 
     @override
@@ -300,7 +370,7 @@ class MixedIdsComeBackInOrder(
 
 @dataclass(frozen=True)
 class AnEmptyListAnswersEmpty(
-    Scenario[SeedingSession, AVariantAndACaller, RuntimeVariantAdapter, Loaded]
+    Scenario[TestSeedingSession, AVariantAndACaller, RuntimeVariantAdapter, Loaded]
 ):
     @override
     def summary(self) -> str:
@@ -308,10 +378,16 @@ class AnEmptyListAnswersEmpty(
 
     @override
     def describe(self) -> str:
-        return "빈 id 목록을 주면 빈 응답이 반환된다. 하위 계층을 호출하지 않는다"
+        return Says(
+            "빈 id 목록을 주면 빈 응답이 반환됩니다. 하위 계층을 호출하지 않습니다",
+            english=(
+                "when an empty id list is given, an empty response comes back. The lower layer "
+                "is not called"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AVariantAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AVariantAndACaller]:
         return AVariantAndSomeone()
 
     @override

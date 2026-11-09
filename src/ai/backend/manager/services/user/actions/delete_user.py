@@ -7,6 +7,7 @@ from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
+from ai.backend.manager.data.user.types import UserData
 
 __all__ = ("DeleteUserAction", "DeleteUserActionResult")
 
@@ -34,4 +35,4 @@ class DeleteUserAction(BaseSingleEntityAction):
 
 @dataclass(frozen=True)
 class DeleteUserActionResult:
-    pass
+    user: UserData

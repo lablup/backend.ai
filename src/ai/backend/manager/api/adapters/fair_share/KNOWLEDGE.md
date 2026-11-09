@@ -1,26 +1,24 @@
 ---
 name: fair-share-adapter-scenarios
 type: reference
-description: TODO - what the fair share adapter guarantees, as scenarios; nobody has written these yet
+description: "what the fair share adapter guarantees: the global authorization check on weight writes and the single transaction of bulk upsert"
 scope: src/ai/backend/manager/api/adapters/fair_share
-keywords: [fair share, scenario, adapter, todo]
+keywords: [fair share, weight, upsert, atomic bulk, scenario, adapter, rbac]
 generated:
-  by: claude-code/opus-5
-  at: 2026-09-10
+  by: claude-code/opus-5.5
+  at: 2026-10-16
 status: draft
 ---
-# fair_share 어댑터 — 시나리오
+# fair_share adapter: Knowledge
 
-TODO. 아직 아무도 적지 않았다.
+The rules are in `AGENTS.md` in the parent directory. When this document and a run result disagree, doubt the sentence first.
 
-규칙은 상위 디렉터리의 `AGENTS.md`에 있다. 이 파일이 이 모양으로 남아 있는 동안, 이 엔티티는
-시나리오 테스트가 없다.
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
-## 적는 법
+A fair share record takes a resource group and one of domain, project and user together as its key. The call that writes a weight is a permission check that refers to that resource group, but the target type it checks is global, not resource group. A role cannot grant a global type permission, so a user who received update permission through a role granted in that resource group cannot write a weight either. Only superadmin can write a weight today.
 
-1. `adapter.py`가 내놓는 호출을 전부 훑는다.
-2. 호출마다 무엇을 보장하는지 한 문장으로 적는다. 권한이 있는 경우와 없는 경우를 짝으로 둔다.
-3. 동작별로 표를 나눈다. 각 줄은 상황, 요청, 결과 셋을 갖는다.
-4. 어느 시나리오도 부르지 않는 호출은 "아직 적지 않은 것"에 남긴다.
+## Setting one weight
 
-먼저 적힌 것을 보려면 `../domain/KNOWLEDGE.md`를 참고한다.
+## Setting several weights at once
+
+Setting several is one transaction. It does not respond per item, and a failure rejects the whole call.

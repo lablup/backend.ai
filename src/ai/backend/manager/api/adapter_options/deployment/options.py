@@ -8,16 +8,16 @@ per-deployment path and the per-resource-group default path.
 
 from __future__ import annotations
 
-from ai.backend.common.dto.manager.v2.deployment_options import (
-    DeploymentHandlerOptionsInfo,
-    DeploymentHandlerOptionsInput,
-    DeploymentOptionsInfo,
+from ai.backend.common.dto.manager.v2.deployment_options.request import (
     DeploymentOptionsInput,
 )
-from ai.backend.common.dto.manager.v2.session_options import (
+from ai.backend.common.dto.manager.v2.deployment_options.response import (
+    DeploymentHandlerOptionsInfo,
+    DeploymentOptionsInfo,
     HandlerOptionsEntryInfo,
     HandlerOptionsInfo,
 )
+from ai.backend.common.dto.manager.v2.session_options.types import AgentSelectionPolicyEnum
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.manager.data.deployment.types import (
     DeploymentHandlerOptions,
@@ -26,8 +26,8 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.session.options import HandlerOptions
 
 __all__ = (
+    "deployment_handler_options_from_input",
     "deployment_options_to_info",
-    "deployment_options_from_input",
 )
 
 
@@ -58,15 +58,21 @@ def deployment_options_to_info(options: DeploymentOptions) -> DeploymentOptionsI
     """Project the domain model to the API response DTO."""
     return DeploymentOptionsInfo(
         handler_options=_handler_options_to_info(options.handler_options),
+        agent_selection_policy=AgentSelectionPolicyEnum(options.agent_selection_policy.value),
     )
 
 
-def _handler_options_from_input(
-    options: DeploymentHandlerOptionsInput,
+def deployment_handler_options_from_input(
+    options: DeploymentOptionsInput,
+    *,
     valid_handler_names: frozenset[str],
 ) -> DeploymentHandlerOptions:
+    """Project the handler options of the payload into the domain model.
+
+    Rejects a duplicate or unregistered ``handler_name`` with :class:`InvalidAPIParameters`.
+    """
     by_handler: dict[str, HandlerOptions] = {}
-    for entry in options.by_handler:
+    for entry in options.handler_options.by_handler:
         if entry.handler_name in by_handler:
             raise InvalidAPIParameters(
                 f"Duplicate handler_name in handler_options.by_handler: {entry.handler_name!r}"
@@ -82,26 +88,8 @@ def _handler_options_from_input(
         )
     return DeploymentHandlerOptions(
         default=HandlerOptions(
-            timeout=options.default.timeout_sec,
-            max_retry_count=options.default.max_retry_count,
+            timeout=options.handler_options.default.timeout_sec,
+            max_retry_count=options.handler_options.default.max_retry_count,
         ),
         by_handler=by_handler,
-    )
-
-
-def deployment_options_from_input(
-    options: DeploymentOptionsInput,
-    *,
-    valid_handler_names: frozenset[str],
-) -> DeploymentOptions:
-    """Validate and project an incoming API payload into the domain
-    model.
-
-    ``valid_handler_names`` is the runtime set of handlers registered on
-    the deployment coordinator; any ``by_handler`` key outside this set
-    is rejected as :class:`InvalidAPIParameters`. Duplicate keys are
-    likewise rejected.
-    """
-    return DeploymentOptions(
-        handler_options=_handler_options_from_input(options.handler_options, valid_handler_names),
     )

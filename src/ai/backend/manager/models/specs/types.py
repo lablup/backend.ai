@@ -110,6 +110,15 @@ class BulkResultWithFailures[TData]:
     errors: dict[EntityIdentifier, Exception]
 
 
+@dataclass(frozen=True)
+class EntityInsertIfAbsentResult:
+    """The entity an insert skipped where a row held its conflict key names, and whether
+    this run inserted it."""
+
+    entity_id: EntityIdentifier
+    inserted: bool
+
+
 @dataclass
 class EntityWithFieldsResult[TData, TFieldData]:
     """An entity and the field rows created under it in the same transaction.

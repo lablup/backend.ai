@@ -31,10 +31,8 @@ from ai.backend.common.events.types import EventCacheDomain, EventDomain
 from ai.backend.common.json import dump_json_str
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.dto.context import RequestCtx, UserContext
-from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.errors.resource import NoCurrentTaskContext
 from ai.backend.manager.exceptions import InvalidArgument
-from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.services.project.actions.lookup import LookupProjectAction
 from ai.backend.manager.services.session.actions.lookup import LookupSessionAction
 
@@ -89,12 +87,6 @@ class EventsHandler:
         scope = params.scope
         user_role = request["user"]["role"]
         user_uuid = user_ctx.user_uuid
-        access_key = params.owner_access_key
-        if access_key is None:
-            access_key = user_ctx.access_key
-        if user_role == UserRole.USER:
-            if access_key != user_ctx.access_key:
-                raise GenericForbidden
         group_name = params.group_name
         if scope == "*":
             scope = "session,kernel"
@@ -131,9 +123,7 @@ class EventsHandler:
             "user_uuid": user_uuid,
             "domain_name": request["user"]["domain_name"],
             "group_id": group_id,
-            "session_name": session_name,
             "session_id": resolved_session_id,
-            "access_key": access_key,
         }
         aliases: list[tuple[EventDomain, str]] = []
         for item in scope.split(","):

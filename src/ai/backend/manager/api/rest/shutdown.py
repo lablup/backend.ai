@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from http import HTTPStatus
 
 from aiohttp import web
@@ -13,6 +14,10 @@ class ServerDrainNotifier:
 
     def notify_draining(self) -> None:
         self._draining = True
+
+    async def drain(self, drain_period: float) -> None:
+        self.notify_draining()
+        await asyncio.sleep(drain_period)
 
     @property
     def is_draining(self) -> bool:

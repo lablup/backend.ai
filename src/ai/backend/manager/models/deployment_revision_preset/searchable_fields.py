@@ -7,6 +7,7 @@ from typing import override
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_preset import DeploymentPresetEntityType
 from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.manager.data.deployment_revision_preset.types import (
@@ -17,6 +18,10 @@ from ai.backend.manager.data.deployment_revision_preset.types import (
 from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetValueData
 from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
+from ai.backend.manager.models.entity_label.searchable_fields import (
+    EntityLabelCorrelation,
+    EntityLabelSearchableFields,
+)
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.resource_slot.row import (
     ModelCardResourceRequirementRow,
@@ -31,7 +36,7 @@ from ai.backend.manager.models.specs.conditions.uuid import UUIDConditions
 from ai.backend.manager.models.specs.orders.column import ColumnOrder
 from ai.backend.manager.models.specs.search.converter import RowDataConverter
 from ai.backend.manager.models.specs.search.correlation import ToManyCorrelation
-from ai.backend.manager.models.specs.search.field import SearchableField
+from ai.backend.manager.models.specs.search.field import NestedSearchableField, SearchableField
 from ai.backend.manager.models.specs.search.usage import UsedByConditions
 
 
@@ -192,6 +197,19 @@ def _meets_every_minimum() -> sa.sql.expression.ColumnElement[bool]:
     )
 
 
+class _DeploymentPresetNestedFields:
+    """Rows of other tables the preset owns: its labels."""
+
+    labels = NestedSearchableField(
+        EntityLabelSearchableFields.own,
+        EntityLabelCorrelation(
+            DeploymentRevisionPresetRow,
+            DeploymentPresetEntityType(),
+            DeploymentRevisionPresetRow.id,
+        ),
+    )
+
+
 class _DeploymentPresetUsage:
     """Uses between a preset and other entities."""
 
@@ -225,4 +243,5 @@ class _DeploymentPresetLinkedEntities:
 
 class DeploymentPresetSearchableFields:
     own = _DeploymentPresetOwnFields()
+    nested = _DeploymentPresetNestedFields
     linked = _DeploymentPresetLinkedEntities

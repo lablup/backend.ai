@@ -109,7 +109,11 @@ from ai.backend.common.exception import InvalidAPIParameters as InvalidUserScope
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderID, VFolderMountPolicy
 from ai.backend.logging.structured import StructuredLogger
-from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
+from ai.backend.manager.data.vfolder.types import (
+    VFolderOwnershipType,
+    VFolderStatusSet,
+    vfolder_status_map,
+)
 from ai.backend.manager.dto.context import (
     RequestCtx,
     UserContext,
@@ -139,7 +143,6 @@ from ai.backend.manager.models.vfolder.creators import (
     UnmanagedProjectVFolderCreator,
     VFolderBaseCreator,
 )
-from ai.backend.manager.models.vfolder.row import VFolderStatusSet, vfolder_status_map
 from ai.backend.manager.models.vfolder.scopes import (
     ProjectVFolderTarget,
     UserVFolderTarget,
@@ -259,11 +262,13 @@ class VFolderHandler:
 
         # A project folder is created in the project named; with none named the folder
         # is the caller's own, and its spec finds the personal project by its owner.
-        # Only an administrator may point a folder at a path the manager does not own.
+        # Only a superadmin may point a folder at a path the manager does not own.
         creator: VFolderBaseCreator
-        if params.unmanaged_path and ctx.user_role not in (UserRole.ADMIN, UserRole.SUPERADMIN):
-            raise Forbidden("Insufficient permission")
-        mount_permission = VFolderMountPolicy(params.permission.value)
+        if params.unmanaged_path and ctx.user_role != UserRole.SUPERADMIN:
+            raise Forbidden("Only superadmins can create a vfolder with an unmanaged path.")
+        mount_permission = (
+            None if params.permission is None else VFolderMountPolicy(params.permission.value)
+        )
         if params.group_id is not None:
             project_id = ProjectID(params.group_id)
             project_quota_scope = str(QuotaScopeID(QuotaScopeType.PROJECT, project_id))
@@ -332,13 +337,16 @@ class VFolderHandler:
         # a generic 500 "Internal server error." title.
 
         vfolder = result.vfolder
+        levels = await self._mount_levels([vfolder.id])
         item = VFolderItemField(
             id=vfolder.id.hex,
             name=vfolder.name,
             quota_scope_id=str(vfolder.quota_scope_id),
             host=vfolder.host,
             usage_mode=vfolder.usage_mode,
-            permission=VFolderPermissionField(vfolder.default_mount_permission.value),
+            permission=VFolderPermissionField(
+                levels.get(vfolder.id, VFolderMountPolicy.NONE).value
+            ),
             max_size=0,
             creator=vfolder.creator or ctx.user_email,
             ownership_type=VFolderOwnershipTypeField(vfolder.ownership_type.value),
@@ -822,6 +830,7 @@ class VFolderHandler:
         result = await self._vfolder_file.mkdir.run(
             MkdirAction(
                 user_id=vfctx.user_uuid,
+                keypair_resource_policy=req.request["keypair"]["resource_policy"],
                 vfolder_uuid=VFolderUUID(row["id"]),
                 path=params.path,
                 parents=params.parents,
@@ -998,6 +1007,7 @@ class VFolderHandler:
         await self._vfolder_file.delete_files.run(
             DeleteFilesAction(
                 user_uuid=vfctx.user_uuid,
+                keypair_resource_policy=req.request["keypair"]["resource_policy"],
                 vfolder_uuid=VFolderUUID(row["id"]),
                 files=params.files,
                 recursive=params.recursive,
@@ -1029,6 +1039,7 @@ class VFolderHandler:
         result = await self._vfolder_file.delete_files_async.run(
             DeleteFilesAsyncAction(
                 user_uuid=vfctx.user_uuid,
+                keypair_resource_policy=req.request["keypair"]["resource_policy"],
                 vfolder_uuid=VFolderUUID(row["id"]),
                 files=params.files,
                 recursive=params.recursive,
@@ -1139,11 +1150,18 @@ class VFolderHandler:
             vfolder_name=req.request.match_info["name"],
             invitee_emails=",".join(invitee_emails),
         )
+        # Every folder lands in a project; one left with none yet is its user's.
+        owner_scope: EntityIdentifier = (
+            ProjectID(uuid.UUID(row["group"]))
+            if row["group"] is not None
+            else UserID(uuid.UUID(row["user"]))
+        )
         result = await self._vfolder_invite.invite_vfolder.run(
             InviteVFolderAction(
                 keypair_resource_policy=req.request["keypair"]["resource_policy"],
                 user_uuid=vfctx.user_uuid,
                 vfolder_uuid=VFolderUUID(row["id"]),
+                owner_scope=owner_scope,
                 mount_permission=perm,
                 invitee_emails=invitee_emails,
             )
@@ -1543,15 +1561,21 @@ class VFolderHandler:
                 target_quota_scope_id=params.target_quota_scope_id,
                 cloneable=params.cloneable,
                 usage_mode=params.usage_mode,
-                mount_permission=VFolderMountPolicy(params.permission.value),
+                mount_permission=(
+                    None
+                    if params.permission is None
+                    else VFolderMountPolicy(params.permission.value)
+                ),
             )
         )
+        target_id = VFolderUUID(result.target_vfolder_id)
+        levels = await self._mount_levels([target_id])
         dto = VFolderCloneInfoDTO(
             id=result.target_vfolder_id.hex,
             name=params.target_name,
             host=result.target_vfolder_host,
             usage_mode=result.usage_mode,
-            permission=VFolderPermissionField(result.mount_permission.value),
+            permission=VFolderPermissionField(levels.get(target_id, VFolderMountPolicy.NONE).value),
             creator=vfctx.user_email,
             ownership_type=VFolderOwnershipTypeField(result.ownership_type.value),
             user=str(result.owner_user_uuid) if result.owner_user_uuid is not None else None,

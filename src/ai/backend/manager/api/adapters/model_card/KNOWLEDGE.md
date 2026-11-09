@@ -1,29 +1,32 @@
 ---
 name: model-card-adapter-scenarios
 type: reference
-description: what the model card adapter guarantees, as scenarios; the tests in tests/scenario/bai_scenario/manager/model_card match these
+description: what the model card adapter guarantees; update and purge authorization, and the partial bulk result shape
 scope: src/ai/backend/manager/api/adapters/model_card
-keywords: [model card, scenario, adapter, rbac]
+keywords: [model card, scenario, adapter, rbac, purge, partial_bulk]
 generated:
   by: claude-code/opus-5
-  at: 2026-09-10
+  at: 2026-10-16
 status: draft
 ---
-# 모델 카드 어댑터 — 시나리오
+# model card adapter: Knowledge
 
-규칙은 상위 디렉터리의 `AGENTS.md`에 있다.
+The rules are in `AGENTS.md` in the parent directory.
 
-## 조회
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 모델 카드가 없을 때 슈퍼관리자가 훑는다 | 모델 카드 없음 | 전체 조회 | 비어 있음 |
-| 슈퍼관리자가 아닌 사용자가 훑는다 | 권한 없음 | 전체 조회 | 역할로 거부 |
+## Get
 
-## 아직 적지 않은 것
+## Update
 
-`create`가 아직 없다. 모델 카드는 폴더 위에 얹히므로 폴더를 먼저 세워야 한다.
+A card is attached to a vfolder placed in a project. The user who created the card and the caller differ. The permission comes from the project the card is placed in. Update reads the updated card together with the minimum resource requirements and responds with it, so it needs the read permission too.
 
-`admin_bulk_delete`, `available_presets`, `batch_load_fields`, `create`, `delete`,
-`deploy`, `get`, `min_resources`, `ownership_search`, `project_search`, `scan_project`,
-`scoped_search`, `update`.
+## purge
+
+Purge deletes the card row. With the option, it moves the card's vfolder into the trash.
+
+## Bulk update
+
+## Bulk purge
+
+A bulk operation does not reject the whole call. Processed cards go into the processed list, and failures carry the id and the reason in the failure list. The minimum resource requirements of a purged card are deleted with the card and are not in the processed list.

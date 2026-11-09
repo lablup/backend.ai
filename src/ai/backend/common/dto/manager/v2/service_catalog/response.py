@@ -12,10 +12,8 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.v2.service_catalog.types import (
-    EndpointInfo,
     ServiceCatalogStatus,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "AdminSearchServiceCatalogsPayload",
@@ -32,7 +30,7 @@ class ServiceCatalogNode(BaseResponseModel):
 
     id: UUID = Field(description="Service catalog entry ID")
     entity_id: UUID = Field(
-        description=f"UUID of the service catalog. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the service catalog. Added in 26.9.0.",
     )
     service_group: str = Field(description="Service group name")
     instance_id: str = Field(description="Unique instance identifier")
@@ -44,9 +42,6 @@ class ServiceCatalogNode(BaseResponseModel):
     registered_at: datetime = Field(description="Registration timestamp")
     last_heartbeat: datetime = Field(description="Last heartbeat timestamp")
     config_hash: str = Field(description="Hash of service configuration")
-    endpoints: list[EndpointInfo] = Field(
-        default_factory=list, description="List of service endpoints"
-    )
 
 
 class CreateServiceCatalogPayload(BaseResponseModel):

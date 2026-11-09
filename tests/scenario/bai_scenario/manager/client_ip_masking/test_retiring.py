@@ -21,7 +21,7 @@ from ai.backend.manager.api.adapters.client_ip_masking.adapter import ClientIPMa
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Configured, Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.client_ip_masking import (
     AMaskingPolicyAndACaller,
@@ -30,11 +30,11 @@ from bai_scenario.components.client_ip_masking import (
 )
 from bai_scenario.components.system import ENFORCEMENT
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type RetiringStep = Scenario[
-    SeedingSession, AMaskingPolicyAndACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode
+    TestSeedingSession, AMaskingPolicyAndACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode
 ]
 
 
@@ -46,21 +46,28 @@ class Purging(When[AMaskingPolicyAndACaller, ClientIPMaskingAdapter, ClientIPMas
 
     @override
     def operation(self) -> str:
-        return "admin_purge"
+        return "purge"
 
     @override
     def describe(self, laid: AMaskingPolicyAndACaller) -> str:
-        target = (
-            "존재하지 않는 id" if self.unknown else f"{laid.policy.target_type.value} 대상 정책"
+        if self.unknown:
+            target_ko = "존재하지 않는 id"
+            target_en = "an id nothing answers to"
+        else:
+            target = laid.policy.target_type.value
+            target_ko = f"{target} 대상 정책"
+            target_en = f"the policy for {target}"
+        return Says(
+            f"{laid.caller.username} 이 {target_ko}를 삭제합니다",
+            english=f"{laid.caller.username} deletes {target_en}",
         )
-        return f"{laid.caller.username}이 {target} 삭제"
 
     @override
     async def call(
         self, adapter: ClientIPMaskingAdapter, laid: AMaskingPolicyAndACaller
     ) -> ClientIPMaskingPolicyNode:
         with ActingAs(laid.caller):
-            payload = await adapter.admin_purge(
+            payload = await adapter.purge(
                 ClientIPMaskingPolicyID(uuid4()) if self.unknown else laid.policy.id
             )
         return payload.policy
@@ -69,7 +76,10 @@ class Purging(When[AMaskingPolicyAndACaller, ClientIPMaskingAdapter, ClientIPMas
 @dataclass(frozen=True)
 class TheSuperadminPurgesAPolicy(
     Scenario[
-        SeedingSession, AMaskingPolicyAndACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode
+        TestSeedingSession,
+        AMaskingPolicyAndACaller,
+        ClientIPMaskingAdapter,
+        ClientIPMaskingPolicyNode,
     ]
 ):
     started: datetime
@@ -80,10 +90,16 @@ class TheSuperadminPurgesAPolicy(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 정책을 id로 삭제하면 삭제한 정책 전체를 담은 응답이 반환된다"
+        return Says(
+            "superadmin 이 정책을 id 로 삭제하면 삭제한 정책 전체를 담은 응답이 반환됩니다",
+            english=(
+                "when the superadmin deletes a policy by id, a response comes back carrying the "
+                "whole deleted policy"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AMaskingPolicyAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AMaskingPolicyAndACaller]:
         return AMaskingPolicyAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -100,7 +116,10 @@ class TheSuperadminPurgesAPolicy(
 @dataclass(frozen=True)
 class AnIdNothingAnswersToIsNotFound(
     Scenario[
-        SeedingSession, AMaskingPolicyAndACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode
+        TestSeedingSession,
+        AMaskingPolicyAndACaller,
+        ClientIPMaskingAdapter,
+        ClientIPMaskingPolicyNode,
     ]
 ):
     @override
@@ -109,10 +128,16 @@ class AnIdNothingAnswersToIsNotFound(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다"
+        return Says(
+            ("superadmin 이 존재하지 않는 id 를 삭제하면 대상을 찾을 수 없다는 이유로 거부됩니다"),
+            english=(
+                "when the superadmin deletes an id nothing answers to, it is rejected because the "
+                "target cannot be found"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AMaskingPolicyAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AMaskingPolicyAndACaller]:
         return AMaskingPolicyAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -129,7 +154,10 @@ class AnIdNothingAnswersToIsNotFound(
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotPurge(
     Scenario[
-        SeedingSession, AMaskingPolicyAndACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode
+        TestSeedingSession,
+        AMaskingPolicyAndACaller,
+        ClientIPMaskingAdapter,
+        ClientIPMaskingPolicyNode,
     ]
 ):
     @override
@@ -138,10 +166,20 @@ class AUserGrantedNothingMayNotPurge(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 없는 사용자가 정책을 삭제하면 권한 부족으로 거부된다. 등록이 역할 부족으로 거부되는 것과는 다른 검사다"
+        return Says(
+            (
+                "아무 권한도 없는 사용자가 정책을 삭제하면 권한 부족으로 거부됩니다. 등록이 역할 "
+                "부족으로 거부되는 것과는 다른 검사입니다"
+            ),
+            english=(
+                "when a user granted nothing deletes a policy, it is rejected for a lack of "
+                "permission. This is a different check from the registration rejected for an "
+                "insufficient role"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AMaskingPolicyAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AMaskingPolicyAndACaller]:
         return AMaskingPolicyAndSomeone()
 
     @override
@@ -158,7 +196,10 @@ class AUserGrantedNothingMayNotPurge(
 @dataclass(frozen=True)
 class AUserGrantedNothingPurgingAnUnknownIdIsRefusedForPermission(
     Scenario[
-        SeedingSession, AMaskingPolicyAndACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode
+        TestSeedingSession,
+        AMaskingPolicyAndACaller,
+        ClientIPMaskingAdapter,
+        ClientIPMaskingPolicyNode,
     ]
 ):
     @override
@@ -169,13 +210,21 @@ class AUserGrantedNothingPurgingAnUnknownIdIsRefusedForPermission(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 없는 사용자가 존재하지 않는 id를 삭제하면 대상 없음이 아니라 권한 부족으로 "
-            "거부된다. 권한 검사가 먼저 실행되고 없는 행에는 부여된 권한도 없기 때문이다"
+        return Says(
+            (
+                "아무 권한도 없는 사용자가 존재하지 않는 id 를 삭제하면 대상 없음이 아니라 권한 "
+                "부족으로 거부됩니다. 권한 검사가 먼저 실행되고 없는 row 에는 부여된 권한도 없기 "
+                "때문입니다"
+            ),
+            english=(
+                "when a user granted nothing deletes an id nothing answers to, it is rejected "
+                "for a lack of permission rather than a missing target, because the permission "
+                "check runs first and no permission is granted on a row that does not exist"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AMaskingPolicyAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AMaskingPolicyAndACaller]:
         return AMaskingPolicyAndSomeone()
 
     @override
@@ -192,7 +241,10 @@ class AUserGrantedNothingPurgingAnUnknownIdIsRefusedForPermission(
 @dataclass(frozen=True)
 class EnforcementOffLetsAnyonePurge(
     Scenario[
-        SeedingSession, AMaskingPolicyAndACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode
+        TestSeedingSession,
+        AMaskingPolicyAndACaller,
+        ClientIPMaskingAdapter,
+        ClientIPMaskingPolicyNode,
     ],
     Configured,
 ):
@@ -204,14 +256,20 @@ class EnforcementOffLetsAnyonePurge(
 
     @override
     def describe(self) -> str:
-        return "권한 검사를 끄면 아무 권한도 없는 사용자도 정책을 삭제할 수 있다"
+        return Says(
+            "권한 검사를 끄면 아무 권한도 없는 사용자도 정책을 삭제할 수 있습니다",
+            english=(
+                "turning permission enforcement off lets even a user granted nothing delete a "
+                "policy"
+            ),
+        )
 
     @override
     def config(self) -> Mapping[str, Any]:
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, AMaskingPolicyAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AMaskingPolicyAndACaller]:
         return AMaskingPolicyAndSomeone()
 
     @override

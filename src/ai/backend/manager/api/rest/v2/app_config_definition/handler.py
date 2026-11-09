@@ -10,6 +10,7 @@ from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.data.entity.app_config_definition import AppConfigDefinitionID
 from ai.backend.common.dto.manager.v2.app_config_definition.request import (
     CreateAppConfigDefinitionInput,
+    PartialBulkPurgeAppConfigDefinitionsInput,
     PurgeAppConfigDefinitionInput,
     SearchAppConfigDefinitionsInput,
 )
@@ -56,12 +57,21 @@ class V2AppConfigDefinitionHandler:
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
-    async def admin_purge(
+    async def purge(
         self,
         path: PathParam[AppConfigDefinitionIdPathParam],
     ) -> APIResponse:
-        """Purge an app config definition by id (superadmin only)."""
-        result = await self._adapter.admin_purge(
+        """Purge an app config definition by id, with the allow-list entries and fragments
+        under it."""
+        result = await self._adapter.purge(
             PurgeAppConfigDefinitionInput(id=path.parsed.app_config_definition_id)
         )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_purge(
+        self,
+        body: BodyParam[PartialBulkPurgeAppConfigDefinitionsInput],
+    ) -> APIResponse:
+        """Purge several app config definitions, answering for each one."""
+        result = await self._adapter.partial_bulk_purge(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)

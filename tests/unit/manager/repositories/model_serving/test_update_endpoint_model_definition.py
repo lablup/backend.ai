@@ -13,6 +13,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.config import DefaultModelDefinition, ModelDefinition
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.contexts.user import with_user_context
@@ -23,8 +24,8 @@ from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.user.types import UserData
+from ai.backend.common.schema.deployment import IntOrPercent, ReplicaGroupRolloutSpec
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.image.types import ImageType
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
@@ -33,7 +34,6 @@ from ai.backend.manager.models.deployment_revision_preset.row import DeploymentR
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.endpoint.updaters import LegacyEndpointUpdater
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow
@@ -42,9 +42,9 @@ from ai.backend.manager.models.resource_group.row import (
     ResourceGroupForDomainRow,
     ResourceGroupForKeypairsRow,
     ResourceGroupForProjectRow,
-    ResourceGroupOpts,
     ResourceGroupRow,
 )
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -356,6 +356,10 @@ class TestModifyEndpointModelDefinitionRefresh:
                     id=ReplicaGroupID(group_id),
                     deployment_id=DeploymentID(endpoint_id),
                     current_revision_id=revision_id,
+                    rollout=ReplicaGroupRolloutSpec(
+                        max_surge=IntOrPercent(count=1),
+                        max_unavailable=IntOrPercent(count=0),
+                    ),
                 )
             )
             await sess.flush()

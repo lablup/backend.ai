@@ -18,18 +18,20 @@ from ai.backend.common.dto.manager.v2.login_client_type.response import (
 )
 from ai.backend.manager.api.adapters.login_client_type.adapter import LoginClientTypeAdapter
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.login_client_type import (
     EveryLaidTypeIsCounted,
     ManyTypesAndACaller,
     ManyTypesAndSomeone,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Searched = SearchLoginClientTypesPayload
-type SearchingStep = Scenario[SeedingSession, ManyTypesAndACaller, LoginClientTypeAdapter, Searched]
+type SearchingStep = Scenario[
+    TestSeedingSession, ManyTypesAndACaller, LoginClientTypeAdapter, Searched
+]
 
 
 @dataclass(frozen=True)
@@ -42,7 +44,10 @@ class SearchingEveryType(When[ManyTypesAndACaller, LoginClientTypeAdapter, Searc
 
     @override
     def describe(self, laid: ManyTypesAndACaller) -> str:
-        return f"{laid.caller.username}이 필터 없이 전체 조회"
+        return Says(
+            f"{laid.caller.username} 이 필터 없이 전체를 조회합니다",
+            english=f"{laid.caller.username} reads every login client type without a filter",
+        )
 
     @override
     async def call(self, adapter: LoginClientTypeAdapter, laid: ManyTypesAndACaller) -> Searched:
@@ -52,7 +57,7 @@ class SearchingEveryType(When[ManyTypesAndACaller, LoginClientTypeAdapter, Searc
 
 @dataclass(frozen=True)
 class AUserGrantedNothingCountsEveryType(
-    Scenario[SeedingSession, ManyTypesAndACaller, LoginClientTypeAdapter, Searched]
+    Scenario[TestSeedingSession, ManyTypesAndACaller, LoginClientTypeAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -60,10 +65,19 @@ class AUserGrantedNothingCountsEveryType(
 
     @override
     def describe(self) -> str:
-        return "종류 둘이 있을 때 아무 권한도 없는 사용자가 필터 없이 조회하면 둘 다 집계된다"
+        return Says(
+            (
+                "로그인 클라이언트 유형 둘이 있을 때 아무 권한도 없는 사용자가 필터 없이 조회하면 둘 "
+                "다 집계됩니다"
+            ),
+            english=(
+                "when two login client types exist and a user granted nothing reads without a "
+                "filter, both are counted"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyTypesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyTypesAndACaller]:
         return ManyTypesAndSomeone(besides=1)
 
     @override

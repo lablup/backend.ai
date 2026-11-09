@@ -2,16 +2,21 @@
 
 from __future__ import annotations
 
+from uuid import UUID
+
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter, ToManyFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.entity.types import EntityTarget
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 from .types import EntityLabelOrderField, OrderDirection
 
 __all__ = (
     "UpsertEntityLabelInput",
+    "PartialBulkUpsertEntityLabelInput",
+    "PartialBulkPurgeEntityLabelInput",
     "EntityLabelFilter",
     "EntityLabelNestedFilter",
     "EntityLabelOrder",
@@ -31,6 +36,10 @@ class EntityLabelFilter(BaseRequestModel):
     value: StringFilter | None = Field(default=None, description="Label value filter")
     entity_type: StringFilter | None = Field(default=None, description="Type of the labeled entity")
     entity_id: UUIDFilter | None = Field(default=None, description="ID of the labeled entity")
+    field_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by label ID",
+    )
     AND: list[EntityLabelFilter] | None = Field(
         default=None, description="All conditions must match"
     )
@@ -66,6 +75,21 @@ class UpsertEntityLabelInput(BaseRequestModel):
     target: EntityTarget = Field(description="The entity to label")
     key: str = Field(min_length=1, max_length=255, description="Label key")
     value: str = Field(min_length=1, max_length=255, description="Label value")
+
+
+class PartialBulkUpsertEntityLabelInput(BaseRequestModel):
+    """Input for putting several keys on several entities in one call. An entity may
+    appear in several items; its keys are written together or refused together."""
+
+    items: list[UpsertEntityLabelInput] = Field(
+        min_length=1, description="The labels to put, each naming the entity it goes on"
+    )
+
+
+class PartialBulkPurgeEntityLabelInput(BaseRequestModel):
+    """Input for taking several labels off in one call, each named by its own id."""
+
+    ids: list[UUID] = Field(min_length=1, description="Ids of the labels to take off")
 
 
 class EntityLabelPageInput(BaseRequestModel):

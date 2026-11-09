@@ -29,6 +29,7 @@ from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
 )
 from ai.backend.manager.models.rbac_models.role_preset.updaters import RolePresetUpdater
 from ai.backend.manager.models.specs.purger import GuardedFieldPurger
+from ai.backend.manager.models.specs.types import BulkResultWithFailures
 from ai.backend.manager.repositories.ops.v2.role_preset.provider import RolePresetOpsProvider
 
 
@@ -50,6 +51,29 @@ class RolePresetRepository:
                 )
             await w.sync_preset_roles(updater.preset_id)
             return data
+
+    async def partial_bulk_update(
+        self, updaters: Sequence[RolePresetUpdater]
+    ) -> BulkResultWithFailures[RolePresetData]:
+        """Apply each edit the way :meth:`update` does, each in its own savepoint."""
+        successes: dict[EntityIdentifier, RolePresetData] = {}
+        errors: dict[EntityIdentifier, Exception] = {}
+        async with self._ops.write_ops() as w:
+            for updater in updaters:
+                try:
+                    async with w.savepoint() as sp:
+                        data = await sp.update_data(updater)
+                        if data is None:
+                            raise EntityNotFoundError(
+                                entity_type=updater.preset_id.entity_type(),
+                                operation=ActionOperationType.UPDATE,
+                                extra_msg=f"RolePresetRow {updater.preset_id} not found",
+                            )
+                        await sp.sync_preset_roles(updater.preset_id)
+                        successes[updater.preset_id] = data
+                except Exception as e:
+                    errors[updater.preset_id] = e
+        return BulkResultWithFailures(successes=successes, errors=errors)
 
     async def add_permissions(
         self, preset_id: RolePresetID, creators: Sequence[RolePermissionPresetCreator]

@@ -93,12 +93,12 @@ class TestObjectStoragePayloads:
 
     def test_delete_payload(self) -> None:
         oid = uuid.uuid4()
-        payload = DeleteObjectStoragePayload(id=oid)
+        payload = DeleteObjectStoragePayload(id=oid, entity_id=oid)
         assert payload.id == oid
 
     def test_delete_payload_round_trip(self) -> None:
         oid = uuid.uuid4()
-        payload = DeleteObjectStoragePayload(id=oid)
+        payload = DeleteObjectStoragePayload(id=oid, entity_id=oid)
         restored = DeleteObjectStoragePayload.model_validate_json(payload.model_dump_json())
         assert restored.id == oid
 

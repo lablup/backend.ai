@@ -8,6 +8,7 @@ from ai.backend.common.clients.valkey_client.client import (
     AbstractValkeyClient,
     create_valkey_client,
 )
+from ai.backend.common.clients.valkey_client.sentinel_monitor.base import AbstractSentinelMonitor
 from ai.backend.common.data.image.types import InstalledImageInfo
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.json import dump_json_str, load_json
@@ -63,6 +64,7 @@ class ValkeyImageClient:
         *,
         db_id: int,
         human_readable_name: str,
+        sentinel_monitor: AbstractSentinelMonitor | None = None,
     ) -> Self:
         """
         Create a ValkeyImageClient instance.
@@ -76,6 +78,7 @@ class ValkeyImageClient:
             valkey_target=valkey_target,
             db_id=db_id,
             human_readable_name=human_readable_name,
+            sentinel_monitor=sentinel_monitor,
         )
         await client.connect()
         return cls(client=client)

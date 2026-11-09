@@ -9,6 +9,7 @@ from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.data.entity.idle_checker import IdleCheckerID
 from ai.backend.common.dto.manager.v2.idle_checker.request import (
     CreateIdleCheckerInput,
+    PartialBulkPurgeIdleCheckersInput,
     PurgeIdleCheckerInput,
     SearchIdleCheckersInput,
     UpdateIdleCheckerInput,
@@ -55,4 +56,12 @@ class V2IdleCheckerHandler:
         result = await self._adapter.admin_purge(
             PurgeIdleCheckerInput(id=IdleCheckerID(path.parsed.idle_checker_id))
         )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def admin_partial_bulk_purge(
+        self,
+        body: BodyParam[PartialBulkPurgeIdleCheckersInput],
+    ) -> APIResponse:
+        """Purge several idle checkers, answering for each one."""
+        result = await self._adapter.admin_partial_bulk_purge(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)

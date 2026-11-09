@@ -22,7 +22,7 @@ from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.errors.service import EndpointNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.deployment import (
     ADeploymentAndACaller,
@@ -31,13 +31,15 @@ from bai_scenario.components.deployment import (
     TheDeploymentNode,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type ReadingStep = Scenario[
-    SeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeploymentNode
+    TestSeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeploymentNode
 ]
-type RevisionStep = Scenario[SeedingSession, ADeploymentAndACaller, DeploymentAdapter, RevisionNode]
+type RevisionStep = Scenario[
+    TestSeedingSession, ADeploymentAndACaller, DeploymentAdapter, RevisionNode
+]
 
 
 @dataclass(frozen=True)
@@ -52,10 +54,15 @@ class ReadingById(When[ADeploymentAndACaller, DeploymentAdapter, DeploymentNode]
 
     @override
     def describe(self, laid: ADeploymentAndACaller) -> str:
-        called = (
-            "아무것도 갖지 않은 id" if self.named is not None else laid.deployment.metadata.name
+        if self.named is not None:
+            return Says(
+                f"{laid.caller.username} 이 아무것도 갖지 않은 id 로 조회합니다",
+                english=f"{laid.caller.username} reads by an id nothing answers to",
+            )
+        return Says(
+            f"{laid.caller.username} 이 {laid.deployment.metadata.name} 로 조회합니다",
+            english=f"{laid.caller.username} reads {laid.deployment.metadata.name}",
         )
-        return f"{laid.caller.username}이 {called}로 조회"
 
     @override
     async def call(self, adapter: DeploymentAdapter, laid: ADeploymentAndACaller) -> DeploymentNode:
@@ -74,7 +81,13 @@ class ReadingTheCurrentRevision(When[ADeploymentAndACaller, DeploymentAdapter, R
 
     @override
     def describe(self, laid: ADeploymentAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.deployment.metadata.name}의 현재 리비전을 조회"
+        return Says(
+            f"{laid.caller.username} 이 {laid.deployment.metadata.name}의 현재 리비전을 조회합니다",
+            english=(
+                f"{laid.caller.username} reads the current revision of "
+                f"{laid.deployment.metadata.name}"
+            ),
+        )
 
     @override
     async def call(self, adapter: DeploymentAdapter, laid: ADeploymentAndACaller) -> RevisionNode:
@@ -84,7 +97,7 @@ class ReadingTheCurrentRevision(When[ADeploymentAndACaller, DeploymentAdapter, R
 
 @dataclass(frozen=True)
 class TheGrantedUserReadsIt(
-    Scenario[SeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeploymentNode]
+    Scenario[TestSeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeploymentNode]
 ):
     started: datetime
 
@@ -94,10 +107,16 @@ class TheGrantedUserReadsIt(
 
     @override
     def describe(self) -> str:
-        return "배포 하나가 있고 읽기 권한을 받은 사용자가 id로 조회하면, 그 배포가 답으로 온다"
+        return Says(
+            "배포 하나가 있고 읽기 권한을 받은 사용자가 id 로 조회하면, 그 배포가 응답으로 옵니다",
+            english=(
+                "when a deployment exists and a user granted read reads it by id, that deployment "
+                "comes back in the response"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ADeploymentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:
         return ADeploymentInThatPlace(granted=(Permission.READ,))
 
     @override
@@ -111,7 +130,7 @@ class TheGrantedUserReadsIt(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotRead(
-    Scenario[SeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeploymentNode]
+    Scenario[TestSeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeploymentNode]
 ):
     @override
     def summary(self) -> str:
@@ -119,10 +138,16 @@ class AUserGrantedNothingMayNotRead(
 
     @override
     def describe(self) -> str:
-        return "같은 배포가 있고 아무 권한도 받지 않은 사용자가 조회하면, 권한 부족으로 거부된다"
+        return Says(
+            "같은 배포가 있고 아무 권한도 받지 않은 사용자가 조회하면, 권한 부족으로 거부됩니다",
+            english=(
+                "when the same deployment exists and a user with no grant reads it, the call is "
+                "rejected for lack of permission"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ADeploymentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:
         return ADeploymentInThatPlace()
 
     @override
@@ -136,7 +161,7 @@ class AUserGrantedNothingMayNotRead(
 
 @dataclass(frozen=True)
 class AnUnknownIdIsRefusedAsPermission(
-    Scenario[SeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeploymentNode]
+    Scenario[TestSeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeploymentNode]
 ):
     @override
     def summary(self) -> str:
@@ -144,13 +169,18 @@ class AnUnknownIdIsRefusedAsPermission(
 
     @override
     def describe(self) -> str:
-        return (
-            "읽기 권한을 받은 사용자가 아무것도 갖지 않은 id로 조회하면, 대상이 없다는 것이 "
-            "아니라 권한 부족으로 거부된다. 없는 행에는 걸린 권한도 없기 때문이다"
+        return Says(
+            "읽기 권한을 받은 사용자가 아무것도 갖지 않은 id 로 조회하면, 대상이 없다는 것이 "
+            "아니라 권한 부족으로 거부됩니다. 없는 row 에는 걸린 권한도 없기 때문입니다",
+            english=(
+                "when a user granted read reads by an id nothing answers to, the call is rejected "
+                "for lack of permission rather than as not found, because no permission is held "
+                "on a row that does not exist"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ADeploymentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:
         return ADeploymentInThatPlace(granted=(Permission.READ,))
 
     @override
@@ -164,7 +194,7 @@ class AnUnknownIdIsRefusedAsPermission(
 
 @dataclass(frozen=True)
 class AnUnknownIdIsNotFoundForASuperadmin(
-    Scenario[SeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeploymentNode]
+    Scenario[TestSeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeploymentNode]
 ):
     @override
     def summary(self) -> str:
@@ -172,13 +202,17 @@ class AnUnknownIdIsNotFoundForASuperadmin(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 아무것도 갖지 않은 id로 조회하면, 대상이 없다는 것으로 거부된다. "
-            "권한 검사를 지나가는 사람만 이 답을 본다"
+        return Says(
+            "superadmin 이 아무것도 갖지 않은 id 로 조회하면, 대상이 없다는 것으로 거부됩니다. "
+            "권한 검사를 지나가는 사람만 이 응답을 봅니다",
+            english=(
+                "when a superadmin reads by an id nothing answers to, the call is rejected as not "
+                "found; only someone who passes the permission check sees this response"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ADeploymentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:
         return ADeploymentInThatPlace(role=UserRole.SUPERADMIN)
 
     @override
@@ -192,7 +226,7 @@ class AnUnknownIdIsNotFoundForASuperadmin(
 
 @dataclass(frozen=True)
 class ADeploymentWithNoRevisionHasNoCurrentOne(
-    Scenario[SeedingSession, ADeploymentAndACaller, DeploymentAdapter, RevisionNode]
+    Scenario[TestSeedingSession, ADeploymentAndACaller, DeploymentAdapter, RevisionNode]
 ):
     @override
     def summary(self) -> str:
@@ -200,13 +234,17 @@ class ADeploymentWithNoRevisionHasNoCurrentOne(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "리비전이 딸리지 않은 배포의 현재 리비전을 조회하면, "
-            "현재 리비전이 없다는 이유로 거부된다"
+            "현재 리비전이 없다는 이유로 거부됩니다",
+            english=(
+                "reading the current revision of a deployment holding no revision is rejected "
+                "because there is no current revision"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ADeploymentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:
         return ADeploymentInThatPlace(granted=(Permission.READ,))
 
     @override
@@ -220,7 +258,7 @@ class ADeploymentWithNoRevisionHasNoCurrentOne(
 
 @dataclass(frozen=True)
 class TheSuperadminReadsAnothers(
-    Scenario[SeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeploymentNode]
+    Scenario[TestSeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeploymentNode]
 ):
     started: datetime
 
@@ -230,13 +268,18 @@ class TheSuperadminReadsAnothers(
 
     @override
     def describe(self) -> str:
-        return (
-            "다른 사람이 만든 배포를 아무 권한도 받지 않은 슈퍼관리자가 id로 조회하면, "
-            "그 배포가 답으로 온다. 역할이 권한 그래프를 지나간다"
+        return Says(
+            "다른 사람이 생성한 배포를 아무 권한도 받지 않은 superadmin 이 id 로 조회하면, "
+            "그 배포가 응답으로 옵니다. 역할이 권한 그래프를 지나갑니다",
+            english=(
+                "when a superadmin holding no grant reads another user's deployment by id, that "
+                "deployment comes back in the response; the role passes through the permission "
+                "graph"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ADeploymentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:
         return AnothersDeploymentAndASuperadmin()
 
     @override

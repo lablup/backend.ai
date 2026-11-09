@@ -249,6 +249,15 @@ class DeploymentStrategyGQL:
 )
 class ReplicaState:
     desired_replica_count: int
+    replica_count: int = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "The replica count the user set. Autoscaling changes only desiredReplicaCount,"
+                " so the two differ when an autoscaling rule set the count."
+            ),
+        )
+    )
 
 
 @gql_pydantic_type(
@@ -372,7 +381,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
     id: NodeID[str]
     entity_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the deployment.",
         ),
     )
@@ -703,7 +712,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="The labels on this deployment.",
         )
     )  # type: ignore[misc]
@@ -785,7 +794,7 @@ class ProjectDeploymentScopeGQL(PydanticInputMixin[ProjectDeploymentScopeDTO]):
 class ReplicaNestedFilterGQL(PydanticInputMixin[ReplicaNestedFilterDTO]):
     exists: bool | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description=(
                 "Matches parents that have at least one replica when true, and parents "
                 "with none when false. Says nothing about what the replicas hold."
@@ -813,7 +822,7 @@ class ReplicaNestedFilterGQL(PydanticInputMixin[ReplicaNestedFilterDTO]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Filter for the deployment scaling state.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
     ),
     name="ScalingStateFilter",
 )
@@ -885,28 +894,27 @@ class DeploymentFilter(PydanticInputMixin[DeploymentFilterDTO]):
 
     labels: EntityLabelNestedFilterGQL | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="Select entities by the labels on them.",
         ),
         default=None,
     )
     entity_id: UUIDFilter | None = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION, description="Filter by deployment ID."
-        ),
+        BackendAIGQLMeta(added_version="26.9.0", description="Filter by deployment ID."),
         default=None,
     )
     desired_replicas: IntFilter | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
-            description="Filter by the requested replica count.",
+            added_version="26.9.0",
+            description=(
+                "Filter by the desired replica count."
+                " Falls back to the user-set replica count until autoscaling sets one."
+            ),
         ),
         default=None,
     )
     scaling_state: ScalingStateFilterGQL | None = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION, description="Filter by scaling state."
-        ),
+        BackendAIGQLMeta(added_version="26.9.0", description="Filter by scaling state."),
         default=None,
     )
 
@@ -951,7 +959,16 @@ class UpdateDeploymentPayload:
     model=DeleteDeploymentPayloadDTO,
 )
 class DeleteDeploymentPayload:
-    id: ID
+    id: ID = gql_field(
+        description="ID of the deleted deployment.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `deployment`.",
+    )
+    deployment: ModelDeployment = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The soft-deleted deployment.",
+        ),
+    )
 
 
 @gql_pydantic_type(
@@ -1102,10 +1119,11 @@ class AdminRefreshDeploymentRevisionsPayload:
 # Replace deployment options types
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version="26.4.4",
+        added_version=NEXT_RELEASE_VERSION,
         description=(
             "Input for the replaceDeploymentOptions mutation. Full-replace"
-            " semantics — the supplied payload is the complete new value."
+            " semantics — the supplied payload is the complete new value,"
+            " except an omitted agent selection policy, which keeps the stored one."
         ),
     ),
     name="ReplaceDeploymentOptionsInput",
@@ -1117,12 +1135,10 @@ class ReplaceDeploymentOptionsInputGQL(PydanticInputMixin[ReplaceDeploymentOptio
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version="26.4.4",
+        added_version=NEXT_RELEASE_VERSION,
         description=(
             "Payload returned after replacing a deployment's options. Only"
-            " the refreshed options surface is returned; the server path uses"
-            " ``UPDATE ... RETURNING`` and does not re-read the surrounding"
-            " deployment node."
+            " the refreshed options surface is returned."
         ),
     ),
     model=ReplaceDeploymentOptionsPayloadDTO,

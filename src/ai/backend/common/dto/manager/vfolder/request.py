@@ -11,7 +11,7 @@ from pydantic import AliasChoices, Field, field_validator, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.field import VFolderPermissionField
-from ai.backend.common.typed_validators import VFolderName
+from ai.backend.common.typed_validators import VFolderName, VFolderRelativePath
 from ai.backend.common.types import QuotaScopeID, VFolderUsageMode
 
 __all__ = (
@@ -75,7 +75,7 @@ class VFolderCreateReq(BaseRequestModel):
     name: VFolderName = Field(description="Name of the vfolder")
     folder_host: str | None = Field(default=None, alias="host")
     usage_mode: VFolderUsageMode = Field(default=VFolderUsageMode.GENERAL)
-    permission: VFolderPermissionField = Field(default=VFolderPermissionField.READ_WRITE)
+    permission: VFolderPermissionField | None = Field(default=None)
     unmanaged_path: str | None = Field(default=None, alias="unmanagedPath")
     group_id: uuid.UUID | None = Field(
         default=None,
@@ -163,7 +163,7 @@ class CloneVFolderReq(BaseRequestModel):
     )
     cloneable: bool = Field(default=False, description="Whether the cloned vfolder is cloneable")
     usage_mode: VFolderUsageMode = Field(default=VFolderUsageMode.GENERAL)
-    permission: VFolderPermissionField = Field(default=VFolderPermissionField.READ_WRITE)
+    permission: VFolderPermissionField | None = Field(default=None)
 
     @field_validator("target_quota_scope_id", mode="before")
     @classmethod
@@ -251,7 +251,7 @@ class CreateDownloadSessionReq(BaseRequestModel):
 class CreateUploadSessionReq(BaseRequestModel):
     """Request to create a file upload session."""
 
-    path: str = Field(description="File path to upload to")
+    path: VFolderRelativePath = Field(description="File path to upload to")
     size: int = Field(description="File size in bytes")
 
 

@@ -367,15 +367,15 @@ class TestDeleteUserPayload:
     """Tests for DeleteUserPayload model."""
 
     def test_success_true(self) -> None:
-        payload = DeleteUserPayload(success=True)
+        payload = DeleteUserPayload(success=True, user=make_user_node())
         assert payload.success is True
 
     def test_success_false(self) -> None:
-        payload = DeleteUserPayload(success=False)
+        payload = DeleteUserPayload(success=False, user=make_user_node())
         assert payload.success is False
 
     def test_round_trip(self) -> None:
-        payload = DeleteUserPayload(success=True)
+        payload = DeleteUserPayload(success=True, user=make_user_node())
         json_str = payload.model_dump_json()
         restored = DeleteUserPayload.model_validate_json(json_str)
         assert restored.success is True

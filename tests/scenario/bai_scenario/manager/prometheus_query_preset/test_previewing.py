@@ -29,6 +29,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Configured,
     Given,
+    Says,
     Scenario,
     Then,
     When,
@@ -40,7 +41,7 @@ from bai_scenario.components.prometheus_query_preset import (
     TheQueryAnswered,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 from bai_scenario.seeds.prometheus_query_preset.preset import EMPTY_WITHOUT_LABELS, TEMPLATE
 
@@ -49,7 +50,7 @@ SERVER_WINDOW = "2m"
 
 type Result = QueryDefinitionResultInfo
 type PreviewingStep = Scenario[
-    SeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, Result
+    TestSeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, Result
 ]
 
 
@@ -68,7 +69,15 @@ class Previewing(When[ACatalogAndACaller, PrometheusQueryPresetAdapter, Result])
         what = (
             "빈 질의로 렌더되는 템플릿" if self.query_template == EMPTY_WITHOUT_LABELS else "템플릿"
         )
-        return f"{laid.caller.username}이 {what} 미리 보기"
+        what_en = (
+            "a template that renders an empty query"
+            if self.query_template == EMPTY_WITHOUT_LABELS
+            else "a template"
+        )
+        return Says(
+            f"{laid.caller.username}이 {what} 미리 봅니다",
+            english=f"{laid.caller.username} previews {what_en}",
+        )
 
     @override
     async def call(self, adapter: PrometheusQueryPresetAdapter, laid: ACatalogAndACaller) -> Result:
@@ -80,7 +89,7 @@ class Previewing(When[ACatalogAndACaller, PrometheusQueryPresetAdapter, Result])
 
 @dataclass(frozen=True)
 class TheSuperadminPreviewsATemplate(
-    Scenario[SeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, Result],
+    Scenario[TestSeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, Result],
     Configured,
 ):
     @override
@@ -89,9 +98,14 @@ class TheSuperadminPreviewsATemplate(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 템플릿만 지정해 미리 보면, 순간 질의로 응답하고 모의 서버가 받은 질의의 "
-            "시간 창은 서버 설정의 기본 시간 창이며 라벨은 비어 있다"
+        return Says(
+            "superadmin 이 템플릿만 지정해 미리 보면, 순간 질의로 응답하고 모의 서버가 받은 "
+            "질의의 시간 창은 서버 설정의 기본 시간 창이며 라벨은 비어 있습니다",
+            english=(
+                "when the superadmin previews giving only a template, it answers with an "
+                "instant query, and the time window of the query the mock server received is "
+                "the server's default time window and the labels are empty"
+            ),
         )
 
     @override
@@ -99,7 +113,7 @@ class TheSuperadminPreviewsATemplate(
         return {SERVER_WINDOW_PATH: SERVER_WINDOW}
 
     @override
-    def given(self) -> Given[SeedingSession, ACatalogAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ACatalogAndACaller]:
         return JustSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -113,7 +127,7 @@ class TheSuperadminPreviewsATemplate(
 
 @dataclass(frozen=True)
 class PrometheusRefusingTheQueryIsAnEvaluationFailure(
-    Scenario[SeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, Result]
+    Scenario[TestSeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, Result]
 ):
     @override
     def summary(self) -> str:
@@ -121,13 +135,20 @@ class PrometheusRefusingTheQueryIsAnEvaluationFailure(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 빈 질의로 렌더되는 템플릿을 미리 보면, Prometheus가 그 질의를 "
-            "거부하고 그 거부가 평가 실패로 바뀌어 전파된다. 실행의 같은 시나리오와 다른 오류로 거부된다"
+        return Says(
+            "superadmin 이 빈 질의로 렌더되는 템플릿을 미리 보면, Prometheus 가 그 질의를 "
+            "거부하고 그 거부가 평가 실패로 변경되어 전파됩니다. 실행의 같은 시나리오와 다른 "
+            "오류로 거부됩니다",
+            english=(
+                "when the superadmin previews a template that renders an empty query, "
+                "Prometheus rejects the query and that rejection propagates changed into an "
+                "evaluation failure. It is rejected with a different error from the same "
+                "scenario in run"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ACatalogAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ACatalogAndACaller]:
         return JustSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -141,7 +162,7 @@ class PrometheusRefusingTheQueryIsAnEvaluationFailure(
 
 @dataclass(frozen=True)
 class AMonitorPreviewsToo(
-    Scenario[SeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, Result],
+    Scenario[TestSeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, Result],
     Configured,
 ):
     @override
@@ -150,14 +171,21 @@ class AMonitorPreviewsToo(
 
     @override
     def describe(self) -> str:
-        return "모니터 역할이 템플릿을 미리 보면, 모의 서버가 응답한 결과가 반환된다. 슈퍼관리자 검사는 읽기에 한해 모니터를 허용한다"
+        return Says(
+            "모니터 역할이 템플릿을 미리 보면, 모의 서버가 응답한 결과가 반환됩니다. superadmin "
+            "검사는 읽기에 대해서만 모니터를 허용합니다",
+            english=(
+                "when the monitor role previews a template, the result the mock server "
+                "answered comes back. The superadmin check allows the monitor only for reads"
+            ),
+        )
 
     @override
     def config(self) -> Mapping[str, Any]:
         return {SERVER_WINDOW_PATH: SERVER_WINDOW}
 
     @override
-    def given(self) -> Given[SeedingSession, ACatalogAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ACatalogAndACaller]:
         return JustSomeone(role=UserRole.MONITOR)
 
     @override
@@ -171,7 +199,7 @@ class AMonitorPreviewsToo(
 
 @dataclass(frozen=True)
 class APlainUserMayNotPreview(
-    Scenario[SeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, Result]
+    Scenario[TestSeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, Result]
 ):
     @override
     def summary(self) -> str:
@@ -179,10 +207,16 @@ class APlainUserMayNotPreview(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 미리 보려 하면, 역할 부족으로 거부된다"
+        return Says(
+            "superadmin 이 아닌 사용자가 미리 보려 하면, 역할 부족으로 거부됩니다",
+            english=(
+                "when a user who is not the superadmin tries to preview, it is rejected for "
+                "lack of role"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ACatalogAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ACatalogAndACaller]:
         return JustSomeone()
 
     @override

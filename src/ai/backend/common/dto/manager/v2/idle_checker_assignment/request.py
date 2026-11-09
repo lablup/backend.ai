@@ -11,7 +11,7 @@ from ai.backend.common.dto.manager.query import (
     DateTimeFilter,
     UUIDFilter,
 )
-from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.dto.manager.v2.common import NonEmptyList, OrderDirection
 from ai.backend.common.dto.manager.v2.idle_checker_assignment.types import (
     IdleCheckerAssignmentOrderField,
     IdleCheckerScopeTypeDTO,
@@ -55,6 +55,22 @@ class UpdateIdleCheckerAssignmentInput(BaseRequestModel):
 
 class PurgeIdleCheckerAssignmentInput(BaseRequestModel):
     id: IdleCheckerAssignmentID = Field(description="Idle checker assignment ID to purge.")
+
+
+class PartialBulkUpdateIdleCheckerAssignmentsInput(BaseRequestModel):
+    """Input for updating several idle checker assignments, each answered for separately."""
+
+    items: NonEmptyList[UpdateIdleCheckerAssignmentInput] = Field(
+        description="The assignments to update, each with its new enabled state."
+    )
+
+
+class PartialBulkPurgeIdleCheckerAssignmentsInput(BaseRequestModel):
+    """Input for purging several idle checker assignments, each answered for separately."""
+
+    ids: NonEmptyList[IdleCheckerAssignmentID] = Field(
+        description="IDs of the idle checker assignments to purge."
+    )
 
 
 class IdleCheckerAssignmentFilter(BaseRequestModel):

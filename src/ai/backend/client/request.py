@@ -31,7 +31,12 @@ from yarl import URL
 from ai.backend.common.json import dump_json_str
 
 from .auth import generate_signature
-from .exceptions import BackendAPIError, BackendClientError
+from .exceptions import (
+    BackendAPIError,
+    BackendClientError,
+    BackendConnectError,
+    BackendConnectionRefusedError,
+)
 from .session import AsyncSession, BaseSession, api_session
 from .session import Session as SyncSession
 
@@ -73,6 +78,17 @@ A struct that represents an attached file to the API request.
 
 async def _coro_return[T](val: T) -> T:
     return val
+
+
+def _connection_failure(msg: str, error: aiohttp.ClientConnectionError) -> BackendClientError:
+    """Pick the client error that tells whether the request was sent before ``error``."""
+    if isinstance(error, aiohttp.ClientConnectorError):
+        if isinstance(error.os_error, ConnectionRefusedError):
+            return BackendConnectionRefusedError(msg)
+        return BackendConnectError(msg)
+    if isinstance(error, aiohttp.ConnectionTimeoutError):
+        return BackendConnectError(msg)
+    return BackendClientError(msg)
 
 
 class ExtendedJSONEncoder(modjson.JSONEncoder):
@@ -621,7 +637,7 @@ class FetchContextManager:
                         "Check your network connection and/or the server status.\n"
                         f"\u279c {e!r}"
                     )
-                    raise BackendClientError(msg) from e
+                    raise _connection_failure(msg, e) from e
                 self.session.config.rotate_endpoints()
                 continue
             except aiohttp.ClientResponseError as e:
@@ -767,7 +783,7 @@ class WebSocketContextManager:
                         "Check your network connection and/or the server status.\n"
                         f"Error detail: {e!r}"
                     )
-                    raise BackendClientError(msg) from e
+                    raise _connection_failure(msg, e) from e
                 self.session.config.rotate_endpoints()
                 continue
             except aiohttp.ClientResponseError as e:
@@ -930,7 +946,7 @@ class SSEContextManager:
                         "Check your network connection and/or the server status.\n"
                         f"\u279c {e!r}"
                     )
-                    raise BackendClientError(msg) from e
+                    raise _connection_failure(msg, e) from e
                 self.session.config.rotate_endpoints()
                 continue
             except aiohttp.ClientResponseError as e:

@@ -1,0 +1,12 @@
+displayName: Request Marker Plugin
+type: middleware
+iconPath: .assets/icon.png
+
+import: backend.ai/appproxy-traefik-plugin-go
+
+summary: 'Mark used'
+
+testData:
+  Headers:
+    X-Demo: test
+    X-URL: '{{URL}}'

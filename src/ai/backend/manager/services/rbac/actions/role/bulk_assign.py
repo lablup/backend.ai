@@ -1,8 +1,8 @@
-import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import override
 
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
@@ -17,8 +17,8 @@ class BulkAssignRoleAction(BaseRelationAction):
 
     role_id: RoleID
     user_ids: Sequence[UserID]
-    granted_by: UserID | None = field(default=None)
-    project_id: uuid.UUID | None = field(default=None)
+    granted_by: UserID
+    project_id: ProjectID | None = field(default=None)
 
     @override
     @classmethod

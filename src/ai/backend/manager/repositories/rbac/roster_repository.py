@@ -7,9 +7,14 @@ from collections.abc import Sequence
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.exception import BackendAIError
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.repositories.ops.v2.roster.provider import RosterOpsProvider
-from ai.backend.manager.repositories.ops.v2.roster.write import RosterLeaveResult
+from ai.backend.manager.repositories.ops.v2.roster.write import (
+    RosterJoinFailure,
+    RosterJoinResult,
+    RosterLeaveResult,
+)
 
 __all__ = ("RbacRosterRepository",)
 
@@ -44,6 +49,23 @@ class RbacRosterRepository:
         """Put one user on the roster. Idempotent."""
         async with self._ops.write_ops() as w:
             await w.join_member(project_id, user_id)
+
+    async def join_each(
+        self, project_id: ProjectID, user_ids: Sequence[UserID]
+    ) -> RosterJoinResult:
+        """Put each named user on the roster as :meth:`join_member` does, each in its own
+        savepoint of one transaction, reporting the users that could not join."""
+        result = RosterJoinResult()
+        async with self._ops.write_ops() as w:
+            for user_id in user_ids:
+                try:
+                    async with w.savepoint() as sp:
+                        await sp.join_member(project_id, user_id)
+                except BackendAIError as e:
+                    result.failures.append(RosterJoinFailure(user_id=user_id, message=str(e)))
+                    continue
+                result.joined.append(user_id)
+        return result
 
     async def leave_member(self, project_id: ProjectID, user_id: UserID) -> None:
         """Take one user off the roster. Silent where they were not on it."""

@@ -12,6 +12,8 @@ from ai.backend.client.v2.base_client import BackendAIAuthClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains.rbac import RBACClient
 from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.role import RoleID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.rbac.request import (
     AssignRoleRequest,
@@ -244,7 +246,9 @@ class TestRoleAssign:
         mock_session = _make_request_session(resp)
         rc = _make_rbac_client(mock_session)
 
-        result = await rc.assign_role(AssignRoleRequest(user_id=user_id, role_id=role_id))
+        result = await rc.assign_role(
+            AssignRoleRequest(user_id=UserID(user_id), role_id=RoleID(role_id))
+        )
 
         assert isinstance(result, AssignRoleResponse)
         assert result.user_id == user_id
@@ -268,7 +272,9 @@ class TestRoleRevoke:
         mock_session = _make_request_session(resp)
         rc = _make_rbac_client(mock_session)
 
-        result = await rc.revoke_role(RevokeRoleRequest(user_id=user_id, role_id=role_id))
+        result = await rc.revoke_role(
+            RevokeRoleRequest(user_id=UserID(user_id), role_id=RoleID(role_id))
+        )
 
         assert isinstance(result, RevokeRoleResponse)
         assert result.user_id == user_id

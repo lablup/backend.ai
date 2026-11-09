@@ -40,6 +40,7 @@ from sqlalchemy.engine import Row
 import ai.backend.common.validators as tx
 from ai.backend.common import msgpack
 from ai.backend.common import typed_validators as tv
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.config import BaseConfigModel, config_key_to_snake_case
@@ -1170,6 +1171,7 @@ async def init_idle_checkers(
     config_provider: ManagerConfigProvider,
     event_producer: EventProducer,
     lock_factory: DistributedLockFactory,
+    sentinel_monitors: SentinelMonitorSet,
 ) -> IdleCheckerHost:
     """
     Create an instance of session idleness checker
@@ -1177,15 +1179,19 @@ async def init_idle_checkers(
     """
     # Create ValkeyLiveClient for dependency injection
     valkey_profile_target = config_provider.config.redis.to_valkey_profile_target()
+    live_valkey_target = valkey_profile_target.profile_target(RedisRole.LIVE)
+    stat_valkey_target = valkey_profile_target.profile_target(RedisRole.STATISTICS)
     valkey_live = await ValkeyLiveClient.create(
-        valkey_profile_target.profile_target(RedisRole.LIVE),
+        live_valkey_target,
         human_readable_name="idle.live",
         db_id=REDIS_LIVE_DB,
+        sentinel_monitor=sentinel_monitors.monitor_for(live_valkey_target),
     )
     valkey_stat = await ValkeyStatClient.create(
-        valkey_profile_target.profile_target(RedisRole.STATISTICS),
+        stat_valkey_target,
         human_readable_name="idle.stat",
         db_id=REDIS_STATISTICS_DB,
+        sentinel_monitor=sentinel_monitors.monitor_for(stat_valkey_target),
     )
     checker_host = IdleCheckerHost(
         db,

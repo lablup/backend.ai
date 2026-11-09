@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
-from typing import TYPE_CHECKING, Annotated, Any, Self
+from typing import TYPE_CHECKING, Annotated, Any, Self, override
 from uuid import UUID
 
 import strawberry
@@ -41,7 +42,6 @@ from ai.backend.common.dto.manager.v2.fair_share.response import (
 from ai.backend.common.dto.manager.v2.fair_share.response import (
     UserFairShareNode,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -178,6 +178,18 @@ class UserFairShareGQL(PydanticNodeMixin[UserFairShareNode]):
     ):
         return await info.context.data_loaders.resource_group_loader.load(self.resource_group_name)
 
+    @classmethod
+    @override
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[UserFairShareGQL | None]:
+        """A fair share is computed per resource group and scope, with no row to read by id."""
+        return [None for _ in node_ids]
+
 
 UserFairShareEdge = Edge[UserFairShareGQL]
 
@@ -203,11 +215,11 @@ class UserFairShareConnection(Connection[UserFairShareGQL]):
 
 
 _USER_FILTER_DEPRECATION = (
-    f"Deprecated since {NEXT_RELEASE_VERSION}. A filter on another entity's columns cannot check"
+    "Deprecated since 26.9.0. A filter on another entity's columns cannot check"
     " whether the caller may read that row. Search users first, then narrow by userUuid."
 )
 _USER_ORDER_DEPRECATION = (
-    f"Deprecated since {NEXT_RELEASE_VERSION}. An order on another entity's columns cannot check"
+    "Deprecated since 26.9.0. An order on another entity's columns cannot check"
     " whether the caller may read that row. Search users first, then order there."
 )
 

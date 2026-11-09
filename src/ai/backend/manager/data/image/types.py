@@ -26,11 +26,6 @@ class ImageStatus(enum.StrEnum):
     PURGE_ERROR = "PURGE_ERROR"
 
     @classmethod
-    def purge_in_progress(cls) -> frozenset[ImageStatus]:
-        """Statuses a purge is working through. Writes are refused while in one."""
-        return frozenset({cls.PURGING, cls.PURGE_ERROR})
-
-    @classmethod
     def restorable(cls) -> frozenset[ImageStatus]:
         """Statuses restore brings back to ALIVE: a forgotten image, or a live one left as is."""
         return frozenset({cls.ALIVE, cls.DELETED})

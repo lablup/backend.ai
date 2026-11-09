@@ -63,6 +63,11 @@ class PreemptSessionsLifecycleHandler(SessionLifecycleHandler):
 
     @classmethod
     @override
+    def description(cls) -> str:
+        return "Terminates or reschedules preemption victims by the preemption mode."
+
+    @classmethod
+    @override
     def target_statuses(cls) -> list[SessionStatus]:
         """Sessions in PREEMPTED state."""
         return [SessionStatus.PREEMPTED]

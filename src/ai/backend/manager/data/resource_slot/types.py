@@ -73,6 +73,7 @@ class AgentResourceData(FieldData):
     slot_name: str
     capacity: Decimal
     reserved: Decimal
+    prereserved: Decimal
     used: Decimal
 
 

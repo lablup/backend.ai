@@ -49,7 +49,7 @@ class ScheduleCacheSource:
         Invalidate caches related to kernel state changes affecting resource calculations.
         """
         try:
-            await self._valkey_stat.invalidate_kernel_related_cache(access_keys)
+            await self._valkey_stat.invalidate_kernel_related_cache()
         except Exception as e:
             log.warning(
                 "kernel related cache invalidation failed",

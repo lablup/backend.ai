@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator
 from typing import Annotated
-from uuid import UUID
 
 import strawberry
 from strawberry import ID, Info
@@ -21,7 +20,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import DeploymentScope
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.base import encode_cursor, resolve_global_id
+from ai.backend.manager.api.gql.base import encode_cursor, parse_uuid, resolve_entity_id
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
@@ -55,6 +54,7 @@ from ai.backend.manager.api.gql.deployment.types.scopes import (
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
+from ai.backend.manager.errors.api import NotImplementedAPI
 from ai.backend.manager.errors.user import UserNotFound
 
 # Query resolvers
@@ -72,7 +72,7 @@ async def admin_deployments(
         DeploymentUsageGQL | None,
         strawberry.argument(
             description=(
-                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "Added in 26.9.0. Uses narrowing the result. Each listed "
                 "entity must be readable by the caller; deployments the caller cannot "
                 "read are left out."
             )
@@ -120,7 +120,7 @@ async def admin_deployments(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description=(
             "Page through the deployments the named scopes reach, combined with OR. "
             "Every scope is authorized before the read runs."
@@ -134,7 +134,7 @@ async def scoped_deployments(
         DeploymentUsageGQL | None,
         strawberry.argument(
             description=(
-                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "Added in 26.9.0. Uses narrowing the result. Each listed "
                 "entity must be readable by the caller; deployments the caller cannot "
                 "read are left out."
             )
@@ -191,7 +191,7 @@ async def project_deployments(
         DeploymentUsageGQL | None,
         strawberry.argument(
             description=(
-                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "Added in 26.9.0. Uses narrowing the result. Each listed "
                 "entity must be readable by the caller; deployments the caller cannot "
                 "read are left out."
             )
@@ -249,7 +249,7 @@ async def my_deployments(
         DeploymentUsageGQL | None,
         strawberry.argument(
             description=(
-                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "Added in 26.9.0. Uses narrowing the result. Each listed "
                 "entity must be readable by the caller; deployments the caller cannot "
                 "read are left out."
             )
@@ -303,8 +303,8 @@ async def my_deployments(
 )  # type: ignore[misc]
 async def deployment(id: ID, info: Info[StrawberryGQLContext]) -> ModelDeployment | None:
     """Get a specific deployment by ID."""
-    _, deployment_id = resolve_global_id(id)
-    node = await info.context.adapters.deployment.get(DeploymentID(UUID(deployment_id)))
+    deployment_id = resolve_entity_id(id, DeploymentID)
+    node = await info.context.adapters.deployment.get(deployment_id)
     return ModelDeployment.from_pydantic(node)
 
 
@@ -329,7 +329,7 @@ async def update_model_deployment(
 ) -> UpdateDeploymentPayload | None:
     """Update an existing model deployment."""
     payload = await info.context.adapters.deployment.update(
-        input.to_pydantic(), DeploymentID(UUID(input.id))
+        input.to_pydantic(), DeploymentID(parse_uuid(input.id))
     )
     return UpdateDeploymentPayload(deployment=ModelDeployment.from_pydantic(payload.deployment))
 
@@ -339,16 +339,19 @@ async def delete_model_deployment(
     input: DeleteDeploymentInput, info: Info[StrawberryGQLContext]
 ) -> DeleteDeploymentPayload | None:
     """Delete a model deployment."""
-    await info.context.adapters.deployment.delete(input.to_pydantic())
-    return DeleteDeploymentPayload(id=input.id)
+    payload = await info.context.adapters.deployment.delete(input.to_pydantic())
+    return DeleteDeploymentPayload(
+        id=input.id, deployment=ModelDeployment.from_pydantic(payload.deployment)
+    )
 
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version="26.4.4",
+        added_version=NEXT_RELEASE_VERSION,
         description=(
             "Fully replace the ``options`` surface of a deployment. "
-            "Replace semantics — the supplied payload is the complete new value."
+            "Replace semantics — the supplied payload is the complete new value, "
+            "except an omitted agent selection policy, which keeps the stored one."
         ),
     )
 )
@@ -359,9 +362,7 @@ async def replace_deployment_options(
 
     GQL input carries the target ``deployment_id`` and the full ``options``
     payload together; REST equivalent carries the id in the path. Only the
-    refreshed options surface is returned (the server path uses
-    ``UPDATE ... RETURNING`` and does not re-read the surrounding
-    deployment node).
+    refreshed options surface is returned.
     """
     gql_pydantic = input.to_pydantic()
     rest_body = ReplaceDeploymentOptionsInput(options=gql_pydantic.options)
@@ -424,5 +425,5 @@ async def deployment_status_changed(
 ) -> AsyncGenerator[DeploymentStatusChangedPayload, None]:
     """Subscribe to deployment status changes."""
     # TODO: Implement actual subscription logic using pub/sub system
-    raise NotImplementedError("Subscription not implemented")
+    raise NotImplementedAPI("Subscription not implemented")
     yield  # type: ignore[unreachable]  # Makes this an async generator

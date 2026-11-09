@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -10,8 +10,12 @@ from ai.backend.common.clients.valkey_client.client import (
     ValkeySentinelTarget,
     create_valkey_client,
 )
+from ai.backend.common.clients.valkey_client.sentinel_monitor.base import AbstractSentinelMonitor
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import (
+    SentinelMonitorKey,
+)
 from ai.backend.common.configs.redis import SingleRedisConfig
-from ai.backend.common.types import RedisTarget, ValkeyTarget
+from ai.backend.common.types import HostPortPair, RedisTarget, ValkeyTarget
 
 MASTER_PASSWORD = "master-pw"
 SENTINEL_PASSWORD = "sentinel-pw"
@@ -47,39 +51,23 @@ def sentinel_target_with_separate_passwords() -> ValkeySentinelTarget:
 
 
 @pytest.fixture
-def sentinel_target_without_sentinel_password() -> ValkeySentinelTarget:
-    return ValkeySentinelTarget(
-        sentinel_addresses=["127.0.0.1:26379"],
-        service_name="mymaster",
-        password=MASTER_PASSWORD,
-    )
+def sentinel_monitor() -> AsyncMock:
+    monitor = AsyncMock(spec=AbstractSentinelMonitor)
+    monitor.get_master.return_value = HostPortPair("127.0.0.1", 6379)
+    return monitor
 
 
 @pytest.fixture
 def sentinel_client_with_separate_passwords(
     sentinel_target_with_separate_passwords: ValkeySentinelTarget,
+    sentinel_monitor: AsyncMock,
 ) -> ValkeySentinelClient:
-    with patch("ai.backend.common.clients.valkey_client.client.Sentinel"):
-        return ValkeySentinelClient(
-            target=sentinel_target_with_separate_passwords,
-            db_id=0,
-            human_readable_name="test",
-        )
-
-
-@pytest.fixture
-def sentinel_client_connected_with_separate_passwords(
-    sentinel_target_with_separate_passwords: ValkeySentinelTarget,
-) -> ValkeySentinelClient:
-    with patch("ai.backend.common.clients.valkey_client.client.Sentinel"):
-        client = ValkeySentinelClient(
-            target=sentinel_target_with_separate_passwords,
-            db_id=0,
-            human_readable_name="test",
-        )
-    client._sentinel = MagicMock()
-    client._sentinel.discover_master = AsyncMock(return_value=("127.0.0.1", 6379))
-    return client
+    return ValkeySentinelClient(
+        target=sentinel_target_with_separate_passwords,
+        db_id=0,
+        human_readable_name="test",
+        sentinel_monitor=sentinel_monitor,
+    )
 
 
 @pytest.fixture
@@ -103,35 +91,25 @@ def single_redis_config_with_separate_passwords() -> SingleRedisConfig:
 
 
 class TestValkeySentinelClientPasswordUsage:
-    """Verify sentinel_password goes to sentinel_kwargs, password (master) to GlideClient."""
+    """Verify sentinel_password goes to the Sentinel monitor, password (master) to GlideClient."""
 
-    def test_uses_sentinel_password_for_sentinel_kwargs(
-        self, sentinel_target_with_separate_passwords: ValkeySentinelTarget
+    def test_uses_sentinel_password_for_sentinel_monitor(
+        self, valkey_target_with_separate_passwords: ValkeyTarget
     ) -> None:
-        with patch("ai.backend.common.clients.valkey_client.client.Sentinel") as mock_sentinel_cls:
-            ValkeySentinelClient(
-                target=sentinel_target_with_separate_passwords,
-                db_id=0,
-                human_readable_name="test",
-            )
-            sentinel_kwargs = mock_sentinel_cls.call_args.kwargs["sentinel_kwargs"]
-            assert sentinel_kwargs["password"] == SENTINEL_PASSWORD
+        key = SentinelMonitorKey.from_valkey_target(valkey_target_with_separate_passwords)
+        assert key is not None
+        assert key.password == SENTINEL_PASSWORD
 
     def test_falls_back_to_password_when_sentinel_password_is_none(
-        self, sentinel_target_without_sentinel_password: ValkeySentinelTarget
+        self, valkey_target_without_sentinel_password: ValkeyTarget
     ) -> None:
-        with patch("ai.backend.common.clients.valkey_client.client.Sentinel") as mock_sentinel_cls:
-            ValkeySentinelClient(
-                target=sentinel_target_without_sentinel_password,
-                db_id=0,
-                human_readable_name="test",
-            )
-            sentinel_kwargs = mock_sentinel_cls.call_args.kwargs["sentinel_kwargs"]
-            assert sentinel_kwargs["password"] == MASTER_PASSWORD
+        key = SentinelMonitorKey.from_valkey_target(valkey_target_without_sentinel_password)
+        assert key is not None
+        assert key.password == MASTER_PASSWORD
 
     async def test_uses_password_for_glide_client_credentials(
         self,
-        sentinel_client_connected_with_separate_passwords: ValkeySentinelClient,
+        sentinel_client_with_separate_passwords: ValkeySentinelClient,
     ) -> None:
         with (
             patch(
@@ -143,7 +121,7 @@ class TestValkeySentinelClientPasswordUsage:
             ) as mock_credentials,
         ):
             mock_create.return_value = AsyncMock()
-            await sentinel_client_connected_with_separate_passwords.connect()
+            await sentinel_client_with_separate_passwords.connect()
 
             mock_credentials.assert_called_once_with(password=MASTER_PASSWORD)
 
@@ -197,10 +175,13 @@ class TestSentinelPasswordPropagation:
         assert redis_target.sentinel_password == SENTINEL_PASSWORD
 
     def test_create_valkey_client_propagates_both(
-        self, valkey_target_with_separate_passwords: ValkeyTarget
+        self, valkey_target_with_separate_passwords: ValkeyTarget, sentinel_monitor: AsyncMock
     ) -> None:
         client = create_valkey_client(
-            valkey_target_with_separate_passwords, db_id=0, human_readable_name="test"
+            valkey_target_with_separate_passwords,
+            db_id=0,
+            human_readable_name="test",
+            sentinel_monitor=sentinel_monitor,
         )
 
         assert isinstance(client, MonitoringValkeyClient)

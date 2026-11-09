@@ -264,7 +264,7 @@ class _PresetBatchUpdater(DataBatchUpdater[RolePresetRow, _PresetData]):
 
     @override
     def build_values(self) -> dict[str, Any]:
-        return {"deleted": True}
+        return {"deleted_at": sa.func.now()}
 
     @override
     def to_data(self, row: RolePresetRow) -> _PresetData:

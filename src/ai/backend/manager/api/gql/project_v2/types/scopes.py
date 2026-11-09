@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from ai.backend.common.dto.manager.v2.group.types import DomainProjectScopeDTO, ProjectScope
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import UUIDScopeGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -34,7 +33,7 @@ class DomainProjectScope(PydanticInputMixin[DomainProjectScopeDTO]):
             "Scope for the scoped project query. Each list is OR'd internally and across "
             "lists, and every scope named is authorized before the read runs."
         ),
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
     ),
     name="ProjectScope",
 )

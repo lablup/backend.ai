@@ -70,6 +70,7 @@ __all__ = (
     "GlobalEntityUpsertOpsAction",
     "EntityUpsertOpsAction",
     "FieldUpsertOpsAction",
+    "FieldPartialBulkUpsertOpsAction",
     "UpdateOpsAction",
     "PartialBulkUpdateOpsAction",
     "BatchUpdateOpsAction",
@@ -97,6 +98,7 @@ __all__ = (
     "UpsertGlobalOpsAction",
     "UpsertEntityOpsAction",
     "UpsertFieldOpsAction",
+    "PartialBulkUpsertFieldOpsAction",
     "UpdateGlobalOpsAction",
     "UpdateSingleEntityOpsAction",
     "DeleteSingleEntityOpsAction",
@@ -531,6 +533,19 @@ class FieldUpsertOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TData: FieldData
     @abstractmethod
     def owner_id(self) -> TOwnerID:
         """Return the owning entity's identifier the row is built under."""
+        raise NotImplementedError
+
+
+class FieldPartialBulkUpsertOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TData: FieldData](
+    OpsBackendAction
+):
+    """A create-or-update of field rows under several owners the caller named, each
+    owner answered for separately."""
+
+    @abstractmethod
+    def to_upserters(self) -> Mapping[TOwnerID, Sequence[FieldUpserter[TOwnerID, TRow, TData]]]:
+        """Return the upsert specs this action executes, grouped by the owner each
+        row is built under."""
         raise NotImplementedError
 
 
@@ -995,6 +1010,22 @@ class UpsertFieldOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TData: FieldData
     BaseSingleEntityAction, FieldUpsertOpsAction[TOwnerID, TRow, TData], ABC
 ):
     """A create-or-update of a field row, authorized against its owner."""
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
+
+
+class PartialBulkUpsertFieldOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TData: FieldData](
+    BasePartialBulkAction, FieldPartialBulkUpsertOpsAction[TOwnerID, TRow, TData], ABC
+):
+    """A create-or-update of field rows under the owners the caller named, each
+    authorized on its own.
+
+    Bulk-shaped rather than field-shaped: the caller names the owners, so there is no
+    row to read an owner off. An owner the caller may not write is one failed item.
+    """
 
     @override
     @classmethod

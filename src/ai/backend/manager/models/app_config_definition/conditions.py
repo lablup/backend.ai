@@ -8,7 +8,7 @@ from datetime import datetime
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import make_string_in_factory
@@ -70,6 +70,26 @@ class AppConfigDefinitionConditions:
         return inner
 
     by_config_name_in = staticmethod(make_string_in_factory(AppConfigDefinitionRow.config_name))
+
+    @staticmethod
+    def by_id_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = AppConfigDefinitionRow.id == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_id_in(spec: UUIDInMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = AppConfigDefinitionRow.id.in_(spec.values)
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
 
     @staticmethod
     def by_ids(ids: Collection[uuid.UUID]) -> QueryCondition:

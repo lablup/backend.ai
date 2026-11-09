@@ -16,7 +16,7 @@ from ai.backend.common.dto.manager.v2.notification.types import NotificationRule
 from ai.backend.manager.api.adapters.notification.adapter import NotificationAdapter
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.notification import (
     AChannelAndACaller,
@@ -24,12 +24,12 @@ from bai_scenario.components.notification import (
     TheNewRuleNode,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 from bai_scenario.seeds.notification.rule import TEMPLATE
 
 type CreatingStep = Scenario[
-    SeedingSession, AChannelAndACaller, NotificationAdapter, NotificationRuleNode
+    TestSeedingSession, AChannelAndACaller, NotificationAdapter, NotificationRuleNode
 ]
 
 
@@ -50,8 +50,18 @@ class Creating(When[AChannelAndACaller, NotificationAdapter, NotificationRuleNod
 
     @override
     def describe(self, laid: AChannelAndACaller) -> str:
-        target = "없는 채널 id" if self.channel_id is not None else f"채널 {laid.channel.name}"
-        return f"{laid.caller.username}이 {target}를 가리키는 규칙 {self.named}을 생성"
+        if self.channel_id is not None:
+            target_ko = "없는 채널 id"
+            target_en = "an unknown channel id"
+        else:
+            target_ko = f"채널 {laid.channel.name}"
+            target_en = f"the channel {laid.channel.name}"
+        return Says(
+            f"{laid.caller.username}이 {target_ko} 를 가리키는 규칙 {self.named} 을 생성합니다",
+            english=(
+                f"{laid.caller.username} creates the rule {self.named} pointing at {target_en}"
+            ),
+        )
 
     @override
     async def call(
@@ -73,7 +83,7 @@ class Creating(When[AChannelAndACaller, NotificationAdapter, NotificationRuleNod
 
 @dataclass(frozen=True)
 class TheSuperadminMakesARule(
-    Scenario[SeedingSession, AChannelAndACaller, NotificationAdapter, NotificationRuleNode]
+    Scenario[TestSeedingSession, AChannelAndACaller, NotificationAdapter, NotificationRuleNode]
 ):
     started: datetime
 
@@ -83,13 +93,17 @@ class TheSuperadminMakesARule(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 종류와 채널과 템플릿을 주고 규칙을 만들면, "
-            "활성 상태이고 설명이 비어 있는 규칙 전체가 반환된다"
+        return Says(
+            "superadmin 이 종류와 채널과 템플릿을 주고 규칙을 생성하면, "
+            "활성 상태이고 설명이 비어 있는 규칙 전체가 응답으로 옵니다",
+            english=(
+                "when the superadmin creates a rule with a type, a channel and a template, "
+                "the whole rule comes back active with an empty description"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AChannelAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AChannelAndACaller]:
         return AChannelAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -103,7 +117,7 @@ class TheSuperadminMakesARule(
 
 @dataclass(frozen=True)
 class ADisabledRuleIsMade(
-    Scenario[SeedingSession, AChannelAndACaller, NotificationAdapter, NotificationRuleNode]
+    Scenario[TestSeedingSession, AChannelAndACaller, NotificationAdapter, NotificationRuleNode]
 ):
     started: datetime
 
@@ -113,10 +127,15 @@ class ADisabledRuleIsMade(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 비활성으로 지정해 규칙을 만들면 비활성인 규칙이 반환된다"
+        return Says(
+            "superadmin 이 비활성으로 지정해 규칙을 생성하면 비활성인 규칙이 응답으로 옵니다",
+            english=(
+                "when the superadmin creates a rule marked disabled, a disabled rule comes back"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AChannelAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AChannelAndACaller]:
         return AChannelAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -130,7 +149,7 @@ class ADisabledRuleIsMade(
 
 @dataclass(frozen=True)
 class ARulePointingAtNoChannelIsMade(
-    Scenario[SeedingSession, AChannelAndACaller, NotificationAdapter, NotificationRuleNode]
+    Scenario[TestSeedingSession, AChannelAndACaller, NotificationAdapter, NotificationRuleNode]
 ):
     started: datetime
     orphan: UUID
@@ -141,13 +160,17 @@ class ARulePointingAtNoChannelIsMade(
 
     @override
     def describe(self) -> str:
-        return (
-            "어느 행에도 없는 채널 id를 가리켜 규칙을 만들면 막히지 않고 그대로 만들어진다. "
-            "두 테이블 사이에 외래 키가 없다"
+        return Says(
+            "어느 행에도 없는 채널 id 를 가리켜 규칙을 생성하면 차단되지 않고 "
+            "그대로 생성됩니다. 두 테이블 사이에 외래 키가 없습니다",
+            english=(
+                "a rule created against a channel id no row answers to is created anyway. "
+                "There is no foreign key between the two tables"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AChannelAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AChannelAndACaller]:
         return AChannelAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -161,7 +184,7 @@ class ARulePointingAtNoChannelIsMade(
 
 @dataclass(frozen=True)
 class AUserWhoIsNotTheSuperadminMayNotCreate(
-    Scenario[SeedingSession, AChannelAndACaller, NotificationAdapter, NotificationRuleNode]
+    Scenario[TestSeedingSession, AChannelAndACaller, NotificationAdapter, NotificationRuleNode]
 ):
     @override
     def summary(self) -> str:
@@ -169,10 +192,16 @@ class AUserWhoIsNotTheSuperadminMayNotCreate(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 규칙을 만들려 하면 역할 부족으로 거부된다"
+        return Says(
+            "superadmin 이 아닌 사용자가 규칙을 생성하려 하면 역할 부족으로 거부됩니다",
+            english=(
+                "when a user who is not the superadmin creates a rule, "
+                "it is rejected for an insufficient role"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AChannelAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AChannelAndACaller]:
         return AChannelAndSomeone()
 
     @override
@@ -186,7 +215,7 @@ class AUserWhoIsNotTheSuperadminMayNotCreate(
 
 @dataclass(frozen=True)
 class TheMonitorMayNotCreate(
-    Scenario[SeedingSession, AChannelAndACaller, NotificationAdapter, NotificationRuleNode]
+    Scenario[TestSeedingSession, AChannelAndACaller, NotificationAdapter, NotificationRuleNode]
 ):
     @override
     def summary(self) -> str:
@@ -194,10 +223,16 @@ class TheMonitorMayNotCreate(
 
     @override
     def describe(self) -> str:
-        return "모니터가 규칙을 만들려 하면 역할 부족으로 거부된다. 모니터는 읽기만 통과한다"
+        return Says(
+            "모니터가 규칙을 생성하려 하면 역할 부족으로 거부됩니다. 모니터는 읽기만 통과합니다",
+            english=(
+                "when the monitor creates a rule, it is rejected for an insufficient "
+                "role. The monitor passes reads only"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AChannelAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AChannelAndACaller]:
         return AChannelAndSomeone(role=UserRole.MONITOR)
 
     @override

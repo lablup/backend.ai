@@ -11,7 +11,8 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.session_template import SessionTemplateID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.manager.models.session_template.row import SessionTemplateRow, TemplateType
+from ai.backend.manager.data.session_template.types import TemplateType
+from ai.backend.manager.models.session_template.row import SessionTemplateRow
 from ai.backend.manager.models.specs.creator import EntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 

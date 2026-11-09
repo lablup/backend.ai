@@ -35,11 +35,16 @@ from ai.backend.common.metrics.multiprocess_setup import cleanup_prometheus_mult
 from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.networking import force_threaded_dns_resolver
-from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
+from ai.backend.common.plugin import AbstractPlugin, BasePluginContext, load_configured_wheelhouse
 from ai.backend.common.types import HostPortPair as CommonHostPortPair
 from ai.backend.common.utils import env_info
 from ai.backend.logging import Logger, LogLevel
-from ai.backend.logging.otel import LegacyOtelLogging, OpenTelemetrySpec, apply_otel_tracer
+from ai.backend.logging.otel import (
+    LegacyOtelLogging,
+    OpenTelemetrySpec,
+    apply_otel_tracer,
+    build_otel_server_middleware,
+)
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.logging.structured_otel import StructuredOtelLogging
 from ai.backend.storage.context_types import ArtifactVerifierContext
@@ -183,6 +188,9 @@ async def api_ctx(
                 str(local_config.api.client.ssl_privkey),
             )
         client_api_app = await init_client_app(root_ctx)
+        client_api_app.on_response_prepare.append(_on_prepare)
+        if local_config.otel.enabled:
+            client_api_app.middlewares.insert(0, build_otel_server_middleware())
         client_api_runner = web.AppRunner(client_api_app)
         await client_api_runner.setup()
         client_service_addr = local_config.api.client.service_addr
@@ -210,6 +218,11 @@ async def api_ctx(
                 str(local_config.api.manager.ssl_privkey),
             )
         manager_api_app = await init_manager_app(root_ctx)
+        manager_api_app.on_response_prepare.append(_on_prepare)
+        if local_config.otel.enabled:
+            manager_api_app.middlewares.insert(
+                0, build_otel_server_middleware(parent_required_prefixes=("/",))
+            )
         manager_api_runner = web.AppRunner(manager_api_app)
         await manager_api_runner.setup()
         manager_service_addr_config = local_config.api.manager.service_addr
@@ -234,6 +247,9 @@ async def api_ctx(
     @asynccontextmanager
     async def internal_api_ctx() -> AsyncGenerator[web.Application]:
         internal_api_app = init_internal_app(root_ctx)
+        internal_api_app.on_response_prepare.append(_on_prepare)
+        if local_config.otel.enabled:
+            internal_api_app.middlewares.insert(0, build_otel_server_middleware())
         internal_api_runner = web.AppRunner(internal_api_app)
         await internal_api_runner.setup()
         internal_addr = local_config.api.manager.internal_addr
@@ -350,6 +366,7 @@ async def server_main(
             health_probe=dep_resources.system.health_probe,
             volume_stats_observer=dep_resources.storage.volume_stats.observer,
             volume_stats_state=dep_resources.storage.volume_stats.state,
+            volume_status_check_registry=dep_resources.storage.status_probe.registry,
             backends={**dep_resources.plugins.backends},
             artifact_verifier_ctx=ArtifactVerifierContext(),
         )
@@ -476,6 +493,7 @@ def main(
                 log.info("Backend.AI Storage Proxy starting", version=VERSION)
                 log.info("runtime environment", runtime_info=env_info())
                 log.info("storage-proxy node", node_id=local_config.storage_proxy.node_id)
+                load_configured_wheelhouse(local_config.wheelhouse)
                 log_config = logging.getLogger("ai.backend.agent.config")
                 if local_config.debug.enabled:
                     log_config.debug("debug mode enabled.")

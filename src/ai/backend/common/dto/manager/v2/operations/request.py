@@ -22,7 +22,6 @@ __all__ = (
     "PerformSchedulerOpsInput",
     "SubscribeBackgroundTaskInput",
     "SubscribeSessionEventsInput",
-    "UpdateAnnouncementInput",
     "UpdateManagerStatusInput",
 )
 
@@ -96,19 +95,6 @@ class UpdateManagerStatusInput(BaseRequestModel):
     force_kill: bool = Field(
         default=False,
         description="Whether to force-kill all running sessions during status transition",
-    )
-
-
-class UpdateAnnouncementInput(BaseRequestModel):
-    """Input for updating the system announcement."""
-
-    enabled: bool = Field(
-        default=False,
-        description="Whether the announcement is enabled",
-    )
-    message: str | None = Field(
-        default=None,
-        description="Announcement message text; required when enabled is true",
     )
 
 

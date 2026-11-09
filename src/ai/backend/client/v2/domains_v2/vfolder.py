@@ -5,6 +5,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from ai.backend.client.v2.base_domain import BaseDomainClient
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.vfolder.request import (
     BulkDeleteVFoldersInput,
     BulkPurgeVFoldersInput,
@@ -18,10 +19,14 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     ListFilesInput,
     MkdirInput,
     MoveFileInput,
+    PartialBulkDeleteVFoldersInput,
+    PartialBulkRestoreVFoldersInput,
+    PartialBulkUpdateVFoldersInput,
     PurgeVFolderInput,
     SearchVFoldersInput,
     SetVFolderMountPolicyInput,
     UnsetVFolderMountPolicyInput,
+    UpdateVFolderInput,
 )
 from ai.backend.common.dto.manager.v2.vfolder.response import (
     BulkDeleteVFoldersPayload,
@@ -41,6 +46,7 @@ from ai.backend.common.dto.manager.v2.vfolder.response import (
     SearchVFoldersPayload,
     SetVFolderMountPolicyPayload,
     UnsetVFolderMountPolicyPayload,
+    UpdateVFolderPayload,
     VFolderMountPoliciesPayload,
     VFolderNode,
 )
@@ -131,11 +137,20 @@ class V2VFolderClient(BaseDomainClient):
             response_model=VFolderNode,
         )
 
+    async def update(self, vfolder_id: UUID, request: UpdateVFolderInput) -> UpdateVFolderPayload:
+        """Update a vfolder's name and options."""
+        return await self._client.typed_request(
+            "PATCH",
+            f"{_PATH}/{vfolder_id}",
+            request=request,
+            response_model=UpdateVFolderPayload,
+        )
+
     async def delete(self, vfolder_id: UUID) -> DeleteVFolderPayload:
         """Soft-delete a vfolder."""
         return await self._client.typed_request(
-            "DELETE",
-            f"{_PATH}/{vfolder_id}",
+            "POST",
+            f"{_PATH}/{vfolder_id}/delete",
             response_model=DeleteVFolderPayload,
         )
 
@@ -282,11 +297,44 @@ class V2VFolderClient(BaseDomainClient):
             response_model=CloneVFolderPayload,
         )
 
+    async def partial_bulk_update(
+        self, request: PartialBulkUpdateVFoldersInput
+    ) -> PartialBulkPayload[VFolderNode]:
+        """Update several vfolders, answering for each one."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/partial-bulk-update",
+            request=request,
+            response_model=PartialBulkPayload[VFolderNode],
+        )
+
+    async def partial_bulk_delete(
+        self, request: PartialBulkDeleteVFoldersInput
+    ) -> PartialBulkPayload[VFolderNode]:
+        """Soft-delete several vfolders, answering for each one."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/partial-bulk-delete",
+            request=request,
+            response_model=PartialBulkPayload[VFolderNode],
+        )
+
+    async def partial_bulk_restore(
+        self, request: PartialBulkRestoreVFoldersInput
+    ) -> PartialBulkPayload[VFolderNode]:
+        """Restore several soft-deleted vfolders, answering for each one."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/partial-bulk-restore",
+            request=request,
+            response_model=PartialBulkPayload[VFolderNode],
+        )
+
     async def bulk_delete(
         self,
         request: BulkDeleteVFoldersInput,
     ) -> BulkDeleteVFoldersPayload:
-        """Soft-delete multiple vfolders."""
+        """Deprecated. Use :meth:`partial_bulk_delete`."""
         return await self._client.typed_request(
             "POST",
             f"{_PATH}/delete",

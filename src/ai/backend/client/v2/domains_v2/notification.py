@@ -5,11 +5,16 @@ from __future__ import annotations
 from uuid import UUID
 
 from ai.backend.client.v2.base_domain import BaseDomainClient
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.notification.request import (
     CreateNotificationChannelInput,
     CreateNotificationRuleInput,
     DeleteNotificationChannelInput,
     DeleteNotificationRuleInput,
+    PartialBulkPurgeNotificationChannelsInput,
+    PartialBulkPurgeNotificationRulesInput,
+    PartialBulkUpdateNotificationChannelsInput,
+    PartialBulkUpdateNotificationRulesInput,
     SearchNotificationChannelsInput,
     SearchNotificationRulesInput,
     UpdateNotificationChannelInput,
@@ -24,6 +29,10 @@ from ai.backend.common.dto.manager.v2.notification.response import (
     DeleteNotificationRulePayload,
     GetNotificationChannelPayload,
     GetNotificationRulePayload,
+    NotificationChannelNode,
+    NotificationRuleNode,
+    PurgeNotificationChannelPayload,
+    PurgeNotificationRulePayload,
     SearchNotificationChannelsPayload,
     SearchNotificationRulesPayload,
     UpdateNotificationChannelPayload,
@@ -70,10 +79,40 @@ class V2NotificationClient(BaseDomainClient):
             response_model=UpdateNotificationChannelPayload,
         )
 
+    async def purge_channel(self, channel_id: UUID) -> PurgeNotificationChannelPayload:
+        """Permanently remove a notification channel."""
+        return await self._client.typed_request(
+            "DELETE",
+            f"{_PATH}/channels/{channel_id}",
+            response_model=PurgeNotificationChannelPayload,
+        )
+
+    async def partial_bulk_update_channels(
+        self, request: PartialBulkUpdateNotificationChannelsInput
+    ) -> PartialBulkPayload[NotificationChannelNode]:
+        """Update several notification channels, answering for each one."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/channels/partial-bulk-update",
+            request=request,
+            response_model=PartialBulkPayload[NotificationChannelNode],
+        )
+
+    async def partial_bulk_purge_channels(
+        self, request: PartialBulkPurgeNotificationChannelsInput
+    ) -> PartialBulkPayload[NotificationChannelNode]:
+        """Permanently remove several notification channels, answering for each one."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/channels/partial-bulk-purge",
+            request=request,
+            response_model=PartialBulkPayload[NotificationChannelNode],
+        )
+
     async def delete_channel(
         self, request: DeleteNotificationChannelInput
     ) -> DeleteNotificationChannelPayload:
-        """Delete a notification channel."""
+        """Deprecated. Use :meth:`purge_channel`."""
         return await self._client.typed_request(
             "POST",
             f"{_PATH}/channels/delete",
@@ -135,10 +174,40 @@ class V2NotificationClient(BaseDomainClient):
             response_model=UpdateNotificationRulePayload,
         )
 
+    async def purge_rule(self, rule_id: UUID) -> PurgeNotificationRulePayload:
+        """Permanently remove a notification rule."""
+        return await self._client.typed_request(
+            "DELETE",
+            f"{_PATH}/rules/{rule_id}",
+            response_model=PurgeNotificationRulePayload,
+        )
+
+    async def partial_bulk_update_rules(
+        self, request: PartialBulkUpdateNotificationRulesInput
+    ) -> PartialBulkPayload[NotificationRuleNode]:
+        """Update several notification rules, answering for each one."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/rules/partial-bulk-update",
+            request=request,
+            response_model=PartialBulkPayload[NotificationRuleNode],
+        )
+
+    async def partial_bulk_purge_rules(
+        self, request: PartialBulkPurgeNotificationRulesInput
+    ) -> PartialBulkPayload[NotificationRuleNode]:
+        """Permanently remove several notification rules, answering for each one."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/rules/partial-bulk-purge",
+            request=request,
+            response_model=PartialBulkPayload[NotificationRuleNode],
+        )
+
     async def delete_rule(
         self, request: DeleteNotificationRuleInput
     ) -> DeleteNotificationRulePayload:
-        """Delete a notification rule."""
+        """Deprecated. Use :meth:`purge_rule`."""
         return await self._client.typed_request(
             "POST",
             f"{_PATH}/rules/delete",

@@ -1,26 +1,34 @@
 ---
 name: role-preset-adapter-scenarios
 type: reference
-description: TODO - what the role preset adapter guarantees, as scenarios; nobody has written these yet
+description: what the role preset adapter guarantees for its writes; the permission graph guarding each write, bulk operations answering per id, and role permission presets added all-or-nothing and removed one by one
 scope: src/ai/backend/manager/api/adapters/role_preset
-keywords: [role preset, scenario, adapter, todo]
+keywords: [role preset, scenario, adapter, partial bulk, soft delete, restore, purge, permission entry]
 generated:
   by: claude-code/opus-5
-  at: 2026-09-10
+  at: 2026-10-15
 status: draft
 ---
-# role_preset 어댑터 — 시나리오
+# role_preset adapter: Knowledge
 
-TODO. 아직 아무도 적지 않았다.
+The rules are in `AGENTS.md` in the parent directory. When this document and a run result disagree, doubt the sentence first.
 
-규칙은 상위 디렉터리의 `AGENTS.md`에 있다. 이 파일이 이 모양으로 남아 있는 동안, 이 엔티티는
-시나리오 테스트가 없다.
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
-## 적는 법
+A role preset (preset below) is created in the global scope. The permission graph on the preset checks update, delete, restore, purge, and the addition and removal of permission entries. A user who received no role has no permission from the global scope and so is rejected. This document covers only the write operations. Create and read are not covered yet.
 
-1. `adapter.py`가 내놓는 호출을 전부 훑는다.
-2. 호출마다 무엇을 보장하는지 한 문장으로 적는다. 권한이 있는 경우와 없는 경우를 짝으로 둔다.
-3. 동작별로 표를 나눈다. 각 줄은 상황, 요청, 결과 셋을 갖는다.
-4. 어느 시나리오도 부르지 않는 호출은 "아직 적지 않은 것"에 남긴다.
+Framework contract tests check the common contract (target existence, bulk composition). This document records only the representative success and representative failure of each operation.
 
-먼저 적힌 것을 보려면 `../domain/KNOWLEDGE.md`를 참고한다.
+## Update
+
+## Delete, restore and purge
+
+## Bulk update
+
+## Bulk delete, restore and purge
+
+A bulk operation does not reject the whole call. Processed presets go into the processed list, and failures are recorded in the failure list with the id and the reason.
+
+## Adding and removing role permission presets
+
+Adding is all or nothing. Removing responds per entry.

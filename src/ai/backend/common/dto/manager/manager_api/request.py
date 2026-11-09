@@ -20,13 +20,6 @@ class UpdateManagerStatusRequest(BaseRequestModel):
     force_kill: bool = Field(default=False, description="Force kill running sessions")
 
 
-class UpdateAnnouncementRequest(BaseRequestModel):
-    """Request body for updating announcement."""
-
-    enabled: bool = Field(default=False, description="Whether announcement is enabled")
-    message: str | None = Field(default=None, description="Announcement message text")
-
-
 class SchedulerOpsRequest(BaseRequestModel):
     """Request body for scheduler operations."""
 

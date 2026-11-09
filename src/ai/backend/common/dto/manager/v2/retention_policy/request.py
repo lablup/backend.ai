@@ -5,8 +5,10 @@ from pydantic import Field
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.entity.retention_policy import RetentionPolicyID
 from ai.backend.common.data.retention.types import RetentionCategory
-from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.dto.manager.query import UUIDFilter
+from ai.backend.common.dto.manager.v2.common import NonEmptyList, OrderDirection
 from ai.backend.common.dto.manager.v2.retention_policy.types import RetentionPolicyOrderField
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 
 class CreateRetentionPolicyInput(BaseRequestModel):
@@ -32,9 +34,29 @@ class UpdateRetentionPolicyInput(BaseRequestModel):
     enabled: bool | None = Field(default=None, description="Toggle enabled; None = no change.")
 
 
+class PartialBulkUpdateRetentionPoliciesInput(BaseRequestModel):
+    """Input for updating several retention policies, each answered for separately."""
+
+    items: NonEmptyList[UpdateRetentionPolicyInput] = Field(
+        description="The retention policies to update, each with its ID and fields."
+    )
+
+
+class PartialBulkPurgeRetentionPoliciesInput(BaseRequestModel):
+    """Input for purging several retention policies, each answered for separately."""
+
+    ids: NonEmptyList[RetentionPolicyID] = Field(
+        description="IDs of the retention policies to purge."
+    )
+
+
 class RetentionPolicyFilter(BaseRequestModel):
     category: RetentionCategory | None = Field(default=None, description="Filter by category.")
     enabled: bool | None = Field(default=None, description="Filter by enabled flag.")
+    entity_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by retention policy ID.",
+    )
 
 
 class RetentionPolicyOrder(BaseRequestModel):

@@ -553,6 +553,29 @@ class TestVFolderInviteList:
         inv_ids = [i.id for i in result.invitations]
         assert str(inv["id"]) in inv_ids
 
+    async def test_superadmin_acting_as_invitee_sees_invitee_invitations(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        vfolder_factory: VFolderFactory,
+        regular_user_fixture: Any,
+        invitation_factory: InvitationFactory,
+    ) -> None:
+        """Superadmin listing with ``X-BackendAI-Act-As: <invitee>`` gets the invitee's invitations."""
+        vf = await vfolder_factory()
+        inv = await invitation_factory(
+            vfolder_id=vf["id"],
+            invitee_email=regular_user_fixture.email,
+        )
+
+        raw = await admin_registry._client._request(
+            "GET",
+            "/folders/invitations/list",
+            extra_headers={"X-BackendAI-Act-As": str(regular_user_fixture.user_uuid)},
+        )
+        result = ListInvitationsResponse.model_validate(raw)
+        inv_ids = [i.id for i in result.invitations]
+        assert str(inv["id"]) in inv_ids
+
     async def test_inviter_sees_sent_invitations(
         self,
         admin_registry: BackendAIClientRegistry,

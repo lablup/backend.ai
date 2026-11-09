@@ -11,7 +11,7 @@ from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec
+from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import make_string_in_factory
@@ -73,6 +73,26 @@ class AppConfigFragmentConditions:
         return inner
 
     by_config_name_in = staticmethod(make_string_in_factory(AppConfigFragmentRow.config_name))
+
+    @staticmethod
+    def by_id_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = AppConfigFragmentRow.id == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_id_in(spec: UUIDInMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = AppConfigFragmentRow.id.in_(spec.values)
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
 
     @staticmethod
     def by_ids(fragment_ids: Sequence[AppConfigFragmentID]) -> QueryCondition:

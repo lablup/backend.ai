@@ -33,8 +33,9 @@ from textual.app import App
 from textual.containers import Vertical
 from textual.widgets import ProgressBar
 
-from ai.backend.common.data.permission.types import Permission
+from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import HostPortPair
 
 from .common import detect_os
@@ -135,8 +136,8 @@ class Context(metaclass=ABCMeta):
             redis_sentinel_addrs=[],
             redis_password=None,
             etcd_addr=[ServerAddr(HostPortPair("127.0.0.1", 8120))],
-            etcd_user=None,
-            etcd_password=None,
+            etcd_user="root",
+            etcd_password="develove",
         )
         service_config = ServiceConfig(
             webserver_addr=ServerAddr(
@@ -426,23 +427,18 @@ class Context(metaclass=ABCMeta):
     @actxmgr
     async def etcd_ctx(self) -> AsyncIterator[AsyncEtcd]:
         halfstack = self.install_info.halfstack_config
-        scope_prefix_map = {
-            ConfigScopes.GLOBAL: "",
-        }
-        creds: dict[str, str] | None = None
-        if halfstack.etcd_user is not None:
-            if halfstack.etcd_password is None:
-                raise ValueError("etcd_password must be set when etcd_user is provided")
-            creds = {
-                "user": halfstack.etcd_user,
-                "password": halfstack.etcd_password,
-            }
-        async with AsyncEtcd(
-            [addr.face for addr in self.install_info.halfstack_config.etcd_addr],
-            "local",
-            scope_prefix_map,
-            credentials=creds,
-        ) as etcd:
+        etcd_config = EtcdConfigData(
+            namespace="local",
+            addrs=[
+                HostPortPairModel(host=addr.face.host, port=addr.face.port)
+                for addr in halfstack.etcd_addr
+            ],
+            user=halfstack.etcd_user,
+            password=halfstack.etcd_password,
+            keep_alive_interval=halfstack.etcd_keep_alive_interval,
+            keep_alive_timeout=halfstack.etcd_keep_alive_timeout,
+        )
+        async with AsyncEtcd.create_from_config(etcd_config) as etcd:
             yield etcd
 
     async def etcd_put_json(
@@ -522,6 +518,7 @@ class Context(metaclass=ABCMeta):
         self.log_header("Installing halfstack...")
         await self._prepare_halfstack_files()
         await self._start_halfstack()
+        await self._enable_etcd_auth()
 
     async def _prepare_halfstack_files(self) -> None:
         base_path = self.install_info.base_path
@@ -656,48 +653,127 @@ class Context(metaclass=ABCMeta):
             cwd=self.install_info.base_path,
         )
 
-    async def load_fixtures(self) -> None:
-        with self.resource_path("ai.backend.install.fixtures", "example-users.json") as path:
-            await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
+    def _halfstack_compose_cmd(self) -> list[str]:
+        compose_path = self.install_info.base_path / "docker-compose.halfstack.current.yml"
+        return [*self.docker_sudo, "docker", "compose", "-f", str(compose_path)]
 
-        with self.resource_path(
-            "ai.backend.install.fixtures", "example-container-registries-harbor.json"
-        ) as path:
-            await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
+    async def _enable_etcd_auth(self) -> None:
+        """Create the halfstack etcd root user and enable authentication, unless already enabled."""
+        halfstack = self.install_info.halfstack_config
+        # The etcd image has no shell, so etcdctl runs through `docker compose exec`.
+        etcdctl = [*self._halfstack_compose_cmd(), "exec", "-T", "backendai-half-etcd", "etcdctl"]
+        proc = await asyncio.create_subprocess_exec(
+            *etcdctl,
+            "auth",
+            "status",
+            stdin=asyncio.subprocess.DEVNULL,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        stdout, _ = await proc.communicate()
+        if b"Authentication Status: false" not in stdout:
+            return
+        self.log_header("Enabling etcd authentication...")
+        # The root user remains from an earlier run that stopped before `auth enable`.
+        await self.run_exec([
+            *etcdctl,
+            "user",
+            "add",
+            halfstack.etcd_user,
+            f"--new-user-password={halfstack.etcd_password}",
+        ])
+        exit_code = await self.run_exec([*etcdctl, "auth", "enable"])
+        if exit_code != 0:
+            raise RuntimeError(f"Failed to enable etcd authentication (exit {exit_code})")
 
-        with self.resource_path("ai.backend.install.fixtures", "example-keypairs.json") as path:
-            await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
-        with self.resource_path(
-            "ai.backend.install.fixtures", "example-resource-slot-types.json"
-        ) as path:
-            await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
-        with self.resource_path(
-            "ai.backend.install.fixtures", "example-resource-presets.json"
-        ) as path:
-            await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
-        with self.resource_path(
-            "ai.backend.install.fixtures", "example-runtime-variants.json"
-        ) as path:
-            await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
-        with self.resource_path(
-            "ai.backend.install.fixtures", "example-runtime-variant-presets.json"
-        ) as path:
-            await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
-        with self.resource_path("ai.backend.install.fixtures", "example-role-presets.json") as path:
-            await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
-        await self.run_manager_cli(["mgr", "permissions", "provision"])
-        with self.resource_path(
-            "ai.backend.install.fixtures", "example-prometheus-query-preset-categories.json"
-        ) as path:
-            await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
-        with self.resource_path(
-            "ai.backend.install.fixtures", "example-prometheus-query-presets.json"
-        ) as path:
-            await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
-        with self.resource_path(
-            "ai.backend.install.fixtures", "example-retention-policies.json"
-        ) as path:
-            await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
+    async def load_seeds(self) -> None:
+        with (
+            self.resource_path("ai.backend.install.seeds", "manager") as manager_seeds,
+            self.resource_path("ai.backend.install.seeds", "examples/manager") as example_seeds,
+            self.resource_path(
+                "ai.backend.install.seeds", "examples/domain_admin"
+            ) as domain_admin_seeds,
+        ):
+            await self.run_manager_cli([
+                "mgr",
+                "seed",
+                "apply",
+                str(manager_seeds),
+                str(example_seeds),
+            ])
+            # Rows that carry this installation's addresses and secrets, rewritten on a re-run.
+            with tempfile.TemporaryDirectory() as tmpdir:
+                self.write_install_seeds(manager_seeds, Path(tmpdir))
+                await self.run_manager_cli(["mgr", "seed", "apply", "--overwrite", tmpdir])
+            await self.run_manager_cli([
+                "mgr",
+                "permissions",
+                "provision",
+                "--seeds",
+                str(manager_seeds),
+            ])
+            # The example domain admins are granted roles that provisioning creates.
+            await self.run_manager_cli(["mgr", "seed", "apply", str(domain_admin_seeds)])
+
+    def read_seed_items(self, root: Path, kind: str) -> list[dict[str, Any]]:
+        yaml = YAML(typ="safe")
+        items: list[dict[str, Any]] = []
+        for path in sorted(root.rglob("*.yaml")):
+            document = yaml.load(path.read_text(encoding="utf8"))
+            if isinstance(document, dict) and document.get("kind") == kind:
+                items.extend(document["items"])
+        return items
+
+    def write_seed_file(self, path: Path, kind: str, items: Sequence[dict[str, Any]]) -> None:
+        with path.open("w", encoding="utf8") as fp:
+            YAML(typ="safe").dump({"kind": kind, "version": 1, "items": list(items)}, fp)
+
+    def write_install_seeds(self, manager_seeds: Path, out_dir: Path) -> None:
+        """Write the default resource group pointed at the app-proxy coordinator, and the SFTP
+        resource group allowed to the default domain when ``--with-sftp-agent`` is given."""
+        service = self.install_info.service_config
+        wsproxy_addr = (
+            f"http://{service.appproxy_coordinator_addr.face.host}"
+            f":{service.appproxy_coordinator_addr.face.port}"
+        )
+        resource_groups = [
+            {
+                **item,
+                "wsproxy_addr": wsproxy_addr,
+                "wsproxy_api_token": service.appproxy_api_secret,
+            }
+            for item in self.read_seed_items(manager_seeds, "resource_group")
+            if item["name"] == "default"
+        ]
+        sftp = service.sftp_agent
+        if sftp is not None:
+            self.log_header(f"Registering '{sftp.scaling_group}' scaling group for SFTP agent...")
+            resource_group_id = str(
+                uuid.uuid5(uuid.NAMESPACE_URL, f"backend.ai/scaling-group/{sftp.scaling_group}")
+            )
+            default_domain_id = next(
+                item["id"]
+                for item in self.read_seed_items(manager_seeds, "domain")
+                if item["name"] == "default"
+            )
+            resource_groups.append({
+                "id": resource_group_id,
+                "name": sftp.scaling_group,
+                "description": "Scaling group dedicated to SFTP upload sessions",
+                "is_active": True,
+                "driver": "static",
+                "driver_opts": {},
+                "scheduler": "fifo",
+                "scheduler_opts": {},
+                "wsproxy_addr": wsproxy_addr,
+                "wsproxy_api_token": service.appproxy_api_secret,
+            })
+            self.write_seed_file(
+                out_dir / "resource_group_for_domain.yaml",
+                "resource_group_for_domain",
+                [{"domain_id": default_domain_id, "resource_group_id": resource_group_id}],
+            )
+        self.write_seed_file(out_dir / "resource_group.yaml", "resource_group", resource_groups)
 
     async def check_prerequisites(self) -> None:
         self.os_info = await detect_os()
@@ -858,10 +934,22 @@ class Context(metaclass=ABCMeta):
         halfstack = self.install_info.halfstack_config
         service = self.install_info.service_config
         accelerator = self.install_info.accelerator
+        base_path = self.install_info.base_path
         toml_path = self.copy_config("agent.toml")
+        (base_path / "fixtures" / "agent").mkdir(parents=True, exist_ok=True)
+        await self.run_manager_cli(["mgr", "generate-rpc-keypair", "fixtures/agent", "agent"])
         self.sed_in_place_multi(
             toml_path,
             [
+                (
+                    re.compile("^rpc-auth-manager-public-key = .*", flags=re.MULTILINE),
+                    "rpc-auth-manager-public-key = "
+                    f'"{base_path / "fixtures" / "manager" / "manager.key"}"',
+                ),
+                (
+                    re.compile("^rpc-auth-agent-keypair = .*", flags=re.MULTILINE),
+                    f'rpc-auth-agent-keypair = "{base_path / "fixtures" / "agent" / "agent.key_secret"}"',
+                ),
                 ("port = 8120", f"port = {halfstack.etcd_addr[0].face.port}"),
                 ("port = 6001", f"port = {service.agent_rpc_addr.bind.port}"),
                 ("port = 6009", f"port = {service.agent_watcher_addr.bind.port}"),
@@ -1072,14 +1160,8 @@ class Context(metaclass=ABCMeta):
             etcd_addr_table["port"] = halfstack.etcd_addr[0].face.port
             etcd_table["addr"] = etcd_addr_table
             etcd_table["namespace"] = "local"
-            if halfstack.etcd_user:
-                etcd_table["user"] = halfstack.etcd_user
-            else:
-                etcd_table.pop("user", None)
-            if halfstack.etcd_password:
-                etcd_table["password"] = halfstack.etcd_password
-            else:
-                etcd_table.pop("password", None)
+            etcd_table["user"] = halfstack.etcd_user
+            etcd_table["password"] = halfstack.etcd_password
             data["etcd"] = etcd_table
             data["storage-proxy"]["secret"] = service.storage_proxy_random  # type: ignore
             data["storage-proxy"]["ipc-base-path"] = service.storage_proxy_ipc_base_path  # type: ignore
@@ -1243,9 +1325,8 @@ class Context(metaclass=ABCMeta):
         self._fixup_appproxy_alembic_ini(alembic_ini)
         await self.run_appproxy_coordinator_cli(["schema", "oneshot", "-f", str(alembic_ini)])
         # NOTE: The "default" scaling_group's wsproxy_addr/token are set by
-        # configure_appproxy_fixture(), which runs after load_fixtures() seeds
-        # the row. Do not update scaling_groups here -- the row does not exist
-        # yet at this point in the install flow.
+        # load_seeds(). Do not update scaling_groups here -- the row does not
+        # exist yet at this point in the install flow.
 
     def _fixup_appproxy_alembic_ini(self, alembic_ini: Path) -> None:
         """
@@ -1460,154 +1541,27 @@ class Context(metaclass=ABCMeta):
         for conf in (coord_conf, worker_conf):
             self.enable_observability_in_toml(conf)
 
-    async def configure_appproxy_fixture(self) -> None:
-        self.log_header("Updating manager scaling_groups to point to appproxy coordinator...")
-
-        service = self.install_info.service_config
-        with tempfile.TemporaryDirectory() as tmpdir:
-            fixture_path = Path(tmpdir) / "fixture.json"
-            with fixture_path.open("w") as fw:
-                fw.write(
-                    json.dumps({
-                        "__mode": "update",
-                        "scaling_groups": [
-                            {
-                                "name": "default",
-                                "wsproxy_addr": f"http://{service.appproxy_coordinator_addr.face.host}:{service.appproxy_coordinator_addr.face.port}",
-                                "wsproxy_api_token": service.appproxy_api_secret,
-                            }
-                        ],
-                    })
-                )
-            await self.run_manager_cli(["mgr", "fixture", "populate", fixture_path.as_posix()])
-
-    async def configure_sftp_agent_fixture(self) -> None:
-        """
-        Register the dedicated SFTP scaling group and associate it with the
-        default domain. This is only populated when the user passed
-        ``--with-sftp-agent`` — it mirrors the ``sgroups_for_domains``
-        association in ``example-users.json`` for the default scaling group.
-        """
-        service = self.install_info.service_config
-        sftp = service.sftp_agent
-        if sftp is None:
-            return
-
-        self.log_header(f"Registering '{sftp.scaling_group}' scaling group for SFTP agent...")
-        resource_group_id = str(
-            uuid.uuid5(uuid.NAMESPACE_URL, f"backend.ai/scaling-group/{sftp.scaling_group}")
-        )
-        with self.resource_path("ai.backend.install.fixtures", "example-users.json") as user_path:
-            user_fixture = json.loads(Path(user_path).read_bytes())
-        default_domain_id = next(
-            domain["id"] for domain in user_fixture["domains"] if domain["name"] == "default"
-        )
-        default_domain_node_id = next(
-            node["id"]
-            for node in user_fixture["virtual_entities"]
-            if node["entity_type"] == "domain" and node["entity_id"] == default_domain_id
-        )
-        resource_group_node_id = str(
-            uuid.uuid5(
-                uuid.NAMESPACE_URL,
-                f"backend.ai/virtual-entity/resource_group/{resource_group_id}",
-            )
-        )
-        membership_id = str(
-            uuid.uuid5(
-                uuid.NAMESPACE_URL,
-                f"backend.ai/entity-membership/resource_group/{resource_group_id}"
-                f"/domain/{default_domain_id}",
-            )
-        )
-        with tempfile.TemporaryDirectory() as tmpdir:
-            fixture_path = Path(tmpdir) / "fixture.json"
-            with fixture_path.open("w") as fw:
-                fw.write(
-                    json.dumps({
-                        "scaling_groups": [
-                            {
-                                "id": resource_group_id,
-                                "name": sftp.scaling_group,
-                                "description": "Scaling group dedicated to SFTP upload sessions",
-                                "is_active": True,
-                                "driver": "static",
-                                "driver_opts": {},
-                                "scheduler": "fifo",
-                                "scheduler_opts": {},
-                                "wsproxy_addr": (
-                                    f"http://{service.appproxy_coordinator_addr.face.host}"
-                                    f":{service.appproxy_coordinator_addr.face.port}"
-                                ),
-                                "wsproxy_api_token": service.appproxy_api_secret,
-                            }
-                        ],
-                        "sgroups_for_domains": [
-                            {
-                                "resource_group_id": resource_group_id,
-                                "domain_id": default_domain_id,
-                            }
-                        ],
-                        "virtual_entities": [
-                            {
-                                "id": resource_group_node_id,
-                                "entity_type": "resource_group",
-                                "entity_id": resource_group_id,
-                            }
-                        ],
-                        "entity_memberships": [
-                            {
-                                "id": membership_id,
-                                "virtual_entity_id": resource_group_node_id,
-                                "member_entity_id": default_domain_node_id,
-                                "capped": True,
-                            }
-                        ],
-                        "entity_membership_caps": [
-                            {
-                                "membership_id": membership_id,
-                                "permission": int(Permission.READ),
-                                "all_fields": True,
-                            }
-                        ],
-                        "scope_bindings": [
-                            {
-                                "virtual_entity_id": resource_group_node_id,
-                                "scope_entity_id": default_domain_node_id,
-                                "permission_cap": int(Permission.READ),
-                            }
-                        ],
-                    })
-                )
-            await self.run_manager_cli(["mgr", "fixture", "populate", fixture_path.as_posix()])
-
     async def configure_client(self) -> None:
         # TODO: add an option to generate keypairs
         base_path = self.install_info.base_path
         service = self.install_info.service_config
-        with self.resource_path("ai.backend.install.fixtures", "example-users.json") as user_path:
-            current_shell = os.environ.get("SHELL", "sh")
-            user_data = json.loads(Path(user_path).read_bytes())
-        username_by_uuid = {user["uuid"]: user["username"] for user in user_data["users"]}
-        with self.resource_path(
-            "ai.backend.install.fixtures", "example-keypairs.json"
-        ) as keypair_path:
-            keypair_data = json.loads(Path(keypair_path).read_bytes())
-        for keypair in keypair_data["keypairs"]:
-            username = username_by_uuid.get(keypair["user"])
-            if username is None:
-                continue
-            with (base_path / f"env-local-{username}-api.sh").open("w") as fp:
-                print("# Directly access to the manager using API keypair (admin)", file=fp)
-                print(
-                    "export"
-                    f" BACKEND_ENDPOINT=http://{service.manager_addr.face.host}:{service.manager_addr.face.port}/",
-                    file=fp,
-                )
-                print("export BACKEND_ENDPOINT_TYPE=api", file=fp)
-                print(f"export BACKEND_ACCESS_KEY={keypair['access_key']}", file=fp)
-                print(f"export BACKEND_SECRET_KEY={keypair['secret_key']}", file=fp)
-        for user in user_data["users"]:
+        current_shell = os.environ.get("SHELL", "sh")
+        with self.resource_path("ai.backend.install.seeds", "examples/manager") as example_seeds:
+            users = self.read_seed_items(example_seeds, "user")
+        for user in users:
+            username = user["username"]
+            for keypair in user.get("keypairs", []):
+                with (base_path / f"env-local-{username}-api.sh").open("w") as fp:
+                    print("# Directly access to the manager using API keypair (admin)", file=fp)
+                    print(
+                        "export"
+                        f" BACKEND_ENDPOINT=http://{service.manager_addr.face.host}:{service.manager_addr.face.port}/",
+                        file=fp,
+                    )
+                    print("export BACKEND_ENDPOINT_TYPE=api", file=fp)
+                    print(f"export BACKEND_ACCESS_KEY={keypair['access_key']}", file=fp)
+                    print(f"export BACKEND_SECRET_KEY={keypair['secret_key']}", file=fp)
+        for user in users:
             username = user["username"]
             with (base_path / f"env-local-{username}-session.sh").open("w") as fp:
                 print(
@@ -1894,10 +1848,9 @@ class Context(metaclass=ABCMeta):
         ``container_registries`` row (with admin credentials) so it shows up
         immediately in the manager API/UI without manual registration.
 
-        The fixture uses ``uuid5(NAMESPACE_URL, harbor_url)`` for the row ID
-        so re-running the installer does not create duplicate rows — the
-        manager's fixture loader treats a matching primary key as
-        idempotent.
+        The seed uses ``uuid5(NAMESPACE_URL, harbor_url)`` for the row ID
+        so re-running the installer does not create duplicate rows — an
+        existing row is skipped by ``mgr seed apply``.
         """
         harbor_url = f"http://{harbor.hostname}:{harbor.http_port}"
         # The registry name becomes the prefix of every image canonical
@@ -1908,8 +1861,11 @@ class Context(metaclass=ABCMeta):
         registry_name = f"{harbor.hostname}:{harbor.http_port}"
         project = "library"
         registry_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"{harbor_url}/{project}"))
-        fixture = {
-            "container_registries": [
+        seed_path = self.install_info.base_path / "harbor" / "container-registry-seed.yaml"
+        self.write_seed_file(
+            seed_path,
+            "container_registry",
+            [
                 {
                     "id": registry_id,
                     "registry_name": registry_name,
@@ -1920,12 +1876,10 @@ class Context(metaclass=ABCMeta):
                     "password": harbor.admin_password,
                     "ssl_verify": False,
                 }
-            ]
-        }
-        fixture_path = self.install_info.base_path / "harbor" / "container-registry-fixture.json"
-        fixture_path.write_text(json.dumps(fixture, indent=2))
+            ],
+        )
         self.log_header("Registering local Harbor as a Backend.AI container registry...")
-        await self.run_manager_cli(["mgr", "fixture", "populate", str(fixture_path)])
+        await self.run_manager_cli(["mgr", "seed", "apply", str(seed_path)])
 
     async def dump_install_info(self) -> None:
         self.log_header("Dumping the installation configs...")
@@ -2153,15 +2107,11 @@ class DevContext(Context):
         await self.configure_webserver()
         await self.configure_webui()
 
-        self.log_header("Loading fixtures...")
-        await self.load_fixtures()
+        self.log_header("Loading seeds...")
+        await self.load_seeds()
 
         self.log_header("Configuring app-proxy...")
         await self.configure_appproxy()
-        await self.configure_appproxy_fixture()
-
-        if self.install_variable.with_sftp_agent:
-            await self.configure_sftp_agent_fixture()
 
         self.log_header("Generating client environ configs...")
         await self.configure_client()
@@ -2355,7 +2305,7 @@ class PackageContext(Context):
         self.log_header("Configuring manager...")
         await self.configure_manager()
 
-        # Manager schema must exist before fixtures and the app-proxy DB step
+        # Manager schema must exist before seeds and the app-proxy DB step
         # update scaling_groups (mirrors the DevContext.configure() order).
         self.log_header("Initializing manager database schema...")
         await self.run_manager_cli(["mgr", "schema", "oneshot"])
@@ -2372,12 +2322,8 @@ class PackageContext(Context):
         await self.configure_appproxy()
         self.log_header("Generating client environ configs...")
         await self.configure_client()
-        self.log_header("Loading fixtures...")
-        await self.load_fixtures()
-        # load_fixtures() seeds the "default" scaling_group with placeholder
-        # wsproxy_addr/token from the example fixture, so this must run *after*
-        # it to overwrite them with the real coordinator address and secret.
-        await self.configure_appproxy_fixture()
+        self.log_header("Loading seeds...")
+        await self.load_seeds()
         self.log_header("Preparing vfolder volumes...")
         await self.prepare_local_vfolder_host()
 
@@ -2566,6 +2512,11 @@ class DockerContext(Context):
         compose_path = await self.generate_services_compose()
         self.log.write(Text.from_markup(f"generated [bold]{compose_path}[/]"))
         await self._start_halfstack()
+        await self._enable_etcd_auth()
+
+    @override
+    def _halfstack_compose_cmd(self) -> list[str]:
+        return [*self.docker_sudo, *self._services_compose_args()]
 
     @override
     async def _start_halfstack(self) -> None:
@@ -2823,7 +2774,7 @@ class DockerContext(Context):
         self.log_header("Configuring manager...")
         await self.configure_manager()
 
-        # Manager schema must exist before fixtures and the app-proxy DB step
+        # Manager schema must exist before seeds and the app-proxy DB step
         # update scaling_groups (mirrors the PackageContext.configure() order).
         # Use the compose mount explicitly rather than manager-cli's working_dir.
         self.log_header("Initializing manager database schema...")
@@ -2850,12 +2801,8 @@ class DockerContext(Context):
         await self.install_appproxy_db()
         self.log_header("Generating client environ configs...")
         await self.configure_client()
-        self.log_header("Loading fixtures...")
-        await self.load_fixtures()
-        # load_fixtures() seeds the "default" scaling_group with placeholder
-        # wsproxy_addr/token from the example fixture, so this must run *after*
-        # it to overwrite them with the real coordinator address and secret.
-        await self.configure_appproxy_fixture()
+        self.log_header("Loading seeds...")
+        await self.load_seeds()
         self.log_header("Preparing vfolder volumes...")
         # The bootstrap runs a one-off container of the storage-proxy
         # SERVICE, whose definition bind-mounts the generated config file and

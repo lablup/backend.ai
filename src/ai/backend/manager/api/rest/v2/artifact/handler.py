@@ -7,9 +7,13 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
+from ai.backend.common.data.entity.artifact import ArtifactID
 from ai.backend.common.dto.manager.v2.artifact.request import (
     AdminSearchArtifactsInput,
     DeleteArtifactsInput,
+    PartialBulkDeleteArtifactsInput,
+    PartialBulkRestoreArtifactsInput,
+    PartialBulkUpdateArtifactsInput,
     RestoreArtifactsInput,
     UpdateArtifactInput,
 )
@@ -62,18 +66,58 @@ class V2ArtifactHandler:
 
     async def delete(
         self,
-        body: BodyParam[DeleteArtifactsInput],
+        path: PathParam[ArtifactIdPathParam],
     ) -> APIResponse:
-        """Delete multiple artifacts by ID."""
-        result = await self._adapter.delete(body.parsed)
+        """Soft-delete an artifact."""
+        result = await self._adapter.delete(ArtifactID(path.parsed.artifact_id))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def restore(
         self,
+        path: PathParam[ArtifactIdPathParam],
+    ) -> APIResponse:
+        """Restore a soft-deleted artifact."""
+        result = await self._adapter.restore(ArtifactID(path.parsed.artifact_id))
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_update(
+        self,
+        body: BodyParam[PartialBulkUpdateArtifactsInput],
+    ) -> APIResponse:
+        """Update several artifacts, answering for each one."""
+        result = await self._adapter.partial_bulk_update(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_delete(
+        self,
+        body: BodyParam[PartialBulkDeleteArtifactsInput],
+    ) -> APIResponse:
+        """Soft-delete several artifacts, answering for each one."""
+        result = await self._adapter.partial_bulk_delete(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_restore(
+        self,
+        body: BodyParam[PartialBulkRestoreArtifactsInput],
+    ) -> APIResponse:
+        """Restore several soft-deleted artifacts, answering for each one."""
+        result = await self._adapter.partial_bulk_restore(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def delete_artifacts(
+        self,
+        body: BodyParam[DeleteArtifactsInput],
+    ) -> APIResponse:
+        """Deprecated. Use `POST /v2/artifacts/partial-bulk-delete`."""
+        result = await self._adapter.delete_artifacts(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def restore_artifacts(
+        self,
         body: BodyParam[RestoreArtifactsInput],
     ) -> APIResponse:
-        """Restore previously deleted artifacts."""
-        artifacts = await self._adapter.restore(body.parsed.artifact_ids)
+        """Deprecated. Use `POST /v2/artifacts/partial-bulk-restore`."""
+        artifacts = await self._adapter.restore_artifacts(body.parsed.artifact_ids)
         result = RestoreArtifactsGQLPayload(artifacts=artifacts)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 

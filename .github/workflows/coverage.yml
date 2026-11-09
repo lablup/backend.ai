@@ -9,6 +9,10 @@ on:
     - cron: '0 15 * * 1-5'
   workflow_dispatch:
 
+# `contents: read`: only runs the tests and uploads coverage to Codecov
+permissions:
+  contents: read
+
 jobs:
   test-coverage:
     if: ${{ contains(fromJson('["schedule", "workflow_dispatch"]'), github.event_name) || github.event.pull_request.merged == true }}
@@ -29,7 +33,7 @@ jobs:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
         cache: pip
     - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v11
+      uses: pantsbuild/actions/init-pants@0aaef864bd133c4055feb6adad0bfdce0de1c2e4  # v11
       with:
         gha-cache-key: v1
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}

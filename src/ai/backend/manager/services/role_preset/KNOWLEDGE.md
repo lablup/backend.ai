@@ -3,7 +3,7 @@ name: role-preset-service-shapes
 type: decision-table
 description: role preset knowledge: why a preset is global state that owns field rows, why creation is one action, why delete and purge both exist, why the two template-settling writes have a service
 scope: src/ai/backend/manager/services/role_preset
-keywords: [CreateRolePresetAction, BulkDeleteRolePresetsAction, BulkRestoreRolePresetsAction, RolePresetCreator, RolePermissionPresetCreator, RolePresetService, role_name_template, field_atomic_create_ops, partial_bulk_delete_ops, deleted]
+keywords: [CreateRolePresetAction, PartialBulkDeleteRolePresetsAction, PartialBulkRestoreRolePresetsAction, RolePresetCreator, RolePermissionPresetCreator, RolePresetService, role_name_template, field_atomic_create_ops, partial_bulk_delete_ops, deleted_at]
 sources:
   - src/ai/backend/manager/services/role_preset
   - src/ai/backend/manager/models/rbac_models/role_preset
@@ -14,9 +14,11 @@ generated:
 status: stable
 ---
 
-# Role preset service — Knowledge
+# Role preset service: Knowledge
 
 > Rules: `../AGENTS.md`. Spec selection: `../../models/specs/KNOWLEDGE.md`.
+
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
 A role preset declares which roles a scope type provisions when an entity of
 that type is created, and which permissions each of those roles carries. The
@@ -49,24 +51,27 @@ that group hands out. The entity recorded is always the preset.
   creators together; a preset that survived a failed permission row would grant
   less than it declares.
 - The field creators build from the parent's id, which does not exist until the
-  parent row does — `FieldCreator.build_row(owner_id)` is what makes that
+  parent row does. `FieldCreator.build_row(owner_id)` is what makes that
   orderable inside one write.
 
-## A permission entry is answered for by its preset
+## The owning preset answers for a permission entry
 
 - Adding or removing an entry is a change to the preset, so it is recorded as `UPDATE`.
   An entry carries no permission bit of its own.
-- `bulk_add` takes the preset id: there is no entry yet to name. `bulk_remove` takes
-  entry ids alone and the owning preset is what the lookup answers.
-- The entries `bulk_remove` takes may belong to different presets. Their owners are
+- `atomic_bulk_add_permissions` takes the preset id: there is no entry yet to name.
+  `partial_bulk_remove_permissions` takes entry ids alone and the owning preset is what
+  the lookup answers.
+- The entries `partial_bulk_remove_permissions` takes may belong to different presets. Their owners are
   read in one go and every one is checked. The answer is per entry, the record per
   preset.
 
 ## Delete and purge are different operations, not duplicates
 
-- `role_presets.deleted` is the lifecycle column, so `bulk_delete` is an UPDATE
-  at the DB recorded as `DELETE`, and `bulk_restore` is the same update reversed.
-- `purge` and `bulk_purge` remove the row, taking the permission rows with it by
+- The lifecycle column is the soft delete mixin's `role_presets.deleted_at`, so `delete`
+  and `partial_bulk_delete` are an UPDATE at the DB recorded as `DELETE`, and `restore`
+  and `partial_bulk_restore` are the same update reversed. Both use the shared updaters
+  (`models/specs/soft_delete.py`).
+- `purge` and `partial_bulk_purge` remove the row, taking the permission rows with it by
   FK cascade.
 - The lifecycle column is not exposed on the general updater, so an ordinary edit
   cannot make the transition.
@@ -76,17 +81,18 @@ that group hands out. The entity recorded is always the preset.
 - The render at use time swallows its own failure and falls back to a generated name,
   because entity creation must not fail on role naming. That makes the write the only
   point a caller learns the template is broken.
-- Create and update are the only operations that take a template, so they are the only
-  ones that branch. The rest still run straight against ops.
+- Create, update and partial bulk update are the only operations that take a template,
+  so they are the only ones that branch. The rest still run straight against ops.
 - The check renders the template against a dummy scope in a sandboxed Jinja
-  environment, refusing syntax errors, undefined variables and an empty result.
+  environment, rejecting syntax errors, undefined variables and an empty result.
 - Length is not checked: the render truncates to the column limit, so there is nothing
-  to refuse.
+  to reject.
 
 ## A preset change carries over to the roles derived from it
 
 - A role records the preset that instantiated it in `roles.role_preset_id`. Update,
-  add permissions and remove permissions go through `RolePresetRepository`, which in the
+  partial bulk update, add permissions and remove permissions go through
+  `RolePresetRepository`, which in the
   same transaction brings that preset's derived roles back to what the preset now
   declares. A role whose link is NULL is never touched.
 - Permissions are stated on the role's own scope to equal the preset's set. An entity

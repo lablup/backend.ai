@@ -1,18 +1,27 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import Self
+from typing import Self, override
 from uuid import UUID
 
-from strawberry import UNSET
+from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.runtime_variant.request import (
     CreateRuntimeVariantInput as CreateRuntimeVariantInputDTO,
 )
 from ai.backend.common.dto.manager.v2.runtime_variant.request import (
     DeleteRuntimeVariantsInput as DeleteRuntimeVariantsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.runtime_variant.request import (
+    PartialBulkPurgeRuntimeVariantsInput as PartialBulkPurgeRuntimeVariantsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.runtime_variant.request import (
+    PartialBulkUpdateRuntimeVariantsInput as PartialBulkUpdateRuntimeVariantsInputDTO,
 )
 from ai.backend.common.dto.manager.v2.runtime_variant.request import (
     RuntimeVariantFilter as RuntimeVariantFilterDTO,
@@ -59,6 +68,8 @@ from ai.backend.common.dto.manager.v2.runtime_variant.types import (
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import StringFilter as StringFilterGQL
+from ai.backend.manager.api.gql.base import UUIDFilter as UUIDFilterGQL
+from ai.backend.manager.api.gql.common_types import PartialBulkFailureGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -75,6 +86,7 @@ from ai.backend.manager.api.gql.deployment.types.revision import (
     PreStartActionGQL,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 
 @gql_enum(
@@ -170,7 +182,7 @@ class RuntimeVariantGQL(PydanticNodeMixin[RuntimeVariantNodeDTO]):
     id: NodeID[str] = gql_field(description="Relay-style global node identifier.")
     entity_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the runtime variant.",
         ),
     )
@@ -202,6 +214,19 @@ class RuntimeVariantGQL(PydanticNodeMixin[RuntimeVariantNodeDTO]):
         description="Timestamp of the last modification to this runtime variant."
     )
 
+    @classmethod
+    @override
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[RuntimeVariantGQL | None]:
+        return await info.context.data_loaders.runtime_variant_loader.load_many([
+            RuntimeVariantID(UUID(nid)) for nid in node_ids
+        ])
+
 
 RuntimeVariantEdge = Edge[RuntimeVariantGQL]
 
@@ -223,6 +248,12 @@ class RuntimeVariantConnection(Connection[RuntimeVariantGQL]):
 )
 class RuntimeVariantFilterGQL(PydanticInputMixin[RuntimeVariantFilterDTO]):
     name: StringFilterGQL | None = gql_field(default=None, description="Name filter.")
+    entity_id: UUIDFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by runtime variant ID."
+        ),
+        default=None,
+    )
     AND: list[Self] | None = gql_added_field(
         BackendAIGQLMeta(added_version="26.7.0", description="Match all of the given sub-filters."),
         default=None,
@@ -239,7 +270,7 @@ class RuntimeVariantFilterGQL(PydanticInputMixin[RuntimeVariantFilterDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="Entities whose use of a runtime variant narrows the read.",
     ),
     name="RuntimeVariantUsedBy",
@@ -254,7 +285,7 @@ class RuntimeVariantUsedByGQL(PydanticInputMixin[RuntimeVariantUsedBy]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description=(
             "Uses narrowing a runtime variant query; every id is AND-ed. The caller must be able "
             "to read each listed entity, or the request is refused. Only runtime variants the caller "
@@ -332,6 +363,19 @@ class DeleteRuntimeVariantPayloadGQL(PydanticOutputMixin[DeleteRuntimeVariantPay
     id: UUID = gql_field(description="ID of the deleted runtime variant.")
 
 
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for runtime variant purge.",
+    ),
+    model=DeleteRuntimeVariantPayloadDTO,
+    name="PurgeRuntimeVariantPayload",
+)
+class PurgeRuntimeVariantPayloadGQL(PydanticOutputMixin[DeleteRuntimeVariantPayloadDTO]):
+    purged_id: ID = gql_field(description="Global ID of the purged runtime variant.")
+    entity_id: UUID = gql_field(description="UUID of the purged runtime variant.")
+
+
 @gql_pydantic_input(
     BackendAIGQLMeta(
         added_version="26.4.2",
@@ -345,7 +389,7 @@ class DeleteRuntimeVariantsInputGQL(PydanticInputMixin[DeleteRuntimeVariantsInpu
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="One failed item of a partial-success bulk runtime variant operation.",
     ),
     model=RuntimeVariantBulkFailureInfoDTO,
@@ -367,14 +411,66 @@ class RuntimeVariantBulkFailureInfoGQL(PydanticOutputMixin[RuntimeVariantBulkFai
 class DeleteRuntimeVariantsPayloadGQL(PydanticOutputMixin[DeleteRuntimeVariantsPayloadDTO]):
     items: list[UUID] = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="Ids of successfully deleted runtime variants.",
         ),
     )
     failed: list[RuntimeVariantBulkFailureInfoGQL] = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="Per-item failures, each naming the runtime variant it targeted.",
         ),
     )
     deleted_count: int = gql_field(description="Number of runtime variants successfully deleted.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for updating several runtime variants, each answered for separately.",
+    ),
+    name="PartialBulkUpdateRuntimeVariantsInput",
+)
+class PartialBulkUpdateRuntimeVariantsInputGQL(
+    PydanticInputMixin[PartialBulkUpdateRuntimeVariantsInputDTO]
+):
+    items: list[UpdateRuntimeVariantInputGQL] = gql_field(
+        description="The runtime variants to update, each with its fields."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for purging several runtime variants, each answered for separately.",
+    ),
+    name="PartialBulkPurgeRuntimeVariantsInput",
+)
+class PartialBulkPurgeRuntimeVariantsInputGQL(
+    PydanticInputMixin[PartialBulkPurgeRuntimeVariantsInputDTO]
+):
+    ids: list[UUID] = gql_field(description="IDs of the runtime variants to purge.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Result of a partial bulk runtime variant operation: the runtime variants processed "
+            "and the ones that failed."
+        ),
+    ),
+    model=PartialBulkPayload[RuntimeVariantNodeDTO],
+    name="PartialBulkRuntimeVariantsPayload",
+)
+class PartialBulkRuntimeVariantsPayloadGQL(
+    PydanticOutputMixin[PartialBulkPayload[RuntimeVariantNodeDTO]]
+):
+    """Payload for partial bulk runtime variant mutations."""
+
+    successes: list[RuntimeVariantGQL] = gql_field(
+        description="The runtime variants processed, as they stood when processed."
+    )
+    failed: list[PartialBulkFailureGQL] = gql_field(
+        description="The runtime variants not processed, each with the reason."
+    )

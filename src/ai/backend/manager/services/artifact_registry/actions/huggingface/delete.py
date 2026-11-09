@@ -18,7 +18,7 @@ class DeleteHuggingFaceRegistryAction(ArtifactRegistrySingleEntityAction):
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.DELETE
+        return ActionOperationType.PURGE
 
 
 @dataclass

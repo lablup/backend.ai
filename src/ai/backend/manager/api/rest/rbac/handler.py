@@ -13,6 +13,7 @@ from http import HTTPStatus
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.types import RuntimeEntityID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.rbac import (
     AssignRoleRequest,
     AssignRoleResponse,
@@ -204,7 +205,7 @@ class RBACHandler:
         input_data = UserRoleAssignmentInput(
             user_id=body.parsed.user_id,
             role_id=body.parsed.role_id,
-            granted_by=body.parsed.granted_by or ctx.user_uuid,
+            granted_by=UserID(ctx.user_uuid),
         )
         action_result = await self._rbac.assign_role.run(AssignRoleAction(input=input_data))
         resp = AssignRoleResponse(

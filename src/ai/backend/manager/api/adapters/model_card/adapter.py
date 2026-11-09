@@ -13,7 +13,11 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.dto.manager.query import StringFilter
-from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.dto.manager.v2.common import (
+    OrderDirection,
+    PartialBulkFailure,
+    PartialBulkPayload,
+)
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
     SearchDeploymentRevisionPresetsInput,
@@ -29,6 +33,8 @@ from ai.backend.common.dto.manager.v2.model_card.request import (
     ModelCardFilter,
     ModelCardOrder,
     ModelCardResourceRequirementFilter,
+    PartialBulkPurgeModelCardsInput,
+    PartialBulkUpdateModelCardsInput,
     ResourceSlotEntryInput,
     ScopedSearchModelCardsInput,
     SearchModelCardsInput,
@@ -56,6 +62,7 @@ from ai.backend.common.dto.manager.v2.model_card.types import (
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.schema.deployment import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.common.types import MountPermission
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkResult
 from ai.backend.manager.actions.v2.ops.result import BatchOpsResult
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
@@ -79,7 +86,11 @@ from ai.backend.manager.data.model_card.types import (
     ResourceRequirementEntry,
 )
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.models.model_card.creators import ModelCardCreator
 from ai.backend.manager.models.model_card.deprecated_search import (
     ModelCardDeprecatedSearch,
@@ -106,12 +117,16 @@ from ai.backend.manager.models.specs.search.usage import UsedBy
 from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
 from ai.backend.manager.services.deployment.actions.create_deployment import CreateDeploymentAction
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
-from ai.backend.manager.services.model_card.actions.bulk_delete import (
-    BulkDeleteModelCardAction,
-)
+from ai.backend.manager.services.model_card.actions.bulk_get import BulkGetModelCardsAction
 from ai.backend.manager.services.model_card.actions.create import CreateModelCardAction
 from ai.backend.manager.services.model_card.actions.delete import DeleteModelCardAction
 from ai.backend.manager.services.model_card.actions.get import GetModelCardAction
+from ai.backend.manager.services.model_card.actions.partial_bulk_purge_model_cards import (
+    PartialBulkPurgeModelCardsAction,
+)
+from ai.backend.manager.services.model_card.actions.partial_bulk_update_model_cards import (
+    PartialBulkUpdateModelCardsAction,
+)
 from ai.backend.manager.services.model_card.actions.scan import ScanProjectModelCardsAction
 from ai.backend.manager.services.model_card.actions.scoped_search import (
     ScopedSearchModelCardsAction,
@@ -322,6 +337,23 @@ class ModelCardAdapter(BaseAdapter):
         )
         return (await self._nodes_with_min_resources([result.data]))[0]
 
+    async def batch_load_by_ids(
+        self, ids: Sequence[ModelCardID]
+    ) -> list[ModelCardNode | Exception | None]:
+        """Batch load model cards by id for DataLoader use, one answer per id."""
+        if not ids:
+            return []
+        result = await self._model_card.bulk_get.run(BulkGetModelCardsAction(ids=ids))
+        by_card = await self.min_resources([
+            item.value.id for item in result.items if item.value is not None
+        ])
+        return [
+            self._data_to_node(item.value, by_card.get(item.value.id))
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
+
     async def create(
         self,
         input: CreateModelCardInput,
@@ -360,7 +392,79 @@ class ModelCardAdapter(BaseAdapter):
         self,
         input: UpdateModelCardInput,
     ) -> UpdateModelCardPayload:
-        updater = ModelCardUpdater(
+        result = await self._model_card.update.run(
+            UpdateModelCardAction(
+                model_card_id=ModelCardID(input.id), updater=self._to_updater(input)
+            )
+        )
+        return UpdateModelCardPayload(
+            model_card=(await self._nodes_with_min_resources([result.model_card]))[0]
+        )
+
+    async def purge(
+        self,
+        card_id: UUID,
+        options: DeleteModelCardOptions,
+    ) -> DeleteModelCardPayload:
+        """Remove a model card; ``options`` decides whether its vfolder goes to the trash."""
+        result = await self._model_card.delete.run(
+            DeleteModelCardAction(
+                model_card_id=ModelCardID(card_id),
+                purger=ModelCardPurger(card_id=ModelCardID(card_id)),
+                options=options,
+            )
+        )
+        return DeleteModelCardPayload(id=result.id, entity_id=result.id)
+
+    async def partial_bulk_update(
+        self, input: PartialBulkUpdateModelCardsInput
+    ) -> PartialBulkPayload[ModelCardNode]:
+        """Update several model cards, answering for each one."""
+        result = await self._model_card.partial_bulk_update.run(
+            PartialBulkUpdateModelCardsAction(
+                updaters=[self._to_updater(item) for item in input.items]
+            )
+        )
+        return PartialBulkPayload[ModelCardNode](
+            successes=await self._nodes_with_min_resources(self._succeeded(result)),
+            failed=self._failed(result),
+        )
+
+    async def partial_bulk_purge(
+        self, input: PartialBulkPurgeModelCardsInput
+    ) -> PartialBulkPayload[ModelCardNode]:
+        """Remove several model cards, answering for each one."""
+        result = await self._model_card.partial_bulk_purge.run(
+            PartialBulkPurgeModelCardsAction(
+                ids=[ModelCardID(card_id) for card_id in input.ids],
+                options=input.options or DeleteModelCardOptions(),
+            )
+        )
+        # The requirements went with the cards, so the nodes come without them.
+        return PartialBulkPayload[ModelCardNode](
+            successes=[self._data_to_node(card) for card in self._succeeded(result)],
+            failed=self._failed(result),
+        )
+
+    async def admin_bulk_delete(
+        self,
+        input: BulkDeleteModelCardsInput,
+        options: DeleteModelCardOptions,
+    ) -> BulkDeleteModelCardsPayload:
+        """Deprecated. Use :meth:`partial_bulk_purge`."""
+        payload = await self.partial_bulk_purge(
+            PartialBulkPurgeModelCardsInput(ids=input.ids, options=options)
+        )
+        return BulkDeleteModelCardsPayload(
+            successes=[node.id for node in payload.successes],
+            failed=[
+                BulkDeleteModelCardV2Error(card_id=failure.id, message=failure.message)
+                for failure in payload.failed
+            ],
+        )
+
+    def _to_updater(self, input: UpdateModelCardInput) -> ModelCardUpdater:
+        return ModelCardUpdater(
             card_id=ModelCardID(input.id),
             name=OptionalState.from_unset(input.name),
             author=TriState.from_unset(input.author),
@@ -377,46 +481,16 @@ class ModelCardAdapter(BaseAdapter):
             readme=TriState.from_unset(input.readme),
             access_level=OptionalState.from_unset(input.access_level).map(lambda x: x.value),
         )
-        result = await self._model_card.update.run(
-            UpdateModelCardAction(model_card_id=ModelCardID(input.id), updater=updater)
-        )
-        return UpdateModelCardPayload(
-            model_card=(await self._nodes_with_min_resources([result.model_card]))[0]
-        )
 
-    async def delete(
-        self,
-        card_id: UUID,
-        options: DeleteModelCardOptions,
-    ) -> DeleteModelCardPayload:
-        result = await self._model_card.delete.run(
-            DeleteModelCardAction(
-                model_card_id=ModelCardID(card_id),
-                purger=ModelCardPurger(card_id=ModelCardID(card_id)),
-                options=options,
-            )
-        )
-        return DeleteModelCardPayload(id=result.id)
+    def _succeeded(self, result: PartialBulkResult[ModelCardData]) -> list[ModelCardData]:
+        return [item.value for item in result.items if item.value is not None]
 
-    async def admin_bulk_delete(
-        self,
-        input: BulkDeleteModelCardsInput,
-        options: DeleteModelCardOptions,
-    ) -> BulkDeleteModelCardsPayload:
-        """Bulk-delete model cards and surface per-card success/failure breakdown."""
-        result = await self._model_card.bulk_delete.run(
-            BulkDeleteModelCardAction(
-                ids=[ModelCardID(card_id) for card_id in input.ids],
-                options=options,
-            )
-        )
-        return BulkDeleteModelCardsPayload(
-            successes=[UUID(str(card_id)) for card_id in result.values()],
-            failed=[
-                BulkDeleteModelCardV2Error(card_id=UUID(str(card_id)), message=str(error))
-                for card_id, error in result.errors().items()
-            ],
-        )
+    def _failed(self, result: PartialBulkResult[ModelCardData]) -> list[PartialBulkFailure]:
+        return [
+            PartialBulkFailure(id=item.entity_id, message=str(item.error))
+            for item in result.items
+            if item.error is not None
+        ]
 
     async def scan_project(self, project_id: UUID) -> ScanProjectModelCardsPayload:
         me = current_user()
@@ -564,15 +638,16 @@ class ModelCardAdapter(BaseAdapter):
         if f.OR:
             or_conditions: list[QueryCondition] = []
             for sub in f.OR:
-                or_conditions.extend(self._convert_filter(sub))
+                sub_conditions = self._convert_filter(sub)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub in f.NOT:
-                not_conditions.extend(self._convert_filter(sub))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     def _storage_host_conditions(self, host: StringFilter | None) -> list[QueryCondition]:

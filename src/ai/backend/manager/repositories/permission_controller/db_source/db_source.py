@@ -5,23 +5,26 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.exception import BackendAIError
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.permission import (
     PermissionData,
 )
 from ai.backend.manager.data.permission.role import (
+    AssignedUserData,
     AssignedUserListResult,
+    BulkRoleAssignmentFailure,
+    BulkRoleAssignmentResultData,
     BulkRoleRevocationFailure,
     BulkRoleRevocationResultData,
     BulkUserRoleRevocationInput,
     ProjectRoleCount,
     RoleRevocationResult,
     UserRoleAssignmentInput,
-    UserRoleRevocationData,
     UserRoleRevocationInput,
 )
 from ai.backend.manager.errors.permission import (
@@ -39,6 +42,9 @@ from ai.backend.manager.models.rbac_models.permission.searchable_fields import (
 from ai.backend.manager.models.rbac_models.permission.updaters import RolePermissionUpdater
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
+from ai.backend.manager.models.rbac_models.user_role.searchable_fields import (
+    RoleAssignmentSearchableFields,
+)
 from ai.backend.manager.models.rbac_models.user_role.searchers import RoleAssignmentSearcher
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.permission import PermissionEntry
@@ -119,18 +125,13 @@ class PermissionDBSource:
     # ============================================================
 
     async def assign_role(self, data: UserRoleAssignmentInput) -> UserRoleRow:
-        role_id = RoleID(data.role_id)
         async with self._ops.write_ops() as w:
-            granted = await w.grant_roles(
-                UserID(data.user_id),
-                [role_id],
-                None if data.granted_by is None else UserID(data.granted_by),
-            )
+            granted = await w.grant_roles(data.user_id, [data.role_id], data.granted_by)
         if not granted[0]:
             raise RoleAlreadyAssigned(
                 f"Role {data.role_id} is already assigned to user {data.user_id}."
             )
-        return await self._user_role_row(UserID(data.user_id), role_id)
+        return await self._user_role_row(data.user_id, data.role_id)
 
     async def _user_role_row(self, user_id: UserID, role_id: RoleID) -> UserRoleRow:
         async with self._db.begin_readonly_session_read_committed() as read_sess:
@@ -147,8 +148,7 @@ class PermissionDBSource:
     async def revoke_role(self, data: UserRoleRevocationInput) -> RoleRevocationResult:
         """Revoke a role from a user.
 
-        Returns (user_role_id, project_remaining_roles) where
-        project_remaining_roles lists how many roles the user still
+        Returns the deleted assignment and project_remaining_roles, which lists how many roles the user still
         holds in each project that this role belongs to.
         """
         async with self._db.begin_session() as db_session:
@@ -161,7 +161,7 @@ class PermissionDBSource:
                 raise RoleNotAssigned(
                     f"Role {data.role_id} is not assigned to user {data.user_id}."
                 )
-            user_role_id = user_role_row.id
+            revoked = RoleAssignmentSearchableFields.own.to_data(user_role_row)
             await db_session.delete(user_role_row)
             await db_session.flush()
 
@@ -187,9 +187,9 @@ class PermissionDBSource:
             ).all()
 
             return RoleRevocationResult(
-                user_role_id=user_role_id,
+                revoked=revoked,
                 project_remaining_roles=[
-                    ProjectRoleCount(project_id=r[0], remaining_count=r[1]) for r in rows
+                    ProjectRoleCount(project_id=ProjectID(r[0]), remaining_count=r[1]) for r in rows
                 ],
             )
 
@@ -266,28 +266,47 @@ class PermissionDBSource:
         self,
         role_id: RoleID,
         user_ids: Sequence[UserID],
-        granted_by: UserID | None = None,
-    ) -> list[UserRoleRow]:
-        """Grant the role to each user; a user already holding it is left as it stands.
-        Answers the rows the named users hold for the role afterwards."""
+        granted_by: UserID,
+    ) -> BulkRoleAssignmentResultData:
+        """Grant the role to each user, each in its own savepoint of one transaction. A
+        user the grant fails for, or one already holding the role, is reported as a
+        failure."""
+        granted_user_ids: list[UserID] = []
+        failures: list[BulkRoleAssignmentFailure] = []
         async with self._ops.write_ops() as w:
             for user_id in user_ids:
-                await w.grant_roles(user_id, [role_id], granted_by)
+                try:
+                    async with w.savepoint() as sp:
+                        [granted] = await sp.grant_roles(user_id, [role_id], granted_by)
+                    if not granted:
+                        raise RoleAlreadyAssigned(
+                            f"Role {role_id} is already assigned to user {user_id}."
+                        )
+                except BackendAIError as e:
+                    log.trace(
+                        "role assignment failed: {}", e, role_id=role_id, target_user_id=user_id
+                    )
+                    failures.append(BulkRoleAssignmentFailure(user_id=user_id, message=str(e)))
+                    continue
+                granted_user_ids.append(user_id)
         async with self._db.begin_readonly_session_read_committed() as read_sess:
             rows = (
                 await read_sess.scalars(
                     sa.select(UserRoleRow).where(
                         UserRoleRow.role_id == role_id,
-                        UserRoleRow.user_id.in_(list(user_ids)),
+                        UserRoleRow.user_id.in_(granted_user_ids),
                     )
                 )
             ).all()
-        return list(rows)
+        return BulkRoleAssignmentResultData(
+            successes=[RoleAssignmentSearchableFields.own.to_data(row) for row in rows],
+            failures=failures,
+        )
 
     async def bulk_revoke_role(
         self, data: BulkUserRoleRevocationInput
     ) -> BulkRoleRevocationResultData:
-        successes: list[UserRoleRevocationData] = []
+        successes: list[AssignedUserData] = []
         failures: list[BulkRoleRevocationFailure] = []
 
         async with self._db.begin_session() as db_session:
@@ -304,16 +323,10 @@ class PermissionDBSource:
                             raise RoleNotAssigned(
                                 f"Role {data.role_id} is not assigned to user {user_id}."
                             )
-                        user_role_id = user_role_row.id
+                        revoked = RoleAssignmentSearchableFields.own.to_data(user_role_row)
                         await db_session.delete(user_role_row)
                         await db_session.flush()
-                        successes.append(
-                            UserRoleRevocationData(
-                                user_role_id=user_role_id,
-                                user_id=user_id,
-                                role_id=data.role_id,
-                            )
-                        )
+                        successes.append(revoked)
                 except Exception as e:
                     log.trace(
                         "role revocation failed: {}",

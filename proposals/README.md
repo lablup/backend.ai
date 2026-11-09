@@ -148,9 +148,20 @@ BEP numbers start from 1000.
 | [1075](BEP-1075-entity-relation-operations.md) | Entity Relation Operations | HyeokJin Kim | Draft |
 | [1076](BEP-1076-project-membership.md) | Project Membership | HyeokJin Kim | Draft |
 | [1077](BEP-1077-project-scoped-ownership.md) | Project-Scoped Ownership and Access | HyeokJin Kim | Draft |
+| [1078](BEP-1078-storage-proxy-enhancement.md) | Storage Proxy Enhancement | Sanghun Lee | Draft |
+| [1079](BEP-1079-vxlan-overlay-cluster-network.md) | VXLAN Overlay Cluster Network | Daemyung Jang | Draft |
 | _next_ | _(reserve your number here)_ | | |
 
 ## File Structure
+
+### English and Korean pairs
+
+Every BEP is a pair in `proposals/`: English `BEP-NNNN-title.md` and Korean `BEP-NNNN-title.ko.md`.
+Each sub-document of a segmented BEP is a pair too, such as `BEP-1033/00-overview.md` and `BEP-1033/00-overview.ko.md`.
+
+- Frontmatter goes only in the English file.
+- Both files keep the same headings in the same order.
+- Update both files in the same change.
 
 ### Single-File BEP (< 500 lines)
 

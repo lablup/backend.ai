@@ -31,6 +31,9 @@ from ai.backend.manager.services.scheduling_history.actions.bulk_get_deployment_
 from ai.backend.manager.services.scheduling_history.actions.bulk_get_kernel_histories import (
     BulkGetKernelHistoriesAction,
 )
+from ai.backend.manager.services.scheduling_history.actions.bulk_get_replica_group_histories import (
+    BulkGetReplicaGroupHistoriesAction,
+)
 from ai.backend.manager.services.scheduling_history.actions.bulk_get_route_histories import (
     BulkGetRouteHistoriesAction,
 )
@@ -106,6 +109,9 @@ class SchedulingHistoryProcessors:
     ]
     bulk_get_route_histories: PartialBulkFieldActionProcessor[
         BulkGetRouteHistoriesAction, RouteHistoryData
+    ]
+    bulk_get_replica_group_histories: PartialBulkFieldActionProcessor[
+        BulkGetReplicaGroupHistoriesAction, ReplicaGroupHistoryData
     ]
 
     # Admin processors
@@ -195,6 +201,9 @@ class SchedulingHistoryProcessors:
         )
         self.bulk_get_route_histories = route_histories.partial_bulk_get_ops(
             BulkGetRouteHistoriesAction
+        )
+        self.bulk_get_replica_group_histories = replica_group_histories.partial_bulk_get_ops(
+            BulkGetReplicaGroupHistoriesAction
         )
 
         # Admin processors

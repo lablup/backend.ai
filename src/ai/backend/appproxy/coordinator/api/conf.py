@@ -44,7 +44,6 @@ async def conf_v2(
         token_id = uuid.uuid4()
         token = Token.create(
             token_id,
-            params.login_session_token,
             params.kernel_host,
             params.kernel_port,
             params.session.id,
@@ -54,7 +53,7 @@ async def conf_v2(
             params.session.domain_name,
         )
         sess.add(token)
-        log.debug("build token with body {}", params.model_dump())
+        log.debug("built a token for session {}", params.session.id)
 
         return PydanticResponse(TokenResponseModel(token=str(token_id)))
 

@@ -8,8 +8,9 @@ from typing import Any, override
 
 import pytest
 
+from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.dto.manager.v2.image.request import UpdateImageInput
+from ai.backend.common.dto.manager.v2.image.request import UpdateImageBody
 from ai.backend.common.dto.manager.v2.image.response import ImageNode
 from ai.backend.common.dto.manager.v2.image.types import (
     ImageResourceLimitGQLInfo,
@@ -17,14 +18,17 @@ from ai.backend.common.dto.manager.v2.image.types import (
 )
 from ai.backend.manager.api.adapters.image.adapter import ImageAdapter
 from ai.backend.manager.data.image.types import ImageType
-from ai.backend.manager.errors.auth import InsufficientPrivilege
-from ai.backend.manager.errors.image import ImageNotFound
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Given,
+    Language,
+    Says,
     Scenario,
     Then,
     When,
+    in_language,
 )
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.image import (
@@ -41,7 +45,7 @@ from bai_scenario.components.image import (
     TheLaidImage,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 A_NEW_TAG = "moved"
@@ -93,49 +97,74 @@ class Editing(When[AnImageAndACaller, ImageAdapter, ImageNode]):
 
     @override
     def operation(self) -> str:
-        return "admin_update"
+        return "update"
 
     @override
     def describe(self, laid: AnImageAndACaller) -> str:
         who = laid.caller.username
         if isinstance(self.at, AnIdThatHoldsNothing):
-            return f"{who}이 {self.at.says()} 수정"
+            return Says(
+                f"{who}이 {self.at.says()}을 수정합니다",
+                english=f"{who} updates {in_language(self.at.says(), Language.ENGLISH)}",
+            )
         if self.accelerators is not None:
             named = self.accelerators.named()
-            put = "비움" if named is None else f"{named}로 지정"
-            return f"{who}이 {laid.image.name}의 가속기 목록을 {put}"
+            if named is None:
+                return Says(
+                    f"{who}이 {laid.image.name}의 가속기 목록을 비웁니다",
+                    english=f"{who} clears the accelerator list of {laid.image.name}",
+                )
+            return Says(
+                f"{who}이 {laid.image.name}의 가속기 목록을 {named}로 지정합니다",
+                english=f"{who} sets the accelerator list of {laid.image.name} to {named}",
+            )
         if self.tag is not None:
-            return f"{who}이 {laid.image.name}의 태그를 {self.tag}로 수정"
+            return Says(
+                f"{who}이 {laid.image.name}의 태그를 {self.tag}로 수정합니다",
+                english=f"{who} changes the tag of {laid.image.name} to {self.tag}",
+            )
         if self.updates:
-            return f"{who}이 {laid.image.name}의 여러 필드를 함께 수정"
-        return f"{who}이 값을 하나도 지정하지 않고 수정"
+            return Says(
+                f"{who}이 {laid.image.name}의 여러 필드를 함께 수정합니다",
+                english=f"{who} changes several fields of {laid.image.name} at once",
+            )
+        return Says(
+            f"{who}이 값을 하나도 지정하지 않고 수정합니다",
+            english=f"{who} updates without naming any value",
+        )
 
     @override
     async def call(self, adapter: ImageAdapter, laid: AnImageAndACaller) -> ImageNode:
         target = self.at.id_of(laid)
-        asked: dict[str, Any] = {"image_id": target}
+        asked: dict[str, Any] = {}
         if self.tag is not None:
             asked["tag"] = self.tag
         if self.accelerators is not None:
             asked["supported_accelerators"] = self.accelerators.named()
         asked.update(self.updates)
         with ActingAs(laid.caller):
-            payload = await adapter.admin_update(UpdateImageInput(**asked))
+            payload = await adapter.update(ImageID(target), UpdateImageBody(**asked))
         return payload.item
 
 
 @dataclass(frozen=True)
-class ChangingOnlyTheTag(Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]):
+class ChangingOnlyTheTag(Scenario[TestSeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]):
     @override
     def summary(self) -> str:
         return "changing-only-the-tag-leaves-every-other-field-alone"
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 태그만 수정하면 태그만 새 값이 되고 나머지 필드는 그대로다"
+        return Says(
+            "superadmin 이 태그만 수정하면 태그만 새 값이 되고 나머지 필드는 그대로입니다",
+            english=(
+                "when the superadmin changes only the tag, only the tag takes the new value "
+                "and every other field stays as it was"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AnImageAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnImageAndACaller]:
         return AnImageAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -149,7 +178,7 @@ class ChangingOnlyTheTag(Scenario[SeedingSession, AnImageAndACaller, ImageAdapte
 
 @dataclass(frozen=True)
 class AnEmptyEditChangesNothing(
-    Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
+    Scenario[TestSeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
 ):
     @override
     def summary(self) -> str:
@@ -157,12 +186,17 @@ class AnEmptyEditChangesNothing(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 값을 하나도 지정하지 않고 수정하면 아무것도 바뀌지 않은 노드가 반환된다"
+        return Says(
+            "superadmin 이 값을 하나도 지정하지 않고 수정하면 아무것도 바뀌지 않은 노드가 "
+            "응답으로 옵니다",
+            english=(
+                "when the superadmin updates without naming any value, "
+                "the whole node comes back unchanged"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AnImageAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnImageAndACaller]:
         return AnImageAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -176,7 +210,7 @@ class AnEmptyEditChangesNothing(
 
 @dataclass(frozen=True)
 class ClearingTheAcceleratorList(
-    Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
+    Scenario[TestSeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
 ):
     @override
     def summary(self) -> str:
@@ -184,13 +218,17 @@ class ClearingTheAcceleratorList(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 가속기 목록을 비우는 수정을 하면 그 필드가 빈 채로 반환된다. "
-            "생략과 비우기를 구분할 수 있는 필드는 이것뿐이다"
+        return Says(
+            "superadmin 이 가속기 목록을 비우는 수정을 하면 그 필드가 빈 채로 응답으로 옵니다. "
+            "생략과 비우기를 구분할 수 있는 필드는 이것뿐입니다",
+            english=(
+                "when the superadmin clears the accelerator list, that field comes back empty. "
+                "It is the only field that distinguishes omission from clearing"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AnImageAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnImageAndACaller]:
         return AnImageAndSomeone(role=UserRole.SUPERADMIN, accelerators=OneAccelerator())
 
     @override
@@ -204,7 +242,7 @@ class ClearingTheAcceleratorList(
 
 @dataclass(frozen=True)
 class WritingTheAcceleratorList(
-    Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
+    Scenario[TestSeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
 ):
     @override
     def summary(self) -> str:
@@ -212,10 +250,15 @@ class WritingTheAcceleratorList(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 가속기 이름을 지정하면 그 이름이 담긴 노드가 반환된다"
+        return Says(
+            "superadmin 이 가속기 이름을 지정하면 그 이름을 담은 노드가 응답으로 옵니다",
+            english=(
+                "when the superadmin names an accelerator, the node comes back carrying that name"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AnImageAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnImageAndACaller]:
         return AnImageAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -229,7 +272,7 @@ class WritingTheAcceleratorList(
 
 @dataclass(frozen=True)
 class ChangingTheRemainingScalarFields(
-    Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
+    Scenario[TestSeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
 ):
     @override
     def summary(self) -> str:
@@ -237,10 +280,17 @@ class ChangingTheRemainingScalarFields(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 이름과 레지스트리 등의 기본 필드를 함께 수정하면 지정한 값이 반환된다"
+        return Says(
+            "superadmin 이 이름과 레지스트리 등 여러 기본 필드를 함께 수정하면 지정한 값이 "
+            "응답으로 옵니다",
+            english=(
+                "when the superadmin changes several basic fields such as the name and the "
+                "registry at once, the values it named come back"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AnImageAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnImageAndACaller]:
         return AnImageAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -263,7 +313,7 @@ class ChangingTheRemainingScalarFields(
 
 @dataclass(frozen=True)
 class ChangingLabelsAndResourceLimits(
-    Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
+    Scenario[TestSeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
 ):
     @override
     def summary(self) -> str:
@@ -271,10 +321,16 @@ class ChangingLabelsAndResourceLimits(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 레이블과 CPU 하한·상한을 수정하면 지정한 값이 반환된다"
+        return Says(
+            "superadmin 이 레이블과 CPU 하한, 상한을 수정하면 지정한 값이 응답으로 옵니다",
+            english=(
+                "when the superadmin changes the labels and the CPU lower and upper limits, "
+                "the values it named come back"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AnImageAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnImageAndACaller]:
         return AnImageAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -296,17 +352,22 @@ class ChangingLabelsAndResourceLimits(
 
 
 @dataclass(frozen=True)
-class EditingWhatIsNotThere(Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]):
+class EditingWhatIsNotThere(
+    Scenario[TestSeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
+):
     @override
     def summary(self) -> str:
         return "editing-an-id-that-holds-no-image-is-refused"
 
     @override
     def describe(self) -> str:
-        return "어느 이미지도 가리키지 않는 ID를 수정하려 하면 대상을 찾을 수 없어 거부된다"
+        return Says(
+            "어느 이미지도 가리키지 않는 id 를 수정하려 하면 대상이 없어 거부됩니다",
+            english="updating an id that points at no image is rejected as not found",
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AnImageAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnImageAndACaller]:
         return AnImageAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -315,21 +376,29 @@ class EditingWhatIsNotThere(Scenario[SeedingSession, AnImageAndACaller, ImageAda
 
     @override
     def then(self) -> Then[AnImageAndACaller, ImageNode]:
-        return TheCallIsRefused(ImageNotFound)
+        return TheCallIsRefused(EntityNotFoundError)
 
 
 @dataclass(frozen=True)
-class APlainUserMayNotEdit(Scenario[SeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]):
+class AUserGrantedNothingMayNotEdit(
+    Scenario[TestSeedingSession, AnImageAndACaller, ImageAdapter, ImageNode]
+):
     @override
     def summary(self) -> str:
-        return "a-user-who-is-not-the-superadmin-may-not-edit-an-image"
+        return "a-user-granted-nothing-may-not-edit-an-image"
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 이미지를 수정하려 하면 슈퍼관리자 권한 부족으로 거부된다"
+        return Says(
+            "아무 권한도 받지 않은 사용자가 이미지를 수정하려 하면 권한 부족으로 거부됩니다",
+            english=(
+                "when a user granted nothing tries to update an image, "
+                "the call is rejected for lack of permission"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AnImageAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnImageAndACaller]:
         return AnImageAndSomeone()
 
     @override
@@ -338,7 +407,7 @@ class APlainUserMayNotEdit(Scenario[SeedingSession, AnImageAndACaller, ImageAdap
 
     @override
     def then(self) -> Then[AnImageAndACaller, ImageNode]:
-        return TheCallIsRefused(InsufficientPrivilege)
+        return TheCallIsRefused(NotEnoughPermission)
 
 
 SCENARIOS: list[Any] = [
@@ -349,7 +418,7 @@ SCENARIOS: list[Any] = [
     ChangingTheRemainingScalarFields(),
     ChangingLabelsAndResourceLimits(),
     EditingWhatIsNotThere(),
-    APlainUserMayNotEdit(),
+    AUserGrantedNothingMayNotEdit(),
 ]
 
 

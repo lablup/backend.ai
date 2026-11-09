@@ -24,15 +24,25 @@ from ai.backend.manager.secret.config_provider import ConfigKeyProvider
 from ai.backend.manager.secret.keys import KeyEncryptionKey
 from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.secret.types import SecretValue
-from ai.backend.testutils.scenario_steps import Answered, Given, Refused, Same, Then, Verdict
+from ai.backend.testutils.scenario_steps import (
+    Answered,
+    Given,
+    Language,
+    Refused,
+    Same,
+    Says,
+    Then,
+    Verdict,
+    in_language,
+)
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf
 from bai_scenario.components.system import role_named
-from bai_scenario.seeds.domain.domain import SeedDomain
-from bai_scenario.seeds.resource_policy.keypair import SeedKeypairPolicy
-from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
-from bai_scenario.seeds.resource_policy.user import SeedUserPolicy
-from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
-from bai_scenario.seeds.user.user import SeedUserOf
+from bai_scenario.seeds.domain.domain import TestSeedDomain
+from bai_scenario.seeds.resource_policy.keypair import TestSeedKeypairPolicy
+from bai_scenario.seeds.resource_policy.project import TestSeedProjectPolicy
+from bai_scenario.seeds.resource_policy.user import TestSeedUserPolicy
+from bai_scenario.seeds.seeder import Laid, TestSeeder, TestSeedNest, joined
+from bai_scenario.seeds.user.user import TestSeedUserOf
 
 KEY_ID = SecretKeyId("k1")
 KEY_MATERIAL = SecretKeyMaterial(base64.b64encode(b"0123456789abcdef0123456789abcdef").decode())
@@ -67,7 +77,7 @@ class AKeyringAndACaller:
 
 
 @dataclass(frozen=True)
-class SomeoneWithASecret(SeedNest[Laid[UserData]]):
+class SomeoneWithASecret(TestSeedNest[Laid[UserData]]):
     """비밀 키를 미리 정해 둔 사용자 한 명. 암호화된 비밀 키를 넣는 유일한 방법이다."""
 
     domain: Laid[Any]
@@ -76,15 +86,21 @@ class SomeoneWithASecret(SeedNest[Laid[UserData]]):
 
     @override
     def kind(self) -> str:
-        return "암호화된 비밀 키를 가진 사용자 한 명 준비"
+        return Says(
+            "암호화된 비밀 키를 가진 사용자 한 명 준비",
+            english="Prepare one user holding an encrypted secret key",
+        )
 
     @override
-    def lay(self, seed: Seeder) -> Laid[UserData]:
-        seed.once(SeedProjectPolicy())
-        policy = seed.creating(SeedUserPolicy())
-        key_policy = seed.creating(SeedKeypairPolicy())
+    def lay(self, seed: TestSeeder) -> Laid[UserData]:
+        seed.once(TestSeedProjectPolicy())
+        policy = seed.creating(TestSeedUserPolicy())
+        key_policy = seed.creating(TestSeedKeypairPolicy())
         return seed.provisioning(
-            SeedUserOf(role=self.role, secret_key=self.secret_key), self.domain, policy, key_policy
+            TestSeedUserOf(role=self.role, secret_key=self.secret_key),
+            self.domain,
+            policy,
+            key_policy,
         )
 
 
@@ -99,16 +115,30 @@ class UsersHoldingSecrets(Given[Any, AKeyringAndACaller]):
 
     @override
     def describe(self) -> str:
-        parts = [f"{role_named(self.role)} 한 명"]
+        who = role_named(self.role)
+        parts = [Says(f"{who} 한 명", english=f"one {in_language(who, Language.ENGLISH)}")]
         if self.plaintext_besides:
-            parts.append(f"평문 비밀 키를 가진 사용자 {self.plaintext_besides}명")
+            parts.append(
+                Says(
+                    f"평문 비밀 키를 가진 사용자 {self.plaintext_besides}명",
+                    english=f"{self.plaintext_besides} users holding a plaintext secret key",
+                )
+            )
         if self.encrypted_besides:
-            parts.append(f"설정 키로 암호화된 비밀 키를 가진 사용자 {self.encrypted_besides}명")
-        return ", ".join(parts)
+            parts.append(
+                Says(
+                    f"설정 키로 암호화된 비밀 키를 가진 사용자 {self.encrypted_besides}명",
+                    english=(
+                        f"{self.encrypted_besides} users holding a secret key encrypted "
+                        "with the config key"
+                    ),
+                )
+            )
+        return joined(parts)
 
     @override
     async def lay(self, seeding: Any) -> AKeyringAndACaller:
-        home = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+        home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         pool = config_key_pool(KeyProviderType.CONFIG)
         if self.caller_encrypted:
             secret = await pool.encrypt("sk-caller", KEYPAIR_SECRET_KEY_CONTEXT)
@@ -164,7 +194,10 @@ class TheStatusCountsWhatIsLaid(Then[AKeyringAndACaller, AdminSecretStatusPayloa
 
     @override
     def says(self) -> str:
-        return "미리 만들어 둔 비밀 키가 암호화 키별로 집계되어 반환된다"
+        return Says(
+            "미리 저장한 비밀 키가 암호화 키별로 집계되어 반환됩니다",
+            english="the secret keys seeded in advance come back counted per encryption key",
+        )
 
     @override
     def look(
@@ -190,7 +223,13 @@ class EveryRowIsRewrittenOntoTheWriter(Then[AKeyringAndACaller, AdminReencryptSe
 
     @override
     def says(self) -> str:
-        return "모두 스캔해 모두 다시 쓰고, 전부 쓰기 제공자로 옮겨진 상태가 반환된다"
+        return Says(
+            "모두 스캔해 모두 다시 쓰고, 전부 쓰기 provider 로 옮겨진 상태가 반환됩니다",
+            english=(
+                "every secret key is scanned and rewritten, and the status that comes back "
+                "has all of them moved to the write provider"
+            ),
+        )
 
     @override
     def look(

@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.login_history import LoginHistoryID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.login_history.request import (
     AdminSearchLoginHistoryInput,
@@ -26,11 +29,18 @@ from ai.backend.manager.api.adapter_options.pagination.pagination import Paginat
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.auth.login_session_types import LoginHistoryData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.models.login_session.row import LoginHistoryRow
 from ai.backend.manager.models.login_session.searchers import LoginHistorySearcher
 from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.repositories.auth.options import LoginHistoryConditions, LoginHistoryOrders
+from ai.backend.manager.services.auth.actions.bulk_get_login_history import (
+    BulkGetLoginHistoryAction,
+)
 from ai.backend.manager.services.auth.actions.search_login_history import (
     GlobalSearchLoginHistoryAction,
     SearchLoginHistoryAction,
@@ -111,8 +121,28 @@ class LoginHistoryAdapter(BaseAdapter):
             has_previous_page=action_result.has_previous_page,
         )
 
+    async def batch_load_by_ids(
+        self, ids: Sequence[LoginHistoryID]
+    ) -> list[LoginHistoryNode | Exception | None]:
+        """Batch load login history rows by id for DataLoader use, checked per owning user."""
+        if not ids:
+            return []
+        return await self.batch_load_fields(
+            self._auth.bulk_get_login_history,
+            BulkGetLoginHistoryAction(ids=ids),
+            ids,
+            self._data_to_node,
+        )
+
     def _convert_filter(self, f: LoginHistoryFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
+        if f.field_id is not None:
+            condition = f.field_id.build_query_condition(
+                equals_factory=LoginHistoryConditions.by_id_equals,
+                in_factory=LoginHistoryConditions.by_id_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
         if f.domain_name is not None:
             condition = self.convert_string_filter(
                 f.domain_name,
@@ -140,15 +170,16 @@ class LoginHistoryAdapter(BaseAdapter):
         if f.OR:
             or_conditions: list[QueryCondition] = []
             for sub_filter in f.OR:
-                or_conditions.extend(self._convert_filter(sub_filter))
+                sub_conditions = self._convert_filter(sub_filter)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub_filter in f.NOT:
-                not_conditions.extend(self._convert_filter(sub_filter))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_filter(sub_filter)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     @staticmethod

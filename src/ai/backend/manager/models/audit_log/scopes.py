@@ -9,17 +9,18 @@ from typing import Any, override
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.audit_log import AuditLogID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.models.audit_log.row import AuditLogRow
 from ai.backend.manager.models.audit_log.scope_row import AuditLogScopeRow
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.scopes import ExistenceCheck, ScopeTarget
+from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope, ScopeTarget
 
 __all__ = (
+    "AuditLogIDScope",
     "AuditLogTarget",
     "EntityAuditLogTarget",
-    "ScopeAuditLogTarget",
     "TriggeredByAuditLogTarget",
 )
 
@@ -35,7 +36,8 @@ class AuditLogTarget(ScopeTarget, ABC):
 
 @dataclass(frozen=True)
 class EntityAuditLogTarget(AuditLogTarget):
-    """The records about one entity: the run named it as what it touched.
+    """The records of one entity's history: the runs that touched it, and the runs that
+    named it as a scope they ran in on ``audit_log_scopes``.
 
     ``existence_checks`` is empty -- RBAC validation already gates entity reachability.
     """
@@ -51,45 +53,18 @@ class EntityAuditLogTarget(AuditLogTarget):
         owner = self.owner
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return sa.and_(
-                AuditLogRow.entity_type == owner.entity_type(),
-                AuditLogRow.entity_id == str(owner),
-            )
-
-        return inner
-
-    @property
-    @override
-    def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
-        return ()
-
-
-@dataclass(frozen=True)
-class ScopeAuditLogTarget(AuditLogTarget):
-    """The records of the runs that named one entity as the scope they ran in.
-
-    The other half of what an entity's history means, kept apart so a caller asks for
-    one or the other rather than always both: a scope action records the entities it
-    touched on the row and the scopes it ran in on ``audit_log_scopes``.
-    """
-
-    owner: EntityIdentifier
-
-    @override
-    def scope_id(self) -> EntityIdentifier:
-        return self.owner
-
-    @override
-    def to_condition(self) -> QueryCondition:
-        owner = self.owner
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return sa.exists().where(
+            return sa.or_(
                 sa.and_(
-                    AuditLogScopeRow.audit_log_id == AuditLogRow.id,
-                    AuditLogScopeRow.scope_type == owner.entity_type(),
-                    AuditLogScopeRow.scope_id == str(owner),
-                )
+                    AuditLogRow.entity_type == owner.entity_type(),
+                    AuditLogRow.entity_id == owner,
+                ),
+                sa.exists().where(
+                    sa.and_(
+                        AuditLogScopeRow.audit_log_id == AuditLogRow.id,
+                        AuditLogScopeRow.scope_type == owner.entity_type(),
+                        AuditLogScopeRow.scope_id == owner,
+                    )
+                ),
             )
 
         return inner
@@ -116,6 +91,32 @@ class TriggeredByAuditLogTarget(AuditLogTarget):
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return AuditLogRow.triggered_by == triggered_by
+
+        return inner
+
+    @property
+    @override
+    def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
+        return ()
+
+
+@dataclass(frozen=True)
+class AuditLogIDScope(OperationScope):
+    """The scope rows of one record.
+
+    Not a :class:`ScopeTarget`: a record is a field row and names no entity to authorize
+    against. The record is authorized through its owner candidates before this bounds
+    the read.
+    """
+
+    audit_log_id: AuditLogID
+
+    @override
+    def to_condition(self) -> QueryCondition:
+        audit_log_id = self.audit_log_id
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AuditLogScopeRow.audit_log_id == audit_log_id
 
         return inner
 

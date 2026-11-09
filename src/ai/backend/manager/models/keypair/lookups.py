@@ -16,6 +16,7 @@ from ai.backend.common.types import AccessKey
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.specs.lookup import (
+    BulkFieldKeyLookup,
     DataLookup,
     FieldKeyLookup,
     FieldOwnerKeyLookup,
@@ -82,7 +83,7 @@ class KeypairAccessKeyLookup(FieldKeyLookup[KeyPairID, UserID]):
 
 @dataclass
 class KeypairAccessKeyUserLookup(DataLookup[KeyPairRow, UserID]):
-    """Resolves an access key into the user it authenticates as."""
+    """Resolves an active keypair's access key into the user it authenticates as."""
 
     access_key: AccessKey
 
@@ -96,8 +97,30 @@ class KeypairAccessKeyUserLookup(DataLookup[KeyPairRow, UserID]):
 
     @override
     def conditions(self) -> Sequence[QueryCondition]:
-        return [lambda: KeyPairRow.access_key == self.access_key]
+        return [
+            lambda: KeyPairRow.access_key == self.access_key,
+            lambda: KeyPairRow.is_active.is_(True),
+        ]
 
     @override
     def to_entity_id(self, row: KeyPairRow) -> UserID:
         return UserID(row.user)
+
+
+@dataclass
+class KeypairAccessKeysLookup(BulkFieldKeyLookup[AccessKey, KeyPairID, UserID]):
+    """Reads the keypair each access key names, and the user that owns it."""
+
+    @override
+    def build_query(self, keys: Sequence[AccessKey]) -> sa.sql.Select[Any]:
+        return sa.select(KeyPairRow.access_key, KeyPairRow.id, KeyPairRow.user).where(
+            KeyPairRow.access_key.in_(keys)
+        )
+
+    @override
+    def to_field_id(self, value: UUID) -> KeyPairID:
+        return KeyPairID(value)
+
+    @override
+    def to_entity_id(self, value: UUID) -> UserID:
+        return UserID(value)

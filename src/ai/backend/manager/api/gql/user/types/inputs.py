@@ -39,6 +39,7 @@ from ai.backend.common.dto.manager.v2.user.request import (
 from ai.backend.common.dto.manager.v2.user.request import (
     UpdateUserInput as UpdateUserInputDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -131,7 +132,14 @@ class UpdateUserV2InputGQL(PydanticInputMixin[UpdateUserInputDTO]):
     password: str | None = gql_field(description="New password.", default=UNSET)
     full_name: str | None = gql_field(description="New full display name.", default=UNSET)
     description: str | None = gql_field(description="New description.", default=UNSET)
-    status: UserStatusEnumGQL | None = gql_field(description="New account status.", default=UNSET)
+    status: UserStatusEnumGQL | None = gql_field(
+        description=(
+            "New account status, ACTIVE or INACTIVE. "
+            f"DELETED is deprecated since {NEXT_RELEASE_VERSION}: it is handled as "
+            "`adminDeleteUserV2`, and ACTIVE on a deleted user as `adminRestoreUserV2`."
+        ),
+        default=UNSET,
+    )
     role: UserRoleEnumGQL | None = gql_field(description="New user role.", default=UNSET)
     domain_name: str | None = gql_field(description="New domain assignment.", default=UNSET)
     group_ids: list[UUID] | None = gql_field(

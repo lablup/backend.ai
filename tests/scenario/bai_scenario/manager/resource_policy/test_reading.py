@@ -22,9 +22,12 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Configured,
     Given,
+    Language,
+    Says,
     Scenario,
     Then,
     When,
+    in_language,
 )
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.resource_policy import (
@@ -35,13 +38,13 @@ from bai_scenario.components.resource_policy import (
     ThePolicyNode,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 NOBODY = "nobody"
 ENFORCEMENT = "manager.rbac.enforcement_enabled"
 
-type ReadingStep = Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
+type ReadingStep = Scenario[TestSeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
 
 
 @dataclass(frozen=True)
@@ -57,7 +60,11 @@ class ReadingByName(When[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]):
 
     @override
     def describe(self, laid: APolicyAndACaller[Any]) -> str:
-        return f"{laid.caller.username}이 {self.named or laid.policy.name} 이름으로 조회"
+        name = self.named or laid.policy.name
+        return Says(
+            f"{laid.caller.username}이 {name} 이름으로 조회합니다",
+            english=f"{laid.caller.username} reads {name} by name",
+        )
 
     @override
     async def call(self, adapter: ResourcePolicyAdapter, laid: APolicyAndACaller[Any]) -> Any:
@@ -67,7 +74,7 @@ class ReadingByName(When[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]):
 
 @dataclass(frozen=True)
 class TheSuperadminReadsItByName(
-    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
+    Scenario[TestSeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
 ):
     family: Family[Any, Any]
     started: datetime
@@ -78,13 +85,18 @@ class TheSuperadminReadsItByName(
 
     @override
     def describe(self) -> str:
-        return (
-            f"{self.family.kind} 하나가 있고 슈퍼관리자가 이름으로 조회하면, "
-            "그 정책 전체가 반환된다"
+        kind = self.family.kind
+        kind_en = in_language(kind, Language.ENGLISH)
+        return Says(
+            f"{kind} 하나가 있고 superadmin 이 이름으로 조회하면, 그 정책 전체가 반환됩니다",
+            english=(
+                f"one {kind_en} exists and the superadmin reads it by name, so the whole policy "
+                "comes back"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
+    def given(self) -> Given[TestSeedingSession, APolicyAndACaller[Any]]:
         return APolicyAndSomeone(self.family, role=UserRole.SUPERADMIN)
 
     @override
@@ -98,7 +110,7 @@ class TheSuperadminReadsItByName(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotRead(
-    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
+    Scenario[TestSeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
 ):
     family: Family[Any, Any]
 
@@ -108,13 +120,19 @@ class AUserGrantedNothingMayNotRead(
 
     @override
     def describe(self) -> str:
-        return (
-            f"같은 {self.family.kind}이 있고 아무 권한도 없는 사용자가 이름으로 조회하면, "
-            "정책을 찾을 수 없다는 이유로 거부된다"
+        kind = self.family.kind
+        kind_en = in_language(kind, Language.ENGLISH)
+        return Says(
+            f"같은 {kind}이 있고 아무 권한도 없는 사용자가 이름으로 조회하면, 정책을 찾을 수 "
+            "없다는 이유로 거부됩니다",
+            english=(
+                f"when the same {kind_en} exists and a user granted nothing reads it by name, "
+                "the call is rejected because the policy cannot be found"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
+    def given(self) -> Given[TestSeedingSession, APolicyAndACaller[Any]]:
         return APolicyAndSomeone(self.family)
 
     @override
@@ -128,7 +146,7 @@ class AUserGrantedNothingMayNotRead(
 
 @dataclass(frozen=True)
 class ANameNothingAnswersToIsNotFound(
-    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
+    Scenario[TestSeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
 ):
     family: Family[Any, Any]
 
@@ -138,13 +156,19 @@ class ANameNothingAnswersToIsNotFound(
 
     @override
     def describe(self) -> str:
-        return (
-            f"슈퍼관리자가 어느 {self.family.kind}에도 없는 이름으로 조회하면, "
-            "권한 문제가 아니라 대상이 없다는 것으로 거부된다"
+        kind = self.family.kind
+        kind_en = in_language(kind, Language.ENGLISH)
+        return Says(
+            f"superadmin 이 어느 {kind}에도 없는 이름으로 조회하면, 권한 문제가 아니라 대상이 "
+            "없다는 것으로 거부됩니다",
+            english=(
+                f"when the superadmin reads a name no {kind_en} holds, the call is rejected as "
+                "no such target, not on a permission problem"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
+    def given(self) -> Given[TestSeedingSession, APolicyAndACaller[Any]]:
         return APolicyAndSomeone(self.family, role=UserRole.SUPERADMIN)
 
     @override
@@ -158,7 +182,7 @@ class ANameNothingAnswersToIsNotFound(
 
 @dataclass(frozen=True)
 class EnforcementOffOpensTheRead(
-    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any], Configured
+    Scenario[TestSeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any], Configured
 ):
     family: Family[Any, Any]
     started: datetime
@@ -169,14 +193,21 @@ class EnforcementOffOpensTheRead(
 
     @override
     def describe(self) -> str:
-        return f"권한 검사를 끄면 아무 권한도 없는 사용자도 {self.family.kind}을 이름으로 조회할 수 있다"
+        kind = self.family.kind
+        return Says(
+            f"권한 검사를 끄면 아무 권한도 없는 사용자도 {kind}을 이름으로 조회할 수 있습니다",
+            english=(
+                "turning permission enforcement off lets a user granted nothing read a "
+                f"{in_language(kind, Language.ENGLISH)} by name"
+            ),
+        )
 
     @override
     def config(self) -> Mapping[str, Any]:
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
+    def given(self) -> Given[TestSeedingSession, APolicyAndACaller[Any]]:
         return APolicyAndSomeone(self.family)
 
     @override

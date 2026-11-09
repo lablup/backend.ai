@@ -7,13 +7,13 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "AdminSearchHuggingFaceRegistriesPayload",
     "CreateHuggingFaceRegistryPayload",
     "DeleteHuggingFaceRegistryPayload",
     "HuggingFaceRegistryNode",
+    "PurgeHuggingFaceRegistryPayload",
     "UpdateHuggingFaceRegistryPayload",
 )
 
@@ -23,7 +23,7 @@ class HuggingFaceRegistryNode(BaseResponseModel):
 
     id: UUID = Field(description="Registry ID")
     entity_id: UUID = Field(
-        description=f"UUID of the HuggingFace registry. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the HuggingFace registry. Added in 26.9.0.",
     )
     name: str = Field(description="Registry name")
     url: str = Field(description="HuggingFace Hub URL")
@@ -50,6 +50,18 @@ class DeleteHuggingFaceRegistryPayload(BaseResponseModel):
     """Payload for HuggingFace registry deletion mutation result."""
 
     id: UUID = Field(description="ID of the deleted HuggingFace registry")
+    entity_id: UUID = Field(
+        description="UUID of the deleted HuggingFace registry. Added in 26.10.0."
+    )
+
+
+class PurgeHuggingFaceRegistryPayload(BaseResponseModel):
+    """Payload for HuggingFace registry purge result."""
+
+    id: UUID = Field(description="ID of the purged HuggingFace registry")
+    entity_id: UUID = Field(
+        description="UUID of the purged HuggingFace registry. Added in 26.10.0."
+    )
 
 
 class AdminSearchHuggingFaceRegistriesPayload(BaseResponseModel):

@@ -6,6 +6,7 @@ from ai.backend.common.data.entity.resource_slot import ResourceSlotTypeUUID
 from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.registry.types import FieldGroupMeta
+from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
@@ -56,6 +57,9 @@ from ai.backend.manager.services.resource_slot.actions.lookup_allocation_owner i
 )
 from ai.backend.manager.services.resource_slot.actions.lookup_kernel_owner import (
     LookupKernelOwnerAction,
+)
+from ai.backend.manager.services.resource_slot.actions.partial_bulk_purge import (
+    PartialBulkPurgeResourceSlotTypesAction,
 )
 from ai.backend.manager.services.resource_slot.actions.purge import PurgeResourceSlotTypeAction
 from ai.backend.manager.services.resource_slot.actions.scoped_search_resource_slot_types import (
@@ -114,6 +118,9 @@ class ResourceSlotProcessors:
         PurgeResourceSlotTypeAction,
         EntityOpsResult[ResourceSlotTypeData],
     ]
+    partial_bulk_purge_resource_slot_types: PartialBulkActionProcessor[
+        PartialBulkPurgeResourceSlotTypesAction, ResourceSlotTypeData
+    ]
 
     def __init__(
         self,
@@ -165,3 +172,6 @@ class ResourceSlotProcessors:
             UpdateResourceSlotTypeAction
         )
         self.purge_resource_slot_type = slot_type.entity_purge_ops(PurgeResourceSlotTypeAction)
+        self.partial_bulk_purge_resource_slot_types = slot_type.entity_partial_bulk_purge_ops(
+            PartialBulkPurgeResourceSlotTypesAction
+        )

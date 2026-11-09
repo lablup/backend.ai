@@ -23,7 +23,7 @@ from ai.backend.manager.api.adapters.runtime_variant_preset.adapter import (
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.errors.resource import RuntimeVariantPresetNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Configured, Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.runtime_variant_preset import (
     APresetAndACaller,
@@ -32,14 +32,14 @@ from bai_scenario.components.runtime_variant_preset import (
 )
 from bai_scenario.components.system import ENFORCEMENT
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 RENAMED = "renamed"
 RERANKED = 7
 
 type EditingStep = Scenario[
-    SeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
+    TestSeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
 ]
 
 
@@ -57,8 +57,16 @@ class Editing(When[APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVarian
     @override
     def describe(self, laid: APresetAndACaller) -> str:
         target = "존재하지 않는 ID" if self.unknown else laid.preset.name
+        target_en = "an unknown id" if self.unknown else laid.preset.name
         changing = ", ".join(self.changes) or "변경 항목 없음"
-        return f"{laid.caller.username}의 수정 요청 — 대상: {target}, 변경 항목: {changing}"
+        changing_en = ", ".join(self.changes) or "no field changed"
+        return Says(
+            f"{laid.caller.username}의 수정 요청: 대상: {target}, 변경 항목: {changing}",
+            english=(
+                f"update request from {laid.caller.username}: target: {target_en}, "
+                f"fields changed: {changing_en}"
+            ),
+        )
 
     @override
     async def call(
@@ -76,7 +84,7 @@ class Editing(When[APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVarian
 @dataclass(frozen=True)
 class TheNameChangesAndTheRestStays(
     Scenario[
-        SeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
+        TestSeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
     ]
 ):
     started: datetime
@@ -87,12 +95,17 @@ class TheNameChangesAndTheRestStays(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 프리셋의 이름만 바꾸면 이름은 새 값으로 바뀌고 나머지는 그대로 유지된다"
+        return Says(
+            "superadmin 이 런타임 파라미터의 이름만 바꾸면 이름은 새 값으로 바뀌고 나머지는 그대로 "
+            "유지됩니다",
+            english=(
+                "when the superadmin changes only the preset's name, the name takes the new "
+                "value and the rest stays"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
         return APresetAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -109,7 +122,7 @@ class TheNameChangesAndTheRestStays(
 @dataclass(frozen=True)
 class ClearingTheDescription(
     Scenario[
-        SeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
+        TestSeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
     ]
 ):
     started: datetime
@@ -120,10 +133,15 @@ class ClearingTheDescription(
 
     @override
     def describe(self) -> str:
-        return "설명이 있는 프리셋의 설명을 비우면 설명이 없어진다"
+        return Says(
+            "설명이 있는 런타임 파라미터의 설명을 비우면 설명이 없어집니다",
+            english=(
+                "when the description of a preset that has one is cleared, the description is gone"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
         return APresetAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -140,7 +158,7 @@ class ClearingTheDescription(
 @dataclass(frozen=True)
 class RerankingMovesIt(
     Scenario[
-        SeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
+        TestSeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
     ]
 ):
     started: datetime
@@ -151,10 +169,16 @@ class RerankingMovesIt(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 프리셋의 순위를 바꾸면 순위가 변경된 노드가 반환된다"
+        return Says(
+            "superadmin 이 런타임 파라미터의 순위를 바꾸면 순위가 변경된 노드가 반환됩니다",
+            english=(
+                "when the superadmin changes the preset's rank, the node comes back with the "
+                "changed rank"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
         return APresetAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -171,7 +195,7 @@ class RerankingMovesIt(
 @dataclass(frozen=True)
 class AnEmptyEditChangesNothing(
     Scenario[
-        SeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
+        TestSeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
     ]
 ):
     started: datetime
@@ -182,10 +206,15 @@ class AnEmptyEditChangesNothing(
 
     @override
     def describe(self) -> str:
-        return "변경할 값을 지정하지 않고 수정하면 아무것도 바뀌지 않은 노드가 반환된다"
+        return Says(
+            "변경할 값을 지정하지 않고 수정하면 아무것도 바뀌지 않은 노드가 반환됩니다",
+            english=(
+                "when an update gives no value to change, the node comes back with nothing changed"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
         return APresetAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -202,7 +231,7 @@ class AnEmptyEditChangesNothing(
 @dataclass(frozen=True)
 class TheSuperadminEditingAnUnknownIdIsNotFound(
     Scenario[
-        SeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
+        TestSeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
     ]
 ):
     @override
@@ -211,10 +240,16 @@ class TheSuperadminEditingAnUnknownIdIsNotFound(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 존재하지 않는 ID를 수정하면 대상을 찾을 수 없어 요청이 거부된다"
+        return Says(
+            "superadmin 이 존재하지 않는 ID 를 수정하면 대상을 찾을 수 없어 요청이 거부됩니다",
+            english=(
+                "when the superadmin updates an unknown id, the request is rejected because the "
+                "target cannot be found"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
         return APresetAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -231,7 +266,7 @@ class TheSuperadminEditingAnUnknownIdIsNotFound(
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotEdit(
     Scenario[
-        SeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
+        TestSeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
     ]
 ):
     @override
@@ -240,13 +275,19 @@ class AUserGrantedNothingMayNotEdit(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 없는 사용자가 프리셋을 수정하면 권한이 부족하여 요청이 거부된다. "
-            "프리셋은 어느 스코프에도 속하지 않아 현재는 해당 권한을 부여할 방법이 없다"
+        return Says(
+            "아무 권한도 없는 사용자가 런타임 파라미터를 수정하면 권한이 부족하여 요청이 "
+            "거부됩니다. 런타임 파라미터는 어느 스코프에도 속하지 않아 현재는 해당 권한을 부여할 "
+            "방법이 없습니다",
+            english=(
+                "when a user granted nothing updates a preset, the request is rejected for lack "
+                "of permission. A preset belongs to no scope, so at present there is no way to "
+                "grant that permission"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
         return APresetAndSomeone()
 
     @override
@@ -263,7 +304,7 @@ class AUserGrantedNothingMayNotEdit(
 @dataclass(frozen=True)
 class EnforcementOffLetsAnyoneEdit(
     Scenario[
-        SeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
+        TestSeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
     ],
     Configured,
 ):
@@ -275,14 +316,19 @@ class EnforcementOffLetsAnyoneEdit(
 
     @override
     def describe(self) -> str:
-        return "권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 수정할 수 있다"
+        return Says(
+            "권한 검사를 끄면 아무 권한도 없는 사용자도 런타임 파라미터를 수정할 수 있습니다",
+            english=(
+                "turning the permission check off lets even a user granted nothing update a preset"
+            ),
+        )
 
     @override
     def config(self) -> Mapping[str, Any]:
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
         return APresetAndSomeone()
 
     @override

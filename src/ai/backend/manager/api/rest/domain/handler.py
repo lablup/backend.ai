@@ -30,19 +30,21 @@ from ai.backend.common.dto.manager.domain import (
 )
 from ai.backend.common.types import ResourceSlot
 from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.dto.domain_request import (
     GetDomainPathParam,
     UpdateDomainPathParam,
 )
 from ai.backend.manager.models.domain.creators import DomainCreator
-from ai.backend.manager.models.domain.updaters import DomainSoftDeleteUpdater
+from ai.backend.manager.models.domain.updaters import DomainRestoreUpdater, DomainSoftDeleteUpdater
 from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.services.domain.actions.create_domain import CreateDomainAction
 from ai.backend.manager.services.domain.actions.delete_domain import DeleteDomainAction
 from ai.backend.manager.services.domain.actions.get import GetDomainAction
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.domain.actions.purge_domain import PurgeDomainAction
+from ai.backend.manager.services.domain.actions.restore_domain import RestoreDomainAction
 from ai.backend.manager.services.domain.actions.search_domains import GlobalSearchDomainsAction
 from ai.backend.manager.services.domain.actions.update_domain import UpdateDomainAction
 
@@ -148,9 +150,25 @@ class DomainHandler:
         updater = self._adapter.build_updater(body.parsed, target.entity_id())
 
         action_result = await self._domain.update.run(UpdateDomainAction(updater=updater))
+        data = await self._apply_is_active(action_result.data, body.parsed.is_active)
 
-        resp = UpdateDomainResponse(domain=self._adapter.convert_to_dto(action_result.data))
+        resp = UpdateDomainResponse(domain=self._adapter.convert_to_dto(data))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
+
+    async def _apply_is_active(self, data: DomainData, is_active: bool | None) -> DomainData:
+        """Soft-delete (``False``) or restore (``True``) the domain; nothing when it is
+        already there."""
+        if is_active is None or data.is_active == is_active:
+            return data
+        if is_active:
+            restored = await self._domain.restore.run(
+                RestoreDomainAction(updater=DomainRestoreUpdater(domain_id=data.id))
+            )
+            return restored.data
+        deleted = await self._domain.delete.run(
+            DeleteDomainAction(updater=DomainSoftDeleteUpdater(domain_id=data.id))
+        )
+        return deleted.data
 
     # ------------------------------------------------------------------
     # delete (POST /admin/domains/delete)

@@ -50,7 +50,6 @@ class DomainAdapter(BaseFilterAdapter):
         """Convert update request to updater."""
         name = OptionalState[str].nop()
         description = TriState[str].nop()
-        is_active = OptionalState[bool].nop()
         total_resource_slots: TriState[ResourceSlot] = TriState.nop()
         allowed_vfolder_hosts: OptionalState[dict[str, list[str]]] = OptionalState.nop()
         allowed_docker_registries: OptionalState[list[str]] = OptionalState.nop()
@@ -60,8 +59,6 @@ class DomainAdapter(BaseFilterAdapter):
             name = OptionalState.update(request.name)
         if request.description is not None:
             description = TriState.update(request.description)
-        if request.is_active is not None:
-            is_active = OptionalState.update(request.is_active)
         if request.total_resource_slots is not None:
             total_resource_slots = TriState.update(ResourceSlot(request.total_resource_slots))
         if request.allowed_vfolder_hosts is not None:
@@ -75,7 +72,6 @@ class DomainAdapter(BaseFilterAdapter):
             domain_id=domain_id,
             new_name=name,
             description=description,
-            is_active=is_active,
             total_resource_slots=total_resource_slots,
             allowed_vfolder_hosts=allowed_vfolder_hosts,
             allowed_docker_registries=allowed_docker_registries,

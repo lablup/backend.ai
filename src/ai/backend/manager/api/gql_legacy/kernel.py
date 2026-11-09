@@ -415,6 +415,7 @@ class ComputeContainer(graphene.ObjectType):  # type: ignore[misc]
         domain_name: str | None = None,
         group_id: uuid.UUID | None = None,
         access_key: str | None = None,
+        user_id: uuid.UUID | None = None,
         filter: str | None = None,
     ) -> int:
         query = (
@@ -430,6 +431,8 @@ class ComputeContainer(graphene.ObjectType):  # type: ignore[misc]
             query = query.where(KernelRow.group_id == group_id)
         if access_key is not None:
             query = query.where(KernelRow.access_key == access_key)
+        if user_id is not None:
+            query = query.where(KernelRow.user_uuid == user_id)
         if filter is not None:
             qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
             query = qfparser.append_filter(query, filter)
@@ -449,6 +452,7 @@ class ComputeContainer(graphene.ObjectType):  # type: ignore[misc]
         domain_name: str | None = None,
         group_id: uuid.UUID | None = None,
         access_key: AccessKey | None = None,
+        user_id: uuid.UUID | None = None,
         filter: str | None = None,
         order: str | None = None,
     ) -> Sequence[ComputeContainer | None]:
@@ -467,6 +471,8 @@ class ComputeContainer(graphene.ObjectType):  # type: ignore[misc]
             query = query.where(KernelRow.group_id == group_id)
         if access_key is not None:
             query = query.where(KernelRow.access_key == access_key)
+        if user_id is not None:
+            query = query.where(KernelRow.user_uuid == user_id)
         if filter is not None:
             qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
             query = qfparser.append_filter(query, filter)
@@ -537,6 +543,7 @@ class ComputeContainer(graphene.ObjectType):  # type: ignore[misc]
         *,
         domain_name: str | None = None,
         access_key: AccessKey | None = None,
+        user_id: uuid.UUID | None = None,
     ) -> Sequence[ComputeContainer | None]:
         query = (
             sa.select(KernelRow)
@@ -554,6 +561,8 @@ class ComputeContainer(graphene.ObjectType):  # type: ignore[misc]
             query = query.where(KernelRow.domain_name == domain_name)
         if access_key is not None:
             query = query.where(KernelRow.access_key == access_key)
+        if user_id is not None:
+            query = query.where(KernelRow.user_uuid == user_id)
         async with ctx.db.begin_readonly_session() as conn:
             return await batch_result(
                 ctx,
@@ -825,6 +834,7 @@ class LegacyComputeSession(graphene.ObjectType):  # type: ignore[misc]
         domain_name: str | None = None,
         group_id: uuid.UUID | None = None,
         access_key: AccessKey | None = None,
+        user_id: uuid.UUID | None = None,
         status: str | KernelStatus | None = None,
     ) -> int:
         status_list: list[KernelStatus] = []
@@ -843,6 +853,8 @@ class LegacyComputeSession(graphene.ObjectType):  # type: ignore[misc]
             query = query.where(kernels.c.group_id == group_id)
         if access_key is not None:
             query = query.where(kernels.c.access_key == access_key)
+        if user_id is not None:
+            query = query.where(kernels.c.user_uuid == user_id)
         if status_list:
             query = query.where(kernels.c.status.in_(status_list))
         async with ctx.db.begin_readonly() as conn:
@@ -859,6 +871,7 @@ class LegacyComputeSession(graphene.ObjectType):  # type: ignore[misc]
         domain_name: str | None = None,
         group_id: uuid.UUID | None = None,
         access_key: AccessKey | None = None,
+        user_id: uuid.UUID | None = None,
         status: str | KernelStatus | None = None,
         order_key: str | None = None,
         order_asc: bool = True,
@@ -890,6 +903,8 @@ class LegacyComputeSession(graphene.ObjectType):  # type: ignore[misc]
             query = query.where(kernels.c.group_id == group_id)
         if access_key is not None:
             query = query.where(kernels.c.access_key == access_key)
+        if user_id is not None:
+            query = query.where(kernels.c.user_uuid == user_id)
         if status_list:
             query = query.where(kernels.c.status.in_(status_list))
         async with ctx.db.begin_readonly() as conn:
@@ -953,6 +968,7 @@ class LegacyComputeSession(graphene.ObjectType):  # type: ignore[misc]
         *,
         domain_name: str | None = None,
         access_key: AccessKey | None = None,
+        user_id: uuid.UUID | None = None,
         status: str | KernelStatus | None = None,
     ) -> Sequence[Sequence[LegacyComputeSession]]:
         status_list: list[KernelStatus] = []
@@ -974,6 +990,8 @@ class LegacyComputeSession(graphene.ObjectType):  # type: ignore[misc]
             query = query.where(kernels.c.domain_name == domain_name)
         if access_key is not None:
             query = query.where(kernels.c.access_key == access_key)
+        if user_id is not None:
+            query = query.where(kernels.c.user_uuid == user_id)
         if status_list:
             query = query.where(kernels.c.status.in_(status_list))
         async with ctx.db.begin_readonly() as conn:

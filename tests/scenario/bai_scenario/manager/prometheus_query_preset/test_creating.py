@@ -28,6 +28,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Configured,
     Given,
+    Says,
     Scenario,
     Then,
     When,
@@ -43,7 +44,7 @@ from bai_scenario.components.prometheus_query_preset import (
     TheNewPresetNode,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 from bai_scenario.seeds.prometheus_query_preset.preset import METRIC, TEMPLATE
 
@@ -52,10 +53,10 @@ WINDOW = "5m"
 ENFORCEMENT = "manager.rbac.enforcement_enabled"
 
 type CreatingStep = Scenario[
-    SeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer
+    TestSeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer
 ]
 type RepeatingStep = Scenario[
-    SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer
+    TestSeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer
 ]
 
 
@@ -91,11 +92,17 @@ class Creating(When[ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNode
     @override
     def describe(self, laid: ACatalogAndACaller) -> str:
         where = ""
+        where_en = ""
         if self.under_the_category:
-            where = " 미리 만들어 둔 카테고리 아래에"
+            where = " 미리 저장한 카테고리 아래에"
+            where_en = " under the category seeded in advance"
         elif self.under_an_unknown_category:
             where = " 존재하지 않는 카테고리 id 아래에"
-        return f"{laid.caller.username}이{where} 이름 {self.named}(으)로 생성"
+            where_en = " under an unknown category id"
+        return Says(
+            f"{laid.caller.username}이{where} 이름 {self.named}(으)로 생성합니다",
+            english=f"{laid.caller.username} creates a preset named {self.named}{where_en}",
+        )
 
     @override
     async def call(
@@ -125,7 +132,13 @@ class CreatingUnderTheSameName(
 
     @override
     def describe(self, laid: APresetAndACaller) -> str:
-        return f"{laid.caller.username}이 이미 있는 이름 {laid.preset.name}(으)로 다시 생성"
+        return Says(
+            f"{laid.caller.username}이 이미 있는 이름 {laid.preset.name}(으)로 다시 생성합니다",
+            english=(
+                f"{laid.caller.username} creates another preset with the name "
+                f"{laid.preset.name} that already exists"
+            ),
+        )
 
     @override
     async def call(
@@ -138,7 +151,7 @@ class CreatingUnderTheSameName(
 
 @dataclass(frozen=True)
 class TheRequiredValuesMakeAWholeNode(
-    Scenario[SeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
+    Scenario[TestSeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
 ):
     started: datetime
 
@@ -148,13 +161,18 @@ class TheRequiredValuesMakeAWholeNode(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 이름, 지표 이름, 템플릿, 허용 라벨 목록만 지정해 생성하면, "
-            "순위는 0이고 카테고리·설명·시간 창은 비어 있는 노드 전체가 반환된다"
+        return Says(
+            "superadmin 이 이름, 지표 이름, 템플릿, 허용 라벨 목록만 지정해 생성하면, 순위는 0이고 "
+            "카테고리, 설명, 시간 창은 비어 있는 노드 전체가 반환됩니다",
+            english=(
+                "when the superadmin creates a preset specifying only a name, a metric name, "
+                "a template and allowed label lists, the whole node comes back with rank 0 "
+                "and an empty category, description and time window"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ACatalogAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ACatalogAndACaller]:
         return JustSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -168,7 +186,7 @@ class TheRequiredValuesMakeAWholeNode(
 
 @dataclass(frozen=True)
 class FiledUnderACategory(
-    Scenario[SeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
+    Scenario[TestSeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
 ):
     started: datetime
 
@@ -178,10 +196,17 @@ class FiledUnderACategory(
 
     @override
     def describe(self) -> str:
-        return "카테고리 하나가 있고 슈퍼관리자가 그 카테고리를 지정해 생성하면, 응답의 카테고리가 그것을 가리킨다"
+        return Says(
+            "카테고리 하나가 있고 superadmin 이 그 카테고리를 지정해 생성하면, 응답의 카테고리가 "
+            "그것을 참조합니다",
+            english=(
+                "when a category exists and the superadmin creates a preset naming it, the "
+                "category in the response references it"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ACatalogAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ACatalogAndACaller]:
         return ACategoryAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -195,7 +220,7 @@ class FiledUnderACategory(
 
 @dataclass(frozen=True)
 class WithAWindow(
-    Scenario[SeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
+    Scenario[TestSeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
 ):
     started: datetime
 
@@ -205,10 +230,16 @@ class WithAWindow(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 시간 창을 함께 지정해 생성하면, 노드에 그 시간 창이 담긴다"
+        return Says(
+            "superadmin 이 시간 창을 함께 지정해 생성하면, 노드에 그 시간 창이 담깁니다",
+            english=(
+                "when the superadmin creates a preset with a time window, the node carries "
+                "that time window"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ACatalogAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ACatalogAndACaller]:
         return JustSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -222,7 +253,7 @@ class WithAWindow(
 
 @dataclass(frozen=True)
 class AnUnknownCategoryIsRefused(
-    Scenario[SeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
+    Scenario[TestSeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
 ):
     @override
     def summary(self) -> str:
@@ -230,13 +261,18 @@ class AnUnknownCategoryIsRefused(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 존재하지 않는 카테고리 id를 지정해 생성하면, 카테고리가 없다는 이유로 "
-            "거부된다. 저장소의 참조 제약이 막는 것이고 도메인 오류로 옮겨져 있지 않다"
+        return Says(
+            "superadmin 이 존재하지 않는 카테고리 id 를 지정해 생성하면, 카테고리가 없다는 이유로 "
+            "거부됩니다. 저장소의 참조 제약이 차단하며 도메인 오류로 옮기지 않았습니다",
+            english=(
+                "when the superadmin creates a preset naming a category id that does not "
+                "exist, it is rejected because the category does not exist. The repository's "
+                "reference constraint blocks it, and it has not been moved to a domain error"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ACatalogAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ACatalogAndACaller]:
         return JustSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -250,7 +286,7 @@ class AnUnknownCategoryIsRefused(
 
 @dataclass(frozen=True)
 class TheSameNameIsAllowedTwice(
-    Scenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
+    Scenario[TestSeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
 ):
     started: datetime
 
@@ -260,13 +296,17 @@ class TheSameNameIsAllowedTwice(
 
     @override
     def describe(self) -> str:
-        return (
-            "이미 다른 프리셋이 사용 중인 이름으로 슈퍼관리자가 다시 생성하면, 생성된다. "
-            "프리셋의 이름에는 유일 제약이 없다"
+        return Says(
+            "이미 다른 프리셋이 사용 중인 이름으로 superadmin 이 다시 생성하면, 생성됩니다. "
+            "프리셋의 이름에는 유일 제약이 없습니다",
+            english=(
+                "when the superadmin creates a preset again with a name another preset "
+                "already uses, it is created. Preset names have no unique constraint"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
         return APresetAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -280,7 +320,7 @@ class TheSameNameIsAllowedTwice(
 
 @dataclass(frozen=True)
 class APlainUserMayNotCreate(
-    Scenario[SeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
+    Scenario[TestSeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
 ):
     @override
     def summary(self) -> str:
@@ -288,10 +328,16 @@ class APlainUserMayNotCreate(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 프리셋을 생성하려 하면, 역할 부족으로 거부된다"
+        return Says(
+            "superadmin 이 아닌 사용자가 프리셋을 생성하려 하면, 역할 부족으로 거부됩니다",
+            english=(
+                "when a user who is not the superadmin tries to create a preset, it is "
+                "rejected for lack of role"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ACatalogAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ACatalogAndACaller]:
         return JustSomeone()
 
     @override
@@ -305,7 +351,7 @@ class APlainUserMayNotCreate(
 
 @dataclass(frozen=True)
 class AMonitorMayNotCreate(
-    Scenario[SeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
+    Scenario[TestSeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer]
 ):
     @override
     def summary(self) -> str:
@@ -313,13 +359,17 @@ class AMonitorMayNotCreate(
 
     @override
     def describe(self) -> str:
-        return (
-            "모니터 역할이 프리셋을 생성하려 하면, 역할 부족으로 거부된다. "
-            "슈퍼관리자 검사는 읽기에만 모니터를 허용한다"
+        return Says(
+            "모니터 역할이 프리셋을 생성하려 하면, 역할 부족으로 거부됩니다. superadmin 검사는 "
+            "읽기에만 모니터를 허용합니다",
+            english=(
+                "when the monitor role tries to create a preset, it is rejected for lack of "
+                "role. The superadmin check allows the monitor only for reads"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ACatalogAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ACatalogAndACaller]:
         return JustSomeone(role=UserRole.MONITOR)
 
     @override
@@ -333,7 +383,9 @@ class AMonitorMayNotCreate(
 
 @dataclass(frozen=True)
 class EnforcementOffChangesNothing(
-    Scenario[SeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer],
+    Scenario[
+        TestSeedingSession, ACatalogAndACaller, PrometheusQueryPresetAdapter, PresetNodeAnswer
+    ],
     Configured,
 ):
     @override
@@ -342,14 +394,17 @@ class EnforcementOffChangesNothing(
 
     @override
     def describe(self) -> str:
-        return "권한 검사를 꺼도 프리셋 생성은 여전히 거부된다"
+        return Says(
+            "권한 검사를 꺼도 프리셋 생성은 여전히 거부됩니다",
+            english="turning the permission check off still rejects creating a preset",
+        )
 
     @override
     def config(self) -> Mapping[str, Any]:
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, ACatalogAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ACatalogAndACaller]:
         return JustSomeone()
 
     @override

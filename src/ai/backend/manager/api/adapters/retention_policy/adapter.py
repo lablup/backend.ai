@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import timedelta
 from typing import assert_never
 
 from ai.backend.common.data.entity.retention_policy import RetentionPolicyID
+from ai.backend.common.dto.manager.v2.common import PartialBulkFailure, PartialBulkPayload
 from ai.backend.common.dto.manager.v2.retention_policy.request import (
     CreateRetentionPolicyInput,
+    PartialBulkPurgeRetentionPoliciesInput,
+    PartialBulkUpdateRetentionPoliciesInput,
     RetentionPolicyFilter,
     RetentionPolicyOrder,
     SearchRetentionPoliciesInput,
@@ -13,13 +17,13 @@ from ai.backend.common.dto.manager.v2.retention_policy.request import (
 )
 from ai.backend.common.dto.manager.v2.retention_policy.response import (
     CreateRetentionPolicyPayload,
-    DeleteRetentionPolicyPayload,
     PurgeRetentionPolicyPayload,
     RetentionPolicyNode,
     SearchRetentionPoliciesPayload,
     UpdateRetentionPolicyPayload,
 )
 from ai.backend.common.dto.manager.v2.retention_policy.types import RetentionPolicyOrderField
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkResult
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.retention.types import RetentionPolicyData
@@ -33,13 +37,19 @@ from ai.backend.manager.models.retention.searchable_fields import (
 from ai.backend.manager.models.retention.searchers import RetentionPolicySearcher
 from ai.backend.manager.models.retention.updaters import RetentionPolicyUpdater
 from ai.backend.manager.models.specs.searcher import GlobalSearcher
+from ai.backend.manager.services.retention_policy.actions.bulk_get import (
+    BulkGetRetentionPoliciesAction,
+)
 from ai.backend.manager.services.retention_policy.actions.create import (
     CreateRetentionPolicyAction,
 )
-from ai.backend.manager.services.retention_policy.actions.delete import (
-    DeleteRetentionPolicyAction,
-)
 from ai.backend.manager.services.retention_policy.actions.get import GetRetentionPolicyAction
+from ai.backend.manager.services.retention_policy.actions.partial_bulk_purge import (
+    PartialBulkPurgeRetentionPoliciesAction,
+)
+from ai.backend.manager.services.retention_policy.actions.partial_bulk_update import (
+    PartialBulkUpdateRetentionPoliciesAction,
+)
 from ai.backend.manager.services.retention_policy.actions.purge import (
     PurgeRetentionPolicyAction,
 )
@@ -98,6 +108,20 @@ class RetentionPolicyAdapter(BaseAdapter):
         result = await self._retention_policy.get.run(GetRetentionPolicyAction(policy_id=policy_id))
         return self._data_to_node(result.data)
 
+    async def batch_load_by_ids(
+        self, ids: Sequence[RetentionPolicyID]
+    ) -> list[RetentionPolicyNode | Exception | None]:
+        """Batch load retention policies by id for DataLoader use, one answer per id."""
+        if not ids:
+            return []
+        result = await self._retention_policy.bulk_get.run(BulkGetRetentionPoliciesAction(ids=ids))
+        return [
+            self._data_to_node(item.value)
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
+
     async def create(
         self,
         input: CreateRetentionPolicyInput,
@@ -116,7 +140,38 @@ class RetentionPolicyAdapter(BaseAdapter):
         self,
         input: UpdateRetentionPolicyInput,
     ) -> UpdateRetentionPolicyPayload:
-        updater = RetentionPolicyUpdater(
+        result = await self._retention_policy.update.run(
+            UpdateRetentionPolicyAction(updater=self._to_updater(input))
+        )
+        return UpdateRetentionPolicyPayload(policy=self._data_to_node(result.data))
+
+    async def purge(self, policy_id: RetentionPolicyID) -> PurgeRetentionPolicyPayload:
+        purger = RetentionPolicyPurger(policy_id=policy_id)
+        result = await self._retention_policy.purge.run(PurgeRetentionPolicyAction(purger=purger))
+        return PurgeRetentionPolicyPayload(id=result.data.id, entity_id=result.data.id)
+
+    async def partial_bulk_update(
+        self, input: PartialBulkUpdateRetentionPoliciesInput
+    ) -> PartialBulkPayload[RetentionPolicyNode]:
+        """Update several retention policies, answering for each one."""
+        result = await self._retention_policy.partial_bulk_update.run(
+            PartialBulkUpdateRetentionPoliciesAction(
+                updaters=[self._to_updater(item) for item in input.items]
+            )
+        )
+        return self._to_partial_bulk_payload(result)
+
+    async def partial_bulk_purge(
+        self, input: PartialBulkPurgeRetentionPoliciesInput
+    ) -> PartialBulkPayload[RetentionPolicyNode]:
+        """Purge several retention policies, answering for each one."""
+        result = await self._retention_policy.partial_bulk_purge.run(
+            PartialBulkPurgeRetentionPoliciesAction(ids=input.ids)
+        )
+        return self._to_partial_bulk_payload(result)
+
+    def _to_updater(self, input: UpdateRetentionPolicyInput) -> RetentionPolicyUpdater:
+        return RetentionPolicyUpdater(
             policy_id=input.id,
             category=(
                 OptionalState.update(input.category)
@@ -134,25 +189,27 @@ class RetentionPolicyAdapter(BaseAdapter):
                 else OptionalState.nop()
             ),
         )
-        result = await self._retention_policy.update.run(
-            UpdateRetentionPolicyAction(updater=updater)
+
+    def _to_partial_bulk_payload(
+        self, result: PartialBulkResult[RetentionPolicyData]
+    ) -> PartialBulkPayload[RetentionPolicyNode]:
+        return PartialBulkPayload[RetentionPolicyNode](
+            successes=[
+                self._data_to_node(item.value) for item in result.items if item.value is not None
+            ],
+            failed=[
+                PartialBulkFailure(id=item.entity_id, message=str(item.error))
+                for item in result.items
+                if item.error is not None
+            ],
         )
-        return UpdateRetentionPolicyPayload(policy=self._data_to_node(result.data))
-
-    async def delete(self, policy_id: RetentionPolicyID) -> DeleteRetentionPolicyPayload:
-        result = await self._retention_policy.delete.run(DeleteRetentionPolicyAction(id=policy_id))
-        return DeleteRetentionPolicyPayload(id=result.data.id)
-
-    async def purge(self, policy_id: RetentionPolicyID) -> PurgeRetentionPolicyPayload:
-        purger = RetentionPolicyPurger(policy_id=policy_id)
-        result = await self._retention_policy.purge.run(PurgeRetentionPolicyAction(purger=purger))
-        return PurgeRetentionPolicyPayload(id=result.data.id)
 
     def _convert_filter(self, filter_: RetentionPolicyFilter) -> list[QueryCondition]:
         fields = RetentionPolicySearchableFields.own
-        conditions: list[QueryCondition] = list(
-            self.apply_bool_filter(filter_.enabled, fields.enabled.filter)
-        )
+        conditions: list[QueryCondition] = [
+            *self.apply_bool_filter(filter_.enabled, fields.enabled.filter),
+            *self.apply_uuid_filter(filter_.entity_id, fields.id.filter),
+        ]
         if filter_.category is not None:
             conditions.append(fields.category.filter.equals(filter_.category))
         return conditions

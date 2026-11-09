@@ -20,9 +20,12 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Configured,
     Given,
+    Language,
+    Says,
     Scenario,
     Then,
     When,
+    in_language,
 )
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.resource_policy import (
@@ -36,12 +39,12 @@ from bai_scenario.components.resource_policy import (
     ThePolicyNode,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 ENFORCEMENT = "manager.rbac.enforcement_enabled"
 
-type OwnStep = Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
+type OwnStep = Scenario[TestSeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
 
 
 @dataclass(frozen=True)
@@ -56,7 +59,13 @@ class ReadingMine(When[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]):
 
     @override
     def describe(self, laid: APolicyAndACaller[Any]) -> str:
-        return f"{laid.caller.username}이 자기 {self.family.kind}을 조회"
+        kind = self.family.kind
+        return Says(
+            f"{laid.caller.username}이 자기 {kind}을 조회합니다",
+            english=(
+                f"{laid.caller.username} reads their own {in_language(kind, Language.ENGLISH)}"
+            ),
+        )
 
     @override
     async def call(self, adapter: ResourcePolicyAdapter, laid: APolicyAndACaller[Any]) -> Any:
@@ -66,7 +75,7 @@ class ReadingMine(When[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]):
 
 @dataclass(frozen=True)
 class TheGrantedUserReadsTheirOwn(
-    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
+    Scenario[TestSeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
 ):
     family: OwnFamily[Any, Any]
     started: datetime
@@ -77,13 +86,19 @@ class TheGrantedUserReadsTheirOwn(
 
     @override
     def describe(self) -> str:
-        return (
-            f"자기 스코프에서 {self.family.kind}을 읽을 권한을 받은 사용자가 자기 정책을 "
-            "조회하면, 그 사용자에게 할당된 정책 전체가 반환된다"
+        kind = self.family.kind
+        kind_en = in_language(kind, Language.ENGLISH)
+        return Says(
+            f"자기 스코프에서 {kind}을 읽을 권한을 받은 사용자가 자기 정책을 조회하면, 그 "
+            "사용자에게 할당된 정책 전체가 반환됩니다",
+            english=(
+                f"a user granted read on the {kind_en} in their own scope reading their own "
+                "policy gets the whole policy assigned to that user"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
+    def given(self) -> Given[TestSeedingSession, APolicyAndACaller[Any]]:
         return SomeoneHeldToTheirPolicy(self.family)
 
     @override
@@ -97,7 +112,7 @@ class TheGrantedUserReadsTheirOwn(
 
 @dataclass(frozen=True)
 class TheDefaultKeyDecidesAmongMany(
-    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
+    Scenario[TestSeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
 ):
     started: datetime
 
@@ -107,13 +122,18 @@ class TheDefaultKeyDecidesAmongMany(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "기본 키페어 외에 다른 키페어 정책이 할당된 활성 키페어를 하나 더 가진 사용자가 자기 "
-            "키페어 정책을 조회하면, 기본 키페어에 할당된 정책이 반환된다"
+            "키페어 정책을 조회하면, 기본 키페어에 할당된 정책이 반환됩니다",
+            english=(
+                "a user with one more active keypair, besides the default keypair, holding a "
+                "different keypair policy reading their own keypair policy gets the policy "
+                "assigned to the default keypair"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
+    def given(self) -> Given[TestSeedingSession, APolicyAndACaller[Any]]:
         return SomeoneWithAnotherKey()
 
     @override
@@ -127,7 +147,7 @@ class TheDefaultKeyDecidesAmongMany(
 
 @dataclass(frozen=True)
 class AnInactiveDefaultKeyYieldsToAnActiveOne(
-    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
+    Scenario[TestSeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
 ):
     started: datetime
 
@@ -137,13 +157,18 @@ class AnInactiveDefaultKeyYieldsToAnActiveOne(
 
     @override
     def describe(self) -> str:
-        return (
-            "기본 키페어는 비활성이고 다른 키페어 정책이 할당된 활성 키페어를 하나 더 가진 사용자가 "
-            "자기 키페어 정책을 조회하면, 그 활성 키페어에 할당된 정책이 반환된다"
+        return Says(
+            "기본 키페어는 비활성이고 다른 키페어 정책이 할당된 활성 키페어를 하나 더 가진 "
+            "사용자가 자기 키페어 정책을 조회하면, 그 활성 키페어에 할당된 정책이 반환됩니다",
+            english=(
+                "a user whose default keypair is inactive and who has one more active keypair "
+                "holding a different keypair policy reading their own keypair policy gets the "
+                "policy assigned to that active keypair"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
+    def given(self) -> Given[TestSeedingSession, APolicyAndACaller[Any]]:
         return SomeoneWithAnotherKey(active=False)
 
     @override
@@ -157,7 +182,7 @@ class AnInactiveDefaultKeyYieldsToAnActiveOne(
 
 @dataclass(frozen=True)
 class NoActiveKeyFindsNoPolicy(
-    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
+    Scenario[TestSeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
 ):
     @override
     def summary(self) -> str:
@@ -165,13 +190,18 @@ class NoActiveKeyFindsNoPolicy(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "활성 키페어가 없는 사용자가 자기 키페어 정책을 조회하면, 권한이 있어도 정책에 "
-            "도달할 키페어가 없어 대상을 찾을 수 없다는 이유로 거부된다"
+            "도달할 키페어가 없어 대상을 찾을 수 없다는 이유로 거부됩니다",
+            english=(
+                "a user with no active keypair reading their own keypair policy is rejected "
+                "because no target answers to it, since no keypair reaches the policy even with "
+                "the permission"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
+    def given(self) -> Given[TestSeedingSession, APolicyAndACaller[Any]]:
         return SomeoneWithNoActiveKey()
 
     @override
@@ -185,7 +215,7 @@ class NoActiveKeyFindsNoPolicy(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotReadTheirOwn(
-    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
+    Scenario[TestSeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
 ):
     family: OwnFamily[Any, Any]
 
@@ -195,13 +225,20 @@ class AUserGrantedNothingMayNotReadTheirOwn(
 
     @override
     def describe(self) -> str:
-        return (
-            f"아무 권한도 없는 사용자가 자기 {self.family.kind}을 조회하면 권한 부족으로 "
-            "거부된다. 자기 정책을 읽는 호출도 범위만 좁히는 것이 아니라 권한을 검사한다"
+        kind = self.family.kind
+        kind_en = in_language(kind, Language.ENGLISH)
+        return Says(
+            f"아무 권한도 없는 사용자가 자기 {kind}을 조회하면 권한 부족으로 거부됩니다. 자기 "
+            "정책을 읽는 호출도 범위만 좁히는 것이 아니라 권한을 검사합니다",
+            english=(
+                f"a user granted nothing reading their own {kind_en} is rejected for not enough "
+                "permission. the call reading their own policy checks the permission instead of "
+                "only narrowing the scope"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
+    def given(self) -> Given[TestSeedingSession, APolicyAndACaller[Any]]:
         return SomeoneHeldToTheirPolicy(self.family, granted=False)
 
     @override
@@ -215,7 +252,7 @@ class AUserGrantedNothingMayNotReadTheirOwn(
 
 @dataclass(frozen=True)
 class EnforcementOffOpensTheirOwn(
-    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any], Configured
+    Scenario[TestSeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any], Configured
 ):
     family: OwnFamily[Any, Any]
     started: datetime
@@ -226,8 +263,13 @@ class EnforcementOffOpensTheirOwn(
 
     @override
     def describe(self) -> str:
-        return (
-            f"권한 검사를 끄면 아무 권한도 없는 사용자도 자기 {self.family.kind}을 조회할 수 있다"
+        kind = self.family.kind
+        return Says(
+            f"권한 검사를 끄면 아무 권한도 없는 사용자도 자기 {kind}을 조회할 수 있습니다",
+            english=(
+                "turning permission enforcement off lets a user granted nothing read their own "
+                f"{in_language(kind, Language.ENGLISH)}"
+            ),
         )
 
     @override
@@ -235,7 +277,7 @@ class EnforcementOffOpensTheirOwn(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
+    def given(self) -> Given[TestSeedingSession, APolicyAndACaller[Any]]:
         return SomeoneHeldToTheirPolicy(self.family, granted=False)
 
     @override

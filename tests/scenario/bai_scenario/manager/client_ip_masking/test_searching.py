@@ -21,7 +21,7 @@ from ai.backend.common.dto.manager.v2.client_ip_masking.response import (
 from ai.backend.manager.api.adapters.client_ip_masking.adapter import ClientIPMaskingAdapter
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.client_ip_masking import (
     ManyMaskingPoliciesAndACaller,
@@ -29,12 +29,12 @@ from bai_scenario.components.client_ip_masking import (
     TwoMaskingPoliciesAndSomeone,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Searched = AdminSearchClientIPMaskingPoliciesPayload
 type SearchingStep = Scenario[
-    SeedingSession, ManyMaskingPoliciesAndACaller, ClientIPMaskingAdapter, Searched
+    TestSeedingSession, ManyMaskingPoliciesAndACaller, ClientIPMaskingAdapter, Searched
 ]
 
 
@@ -48,7 +48,10 @@ class SearchingEveryPolicy(When[ManyMaskingPoliciesAndACaller, ClientIPMaskingAd
 
     @override
     def describe(self, laid: ManyMaskingPoliciesAndACaller) -> str:
-        return f"{laid.caller.username}이 필터 없이 전체 조회"
+        return Says(
+            f"{laid.caller.username} 이 필터 없이 전체를 조회합니다",
+            english=f"{laid.caller.username} reads every masking policy without a filter",
+        )
 
     @override
     async def call(
@@ -60,7 +63,7 @@ class SearchingEveryPolicy(When[ManyMaskingPoliciesAndACaller, ClientIPMaskingAd
 
 @dataclass(frozen=True)
 class TheSuperadminCountsEveryPolicy(
-    Scenario[SeedingSession, ManyMaskingPoliciesAndACaller, ClientIPMaskingAdapter, Searched]
+    Scenario[TestSeedingSession, ManyMaskingPoliciesAndACaller, ClientIPMaskingAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -68,10 +71,16 @@ class TheSuperadminCountsEveryPolicy(
 
     @override
     def describe(self) -> str:
-        return "대상이 다른 정책 둘이 있을 때 슈퍼관리자가 필터 없이 조회하면 둘 다 집계된다"
+        return Says(
+            "대상이 다른 정책 둘이 있을 때 superadmin 이 필터 없이 조회하면 둘 다 집계됩니다",
+            english=(
+                "when two policies of different targets exist and the superadmin reads without a "
+                "filter, both are counted"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyMaskingPoliciesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyMaskingPoliciesAndACaller]:
         return TwoMaskingPoliciesAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -85,7 +94,7 @@ class TheSuperadminCountsEveryPolicy(
 
 @dataclass(frozen=True)
 class TheMonitorSearchesLikeTheSuperadmin(
-    Scenario[SeedingSession, ManyMaskingPoliciesAndACaller, ClientIPMaskingAdapter, Searched]
+    Scenario[TestSeedingSession, ManyMaskingPoliciesAndACaller, ClientIPMaskingAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -93,10 +102,19 @@ class TheMonitorSearchesLikeTheSuperadmin(
 
     @override
     def describe(self) -> str:
-        return "모니터 역할이 필터 없이 조회하면 슈퍼관리자와 같은 응답이 반환된다. 슈퍼관리자 검사는 모니터의 읽기를 허용한다"
+        return Says(
+            (
+                "모니터 역할이 필터 없이 조회하면 superadmin 과 같은 응답이 반환됩니다. superadmin "
+                "검사는 모니터의 읽기를 허용합니다"
+            ),
+            english=(
+                "when the monitor role reads without a filter, the same response as the superadmin "
+                "comes back. The superadmin check allows the monitor's read"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyMaskingPoliciesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyMaskingPoliciesAndACaller]:
         return TwoMaskingPoliciesAndSomeone(role=UserRole.MONITOR)
 
     @override
@@ -110,7 +128,7 @@ class TheMonitorSearchesLikeTheSuperadmin(
 
 @dataclass(frozen=True)
 class AUserWhoIsNotTheSuperadminMayNotSearch(
-    Scenario[SeedingSession, ManyMaskingPoliciesAndACaller, ClientIPMaskingAdapter, Searched]
+    Scenario[TestSeedingSession, ManyMaskingPoliciesAndACaller, ClientIPMaskingAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -118,10 +136,16 @@ class AUserWhoIsNotTheSuperadminMayNotSearch(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 전체 조회를 요청하면 역할 부족으로 거부된다"
+        return Says(
+            ("superadmin 이 아닌 사용자가 전체를 조회하도록 요청하면 역할 부족으로 거부됩니다"),
+            english=(
+                "when a user who is not the superadmin requests a read of everything, it is "
+                "rejected because the role is insufficient"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyMaskingPoliciesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyMaskingPoliciesAndACaller]:
         return TwoMaskingPoliciesAndSomeone()
 
     @override

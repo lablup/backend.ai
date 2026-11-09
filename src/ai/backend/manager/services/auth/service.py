@@ -10,6 +10,9 @@ from typing import Any, cast
 from aiohttp import web
 from sqlalchemy import RowMapping
 
+from ai.backend.common import msgpack
+from ai.backend.common.auth.password import PasswordInfo
+from ai.backend.common.auth.ssh import generate_ssh_keypair
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
 from ai.backend.common.clients.valkey_client.valkey_session.types import (
     LoginSessionData,
@@ -18,6 +21,7 @@ from ai.backend.common.clients.valkey_client.valkey_session.types import (
 )
 from ai.backend.common.contexts.client_ip import current_client_ip
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.bootstrap_script import BootstrapScript
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserData
 from ai.backend.common.dto.manager.auth.types import AuthTokenType
@@ -49,18 +53,13 @@ from ai.backend.manager.errors.common import (
     RejectedByHook,
 )
 from ai.backend.manager.errors.user import KeyPairNotFound, UserResourcePolicyNotFound
-from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.keypair.row import (
-    KEYPAIR_SECRET_KEY_CONTEXT,
-    generate_ssh_keypair,
-)
+from ai.backend.manager.models.hasher.factory import compare_to_hashed_password
+from ai.backend.manager.models.keypair.row import KEYPAIR_SECRET_KEY_CONTEXT
 from ai.backend.manager.models.keypair.ssh_key_validator import SSHKeyValidator
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.row import (
-    INACTIVE_USER_STATUSES,
     UserRole,
     UserStatus,
-    compare_to_hashed_password,
 )
 from ai.backend.manager.repositories.auth.db_source.db_source import ActiveSessionInfo
 from ai.backend.manager.repositories.auth.repository import AuthRepository
@@ -215,7 +214,13 @@ class AuthService:
         return await self._key_provider_pool.decrypt(keypair.secret_key, KEYPAIR_SECRET_KEY_CONTEXT)
 
     async def _keypair_hook_payload(self, keypair: KeyPairData) -> dict[str, object]:
-        """The keypair columns POST_AUTHORIZE hands to its plugins."""
+        """The legacy keypair payload, with user-owned auto-generated files and bootstrap script."""
+        bootstrap_script = await self._user_repository.default_bootstrap_script(
+            UserID(keypair.user_id)
+        )
+        auto_generated_files = await self._user_repository.get_default_auto_generated_files(
+            UserID(keypair.user_id)
+        )
         return {
             "access_key": keypair.access_key,
             "secret_key": await self._secret_key_of(keypair),
@@ -230,8 +235,14 @@ class AuthService:
             "ssh_private_key": keypair.ssh_private_key,
             "user": keypair.user_id,
             "resource_policy": keypair.resource_policy_name,
-            "dotfiles": keypair.dotfiles,
-            "bootstrap_script": keypair.bootstrap_script,
+            # Rows carry no aggregate size limit, so pack without DotfileEntries.pack()'s.
+            "dotfiles": msgpack.packb([
+                {"path": e.path, "perm": e.perm, "data": e.data}
+                for e in auto_generated_files.entries
+            ]),
+            "bootstrap_script": (
+                bootstrap_script.script if bootstrap_script is not None else BootstrapScript.empty()
+            ),
         }
 
     async def authorize(self, action: AuthorizeAction) -> AuthorizeActionResult:
@@ -309,7 +320,7 @@ class AuthService:
         """Step 2: User status checks, keypair lookup, POST_AUTHORIZE hook, Valkey cross-check."""
         if user.status == UserStatus.BEFORE_VERIFICATION:
             raise AuthorizationFailed("This account needs email verification.")
-        if user.status in INACTIVE_USER_STATUSES:
+        if user.status in UserStatus.auth_denied():
             raise AuthorizationFailed("User credential mismatch.")
         await self._check_password_age(user, auth_config)
 
@@ -337,16 +348,22 @@ class AuthService:
             )
 
         # Cross-check active sessions with Valkey
+        session_data = await self._valkey_session_client.get_login_sessions([
+            session_info.session_token for session_info in active_sessions
+        ])
         live_sessions: list[ActiveSessionInfo] = []
-        for session_info in active_sessions:
-            if await self._valkey_session_client.get_login_session(session_info.session_token):
+        expired_tokens: list[str] = []
+        for session_info, data in zip(active_sessions, session_data, strict=True):
+            if data:
                 live_sessions.append(session_info)
             else:
-                await self._auth_repository.delete_login_session_by_token(
-                    session_info.session_token,
-                    LoginAttemptResult.EXPIRED,
-                    await self._recorded_client_ip(),
-                )
+                expired_tokens.append(session_info.session_token)
+        if expired_tokens:
+            await self._auth_repository.delete_login_sessions_by_tokens(
+                expired_tokens,
+                LoginAttemptResult.EXPIRED,
+                await self._recorded_client_ip(),
+            )
 
         return default_keypair, live_sessions
 
@@ -430,8 +447,7 @@ class AuthService:
         )
 
         if tokens_to_invalidate:
-            for token in tokens_to_invalidate:
-                await self._valkey_session_client.delete_login_session(token)
+            await self._valkey_session_client.delete_login_sessions(tokens_to_invalidate)
             await self._auth_repository.delete_login_sessions_by_tokens(
                 tokens_to_invalidate, LoginAttemptResult.EVICTED, await self._recorded_client_ip()
             )
@@ -591,8 +607,11 @@ class AuthService:
         )
 
     async def logout(self, action: LogoutAction) -> LogoutActionResult:
-        await self._auth_repository.delete_login_session_by_token(
-            action.session_token, LoginAttemptResult.LOGOUT, await self._recorded_client_ip()
+        await self._auth_repository.delete_owned_login_session_by_token(
+            action.session_token,
+            action.user_id,
+            LoginAttemptResult.LOGOUT,
+            await self._recorded_client_ip(),
         )
         await self._valkey_session_client.delete_login_session(action.session_token)
         return LogoutActionResult(success=True)
@@ -625,10 +644,16 @@ class AuthService:
         if action.email != action.requester_email:
             raise GenericForbidden("Not the account owner")
         email = action.email
+        auth_config = self._config_provider.config.auth
         await self._auth_repository.check_credential_without_migration(
             action.domain_name,
             email,
-            action.password,
+            PasswordInfo(
+                password=action.password,
+                algorithm=auth_config.password_hash_algorithm,
+                rounds=auth_config.password_hash_rounds,
+                salt_size=auth_config.password_hash_salt_size,
+            ),
         )
         deleted_tokens = await self._auth_repository.delete_user_login_sessions(
             action.user_id,
@@ -641,6 +666,15 @@ class AuthService:
         await self._auth_repository.deactivate_user_and_keypairs(email)
 
         return SignoutActionResult(success=True)
+
+    async def _revoke_user_login_sessions(self, user_id: UserID, domain_name: str) -> None:
+        deleted_tokens = await self._auth_repository.delete_user_login_sessions(
+            user_id,
+            domain_name,
+            LoginAttemptResult.REVOKED_BY_USER,
+            await self._recorded_client_ip(),
+        )
+        await self._valkey_session_client.delete_login_sessions(deleted_tokens)
 
     async def update_full_name(self, action: UpdateFullNameAction) -> UpdateFullNameActionResult:
         await self._auth_repository.update_user_full_name(
@@ -661,11 +695,17 @@ class AuthService:
                 success=False,
                 message="new password mismatch",
             )
+        auth_config = self._config_provider.config.auth
         try:
             await self._auth_repository.check_credential_without_migration(
                 domain_name,
                 email,
-                action.old_password,
+                PasswordInfo(
+                    password=action.old_password,
+                    algorithm=auth_config.password_hash_algorithm,
+                    rounds=auth_config.password_hash_rounds,
+                    salt_size=auth_config.password_hash_salt_size,
+                ),
             )
         except AuthorizationFailed as e:
             raise AuthorizationFailed("Old password mismatch") from e
@@ -692,6 +732,7 @@ class AuthService:
             salt_size=auth_config.password_hash_salt_size,
         )
         await self._auth_repository.update_user_password(email, password_info)
+        await self._revoke_user_login_sessions(action.user_id, domain_name)
 
         return UpdatePasswordActionResult(
             success=True,
@@ -707,10 +748,15 @@ class AuthService:
         checked_user = await self._auth_repository.check_credential_without_migration(
             action.domain_name,
             action.email,
-            password=action.current_password,
+            PasswordInfo(
+                password=action.current_password,
+                algorithm=auth_config.password_hash_algorithm,
+                rounds=auth_config.password_hash_rounds,
+                salt_size=auth_config.password_hash_salt_size,
+            ),
         )
         new_password = action.new_password
-        if compare_to_hashed_password(new_password, checked_user["password"]):
+        if compare_to_hashed_password(new_password, checked_user.hashed_password):
             raise AuthorizationFailed("Cannot update to the same password as an existing password.")
 
         # [Hooking point for VERIFY_PASSWORD_FORMAT with the ALL_COMPLETED requirement]
@@ -733,11 +779,12 @@ class AuthService:
             salt_size=auth_config.password_hash_salt_size,
         )
         changed_at = await self._auth_repository.update_user_password_by_uuid(
-            checked_user["uuid"], password_info
+            checked_user.user_id, password_info
         )
+        await self._revoke_user_login_sessions(checked_user.user_id, action.domain_name)
 
         return UpdatePasswordNoAuthActionResult(
-            user_id=checked_user["uuid"],
+            user_id=checked_user.user_id,
             password_changed_at=changed_at,
         )
 

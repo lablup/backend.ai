@@ -35,6 +35,7 @@ from ai.backend.manager.actions.v2.ops.base import PartialBulkPurgeGlobalEntityO
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.data.permission.status import RoleStatus
+from ai.backend.manager.data.role_preset.types import RolePresetData
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.errors.resource_slot import ResourceSlotTypeInUse
@@ -43,8 +44,10 @@ from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.audit_log.row import AuditLogRow
 from ai.backend.manager.models.rbac_models.role.purgers import RolePurger
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.role_preset.purgers import RolePresetPurger
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
-from ai.backend.manager.models.resource_group.row import ResourceGroupOpts, ResourceGroupRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.models.resource_slot.purgers import ResourceSlotTypePurger
 from ai.backend.manager.models.resource_slot.row import (
     AgentResourceRow,
@@ -60,7 +63,6 @@ from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.rbac.permission_check_repository import (
     RbacPermissionCheckRepository,
 )
-from ai.backend.manager.services.role_preset.actions.bulk_purge import BulkPurgeRolePresetsAction
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.ops_contract import (
     ANONYMOUS_NOT_REFUSED,
@@ -77,6 +79,31 @@ from ai.backend.testutils.ops_contract import (
 DENIALS_RECORDED_AS_ERROR_ON_A_FAILED_RUN = pytest.mark.xfail(
     strict=True, reason="a run that raises records the ids it denied as ERROR, not DENIED"
 )
+
+
+@dataclass
+class _PresetPurgeAction(PartialBulkPurgeGlobalEntityOpsAction[RolePresetRow, RolePresetData]):
+    """A test-only action of this shape over role presets."""
+
+    ids: Sequence[RolePresetID]
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "test_global_bulk_purge_role_presets"
+
+    @override
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
+        return tuple(self.ids)
+
+    @override
+    def to_purgers(self) -> Mapping[EntityIdentifier, RolePresetPurger]:
+        return {preset_id: RolePresetPurger(preset_id=preset_id) for preset_id in self.ids}
+
+    @override
+    def narrowed_to(self, entity_ids: Sequence[EntityIdentifier]) -> Self:
+        allowed = frozenset(entity_ids)
+        return replace(self, ids=[entity_id for entity_id in self.ids if entity_id in allowed])
 
 
 @pytest.fixture
@@ -135,9 +162,7 @@ async def _remaining(db: ExtendedAsyncSAEngine, preset_ids: list[RolePresetID]) 
 
 
 def _processor(harness: OpsHarness) -> Any:
-    return harness.group(RolePresetEntityType()).global_partial_bulk_purge_ops(
-        BulkPurgeRolePresetsAction
-    )
+    return harness.group(RolePresetEntityType()).global_partial_bulk_purge_ops(_PresetPurgeAction)
 
 
 def _spy_writes(monkeypatch: pytest.MonkeyPatch) -> list[list[EntityIdentifier]]:
@@ -156,7 +181,7 @@ async def _action_ids(db: ExtendedAsyncSAEngine) -> set[uuid.UUID]:
     async with db.begin_readonly_session() as sess:
         rows = await sess.scalars(
             sa.select(AuditLogRow.action_id).where(
-                AuditLogRow.action_name == BulkPurgeRolePresetsAction.action_name()
+                AuditLogRow.action_name == _PresetPurgeAction.action_name()
             )
         )
         return set(rows.all())
@@ -183,7 +208,7 @@ class TestActor:
         harness.enforce(enforced)
 
         with actors.acting_as(actor):
-            result = await _processor(harness).run(BulkPurgeRolePresetsAction(ids=presets))
+            result = await _processor(harness).run(_PresetPurgeAction(ids=presets))
 
         assert [item.value.id for item in result.items] == presets
         assert await _remaining(preset_db, presets) == set()
@@ -204,7 +229,7 @@ class TestActor:
         writes = _spy_writes(monkeypatch)
 
         with actors.acting_as(actor):
-            result = await _processor(harness).run(BulkPurgeRolePresetsAction(ids=presets))
+            result = await _processor(harness).run(_PresetPurgeAction(ids=presets))
 
         assert all(item.is_denied for item in result.items)
         assert all(isinstance(item.error, NotEnoughPermission) for item in result.items)
@@ -232,7 +257,7 @@ class TestActor:
 
         with actors.acting_as(Actor.ANONYMOUS):
             with pytest.raises(BackendAIError) as raised:
-                await _processor(harness).run(BulkPurgeRolePresetsAction(ids=presets))
+                await _processor(harness).run(_PresetPurgeAction(ids=presets))
 
         assert writes == []
         assert await _remaining(preset_db, presets) == set(presets)
@@ -251,9 +276,7 @@ class TestTarget:
         missing = RolePresetID(uuid.uuid4())
 
         with actors.acting_as(Actor.SUPERADMIN):
-            result = await _processor(harness).run(
-                BulkPurgeRolePresetsAction(ids=[presets[0], missing])
-            )
+            result = await _processor(harness).run(_PresetPurgeAction(ids=[presets[0], missing]))
 
         purged, gone = result.items
         assert purged.value.id == presets[0]
@@ -267,7 +290,7 @@ class TestTarget:
         """target-2."""
         with actors.acting_as(Actor.GRANTED):
             result = await _processor(harness).run(
-                BulkPurgeRolePresetsAction(ids=[RolePresetID(uuid.uuid4())])
+                _PresetPurgeAction(ids=[RolePresetID(uuid.uuid4())])
             )
 
         (item,) = result.items
@@ -290,7 +313,7 @@ class TestMulti:
         writes = _spy_writes(monkeypatch)
 
         with actors.acting_as(Actor.UNGRANTED):
-            result = await _processor(harness).run(BulkPurgeRolePresetsAction(ids=presets))
+            result = await _processor(harness).run(_PresetPurgeAction(ids=presets))
 
         purged, refused = result.items
         assert purged.value.id == allowed
@@ -314,7 +337,7 @@ class TestMulti:
 
         with actors.acting_as(Actor.UNGRANTED):
             result = await _processor(harness).run(
-                BulkPurgeRolePresetsAction(ids=[allowed, denied, allowed, denied])
+                _PresetPurgeAction(ids=[allowed, denied, allowed, denied])
             )
 
         assert result.items[0] == result.items[2]
@@ -328,7 +351,7 @@ class TestMulti:
     ) -> None:
         """multi-3."""
         with actors.acting_as(Actor.GRANTED):
-            result = await _processor(harness).run(BulkPurgeRolePresetsAction(ids=[]))
+            result = await _processor(harness).run(_PresetPurgeAction(ids=[]))
 
         assert result.items == []
 
@@ -339,7 +362,7 @@ class TestMulti:
         ids = [presets[1], RolePresetID(uuid.uuid4()), presets[0]]
 
         with actors.acting_as(Actor.SUPERADMIN):
-            result = await _processor(harness).run(BulkPurgeRolePresetsAction(ids=ids))
+            result = await _processor(harness).run(_PresetPurgeAction(ids=ids))
 
         assert [item.entity_id for item in result.items] == ids
 
@@ -365,9 +388,9 @@ class TestRecord:
         target = presets[0] if exists else RolePresetID(uuid.uuid4())
 
         with actors.acting_as(actor):
-            await _processor(silent_reads_harness).run(BulkPurgeRolePresetsAction(ids=[target]))
+            await _processor(silent_reads_harness).run(_PresetPurgeAction(ids=[target]))
 
-        records = await silent_reads_harness.audit(BulkPurgeRolePresetsAction.action_name())
+        records = await silent_reads_harness.audit(_PresetPurgeAction.action_name())
         assert [((r.entity_type, r.entity_id), r.operation, r.status) for r in records] == [
             (entity_key(target), ActionOperationType.PURGE, status)
         ]
@@ -386,11 +409,9 @@ class TestRecord:
         await _grant_on(preset_db, actors, missing)
 
         with actors.acting_as(Actor.UNGRANTED):
-            await _processor(harness).run(
-                BulkPurgeRolePresetsAction(ids=[allowed, denied, missing])
-            )
+            await _processor(harness).run(_PresetPurgeAction(ids=[allowed, denied, missing]))
 
-        records = await harness.audit(BulkPurgeRolePresetsAction.action_name())
+        records = await harness.audit(_PresetPurgeAction.action_name())
         assert {(r.entity_type, r.entity_id): r.status for r in records} == {
             entity_key(allowed): OperationStatus.SUCCESS,
             entity_key(denied): OperationStatus.DENIED,
@@ -419,9 +440,9 @@ class TestRecord:
 
         with actors.acting_as(Actor.UNGRANTED):
             with pytest.raises(RuntimeError):
-                await _processor(harness).run(BulkPurgeRolePresetsAction(ids=presets))
+                await _processor(harness).run(_PresetPurgeAction(ids=presets))
 
-        records = await harness.audit(BulkPurgeRolePresetsAction.action_name())
+        records = await harness.audit(_PresetPurgeAction.action_name())
         assert {(r.entity_type, r.entity_id): r.status for r in records} == {
             entity_key(allowed): OperationStatus.ERROR,
             entity_key(denied): OperationStatus.DENIED,
@@ -434,9 +455,9 @@ class TestRecord:
         """record-6."""
         with actors.acting_as(Actor.ANONYMOUS):
             with contextlib.suppress(BackendAIError):
-                await _processor(harness).run(BulkPurgeRolePresetsAction(ids=presets))
+                await _processor(harness).run(_PresetPurgeAction(ids=presets))
 
-        records = await harness.audit(BulkPurgeRolePresetsAction.action_name())
+        records = await harness.audit(_PresetPurgeAction.action_name())
         assert sorted(((r.entity_type, r.entity_id), r.status) for r in records) == sorted(
             (entity_key(preset_id), OperationStatus.DENIED) for preset_id in presets
         )
@@ -446,9 +467,9 @@ class TestRecord:
     ) -> None:
         """record-7."""
         with actors.acting_as(Actor.GRANTED):
-            await _processor(harness).run(BulkPurgeRolePresetsAction(ids=[]))
+            await _processor(harness).run(_PresetPurgeAction(ids=[]))
 
-        assert await harness.audit(BulkPurgeRolePresetsAction.action_name()) == []
+        assert await harness.audit(_PresetPurgeAction.action_name()) == []
 
     async def test_a_failing_permission_read_is_an_error_not_a_denial(
         self,
@@ -467,9 +488,9 @@ class TestRecord:
 
         with actors.acting_as(Actor.GRANTED):
             with pytest.raises(RuntimeError):
-                await _processor(harness).run(BulkPurgeRolePresetsAction(ids=[presets[0]]))
+                await _processor(harness).run(_PresetPurgeAction(ids=[presets[0]]))
 
-        records = await harness.audit(BulkPurgeRolePresetsAction.action_name())
+        records = await harness.audit(_PresetPurgeAction.action_name())
         assert [r.status for r in records] == [OperationStatus.ERROR]
         assert await _remaining(preset_db, presets) == set(presets)
 
@@ -480,7 +501,7 @@ class TestResult:
     ) -> None:
         """result-1."""
         with actors.acting_as(Actor.GRANTED):
-            result = await _processor(harness).run(BulkPurgeRolePresetsAction(ids=[presets[0]]))
+            result = await _processor(harness).run(_PresetPurgeAction(ids=[presets[0]]))
 
         (item,) = result.items
         assert item.value.id == presets[0]
@@ -666,8 +687,8 @@ class TestConflict:
             result = await processor.run(
                 _PurgeAction(
                     purgers=[
-                        ResourceSlotTypePurger(slot_name="free.device", slot_type_id=free),
-                        ResourceSlotTypePurger(slot_name="cuda.device", slot_type_id=reported),
+                        ResourceSlotTypePurger(slot_type_id=free),
+                        ResourceSlotTypePurger(slot_type_id=reported),
                     ]
                 )
             )

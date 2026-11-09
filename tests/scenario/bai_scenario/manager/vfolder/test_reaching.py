@@ -20,6 +20,7 @@ from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
     Same,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -34,11 +35,11 @@ from bai_scenario.components.vfolder import (
     VFolderNodeLook,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Answer = VFolderNode | SearchVFoldersPayload
-type ReachStep = Scenario[SeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
+type ReachStep = Scenario[TestSeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
 
 
 @dataclass(frozen=True)
@@ -51,7 +52,10 @@ class ReadingTheFolder(When[AFolderAndItsReader, VFolderAdapter, Answer]):
 
     @override
     def describe(self, laid: AFolderAndItsReader) -> str:
-        return f"{laid.caller.username}이 {laid.folder.name} 폴더를 읽음"
+        return Says(
+            f"{laid.caller.username}이 {laid.folder.name} vfolder 를 조회합니다",
+            english=f"{laid.caller.username} reads the {laid.folder.name} vfolder",
+        )
 
     @override
     async def call(self, adapter: VFolderAdapter, laid: AFolderAndItsReader) -> Answer:
@@ -69,7 +73,14 @@ class ListingTheProjectFolders(When[AFolderAndItsReader, VFolderAdapter, Answer]
 
     @override
     def describe(self, laid: AFolderAndItsReader) -> str:
-        return f"{laid.caller.username}이 {laid.folder.name} 폴더가 놓인 프로젝트의 폴더를 조회"
+        return Says(
+            f"{laid.caller.username}이 {laid.folder.name} vfolder 가 놓인 프로젝트의 vfolder 를 "
+            "조회합니다",
+            english=(
+                f"{laid.caller.username} lists the vfolders of the project the "
+                f"{laid.folder.name} vfolder is placed in"
+            ),
+        )
 
     @override
     async def call(self, adapter: VFolderAdapter, laid: AFolderAndItsReader) -> Answer:
@@ -88,7 +99,10 @@ class TheFolderIsReached(Then[AFolderAndItsReader, Answer]):
 
     @override
     def says(self) -> str:
-        return "심은 폴더 전체가 온다"
+        return Says(
+            "미리 저장한 vfolder 전체가 응답으로 옵니다",
+            english="the whole vfolder seeded in advance comes back",
+        )
 
     @override
     def look(self, laid: AFolderAndItsReader, answered: Answered[Answer]) -> list[Verdict]:
@@ -115,7 +129,7 @@ class TheFolderIsReached(Then[AFolderAndItsReader, Answer]):
 
 @dataclass(frozen=True)
 class AUserReadsTheirOwnFolder(
-    Scenario[SeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
+    Scenario[TestSeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
 ):
     started: datetime
 
@@ -125,13 +139,17 @@ class AUserReadsTheirOwnFolder(
 
     @override
     def describe(self) -> str:
-        return (
-            "자기 개인 프로젝트에서 폴더 읽기 권한을 받은 사용자가 자기 폴더를 읽으면, "
-            "그 폴더가 온다"
+        return Says(
+            "자기 개인 프로젝트에서 vfolder 읽기 권한을 받은 사용자가 자기 vfolder 를 조회하면, "
+            "그 vfolder 가 응답으로 옵니다",
+            english=(
+                "when a user granted vfolder read in their personal project reads their own "
+                "vfolder, that vfolder comes back"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AFolderAndItsReader]:
+    def given(self) -> Given[TestSeedingSession, AFolderAndItsReader]:
         return SomeoneWithAFolderOfTheirOwn(granted=True)
 
     @override
@@ -145,7 +163,7 @@ class AUserReadsTheirOwnFolder(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotReadTheirOwnFolder(
-    Scenario[SeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
+    Scenario[TestSeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -153,10 +171,16 @@ class AUserGrantedNothingMayNotReadTheirOwnFolder(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 받지 않은 사용자가 자기 폴더를 읽으려 하면 권한 부족으로 거부된다"
+        return Says(
+            "아무 권한도 받지 않은 사용자가 자기 vfolder 를 조회하려 하면 권한 부족으로 거부됩니다",
+            english=(
+                "when a user granted nothing tries to read their own vfolder, it is rejected "
+                "for lack of permission"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AFolderAndItsReader]:
+    def given(self) -> Given[TestSeedingSession, AFolderAndItsReader]:
         return SomeoneWithAFolderOfTheirOwn(granted=False)
 
     @override
@@ -170,7 +194,7 @@ class AUserGrantedNothingMayNotReadTheirOwnFolder(
 
 @dataclass(frozen=True)
 class AProjectRoleListsTheProjectFolder(
-    Scenario[SeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
+    Scenario[TestSeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
 ):
     started: datetime
 
@@ -180,13 +204,17 @@ class AProjectRoleListsTheProjectFolder(
 
     @override
     def describe(self) -> str:
-        return (
-            "프로젝트에서 폴더 읽기 권한을 받은 사용자가 그 프로젝트의 폴더를 조회하면, "
-            "그 프로젝트의 폴더가 온다"
+        return Says(
+            "프로젝트에서 vfolder 읽기 권한을 받은 사용자가 그 프로젝트의 vfolder 를 조회하면, "
+            "그 프로젝트의 vfolder 가 응답으로 옵니다",
+            english=(
+                "when a user granted vfolder read in a project lists the vfolders of that "
+                "project, the vfolders of that project come back"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AFolderAndItsReader]:
+    def given(self) -> Given[TestSeedingSession, AFolderAndItsReader]:
         return AProjectFolderAndSomeone(granted=True)
 
     @override
@@ -200,7 +228,7 @@ class AProjectRoleListsTheProjectFolder(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotListAProjectsFolders(
-    Scenario[SeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
+    Scenario[TestSeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -208,12 +236,17 @@ class AUserGrantedNothingMayNotListAProjectsFolders(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 받지 않은 사용자가 프로젝트의 폴더를 조회하려 하면 권한 부족으로 거부된다"
+        return Says(
+            "아무 권한도 받지 않은 사용자가 프로젝트의 vfolder 를 조회하려 하면 권한 부족으로 "
+            "거부됩니다",
+            english=(
+                "when a user granted nothing tries to list the vfolders of a project, it is "
+                "rejected for lack of permission"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AFolderAndItsReader]:
+    def given(self) -> Given[TestSeedingSession, AFolderAndItsReader]:
         return AProjectFolderAndSomeone(granted=False)
 
     @override
@@ -227,7 +260,7 @@ class AUserGrantedNothingMayNotListAProjectsFolders(
 
 @dataclass(frozen=True)
 class AnAcceptedShareReachesSomeoneElsesFolder(
-    Scenario[SeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
+    Scenario[TestSeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
 ):
     started: datetime
 
@@ -237,10 +270,17 @@ class AnAcceptedShareReachesSomeoneElsesFolder(
 
     @override
     def describe(self) -> str:
-        return "남의 폴더를 읽기로 공유받아 받아들인 사용자가 그 폴더를 읽으면, 그 폴더가 온다"
+        return Says(
+            "다른 사용자의 vfolder 를 읽기로 공유받아 받아들인 사용자가 그 vfolder 를 조회하면, "
+            "그 vfolder 가 응답으로 옵니다",
+            english=(
+                "when a user who accepted a read share of someone else's vfolder reads it, "
+                "that vfolder comes back"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AFolderAndItsReader]:
+    def given(self) -> Given[TestSeedingSession, AFolderAndItsReader]:
         return AFolderOfferedToSomeone(accepted=True)
 
     @override
@@ -254,7 +294,7 @@ class AnAcceptedShareReachesSomeoneElsesFolder(
 
 @dataclass(frozen=True)
 class AnUnansweredOfferDoesNotReachTheFolder(
-    Scenario[SeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
+    Scenario[TestSeedingSession, AFolderAndItsReader, VFolderAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -262,13 +302,17 @@ class AnUnansweredOfferDoesNotReachTheFolder(
 
     @override
     def describe(self) -> str:
-        return (
-            "남의 폴더를 공유 제안만 받고 받아들이지 않은 사용자가 그 폴더를 읽으려 하면 "
-            "권한 부족으로 거부된다"
+        return Says(
+            "다른 사용자의 vfolder 를 공유 제안만 받고 받아들이지 않은 사용자가 그 vfolder 를 "
+            "조회하려 하면 권한 부족으로 거부됩니다",
+            english=(
+                "when a user who was offered someone else's vfolder but did not accept tries "
+                "to read it, it is rejected for lack of permission"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AFolderAndItsReader]:
+    def given(self) -> Given[TestSeedingSession, AFolderAndItsReader]:
         return AFolderOfferedToSomeone(accepted=False)
 
     @override

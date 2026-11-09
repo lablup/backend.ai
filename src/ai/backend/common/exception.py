@@ -846,6 +846,19 @@ class ScalingGroupNotFoundError(BackendAIError, web.HTTPNotFound):
         )
 
 
+class InvalidVFolderMountSourceError(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/invalid-vfolder-mount-source"
+    error_title = "Invalid vfolder mount source."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.VFOLDER,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
 class ResourceGroupConflict(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/duplicate-scaling-group"
     error_title = "Duplicate Scaling Group"
@@ -1046,6 +1059,23 @@ class ValkeySentinelMasterNotFound(BackendAIError, web.HTTPServiceUnavailable):
             domain=ErrorDomain.BACKENDAI,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.UNAVAILABLE,
+        )
+
+
+class ValkeySentinelMonitorNotFound(BackendAIError, web.HTTPInternalServerError):
+    """
+    Raised when a Valkey client for a Sentinel target is created without its Sentinel monitor.
+    """
+
+    error_type = "https://api.backend.ai/probs/valkey-sentinel-monitor-not-found"
+    error_title = "Valkey Sentinel Monitor Not Found"
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
         )
 
 

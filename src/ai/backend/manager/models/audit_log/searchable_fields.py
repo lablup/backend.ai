@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from typing import override
 
-from ai.backend.common.data.entity.audit_log import AuditLogID
+import sqlalchemy as sa
+
+from ai.backend.common.data.entity.audit_log import AuditLogID, AuditLogScopeID
 from ai.backend.manager.actions.types import ActionKind, OperationStatus
 from ai.backend.manager.data.audit_log.types import AuditLogData, AuditLogScopeData
 from ai.backend.manager.models.audit_log.row import AuditLogRow
@@ -34,18 +36,19 @@ class _AuditLogScopeOwnFields(RowDataConverter[AuditLogScopeRow, AuditLogScopeDa
     )
     scope_type = SearchableField(
         AuditLogScopeRow.scope_type,
-        StringConditions(AuditLogScopeRow.scope_type),
+        StringConditions(sa.type_coerce(AuditLogScopeRow.scope_type, sa.String())),
         ColumnOrder(AuditLogScopeRow.scope_type),
     )
     scope_id = SearchableField(
         AuditLogScopeRow.scope_id,
-        StringConditions(AuditLogScopeRow.scope_id),
+        UUIDConditions(AuditLogScopeRow.scope_id),
         ColumnOrder(AuditLogScopeRow.scope_id),
     )
 
     @override
     def to_data(self, row: AuditLogScopeRow) -> AuditLogScopeData:
         return AuditLogScopeData(
+            id=AuditLogScopeID(self.field_id.read(row)),
             audit_log_id=AuditLogID(self.audit_log_id.read(row)),
             scope_type=self.scope_type.read(row),
             scope_id=self.scope_id.read(row),
@@ -79,7 +82,7 @@ class _AuditLogOwnFields(RowDataConverter[AuditLogRow, AuditLogData]):
     )
     entity_type = SearchableField(
         AuditLogRow.entity_type,
-        StringConditions(AuditLogRow.entity_type),
+        StringConditions(sa.type_coerce(AuditLogRow.entity_type, sa.String())),
         ColumnOrder(AuditLogRow.entity_type),
     )
     operation = SearchableField(
@@ -104,9 +107,15 @@ class _AuditLogOwnFields(RowDataConverter[AuditLogRow, AuditLogData]):
     )
     target_entity_id = SearchableField(
         AuditLogRow.entity_id,
-        StringConditions(AuditLogRow.entity_id),
+        UUIDConditions(AuditLogRow.entity_id),
         ColumnOrder(AuditLogRow.entity_id),
     )
+    entity_id_text = SearchableField(
+        AuditLogRow.entity_id,
+        StringConditions(sa.cast(AuditLogRow.entity_id, sa.String())),
+        None,
+    )
+    """The id as text, for the deprecated string filter on ``entity_id``."""
     lookup_kind = SearchableField(
         AuditLogRow.lookup_kind,
         StringConditions(AuditLogRow.lookup_kind),

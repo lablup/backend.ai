@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
-from typing import Any
+from typing import Any, override
 from uuid import UUID
 
 from strawberry import Info
@@ -49,13 +50,26 @@ class RolePresetGQL(PydanticNodeMixin[RolePresetNode]):
     id: NodeID[str] = gql_field(description="Role preset UUID (primary key).")
     entity_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the role preset.",
         ),
     )
     name: str = gql_field(description="Role preset name.")
     scope_type: str = gql_field(
-        description="Scope type this preset targets (e.g., domain, project)."
+        description=(
+            "Scope type this preset targets (e.g., domain, project). A preset of the "
+            "`global` type reads as the global entity its role is created in: `global` or "
+            "`public`."
+        )
+    )
+    role_name_template: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Jinja template rendering the name of each role instantiated from this preset."
+            ),
+        ),
+        default=None,
     )
     auto_assign: bool = gql_field(
         description=(
@@ -63,11 +77,30 @@ class RolePresetGQL(PydanticNodeMixin[RolePresetNode]):
             "from this preset."
         )
     )
+    auto_assign_to_owner: bool = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Whether a personal project's owner is mapped to the role made from this preset. "
+                "Allowed only on a project preset."
+            ),
+        ),
+    )
     deleted: bool = gql_field(
         description=(
             "Soft-delete flag. Set by the delete mutation and cleared by the restore "
             "mutation; archived rows are excluded from default searches."
-        )
+        ),
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `deletedAt`.",
+    )
+    deleted_at: datetime | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Soft-delete time. Set by the delete mutation and cleared by the restore "
+                "mutation; null while the preset is in use."
+            ),
+        ),
     )
     created_at: datetime = gql_field(description="Creation timestamp.")
     updated_at: datetime = gql_field(description="Last modification timestamp.")
@@ -126,6 +159,19 @@ class RolePresetGQL(PydanticNodeMixin[RolePresetNode]):
             ),
             count=result.total_count,
         )
+
+    @classmethod
+    @override
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[RolePresetGQL | None]:
+        return await info.context.data_loaders.role_preset_loader.load_many([
+            RolePresetID(UUID(nid)) for nid in node_ids
+        ])
 
 
 RolePresetEdge = Edge[RolePresetGQL]

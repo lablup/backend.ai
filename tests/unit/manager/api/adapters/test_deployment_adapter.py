@@ -347,7 +347,9 @@ class TestFieldBatchLoads:
             deploying_revision_id=None,
             revision_history_ids=[],
             scaling_rule_ids=[],
-            replica_state=ReplicaStateData(desired_replica_count=1, replica_ids=[]),
+            replica_state=ReplicaStateData(
+                replica_count=1, desired_replica_count=1, replica_ids=[]
+            ),
             default_deployment_strategy=DeploymentStrategy.ROLLING,
             created_user_id=uuid4(),
             options=DeploymentOptions(),

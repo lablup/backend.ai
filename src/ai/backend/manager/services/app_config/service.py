@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, PartialBulkResult
 from ai.backend.manager.actions.v2.ops.result import EntityOpsResult
 from ai.backend.manager.data.app_config.types import (
     AppConfigAllowListData,
@@ -10,12 +11,20 @@ from ai.backend.manager.data.app_config.types import (
     AppConfigDefinitionData,
     AppConfigFragmentData,
 )
+from ai.backend.manager.models.app_config_allow_list.purgers import AppConfigAllowListPurger
+from ai.backend.manager.models.app_config_definition.purgers import AppConfigDefinitionPurger
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.searcher import Searcher
 from ai.backend.manager.repositories.app_config.repository import AppConfigRepository
 from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.services.app_config.actions.allow_list.partial_bulk_purge import (
+    PartialBulkPurgeAppConfigAllowListsAction,
+)
 from ai.backend.manager.services.app_config.actions.allow_list.purge import (
     PurgeAppConfigAllowListAction,
+)
+from ai.backend.manager.services.app_config.actions.definition.partial_bulk_purge import (
+    PartialBulkPurgeAppConfigDefinitionsAction,
 )
 from ai.backend.manager.services.app_config.actions.definition.purge import (
     PurgeAppConfigDefinitionAction,
@@ -84,6 +93,46 @@ class AppConfigService:
         """Purge an allow-list entry with the fragments it admits."""
         data = await self._app_config_repository.purge_allow_list(action.to_purger())
         return EntityOpsResult(data=data)
+
+    async def partial_bulk_purge_definitions(
+        self, action: PartialBulkPurgeAppConfigDefinitionsAction
+    ) -> PartialBulkResult[AppConfigDefinitionData]:
+        """Purge each named config name with what lies under it, answering for every one."""
+        result = await self._app_config_repository.partial_bulk_purge_definitions([
+            AppConfigDefinitionPurger(definition_id=definition_id) for definition_id in action.ids
+        ])
+        return PartialBulkResult(
+            items=[
+                PartialBulkEntityResult[AppConfigDefinitionData].succeeded(
+                    definition_id, result.successes[definition_id]
+                )
+                if definition_id in result.successes
+                else PartialBulkEntityResult[AppConfigDefinitionData].failed(
+                    definition_id, result.errors[definition_id]
+                )
+                for definition_id in action.ids
+            ]
+        )
+
+    async def partial_bulk_purge_allow_lists(
+        self, action: PartialBulkPurgeAppConfigAllowListsAction
+    ) -> PartialBulkResult[AppConfigAllowListData]:
+        """Purge each named allow-list entry with its fragments, answering for every one."""
+        result = await self._app_config_repository.partial_bulk_purge_allow_lists([
+            AppConfigAllowListPurger(allow_list_id=allow_list_id) for allow_list_id in action.ids
+        ])
+        return PartialBulkResult(
+            items=[
+                PartialBulkEntityResult[AppConfigAllowListData].succeeded(
+                    allow_list_id, result.successes[allow_list_id]
+                )
+                if allow_list_id in result.successes
+                else PartialBulkEntityResult[AppConfigAllowListData].failed(
+                    allow_list_id, result.errors[allow_list_id]
+                )
+                for allow_list_id in action.ids
+            ]
+        )
 
     async def search_app_configs(
         self, action: SearchAppConfigsAction

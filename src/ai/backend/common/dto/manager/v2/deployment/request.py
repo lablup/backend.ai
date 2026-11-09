@@ -41,7 +41,7 @@ from ai.backend.common.dto.manager.query import (
     ToManyFilter,
     UUIDFilter,
 )
-from ai.backend.common.dto.manager.v2.common import ResourceSlotEntryInput
+from ai.backend.common.dto.manager.v2.common import NonEmptyList, ResourceSlotEntryInput
 from ai.backend.common.dto.manager.v2.deployment.types import (
     AccessTokenOrderField,
     AutoScalingRuleOrderField,
@@ -56,8 +56,10 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
 from ai.backend.common.dto.manager.v2.deployment_options import DeploymentOptionsInput
 from ai.backend.common.dto.manager.v2.entity_label.request import EntityLabelNestedFilter
 from ai.backend.common.dto.manager.v2.resource_slot.types import ResourceOptsDTOInput
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.schema.deployment import IntOrPercent
 from ai.backend.common.tristate.unset import UNSET, Unset
+from ai.backend.common.typed_validators import HealthCheckPath
 from ai.backend.common.types import (
     AutoScalingMetricSource,
     ClusterMode,
@@ -101,6 +103,7 @@ __all__ = (
     "ModelMountConfigInput",
     "ModelRuntimeConfigInput",
     "ModelServiceConfigInput",
+    "PartialBulkPurgeAccessTokensInput",
     "PresetValueInput",
     "ReplicaFilter",
     "ReplicaHealthStatusFilter",
@@ -135,7 +138,7 @@ __all__ = (
 class ModelHealthCheckInput(BaseRequestModel):
     enable: bool = False
     interval: float | None = None
-    path: str | None = None
+    path: HealthCheckPath | None = None
     max_retries: int | None = None
     max_wait_time: float | None = None
     expected_status_code: int | None = None
@@ -667,7 +670,8 @@ class DeploymentFilter(BaseRequestModel):
     )
     entity_id: UUIDFilter | None = Field(default=None, description="Filter by deployment ID")
     desired_replicas: IntFilter | None = Field(
-        default=None, description="Filter by the requested replica count"
+        default=None,
+        description="Filter by the desired replica count, or the user-set replica count until autoscaling sets one",
     )
     scaling_state: DeploymentScalingStateFilter | None = Field(
         default=None, description="Filter by scaling state"
@@ -736,6 +740,9 @@ class RouteFilter(BaseRequestModel):
     )
     traffic_status: list[RouteTrafficStatus] | None = Field(
         default=None, description="Traffic status filter"
+    )
+    field_id: UUIDFilter | None = Field(
+        default=None, description=f"Added in {NEXT_RELEASE_VERSION}. Filter by route ID."
     )
     AND: list[RouteFilter] | None = Field(default=None, description="AND conjunction")
     OR: list[RouteFilter] | None = Field(default=None, description="OR conjunction")
@@ -999,6 +1006,12 @@ class BulkDeleteAccessTokensInput(BaseRequestModel):
     """Input for bulk deleting access tokens."""
 
     ids: list[UUID] = Field(description="List of access token UUIDs to delete.")
+
+
+class PartialBulkPurgeAccessTokensInput(BaseRequestModel):
+    """Input for permanently removing several access tokens, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the access tokens to purge.")
 
 
 class CreateAutoScalingRuleInput(BaseRequestModel):

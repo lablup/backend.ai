@@ -27,6 +27,9 @@ from ai.backend.common.dto.manager.v2.artifact.request import (
     DelegateeTargetInput,
     DeleteArtifactsInput,
     ModelTargetInput,
+    PartialBulkDeleteArtifactsInput,
+    PartialBulkRestoreArtifactsInput,
+    PartialBulkUpdateArtifactsInput,
     UpdateArtifactInput,
 )
 from ai.backend.common.dto.manager.v2.artifact.response import (
@@ -34,7 +37,9 @@ from ai.backend.common.dto.manager.v2.artifact.response import (
     AdminSearchArtifactsPayload,
     ArtifactNode,
     ArtifactRevisionNode,
+    DeleteArtifactPayload,
     DeleteArtifactsPayload,
+    RestoreArtifactPayload,
     UpdateArtifactPayload,
 )
 from ai.backend.common.dto.manager.v2.artifact.types import (
@@ -47,6 +52,8 @@ from ai.backend.common.dto.manager.v2.artifact.types import (
     ArtifactTypeFilter,
     OrderDirection,
 )
+from ai.backend.common.dto.manager.v2.common import PartialBulkFailure, PartialBulkPayload
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkResult
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.artifact.types import (
@@ -72,24 +79,43 @@ from ai.backend.manager.data.artifact.types import (
 from ai.backend.manager.models.artifact.row import ArtifactRow
 from ai.backend.manager.models.artifact.searchable_fields import ArtifactSearchableFields
 from ai.backend.manager.models.artifact.searchers import ArtifactSearcher
-from ai.backend.manager.models.artifact.updaters import ArtifactUpdater
+from ai.backend.manager.models.artifact.updaters import (
+    ArtifactRestoreUpdater,
+    ArtifactSoftDeleteUpdater,
+    ArtifactUpdater,
+)
 from ai.backend.manager.models.artifact_revision.row import ArtifactRevisionRow
 from ai.backend.manager.models.artifact_revision.searchable_fields import (
     ArtifactRevisionSearchableFields,
 )
 from ai.backend.manager.models.artifact_revision.searchers import ArtifactRevisionSearcher
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.services.artifact.actions.bulk_get import BulkGetArtifactsAction
 from ai.backend.manager.services.artifact.actions.delegate_scan import (
     DelegateScanArtifactsAction,
     DelegateScanArtifactsActionResult,
 )
+from ai.backend.manager.services.artifact.actions.delete import DeleteArtifactAction
 from ai.backend.manager.services.artifact.actions.delete_multi import DeleteArtifactsAction
 from ai.backend.manager.services.artifact.actions.get import GetArtifactAction
 from ai.backend.manager.services.artifact.actions.get_revisions import (
     GetArtifactRevisionsAction,
 )
+from ai.backend.manager.services.artifact.actions.partial_bulk_delete_artifacts import (
+    PartialBulkDeleteArtifactsAction,
+)
+from ai.backend.manager.services.artifact.actions.partial_bulk_restore_artifacts import (
+    PartialBulkRestoreArtifactsAction,
+)
+from ai.backend.manager.services.artifact.actions.partial_bulk_update_artifacts import (
+    PartialBulkUpdateArtifactsAction,
+)
+from ai.backend.manager.services.artifact.actions.restore import RestoreArtifactAction
 from ai.backend.manager.services.artifact.actions.restore_multi import (
     RestoreArtifactsAction,
     RestoreArtifactsActionResult,
@@ -305,17 +331,83 @@ class ArtifactAdapter(BaseAdapter):
         artifact_id: UUID,
     ) -> UpdateArtifactPayload:
         """Update artifact metadata (readonly flag and description)."""
-        updater = ArtifactUpdater(
-            artifact_id=ArtifactID(artifact_id),
-            readonly=OptionalState.from_unset(input.readonly),
-            description=TriState.from_unset(input.description),
-        )
         action_result = await self._artifact.update.run(
-            UpdateArtifactAction(artifact_id=ArtifactID(artifact_id), updater=updater)
+            UpdateArtifactAction(
+                artifact_id=ArtifactID(artifact_id),
+                updater=self._to_updater(ArtifactID(artifact_id), input),
+            )
         )
         return UpdateArtifactPayload(artifact=self._data_to_dto(action_result.result))
 
-    async def delete(self, input: DeleteArtifactsInput) -> DeleteArtifactsPayload:
+    async def delete(self, artifact_id: ArtifactID) -> DeleteArtifactPayload:
+        """Soft-delete an artifact."""
+        result = await self._artifact.delete.run(
+            DeleteArtifactAction(updater=ArtifactSoftDeleteUpdater(artifact_id=artifact_id))
+        )
+        return DeleteArtifactPayload(artifact=self._data_to_dto(result.data))
+
+    async def restore(self, artifact_id: ArtifactID) -> RestoreArtifactPayload:
+        """Restore a soft-deleted artifact."""
+        result = await self._artifact.restore.run(
+            RestoreArtifactAction(updater=ArtifactRestoreUpdater(artifact_id=artifact_id))
+        )
+        return RestoreArtifactPayload(artifact=self._data_to_dto(result.data))
+
+    async def partial_bulk_update(
+        self, input: PartialBulkUpdateArtifactsInput
+    ) -> PartialBulkPayload[ArtifactNode]:
+        """Update several artifacts, answering for each one."""
+        result = await self._artifact.partial_bulk_update.run(
+            PartialBulkUpdateArtifactsAction(
+                updaters=[self._to_updater(ArtifactID(item.id), item.input) for item in input.items]
+            )
+        )
+        return self._to_partial_bulk_payload(result)
+
+    async def partial_bulk_delete(
+        self, input: PartialBulkDeleteArtifactsInput
+    ) -> PartialBulkPayload[ArtifactNode]:
+        """Soft-delete several artifacts, answering for each one."""
+        result = await self._artifact.partial_bulk_delete.run(
+            PartialBulkDeleteArtifactsAction(
+                ids=[ArtifactID(artifact_id) for artifact_id in input.ids]
+            )
+        )
+        return self._to_partial_bulk_payload(result)
+
+    async def partial_bulk_restore(
+        self, input: PartialBulkRestoreArtifactsInput
+    ) -> PartialBulkPayload[ArtifactNode]:
+        """Restore several soft-deleted artifacts, answering for each one."""
+        result = await self._artifact.partial_bulk_restore.run(
+            PartialBulkRestoreArtifactsAction(
+                ids=[ArtifactID(artifact_id) for artifact_id in input.ids]
+            )
+        )
+        return self._to_partial_bulk_payload(result)
+
+    def _to_updater(self, artifact_id: ArtifactID, input: UpdateArtifactInput) -> ArtifactUpdater:
+        return ArtifactUpdater(
+            artifact_id=artifact_id,
+            readonly=OptionalState.from_unset(input.readonly),
+            description=TriState.from_unset(input.description),
+        )
+
+    def _to_partial_bulk_payload(
+        self, result: PartialBulkResult[ArtifactData]
+    ) -> PartialBulkPayload[ArtifactNode]:
+        return PartialBulkPayload[ArtifactNode](
+            successes=[
+                self._data_to_dto(item.value) for item in result.items if item.value is not None
+            ],
+            failed=[
+                PartialBulkFailure(id=item.entity_id, message=str(item.error))
+                for item in result.items
+                if item.error is not None
+            ],
+        )
+
+    async def delete_artifacts(self, input: DeleteArtifactsInput) -> DeleteArtifactsPayload:
         """Delete multiple artifacts by ID."""
         action_result = await self._artifact.delete_artifacts.run(
             DeleteArtifactsAction(artifact_ids=input.artifact_ids)
@@ -444,7 +536,7 @@ class ArtifactAdapter(BaseAdapter):
         )
         return self._revision_data_to_dto(action_result.result)
 
-    async def restore(self, artifact_ids: list[UUID]) -> list[ArtifactNode]:
+    async def restore_artifacts(self, artifact_ids: list[UUID]) -> list[ArtifactNode]:
         """Restore previously deleted artifacts."""
         action_result: RestoreArtifactsActionResult = await self._artifact.restore_artifacts.run(
             RestoreArtifactsAction(artifact_ids=artifact_ids)
@@ -533,6 +625,7 @@ class ArtifactAdapter(BaseAdapter):
                     DataArtifactAvailability(a.value) for a in filter.availability
                 ])
             )
+        conditions.extend(self.apply_uuid_filter(filter.entity_id, fields.id.filter))
 
         if filter.AND:
             for sub_filter in filter.AND:
@@ -540,15 +633,16 @@ class ArtifactAdapter(BaseAdapter):
         if filter.OR:
             or_conditions: list[QueryCondition] = []
             for sub_filter in filter.OR:
-                or_conditions.extend(self._convert_gql_filter(sub_filter))
+                sub_conditions = self._convert_gql_filter(sub_filter)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if filter.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub_filter in filter.NOT:
-                not_conditions.extend(self._convert_gql_filter(sub_filter))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_gql_filter(sub_filter)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
 
         return conditions
 
@@ -577,6 +671,7 @@ class ArtifactAdapter(BaseAdapter):
         if filter.artifact_id is not None:
             conditions.extend(self.apply_uuid_filter(filter.artifact_id, fields.artifact_id.filter))
         conditions.extend(self.apply_int_filter(filter.size, fields.size.filter))
+        conditions.extend(self.apply_uuid_filter(filter.field_id, fields.field_id.filter))
 
         if filter.AND:
             for sub_filter in filter.AND:
@@ -584,15 +679,16 @@ class ArtifactAdapter(BaseAdapter):
         if filter.OR:
             or_conditions: list[QueryCondition] = []
             for sub_filter in filter.OR:
-                or_conditions.extend(self._convert_gql_revision_filter(sub_filter))
+                sub_conditions = self._convert_gql_revision_filter(sub_filter)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if filter.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub_filter in filter.NOT:
-                not_conditions.extend(self._convert_gql_revision_filter(sub_filter))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_gql_revision_filter(sub_filter)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
 
         return conditions
 
@@ -655,6 +751,7 @@ class ArtifactAdapter(BaseAdapter):
             conditions.extend(self._convert_type_filter(filter.type))
         if filter.availability is not None:
             conditions.extend(self._convert_availability_filter(filter.availability))
+        conditions.extend(self.apply_uuid_filter(filter.entity_id, fields.id.filter))
         return conditions
 
     @staticmethod

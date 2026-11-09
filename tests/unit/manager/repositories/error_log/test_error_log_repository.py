@@ -10,6 +10,7 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
+from ai.backend.common.auth.password import PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.error_log import ErrorLogID
 from ai.backend.common.data.entity.user import UserID
@@ -31,7 +32,6 @@ from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.error_log.creators import ErrorLogCreator
 from ai.backend.manager.models.error_log.row import ErrorLogRow
 from ai.backend.manager.models.error_log.searchers import ErrorLogSearcher
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow

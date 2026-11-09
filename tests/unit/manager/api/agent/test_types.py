@@ -53,6 +53,7 @@ def create_mock_agent_data(
                 slot_name="cpu",
                 capacity=Decimal("8"),
                 reserved=Decimal(0),
+                prereserved=Decimal(0),
                 used=Decimal(0),
             )
         ],

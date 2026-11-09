@@ -23,7 +23,7 @@ from typing import Final
 import sqlalchemy as sa
 from alembic import op
 
-revision = "d17b4e9c25a8"  # Part of: NEXT_RELEASE_VERSION
+revision = "d17b4e9c25a8"  # Part of: 26.9.0
 down_revision = "a91c4e7d0b35"
 branch_labels = None
 depends_on = None

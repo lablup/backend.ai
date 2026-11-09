@@ -31,6 +31,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Configured,
     Given,
+    Says,
     Scenario,
     Then,
     When,
@@ -43,7 +44,7 @@ from bai_scenario.components.deployment import (
     TheNewDeploymentNode,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 MADE = "serving"
@@ -51,7 +52,9 @@ ENFORCEMENT = "manager.rbac.enforcement_enabled"
 SURGE = IntOrPercent(count=2)
 UNAVAILABLE = IntOrPercent(count=0)
 
-type CreatingStep = Scenario[SeedingSession, APlaceAndACaller, DeploymentAdapter, DeploymentNode]
+type CreatingStep = Scenario[
+    TestSeedingSession, APlaceAndACaller, DeploymentAdapter, DeploymentNode
+]
 
 
 @dataclass(frozen=True)
@@ -67,8 +70,21 @@ class Creating(When[APlaceAndACaller, DeploymentAdapter, DeploymentNode]):
 
     @override
     def describe(self, laid: APlaceAndACaller) -> str:
-        called = self.named if self.named is not None else "이름 없이"
-        return f"{laid.caller.username}이 {laid.project.name}에 {called} 배포를 만듦"
+        if self.named is None:
+            return Says(
+                f"{laid.caller.username} 이 {laid.project.name}에 이름 없이 배포를 생성합니다",
+                english=(
+                    f"{laid.caller.username} creates a deployment without a name in "
+                    f"{laid.project.name}"
+                ),
+            )
+        return Says(
+            f"{laid.caller.username} 이 {laid.project.name}에 {self.named} 배포를 생성합니다",
+            english=(
+                f"{laid.caller.username} creates a deployment named {self.named} in "
+                f"{laid.project.name}"
+            ),
+        )
 
     @override
     async def call(self, adapter: DeploymentAdapter, laid: APlaceAndACaller) -> DeploymentNode:
@@ -97,7 +113,7 @@ class Creating(When[APlaceAndACaller, DeploymentAdapter, DeploymentNode]):
 
 @dataclass(frozen=True)
 class TheWholeNodeComesBack(
-    Scenario[SeedingSession, APlaceAndACaller, DeploymentAdapter, DeploymentNode]
+    Scenario[TestSeedingSession, APlaceAndACaller, DeploymentAdapter, DeploymentNode]
 ):
     started: datetime
 
@@ -107,13 +123,18 @@ class TheWholeNodeComesBack(
 
     @override
     def describe(self) -> str:
-        return (
-            "프로젝트에서 배포 생성 권한을 받은 사용자가 배포를 만들면, "
-            "그 프로젝트에 속하고 부른 사람이 소유하는 배포가 리비전 없이 만들어진다"
+        return Says(
+            "프로젝트에서 배포 생성 권한을 받은 사용자가 배포를 생성하면, "
+            "그 프로젝트에 속하고 요청한 사용자가 소유하는 배포가 리비전 없이 생성됩니다",
+            english=(
+                "when a user granted create in a project creates a deployment, a deployment that "
+                "belongs to the project and is owned by the requesting user is created with no "
+                "revision"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APlaceAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APlaceAndACaller]:
         return APlaceForDeployments(granted=(Permission.CREATE,))
 
     @override
@@ -133,7 +154,7 @@ class TheWholeNodeComesBack(
 
 @dataclass(frozen=True)
 class ANamelessOneIsNamedAfterItsMaker(
-    Scenario[SeedingSession, APlaceAndACaller, DeploymentAdapter, DeploymentNode]
+    Scenario[TestSeedingSession, APlaceAndACaller, DeploymentAdapter, DeploymentNode]
 ):
     started: datetime
 
@@ -143,10 +164,13 @@ class ANamelessOneIsNamedAfterItsMaker(
 
     @override
     def describe(self) -> str:
-        return "이름을 대지 않고 배포를 만들면, 만든 사람에게서 이름이 지어진다"
+        return Says(
+            "이름을 지정하지 않고 배포를 생성하면, 생성한 사용자에게서 이름이 정해집니다",
+            english=("creating a deployment without a name names it after the user who created it"),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, APlaceAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APlaceAndACaller]:
         return APlaceForDeployments(granted=(Permission.CREATE,))
 
     @override
@@ -166,7 +190,7 @@ class ANamelessOneIsNamedAfterItsMaker(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotCreate(
-    Scenario[SeedingSession, APlaceAndACaller, DeploymentAdapter, DeploymentNode]
+    Scenario[TestSeedingSession, APlaceAndACaller, DeploymentAdapter, DeploymentNode]
 ):
     @override
     def summary(self) -> str:
@@ -174,10 +198,16 @@ class AUserGrantedNothingMayNotCreate(
 
     @override
     def describe(self) -> str:
-        return "아무 배포 권한도 받지 않은 사용자가 배포를 만들면, 권한 부족으로 거부된다"
+        return Says(
+            "아무 배포 권한도 받지 않은 사용자가 배포를 생성하면, 권한 부족으로 거부됩니다",
+            english=(
+                "when a user granted no deployment permission creates a deployment, the call is "
+                "rejected for lack of permission"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, APlaceAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APlaceAndACaller]:
         return APlaceForDeployments()
 
     @override
@@ -191,7 +221,7 @@ class AUserGrantedNothingMayNotCreate(
 
 @dataclass(frozen=True)
 class AGrantInAnotherProjectDoesNotReachHere(
-    Scenario[SeedingSession, APlaceAndACaller, DeploymentAdapter, DeploymentNode]
+    Scenario[TestSeedingSession, APlaceAndACaller, DeploymentAdapter, DeploymentNode]
 ):
     @override
     def summary(self) -> str:
@@ -199,12 +229,17 @@ class AGrantInAnotherProjectDoesNotReachHere(
 
     @override
     def describe(self) -> str:
-        return (
-            "생성 권한을 받은 프로젝트가 아닌 다른 프로젝트에 배포를 만들면, 권한 부족으로 거부된다"
+        return Says(
+            "생성 권한을 받은 프로젝트가 아닌 다른 프로젝트에 배포를 생성하면, "
+            "권한 부족으로 거부됩니다",
+            english=(
+                "creating a deployment in a project other than the one where the create grant was "
+                "given is rejected for lack of permission"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APlaceAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APlaceAndACaller]:
         return AProjectGrantedElsewhere(granted=(Permission.CREATE,))
 
     @override
@@ -218,7 +253,7 @@ class AGrantInAnotherProjectDoesNotReachHere(
 
 @dataclass(frozen=True)
 class EnforcementOffLetsAnyoneCreate(
-    Scenario[SeedingSession, APlaceAndACaller, DeploymentAdapter, DeploymentNode], Configured
+    Scenario[TestSeedingSession, APlaceAndACaller, DeploymentAdapter, DeploymentNode], Configured
 ):
     started: datetime
 
@@ -228,9 +263,13 @@ class EnforcementOffLetsAnyoneCreate(
 
     @override
     def describe(self) -> str:
-        return (
-            "엔티티 권한 집행을 끄면 아무 권한도 받지 않은 사용자도 배포를 만든다. "
-            "이 문은 역할이 아니라 권한 그래프가 지키기 때문이다"
+        return Says(
+            "엔티티 권한 집행을 비활성화하면 아무 권한도 받지 않은 사용자도 배포를 생성합니다. "
+            "이 동작은 역할이 아니라 권한 그래프가 검사합니다",
+            english=(
+                "turning entity permission enforcement off lets a user with no grant create a "
+                "deployment, because the permission graph checks this operation, not the role"
+            ),
         )
 
     @override
@@ -238,7 +277,7 @@ class EnforcementOffLetsAnyoneCreate(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, APlaceAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APlaceAndACaller]:
         return APlaceForDeployments()
 
     @override

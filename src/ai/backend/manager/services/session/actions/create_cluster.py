@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any, override
 
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.types import AccessKey, SessionTypes
 from ai.backend.manager.actions.types import ActionOperationType
@@ -61,3 +62,7 @@ class CreateClusterActionResult(SessionScopeActionResult):
 
     # TODO: Add proper type
     result: Mapping[str, Any]
+
+    @override
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
+        return (SessionID(self.session_id),)

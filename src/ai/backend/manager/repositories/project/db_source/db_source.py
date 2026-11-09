@@ -23,7 +23,12 @@ from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
-from ai.backend.manager.data.project.types import ProjectData, ProjectType
+from ai.backend.manager.data.project.types import ProjectData, ProjectStatus, ProjectType
+from ai.backend.manager.data.vfolder.types import (
+    VFolderStatusSet,
+    VFolderStorageTarget,
+    vfolder_status_map,
+)
 from ai.backend.manager.errors.resource import (
     PersonalProjectDeletionError,
     ProjectHasActiveEndpointsError,
@@ -43,6 +48,7 @@ from ai.backend.manager.models.project.purgers import (
     ProjectKernelPurger,
     ProjectPurger,
     ProjectSessionPurger,
+    ProjectVFolderAutoMountPurger,
     SessionsByIdsPurger,
 )
 from ai.backend.manager.models.project.row import (
@@ -60,12 +66,7 @@ from ai.backend.manager.models.resource_usage import fetch_resource_usage
 from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.models.user.row import users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder.row import (
-    VFolderDeletionInfo,
-    VFolderRow,
-    VFolderStatusSet,
-    vfolder_status_map,
-)
+from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.project.types import ProjectSearchResult
 from ai.backend.manager.repositories.vfolder.deletion import initiate_vfolder_deletion
@@ -292,13 +293,25 @@ class ProjectDBSource:
         group_id: uuid.UUID,
         storage_manager: StorageSessionManager,
     ) -> bool:
-        """Completely remove a group and all its associated data."""
+        """Completely remove a group and all its associated data.
+
+        A personal project is refused while its creator is there: it goes with the
+        user. One left dangling by a purged creator is collectable.
+        """
         project_id = ProjectID(group_id)
         async with self._db.begin_readonly_session_read_committed() as sess:
-            project_type = await sess.scalar(
-                sa.select(ProjectRow.type).where(ProjectRow.id == project_id)
-            )
-            if project_type is ProjectType.PERSONAL:
+            project = (
+                await sess.execute(
+                    sa.select(ProjectRow.type, ProjectRow.creator_id).where(
+                        ProjectRow.id == project_id
+                    )
+                )
+            ).first()
+            if (
+                project is not None
+                and project.type is ProjectType.PERSONAL
+                and project.creator_id is not None
+            ):
                 raise PersonalProjectDeletionError(
                     f"Personal project is purged with its user: {project_id}"
                 )
@@ -321,6 +334,9 @@ class ProjectDBSource:
                 project_id, ProjectKernelPurger(project_id=project_id)
             )
             await w.batch_purge_entities_in_global(ProjectSessionPurger(project_id=project_id))
+            await w.batch_purge_entities_in_global(
+                ProjectVFolderAutoMountPurger(project_id=project_id)
+            )
             if await w.purge_entity(ProjectPurger(project_id=project_id)) is None:
                 raise ProjectNotFound("project not found")
 
@@ -387,7 +403,7 @@ class ProjectDBSource:
 
     async def _purgable_project_vfolders(
         self, sess: SASession, group_id: uuid.UUID
-    ) -> list[VFolderDeletionInfo]:
+    ) -> list[VFolderStorageTarget]:
         """The project's vfolders whose status allows the owner to purge them."""
         rows = (
             await sess.scalars(
@@ -398,13 +414,13 @@ class ProjectDBSource:
             )
         ).all()
         return [
-            VFolderDeletionInfo(VFolderID.from_row(row), row.host, row.unmanaged_path)
+            VFolderStorageTarget(VFolderID.from_row(row), row.host, row.unmanaged_path)
             for row in rows
         ]
 
     async def _delete_project_vfolders(
         self,
-        target_vfs: list[VFolderDeletionInfo],
+        target_vfs: list[VFolderStorageTarget],
         storage_manager: StorageSessionManager,
     ) -> None:
         """Hand the project's purgable vfolders to the storage-side deletion."""
@@ -417,6 +433,27 @@ class ProjectDBSource:
             storage_manager,
             storage_ptask_group,
         )
+
+    async def dangling_personal_project_ids(
+        self,
+        threshold: datetime,
+        limit: int,
+    ) -> list[ProjectID]:
+        """The personal projects whose creator is gone and whose deletion aged past
+        ``threshold``, oldest first."""
+        async with self._db.begin_readonly_session_read_committed() as sess:
+            ids = await sess.scalars(
+                sa.select(ProjectRow.id)
+                .where(
+                    ProjectRow.type == ProjectType.PERSONAL,
+                    ProjectRow.creator_id.is_(None),
+                    ProjectRow.status == ProjectStatus.DELETED,
+                    ProjectRow.updated_at < threshold,
+                )
+                .order_by(ProjectRow.updated_at)
+                .limit(limit)
+            )
+            return [ProjectID(project_id) for project_id in ids]
 
     async def get_project(self, project_id: UUID) -> ProjectData:
         """Get a single project by UUID.

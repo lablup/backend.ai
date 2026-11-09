@@ -7,11 +7,15 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.dto.manager.v2.group.request import (
     AdminSearchProjectsInput,
     AssignUsersToProjectInput,
     CreateProjectInput,
     DeleteProjectInput,
+    PartialBulkDeleteProjectsInput,
+    PartialBulkRestoreProjectsInput,
+    PartialBulkUpdateProjectsInput,
     PurgeProjectInput,
     RestoreProjectInput,
     ScopedSearchProjectsInput,
@@ -89,29 +93,69 @@ class V2ProjectHandler:
         result = await self._adapter.admin_create(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=result)
 
-    async def admin_update(
+    async def update(
         self,
         path: PathParam[ProjectIdPathParam],
         body: BodyParam[UpdateProjectInput],
     ) -> APIResponse:
-        """Update a project (superadmin only)."""
-        result = await self._adapter.admin_update(path.parsed.project_id, body.parsed)
+        """Update a project."""
+        result = await self._adapter.update(ProjectID(path.parsed.project_id), body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def delete(
+        self,
+        path: PathParam[ProjectIdPathParam],
+    ) -> APIResponse:
+        """Soft-delete a project."""
+        result = await self._adapter.delete(ProjectID(path.parsed.project_id))
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def restore(
+        self,
+        path: PathParam[ProjectIdPathParam],
+    ) -> APIResponse:
+        """Restore a soft-deleted project."""
+        result = await self._adapter.restore(ProjectID(path.parsed.project_id))
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_update(
+        self,
+        body: BodyParam[PartialBulkUpdateProjectsInput],
+    ) -> APIResponse:
+        """Update several projects, answering for each one."""
+        result = await self._adapter.partial_bulk_update(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_delete(
+        self,
+        body: BodyParam[PartialBulkDeleteProjectsInput],
+    ) -> APIResponse:
+        """Soft-delete several projects, answering for each one."""
+        result = await self._adapter.partial_bulk_delete(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_restore(
+        self,
+        body: BodyParam[PartialBulkRestoreProjectsInput],
+    ) -> APIResponse:
+        """Restore several soft-deleted projects, answering for each one."""
+        result = await self._adapter.partial_bulk_restore(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def admin_delete(
         self,
         body: BodyParam[DeleteProjectInput],
     ) -> APIResponse:
-        """Soft-delete a project (superadmin only)."""
-        result = await self._adapter.admin_delete(body.parsed)
+        """Deprecated. Use `POST /v2/projects/{project_id}/delete`."""
+        result = await self._adapter.delete(ProjectID(body.parsed.group_id))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def admin_restore(
         self,
         body: BodyParam[RestoreProjectInput],
     ) -> APIResponse:
-        """Restore a soft-deleted project (superadmin only)."""
-        result = await self._adapter.admin_restore(body.parsed)
+        """Deprecated. Use `POST /v2/projects/{project_id}/restore`."""
+        result = await self._adapter.restore(ProjectID(body.parsed.group_id))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def admin_purge(

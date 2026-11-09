@@ -10,11 +10,64 @@
 
 from __future__ import annotations
 
+import enum
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any, ClassVar, override
+from typing import Any, ClassVar, Self, override
 from uuid import UUID
+
+
+class Language(enum.StrEnum):
+    """The language a report writes in."""
+
+    ENGLISH = "en"
+    KOREAN = "ko"
+
+
+class Says(str):
+    """A sentence in Korean with the English one beside it.
+
+    Formatting it gives the Korean sentence. The report asks for a language, so a
+    sentence whose English is not written yet falls back to Korean there, and the
+    English report refuses to write it.
+    """
+
+    english: str
+
+    def __new__(cls, korean: str, english: str = "") -> Self:
+        self = super().__new__(cls, korean)
+        self.english = english
+        return self
+
+    def in_(self, language: Language) -> str:
+        """This sentence in ``language``; English that is not written yet falls back."""
+        if language is Language.ENGLISH and self.english:
+            return self.english
+        return str(self)
+
+    def as_data(self) -> dict[str, str]:
+        """Both sentences, for the JSON record a run writes."""
+        return {"korean": str(self), "english": self.english}
+
+    @classmethod
+    def from_data(cls, raw: str | Mapping[str, str]) -> Says:
+        """A record field; a run may have written it as a bare Korean string."""
+        if isinstance(raw, Mapping):
+            return cls(raw["korean"], raw.get("english", ""))
+        return cls(raw)
+
+
+def in_language(text: str, language: Language) -> str:
+    """``text`` in ``language``; a plain string has the same text in either."""
+    return text.in_(language) if isinstance(text, Says) else text
+
+
+def with_particle(text: str, particle: str) -> str:
+    """``particle`` after ``text``; spaced when the text ends in a Latin letter or digit."""
+    if text and text[-1].isascii() and text[-1].isalnum():
+        return f"{text} {particle}"
+    return f"{text}{particle}"
 
 
 @dataclass(frozen=True)
@@ -84,8 +137,11 @@ class SameAs[V](Condition[V]):
     came_from: str
 
     @override
-    def says(self) -> str:
-        return f"{self.came_from}와 같다"
+    def says(self) -> Says:
+        return Says(
+            with_particle(str(self.came_from), "와 같다"),
+            f"same as {in_language(self.came_from, Language.ENGLISH)}",
+        )
 
     @override
     def holds(self, got: V) -> bool:
@@ -104,10 +160,23 @@ class Same[V](Verdict):
     got: V
     wanted: V
 
-    def _shows(self) -> str:
+    def _shows(self) -> Says:
         if isinstance(self.wanted, UUID):
             raise ValueError(f"{self.called}: 생성된 id를 값으로 적을 수 없다. SameAs 조건을 쓴다")
-        return f"{self.called} = {self.wanted!r}"
+
+        def spoken(value: Any, language: Language) -> Any:
+            if isinstance(value, Says):
+                return value.in_(language)
+            if isinstance(value, list):
+                return [spoken(one, language) for one in value]
+            if isinstance(value, tuple):
+                return tuple(spoken(one, language) for one in value)
+            if isinstance(value, Mapping):
+                return {key: spoken(one, language) for key, one in value.items()}
+            return value
+
+        text = f"{self.called} = {spoken(self.wanted, Language.KOREAN)!r}"
+        return Says(text, english=f"{self.called} = {spoken(self.wanted, Language.ENGLISH)!r}")
 
     @override
     def told(self) -> Told:
@@ -126,7 +195,12 @@ class Skipped(Verdict):
 
     @override
     def told(self) -> Told:
-        return Told(f"{self.called}: 무시함 — {self.why}")
+        return Told(
+            Says(
+                f"{self.called}: 건너뜀: {self.why}",
+                f"{self.called}: skipped: {in_language(self.why, Language.ENGLISH)}",
+            )
+        )
 
 
 @dataclass(frozen=True)
@@ -139,10 +213,14 @@ class Held[V](Verdict):
 
     @override
     def told(self) -> Told:
-        if self.condition.holds(self.got):
-            return Told(f"{self.called}: {self.condition.says()}")
-        return Told(
+        says = Says(
             f"{self.called}: {self.condition.says()}",
+            f"{self.called}: {in_language(self.condition.says(), Language.ENGLISH)}",
+        )
+        if self.condition.holds(self.got):
+            return Told(says)
+        return Told(
+            says,
             problems=(f"{self.called}: {self.condition.says()} 이어야 하는데 아니다",),
         )
 
@@ -159,7 +237,10 @@ class Refused(Verdict):
 
     @override
     def told(self) -> Told:
-        says = f"{self.PREFIX}{self.expected.__name__}"
+        says = Says(
+            f"{self.PREFIX}{self.expected.__name__}",
+            f"rejected: {self.expected.__name__}",
+        )
         if self.raised is None:
             return Told(says, problems=(f"{says} 이어야 하는데 답이 왔다",))
         if not isinstance(self.raised, self.expected):
@@ -241,7 +322,7 @@ class Scenario[S, G, A, R](ABC):
 
     @abstractmethod
     def describe(self) -> str:
-        """이 행이 무엇을 보장하는지 한 문장."""
+        """이 행이 무엇을 보장하는지 한 문장. :class:`Says`면 영어가 함께 나간다."""
         raise NotImplementedError
 
     @abstractmethod

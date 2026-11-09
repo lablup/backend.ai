@@ -1,78 +1,250 @@
 ## runtime_variant_preset
 
-[무엇을 보장하는가](/src/ai/backend/manager/api/adapters/runtime_variant_preset/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/runtime_variant_preset/adapter.py)
+[background](/src/ai/backend/manager/api/adapters/runtime_variant_preset/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/runtime_variant_preset/adapter.py)
 
-시나리오: 미완 2 / 6
+Scenario: incomplete 2 / 8
 
-- ops 로 구성 (5)
-  - batch_load_by_ids — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - create — 대표 성공 ✓ · 대표 실패 ✓
-  - delete — 대표 성공 ✓ · 대표 실패 ✓
-  - get — 대표 성공 ✓ · 대표 실패 ✓
-  - search — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-- 직접 구현 (1)
-  - update — 성공 있음 5 · 실패 있음 2 (single_entity)
+- built from ops (6)
+  - batch_load_by_ids: representative success ✓ · representative rejection ✓
+  - create: representative success ✓ · representative rejection ✓
+  - get: representative success ✓ · representative rejection ✓
+  - partial_bulk_purge: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - purge: representative success ✓ · representative rejection ✓
+  - search: representative success ✓ · representative rejection ✓
+- direct implementation (2)
+  - partial_bulk_update: success present 2 · rejection absent (partial_bulk): SCENARIO-GAP
+  - update: success present 5 · rejection present 2 (single_entity)
 
-### creating
+**batch_load_by_ids**
 
-#### [a-preset-name-taken-in-the-same-variant-is-refused](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_creating.py) — pass
+| scenario | verdict |
+|---|---|
+| [when an empty id list is read, an empty response comes back and the lower layer is not called](#reading-an-empty-preset-id-list-answers-empty-without-a-call) | answered |
+| [when two existing ids and one unknown id are read together, the items come back in the order asked and the place of the unknown id is empty](#reading-presets-read-by-many-ids-come-back-in-the-order-asked) | answered |
+| [when a user without read permission on presets in public reads several by id, the whole read is refused](#reading-a-user-without-read-permission-is-refused-on-batch-read) | rejected |
 
-같은 변형에 같은 이름의 프리셋을 다시 생성하면 이름이 중복되어 요청이 거부된다
+**create**
+
+| scenario | verdict |
+|---|---|
+| [when the superadmin creates one more preset on a runtime variant that already has one, the new preset's rank is 100 higher](#creating-a-second-preset-in-the-same-variant-is-ranked-a-hundred-higher) | answered |
+| [when a preset is created with a slider option added, the UI type is read from the option and carried on the response node](#creating-a-ui-option-given-on-create-carries-its-type-into-the-node) | answered |
+| [when target, value type, default and key are all given on creation, the four values come back bound into one spec](#creating-target-value-type-default-and-key-come-back-as-one-spec) | answered |
+| [when the superadmin creates a preset on a runtime variant that has none, giving only the required values, the rank is 100, it is not marked required, and the remaining optional values are empty](#creating-the-first-preset-of-a-variant-is-ranked-a-hundred) | answered |
+| [because the uniqueness constraint applies to the pair of runtime variant and name, a preset with the same name can be created under another runtime variant](#creating-the-same-preset-name-is-free-in-another-variant) | answered |
+| [when a preset with the same name is created again under the same runtime variant, the request is rejected as a duplicate name](#creating-a-preset-name-taken-in-the-same-variant-is-refused) | rejected |
+| [when a user who is not the superadmin creates a preset, the request is rejected for lack of role](#creating-a-user-who-is-not-the-superadmin-may-not-create-a-preset) | rejected |
+| [turning the permission check off still does not let a user who is not the superadmin create a preset](#creating-turning-enforcement-off-does-not-let-a-user-create-a-preset) | rejected |
+
+**get**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted nothing reads a preset by id, the whole preset comes back. This read checks authentication only](#reading-a-user-granted-nothing-reads-a-preset-by-id) | answered |
+| [when a read names an id that nothing answers to, it is rejected. There is no target to ask for permission on, so the response does not show whether it does not exist or cannot be reached](#reading-reading-a-preset-id-nothing-answers-to-is-refused) | rejected |
+
+**partial_bulk_purge**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted nothing tries to purge several presets in one call, nothing is purged and every one comes back in the failed list for lack of permission](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-presets) | answered |
+| [when the superadmin purges two presets and one unknown id in one call, the two come back in the processed list as they were before the purge, and the unknown id comes back in the failed list](#partial_bulk_purging-purging-several-presets-answers-for-the-missing-one) | answered |
+
+**purge**
+
+| scenario | verdict |
+|---|---|
+| [when the superadmin deletes a preset, a response carrying the id of the deleted preset comes back](#retiring-the-superadmin-deletes-a-preset) | answered |
+| [turning the permission check off lets even a user granted nothing delete a preset](#retiring-turning-enforcement-off-lets-a-user-delete-a-preset) | answered |
+| [when a user granted nothing deletes a preset, the request is rejected for lack of permission](#retiring-a-user-granted-nothing-may-not-delete-a-preset) | rejected |
+| [when the superadmin deletes an unknown id, the request is rejected because the target cannot be found](#retiring-deleting-a-preset-id-nothing-answers-to-is-not-found) | rejected |
+
+**search**
+
+| scenario | verdict |
+|---|---|
+| [when two presets exist and a user granted nothing reads with no filter, both presets come back](#searching-a-user-granted-nothing-counts-every-preset-laid) | answered |
+| [when presets are split across two runtime variants and one runtime variant is named in the filter, only the presets of that runtime variant come back](#searching-a-variant-filter-narrows-the-answer-to-that-variants-presets) | answered |
+| [when presets with different added and deprecated versions are read with a version filter, only the presets at or above the added version and below the deprecated version come back. An empty side places no limit](#searching-a-version-filter-keeps-only-the-presets-valid-at-that-version) | answered |
+| [when eleven presets exist and the page size is omitted, ten come back and the response marks that there is a next page](#searching-omitting-the-page-size-answers-ten-presets-and-a-next-page) | answered |
+| [when a user without read permission on presets in public searches, the whole search is refused](#searching-a-user-without-read-permission-is-refused-on-search) | rejected |
+
+**partial_bulk_update**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted nothing tries to update several presets in one call, nothing is updated and every one comes back in the failed list for lack of permission](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-presets) | answered |
+| [when the superadmin changes the description of several presets in one call, they all come back with the new description and nothing failed](#partial_bulk_editing-the-superadmin-edits-several-presets-at-once) | answered |
+
+**update**
+
+| scenario | verdict |
+|---|---|
+| [when an update gives no value to change, the node comes back with nothing changed](#editing-a-preset-edit-giving-no-value-changes-nothing) | answered |
+| [when the description of a preset that has one is cleared, the description is gone](#editing-clearing-a-preset-description-leaves-it-empty) | answered |
+| [when the superadmin changes the preset's rank, the node comes back with the changed rank](#editing-editing-a-preset-rank-sets-the-new-rank) | answered |
+| [when the superadmin changes only the preset's name, the name takes the new value and the rest stays](#editing-renaming-a-preset-leaves-the-rest-alone) | answered |
+| [turning the permission check off lets even a user granted nothing update a preset](#editing-turning-enforcement-off-lets-a-user-edit-a-preset) | answered |
+| [when a user granted nothing updates a preset, the request is rejected for lack of permission. A preset belongs to no scope, so at present there is no way to grant that permission](#editing-a-user-granted-nothing-may-not-edit-a-preset) | rejected |
+| [when the superadmin updates an unknown id, the request is rejected because the target cannot be found](#editing-the-superadmin-editing-a-preset-id-nothing-answers-to-is-not-found) | rejected |
+
+### batch_load_by_ids
+
+<a id="reading-an-empty-preset-id-list-answers-empty-without-a-call"></a>
+
+#### [an-empty-preset-id-list-answers-empty-without-a-call](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_reading.py): pass
+
+when an empty id list is read, an empty response comes back and the lower layer is not called
 
 Given
 
-- 변형 하나와 해당 변형의 프리셋 하나, 그리고 슈퍼관리자 한 명
-  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-  - 런타임 변형 프리셋 preset-1: 대상 env, 값 종류 str
-  - 도메인 home-1
-  - public 에서 runtime_variant_preset 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: runtime_variant_preset 전체에 READ 허용
-    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+- one variant, one preset of that variant, and one regular user
+  - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+  - Runtime variant preset preset-1: target env, value type str
+  - Domain home-1
+  - Prepare a user granted read permission on runtime_variant_preset in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every runtime_variant_preset
+    - regular user user-1: holds Role public-reader-1
 
 When
 
-- RuntimeVariantPresetAdapter.create — user-1이 runtime-1 변형에 preset-1 프리셋을 하나 더 생성
+- RuntimeVariantPresetAdapter.batch_load_by_ids: user-1 reads with an empty id list
 
 Then
 
-- 거부된다
-  - 거부: RuntimeVariantPresetConflict
+- an empty response comes back
+  - items = []
 
-#### [a-second-preset-in-the-same-variant-is-ranked-a-hundred-higher](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_creating.py) — pass
+<a id="reading-presets-read-by-many-ids-come-back-in-the-order-asked"></a>
 
-프리셋이 하나 있는 변형에 슈퍼관리자가 하나 더 생성하면 새 프리셋의 순위가 100 더 크다
+#### [presets-read-by-many-ids-come-back-in-the-order-asked](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_reading.py): pass
+
+when two existing ids and one unknown id are read together, the items come back in the order asked and the place of the unknown id is empty
 
 Given
 
-- 변형 하나와 해당 변형의 프리셋 하나, 그리고 슈퍼관리자 한 명
-  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-  - 런타임 변형 프리셋 preset-1: 대상 env, 값 종류 str
-  - 도메인 home-1
-  - public 에서 runtime_variant_preset 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: runtime_variant_preset 전체에 READ 허용
-    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+- 2 presets of one variant and one regular user
+  - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+  - Runtime variant preset preset-1: target env, value type str
+  - Runtime variant preset preset-2: target env, value type str
+  - Domain home-1
+  - Prepare a user granted read permission on runtime_variant_preset in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every runtime_variant_preset
+    - regular user user-1: holds Role public-reader-1
 
 When
 
-- RuntimeVariantPresetAdapter.create — user-1이 runtime-1 변형에 max-tokens 프리셋을 하나 더 생성
+- RuntimeVariantPresetAdapter.batch_load_by_ids: user-1 reads 2 presets seeded in advance together with one unknown id
 
 Then
 
-- 순위가 기존 프리셋보다 지정된 간격만큼 큰 프리셋 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
-  - runtime_variant_id: 미리 만들어 둔 변형의 식별자와 같다
+- items come back in the order asked, and an empty item comes back where the id does not exist
+  - len(items) = 3
+  - items[0].id: skipped: the database generates it
+  - items[0].runtime_variant_id: same as the identifier of the variant seeded in advance
+  - items[0].name = 'preset-1'
+  - items[0].description = 'a preset seeded in advance'
+  - items[0].rank = 100
+  - items[0].target_spec = PresetTargetSpec(preset_target=<PresetTarget.ENV: 'env'>, value_type=<PresetValueType.STR: 'str'>, default_value=None, key='PRESET_KEY')
+  - items[0].required = False
+  - items[0].added_version = None
+  - items[0].deprecated_version = None
+  - items[0].category = None
+  - items[0].ui_type = None
+  - items[0].display_name = None
+  - items[0].ui_option = None
+  - items[0].created_at: the time this run wrote
+  - items[0].updated_at: the time this run wrote
+  - items[1].id: skipped: the database generates it
+  - items[1].runtime_variant_id: same as the identifier of the variant seeded in advance
+  - items[1].name = 'preset-2'
+  - items[1].description = 'a preset seeded in advance'
+  - items[1].rank = 200
+  - items[1].target_spec = PresetTargetSpec(preset_target=<PresetTarget.ENV: 'env'>, value_type=<PresetValueType.STR: 'str'>, default_value=None, key='PRESET_KEY')
+  - items[1].required = False
+  - items[1].added_version = None
+  - items[1].deprecated_version = None
+  - items[1].category = None
+  - items[1].ui_type = None
+  - items[1].display_name = None
+  - items[1].ui_option = None
+  - items[1].created_at: the time this run wrote
+  - items[1].updated_at: the time this run wrote
+  - items[2] = None
+
+<a id="reading-a-user-without-read-permission-is-refused-on-batch-read"></a>
+
+#### [a-user-without-read-permission-is-refused-on-batch-read](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_reading.py): pass
+
+when a user without read permission on presets in public reads several by id, the whole read is refused
+
+Given
+
+- 2 presets of one variant and one regular user with no permission
+  - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+  - Runtime variant preset preset-1: target env, value type str
+  - Runtime variant preset preset-2: target env, value type str
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- RuntimeVariantPresetAdapter.batch_load_by_ids: user-1 reads 2 presets seeded in advance together with one unknown id
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+### create
+
+<a id="creating-a-second-preset-in-the-same-variant-is-ranked-a-hundred-higher"></a>
+
+#### [a-second-preset-in-the-same-variant-is-ranked-a-hundred-higher](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_creating.py): pass
+
+when the superadmin creates one more preset on a runtime variant that already has one, the new preset's rank is 100 higher
+
+Given
+
+- one variant, one preset of that variant, and one superadmin
+  - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+  - Runtime variant preset preset-1: target env, value type str
+  - Domain home-1
+  - Prepare a user granted read permission on runtime_variant_preset in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - superadmin user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every runtime_variant_preset
+    - superadmin user-1: holds Role public-reader-1
+
+When
+
+- RuntimeVariantPresetAdapter.create: user-1 creates one more runtime variant preset named max-tokens under the runtime variant runtime-1
+
+Then
+
+- the whole preset comes back with a rank larger than the existing preset by the set gap
+  - id: skipped: the database generates it
+  - runtime_variant_id: same as the identifier of the variant seeded in advance
   - name = 'max-tokens'
   - description = None
   - rank = 200
@@ -84,37 +256,39 @@ Then
   - ui_type = None
   - display_name = None
   - ui_option = None
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
-#### [a-ui-option-given-on-create-carries-its-type-into-the-node](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_creating.py) — pass
+<a id="creating-a-ui-option-given-on-create-carries-its-type-into-the-node"></a>
 
-슬라이더 옵션을 추가하여 생성하면 UI 종류를 옵션에서 읽어 응답 노드에 함께 담는다
+#### [a-ui-option-given-on-create-carries-its-type-into-the-node](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_creating.py): pass
+
+when a preset is created with a slider option added, the UI type is read from the option and carried on the response node
 
 Given
 
-- 런타임 변형 하나와, 슈퍼관리자 한 명
-  - 런타임 변형 variant-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-  - 도메인 home-1
-  - public 에서 runtime_variant 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: runtime_variant 전체에 READ 허용
-    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+- one runtime variant and one superadmin
+  - Runtime variant variant-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+  - Domain home-1
+  - Prepare a user granted read permission on runtime_variant in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - superadmin user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every runtime_variant
+    - superadmin user-1: holds Role public-reader-1
 
 When
 
-- RuntimeVariantPresetAdapter.create — user-1이 variant-1 변형에 max-tokens 프리셋을 생성
+- RuntimeVariantPresetAdapter.create: user-1 creates the runtime variant preset max-tokens under the runtime variant variant-1
 
 Then
 
-- 생성한 프리셋 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
-  - runtime_variant_id: 미리 만들어 둔 변형의 식별자와 같다
+- the whole preset just created comes back
+  - id: skipped: the database generates it
+  - runtime_variant_id: same as the identifier of the variant seeded in advance
   - name = 'max-tokens'
   - description = None
   - rank = 100
@@ -126,65 +300,39 @@ Then
   - ui_type = 'slider'
   - display_name = None
   - ui_option = UIOption(ui_type=<UIType.SLIDER: 'slider'>, slider=SliderOption(min=1.0, max=8.0, step=1.0), number=None, choices=None, text=None)
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
-#### [a-user-who-is-not-the-superadmin-may-not-create-a-preset](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_creating.py) — pass
+<a id="creating-target-value-type-default-and-key-come-back-as-one-spec"></a>
 
-슈퍼관리자가 아닌 사용자가 프리셋을 생성하면 역할이 부족하여 요청이 거부된다
+#### [target-value-type-default-and-key-come-back-as-one-spec](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_creating.py): pass
 
-Given
-
-- 런타임 변형 하나와, 일반 사용자 한 명
-  - 런타임 변형 variant-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-  - 도메인 home-1
-  - public 에서 runtime_variant 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: runtime_variant 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 public-reader-1 보유
-
-When
-
-- RuntimeVariantPresetAdapter.create — user-1이 variant-1 변형에 max-tokens 프리셋을 생성
-
-Then
-
-- 거부된다
-  - 거부: InsufficientPrivilege
-
-#### [target-value-type-default-and-key-come-back-as-one-spec](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_creating.py) — pass
-
-대상·값 종류·기본값·키를 모두 지정해 생성하면 네 값이 하나의 명세로 묶여 반환된다
+when target, value type, default and key are all given on creation, the four values come back bound into one spec
 
 Given
 
-- 런타임 변형 하나와, 슈퍼관리자 한 명
-  - 런타임 변형 variant-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-  - 도메인 home-1
-  - public 에서 runtime_variant 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: runtime_variant 전체에 READ 허용
-    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+- one runtime variant and one superadmin
+  - Runtime variant variant-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+  - Domain home-1
+  - Prepare a user granted read permission on runtime_variant in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - superadmin user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every runtime_variant
+    - superadmin user-1: holds Role public-reader-1
 
 When
 
-- RuntimeVariantPresetAdapter.create — user-1이 variant-1 변형에 max-tokens 프리셋을 생성
+- RuntimeVariantPresetAdapter.create: user-1 creates the runtime variant preset max-tokens under the runtime variant variant-1
 
 Then
 
-- 생성한 프리셋 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
-  - runtime_variant_id: 미리 만들어 둔 변형의 식별자와 같다
+- the whole preset just created comes back
+  - id: skipped: the database generates it
+  - runtime_variant_id: same as the identifier of the variant seeded in advance
   - name = 'max-tokens'
   - description = None
   - rank = 100
@@ -196,37 +344,39 @@ Then
   - ui_type = None
   - display_name = None
   - ui_option = None
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
-#### [the-first-preset-of-a-variant-is-ranked-a-hundred](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_creating.py) — pass
+<a id="creating-the-first-preset-of-a-variant-is-ranked-a-hundred"></a>
 
-프리셋이 없는 변형에 슈퍼관리자가 필수 항목만 지정해 생성하면 순위는 100이고, 필수 항목으로 지정되지 않으며, 나머지 선택 항목은 비어 있다
+#### [the-first-preset-of-a-variant-is-ranked-a-hundred](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_creating.py): pass
+
+when the superadmin creates a preset on a runtime variant that has none, giving only the required values, the rank is 100, it is not marked required, and the remaining optional values are empty
 
 Given
 
-- 런타임 변형 하나와, 슈퍼관리자 한 명
-  - 런타임 변형 variant-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-  - 도메인 home-1
-  - public 에서 runtime_variant 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: runtime_variant 전체에 READ 허용
-    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+- one runtime variant and one superadmin
+  - Runtime variant variant-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+  - Domain home-1
+  - Prepare a user granted read permission on runtime_variant in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - superadmin user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every runtime_variant
+    - superadmin user-1: holds Role public-reader-1
 
 When
 
-- RuntimeVariantPresetAdapter.create — user-1이 variant-1 변형에 max-tokens 프리셋을 생성
+- RuntimeVariantPresetAdapter.create: user-1 creates the runtime variant preset max-tokens under the runtime variant variant-1
 
 Then
 
-- 생성한 프리셋 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
-  - runtime_variant_id: 미리 만들어 둔 변형의 식별자와 같다
+- the whole preset just created comes back
+  - id: skipped: the database generates it
+  - runtime_variant_id: same as the identifier of the variant seeded in advance
   - name = 'max-tokens'
   - description = None
   - rank = 100
@@ -238,39 +388,41 @@ Then
   - ui_type = None
   - display_name = None
   - ui_option = None
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
-#### [the-same-preset-name-is-free-in-another-variant](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_creating.py) — pass
+<a id="creating-the-same-preset-name-is-free-in-another-variant"></a>
 
-고유성 제약은 변형과 이름의 조합에 적용되므로 다른 변형에는 같은 이름의 프리셋을 생성할 수 있다
+#### [the-same-preset-name-is-free-in-another-variant](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_creating.py): pass
+
+because the uniqueness constraint applies to the pair of runtime variant and name, a preset with the same name can be created under another runtime variant
 
 Given
 
-- 변형 둘과 한쪽에만 있는 프리셋 하나, 그리고 슈퍼관리자 한 명
-  - 런타임 변형 taken-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-  - 런타임 변형 free-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-  - 런타임 변형 프리셋 preset-1: 대상 env, 값 종류 str
-  - 도메인 home-1
-  - public 에서 runtime_variant_preset 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: runtime_variant_preset 전체에 READ 허용
-    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+- two variants, one preset that only one of them holds, and one superadmin
+  - Runtime variant taken-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+  - Runtime variant free-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+  - Runtime variant preset preset-1: target env, value type str
+  - Domain home-1
+  - Prepare a user granted read permission on runtime_variant_preset in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - superadmin user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every runtime_variant_preset
+    - superadmin user-1: holds Role public-reader-1
 
 When
 
-- RuntimeVariantPresetAdapter.create — user-1이 free-1 변형에 preset-1 프리셋을 생성
+- RuntimeVariantPresetAdapter.create: user-1 creates the runtime variant preset preset-1 under the runtime variant free-1
 
 Then
 
-- 다른 변형에 생성한 프리셋 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
-  - runtime_variant_id: 미리 만들어 둔 변형의 식별자와 같다
+- the whole preset created under the other variant comes back
+  - id: skipped: the database generates it
+  - runtime_variant_id: same as the identifier of the variant seeded in advance
   - name = 'preset-1'
   - description = None
   - rank = 100
@@ -282,70 +434,135 @@ Then
   - ui_type = None
   - display_name = None
   - ui_option = None
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
-#### [turning-enforcement-off-does-not-let-a-user-create-a-preset](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_creating.py) — pass
+<a id="creating-a-preset-name-taken-in-the-same-variant-is-refused"></a>
 
-권한 검사를 꺼도 슈퍼관리자가 아니면 프리셋을 생성할 수 없다
+#### [a-preset-name-taken-in-the-same-variant-is-refused](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_creating.py): pass
 
-Given
-
-- 런타임 변형 하나와, 일반 사용자 한 명
-  - 런타임 변형 variant-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-  - 도메인 home-1
-  - public 에서 runtime_variant 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: runtime_variant 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 public-reader-1 보유
-
-When
-
-- RuntimeVariantPresetAdapter.create — user-1이 variant-1 변형에 max-tokens 프리셋을 생성
-
-Then
-
-- 거부된다
-  - 거부: InsufficientPrivilege
-
-### editing
-
-#### [a-preset-edit-giving-no-value-changes-nothing](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_editing.py) — pass
-
-변경할 값을 지정하지 않고 수정하면 아무것도 바뀌지 않은 노드가 반환된다
+when a preset with the same name is created again under the same runtime variant, the request is rejected as a duplicate name
 
 Given
 
-- 변형 하나와 해당 변형의 프리셋 하나, 그리고 슈퍼관리자 한 명
-  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-  - 런타임 변형 프리셋 preset-1: 대상 env, 값 종류 str
-  - 도메인 home-1
-  - public 에서 runtime_variant_preset 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: runtime_variant_preset 전체에 READ 허용
-    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+- one variant, one preset of that variant, and one superadmin
+  - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+  - Runtime variant preset preset-1: target env, value type str
+  - Domain home-1
+  - Prepare a user granted read permission on runtime_variant_preset in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - superadmin user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every runtime_variant_preset
+    - superadmin user-1: holds Role public-reader-1
 
 When
 
-- RuntimeVariantPresetAdapter.update — user-1의 수정 요청 — 대상: preset-1, 변경 항목: 변경 항목 없음
+- RuntimeVariantPresetAdapter.create: user-1 creates one more runtime variant preset named preset-1 under the runtime variant runtime-1
 
 Then
 
-- 미리 만들어 둔 프리셋 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
-  - runtime_variant_id: 미리 만들어 둔 변형의 식별자와 같다
+- the call is rejected
+  - rejected: RuntimeVariantPresetConflict
+
+<a id="creating-a-user-who-is-not-the-superadmin-may-not-create-a-preset"></a>
+
+#### [a-user-who-is-not-the-superadmin-may-not-create-a-preset](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_creating.py): pass
+
+when a user who is not the superadmin creates a preset, the request is rejected for lack of role
+
+Given
+
+- one runtime variant and one regular user
+  - Runtime variant variant-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+  - Domain home-1
+  - Prepare a user granted read permission on runtime_variant in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every runtime_variant
+    - regular user user-1: holds Role public-reader-1
+
+When
+
+- RuntimeVariantPresetAdapter.create: user-1 creates the runtime variant preset max-tokens under the runtime variant variant-1
+
+Then
+
+- the call is rejected
+  - rejected: InsufficientPrivilege
+
+<a id="creating-turning-enforcement-off-does-not-let-a-user-create-a-preset"></a>
+
+#### [turning-enforcement-off-does-not-let-a-user-create-a-preset](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_creating.py): pass
+
+turning the permission check off still does not let a user who is not the superadmin create a preset
+
+Given
+
+- one runtime variant and one regular user
+  - Runtime variant variant-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+  - Domain home-1
+  - Prepare a user granted read permission on runtime_variant in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every runtime_variant
+    - regular user user-1: holds Role public-reader-1
+
+When
+
+- RuntimeVariantPresetAdapter.create: user-1 creates the runtime variant preset max-tokens under the runtime variant variant-1
+
+Then
+
+- the call is rejected
+  - rejected: InsufficientPrivilege
+
+### get
+
+<a id="reading-a-user-granted-nothing-reads-a-preset-by-id"></a>
+
+#### [a-user-granted-nothing-reads-a-preset-by-id](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_reading.py): pass
+
+when a user granted nothing reads a preset by id, the whole preset comes back. This read checks authentication only
+
+Given
+
+- one variant, one preset of that variant, and one regular user
+  - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+  - Runtime variant preset preset-1: target env, value type str
+  - Domain home-1
+  - Prepare a user granted read permission on runtime_variant_preset in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every runtime_variant_preset
+    - regular user user-1: holds Role public-reader-1
+
+When
+
+- RuntimeVariantPresetAdapter.get: read request from user-1: target: preset-1
+
+Then
+
+- the whole preset seeded in advance comes back
+  - id: skipped: the database generates it
+  - runtime_variant_id: same as the identifier of the variant seeded in advance
   - name = 'preset-1'
-  - description = '미리 만들어 둔 프리셋'
+  - description = 'a preset seeded in advance'
   - rank = 100
   - target_spec = PresetTargetSpec(preset_target=<PresetTarget.ENV: 'env'>, value_type=<PresetValueType.STR: 'str'>, default_value=None, key='PRESET_KEY')
   - required = False
@@ -355,67 +572,634 @@ Then
   - ui_type = None
   - display_name = None
   - ui_option = None
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
-#### [a-user-granted-nothing-may-not-edit-a-preset](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_editing.py) — pass
+<a id="reading-reading-a-preset-id-nothing-answers-to-is-refused"></a>
 
-아무 권한도 없는 사용자가 프리셋을 수정하면 권한이 부족하여 요청이 거부된다. 프리셋은 어느 스코프에도 속하지 않아 현재는 해당 권한을 부여할 방법이 없다
+#### [reading-a-preset-id-nothing-answers-to-is-refused](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_reading.py): pass
 
-Given
-
-- 변형 하나와 해당 변형의 프리셋 하나, 그리고 일반 사용자 한 명
-  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-  - 런타임 변형 프리셋 preset-1: 대상 env, 값 종류 str
-  - 도메인 home-1
-  - public 에서 runtime_variant_preset 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: runtime_variant_preset 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 public-reader-1 보유
-
-When
-
-- RuntimeVariantPresetAdapter.update — user-1의 수정 요청 — 대상: preset-1, 변경 항목: name
-
-Then
-
-- 거부된다
-  - 거부: NotEnoughPermission
-
-#### [clearing-a-preset-description-leaves-it-empty](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_editing.py) — pass
-
-설명이 있는 프리셋의 설명을 비우면 설명이 없어진다
+when a read names an id that nothing answers to, it is rejected. There is no target to ask for permission on, so the response does not show whether it does not exist or cannot be reached
 
 Given
 
-- 변형 하나와 해당 변형의 프리셋 하나, 그리고 슈퍼관리자 한 명
-  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-  - 런타임 변형 프리셋 preset-1: 대상 env, 값 종류 str
-  - 도메인 home-1
-  - public 에서 runtime_variant_preset 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: runtime_variant_preset 전체에 READ 허용
-    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+- one variant, one preset of that variant, and one regular user
+  - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+  - Runtime variant preset preset-1: target env, value type str
+  - Domain home-1
+  - Prepare a user granted read permission on runtime_variant_preset in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every runtime_variant_preset
+    - regular user user-1: holds Role public-reader-1
 
 When
 
-- RuntimeVariantPresetAdapter.update — user-1의 수정 요청 — 대상: preset-1, 변경 항목: description
+- RuntimeVariantPresetAdapter.get: read request from user-1: target: an unknown id
 
 Then
 
-- 미리 만들어 둔 프리셋 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
-  - runtime_variant_id: 미리 만들어 둔 변형의 식별자와 같다
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+### partial_bulk_purge
+
+<a id="partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-presets"></a>
+
+#### [a-user-granted-nothing-purges-none-of-several-presets](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_partial_bulk_purging.py): pass
+
+when a user granted nothing tries to purge several presets in one call, nothing is purged and every one comes back in the failed list for lack of permission
+
+Given
+
+- 2 presets of one variant and one regular user
+  - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+  - Runtime variant preset preset-1: target env, value type str
+  - Runtime variant preset preset-2: target env, value type str
+  - Domain home-1
+  - Prepare a user granted read permission on runtime_variant_preset in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every runtime_variant_preset
+    - regular user user-1: holds Role public-reader-1
+
+When
+
+- RuntimeVariantPresetAdapter.partial_bulk_purge: user-1 purges 2 presets in one call
+
+Then
+
+- no preset is processed and every preset seeded in advance comes back in the failed list
+  - successes = []
+  - failed count = 2
+  - failed[0].id: same as the id of the preset seeded in advance
+  - failed[0].message: a reason containing 'Insufficient permission'
+  - failed[1].id: same as the id of the preset seeded in advance
+  - failed[1].message: a reason containing 'Insufficient permission'
+
+<a id="partial_bulk_purging-purging-several-presets-answers-for-the-missing-one"></a>
+
+#### [purging-several-presets-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_partial_bulk_purging.py): pass
+
+when the superadmin purges two presets and one unknown id in one call, the two come back in the processed list as they were before the purge, and the unknown id comes back in the failed list
+
+Given
+
+- 2 presets of one variant and one superadmin
+  - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+  - Runtime variant preset preset-1: target env, value type str
+  - Runtime variant preset preset-2: target env, value type str
+  - Domain home-1
+  - Prepare a user granted read permission on runtime_variant_preset in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - superadmin user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every runtime_variant_preset
+    - superadmin user-1: holds Role public-reader-1
+
+When
+
+- RuntimeVariantPresetAdapter.partial_bulk_purge: user-1 purges 2 presets and one unknown id in one call
+
+Then
+
+- every preset seeded in advance comes back in the processed list, and an unknown id comes back in the failed list
+  - successes count = 2
+  - successes[0].id: skipped: the database generates it
+  - successes[0].runtime_variant_id: same as the identifier of the variant seeded in advance
+  - successes[0].name = 'preset-1'
+  - successes[0].description = 'a preset seeded in advance'
+  - successes[0].rank = 100
+  - successes[0].target_spec = PresetTargetSpec(preset_target=<PresetTarget.ENV: 'env'>, value_type=<PresetValueType.STR: 'str'>, default_value=None, key='PRESET_KEY')
+  - successes[0].required = False
+  - successes[0].added_version = None
+  - successes[0].deprecated_version = None
+  - successes[0].category = None
+  - successes[0].ui_type = None
+  - successes[0].display_name = None
+  - successes[0].ui_option = None
+  - successes[0].created_at: the time this run wrote
+  - successes[0].updated_at: the time this run wrote
+  - successes[1].id: skipped: the database generates it
+  - successes[1].runtime_variant_id: same as the identifier of the variant seeded in advance
+  - successes[1].name = 'preset-2'
+  - successes[1].description = 'a preset seeded in advance'
+  - successes[1].rank = 200
+  - successes[1].target_spec = PresetTargetSpec(preset_target=<PresetTarget.ENV: 'env'>, value_type=<PresetValueType.STR: 'str'>, default_value=None, key='PRESET_KEY')
+  - successes[1].required = False
+  - successes[1].added_version = None
+  - successes[1].deprecated_version = None
+  - successes[1].category = None
+  - successes[1].ui_type = None
+  - successes[1].display_name = None
+  - successes[1].ui_option = None
+  - successes[1].created_at: the time this run wrote
+  - successes[1].updated_at: the time this run wrote
+  - failed count = 1
+  - failed[0].id: same as the unknown id put in the request
+  - failed[0].message: skipped: the reason comes as a string, and the string is a value that may change
+
+### purge
+
+<a id="retiring-the-superadmin-deletes-a-preset"></a>
+
+#### [the-superadmin-deletes-a-preset](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_retiring.py): pass
+
+when the superadmin deletes a preset, a response carrying the id of the deleted preset comes back
+
+Given
+
+- one variant, one preset of that variant, and one superadmin
+  - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+  - Runtime variant preset preset-1: target env, value type str
+  - Domain home-1
+  - Prepare a user granted read permission on runtime_variant_preset in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - superadmin user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every runtime_variant_preset
+    - superadmin user-1: holds Role public-reader-1
+
+When
+
+- RuntimeVariantPresetAdapter.purge: delete request from user-1: target: preset-1
+
+Then
+
+- the id of the preset deleted comes back
+  - id: same as the identifier of the preset seeded in advance
+
+<a id="retiring-turning-enforcement-off-lets-a-user-delete-a-preset"></a>
+
+#### [turning-enforcement-off-lets-a-user-delete-a-preset](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_retiring.py): pass
+
+turning the permission check off lets even a user granted nothing delete a preset
+
+Given
+
+- one variant, one preset of that variant, and one regular user
+  - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+  - Runtime variant preset preset-1: target env, value type str
+  - Domain home-1
+  - Prepare a user granted read permission on runtime_variant_preset in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every runtime_variant_preset
+    - regular user user-1: holds Role public-reader-1
+
+When
+
+- RuntimeVariantPresetAdapter.purge: delete request from user-1: target: preset-1
+
+Then
+
+- the id of the preset deleted comes back
+  - id: same as the identifier of the preset seeded in advance
+
+<a id="retiring-a-user-granted-nothing-may-not-delete-a-preset"></a>
+
+#### [a-user-granted-nothing-may-not-delete-a-preset](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_retiring.py): pass
+
+when a user granted nothing deletes a preset, the request is rejected for lack of permission
+
+Given
+
+- one variant, one preset of that variant, and one regular user
+  - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+  - Runtime variant preset preset-1: target env, value type str
+  - Domain home-1
+  - Prepare a user granted read permission on runtime_variant_preset in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every runtime_variant_preset
+    - regular user user-1: holds Role public-reader-1
+
+When
+
+- RuntimeVariantPresetAdapter.purge: delete request from user-1: target: preset-1
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+<a id="retiring-deleting-a-preset-id-nothing-answers-to-is-not-found"></a>
+
+#### [deleting-a-preset-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_retiring.py): pass
+
+when the superadmin deletes an unknown id, the request is rejected because the target cannot be found
+
+Given
+
+- one variant, one preset of that variant, and one superadmin
+  - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+  - Runtime variant preset preset-1: target env, value type str
+  - Domain home-1
+  - Prepare a user granted read permission on runtime_variant_preset in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - superadmin user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every runtime_variant_preset
+    - superadmin user-1: holds Role public-reader-1
+
+When
+
+- RuntimeVariantPresetAdapter.purge: delete request from user-1: target: an unknown id
+
+Then
+
+- the call is rejected
+  - rejected: EntityNotFoundError
+
+### search
+
+<a id="searching-a-user-granted-nothing-counts-every-preset-laid"></a>
+
+#### [a-user-granted-nothing-counts-every-preset-laid](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_searching.py): pass
+
+when two presets exist and a user granted nothing reads with no filter, both presets come back
+
+Given
+
+- 2 presets of one variant and one regular user
+  - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+  - Runtime variant preset preset-1: target env, value type str
+  - Runtime variant preset preset-2: target env, value type str
+  - Domain home-1
+  - Prepare a user granted read permission on runtime_variant_preset in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every runtime_variant_preset
+    - regular user user-1: holds Role public-reader-1
+
+When
+
+- RuntimeVariantPresetAdapter.search: user-1 reads everything with no filter
+
+Then
+
+- only the presets that belong in the response come back
+  - items = ['preset-1', 'preset-2']
+  - total_count = 2
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="searching-a-variant-filter-narrows-the-answer-to-that-variants-presets"></a>
+
+#### [a-variant-filter-narrows-the-answer-to-that-variants-presets](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_searching.py): pass
+
+when presets are split across two runtime variants and one runtime variant is named in the filter, only the presets of that runtime variant come back
+
+Given
+
+- three presets split across two variants and one regular user
+  - Runtime variant wanted-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+  - Runtime variant other-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+  - Runtime variant preset mine-1: target env, value type str
+  - Runtime variant preset mine-2: target env, value type str
+  - Runtime variant preset elsewhere-1: target env, value type str
+  - Domain home-1
+  - Prepare a user granted read permission on runtime_variant_preset in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every runtime_variant_preset
+    - regular user user-1: holds Role public-reader-1
+
+When
+
+- RuntimeVariantPresetAdapter.search: user-1 reads with the runtime variant filter: target: wanted-1
+
+Then
+
+- only the presets that belong in the response come back
+  - items = ['mine-1', 'mine-2']
+  - total_count = 2
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="searching-a-version-filter-keeps-only-the-presets-valid-at-that-version"></a>
+
+#### [a-version-filter-keeps-only-the-presets-valid-at-that-version](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_searching.py): pass
+
+when presets with different added and deprecated versions are read with a version filter, only the presets at or above the added version and below the deprecated version come back. An empty side places no limit
+
+Given
+
+- five presets with different added and deprecated versions and one regular user
+  - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+  - Runtime variant preset open-1: target env, value type str, version from 1.0.0 to the last
+  - Runtime variant preset unbounded-1: target env, value type str
+  - Runtime variant preset closed-1: target env, value type str, version from 1.0.0 to 2.0.0
+  - Runtime variant preset retired-1: target env, value type str, version from the first to 2.0.0
+  - Runtime variant preset upcoming-1: target env, value type str, version from 3.0.0 to the last
+  - Domain home-1
+  - Prepare a user granted read permission on runtime_variant_preset in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every runtime_variant_preset
+    - regular user user-1: holds Role public-reader-1
+
+When
+
+- RuntimeVariantPresetAdapter.search: user-1 reads only the presets valid at version 2.5.0
+
+Then
+
+- only the presets that belong in the response come back
+  - items = ['open-1', 'unbounded-1']
+  - total_count = 2
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="searching-omitting-the-page-size-answers-ten-presets-and-a-next-page"></a>
+
+#### [omitting-the-page-size-answers-ten-presets-and-a-next-page](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_searching.py): pass
+
+when eleven presets exist and the page size is omitted, ten come back and the response marks that there is a next page
+
+Given
+
+- 11 presets of one variant and one regular user
+  - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+  - Runtime variant preset preset-1: target env, value type str
+  - Runtime variant preset preset-2: target env, value type str
+  - Runtime variant preset preset-3: target env, value type str
+  - Runtime variant preset preset-4: target env, value type str
+  - Runtime variant preset preset-5: target env, value type str
+  - Runtime variant preset preset-6: target env, value type str
+  - Runtime variant preset preset-7: target env, value type str
+  - Runtime variant preset preset-8: target env, value type str
+  - Runtime variant preset preset-9: target env, value type str
+  - Runtime variant preset preset-10: target env, value type str
+  - Runtime variant preset preset-11: target env, value type str
+  - Domain home-1
+  - Prepare a user granted read permission on runtime_variant_preset in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every runtime_variant_preset
+    - regular user user-1: holds Role public-reader-1
+
+When
+
+- RuntimeVariantPresetAdapter.search: user-1 reads everything with no filter
+
+Then
+
+- the first page of the default size comes back
+  - len(items) = 10
+  - total_count = 11
+  - has_next_page = True
+  - has_previous_page = False
+
+<a id="searching-a-user-without-read-permission-is-refused-on-search"></a>
+
+#### [a-user-without-read-permission-is-refused-on-search](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_searching.py): pass
+
+when a user without read permission on presets in public searches, the whole search is refused
+
+Given
+
+- 2 presets of one variant and one regular user with no permission
+  - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+  - Runtime variant preset preset-1: target env, value type str
+  - Runtime variant preset preset-2: target env, value type str
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- RuntimeVariantPresetAdapter.search: user-1 reads everything with no filter
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+### partial_bulk_update
+
+<a id="partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-presets"></a>
+
+#### [a-user-granted-nothing-edits-none-of-several-presets](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_partial_bulk_editing.py): pass
+
+when a user granted nothing tries to update several presets in one call, nothing is updated and every one comes back in the failed list for lack of permission
+
+Given
+
+- 2 presets of one variant and one regular user
+  - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+  - Runtime variant preset preset-1: target env, value type str
+  - Runtime variant preset preset-2: target env, value type str
+  - Domain home-1
+  - Prepare a user granted read permission on runtime_variant_preset in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every runtime_variant_preset
+    - regular user user-1: holds Role public-reader-1
+
+When
+
+- RuntimeVariantPresetAdapter.partial_bulk_update: user-1 updates the description of 2 presets in one call
+
+Then
+
+- no preset is processed and every preset seeded in advance comes back in the failed list
+  - successes = []
+  - failed count = 2
+  - failed[0].id: same as the id of the preset seeded in advance
+  - failed[0].message: a reason containing 'Insufficient permission'
+  - failed[1].id: same as the id of the preset seeded in advance
+  - failed[1].message: a reason containing 'Insufficient permission'
+
+<a id="partial_bulk_editing-the-superadmin-edits-several-presets-at-once"></a>
+
+#### [the-superadmin-edits-several-presets-at-once](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_partial_bulk_editing.py): pass
+
+when the superadmin changes the description of several presets in one call, they all come back with the new description and nothing failed
+
+Given
+
+- 2 presets of one variant and one superadmin
+  - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+  - Runtime variant preset preset-1: target env, value type str
+  - Runtime variant preset preset-2: target env, value type str
+  - Domain home-1
+  - Prepare a user granted read permission on runtime_variant_preset in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - superadmin user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every runtime_variant_preset
+    - superadmin user-1: holds Role public-reader-1
+
+When
+
+- RuntimeVariantPresetAdapter.partial_bulk_update: user-1 updates the description of 2 presets in one call
+
+Then
+
+- every preset seeded in advance comes back in the processed list, and nothing failed
+  - successes count = 2
+  - successes[0].id: skipped: the database generates it
+  - successes[0].runtime_variant_id: same as the identifier of the variant seeded in advance
+  - successes[0].name = 'preset-1'
+  - successes[0].description = 'the description updated in one call'
+  - successes[0].rank = 100
+  - successes[0].target_spec = PresetTargetSpec(preset_target=<PresetTarget.ENV: 'env'>, value_type=<PresetValueType.STR: 'str'>, default_value=None, key='PRESET_KEY')
+  - successes[0].required = False
+  - successes[0].added_version = None
+  - successes[0].deprecated_version = None
+  - successes[0].category = None
+  - successes[0].ui_type = None
+  - successes[0].display_name = None
+  - successes[0].ui_option = None
+  - successes[0].created_at: the time this run wrote
+  - successes[0].updated_at: the time this run wrote
+  - successes[1].id: skipped: the database generates it
+  - successes[1].runtime_variant_id: same as the identifier of the variant seeded in advance
+  - successes[1].name = 'preset-2'
+  - successes[1].description = 'the description updated in one call'
+  - successes[1].rank = 200
+  - successes[1].target_spec = PresetTargetSpec(preset_target=<PresetTarget.ENV: 'env'>, value_type=<PresetValueType.STR: 'str'>, default_value=None, key='PRESET_KEY')
+  - successes[1].required = False
+  - successes[1].added_version = None
+  - successes[1].deprecated_version = None
+  - successes[1].category = None
+  - successes[1].ui_type = None
+  - successes[1].display_name = None
+  - successes[1].ui_option = None
+  - successes[1].created_at: the time this run wrote
+  - successes[1].updated_at: the time this run wrote
+  - failed = []
+
+### update
+
+<a id="editing-a-preset-edit-giving-no-value-changes-nothing"></a>
+
+#### [a-preset-edit-giving-no-value-changes-nothing](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_editing.py): pass
+
+when an update gives no value to change, the node comes back with nothing changed
+
+Given
+
+- one variant, one preset of that variant, and one superadmin
+  - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+  - Runtime variant preset preset-1: target env, value type str
+  - Domain home-1
+  - Prepare a user granted read permission on runtime_variant_preset in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - superadmin user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every runtime_variant_preset
+    - superadmin user-1: holds Role public-reader-1
+
+When
+
+- RuntimeVariantPresetAdapter.update: update request from user-1: target: preset-1, fields changed: no field changed
+
+Then
+
+- the whole preset seeded in advance comes back
+  - id: skipped: the database generates it
+  - runtime_variant_id: same as the identifier of the variant seeded in advance
+  - name = 'preset-1'
+  - description = 'a preset seeded in advance'
+  - rank = 100
+  - target_spec = PresetTargetSpec(preset_target=<PresetTarget.ENV: 'env'>, value_type=<PresetValueType.STR: 'str'>, default_value=None, key='PRESET_KEY')
+  - required = False
+  - added_version = None
+  - deprecated_version = None
+  - category = None
+  - ui_type = None
+  - display_name = None
+  - ui_option = None
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
+
+<a id="editing-clearing-a-preset-description-leaves-it-empty"></a>
+
+#### [clearing-a-preset-description-leaves-it-empty](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_editing.py): pass
+
+when the description of a preset that has one is cleared, the description is gone
+
+Given
+
+- one variant, one preset of that variant, and one superadmin
+  - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+  - Runtime variant preset preset-1: target env, value type str
+  - Domain home-1
+  - Prepare a user granted read permission on runtime_variant_preset in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - superadmin user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every runtime_variant_preset
+    - superadmin user-1: holds Role public-reader-1
+
+When
+
+- RuntimeVariantPresetAdapter.update: update request from user-1: target: preset-1, fields changed: description
+
+Then
+
+- the whole preset seeded in advance comes back
+  - id: skipped: the database generates it
+  - runtime_variant_id: same as the identifier of the variant seeded in advance
   - name = 'preset-1'
   - description = None
   - rank = 100
@@ -427,40 +1211,42 @@ Then
   - ui_type = None
   - display_name = None
   - ui_option = None
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
-#### [editing-a-preset-rank-sets-the-new-rank](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_editing.py) — pass
+<a id="editing-editing-a-preset-rank-sets-the-new-rank"></a>
 
-슈퍼관리자가 프리셋의 순위를 바꾸면 순위가 변경된 노드가 반환된다
+#### [editing-a-preset-rank-sets-the-new-rank](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_editing.py): pass
+
+when the superadmin changes the preset's rank, the node comes back with the changed rank
 
 Given
 
-- 변형 하나와 해당 변형의 프리셋 하나, 그리고 슈퍼관리자 한 명
-  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-  - 런타임 변형 프리셋 preset-1: 대상 env, 값 종류 str
-  - 도메인 home-1
-  - public 에서 runtime_variant_preset 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: runtime_variant_preset 전체에 READ 허용
-    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+- one variant, one preset of that variant, and one superadmin
+  - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+  - Runtime variant preset preset-1: target env, value type str
+  - Domain home-1
+  - Prepare a user granted read permission on runtime_variant_preset in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - superadmin user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every runtime_variant_preset
+    - superadmin user-1: holds Role public-reader-1
 
 When
 
-- RuntimeVariantPresetAdapter.update — user-1의 수정 요청 — 대상: preset-1, 변경 항목: rank
+- RuntimeVariantPresetAdapter.update: update request from user-1: target: preset-1, fields changed: rank
 
 Then
 
-- 미리 만들어 둔 프리셋 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
-  - runtime_variant_id: 미리 만들어 둔 변형의 식별자와 같다
+- the whole preset seeded in advance comes back
+  - id: skipped: the database generates it
+  - runtime_variant_id: same as the identifier of the variant seeded in advance
   - name = 'preset-1'
-  - description = '미리 만들어 둔 프리셋'
+  - description = 'a preset seeded in advance'
   - rank = 7
   - target_spec = PresetTargetSpec(preset_target=<PresetTarget.ENV: 'env'>, value_type=<PresetValueType.STR: 'str'>, default_value=None, key='PRESET_KEY')
   - required = False
@@ -470,40 +1256,42 @@ Then
   - ui_type = None
   - display_name = None
   - ui_option = None
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
-#### [renaming-a-preset-leaves-the-rest-alone](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_editing.py) — pass
+<a id="editing-renaming-a-preset-leaves-the-rest-alone"></a>
 
-슈퍼관리자가 프리셋의 이름만 바꾸면 이름은 새 값으로 바뀌고 나머지는 그대로 유지된다
+#### [renaming-a-preset-leaves-the-rest-alone](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_editing.py): pass
+
+when the superadmin changes only the preset's name, the name takes the new value and the rest stays
 
 Given
 
-- 변형 하나와 해당 변형의 프리셋 하나, 그리고 슈퍼관리자 한 명
-  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-  - 런타임 변형 프리셋 preset-1: 대상 env, 값 종류 str
-  - 도메인 home-1
-  - public 에서 runtime_variant_preset 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: runtime_variant_preset 전체에 READ 허용
-    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+- one variant, one preset of that variant, and one superadmin
+  - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+  - Runtime variant preset preset-1: target env, value type str
+  - Domain home-1
+  - Prepare a user granted read permission on runtime_variant_preset in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - superadmin user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every runtime_variant_preset
+    - superadmin user-1: holds Role public-reader-1
 
 When
 
-- RuntimeVariantPresetAdapter.update — user-1의 수정 요청 — 대상: preset-1, 변경 항목: name
+- RuntimeVariantPresetAdapter.update: update request from user-1: target: preset-1, fields changed: name
 
 Then
 
-- 미리 만들어 둔 프리셋 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
-  - runtime_variant_id: 미리 만들어 둔 변형의 식별자와 같다
+- the whole preset seeded in advance comes back
+  - id: skipped: the database generates it
+  - runtime_variant_id: same as the identifier of the variant seeded in advance
   - name = 'renamed'
-  - description = '미리 만들어 둔 프리셋'
+  - description = 'a preset seeded in advance'
   - rank = 100
   - target_spec = PresetTargetSpec(preset_target=<PresetTarget.ENV: 'env'>, value_type=<PresetValueType.STR: 'str'>, default_value=None, key='PRESET_KEY')
   - required = False
@@ -513,69 +1301,42 @@ Then
   - ui_type = None
   - display_name = None
   - ui_option = None
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
-#### [the-superadmin-editing-a-preset-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_editing.py) — pass
+<a id="editing-turning-enforcement-off-lets-a-user-edit-a-preset"></a>
 
-슈퍼관리자가 존재하지 않는 ID를 수정하면 대상을 찾을 수 없어 요청이 거부된다
+#### [turning-enforcement-off-lets-a-user-edit-a-preset](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_editing.py): pass
 
-Given
-
-- 변형 하나와 해당 변형의 프리셋 하나, 그리고 슈퍼관리자 한 명
-  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-  - 런타임 변형 프리셋 preset-1: 대상 env, 값 종류 str
-  - 도메인 home-1
-  - public 에서 runtime_variant_preset 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: runtime_variant_preset 전체에 READ 허용
-    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
-
-When
-
-- RuntimeVariantPresetAdapter.update — user-1의 수정 요청 — 대상: 존재하지 않는 ID, 변경 항목: name
-
-Then
-
-- 거부된다
-  - 거부: RuntimeVariantPresetNotFound
-
-#### [turning-enforcement-off-lets-a-user-edit-a-preset](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_editing.py) — pass
-
-권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 수정할 수 있다
+turning the permission check off lets even a user granted nothing update a preset
 
 Given
 
-- 변형 하나와 해당 변형의 프리셋 하나, 그리고 일반 사용자 한 명
-  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-  - 런타임 변형 프리셋 preset-1: 대상 env, 값 종류 str
-  - 도메인 home-1
-  - public 에서 runtime_variant_preset 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: runtime_variant_preset 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 public-reader-1 보유
+- one variant, one preset of that variant, and one regular user
+  - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+  - Runtime variant preset preset-1: target env, value type str
+  - Domain home-1
+  - Prepare a user granted read permission on runtime_variant_preset in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every runtime_variant_preset
+    - regular user user-1: holds Role public-reader-1
 
 When
 
-- RuntimeVariantPresetAdapter.update — user-1의 수정 요청 — 대상: preset-1, 변경 항목: name
+- RuntimeVariantPresetAdapter.update: update request from user-1: target: preset-1, fields changed: name
 
 Then
 
-- 미리 만들어 둔 프리셋 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
-  - runtime_variant_id: 미리 만들어 둔 변형의 식별자와 같다
+- the whole preset seeded in advance comes back
+  - id: skipped: the database generates it
+  - runtime_variant_id: same as the identifier of the variant seeded in advance
   - name = 'renamed'
-  - description = '미리 만들어 둔 프리셋'
+  - description = 'a preset seeded in advance'
   - rank = 100
   - target_spec = PresetTargetSpec(preset_target=<PresetTarget.ENV: 'env'>, value_type=<PresetValueType.STR: 'str'>, default_value=None, key='PRESET_KEY')
   - required = False
@@ -585,436 +1346,68 @@ Then
   - ui_type = None
   - display_name = None
   - ui_option = None
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
-### reading
+<a id="editing-a-user-granted-nothing-may-not-edit-a-preset"></a>
 
-#### [a-user-granted-nothing-reads-a-preset-by-id](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_reading.py) — pass
+#### [a-user-granted-nothing-may-not-edit-a-preset](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_editing.py): pass
 
-아무 권한도 없는 사용자가 ID로 조회해도 해당 프리셋 전체가 반환된다. 이 조회는 인증 여부만 확인한다
-
-Given
-
-- 변형 하나와 해당 변형의 프리셋 하나, 그리고 일반 사용자 한 명
-  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-  - 런타임 변형 프리셋 preset-1: 대상 env, 값 종류 str
-  - 도메인 home-1
-  - public 에서 runtime_variant_preset 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: runtime_variant_preset 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 public-reader-1 보유
-
-When
-
-- RuntimeVariantPresetAdapter.get — user-1의 조회 요청 — 대상: preset-1
-
-Then
-
-- 미리 만들어 둔 프리셋 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
-  - runtime_variant_id: 미리 만들어 둔 변형의 식별자와 같다
-  - name = 'preset-1'
-  - description = '미리 만들어 둔 프리셋'
-  - rank = 100
-  - target_spec = PresetTargetSpec(preset_target=<PresetTarget.ENV: 'env'>, value_type=<PresetValueType.STR: 'str'>, default_value=None, key='PRESET_KEY')
-  - required = False
-  - added_version = None
-  - deprecated_version = None
-  - category = None
-  - ui_type = None
-  - display_name = None
-  - ui_option = None
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
-
-#### [an-empty-preset-id-list-answers-empty-without-a-call](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_reading.py) — pass
-
-빈 ID 목록으로 조회하면 빈 응답이 반환되며 하위 계층은 호출하지 않는다
+when a user granted nothing updates a preset, the request is rejected for lack of permission. A preset belongs to no scope, so at present there is no way to grant that permission
 
 Given
 
-- 변형 하나와 해당 변형의 프리셋 하나, 그리고 일반 사용자 한 명
-  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-  - 런타임 변형 프리셋 preset-1: 대상 env, 값 종류 str
-  - 도메인 home-1
-  - public 에서 runtime_variant_preset 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: runtime_variant_preset 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 public-reader-1 보유
+- one variant, one preset of that variant, and one regular user
+  - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+  - Runtime variant preset preset-1: target env, value type str
+  - Domain home-1
+  - Prepare a user granted read permission on runtime_variant_preset in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every runtime_variant_preset
+    - regular user user-1: holds Role public-reader-1
 
 When
 
-- RuntimeVariantPresetAdapter.batch_load_by_ids — user-1이 빈 ID 목록으로 조회
+- RuntimeVariantPresetAdapter.update: update request from user-1: target: preset-1, fields changed: name
 
 Then
 
-- 빈 응답이 반환된다
-  - items = []
+- the call is rejected
+  - rejected: NotEnoughPermission
 
-#### [presets-read-by-many-ids-come-back-in-the-order-asked](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_reading.py) — pass
+<a id="editing-the-superadmin-editing-a-preset-id-nothing-answers-to-is-not-found"></a>
 
-존재하는 ID 둘과 존재하지 않는 ID 하나를 함께 조회하면 요청한 순서대로 반환되고, 존재하지 않는 ID의 위치는 비어 있다
+#### [the-superadmin-editing-a-preset-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_editing.py): pass
+
+when the superadmin updates an unknown id, the request is rejected because the target cannot be found
 
 Given
 
-- 한 변형의 프리셋 2개와 일반 사용자 한 명
-  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-  - 런타임 변형 프리셋 preset-1: 대상 env, 값 종류 str
-  - 런타임 변형 프리셋 preset-2: 대상 env, 값 종류 str
-  - 도메인 home-1
-  - public 에서 runtime_variant_preset 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: runtime_variant_preset 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 public-reader-1 보유
+- one variant, one preset of that variant, and one superadmin
+  - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+  - Runtime variant preset preset-1: target env, value type str
+  - Domain home-1
+  - Prepare a user granted read permission on runtime_variant_preset in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - superadmin user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every runtime_variant_preset
+    - superadmin user-1: holds Role public-reader-1
 
 When
 
-- RuntimeVariantPresetAdapter.batch_load_by_ids — user-1이 미리 만들어 둔 프리셋 2개와 존재하지 않는 ID 하나를 함께 조회
+- RuntimeVariantPresetAdapter.update: update request from user-1: target: an unknown id, fields changed: name
 
 Then
 
-- 요청한 순서대로 반환되며, 존재하지 않는 ID의 위치에는 빈 항목이 반환된다
-  - len(items) = 3
-  - items[0].id: 무시함 — 데이터베이스가 만든다
-  - items[0].runtime_variant_id: 미리 만들어 둔 변형의 식별자와 같다
-  - items[0].name = 'preset-1'
-  - items[0].description = '미리 만들어 둔 프리셋'
-  - items[0].rank = 100
-  - items[0].target_spec = PresetTargetSpec(preset_target=<PresetTarget.ENV: 'env'>, value_type=<PresetValueType.STR: 'str'>, default_value=None, key='PRESET_KEY')
-  - items[0].required = False
-  - items[0].added_version = None
-  - items[0].deprecated_version = None
-  - items[0].category = None
-  - items[0].ui_type = None
-  - items[0].display_name = None
-  - items[0].ui_option = None
-  - items[0].created_at: 이 실행이 쓴 시각
-  - items[0].updated_at: 이 실행이 쓴 시각
-  - items[1].id: 무시함 — 데이터베이스가 만든다
-  - items[1].runtime_variant_id: 미리 만들어 둔 변형의 식별자와 같다
-  - items[1].name = 'preset-2'
-  - items[1].description = '미리 만들어 둔 프리셋'
-  - items[1].rank = 200
-  - items[1].target_spec = PresetTargetSpec(preset_target=<PresetTarget.ENV: 'env'>, value_type=<PresetValueType.STR: 'str'>, default_value=None, key='PRESET_KEY')
-  - items[1].required = False
-  - items[1].added_version = None
-  - items[1].deprecated_version = None
-  - items[1].category = None
-  - items[1].ui_type = None
-  - items[1].display_name = None
-  - items[1].ui_option = None
-  - items[1].created_at: 이 실행이 쓴 시각
-  - items[1].updated_at: 이 실행이 쓴 시각
-  - items[2] = None
-
-#### [reading-a-preset-id-nothing-answers-to-is-refused](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_reading.py) — pass
-
-존재하지 않는 id로 조회하면 거부된다. 권한을 물을 대상이 없으므로, 없는 것인지 닿지 못하는 것인지는 응답으로 드러나지 않는다
-
-Given
-
-- 변형 하나와 해당 변형의 프리셋 하나, 그리고 일반 사용자 한 명
-  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-  - 런타임 변형 프리셋 preset-1: 대상 env, 값 종류 str
-  - 도메인 home-1
-  - public 에서 runtime_variant_preset 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: runtime_variant_preset 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 public-reader-1 보유
-
-When
-
-- RuntimeVariantPresetAdapter.get — user-1의 조회 요청 — 대상: 존재하지 않는 ID
-
-Then
-
-- 거부된다
-  - 거부: NotEnoughPermission
-
-### retiring
-
-#### [a-user-granted-nothing-may-not-delete-a-preset](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_retiring.py) — pass
-
-아무 권한도 없는 사용자가 프리셋을 삭제하면 권한이 부족하여 요청이 거부된다
-
-Given
-
-- 변형 하나와 해당 변형의 프리셋 하나, 그리고 일반 사용자 한 명
-  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-  - 런타임 변형 프리셋 preset-1: 대상 env, 값 종류 str
-  - 도메인 home-1
-  - public 에서 runtime_variant_preset 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: runtime_variant_preset 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 public-reader-1 보유
-
-When
-
-- RuntimeVariantPresetAdapter.delete — user-1의 삭제 요청 — 대상: preset-1
-
-Then
-
-- 거부된다
-  - 거부: NotEnoughPermission
-
-#### [deleting-a-preset-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_retiring.py) — pass
-
-슈퍼관리자가 존재하지 않는 ID를 삭제하면 대상을 찾을 수 없어 요청이 거부된다
-
-Given
-
-- 변형 하나와 해당 변형의 프리셋 하나, 그리고 슈퍼관리자 한 명
-  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-  - 런타임 변형 프리셋 preset-1: 대상 env, 값 종류 str
-  - 도메인 home-1
-  - public 에서 runtime_variant_preset 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: runtime_variant_preset 전체에 READ 허용
-    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
-
-When
-
-- RuntimeVariantPresetAdapter.delete — user-1의 삭제 요청 — 대상: 존재하지 않는 ID
-
-Then
-
-- 거부된다
-  - 거부: EntityNotFoundError
-
-#### [the-superadmin-deletes-a-preset](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_retiring.py) — pass
-
-슈퍼관리자가 프리셋을 삭제하면 삭제한 프리셋의 ID를 담은 응답이 반환된다
-
-Given
-
-- 변형 하나와 해당 변형의 프리셋 하나, 그리고 슈퍼관리자 한 명
-  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-  - 런타임 변형 프리셋 preset-1: 대상 env, 값 종류 str
-  - 도메인 home-1
-  - public 에서 runtime_variant_preset 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: runtime_variant_preset 전체에 READ 허용
-    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
-
-When
-
-- RuntimeVariantPresetAdapter.delete — user-1의 삭제 요청 — 대상: preset-1
-
-Then
-
-- 삭제한 프리셋의 ID가 반환된다
-  - id: 미리 만들어 둔 프리셋의 식별자와 같다
-
-#### [turning-enforcement-off-lets-a-user-delete-a-preset](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_retiring.py) — pass
-
-권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 삭제할 수 있다
-
-Given
-
-- 변형 하나와 해당 변형의 프리셋 하나, 그리고 일반 사용자 한 명
-  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-  - 런타임 변형 프리셋 preset-1: 대상 env, 값 종류 str
-  - 도메인 home-1
-  - public 에서 runtime_variant_preset 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: runtime_variant_preset 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 public-reader-1 보유
-
-When
-
-- RuntimeVariantPresetAdapter.delete — user-1의 삭제 요청 — 대상: preset-1
-
-Then
-
-- 삭제한 프리셋의 ID가 반환된다
-  - id: 미리 만들어 둔 프리셋의 식별자와 같다
-
-### searching
-
-#### [a-user-granted-nothing-counts-every-preset-laid](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_searching.py) — pass
-
-프리셋이 둘 있을 때 아무 권한도 없는 사용자가 필터 없이 조회하면 두 프리셋이 모두 반환된다
-
-Given
-
-- 한 변형의 프리셋 2개와 일반 사용자 한 명
-  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-  - 런타임 변형 프리셋 preset-1: 대상 env, 값 종류 str
-  - 런타임 변형 프리셋 preset-2: 대상 env, 값 종류 str
-  - 도메인 home-1
-  - public 에서 runtime_variant_preset 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: runtime_variant_preset 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 public-reader-1 보유
-
-When
-
-- RuntimeVariantPresetAdapter.search — user-1이 필터 없이 전체를 조회
-
-Then
-
-- 응답에 포함되어야 하는 프리셋만 반환된다
-  - items = ['preset-1', 'preset-2']
-  - total_count = 2
-  - has_next_page = False
-  - has_previous_page = False
-
-#### [a-variant-filter-narrows-the-answer-to-that-variants-presets](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_searching.py) — pass
-
-프리셋이 두 변형에 나뉘어 있을 때 한 변형을 필터로 조회하면 해당 변형의 프리셋만 반환된다
-
-Given
-
-- 두 변형에 나뉘어 있는 프리셋 세 개와 일반 사용자 한 명
-  - 런타임 변형 wanted-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-  - 런타임 변형 other-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-  - 런타임 변형 프리셋 mine-1: 대상 env, 값 종류 str
-  - 런타임 변형 프리셋 mine-2: 대상 env, 값 종류 str
-  - 런타임 변형 프리셋 elsewhere-1: 대상 env, 값 종류 str
-  - 도메인 home-1
-  - public 에서 runtime_variant_preset 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: runtime_variant_preset 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 public-reader-1 보유
-
-When
-
-- RuntimeVariantPresetAdapter.search — user-1이 변형 필터로 조회 — 대상: wanted-1
-
-Then
-
-- 응답에 포함되어야 하는 프리셋만 반환된다
-  - items = ['mine-1', 'mine-2']
-  - total_count = 2
-  - has_next_page = False
-  - has_previous_page = False
-
-#### [a-version-filter-keeps-only-the-presets-valid-at-that-version](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_searching.py) — pass
-
-추가 버전과 폐기 버전이 서로 다른 프리셋을 버전 필터로 조회하면 추가 버전 이상이고 폐기 버전 미만인 프리셋만 반환된다. 값이 비어 있는 쪽에는 제한이 없다
-
-Given
-
-- 추가 버전과 폐기 버전이 서로 다른 프리셋 다섯 개와 일반 사용자 한 명
-  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-  - 런타임 변형 프리셋 open-1: 대상 env, 값 종류 str, 버전 1.0.0부터 끝까지
-  - 런타임 변형 프리셋 unbounded-1: 대상 env, 값 종류 str
-  - 런타임 변형 프리셋 closed-1: 대상 env, 값 종류 str, 버전 1.0.0부터 2.0.0까지
-  - 런타임 변형 프리셋 retired-1: 대상 env, 값 종류 str, 버전 처음부터 2.0.0까지
-  - 런타임 변형 프리셋 upcoming-1: 대상 env, 값 종류 str, 버전 3.0.0부터 끝까지
-  - 도메인 home-1
-  - public 에서 runtime_variant_preset 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: runtime_variant_preset 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 public-reader-1 보유
-
-When
-
-- RuntimeVariantPresetAdapter.search — user-1이 버전 2.5.0에 유효한 프리셋만 조회
-
-Then
-
-- 응답에 포함되어야 하는 프리셋만 반환된다
-  - items = ['open-1', 'unbounded-1']
-  - total_count = 2
-  - has_next_page = False
-  - has_previous_page = False
-
-#### [omitting-the-page-size-answers-ten-presets-and-a-next-page](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_searching.py) — pass
-
-프리셋이 11개 있을 때 페이지 크기를 생략하면 10건을 반환하고 다음 페이지가 있음을 표시한다
-
-Given
-
-- 한 변형의 프리셋 11개와 일반 사용자 한 명
-  - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-  - 런타임 변형 프리셋 preset-1: 대상 env, 값 종류 str
-  - 런타임 변형 프리셋 preset-2: 대상 env, 값 종류 str
-  - 런타임 변형 프리셋 preset-3: 대상 env, 값 종류 str
-  - 런타임 변형 프리셋 preset-4: 대상 env, 값 종류 str
-  - 런타임 변형 프리셋 preset-5: 대상 env, 값 종류 str
-  - 런타임 변형 프리셋 preset-6: 대상 env, 값 종류 str
-  - 런타임 변형 프리셋 preset-7: 대상 env, 값 종류 str
-  - 런타임 변형 프리셋 preset-8: 대상 env, 값 종류 str
-  - 런타임 변형 프리셋 preset-9: 대상 env, 값 종류 str
-  - 런타임 변형 프리셋 preset-10: 대상 env, 값 종류 str
-  - 런타임 변형 프리셋 preset-11: 대상 env, 값 종류 str
-  - 도메인 home-1
-  - public 에서 runtime_variant_preset 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: runtime_variant_preset 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 public-reader-1 보유
-
-When
-
-- RuntimeVariantPresetAdapter.search — user-1이 필터 없이 전체를 조회
-
-Then
-
-- 기본 크기의 첫 페이지가 반환된다
-  - len(items) = 10
-  - total_count = 11
-  - has_next_page = True
-  - has_previous_page = False
+- the call is rejected
+  - rejected: RuntimeVariantPresetNotFound
 

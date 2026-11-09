@@ -11,7 +11,12 @@ from ai.backend.common.dto.manager.v2.huggingface_registry.request import (
     AdminSearchHuggingFaceRegistriesInput,
     CreateHuggingFaceRegistryInput,
     DeleteHuggingFaceRegistryInput,
+    PartialBulkPurgeHuggingFaceRegistriesInput,
+    PartialBulkUpdateHuggingFaceRegistriesInput,
     UpdateHuggingFaceRegistryInput,
+)
+from ai.backend.common.dto.manager.v2.huggingface_registry.response import (
+    DeleteHuggingFaceRegistryPayload,
 )
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.v2.path_params import RegistryIdPathParam
@@ -62,10 +67,39 @@ class V2HuggingFaceRegistryHandler:
         result = await self._adapter.update(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
+    async def purge(
+        self,
+        path: PathParam[RegistryIdPathParam],
+    ) -> APIResponse:
+        """Permanently delete a HuggingFace registry."""
+        result = await self._adapter.purge(path.parsed.registry_id)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_update(
+        self,
+        body: BodyParam[PartialBulkUpdateHuggingFaceRegistriesInput],
+    ) -> APIResponse:
+        """Update several HuggingFace registries, answering for each one."""
+        result = await self._adapter.partial_bulk_update(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_purge(
+        self,
+        body: BodyParam[PartialBulkPurgeHuggingFaceRegistriesInput],
+    ) -> APIResponse:
+        """Permanently delete several HuggingFace registries, answering for each one."""
+        result = await self._adapter.partial_bulk_purge(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
     async def delete(
         self,
         body: BodyParam[DeleteHuggingFaceRegistryInput],
     ) -> APIResponse:
-        """Delete a HuggingFace registry."""
-        result = await self._adapter.delete(body.parsed)
-        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+        """Deprecated. Use `DELETE /v2/huggingface-registries/{registry_id}`."""
+        result = await self._adapter.purge(body.parsed.id)
+        return APIResponse.build(
+            status_code=HTTPStatus.OK,
+            response_model=DeleteHuggingFaceRegistryPayload(
+                id=result.id, entity_id=result.entity_id
+            ),
+        )

@@ -42,11 +42,14 @@ from ai.backend.testutils.scenario_steps import (
     Condition,
     Given,
     Held,
+    Language,
     Refused,
     Same,
     SameAs,
+    Says,
     Then,
     Verdict,
+    in_language,
 )
 from bai_scenario.components.deployment import lay_a_deployment
 from bai_scenario.components.deployment import lay_a_place as lay_a_deployment_place
@@ -54,19 +57,19 @@ from bai_scenario.components.deployment_revision import WhatARevisionStandsOn, l
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf
 from bai_scenario.components.resource_slot import ASlotTypeAndACaller
 from bai_scenario.components.system import role_named
-from bai_scenario.seeds.domain.domain import SeedDomain
-from bai_scenario.seeds.image.image import SeedImage
-from bai_scenario.seeds.image.registry import SeedContainerRegistry
-from bai_scenario.seeds.project.project import SeedProject
-from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
-from bai_scenario.seeds.resource_group.resource_group import SeedResourceGroup
-from bai_scenario.seeds.resource_policy.keypair import SeedKeypairPolicy
-from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
-from bai_scenario.seeds.resource_slot.slot_type import SeedResourceSlotType
-from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
-from bai_scenario.seeds.session.kernel import SeedKernelOf
-from bai_scenario.seeds.session.session import SeedSession
-from bai_scenario.seeds.user.fields import SeedKeypairOf
+from bai_scenario.seeds.domain.domain import TestSeedDomain
+from bai_scenario.seeds.image.image import TestSeedImage
+from bai_scenario.seeds.image.registry import TestSeedContainerRegistry
+from bai_scenario.seeds.project.project import TestSeedProject
+from bai_scenario.seeds.rbac.role import TestSeedPermission, TestSeedRole
+from bai_scenario.seeds.resource_group.resource_group import TestSeedResourceGroup
+from bai_scenario.seeds.resource_policy.keypair import TestSeedKeypairPolicy
+from bai_scenario.seeds.resource_policy.project import TestSeedProjectPolicy
+from bai_scenario.seeds.resource_slot.slot_type import TestSeedResourceSlotType
+from bai_scenario.seeds.seeder import Laid, TestSeeder, TestSeedNest
+from bai_scenario.seeds.session.kernel import TestSeedKernelOf, TestSeedMainKernelGroupOf
+from bai_scenario.seeds.session.session import TestSeedSession
+from bai_scenario.seeds.user.fields import TestSeedKeypairOf
 
 type Slots = tuple[tuple[str, Decimal], ...]
 """커널이 슬롯마다 요구한 양. 슬롯 이름과 양의 짝이다."""
@@ -113,7 +116,7 @@ class KernelsAndACaller:
 
 
 @dataclass(frozen=True)
-class SomeoneReadingSessionsIn[S](SeedNest[Laid[UserData]]):
+class SomeoneReadingSessionsIn[S](TestSeedNest[Laid[UserData]]):
     """그 스코프에서 세션을 읽을 수 있는 사용자."""
 
     domain: Laid[DomainData]
@@ -123,14 +126,22 @@ class SomeoneReadingSessionsIn[S](SeedNest[Laid[UserData]]):
 
     @override
     def kind(self) -> str:
-        return f"{self.where} 범위의 세션 조회 권한을 받은 사용자 준비"
+        return Says(
+            f"{self.where} 범위의 세션 조회 권한을 받은 사용자 준비",
+            english=(
+                "Prepare a user granted permission to read sessions in the "
+                f"{in_language(self.where, Language.ENGLISH)} scope"
+            ),
+        )
 
     @override
-    def lay(self, seed: Seeder) -> Laid[UserData]:
+    def lay(self, seed: TestSeeder) -> Laid[UserData]:
         someone = seed.within(SomeoneOf(self.domain))
-        role = seed.creating_from(SeedRole(self.scope_of, name_hint="session-reader"), self.scope)
+        role = seed.creating_from(
+            TestSeedRole(self.scope_of, name_hint="session-reader"), self.scope
+        )
         seed.adding(
-            SeedPermission(entity_type=SessionEntityType(), permission=Permission.READ), role
+            TestSeedPermission(entity_type=SessionEntityType(), permission=Permission.READ), role
         )
         seed.granting(role, someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id))
         return someone
@@ -152,16 +163,18 @@ class LaidPlace:
 async def lay_a_place(seeding: Any, *, slots: int) -> LaidPlace:
     """커널이 놓일 도메인·프로젝트·리소스 그룹과, 세션을 요청한 사용자와 그 키, 커널이 실행할
     이미지, 커널이 요구할 슬롯 종류를 만든다."""
-    domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
-    policy = await seeding.once(SeedProjectPolicy())
-    project = await seeding.creating_from_two(SeedProject(name_hint="team"), domain, policy)
-    group = await seeding.creating(SeedResourceGroup())
+    domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+    policy = await seeding.once(TestSeedProjectPolicy())
+    project = await seeding.creating_from_two(TestSeedProject(name_hint="team"), domain, policy)
+    group = await seeding.creating(TestSeedResourceGroup())
     owner = await seeding.within(SomeoneOf(domain))
-    key_policy = await seeding.creating(SeedKeypairPolicy())
-    key = await seeding.adding(SeedKeypairOf(resource_policy=seeding.made(key_policy).name), owner)
-    registry = await seeding.creating(SeedContainerRegistry())
-    image = await seeding.creating_from(SeedImage(), registry)
-    slot_types = [await seeding.creating(SeedResourceSlotType()) for _ in range(slots)]
+    key_policy = await seeding.creating(TestSeedKeypairPolicy())
+    key = await seeding.adding(
+        TestSeedKeypairOf(resource_policy=seeding.made(key_policy).name), owner
+    )
+    registry = await seeding.creating(TestSeedContainerRegistry())
+    image = await seeding.creating_from(TestSeedImage(), registry)
+    slot_types = [await seeding.creating(TestSeedResourceSlotType()) for _ in range(slots)]
     return LaidPlace(
         domain=domain,
         project=project,
@@ -183,11 +196,19 @@ def asked_for(seeding: Any, place: LaidPlace) -> Slots:
 async def lay_a_kernel(seeding: Any, place: LaidPlace) -> AKernel:
     """그 자리에 세션 하나와 그 커널을 만든다. 커널은 자리의 슬롯 종류 전부를 요구한다."""
     session = await seeding.creating_from_three(
-        SeedSession(access_key=place.access_key), place.project, place.owner, place.group
+        TestSeedSession(access_key=place.access_key), place.project, place.owner, place.group
     )
     slots = asked_for(seeding, place)
+    group = await seeding.adding(
+        TestSeedMainKernelGroupOf(image=seeding.made(place.image), slots=slots), session
+    )
     kernel = await seeding.adding_with_nested(
-        SeedKernelOf(session=seeding.made(session), image=seeding.made(place.image), slots=slots),
+        TestSeedKernelOf(
+            session=seeding.made(session),
+            group=seeding.made(group),
+            image=seeding.made(place.image),
+            slots=slots,
+        ),
         session,
     )
     return AKernel(session=seeding.made(session), kernel=seeding.made(kernel), slots=slots)
@@ -204,26 +225,42 @@ async def lay_a_caller_of(
         case Granted.THE_PROJECT:
             caller = await seeding.within(
                 SomeoneReadingSessionsIn(
-                    place.domain, place.project, lambda p: ProjectID(p.id), "프로젝트"
+                    place.domain,
+                    place.project,
+                    lambda p: ProjectID(p.id),
+                    Says("프로젝트", english="project"),
                 )
             )
         case Granted.THE_DOMAIN:
             caller = await seeding.within(
                 SomeoneReadingSessionsIn(
-                    place.domain, place.domain, lambda d: DomainID(d.id), "도메인"
+                    place.domain,
+                    place.domain,
+                    lambda d: DomainID(d.id),
+                    Says("도메인", english="domain"),
                 )
             )
     return caller
 
 
-def _who(role: UserRole, granted: Granted) -> str:
+def _who(role: UserRole, granted: Granted) -> Says:
     match granted:
         case Granted.NOTHING:
-            return f"{role_named(role)} 한 명"
+            named = role_named(role)
+            return Says(
+                f"{named} 한 명",
+                english=f"one {in_language(named, Language.ENGLISH)}",
+            )
         case Granted.THE_PROJECT:
-            return "프로젝트 범위에서 세션을 읽을 수 있는 일반 사용자 한 명"
+            return Says(
+                "프로젝트 범위에서 세션을 읽을 수 있는 일반 사용자 한 명",
+                english="one regular user who can read sessions in the project scope",
+            )
         case Granted.THE_DOMAIN:
-            return "도메인 범위에서 세션을 읽을 수 있는 일반 사용자 한 명"
+            return Says(
+                "도메인 범위에서 세션을 읽을 수 있는 일반 사용자 한 명",
+                english="one regular user who can read sessions in the domain scope",
+            )
 
 
 @dataclass(frozen=True)
@@ -235,7 +272,14 @@ class AKernelAndSomeone(Given[Any, AKernelAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"슬롯 둘을 요구하며 대기 중인 커널 하나와, {_who(self.role, self.granted)}"
+        who = _who(self.role, self.granted)
+        return Says(
+            f"슬롯 둘을 요구하며 대기 중인 커널 하나와, {who}",
+            english=(
+                "one kernel waiting and asking for two slots, and "
+                f"{in_language(who, Language.ENGLISH)}"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> AKernelAndACaller:
@@ -260,9 +304,13 @@ class KernelsAndSomeone(Given[Any, KernelsAndACaller]):
 
     @override
     def describe(self) -> str:
-        return (
-            f"슬롯 {self.slots_each}개씩 요구하는 커널 {self.kernels}개와, "
-            f"{role_named(self.role)} 한 명"
+        named = role_named(self.role)
+        return Says(
+            f"슬롯 {self.slots_each}개씩 요구하는 커널 {self.kernels}개와, {named} 한 명",
+            english=(
+                f"{self.kernels} kernels each asking for {self.slots_each} slots and "
+                f"one {in_language(named, Language.ENGLISH)}"
+            ),
         )
 
     @override
@@ -281,8 +329,13 @@ class ASlotTypeAKernelAsksForAndSomeone(Given[Any, ASlotTypeAndACaller]):
 
     @override
     def describe(self) -> str:
-        return (
-            f"대기 중인 커널 하나가 요구하는 자원 슬롯 종류 하나와, {role_named(self.role)} 한 명"
+        named = role_named(self.role)
+        return Says(
+            f"대기 중인 커널 하나가 요구하는 자원 슬롯 종류 하나와, {named} 한 명",
+            english=(
+                "one resource slot type that one waiting kernel asks for and "
+                f"one {in_language(named, Language.ENGLISH)}"
+            ),
         )
 
     @override
@@ -303,7 +356,14 @@ class ASlotTypeARevisionUsesAndSomeone(Given[Any, ASlotTypeAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"배포 리비전 하나가 사용하는 자원 슬롯 종류 하나와, {role_named(self.role)} 한 명"
+        named = role_named(self.role)
+        return Says(
+            f"배포 리비전 하나가 사용하는 자원 슬롯 종류 하나와, {named} 한 명",
+            english=(
+                "one resource slot type that one deployment revision uses and "
+                f"one {in_language(named, Language.ENGLISH)}"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> ASlotTypeAndACaller:
@@ -324,7 +384,10 @@ class AmountOf(Condition[str]):
 
     @override
     def says(self) -> str:
-        return f"수로 보아 {self.wanted}"
+        return Says(
+            f"수로 보아 {self.wanted}",
+            english=f"seen as a number, {self.wanted}",
+        )
 
     @override
     def holds(self, got: str) -> bool:
@@ -338,10 +401,24 @@ def allocation_verdicts(node: ResourceAllocationNode, kernel: AKernel, slot: str
         Held(
             "id",
             node.id,
-            SameAs(f"{kernel.kernel.id}:{slot}", "미리 만들어 둔 커널의 id와 슬롯 이름"),
+            SameAs(
+                f"{kernel.kernel.id}:{slot}",
+                Says(
+                    "미리 저장한 커널의 id 와 슬롯 이름",
+                    english="the id and slot name of the kernel seeded in advance",
+                ),
+            ),
         ),
         Held(
-            "kernel_id", node.kernel_id, SameAs(str(kernel.kernel.id), "미리 만들어 둔 커널의 id")
+            "kernel_id",
+            node.kernel_id,
+            SameAs(
+                str(kernel.kernel.id),
+                Says(
+                    "미리 저장한 커널의 id",
+                    english="the id of the kernel seeded in advance",
+                ),
+            ),
         ),
         Same("slot_name", node.slot_name, slot),
         Held("requested", node.requested, AmountOf(dict(kernel.slots)[slot])),
@@ -356,7 +433,10 @@ class TheAllocationNode(Then[AKernelAndACaller, ResourceAllocationNode]):
 
     @override
     def says(self) -> str:
-        return "그 커널의 할당 전체가 반환된다"
+        return Says(
+            "그 커널의 할당 전체가 반환됩니다",
+            english="the whole allocation of that kernel comes back",
+        )
 
     @override
     def look(
@@ -374,7 +454,10 @@ class EveryLaidAllocationIsCounted(Then[KernelsAndACaller, AdminSearchResourceAl
 
     @override
     def says(self) -> str:
-        return "미리 만들어 둔 할당이 모두 집계된다"
+        return Says(
+            "미리 저장한 할당이 모두 집계됩니다",
+            english="every allocation seeded in advance is counted",
+        )
 
     @override
     def look(
@@ -388,7 +471,13 @@ class EveryLaidAllocationIsCounted(Then[KernelsAndACaller, AdminSearchResourceAl
             Held(
                 "items",
                 sorted((one.kernel_id, one.slot_name) for one in page.items),
-                SameAs(sorted(wanted), "미리 만들어 둔 커널들의 id와 슬롯 이름"),
+                SameAs(
+                    sorted(wanted),
+                    Says(
+                        "미리 저장한 커널들의 id 와 슬롯 이름",
+                        english="the ids and slot names of the kernels seeded in advance",
+                    ),
+                ),
             ),
             Same("total_count", page.total_count, len(wanted)),
             Same("has_next_page", page.has_next_page, False),
@@ -402,7 +491,10 @@ class OnlyTheNamedSlotIsLeft(Then[KernelsAndACaller, AdminSearchResourceAllocati
 
     @override
     def says(self) -> str:
-        return "필터에 맞는 슬롯의 할당 하나만 반환된다"
+        return Says(
+            "필터에 맞는 슬롯의 할당 하나만 반환됩니다",
+            english="only the one allocation of the slot the filter names comes back",
+        )
 
     @override
     def look(
@@ -417,7 +509,10 @@ class OnlyTheNamedSlotIsLeft(Then[KernelsAndACaller, AdminSearchResourceAllocati
             Held(
                 "items[0].kernel_id",
                 [one.kernel_id for one in page.items],
-                SameAs([str(laid.named.kernel.id)], "골라낼 커널의 id"),
+                SameAs(
+                    [str(laid.named.kernel.id)],
+                    Says("골라낼 커널의 id", english="the id of the kernel the filter picks"),
+                ),
             ),
             Same("total_count", page.total_count, 1),
             Same("has_next_page", page.has_next_page, False),
@@ -431,7 +526,10 @@ class OnlyTheNamedKernelIsLeft(Then[KernelsAndACaller, AdminSearchResourceAlloca
 
     @override
     def says(self) -> str:
-        return "필터에 맞는 커널의 할당만 반환된다"
+        return Says(
+            "필터에 맞는 커널의 할당만 반환됩니다",
+            english="only the allocations of the kernel the filter names come back",
+        )
 
     @override
     def look(
@@ -446,7 +544,10 @@ class OnlyTheNamedKernelIsLeft(Then[KernelsAndACaller, AdminSearchResourceAlloca
                 sorted((one.kernel_id, one.slot_name) for one in page.items),
                 SameAs(
                     sorted((str(laid.named.kernel.id), name) for name, _ in laid.named.slots),
-                    "골라낼 커널의 id와 그 슬롯 이름",
+                    Says(
+                        "골라낼 커널의 id 와 그 슬롯 이름",
+                        english="the id of the kernel the filter picks and its slot names",
+                    ),
                 ),
             ),
             Same("total_count", page.total_count, len(laid.named.slots)),
@@ -463,7 +564,10 @@ class TheFirstPageOfAllocations(Then[KernelsAndACaller, AdminSearchResourceAlloc
 
     @override
     def says(self) -> str:
-        return "기본 크기의 첫 페이지가 반환된다"
+        return Says(
+            "기본 크기의 첫 페이지가 반환됩니다",
+            english="the first page of the default size comes back",
+        )
 
     @override
     def look(
@@ -486,7 +590,10 @@ class NothingIsOccupied(Then[Any, ActiveResourceOverviewInfoDTO]):
 
     @override
     def says(self) -> str:
-        return "점유된 슬롯이 없고 세션 수가 0인 개요가 반환된다"
+        return Says(
+            "점유된 슬롯이 없고 세션 수가 0인 개요가 반환됩니다",
+            english="an overview with no occupied slot and a session count of zero comes back",
+        )
 
     @override
     def look(self, laid: Any, answered: Answered[ActiveResourceOverviewInfoDTO]) -> list[Verdict]:

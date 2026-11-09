@@ -16,12 +16,17 @@ from ai.backend.common.data.idle_checker.types import (
     UtilizationSpec,
     UtilizationThresholdEntry,
 )
-from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.dto.manager.v2.common import (
+    OrderDirection,
+    PartialBulkFailure,
+    PartialBulkPayload,
+)
 from ai.backend.common.dto.manager.v2.idle_checker.request import (
     CreateIdleCheckerInput,
     IdleCheckerFilter,
     IdleCheckerOrder,
     IdleCheckerSpecInputDTO,
+    PartialBulkPurgeIdleCheckersInput,
     PurgeIdleCheckerInput,
     SearchIdleCheckersInput,
     UpdateIdleCheckerInput,
@@ -48,7 +53,11 @@ from ai.backend.manager.api.adapter_options.pagination.pagination import Paginat
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.idle_checker.types import IdleCheckerData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.models.idle_checker.creators import IdleCheckerCreator
 from ai.backend.manager.models.idle_checker.row import IdleCheckerRow
 from ai.backend.manager.models.idle_checker.searchable_fields import (
@@ -184,7 +193,28 @@ class IdleCheckerAdapter(BaseAdapter):
         error = action_result.errors().get(input.id)
         if error is not None:
             raise error
-        return PurgeIdleCheckerPayload(id=input.id)
+        return PurgeIdleCheckerPayload(id=input.id, entity_id=input.id)
+
+    async def admin_partial_bulk_purge(
+        self,
+        input: PartialBulkPurgeIdleCheckersInput,
+    ) -> PartialBulkPayload[IdleCheckerNode]:
+        """Purge several idle checkers, answering for each one."""
+        action_result = await self._idle_checker.bulk_purge.run(
+            BulkPurgeIdleCheckersAction(ids=input.ids)
+        )
+        return PartialBulkPayload[IdleCheckerNode](
+            successes=[
+                self._data_to_node(item.value)
+                for item in action_result.items
+                if item.value is not None
+            ],
+            failed=[
+                PartialBulkFailure(id=item.entity_id, message=str(item.error))
+                for item in action_result.items
+                if item.error is not None
+            ],
+        )
 
     @staticmethod
     def _data_to_node(data: IdleCheckerData) -> IdleCheckerNode:
@@ -282,6 +312,7 @@ class IdleCheckerAdapter(BaseAdapter):
             *self.apply_string_filter(filter_.name, fields.name.filter),
             *self.apply_datetime_filter(filter_.created_at, fields.created_at.filter),
             *self.apply_datetime_filter(filter_.updated_at, fields.updated_at.filter),
+            *self.apply_uuid_filter(filter_.entity_id, fields.id.filter),
         ]
         if filter_.checker_type is not None:
             if filter_.checker_type.equals is not None:
@@ -302,15 +333,16 @@ class IdleCheckerAdapter(BaseAdapter):
         if filter_.OR:
             or_conditions: list[QueryCondition] = []
             for sub_filter in filter_.OR:
-                or_conditions.extend(self._convert_filter(sub_filter))
+                sub_conditions = self._convert_filter(sub_filter)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if filter_.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub_filter in filter_.NOT:
-                not_conditions.extend(self._convert_filter(sub_filter))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_filter(sub_filter)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     @staticmethod

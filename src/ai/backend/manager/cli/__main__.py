@@ -153,9 +153,14 @@ def dbshell(
             sys.exit(ExitCode.FAILURE)
     elif container_name == "-":
         # Use the host-provided psql command
+        hosts = ",".join(addr.host for addr in db_config.addrs)
+        ports = ",".join(str(addr.port) for addr in db_config.addrs)
         cmd = [
             "psql",
-            (f"postgres://{db_config.user}:{db_config.password}@{db_config.addr}/{db_config.name}"),
+            (
+                f"postgres://{db_config.user}:{db_config.password}@/{db_config.name}"
+                f"?host={hosts}&port={ports}&target_session_attrs=primary"
+            ),
             *_psql_args,
         ]
         subprocess.run(cmd)
@@ -184,10 +189,11 @@ def generate_api_keypair(_cli_ctx: CLIContext) -> None:
     """
     Generate a manager API keypair and print it out to stdout.
     """
-    from ai.backend.manager.models.keypair.row import generate_keypair as _gen_keypair
+    from ai.backend.common.auth.keypair import generate_keypair
 
     _get_logger().info("generating a manager API keypair")
-    ak, sk = _gen_keypair()
+    keypair = generate_keypair()
+    ak, sk = keypair.access_key, keypair.secret_key
     print(f"Access Key: {ak} ({len(ak)} bytes)")
     print(f"Secret Key: {sk} ({len(sk)} bytes)")
 
@@ -359,6 +365,11 @@ def etcd() -> None:
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.fixture:cli")
 def fixture() -> None:
     """Command set for managing fixtures."""
+
+
+@main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.seed:cli")
+def seed() -> None:
+    """Command set for applying seed files."""
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.api:cli")

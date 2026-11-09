@@ -4,7 +4,6 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
-from ai.backend.common import redis_helper
 from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.message_queue.message import MQMessage
 from ai.backend.common.message_queue.payload import AnycastMessagePayload, BroadcastMessagePayload
@@ -12,35 +11,8 @@ from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.message_queue.types import MessageName
 from ai.backend.common.types import (
     HostPortPair,
-    RedisConnectionInfo,
-    RedisHelperConfig,
     RedisTarget,
 )
-
-
-@pytest.fixture
-async def redis_conn(
-    redis_container: tuple[str, HostPortPair],
-) -> AsyncGenerator[RedisConnectionInfo, None]:
-    # Configure test Redis connection
-    addr = redis_container[1]
-    conn = redis_helper.get_redis_object(
-        RedisTarget(
-            addr=addr,
-            redis_helper_config=RedisHelperConfig(
-                socket_timeout=1.0,
-                socket_connect_timeout=1.0,
-                reconnect_poll_timeout=1.0,
-                max_connections=10,
-                connection_ready_timeout=1.0,
-            ),
-        ),
-        name="test-redis",
-    )
-    yield conn
-    # Cleanup after tests
-    await conn.client.flushdb()
-    await conn.close()
 
 
 @pytest.fixture

@@ -13,35 +13,43 @@ from uuid import UUID
 
 from ai.backend.common.data.entity.login_client_type import LoginClientTypeEntityType
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.login_client_type.response import (
-    DeleteLoginClientTypePayload,
     LoginClientTypeNode,
+    PurgeLoginClientTypePayload,
     SearchLoginClientTypesPayload,
 )
 from ai.backend.manager.data.login_client_type.types import LoginClientTypeData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
     Held,
+    Language,
     Refused,
     Same,
     SameAs,
+    Says,
     Skipped,
     Then,
     Verdict,
+    in_language,
 )
-from bai_scenario.components.domain import WrittenByThisRun
+from bai_scenario.components.domain import Mentions, WrittenByThisRun
 from bai_scenario.components.system import (
     KEPT,
     Kept,
     lay_a_public_reader,
     role_named,
 )
-from bai_scenario.seeds.login_client_type.login_client_type import SeedLoginClientType
+from bai_scenario.seeds.login_client_type.login_client_type import TestSeedLoginClientType
 
-DESCRIBED = "미리 만들어 둔 로그인 클라이언트 종류"
+DESCRIBED = Says(
+    "미리 저장한 로그인 클라이언트 종류",
+    english="a login client type created in advance",
+)
 """시드가 미리 만들어 두는 종류의 설명. 시나리오가 기대값으로 다시 쓰므로 한 곳에 둔다."""
 
 
@@ -70,11 +78,15 @@ class ATypeAndSomeone(Given[Any, ATypeAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"로그인 클라이언트 종류 하나와, {role_named(self.role)} 한 명"
+        who = role_named(self.role)
+        return Says(
+            f"로그인 클라이언트 종류 하나와, {who} 한 명",
+            english=f"one login client type and one {in_language(who, Language.ENGLISH)}",
+        )
 
     @override
     async def lay(self, seeding: Any) -> ATypeAndACaller:
-        client_type = await seeding.creating(SeedLoginClientType(description=DESCRIBED))
+        client_type = await seeding.creating(TestSeedLoginClientType(description=DESCRIBED))
         caller = await lay_a_public_reader(seeding, LoginClientTypeEntityType(), self.role)
         return ATypeAndACaller(seeding.made(client_type), seeding.made(caller))
 
@@ -88,13 +100,20 @@ class ManyTypesAndSomeone(Given[Any, ManyTypesAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"로그인 클라이언트 종류 {self.besides + 1}개와, {role_named(self.role)} 한 명"
+        who = role_named(self.role)
+        return Says(
+            f"로그인 클라이언트 종류 {self.besides + 1}개와, {who} 한 명",
+            english=(
+                f"{self.besides + 1} login client types and one "
+                f"{in_language(who, Language.ENGLISH)}"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> ManyTypesAndACaller:
-        wanted = await seeding.creating(SeedLoginClientType(name_hint="wanted"))
+        wanted = await seeding.creating(TestSeedLoginClientType(name_hint="wanted"))
         others = [
-            await seeding.creating(SeedLoginClientType(name_hint="other"))
+            await seeding.creating(TestSeedLoginClientType(name_hint="other"))
             for _ in range(self.besides)
         ]
         caller = await lay_a_public_reader(seeding, LoginClientTypeEntityType(), self.role)
@@ -114,7 +133,7 @@ def type_verdicts(
 ) -> list[Verdict]:
     """Every place of one login client type node."""
     return [
-        Skipped("id", "데이터베이스가 만든다"),
+        Skipped("id", Says("데이터베이스가 생성합니다", english="the database generates it")),
         Same("name", node.name, named),
         Same("description", node.description, described),
         Held("created_at", node.created_at, written),
@@ -132,7 +151,10 @@ class TheNewTypeNode(Then[Any, LoginClientTypeNode]):
 
     @override
     def says(self) -> str:
-        return "생성한 종류 전체가 반환된다"
+        return Says(
+            "생성한 종류 전체가 반환됩니다",
+            english="the whole login client type just created comes back",
+        )
 
     @override
     def look(self, laid: Any, answered: Answered[LoginClientTypeNode]) -> list[Verdict]:
@@ -157,7 +179,10 @@ class TheTypeNode(Then[ATypeAndACaller, LoginClientTypeNode]):
 
     @override
     def says(self) -> str:
-        return "미리 만들어 둔 종류 전체가 반환된다"
+        return Says(
+            "미리 저장한 종류 전체가 반환됩니다",
+            english="the whole login client type created in advance comes back",
+        )
 
     @override
     def look(self, laid: ATypeAndACaller, answered: Answered[LoginClientTypeNode]) -> list[Verdict]:
@@ -179,7 +204,10 @@ class EveryLaidTypeIsCounted(Then[ManyTypesAndACaller, SearchLoginClientTypesPay
 
     @override
     def says(self) -> str:
-        return "미리 만들어 둔 종류가 모두 집계된다"
+        return Says(
+            "미리 저장한 종류가 모두 집계됩니다",
+            english="every login client type created in advance is counted",
+        )
 
     @override
     def look(
@@ -201,20 +229,76 @@ class EveryLaidTypeIsCounted(Then[ManyTypesAndACaller, SearchLoginClientTypesPay
 
 
 @dataclass(frozen=True)
-class TheDeletedTypeId(Then[ATypeAndACaller, DeleteLoginClientTypePayload]):
+class TheDeletedTypeId(Then[ATypeAndACaller, PurgeLoginClientTypePayload]):
     """삭제한 종류의 id를 담은 응답."""
 
     @override
     def says(self) -> str:
-        return "삭제한 종류의 id가 반환된다"
+        return Says(
+            "삭제한 종류의 id 가 반환됩니다",
+            english="the id of the deleted login client type comes back",
+        )
 
     @override
     def look(
-        self, laid: ATypeAndACaller, answered: Answered[DeleteLoginClientTypePayload]
+        self, laid: ATypeAndACaller, answered: Answered[PurgeLoginClientTypePayload]
     ) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [Refused(EntityNotFoundError, answered.raised)]
         return [
-            Held[UUID]("id", payload.id, SameAs[UUID](laid.client_type.id, "미리 만들어 둔 종류"))
+            Held[UUID](
+                "id",
+                payload.id,
+                SameAs[UUID](
+                    laid.client_type.id,
+                    Says(
+                        "미리 저장한 종류",
+                        english="the login client type created in advance",
+                    ),
+                ),
+            )
         ]
+
+
+@dataclass(frozen=True)
+class NoTypeIsProcessed(Then[ManyTypesAndACaller, PartialBulkPayload[LoginClientTypeNode]]):
+    """처리된 종류 없이, 미리 만들어 둔 종류가 모두 같은 이유로 실패 목록에 온다."""
+
+    reason: str
+
+    @override
+    def says(self) -> str:
+        return Says(
+            "처리된 종류 없이 대상이 모두 실패 목록에 옵니다",
+            english=(
+                "no login client type is processed and every target comes back in the failed list"
+            ),
+        )
+
+    @override
+    def look(
+        self,
+        laid: ManyTypesAndACaller,
+        answered: Answered[PartialBulkPayload[LoginClientTypeNode]],
+    ) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        verdicts: list[Verdict] = [
+            Same("successes", payload.successes, []),
+            Same("failed count", len(payload.failed), len(laid.laid)),
+        ]
+        for i, (failure, client_type) in enumerate(zip(payload.failed, laid.laid, strict=False)):
+            verdicts += [
+                Held[UUID](
+                    f"failed[{i}].id",
+                    failure.id,
+                    SameAs[UUID](
+                        client_type.id,
+                        Says("대상 종류의 id", english="the id of the target login client type"),
+                    ),
+                ),
+                Held(f"failed[{i}].message", failure.message, Mentions(self.reason)),
+            ]
+        return verdicts

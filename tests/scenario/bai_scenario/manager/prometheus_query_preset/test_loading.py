@@ -1,6 +1,6 @@
 """여러 id로 조회 — 검색을 id 조건으로 호출하므로 권한 경로가 검색과 같다.
 
-인증만 확인하므로 거부 원소는 생기지 않는다. 없는 id만 빈 항목으로 반환된다.
+권한이 없는 호출자는 거부된다. 없는 id만 빈 항목으로 반환된다.
 """
 
 from __future__ import annotations
@@ -15,8 +15,16 @@ from ai.backend.common.data.entity.prometheus_query_preset import PrometheusQuer
 from ai.backend.manager.api.adapters.prometheus_query_preset.adapter import (
     PrometheusQueryPresetAdapter,
 )
+from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import (
+    Given,
+    Says,
+    Scenario,
+    Then,
+    When,
+)
+from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.prometheus_query_preset import (
     ManyPresetsAndACaller,
     ManyPresetsAndSomeone,
@@ -25,12 +33,12 @@ from bai_scenario.components.prometheus_query_preset import (
     TheBatchAnswersInOrder,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Loaded = list[PresetNodeAnswer]
 type LoadingStep = Scenario[
-    SeedingSession, ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Loaded
+    TestSeedingSession, ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Loaded
 ]
 
 
@@ -46,7 +54,14 @@ class LoadingTheLaidAndOneUnknown(
 
     @override
     def describe(self, laid: ManyPresetsAndACaller) -> str:
-        return f"{laid.caller.username}이 미리 만들어 둔 프리셋 {len(laid.laid)}개의 id와 없는 id 하나를 한 번에 조회"
+        return Says(
+            f"{laid.caller.username}이 미리 저장한 프리셋 {len(laid.laid)}개의 id 와 없는 id 하나를 "
+            "한 번에 조회합니다",
+            english=(
+                f"{laid.caller.username} reads the ids of {len(laid.laid)} presets seeded in "
+                "advance and one absent id at once"
+            ),
+        )
 
     @override
     async def call(
@@ -67,7 +82,10 @@ class LoadingNothing(When[ManyPresetsAndACaller, PrometheusQueryPresetAdapter, L
 
     @override
     def describe(self, laid: ManyPresetsAndACaller) -> str:
-        return f"{laid.caller.username}이 빈 id 목록으로 조회"
+        return Says(
+            f"{laid.caller.username}이 빈 id 목록으로 조회합니다",
+            english=f"{laid.caller.username} reads with an empty id list",
+        )
 
     @override
     async def call(
@@ -79,7 +97,7 @@ class LoadingNothing(When[ManyPresetsAndACaller, PrometheusQueryPresetAdapter, L
 
 @dataclass(frozen=True)
 class TheLaidAndTheUnknownComeBackInOrder(
-    Scenario[SeedingSession, ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Loaded]
+    Scenario[TestSeedingSession, ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Loaded]
 ):
     @override
     def summary(self) -> str:
@@ -87,13 +105,18 @@ class TheLaidAndTheUnknownComeBackInOrder(
 
     @override
     def describe(self) -> str:
-        return (
-            "프리셋 둘과 없는 id 하나를 섞어 한 번에 조회하면, 있는 둘은 노드로 없는 하나는 "
-            "빈 항목으로 반환되고 순서가 요청한 순서와 같다"
+        return Says(
+            "프리셋 둘과 없는 id 하나를 섞어 한 번에 조회하면, 있는 둘은 노드로 없는 하나는 빈 "
+            "항목으로 반환되고 순서가 요청한 순서와 같습니다",
+            english=(
+                "when two presets and one absent id are read at once, the two present ones "
+                "come back as nodes and the absent one as an empty item, in the requested "
+                "order"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyPresetsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyPresetsAndACaller]:
         return ManyPresetsAndSomeone(besides=1)
 
     @override
@@ -107,7 +130,7 @@ class TheLaidAndTheUnknownComeBackInOrder(
 
 @dataclass(frozen=True)
 class AnEmptyListAnswersNothing(
-    Scenario[SeedingSession, ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Loaded]
+    Scenario[TestSeedingSession, ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Loaded]
 ):
     @override
     def summary(self) -> str:
@@ -115,10 +138,13 @@ class AnEmptyListAnswersNothing(
 
     @override
     def describe(self) -> str:
-        return "프리셋이 있어도 빈 id 목록으로 조회하면, 빈 응답이 반환된다"
+        return Says(
+            "프리셋이 있어도 빈 id 목록으로 조회하면, 빈 응답이 반환됩니다",
+            english=("even when presets exist, reading an empty id list answers an empty response"),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyPresetsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyPresetsAndACaller]:
         return ManyPresetsAndSomeone(besides=0)
 
     @override
@@ -130,7 +156,42 @@ class AnEmptyListAnswersNothing(
         return NothingIsAnswered()
 
 
-SCENARIOS: list[LoadingStep] = [TheLaidAndTheUnknownComeBackInOrder(), AnEmptyListAnswersNothing()]
+@dataclass(frozen=True)
+class AUserGrantedNothingMayNotLoad(
+    Scenario[TestSeedingSession, ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Loaded]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-granted-nothing-may-not-load-presets-by-ids"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "아무 권한도 없는 사용자가 프리셋 id 를 한 번에 조회하면, 권한 부족으로 거부됩니다",
+            english=(
+                "when a user granted nothing reads presets by ids at once, it is rejected "
+                "for lack of permission"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ManyPresetsAndACaller]:
+        return ManyPresetsAndSomeone(reading_in_public=False)
+
+    @override
+    def when(self) -> When[ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Loaded]:
+        return LoadingTheLaidAndOneUnknown()
+
+    @override
+    def then(self) -> Then[ManyPresetsAndACaller, Loaded]:
+        return TheCallIsRefused(NotEnoughPermission)
+
+
+SCENARIOS: list[LoadingStep] = [
+    TheLaidAndTheUnknownComeBackInOrder(),
+    AnEmptyListAnswersNothing(),
+    AUserGrantedNothingMayNotLoad(),
+]
 
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())

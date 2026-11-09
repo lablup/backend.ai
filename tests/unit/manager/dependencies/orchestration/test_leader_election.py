@@ -50,11 +50,13 @@ class TestLeaderElectionDependency:
         dependency = LeaderElectionDependency()
         election_input = LeaderElectionInput(
             valkey_profile_target=mock_valkey_profile_target,
+            sentinel_monitors=MagicMock(),
             pidx=0,
             config_provider=mock_config_provider,
             event_producer=mock_event_producer,
             sokovan_orchestrator=mock_orchestrator,
             retention_repository=MagicMock(),
+            project_repository=MagicMock(),
             valkey_live=MagicMock(),
         )
 
@@ -93,11 +95,13 @@ class TestLeaderElectionDependency:
         dependency = LeaderElectionDependency()
         election_input = LeaderElectionInput(
             valkey_profile_target=MagicMock(),
+            sentinel_monitors=MagicMock(),
             pidx=1,
             config_provider=mock_config_provider,
             event_producer=MagicMock(),
             sokovan_orchestrator=mock_orchestrator,
             retention_repository=MagicMock(),
+            project_repository=MagicMock(),
             valkey_live=MagicMock(),
         )
 
@@ -131,11 +135,13 @@ class TestLeaderElectionDependency:
         dependency = LeaderElectionDependency()
         election_input = LeaderElectionInput(
             valkey_profile_target=MagicMock(),
+            sentinel_monitors=MagicMock(),
             pidx=0,
             config_provider=mock_config_provider,
             event_producer=MagicMock(),
             sokovan_orchestrator=mock_orchestrator,
             retention_repository=MagicMock(),
+            project_repository=MagicMock(),
             valkey_live=MagicMock(),
         )
 
@@ -172,11 +178,13 @@ class TestLeaderElectionDependency:
         dependency = LeaderElectionDependency()
         election_input = LeaderElectionInput(
             valkey_profile_target=MagicMock(),
+            sentinel_monitors=MagicMock(),
             pidx=0,
             config_provider=mock_config_provider,
             event_producer=MagicMock(),
             sokovan_orchestrator=mock_orchestrator,
             retention_repository=MagicMock(),
+            project_repository=MagicMock(),
             valkey_live=MagicMock(),
         )
 

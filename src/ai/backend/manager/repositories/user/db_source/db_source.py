@@ -16,14 +16,17 @@ from sqlalchemy.orm import load_only, noload
 from sqlalchemy.sql.expression import bindparam
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.data.entity.bootstrap_script import BootstrapScript
 from ai.backend.common.data.entity.entity_share import EntityShareID
 from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
+from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.common.types import AccessKey, VFolderID
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
+from ai.backend.manager.data.bootstrap_script.types import BootstrapScriptRevisionData
 from ai.backend.manager.data.common.bulk import BulkCreateFailure, BulkUpdateFailure
 from ai.backend.manager.data.entity_share.types import EntityShareStatus
 from ai.backend.manager.data.keypair.types import (
@@ -31,12 +34,18 @@ from ai.backend.manager.data.keypair.types import (
     KeyPairData,
 )
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
+from ai.backend.manager.data.session.types import SessionEntityData, SessionStatus
 from ai.backend.manager.data.user.types import (
     BulkUserCreateResultData,
     BulkUserUpdateResultData,
     UserCreateResultData,
     UserData,
     UserSearchResult,
+)
+from ai.backend.manager.data.vfolder.types import (
+    VFolderStatusSet,
+    VFolderStorageTarget,
+    vfolder_status_map,
 )
 from ai.backend.manager.errors.keypair import NoDefaultKeypairResourcePolicy
 from ai.backend.manager.errors.resource import PersonalProjectNotFound
@@ -49,36 +58,54 @@ from ai.backend.manager.errors.user import (
     UserNotFound,
     UserPurgeInProgress,
 )
+from ai.backend.manager.models.bootstrap_script.creators import BootstrapScriptCreator
+from ai.backend.manager.models.bootstrap_script.purgers import BootstrapScriptPurger
+from ai.backend.manager.models.bootstrap_script.upserters import (
+    UserDefaultBootstrapScriptUpserter,
+)
+from ai.backend.manager.models.bootstrap_script_revision.creators import (
+    BootstrapScriptRevisionCreator,
+)
+from ai.backend.manager.models.bootstrap_script_revision.searchable_fields import (
+    BootstrapScriptRevisionSearchableFields,
+)
+from ai.backend.manager.models.bootstrap_script_revision.searchers import (
+    DefaultBootstrapScriptRevisionSearcher,
+)
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.endpoint.purgers import UserEndpointPurger
-from ai.backend.manager.models.endpoint.row import EndpointRow
+from ai.backend.manager.models.endpoint.row import EndpointRow, EndpointTokenRow
 from ai.backend.manager.models.entity_share.purgers import EntitySharePendingOfferBatchPurger
 from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.entity_share.updaters import EntityShareRevokeUpdater
 from ai.backend.manager.models.kernel.row import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     RESOURCE_USAGE_KERNEL_STATUSES,
+    KernelRow,
     kernels,
 )
 from ai.backend.manager.models.keypair.row import (
     KeyPairRow,
-    generate_keypair_data,
     keypairs,
 )
 from ai.backend.manager.models.keypair.searchable_fields import KeyPairSearchableFields
 from ai.backend.manager.models.project.lookups import PersonalProjectOfUserLookup
+from ai.backend.manager.models.project.updaters import PersonalProjectSoftDeleteUpdater
+from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
 from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.resource_slot.aggregates import kernel_allocated_slots_expr
+from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.models.session.row import (
     AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
     SessionRow,
-    by_status,
-    by_user_id,
 )
-from ai.backend.manager.models.types import QueryCondition, QueryOption, join_by_related_field
+from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
+from ai.backend.manager.models.session.searchers import SessionSearcher
+from ai.backend.manager.models.session_group.row import SessionGroupRow
+from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.purgers import (
     UserErrorLogPurger,
@@ -86,6 +113,7 @@ from ai.backend.manager.models.user.purgers import (
     UserKeyPairPurger,
     UserPurger,
     UserSessionGroupPurger,
+    UserVFolderAutoMountPurger,
 )
 from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus, users
 from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
@@ -93,13 +121,12 @@ from ai.backend.manager.models.user.searchers import UserSearcher
 from ai.backend.manager.models.user.updaters import UserUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder.row import (
-    VFolderDeletionInfo,
     VFolderRow,
-    VFolderStatusSet,
-    vfolder_status_map,
     vfolders,
 )
+from ai.backend.manager.repositories.auth.keypair_secrets import generate_keypair_data
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.read import V2ReadOps
 from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
     ResourcePolicyOpsProvider,
 )
@@ -140,6 +167,51 @@ class UserDBSource:
         self._policy_ops = policy_ops_provider
         self._user_ops_provider = UserOpsProvider(db)
         self._key_provider_pool = key_provider_pool
+
+    async def current_default_bootstrap_script(
+        self, user_id: UserID
+    ) -> BootstrapScriptRevisionData | None:
+        async with self._v2_ops.read_ops() as r:
+            return await self._current_default_revision(r, user_id)
+
+    async def add_default_bootstrap_script_revision(
+        self, user_id: UserID, script: BootstrapScript, creator_id: UserID
+    ) -> None:
+        """Append the next revision to the user's live default script. A user with no
+        default gets a new script, set as the default."""
+        async with self._v2_ops.write_ops() as w:
+            current = await self._current_default_revision(w, user_id)
+            if current is not None:
+                await w.create_dangling_field(
+                    BootstrapScriptRevisionCreator(
+                        script_id=current.script_id,
+                        script=script,
+                        creator_id=creator_id,
+                    )
+                )
+                return
+            created = await w.create_field(user_id, BootstrapScriptCreator())
+            await w.create_dangling_field(
+                BootstrapScriptRevisionCreator(
+                    script_id=created.id, script=script, creator_id=creator_id
+                )
+            )
+            await w.upsert_field_entity(
+                user_id, UserDefaultBootstrapScriptUpserter(script_id=created.id)
+            )
+
+    async def _current_default_revision(
+        self, ops: V2ReadOps, user_id: UserID
+    ) -> BootstrapScriptRevisionData | None:
+        revision = BootstrapScriptRevisionSearchableFields.own
+        result = await ops.search_in_global(
+            DefaultBootstrapScriptRevisionSearcher(
+                user_id=user_id,
+                pagination=OffsetPagination(limit=1),
+                orders=[revision.revision_number.order.apply(ascending=False)],
+            )
+        )
+        return result.items[0] if result.items else None
 
     async def get_user_by_uuid(self, user_uuid: UUID) -> UserData:
         """
@@ -287,8 +359,7 @@ class UserDBSource:
 
         # Get current user data for validation (by UUID)
         current_user = await self._get_user_by_uuid_with_session(session, user_id)
-        if current_user.status in UserStatus.purge_in_progress():
-            raise UserPurgeInProgress(f"User is being purged: {user_id}")
+        await self._raise_failing_guard(session, updater)
 
         # Check if new username is already taken by another user
         new_username = updater.username.optional_value()
@@ -324,11 +395,15 @@ class UserDBSource:
         if status is not None and status != current_user.status:
             to_update["status_info"] = "admin-requested"
         update_query = (
-            sa.update(users).where(users.c.uuid == user_id).values(to_update).returning(users)
+            sa.update(users)
+            .where(users.c.uuid == user_id, *[g.condition() for g in updater.guard_checks()])
+            .values(to_update)
+            .returning(users)
         )
         result = await session.execute(update_query)
         updated_user = result.first()
         if not updated_user:
+            await self._raise_failing_guard(session, updater)
             raise UserModificationFailure("Failed to update user")
 
         # Handle role changes
@@ -346,41 +421,62 @@ class UserDBSource:
         await self._restate_user_policy_shares(UserID(updated_user.uuid))
         return UserData.from_row(updated_user)
 
+    async def _raise_failing_guard(self, session: SASession, updater: UserUpdater) -> None:
+        """Raise the first guard of ``updater`` the user's current row fails."""
+        guards = updater.guard_checks()
+        stmt = sa.select(*[g.condition().label(f"guard_{i}") for i, g in enumerate(guards)]).where(
+            users.c.uuid == updater.user_id
+        )
+        row = (await session.execute(stmt)).mappings().first()
+        if row is None:
+            return
+        for i, guard in enumerate(guards):
+            if not row[f"guard_{i}"]:
+                raise guard.error
+
     async def update_user_by_uuid_validated(self, updater: UserUpdater) -> UserData:
         """Update user by UUID with validation and handle role/group changes."""
         async with self._db.begin_session() as session:
             return await self._update_single_user_validated(session, updater)
 
-    async def delete_user_by_uuid_validated(self, user_uuid: UUID) -> None:
+    async def delete_user_by_uuid_validated(self, user_uuid: UUID) -> UserData:
         """Soft delete a user by UUID, setting status to DELETED.
 
         The user's keypairs are left active: what keeps a deleted account out of the
         API is the status gate the auth middleware applies.
         """
-        async with self._db.begin() as conn:
-            result = await conn.execute(
-                sa.update(users)
+        async with self._db.begin_session() as session:
+            result = await session.execute(
+                sa.update(UserRow)
                 .values(status=UserStatus.DELETED, status_info="admin-requested")
                 .where(
-                    (users.c.uuid == user_uuid)
-                    & users.c.status.not_in(UserStatus.purge_in_progress())
+                    (UserRow.uuid == user_uuid)
+                    & UserRow.status.not_in(UserStatus.purge_in_progress())
                 )
+                .returning(UserRow)
             )
-            if result.rowcount == 0:
-                await self._raise_missing_or_purging(conn, user_uuid)
+            deleted_user = result.scalars().one_or_none()
+            if deleted_user is None:
+                await self._raise_missing_or_purging(await session.connection(), user_uuid)
+            return UserSearchableFields.own.to_data(deleted_user)
 
     async def restore_user_by_uuid_validated(self, user_uuid: UUID) -> None:
-        """Restore a soft-deleted user by UUID, setting status back to ACTIVE."""
+        """Restore a soft-deleted user by UUID, setting status back to ACTIVE.
+
+        A user whose status is not DELETED is refused.
+        """
         async with self._db.begin() as conn:
             result = await conn.execute(
                 sa.update(users)
                 .values(status=UserStatus.ACTIVE, status_info="admin-requested")
-                .where(
-                    (users.c.uuid == user_uuid)
-                    & users.c.status.not_in(UserStatus.purge_in_progress())
-                )
+                .where((users.c.uuid == user_uuid) & (users.c.status == UserStatus.DELETED))
             )
             if result.rowcount == 0:
+                current = await conn.scalar(
+                    sa.select(users.c.status).where(users.c.uuid == user_uuid)
+                )
+                if current is not None and current not in UserStatus.purge_in_progress():
+                    raise UserModificationBadRequest(f"User is not deleted: {user_uuid}")
                 await self._raise_missing_or_purging(conn, user_uuid)
 
     async def _raise_missing_or_purging(self, conn: AsyncConnection, user_uuid: UUID) -> NoReturn:
@@ -393,20 +489,28 @@ class UserDBSource:
     async def purge_user_by_uuid(self, user_uuid: UUID) -> None:
         """Completely purge user and all associated data by UUID.
 
-        The user's personal project is not among it. Its creator column is nulled by
-        the foreign key, leaving the project dangling for the retention sweep — the
-        resources it holds outlive the account rather than going with it.
+        The user's personal project is not among it. It is marked deleted and its
+        creator column is nulled by the foreign key, leaving the project dangling for
+        the retention sweep — the resources it holds outlive the account rather than
+        going with it.
         """
         user_id = UserID(user_uuid)
         await self._revoke_shared_vfolders(user_uuid)
         async with self._v2_ops.write_ops() as w:
             await w.batch_purge_field_entities(user_id, UserErrorLogPurger())
             await w.batch_purge_field_entities(user_id, UserKeyPairPurger())
+            await w.batch_purge_field_entities(user_id, BootstrapScriptPurger())
             await w.batch_purge_field_entities(user_id, UserGroupAssociationPurger())
             # Placement groups the user still owns: their deployments were either
             # delegated (the groups moved with them) or deleted by now.
             # TODO: scope this purge. A user operation must not use in_global.
             await w.batch_purge_entities_in_global(UserSessionGroupPurger(user_id=user_id))
+            # TODO: scope this purge. A user operation must not use in_global.
+            await w.batch_purge_entities_in_global(UserVFolderAutoMountPurger(user_id=user_id))
+            # Marked before the user row goes: the FK nulls the creator column on delete,
+            # after which no statement can name the project by it.
+            # TODO: scope this update. A user operation must not use in_global.
+            await w.batch_update_in_global(PersonalProjectSoftDeleteUpdater(user_id=user_id))
             # Finally the user itself as a scope: the row and the RBAC graph it left.
             await w.purge_entity(UserPurger(user_id=user_id))
 
@@ -427,20 +531,22 @@ class UserDBSource:
                 conn, deleted_user_uuid, target_user_uuid, target_user_email
             )
 
-    async def retrieve_active_sessions(self, user_uuid: UUID) -> list[SessionRow]:
+    async def retrieve_active_sessions(self, user_uuid: UUID) -> list[SessionEntityData]:
         """Retrieve active sessions for a user."""
-        query_conditions: list[QueryCondition] = [
-            by_user_id(user_uuid),
-            by_status(AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES),
-        ]
-
-        query_options: list[QueryOption] = [
-            join_by_related_field(SessionRow.user),
-        ]
-
-        return await SessionRow.list_session_by_condition(
-            query_conditions, query_options, db=self._db
-        )
+        fields = SessionSearchableFields.own
+        async with self._v2_ops.read_ops() as r:
+            result = await r.search_in_global(
+                SessionSearcher(
+                    pagination=NoPagination(),
+                    conditions=[
+                        fields.user_uuid.filter.equals(
+                            UUIDEqualMatchSpec(value=user_uuid, negated=False)
+                        ),
+                        fields.status.filter.in_(AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES),
+                    ],
+                )
+            )
+        return result.items
 
     async def delegate_endpoint_ownership(
         self,
@@ -458,9 +564,66 @@ class UserDBSource:
                 raise KeyPairNotFound(
                     f"User {target_user_uuid} has no default keypair to delegate endpoints to."
                 )
-            await EndpointRow.delegate_endpoint_ownership(
+            await self._delegate_endpoint_ownership(
                 session, user_uuid, UserID(target_user_uuid), default_access_key
             )
+
+    async def _delegate_endpoint_ownership(
+        self,
+        session: SASession,
+        owner_user_uuid: UUID,
+        target_user_uuid: UserID,
+        target_access_key: AccessKey,
+    ) -> None:
+        endpoint_ids = sa.select(EndpointRow.id).where(
+            (EndpointRow.session_owner == owner_user_uuid)
+            & (EndpointRow.lifecycle_stage == EndpointLifecycle.CREATED)
+        )
+        # The placement groups of the delegated replica groups follow their
+        # members: a group's members all belong to its owner (BEP-1064).
+        await session.execute(
+            sa.update(SessionGroupRow)
+            .where(
+                SessionGroupRow.id.in_(
+                    sa.select(ReplicaGroupRow.session_group_id).where(
+                        ReplicaGroupRow.deployment_id.in_(endpoint_ids)
+                    )
+                )
+            )
+            .values(owner_user_id=target_user_uuid)
+        )
+        await session.execute(
+            sa.update(EndpointTokenRow)
+            .where(EndpointTokenRow.endpoint.in_(endpoint_ids))
+            .values(session_owner=target_user_uuid)
+        )
+        await session.execute(
+            sa.update(RoutingRow)
+            .where(RoutingRow.endpoint.in_(endpoint_ids))
+            .values(session_owner=target_user_uuid)
+        )
+        live_session_ids = sa.select(SessionRow.id).where(
+            SessionRow.id.in_(
+                sa.select(RoutingRow.session).where(RoutingRow.endpoint.in_(endpoint_ids))
+            )
+            & SessionRow.status.not_in(SessionStatus.terminal_statuses())
+        )
+        await session.execute(
+            sa.update(KernelRow)
+            .where(KernelRow.session_id.in_(live_session_ids))
+            .values(user_uuid=target_user_uuid, access_key=target_access_key)
+        )
+        await session.execute(
+            sa.update(SessionRow)
+            .where(SessionRow.id.in_(live_session_ids))
+            .values(user_uuid=target_user_uuid, access_key=target_access_key)
+        )
+        # Last, since the statements above select the endpoints by their owner.
+        await session.execute(
+            sa.update(EndpointRow)
+            .where(EndpointRow.id.in_(endpoint_ids))
+            .values(session_owner=target_user_uuid)
+        )
 
     async def delete_endpoints(
         self,
@@ -517,7 +680,7 @@ class UserDBSource:
         """
         Delete user's all virtual folders as well as their physical data.
         """
-        target_vfs: list[VFolderDeletionInfo] = []
+        target_vfs: list[VFolderStorageTarget] = []
         async with self._db.begin_session() as db_session:
             result = await db_session.scalars(
                 sa.select(VFolderRow).where(
@@ -530,7 +693,7 @@ class UserDBSource:
             rows = result.fetchall()
             for vf in rows:
                 target_vfs.append(
-                    VFolderDeletionInfo(VFolderID.from_row(vf), vf.host, vf.unmanaged_path)
+                    VFolderStorageTarget(VFolderID.from_row(vf), vf.host, vf.unmanaged_path)
                 )
 
         storage_ptask_group = aiotools.PersistentTaskGroup()

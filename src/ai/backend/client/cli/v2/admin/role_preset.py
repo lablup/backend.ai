@@ -12,7 +12,10 @@ import uuid
 import click
 
 from ai.backend.client.cli.v2.helpers import (
+    EntityLabelTerm,
     create_v2_registry,
+    entity_label_filter_options,
+    entity_label_relations,
     load_model,
     load_v2_config,
     parse_order_options,
@@ -39,6 +42,11 @@ def role_preset() -> None:
     help="Default auto-assign flag for roles instantiated from this preset.",
 )
 @click.option(
+    "--auto-assign-to-owner/--no-auto-assign-to-owner",
+    default=False,
+    help="Map a personal project's owner to the role made from this preset. Project scope only.",
+)
+@click.option(
     "--permissions",
     default=None,
     help='Permission entries as JSON or @file: [{"entity_type": "...", "permission": "..."}].',
@@ -47,6 +55,7 @@ def create(
     name: str,
     scope_type: str,
     auto_assign: bool,
+    auto_assign_to_owner: bool,
     permissions: str | None,
 ) -> None:
     """Create a new role preset."""
@@ -68,6 +77,7 @@ def create(
                     name=name,
                     scope_type=EntityType(scope_type),
                     auto_assign=auto_assign,
+                    auto_assign_to_owner=auto_assign_to_owner,
                     permissions=entries,
                 ),
             )
@@ -135,10 +145,16 @@ def get(role_preset_id: uuid.UUID, detail: bool) -> None:
     help="Filter by auto-assign flag.",
 )
 @click.option(
+    "--auto-assign-to-owner/--no-auto-assign-to-owner",
+    default=None,
+    help="Filter by the assign-to-owner flag.",
+)
+@click.option(
     "--deleted/--no-deleted",
     default=None,
     help="Filter by soft-delete flag (defaults to excluding soft-deleted rows).",
 )
+@entity_label_filter_options
 @click.option(
     "--order-by",
     multiple=True,
@@ -150,11 +166,13 @@ def search(
     name_contains: str | None,
     scope_type: str | None,
     auto_assign: bool | None,
+    auto_assign_to_owner: bool | None,
     deleted: bool | None,
     order_by: tuple[str, ...],
+    label: tuple[EntityLabelTerm, ...],
 ) -> None:
     """Search role presets across the system."""
-    from ai.backend.common.dto.manager.query import StringFilter
+    from ai.backend.common.dto.manager.query import NullableDateTimeFilter, StringFilter
     from ai.backend.common.dto.manager.v2.role_preset.request import (
         RolePresetFilter,
         RolePresetOrder,
@@ -162,13 +180,19 @@ def search(
     )
     from ai.backend.common.dto.manager.v2.role_preset.types import RolePresetOrderField
 
+    relations = entity_label_relations(label)
     filter_dto: RolePresetFilter | None = None
-    if any(v is not None for v in (name_contains, scope_type, auto_assign, deleted)):
+    if relations or any(
+        v is not None
+        for v in (name_contains, scope_type, auto_assign, auto_assign_to_owner, deleted)
+    ):
         filter_dto = RolePresetFilter(
             name=StringFilter(contains=name_contains) if name_contains is not None else None,
             scope_type=StringFilter(equals=scope_type) if scope_type is not None else None,
             auto_assign=auto_assign,
-            deleted=deleted,
+            auto_assign_to_owner=auto_assign_to_owner,
+            deleted_at=NullableDateTimeFilter(is_null=not deleted) if deleted is not None else None,
+            AND=[RolePresetFilter(labels=rel) for rel in relations] or None,
         )
 
     orders = (
@@ -201,10 +225,16 @@ def search(
     default=None,
     help="Updated default auto-assign flag for instantiated roles.",
 )
+@click.option(
+    "--auto-assign-to-owner/--no-auto-assign-to-owner",
+    default=None,
+    help="Update whether a personal project's owner is mapped to the role. Project scope only.",
+)
 def update(
     role_preset_id: uuid.UUID,
     name: str | None,
     auto_assign: bool | None,
+    auto_assign_to_owner: bool | None,
 ) -> None:
     """Update a role preset's mutable metadata."""
     from ai.backend.common.data.entity.role_preset import RolePresetID
@@ -215,7 +245,11 @@ def update(
         try:
             result = await registry.role_preset.update(
                 RolePresetID(role_preset_id),
-                UpdateRolePresetBody(name=name, auto_assign=auto_assign),
+                UpdateRolePresetBody(
+                    name=name,
+                    auto_assign=auto_assign,
+                    auto_assign_to_owner=auto_assign_to_owner,
+                ),
             )
             print_result(result)
         finally:
@@ -227,17 +261,16 @@ def update(
 @role_preset.command()
 @click.argument("role_preset_ids", type=click.UUID, nargs=-1, required=True)
 def delete(role_preset_ids: tuple[uuid.UUID, ...]) -> None:
-    """Soft-delete one or more role presets (sets ``deleted = true``)."""
-    from ai.backend.common.data.entity.role_preset import RolePresetID
-    from ai.backend.common.dto.manager.v2.role_preset.request import BulkDeleteRolePresetsInput
-
-    ids = [RolePresetID(rid) for rid in role_preset_ids]
+    """Soft-delete one or more role presets (sets ``deleted_at``)."""
+    from ai.backend.common.dto.manager.v2.role_preset.request import (
+        PartialBulkDeleteRolePresetsInput,
+    )
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.role_preset.delete(
-                BulkDeleteRolePresetsInput(role_preset_ids=ids),
+            result = await registry.role_preset.partial_bulk_delete(
+                PartialBulkDeleteRolePresetsInput(ids=list(role_preset_ids)),
             )
             print_result(result)
         finally:
@@ -249,17 +282,16 @@ def delete(role_preset_ids: tuple[uuid.UUID, ...]) -> None:
 @role_preset.command()
 @click.argument("role_preset_ids", type=click.UUID, nargs=-1, required=True)
 def restore(role_preset_ids: tuple[uuid.UUID, ...]) -> None:
-    """Restore one or more soft-deleted role presets (sets ``deleted = false``)."""
-    from ai.backend.common.data.entity.role_preset import RolePresetID
-    from ai.backend.common.dto.manager.v2.role_preset.request import BulkRestoreRolePresetsInput
-
-    ids = [RolePresetID(rid) for rid in role_preset_ids]
+    """Restore one or more soft-deleted role presets (clears ``deleted_at``)."""
+    from ai.backend.common.dto.manager.v2.role_preset.request import (
+        PartialBulkRestoreRolePresetsInput,
+    )
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.role_preset.restore(
-                BulkRestoreRolePresetsInput(role_preset_ids=ids),
+            result = await registry.role_preset.partial_bulk_restore(
+                PartialBulkRestoreRolePresetsInput(ids=list(role_preset_ids)),
             )
             print_result(result)
         finally:
@@ -272,16 +304,15 @@ def restore(role_preset_ids: tuple[uuid.UUID, ...]) -> None:
 @click.argument("role_preset_ids", type=click.UUID, nargs=-1, required=True)
 def purge(role_preset_ids: tuple[uuid.UUID, ...]) -> None:
     """Hard-delete one or more role presets, cascading to their permission entries."""
-    from ai.backend.common.data.entity.role_preset import RolePresetID
-    from ai.backend.common.dto.manager.v2.role_preset.request import BulkPurgeRolePresetsInput
-
-    ids = [RolePresetID(rid) for rid in role_preset_ids]
+    from ai.backend.common.dto.manager.v2.role_preset.request import (
+        PartialBulkPurgeRolePresetsInput,
+    )
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.role_preset.purge(
-                BulkPurgeRolePresetsInput(role_preset_ids=ids),
+            result = await registry.role_preset.partial_bulk_purge(
+                PartialBulkPurgeRolePresetsInput(ids=list(role_preset_ids)),
             )
             print_result(result)
         finally:

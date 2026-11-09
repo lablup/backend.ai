@@ -8,6 +8,9 @@ from ai.backend.client.v2.base_domain import BaseDomainClient
 from ai.backend.common.dto.manager.v2.artifact.request import (
     AdminSearchArtifactsInput,
     DeleteArtifactsInput,
+    PartialBulkDeleteArtifactsInput,
+    PartialBulkRestoreArtifactsInput,
+    PartialBulkUpdateArtifactsInput,
     RestoreArtifactsInput,
     UpdateArtifactInput,
 )
@@ -18,11 +21,14 @@ from ai.backend.common.dto.manager.v2.artifact.response import (
     ArtifactRevisionNode,
     CancelImportTaskPayload,
     CleanupRevisionsPayload,
+    DeleteArtifactPayload,
     DeleteArtifactsPayload,
     RejectRevisionPayload,
+    RestoreArtifactPayload,
     RestoreArtifactsGQLPayload,
     UpdateArtifactPayload,
 )
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 
 _PATH = "/v2/artifacts"
 
@@ -63,11 +69,60 @@ class V2ArtifactClient(BaseDomainClient):
             response_model=UpdateArtifactPayload,
         )
 
-    async def delete(
+    async def delete(self, artifact_id: UUID) -> DeleteArtifactPayload:
+        """Soft-delete an artifact."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/{artifact_id}/delete",
+            response_model=DeleteArtifactPayload,
+        )
+
+    async def restore(self, artifact_id: UUID) -> RestoreArtifactPayload:
+        """Restore a soft-deleted artifact."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/{artifact_id}/restore",
+            response_model=RestoreArtifactPayload,
+        )
+
+    async def partial_bulk_update(
+        self, request: PartialBulkUpdateArtifactsInput
+    ) -> PartialBulkPayload[ArtifactNode]:
+        """Update several artifacts, answering for each one."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/partial-bulk-update",
+            request=request,
+            response_model=PartialBulkPayload[ArtifactNode],
+        )
+
+    async def partial_bulk_delete(
+        self, request: PartialBulkDeleteArtifactsInput
+    ) -> PartialBulkPayload[ArtifactNode]:
+        """Soft-delete several artifacts, answering for each one."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/partial-bulk-delete",
+            request=request,
+            response_model=PartialBulkPayload[ArtifactNode],
+        )
+
+    async def partial_bulk_restore(
+        self, request: PartialBulkRestoreArtifactsInput
+    ) -> PartialBulkPayload[ArtifactNode]:
+        """Restore several soft-deleted artifacts, answering for each one."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/partial-bulk-restore",
+            request=request,
+            response_model=PartialBulkPayload[ArtifactNode],
+        )
+
+    async def delete_artifacts(
         self,
         request: DeleteArtifactsInput,
     ) -> DeleteArtifactsPayload:
-        """Delete multiple artifacts by ID."""
+        """Deprecated. Use :meth:`partial_bulk_delete`."""
         return await self._client.typed_request(
             "POST",
             f"{_PATH}/delete",
@@ -75,11 +130,11 @@ class V2ArtifactClient(BaseDomainClient):
             response_model=DeleteArtifactsPayload,
         )
 
-    async def restore(
+    async def restore_artifacts(
         self,
         request: RestoreArtifactsInput,
     ) -> RestoreArtifactsGQLPayload:
-        """Restore previously deleted artifacts."""
+        """Deprecated. Use :meth:`partial_bulk_restore`."""
         return await self._client.typed_request(
             "POST",
             f"{_PATH}/restore",

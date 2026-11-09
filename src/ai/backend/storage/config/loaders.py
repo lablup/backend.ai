@@ -44,22 +44,8 @@ def load_local_config(
 
 def make_etcd(local_config: StorageProxyUnifiedConfig) -> AsyncEtcd:
     """Load shared configuration from etcd."""
-    etcd_credentials = None
-    if local_config.etcd.user and local_config.etcd.password:
-        etcd_credentials = {
-            "user": local_config.etcd.user,
-            "password": local_config.etcd.password,
-        }
-
     scope_prefix_map = {
         ConfigScopes.GLOBAL: "",
         ConfigScopes.NODE: f"nodes/storage/{local_config.storage_proxy.node_id}",
     }
-
-    etcd_config_data = local_config.etcd.to_dataclass()
-    return AsyncEtcd(
-        [addr.to_legacy() for addr in etcd_config_data.addrs],
-        local_config.etcd.namespace,
-        scope_prefix_map,
-        credentials=etcd_credentials,
-    )
+    return AsyncEtcd.create_from_config(local_config.etcd.to_dataclass(), scope_prefix_map)

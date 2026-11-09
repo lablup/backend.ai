@@ -7,6 +7,7 @@ from ai.backend.common.clients.valkey_client.client import (
     AbstractValkeyClient,
     create_valkey_client,
 )
+from ai.backend.common.clients.valkey_client.sentinel_monitor.base import AbstractSentinelMonitor
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience import (
@@ -65,6 +66,7 @@ class ValkeySessionClient:
         *,
         db_id: int,
         human_readable_name: str,
+        sentinel_monitor: AbstractSentinelMonitor | None = None,
     ) -> Self:
         """
         Create a ValkeySessionClient instance.
@@ -78,6 +80,7 @@ class ValkeySessionClient:
             valkey_target=valkey_target,
             db_id=db_id,
             human_readable_name=human_readable_name,
+            sentinel_monitor=sentinel_monitor,
         )
         await client.connect()
         return cls(client=client)
@@ -144,6 +147,20 @@ class ValkeySessionClient:
             return await conn.get(f"{SESSION_KEY_PREFIX}{session_token}")
 
     @valkey_session_resilience.apply()
+    async def get_login_sessions(self, session_tokens: list[str]) -> list[bytes | None]:
+        """
+        Get login session data for several session tokens in a single batch operation.
+
+        :param session_tokens: The session tokens (prefix is added internally).
+        :return: The session data in the order of ``session_tokens``, None where not found.
+        """
+        if not session_tokens:
+            return []
+        keys: list[str | bytes] = [f"{SESSION_KEY_PREFIX}{token}" for token in session_tokens]
+        async with self._client.client() as conn:
+            return await conn.mget(keys)
+
+    @valkey_session_resilience.apply()
     async def set_login_session(
         self, session_token: str, session_data: str | bytes, ttl_seconds: int
     ) -> None:
@@ -170,6 +187,19 @@ class ValkeySessionClient:
         """
         async with self._client.client() as conn:
             await conn.delete([f"{SESSION_KEY_PREFIX}{session_token}"])
+
+    @valkey_session_resilience.apply()
+    async def delete_login_sessions(self, session_tokens: list[str]) -> None:
+        """
+        Delete login session data for several session tokens in a single batch operation.
+
+        :param session_tokens: The session tokens (prefix is added internally).
+        """
+        if not session_tokens:
+            return
+        keys: list[str | bytes] = [f"{SESSION_KEY_PREFIX}{token}" for token in session_tokens]
+        async with self._client.client() as conn:
+            await conn.delete(keys)
 
     @valkey_session_resilience.apply()
     async def get_login_history(self, username: str) -> bytes | None:

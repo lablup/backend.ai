@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.dependencies import DependencyBuilderStack
 from ai.backend.manager.dependencies.domain.composer import (
     DomainComposer,
@@ -45,6 +46,7 @@ class TestDomainComposer:
             valkey_schedule=MagicMock(),
             valkey_image=MagicMock(),
             prometheus_client=MagicMock(),
+            sentinel_monitors=SentinelMonitorSet([]),
         )
 
         composer = DomainComposer()

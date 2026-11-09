@@ -20,11 +20,15 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     ListFilesInput,
     MkdirInput,
     MoveFileInput,
+    PartialBulkDeleteVFoldersInput,
+    PartialBulkRestoreVFoldersInput,
+    PartialBulkUpdateVFoldersInput,
     PurgeVFolderInput,
     ScopedSearchVFoldersInput,
     SearchVFoldersInput,
     SetVFolderMountPolicyInput,
     UnsetVFolderMountPolicyInput,
+    UpdateVFolderInput,
 )
 from ai.backend.common.dto.manager.v2.vfolder.types import VFolderScope
 from ai.backend.manager.api.rest.v2.path_params import (
@@ -143,12 +147,53 @@ class V2VFolderHandler:
         result = await self._adapter.list_mount_policies(path.parsed.vfolder_id)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
+    async def update(
+        self,
+        path: PathParam[VFolderIdPathParam],
+        body: BodyParam[UpdateVFolderInput],
+    ) -> APIResponse:
+        """Update a vfolder's name and options."""
+        result = await self._adapter.update(path.parsed.vfolder_id, body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
     async def delete(
         self,
         path: PathParam[VFolderIdPathParam],
     ) -> APIResponse:
         """Soft-delete a vfolder."""
         result = await self._adapter.delete(path.parsed.vfolder_id)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def deprecated_delete(
+        self,
+        path: PathParam[VFolderIdPathParam],
+    ) -> APIResponse:
+        """Deprecated. Use `POST /v2/vfolders/{vfolder_id}/delete`."""
+        result = await self._adapter.delete(path.parsed.vfolder_id)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_update(
+        self,
+        body: BodyParam[PartialBulkUpdateVFoldersInput],
+    ) -> APIResponse:
+        """Update several vfolders, answering for each one."""
+        result = await self._adapter.partial_bulk_update(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_delete(
+        self,
+        body: BodyParam[PartialBulkDeleteVFoldersInput],
+    ) -> APIResponse:
+        """Soft-delete several vfolders, answering for each one."""
+        result = await self._adapter.partial_bulk_delete(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_restore(
+        self,
+        body: BodyParam[PartialBulkRestoreVFoldersInput],
+    ) -> APIResponse:
+        """Restore several soft-deleted vfolders, answering for each one."""
+        result = await self._adapter.partial_bulk_restore(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def purge(
@@ -244,7 +289,7 @@ class V2VFolderHandler:
         self,
         body: BodyParam[BulkDeleteVFoldersInput],
     ) -> APIResponse:
-        """Soft-delete multiple vfolders."""
+        """Deprecated. Use `POST /v2/vfolders/partial-bulk-delete`."""
         result = await self._adapter.bulk_delete(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 

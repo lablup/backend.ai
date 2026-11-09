@@ -11,14 +11,15 @@ from ai.backend.common.data.notification import NotificationRuleType
 from ai.backend.manager.data.notification.types import NotificationChannelData, NotificationRuleData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.models.notification.creators import NotificationRuleCreator
-from bai_scenario.seeds.seeder import Naming, SeedRowFrom, SeedRowFromTwo
+from ai.backend.testutils.scenario_steps import Says
+from bai_scenario.seeds.seeder import Naming, TestSeedRowFrom, TestSeedRowFromTwo, joined
 
 TEMPLATE = "Session {{ session_name }} is {{ status }}"
 """A template the session.started data fills in whole."""
 
 
 @dataclass(frozen=True)
-class SeedRuleOf(SeedRowFromTwo[NotificationChannelData, UserData, NotificationRuleData]):
+class TestSeedRuleOf(TestSeedRowFromTwo[NotificationChannelData, UserData, NotificationRuleData]):
     """A rule dispatching through the channel laid before it, created by that user."""
 
     name_hint: str = "rule"
@@ -29,14 +30,19 @@ class SeedRuleOf(SeedRowFromTwo[NotificationChannelData, UserData, NotificationR
 
     @override
     def kind(self) -> str:
-        return "규칙"
+        return Says("규칙", english="Rule")
 
     @override
     def detail(self) -> str:
-        parts = [f"{self.rule_type.value} 이벤트를 알린다"]
+        parts: list[str] = [
+            Says(
+                f"{self.rule_type.value} 이벤트를 알립니다",
+                english=f"announces {self.rule_type.value} events",
+            )
+        ]
         if not self.enabled:
-            parts.append("비활성")
-        return ", ".join(parts)
+            parts.append(Says("비활성", english="inactive"))
+        return joined(parts, ", ")
 
     @override
     def name(self, naming: Naming) -> str:
@@ -58,18 +64,20 @@ class SeedRuleOf(SeedRowFromTwo[NotificationChannelData, UserData, NotificationR
 
 
 @dataclass(frozen=True)
-class SeedRuleOfNoChannel(SeedRowFrom[UserData, NotificationRuleData]):
+class TestSeedRuleOfNoChannel(TestSeedRowFrom[UserData, NotificationRuleData]):
     """A rule naming a channel id no row answers to. Nothing stops the write."""
 
     name_hint: str = "orphan-rule"
 
     @override
     def kind(self) -> str:
-        return "규칙"
+        return Says("규칙", english="Rule")
 
     @override
     def detail(self) -> str:
-        return "없는 채널 id를 가리킨다"
+        return Says(
+            "없는 채널 id 를 참조합니다", english="refers to a channel id no row answers to"
+        )
 
     @override
     def name(self, naming: Naming) -> str:

@@ -144,7 +144,6 @@ class _ServiceCatalogOwnFields(RowDataConverter[ServiceCatalogRow, ServiceCatalo
 
     @override
     def to_data(self, row: ServiceCatalogRow) -> ServiceCatalogData:
-        endpoints = ServiceCatalogEndpointSearchableFields.own
         return ServiceCatalogData(
             id=ServiceCatalogID(self.id.read(row)),
             service_group=self.service_group.read(row),
@@ -157,7 +156,6 @@ class _ServiceCatalogOwnFields(RowDataConverter[ServiceCatalogRow, ServiceCatalo
             registered_at=self.registered_at.read(row),
             last_heartbeat=self.last_heartbeat.read(row),
             config_hash=self.config_hash.read(row),
-            endpoints=[endpoints.to_data(endpoint) for endpoint in row.endpoints],
         )
 
 

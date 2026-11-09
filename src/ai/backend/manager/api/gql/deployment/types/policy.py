@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
+from typing import Self, cast, override
 from uuid import UUID
 
-from strawberry import ID, UNSET
+from strawberry import ID, UNSET, Info
 from strawberry.relay import NodeID
 
+from ai.backend.common.data.entity.deployment_policy import DeploymentPolicyID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.dto.manager.v2.deployment.request import (
     BlueGreenConfigInput as BlueGreenConfigInputDTO,
@@ -29,7 +32,6 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     DeploymentStrategySpecInfo,
     RollingUpdateStrategySpecInfo,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.schema.deployment import (
     IntOrPercent as IntOrPercentDTO,
 )
@@ -44,6 +46,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
 
 # Enum defined here to avoid circular import with deployment.py
@@ -143,13 +146,27 @@ class DeploymentPolicyGQL(PydanticNodeMixin[DeploymentPolicyNodeDTO]):
     id: NodeID[str]
     field_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the deployment policy.",
         ),
     )
     strategy_spec: DeploymentStrategySpecGQL
     created_at: datetime
     updated_at: datetime
+
+    @classmethod
+    @override
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[Self | None]:
+        results = await info.context.data_loaders.deployment_policy_loader.load_many([
+            DeploymentPolicyID(UUID(nid)) for nid in node_ids
+        ])
+        return cast(list[Self | None], results)
 
 
 # ========== Input Types ==========

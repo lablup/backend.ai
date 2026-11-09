@@ -18,7 +18,11 @@ from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.dto.manager.v2.audit_log.response import AuditLogNode, SearchAuditLogsPayload
+from ai.backend.common.dto.manager.v2.audit_log.response import (
+    AuditLogNode,
+    SearchAuditLogScopesPayload,
+    SearchAuditLogsPayload,
+)
 from ai.backend.common.dto.manager.v2.audit_log.types import AuditLogStatus
 from ai.backend.manager.actions.types import OperationStatus
 from ai.backend.manager.data.domain.types import DomainData
@@ -29,20 +33,23 @@ from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
     Held,
+    Language,
     Refused,
     Same,
     SameAs,
+    Says,
     Skipped,
     Then,
     Verdict,
+    in_language,
 )
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf
-from bai_scenario.runner.planting import SeedingSession
-from bai_scenario.seeds.audit_log.audit_log import SeedAuditRecord, SeedScopedAuditRecord
-from bai_scenario.seeds.domain.domain import SeedDomain
-from bai_scenario.seeds.project.project import SeedProject
-from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
-from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
+from bai_scenario.runner.planting import TestSeedingSession
+from bai_scenario.seeds.audit_log.audit_log import TestSeedAuditRecord, TestSeedScopedAuditRecord
+from bai_scenario.seeds.domain.domain import TestSeedDomain
+from bai_scenario.seeds.project.project import TestSeedProject
+from bai_scenario.seeds.rbac.role import TestSeedPermission, TestSeedRole
+from bai_scenario.seeds.resource_policy.project import TestSeedProjectPolicy
 from bai_scenario.seeds.seeder import Laid
 
 # Two clearly ordered timestamps, so a "newest first" answer is a fixed order rather than
@@ -59,6 +66,8 @@ OP_DENIED = "was-refused"
 OP_MINE = "acted-by-me"
 OP_THEIRS = "acted-by-another"
 OP_SCOPED = "linked"
+OP_TRIGGERED = "acted-on-a-project"
+OP_OTHER_RUN = "ran-separately"
 
 
 @dataclass(frozen=True)
@@ -81,14 +90,31 @@ def look_node(node: AuditLogNode, expected: ExpectedRecord, *, at: str = "") -> 
     """The whole node, checked. The ids the database and the run make are skipped; the
     owner and actor are read as coming from the rows earlier steps laid."""
     verdicts: list[Verdict] = [
-        Skipped(f"{at}id", "데이터베이스가 만든다"),
-        Skipped(f"{at}action_id", "실행마다 새로 생성된다"),
+        Skipped(
+            f"{at}id",
+            Says("데이터베이스가 생성합니다", english="the database generates it"),
+        ),
+        Skipped(
+            f"{at}action_id",
+            Says("실행마다 새로 생성됩니다", english="a new one is generated each run"),
+        ),
         Same(f"{at}operation", node.operation, expected.operation),
         Same(f"{at}entity_type", node.entity_type, expected.entity_type),
         Held(
             f"{at}entity_id",
             node.entity_id,
-            SameAs[str | None](str(expected.entity_id), "기록의 대상 엔티티"),
+            SameAs[str | None](
+                str(expected.entity_id),
+                Says("기록의 대상 엔티티", english="the entity the record is about"),
+            ),
+        ),
+        Held(
+            f"{at}target_entity_id",
+            node.target_entity_id,
+            SameAs[UUID | None](
+                expected.entity_id,
+                Says("기록의 대상 엔티티", english="the entity the record is about"),
+            ),
         ),
         Same(f"{at}status", node.status, expected.status),
         Same(f"{at}description", node.description, f"{expected.operation} was recorded"),
@@ -105,7 +131,10 @@ def look_node(node: AuditLogNode, expected: ExpectedRecord, *, at: str = "") -> 
             Held(
                 f"{at}triggered_by",
                 node.triggered_by,
-                SameAs[str | None](str(expected.triggered_by), "실행한 사용자"),
+                SameAs[str | None](
+                    str(expected.triggered_by),
+                    Says("실행한 사용자", english="the user who ran it"),
+                ),
             )
         )
     return verdicts
@@ -114,11 +143,13 @@ def look_node(node: AuditLogNode, expected: ExpectedRecord, *, at: str = "") -> 
 @dataclass(frozen=True)
 class RecordsAndACaller:
     """Records that exist and the person asking. ``visible`` is the answer expected,
-    newest first; ``filter_triggered`` is the actor a filtering read narrows to."""
+    newest first; ``filter_triggered`` is the actor a filtering read narrows to, and
+    ``filter_action`` the run."""
 
     caller: UserData
     visible: tuple[ExpectedRecord, ...]
     filter_triggered: UUID | None = None
+    filter_action: UUID | None = None
 
 
 @dataclass(frozen=True)
@@ -133,11 +164,13 @@ class RecordsToLoad:
 
 @dataclass(frozen=True)
 class ScopedEntities:
-    """The entity ids a scoped read names, and the answer expected of it."""
+    """The entity ids a scoped read names, and the answer expected of it. ``filter_action``
+    is the run a filtering read narrows to."""
 
     caller: UserData
     named: tuple[UUID, ...]
     visible: tuple[ExpectedRecord, ...]
+    filter_action: UUID | None = None
 
 
 @dataclass(frozen=True)
@@ -150,7 +183,7 @@ class ScopedActors:
 
 
 async def grant_reading(
-    seeding: SeedingSession,
+    seeding: TestSeedingSession,
     entity: Laid[Any],
     to: Laid[UserData],
     *,
@@ -159,8 +192,10 @@ async def grant_reading(
 ) -> None:
     """Give ``to`` READ on ``entity`` through a role in that entity's own scope: the role,
     the READ permission on the entity's type, and the grant."""
-    role = await seeding.creating_from(SeedRole(scope_of, name_hint="record-reader"), entity)
-    await seeding.adding(SeedPermission(entity_type=entity_type, permission=Permission.READ), role)
+    role = await seeding.creating_from(TestSeedRole(scope_of, name_hint="record-reader"), entity)
+    await seeding.adding(
+        TestSeedPermission(entity_type=entity_type, permission=Permission.READ), role
+    )
     await seeding.granting(role, to, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id))
 
 
@@ -177,7 +212,7 @@ class TwoProjectsLaid:
 
 
 async def lay_two_projects(
-    seeding: SeedingSession,
+    seeding: TestSeedingSession,
     *,
     grant_first: bool = False,
     grant_second: bool = False,
@@ -186,17 +221,19 @@ async def lay_two_projects(
     """A domain with two projects, one record on each, and a caller granted READ on the
     projects asked for."""
     domain: Laid[DomainData] = await seeding.creating(
-        SeedDomain(name_hint="home", description=WAS_HERE)
+        TestSeedDomain(name_hint="home", description=WAS_HERE)
     )
-    policy = await seeding.once(SeedProjectPolicy())
-    first = await seeding.creating_from_two(SeedProject(name_hint="team"), domain, policy)
-    second = await seeding.creating_from_two(SeedProject(name_hint="other"), domain, policy)
+    policy = await seeding.once(TestSeedProjectPolicy())
+    first = await seeding.creating_from_two(TestSeedProject(name_hint="team"), domain, policy)
+    second = await seeding.creating_from_two(TestSeedProject(name_hint="other"), domain, policy)
     first_record = await seeding.adding(
-        SeedAuditRecord(owner_of=lambda p: ProjectID(p.id), operation=OP_LATE, created_at=LATE),
+        TestSeedAuditRecord(owner_of=lambda p: ProjectID(p.id), operation=OP_LATE, created_at=LATE),
         first,
     )
     second_record = await seeding.adding(
-        SeedAuditRecord(owner_of=lambda p: ProjectID(p.id), operation=OP_EARLY, created_at=EARLY),
+        TestSeedAuditRecord(
+            owner_of=lambda p: ProjectID(p.id), operation=OP_EARLY, created_at=EARLY
+        ),
         second,
     )
     caller = await seeding.within(SomeoneOf(domain, role=role))
@@ -226,7 +263,7 @@ async def lay_two_projects(
 
 
 async def lay_two_actors(
-    seeding: SeedingSession,
+    seeding: TestSeedingSession,
     *,
     caller_is_first: bool = False,
     grant_first_to_caller: bool = False,
@@ -234,14 +271,14 @@ async def lay_two_actors(
     """A domain with two users who each triggered a record, and a caller. The caller is
     the first user, or a third person granted READ on the first user."""
     domain: Laid[DomainData] = await seeding.creating(
-        SeedDomain(name_hint="home", description=WAS_HERE)
+        TestSeedDomain(name_hint="home", description=WAS_HERE)
     )
     first = await seeding.within(SomeoneOf(domain))
     second = await seeding.within(SomeoneOf(domain))
     first_id = seeding.made(first).id
     second_id = seeding.made(second).id
     await seeding.adding(
-        SeedAuditRecord(
+        TestSeedAuditRecord(
             owner_of=lambda u: UserID(u.id),
             operation=OP_MINE,
             created_at=LATE,
@@ -250,7 +287,7 @@ async def lay_two_actors(
         first,
     )
     await seeding.adding(
-        SeedAuditRecord(
+        TestSeedAuditRecord(
             owner_of=lambda u: UserID(u.id),
             operation=OP_THEIRS,
             created_at=EARLY,
@@ -274,18 +311,25 @@ class TwoRecordsGlobally(Given[Any, RecordsAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"서로 다른 시각의 기록 둘과, {self.role.value} 한 명"
+        return Says(
+            f"서로 다른 시각의 기록 둘과, {self.role.value} 한 명",
+            english=f"two records from different times and one {self.role.value}",
+        )
 
     @override
-    async def lay(self, seeding: SeedingSession) -> RecordsAndACaller:
-        domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+    async def lay(self, seeding: TestSeedingSession) -> RecordsAndACaller:
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         caller = await seeding.within(SomeoneOf(domain, role=self.role))
         await seeding.adding(
-            SeedAuditRecord(owner_of=lambda u: UserID(u.id), operation=OP_LATE, created_at=LATE),
+            TestSeedAuditRecord(
+                owner_of=lambda u: UserID(u.id), operation=OP_LATE, created_at=LATE
+            ),
             caller,
         )
         await seeding.adding(
-            SeedAuditRecord(owner_of=lambda u: UserID(u.id), operation=OP_EARLY, created_at=EARLY),
+            TestSeedAuditRecord(
+                owner_of=lambda u: UserID(u.id), operation=OP_EARLY, created_at=EARLY
+            ),
             caller,
         )
         made = seeding.made(caller)
@@ -304,18 +348,21 @@ class MixedStatusGlobally(Given[Any, RecordsAndACaller]):
 
     @override
     def describe(self) -> str:
-        return "성공한 기록과 거부된 기록, 그리고 슈퍼관리자 한 명"
+        return Says(
+            "성공한 기록과 거부된 기록, 그리고 superadmin 한 명",
+            english="a successful record and a rejected record, and one superadmin",
+        )
 
     @override
-    async def lay(self, seeding: SeedingSession) -> RecordsAndACaller:
-        domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+    async def lay(self, seeding: TestSeedingSession) -> RecordsAndACaller:
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         caller = await seeding.within(SomeoneOf(domain, role=UserRole.SUPERADMIN))
         await seeding.adding(
-            SeedAuditRecord(owner_of=lambda u: UserID(u.id), operation=OP_OK, created_at=LATE),
+            TestSeedAuditRecord(owner_of=lambda u: UserID(u.id), operation=OP_OK, created_at=LATE),
             caller,
         )
         await seeding.adding(
-            SeedAuditRecord(
+            TestSeedAuditRecord(
                 owner_of=lambda u: UserID(u.id),
                 operation=OP_DENIED,
                 created_at=EARLY,
@@ -334,16 +381,19 @@ class TwoActorsGlobally(Given[Any, RecordsAndACaller]):
 
     @override
     def describe(self) -> str:
-        return "두 사용자가 각각 남긴 기록과, 슈퍼관리자 한 명"
+        return Says(
+            "두 사용자가 각각 남긴 기록과, superadmin 한 명",
+            english="records two users each left, and one superadmin",
+        )
 
     @override
-    async def lay(self, seeding: SeedingSession) -> RecordsAndACaller:
-        domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+    async def lay(self, seeding: TestSeedingSession) -> RecordsAndACaller:
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         first = await seeding.within(SomeoneOf(domain))
         second = await seeding.within(SomeoneOf(domain))
         first_id = seeding.made(first).id
         await seeding.adding(
-            SeedAuditRecord(
+            TestSeedAuditRecord(
                 owner_of=lambda u: UserID(u.id),
                 operation=OP_MINE,
                 created_at=LATE,
@@ -352,7 +402,7 @@ class TwoActorsGlobally(Given[Any, RecordsAndACaller]):
             first,
         )
         await seeding.adding(
-            SeedAuditRecord(
+            TestSeedAuditRecord(
                 owner_of=lambda u: UserID(u.id),
                 operation=OP_THEIRS,
                 created_at=EARLY,
@@ -369,6 +419,59 @@ class TwoActorsGlobally(Given[Any, RecordsAndACaller]):
 
 
 @dataclass(frozen=True)
+class OneRunGlobally(Given[Any, RecordsAndACaller]):
+    """One run that left a record on each of two users, another run's record on the first
+    user, and a superadmin caller narrowing to the first run."""
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "한 실행이 두 사용자에 하나씩 남긴 기록, 다른 실행이 남긴 기록 하나와, superadmin 한 명",
+            english=(
+                "records one run left on each of two users, one record another run left, "
+                "and one superadmin"
+            ),
+        )
+
+    @override
+    async def lay(self, seeding: TestSeedingSession) -> RecordsAndACaller:
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+        first = await seeding.within(SomeoneOf(domain))
+        second = await seeding.within(SomeoneOf(domain))
+        run = uuid4()
+        await seeding.adding(
+            TestSeedAuditRecord(
+                owner_of=lambda u: UserID(u.id), operation=OP_LATE, created_at=LATE, action_id=run
+            ),
+            first,
+        )
+        await seeding.adding(
+            TestSeedAuditRecord(
+                owner_of=lambda u: UserID(u.id),
+                operation=OP_EARLY,
+                created_at=EARLY,
+                action_id=run,
+            ),
+            second,
+        )
+        await seeding.adding(
+            TestSeedAuditRecord(
+                owner_of=lambda u: UserID(u.id), operation=OP_OTHER_RUN, created_at=LATE
+            ),
+            first,
+        )
+        caller = await seeding.within(SomeoneOf(domain, role=UserRole.SUPERADMIN))
+        return RecordsAndACaller(
+            seeding.made(caller),
+            (
+                ExpectedRecord(OP_LATE, "user", seeding.made(first).id, LATE),
+                ExpectedRecord(OP_EARLY, "user", seeding.made(second).id, EARLY),
+            ),
+            filter_action=run,
+        )
+
+
+@dataclass(frozen=True)
 class ManyRecordsGlobally(Given[Any, RecordsAndACaller]):
     """More records than one default page holds, with a superadmin caller."""
 
@@ -376,15 +479,18 @@ class ManyRecordsGlobally(Given[Any, RecordsAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"기록 {self.total}개와, 슈퍼관리자 한 명"
+        return Says(
+            f"기록 {self.total}개와, superadmin 한 명",
+            english=f"{self.total} records and one superadmin",
+        )
 
     @override
-    async def lay(self, seeding: SeedingSession) -> RecordsAndACaller:
-        domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+    async def lay(self, seeding: TestSeedingSession) -> RecordsAndACaller:
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         caller = await seeding.within(SomeoneOf(domain, role=UserRole.SUPERADMIN))
         for i in range(self.total):
             await seeding.adding(
-                SeedAuditRecord(
+                TestSeedAuditRecord(
                     owner_of=lambda u: UserID(u.id), operation=f"op-{i}", created_at=EARLY
                 ),
                 caller,
@@ -400,18 +506,25 @@ class TwoRecordsToRead(Given[Any, RecordsToLoad]):
 
     @override
     def describe(self) -> str:
-        return f"id로 조회할 자기에 대한 기록 둘과, {self.role.value} 한 명"
+        return Says(
+            f"id 로 조회할 자기에 대한 기록 둘과, {self.role.value} 한 명",
+            english=f"two records about the caller to read by id, and one {self.role.value}",
+        )
 
     @override
-    async def lay(self, seeding: SeedingSession) -> RecordsToLoad:
-        domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+    async def lay(self, seeding: TestSeedingSession) -> RecordsToLoad:
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         caller = await seeding.within(SomeoneOf(domain, role=self.role))
         first = await seeding.adding(
-            SeedAuditRecord(owner_of=lambda u: UserID(u.id), operation=OP_LATE, created_at=LATE),
+            TestSeedAuditRecord(
+                owner_of=lambda u: UserID(u.id), operation=OP_LATE, created_at=LATE
+            ),
             caller,
         )
         second = await seeding.adding(
-            SeedAuditRecord(owner_of=lambda u: UserID(u.id), operation=OP_EARLY, created_at=EARLY),
+            TestSeedAuditRecord(
+                owner_of=lambda u: UserID(u.id), operation=OP_EARLY, created_at=EARLY
+            ),
             caller,
         )
         made = seeding.made(caller)
@@ -435,14 +548,33 @@ class ProjectRecords(Given[Any, ScopedEntities]):
 
     @override
     def describe(self) -> str:
-        granted = [n for n, g in (("첫째", self.grant_first), ("둘째", self.grant_second)) if g]
-        holding = (
-            f"{'·'.join(granted)} 프로젝트에 읽기 권한을 받은" if granted else "아무 권한도 없는"
+        granted_ko = [
+            name
+            for name, given in (("첫째", self.grant_first), ("둘째", self.grant_second))
+            if given
+        ]
+        granted_en = [
+            name
+            for name, given in (("the first", self.grant_first), ("the second", self.grant_second))
+            if given
+        ]
+        holding_ko = (
+            f"{', '.join(granted_ko)} 프로젝트에 읽기 권한을 받은"
+            if granted_ko
+            else "아무 권한도 없는"
         )
-        return f"서로 다른 프로젝트의 기록 둘과, {holding} {self.role.value} 한 명"
+        holding_en = (
+            f"granted read permission on the {' and '.join(granted_en)} projects"
+            if granted_en
+            else "with no permission"
+        )
+        return Says(
+            f"서로 다른 프로젝트의 기록 둘과, {holding_ko} {self.role.value} 한 명",
+            english=(f"two records of different projects, and one {self.role.value} {holding_en}"),
+        )
 
     @override
-    async def lay(self, seeding: SeedingSession) -> ScopedEntities:
+    async def lay(self, seeding: TestSeedingSession) -> ScopedEntities:
         laid = await lay_two_projects(
             seeding,
             grant_first=self.grant_first,
@@ -475,10 +607,16 @@ class ProjectRecordsToLoad(Given[Any, RecordsToLoad]):
 
     @override
     def describe(self) -> str:
-        return "서로 다른 프로젝트의 기록 둘과, 첫째 프로젝트에만 읽기 권한을 받은 사용자 한 명"
+        return Says(
+            "서로 다른 프로젝트의 기록 둘과, 첫째 프로젝트에만 읽기 권한을 받은 사용자 한 명",
+            english=(
+                "two records of different projects, and one user granted read permission "
+                "on the first project only"
+            ),
+        )
 
     @override
-    async def lay(self, seeding: SeedingSession) -> RecordsToLoad:
+    async def lay(self, seeding: TestSeedingSession) -> RecordsToLoad:
         laid = await lay_two_projects(seeding, grant_first=True)
         return RecordsToLoad(
             laid.caller,
@@ -494,19 +632,27 @@ class OneProjectMixedStatus(Given[Any, ScopedEntities]):
 
     @override
     def describe(self) -> str:
-        return "성공한 기록과 거부된 기록을 가진 프로젝트 하나와, 읽기 권한을 받은 사용자 한 명"
+        return Says(
+            "성공한 기록과 거부된 기록을 가진 프로젝트 하나와, 읽기 권한을 받은 사용자 한 명",
+            english=(
+                "one project holding a successful record and a rejected record, and one "
+                "user granted read permission"
+            ),
+        )
 
     @override
-    async def lay(self, seeding: SeedingSession) -> ScopedEntities:
-        domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
-        policy = await seeding.once(SeedProjectPolicy())
-        project = await seeding.creating_from_two(SeedProject(name_hint="team"), domain, policy)
+    async def lay(self, seeding: TestSeedingSession) -> ScopedEntities:
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+        policy = await seeding.once(TestSeedProjectPolicy())
+        project = await seeding.creating_from_two(TestSeedProject(name_hint="team"), domain, policy)
         await seeding.adding(
-            SeedAuditRecord(owner_of=lambda p: ProjectID(p.id), operation=OP_OK, created_at=LATE),
+            TestSeedAuditRecord(
+                owner_of=lambda p: ProjectID(p.id), operation=OP_OK, created_at=LATE
+            ),
             project,
         )
         await seeding.adding(
-            SeedAuditRecord(
+            TestSeedAuditRecord(
                 owner_of=lambda p: ProjectID(p.id),
                 operation=OP_DENIED,
                 created_at=EARLY,
@@ -529,6 +675,72 @@ class OneProjectMixedStatus(Given[Any, ScopedEntities]):
 
 
 @dataclass(frozen=True)
+class OneProjectOneRun(Given[Any, ScopedEntities]):
+    """A single project holding two records of one run and a record of another run, with
+    a caller granted READ on it."""
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "한 실행이 남긴 기록 둘과 다른 실행이 남긴 기록 하나를 가진 프로젝트 하나와, 읽기 "
+            "권한을 받은 사용자 한 명",
+            english=(
+                "one project holding two records one run left and one record another run "
+                "left, and one user granted read permission"
+            ),
+        )
+
+    @override
+    async def lay(self, seeding: TestSeedingSession) -> ScopedEntities:
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+        policy = await seeding.once(TestSeedProjectPolicy())
+        project = await seeding.creating_from_two(TestSeedProject(name_hint="team"), domain, policy)
+        run = uuid4()
+        await seeding.adding(
+            TestSeedAuditRecord(
+                owner_of=lambda p: ProjectID(p.id),
+                operation=OP_LATE,
+                created_at=LATE,
+                action_id=run,
+            ),
+            project,
+        )
+        await seeding.adding(
+            TestSeedAuditRecord(
+                owner_of=lambda p: ProjectID(p.id),
+                operation=OP_EARLY,
+                created_at=EARLY,
+                action_id=run,
+            ),
+            project,
+        )
+        await seeding.adding(
+            TestSeedAuditRecord(
+                owner_of=lambda p: ProjectID(p.id), operation=OP_OTHER_RUN, created_at=LATE
+            ),
+            project,
+        )
+        caller = await seeding.within(SomeoneOf(domain))
+        await grant_reading(
+            seeding,
+            project,
+            caller,
+            entity_type=ProjectEntityType(),
+            scope_of=lambda p: ProjectID(p.id),
+        )
+        pid = seeding.made(project).id
+        return ScopedEntities(
+            seeding.made(caller),
+            (pid,),
+            (
+                ExpectedRecord(OP_LATE, "project", pid, LATE),
+                ExpectedRecord(OP_EARLY, "project", pid, EARLY),
+            ),
+            filter_action=run,
+        )
+
+
+@dataclass(frozen=True)
 class OneProjectManyRecords(Given[Any, ScopedEntities]):
     """A single project holding more records than a default page, with a granted caller."""
 
@@ -536,16 +748,21 @@ class OneProjectManyRecords(Given[Any, ScopedEntities]):
 
     @override
     def describe(self) -> str:
-        return f"기록 {self.total}개를 가진 프로젝트 하나와, 읽기 권한을 받은 사용자 한 명"
+        return Says(
+            f"기록 {self.total}개를 가진 프로젝트 하나와, 읽기 권한을 받은 사용자 한 명",
+            english=(
+                f"one project holding {self.total} records, and one user granted read permission"
+            ),
+        )
 
     @override
-    async def lay(self, seeding: SeedingSession) -> ScopedEntities:
-        domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
-        policy = await seeding.once(SeedProjectPolicy())
-        project = await seeding.creating_from_two(SeedProject(name_hint="team"), domain, policy)
+    async def lay(self, seeding: TestSeedingSession) -> ScopedEntities:
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+        policy = await seeding.once(TestSeedProjectPolicy())
+        project = await seeding.creating_from_two(TestSeedProject(name_hint="team"), domain, policy)
         for i in range(self.total):
             await seeding.adding(
-                SeedAuditRecord(
+                TestSeedAuditRecord(
                     owner_of=lambda p: ProjectID(p.id), operation=f"op-{i}", created_at=EARLY
                 ),
                 project,
@@ -569,20 +786,24 @@ class ARecordScopedToAProject(Given[Any, ScopedEntities]):
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "다른 엔티티에 대한 기록이 한 프로젝트를 스코프로 달고 있고, 그 프로젝트에 읽기 "
-            "권한을 받은 사용자 한 명"
+            "권한을 받은 사용자 한 명",
+            english=(
+                "a record about another entity carrying a project as its scope, and one "
+                "user granted read permission on that project"
+            ),
         )
 
     @override
-    async def lay(self, seeding: SeedingSession) -> ScopedEntities:
-        domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
-        policy = await seeding.once(SeedProjectPolicy())
-        project = await seeding.creating_from_two(SeedProject(name_hint="team"), domain, policy)
+    async def lay(self, seeding: TestSeedingSession) -> ScopedEntities:
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+        policy = await seeding.once(TestSeedProjectPolicy())
+        project = await seeding.creating_from_two(TestSeedProject(name_hint="team"), domain, policy)
         subject = await seeding.within(SomeoneOf(domain))
         pid = seeding.made(project).id
         await seeding.adding_with_nested(
-            SeedScopedAuditRecord(
+            TestSeedScopedAuditRecord(
                 owner_of=lambda u: UserID(u.id),
                 operation=OP_SCOPED,
                 created_at=LATE,
@@ -615,15 +836,19 @@ class ActorRecords(Given[Any, ScopedActors]):
 
     @override
     def describe(self) -> str:
-        who = (
-            "그중 첫 사용자"
-            if self.caller_is_first
-            else "그 사용자에 대한 읽기 권한을 받은 다른 사용자 한 명"
+        if self.caller_is_first:
+            who_ko = "그중 첫 사용자"
+            who_en = "the first of those users"
+        else:
+            who_ko = "그 사용자에 대한 읽기 권한을 받은 다른 사용자 한 명"
+            who_en = "another user granted read permission on that user"
+        return Says(
+            f"두 사용자가 각각 실행한 기록과, {who_ko}",
+            english=f"records two users each triggered, and {who_en}",
         )
-        return f"두 사용자가 각각 실행한 기록과, {who}"
 
     @override
-    async def lay(self, seeding: SeedingSession) -> ScopedActors:
+    async def lay(self, seeding: TestSeedingSession) -> ScopedActors:
         caller, first_id, _second_id = await lay_two_actors(
             seeding, caller_is_first=self.caller_is_first, grant_first_to_caller=self.grant
         )
@@ -644,7 +869,10 @@ class TheRecordsAnswered(Then[Any, SearchAuditLogsPayload]):
 
     @override
     def says(self) -> str:
-        return "지정한 기록이 순서대로, 그리고 그것만 반환된다"
+        return Says(
+            "지정한 기록이 순서대로, 그리고 그것만 반환됩니다",
+            english="the named records come back in order, and only those",
+        )
 
     @override
     def look(self, laid: Any, answered: Answered[SearchAuditLogsPayload]) -> list[Verdict]:
@@ -671,7 +899,10 @@ class ThePageIsCapped(Then[Any, SearchAuditLogsPayload]):
 
     @override
     def says(self) -> str:
-        return "기본 페이지 크기만큼 반환되고 다음 페이지가 있다고 응답한다"
+        return Says(
+            "기본 페이지 크기만큼 반환되고 다음 페이지가 있다고 응답합니다",
+            english="the default page size comes back and the answer says another page follows",
+        )
 
     @override
     def look(self, laid: Any, answered: Answered[SearchAuditLogsPayload]) -> list[Verdict]:
@@ -691,14 +922,19 @@ type Loaded = list[AuditLogNode | Exception | None]
 
 @dataclass(frozen=True)
 class TheSlotsInOrder(Then[RecordsToLoad, Loaded]):
-    """Each id is answered in the order named: its node whole, a refusal, or a gap for an
+    """Each id is answered in the order named: its node whole, a rejection, or a gap for an
     id nothing answers to. A slot names which — ``first``, ``second``, ``refused``, ``gap``."""
 
     slots: tuple[str, ...]
 
     @override
     def says(self) -> str:
-        return "요청한 순서대로 항목마다 노드, 거부, 또는 빈 항목이 반환된다"
+        return Says(
+            "요청한 순서대로 항목마다 노드, 거부, 또는 빈 항목이 반환됩니다",
+            english=(
+                "for each item in request order, a node, a rejection, or an empty item comes back"
+            ),
+        )
 
     @override
     def look(self, laid: RecordsToLoad, answered: Answered[Loaded]) -> list[Verdict]:
@@ -721,4 +957,366 @@ class TheSlotsInOrder(Then[RecordsToLoad, Loaded]):
                         if isinstance(got, AuditLogNode)
                         else [Same(f"[{index}]", type(got).__name__, "AuditLogNode")]
                     )
+        return verdicts
+
+
+@dataclass(frozen=True)
+class ARecordReachedThroughItsScope(Given[Any, RecordsToLoad]):
+    """A record about one user, tagged with a project scope, and a record on another
+    project. The caller holds READ on the scope project alone, so the first record is
+    reached through its scope and the second not at all."""
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "한 사용자에 대한 기록이 한 프로젝트를 범위로 남겼고, 다른 프로젝트에 기록 하나가 "
+            "있으며, 범위 프로젝트에만 읽기 권한을 받은 사용자 한 명",
+            english=(
+                "a record about one user that left a project as its scope, one record on "
+                "another project, and one user granted read permission on the scope "
+                "project only"
+            ),
+        )
+
+    @override
+    async def lay(self, seeding: TestSeedingSession) -> RecordsToLoad:
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+        policy = await seeding.once(TestSeedProjectPolicy())
+        scope = await seeding.creating_from_two(TestSeedProject(name_hint="team"), domain, policy)
+        other = await seeding.creating_from_two(TestSeedProject(name_hint="other"), domain, policy)
+        subject = await seeding.within(SomeoneOf(domain))
+        scoped = await seeding.adding_with_nested(
+            TestSeedScopedAuditRecord(
+                owner_of=lambda u: UserID(u.id),
+                operation=OP_SCOPED,
+                created_at=LATE,
+                scopes=((ProjectEntityType(), seeding.made(scope).id),),
+            ),
+            subject,
+        )
+        unreachable = await seeding.adding(
+            TestSeedAuditRecord(
+                owner_of=lambda p: ProjectID(p.id), operation=OP_EARLY, created_at=EARLY
+            ),
+            other,
+        )
+        caller = await seeding.within(SomeoneOf(domain))
+        await grant_reading(
+            seeding,
+            scope,
+            caller,
+            entity_type=ProjectEntityType(),
+            scope_of=lambda p: ProjectID(p.id),
+        )
+        return RecordsToLoad(
+            seeding.made(caller),
+            (
+                seeding.made(scoped).id,
+                ExpectedRecord(OP_SCOPED, "user", seeding.made(subject).id, LATE),
+            ),
+            (
+                seeding.made(unreachable).id,
+                ExpectedRecord(OP_EARLY, "project", seeding.made(other).id, EARLY),
+            ),
+        )
+
+
+@dataclass(frozen=True)
+class ARecordReachedThroughItsTrigger(Given[Any, RecordsToLoad]):
+    """A record about one project triggered by a user, and a record on another project.
+    The caller holds READ on the triggering user alone, so the first record is reached
+    through who triggered it and the second not at all."""
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "한 프로젝트에 대한 기록을 다른 사용자가 실행했고, 다른 프로젝트에 기록 하나가 "
+            "있으며, 실행한 사용자에만 읽기 권한을 받은 사용자 한 명",
+            english=(
+                "a record about one project triggered by another user, one record on "
+                "another project, and one user granted read permission on the triggering "
+                "user only"
+            ),
+        )
+
+    @override
+    async def lay(self, seeding: TestSeedingSession) -> RecordsToLoad:
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+        policy = await seeding.once(TestSeedProjectPolicy())
+        about = await seeding.creating_from_two(TestSeedProject(name_hint="team"), domain, policy)
+        other = await seeding.creating_from_two(TestSeedProject(name_hint="other"), domain, policy)
+        trigger = await seeding.within(SomeoneOf(domain))
+        trigger_id = seeding.made(trigger).id
+        triggered = await seeding.adding(
+            TestSeedAuditRecord(
+                owner_of=lambda p: ProjectID(p.id),
+                operation=OP_TRIGGERED,
+                created_at=LATE,
+                triggered_by=UserID(trigger_id),
+            ),
+            about,
+        )
+        unreachable = await seeding.adding(
+            TestSeedAuditRecord(
+                owner_of=lambda p: ProjectID(p.id), operation=OP_EARLY, created_at=EARLY
+            ),
+            other,
+        )
+        caller = await seeding.within(SomeoneOf(domain))
+        await grant_reading(
+            seeding, trigger, caller, entity_type=UserEntityType(), scope_of=lambda u: UserID(u.id)
+        )
+        return RecordsToLoad(
+            seeding.made(caller),
+            (
+                seeding.made(triggered).id,
+                ExpectedRecord(
+                    OP_TRIGGERED,
+                    "project",
+                    seeding.made(about).id,
+                    LATE,
+                    triggered_by=trigger_id,
+                ),
+            ),
+            (
+                seeding.made(unreachable).id,
+                ExpectedRecord(OP_EARLY, "project", seeding.made(other).id, EARLY),
+            ),
+        )
+
+
+@dataclass(frozen=True)
+class ExpectedScope:
+    """One scope a record recorded, as the search answers it."""
+
+    scope_type: str
+    scope_id: UUID
+
+
+@dataclass(frozen=True)
+class ScopesToSearch:
+    """One record whose scopes are searched, the scopes expected back in order, and the
+    person asking. ``narrow_id`` is the scope a filtering search narrows to."""
+
+    caller: UserData
+    record: UUID
+    visible: tuple[ExpectedScope, ...]
+    narrow_id: UUID | None = None
+
+
+@dataclass(frozen=True)
+class AScopedRecord(Given[Any, ScopesToSearch]):
+    """A record about one project, triggered by a user, that recorded another project and
+    a user as its scopes, and a caller who reaches it one way or none.
+
+    ``reader`` says how: ``superadmin``, ``scope`` (READ on the scope project), ``about``
+    (READ on the project the record is about), ``trigger`` (READ on the triggering user),
+    ``nobody`` or ``monitor`` (no grant). ``narrow`` says which scopes the answer keeps:
+    ``all``, ``project`` (by type) or ``user`` (by id).
+    """
+
+    reader: str = "superadmin"
+    narrow: str = "all"
+
+    @override
+    def describe(self) -> str:
+        who = {
+            "superadmin": Says("superadmin 한 명", english="one superadmin"),
+            "scope": Says(
+                "범위 프로젝트에만 읽기 권한을 받은 사용자 한 명",
+                english="one user granted read permission on the scope project only",
+            ),
+            "about": Says(
+                "대상 프로젝트에만 읽기 권한을 받은 사용자 한 명",
+                english="one user granted read permission on the target project only",
+            ),
+            "trigger": Says(
+                "실행한 사용자에만 읽기 권한을 받은 사용자 한 명",
+                english="one user granted read permission on the triggering user only",
+            ),
+            "nobody": Says(
+                "아무 권한도 없는 사용자 한 명",
+                english="one user with no permission",
+            ),
+            "monitor": Says(
+                "아무 권한도 없는 모니터 역할 사용자 한 명",
+                english="one monitor-role user with no permission",
+            ),
+        }[self.reader]
+        return Says(
+            "한 프로젝트에 대한 기록을 다른 사용자가 실행했고 그 기록이 다른 프로젝트와 "
+            f"한 사용자를 범위로 남겼으며, {who}",
+            english=(
+                "a record about one project was triggered by another user and left another "
+                "project and one user as its scopes, and "
+                f"{in_language(who, Language.ENGLISH)}"
+            ),
+        )
+
+    @override
+    async def lay(self, seeding: TestSeedingSession) -> ScopesToSearch:
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+        policy = await seeding.once(TestSeedProjectPolicy())
+        about = await seeding.creating_from_two(TestSeedProject(name_hint="team"), domain, policy)
+        scope = await seeding.creating_from_two(TestSeedProject(name_hint="other"), domain, policy)
+        member = await seeding.within(SomeoneOf(domain))
+        trigger = await seeding.within(SomeoneOf(domain))
+        scope_id = seeding.made(scope).id
+        member_id = seeding.made(member).id
+        record = await seeding.adding_with_nested(
+            TestSeedScopedAuditRecord(
+                owner_of=lambda p: ProjectID(p.id),
+                operation=OP_SCOPED,
+                created_at=LATE,
+                triggered_by=UserID(seeding.made(trigger).id),
+                scopes=((ProjectEntityType(), scope_id), (UserEntityType(), member_id)),
+            ),
+            about,
+        )
+        role = {"superadmin": UserRole.SUPERADMIN, "monitor": UserRole.MONITOR}.get(
+            self.reader, UserRole.USER
+        )
+        caller = await seeding.within(SomeoneOf(domain, role=role))
+        match self.reader:
+            case "scope":
+                await grant_reading(
+                    seeding,
+                    scope,
+                    caller,
+                    entity_type=ProjectEntityType(),
+                    scope_of=lambda p: ProjectID(p.id),
+                )
+            case "about":
+                await grant_reading(
+                    seeding,
+                    about,
+                    caller,
+                    entity_type=ProjectEntityType(),
+                    scope_of=lambda p: ProjectID(p.id),
+                )
+            case "trigger":
+                await grant_reading(
+                    seeding,
+                    trigger,
+                    caller,
+                    entity_type=UserEntityType(),
+                    scope_of=lambda u: UserID(u.id),
+                )
+        project_scope = ExpectedScope("project", scope_id)
+        user_scope = ExpectedScope("user", member_id)
+        visible = {
+            "all": (project_scope, user_scope),
+            "project": (project_scope,),
+            "user": (user_scope,),
+        }[self.narrow]
+        return ScopesToSearch(
+            seeding.made(caller), seeding.made(record).id, visible, narrow_id=member_id
+        )
+
+
+@dataclass(frozen=True)
+class ARecordWithoutScopes(Given[Any, ScopesToSearch]):
+    """A record about one project that recorded no scope, and a caller granted READ on
+    that project."""
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "범위를 남기지 않은 한 프로젝트의 기록과, 그 프로젝트에 읽기 권한을 받은 사용자 한 명",
+            english=(
+                "a record of one project that left no scope, and one user granted read "
+                "permission on that project"
+            ),
+        )
+
+    @override
+    async def lay(self, seeding: TestSeedingSession) -> ScopesToSearch:
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+        policy = await seeding.once(TestSeedProjectPolicy())
+        project = await seeding.creating_from_two(TestSeedProject(name_hint="team"), domain, policy)
+        record = await seeding.adding(
+            TestSeedAuditRecord(
+                owner_of=lambda p: ProjectID(p.id), operation=OP_OK, created_at=LATE
+            ),
+            project,
+        )
+        caller = await seeding.within(SomeoneOf(domain))
+        await grant_reading(
+            seeding,
+            project,
+            caller,
+            entity_type=ProjectEntityType(),
+            scope_of=lambda p: ProjectID(p.id),
+        )
+        return ScopesToSearch(seeding.made(caller), seeding.made(record).id, ())
+
+
+@dataclass(frozen=True)
+class NoRecordToSearch(Given[Any, ScopesToSearch]):
+    """A superadmin, and a record id nothing answers to."""
+
+    @override
+    def describe(self) -> str:
+        return Says("superadmin 한 명", english="one superadmin")
+
+    @override
+    async def lay(self, seeding: TestSeedingSession) -> ScopesToSearch:
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+        caller = await seeding.within(SomeoneOf(domain, role=UserRole.SUPERADMIN))
+        return ScopesToSearch(seeding.made(caller), uuid4(), ())
+
+
+@dataclass(frozen=True)
+class TheScopesAnswered(Then[ScopesToSearch, SearchAuditLogScopesPayload]):
+    """The scopes expected come back, in order and whole, and only those."""
+
+    @override
+    def says(self) -> str:
+        return Says(
+            "기록의 범위가 순서대로, 그리고 그것만 반환됩니다",
+            english="the scopes of the record come back in order, and only those",
+        )
+
+    @override
+    def look(
+        self, laid: ScopesToSearch, answered: Answered[SearchAuditLogScopesPayload]
+    ) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Same("answer", repr(answered.raised), "a page of scopes")]
+        verdicts: list[Verdict] = [
+            Same("item_count", len(payload.items), len(laid.visible)),
+            Same("total_count", payload.total_count, len(laid.visible)),
+            Same("has_next_page", payload.has_next_page, False),
+            Same("has_previous_page", payload.has_previous_page, False),
+        ]
+        for index, (node, expected) in enumerate(zip(payload.items, laid.visible, strict=False)):
+            at = f"[{index}]."
+            verdicts.extend([
+                Skipped(
+                    f"{at}id",
+                    Says("데이터베이스가 생성합니다", english="the database generates it"),
+                ),
+                Skipped(
+                    f"{at}field_id",
+                    Says("데이터베이스가 생성합니다", english="the database generates it"),
+                ),
+                Held(
+                    f"{at}audit_log_id",
+                    node.audit_log_id,
+                    SameAs[UUID](
+                        laid.record,
+                        Says("검색한 기록", english="the record searched"),
+                    ),
+                ),
+                Same(f"{at}scope_type", node.scope_type, expected.scope_type),
+                Held(
+                    f"{at}scope_id",
+                    node.scope_id,
+                    SameAs[UUID](
+                        expected.scope_id,
+                        Says("기록이 남긴 범위", english="the scope the record left"),
+                    ),
+                ),
+            ])
         return verdicts

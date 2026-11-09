@@ -148,11 +148,11 @@ class TestDeleteKeypairResourcePolicyPayload:
     """Tests for DeleteKeypairResourcePolicyPayload."""
 
     def test_valid_creation(self) -> None:
-        payload = DeleteKeypairResourcePolicyPayload(name="default")
+        payload = DeleteKeypairResourcePolicyPayload(name="default", entity_id=uuid.uuid4())
         assert payload.name == "default"
 
     def test_round_trip(self) -> None:
-        payload = DeleteKeypairResourcePolicyPayload(name="default")
+        payload = DeleteKeypairResourcePolicyPayload(name="default", entity_id=uuid.uuid4())
         json_data = payload.model_dump_json()
         restored = DeleteKeypairResourcePolicyPayload.model_validate_json(json_data)
         assert restored.name == payload.name
@@ -206,7 +206,7 @@ class TestDeleteUserResourcePolicyPayload:
     """Tests for DeleteUserResourcePolicyPayload."""
 
     def test_valid_creation(self) -> None:
-        payload = DeleteUserResourcePolicyPayload(name="user-policy")
+        payload = DeleteUserResourcePolicyPayload(name="user-policy", entity_id=uuid.uuid4())
         assert payload.name == "user-policy"
 
 
@@ -257,11 +257,11 @@ class TestDeleteProjectResourcePolicyPayload:
     """Tests for DeleteProjectResourcePolicyPayload."""
 
     def test_valid_creation(self) -> None:
-        payload = DeleteProjectResourcePolicyPayload(name="project-policy")
+        payload = DeleteProjectResourcePolicyPayload(name="project-policy", entity_id=uuid.uuid4())
         assert payload.name == "project-policy"
 
     def test_round_trip(self) -> None:
-        payload = DeleteProjectResourcePolicyPayload(name="project-policy")
+        payload = DeleteProjectResourcePolicyPayload(name="project-policy", entity_id=uuid.uuid4())
         json_data = payload.model_dump_json()
         restored = DeleteProjectResourcePolicyPayload.model_validate_json(json_data)
         assert restored.name == payload.name

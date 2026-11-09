@@ -565,7 +565,7 @@
           },
           "editorMode": "code",
           "expr": "increase(backendai_graphql_request_count_total{service_group=\"$services\", success=\"True\"}[5m])",
-          "legendFormat": "{{parent_type}} / {{operation_type}} / {{operation_name}} / {{field_name}} : Success",
+          "legendFormat": "{{parent_type}} / {{operation_type}} / {{field_name}} : Success",
           "range": true,
           "refId": "A"
         },
@@ -577,7 +577,7 @@
           "editorMode": "code",
           "expr": "increase(backendai_graphql_request_count_total{service_group=\"$services\", success=\"False\"}[5m])",
           "hide": false,
-          "legendFormat": "{{parent_type}} / {{operation_type}} / {{operation_name}} / {{field_name}} : Failed",
+          "legendFormat": "{{parent_type}} / {{operation_type}} / {{field_name}} : Failed",
           "range": true,
           "refId": "B"
         }
@@ -672,8 +672,8 @@
             "uid": "prom_ds_001"
           },
           "editorMode": "code",
-          "expr": "sum(increase(backendai_graphql_request_count_total{service_group=\"$services\", success=\"False\"}[5m])) by (parent_type, operation_type, operation_name, field_name)",
-          "legendFormat": "{{parent_type}} / {{operation_type}} / {{operation_name}} / {{field_name}} : Success",
+          "expr": "sum(increase(backendai_graphql_request_count_total{service_group=\"$services\", success=\"False\"}[5m])) by (parent_type, operation_type, field_name)",
+          "legendFormat": "{{parent_type}} / {{operation_type}} / {{field_name}} : Success",
           "range": true,
           "refId": "A"
         }
@@ -769,8 +769,8 @@
             "uid": "prom_ds_001"
           },
           "editorMode": "code",
-          "expr": "sum by (parent_type, operation_type, operation_name, field_name) (increase(backendai_graphql_request_duration_sec_sum{service_group=\"$services\", success=\"True\"}[5m])) \n/\nsum by (parent_type, operation_type, operation_name, field_name) (increase(backendai_graphql_request_duration_sec_count{service_group=\"$services\", success=\"True\"}[5m]))",
-          "legendFormat": "{{parent_type}} / {{operation_type}} / {{operation_name}} / {{field_name}} : Success",
+          "expr": "sum by (parent_type, operation_type, field_name) (increase(backendai_graphql_request_duration_sec_sum{service_group=\"$services\", success=\"True\"}[5m])) \n/\nsum by (parent_type, operation_type, field_name) (increase(backendai_graphql_request_duration_sec_count{service_group=\"$services\", success=\"True\"}[5m]))",
+          "legendFormat": "{{parent_type}} / {{operation_type}} / {{field_name}} : Success",
           "range": true,
           "refId": "A"
         },
@@ -780,9 +780,9 @@
             "uid": "prom_ds_001"
           },
           "editorMode": "code",
-          "expr": "sum by (parent_type, operation_type, operation_name, field_name) (increase(backendai_graphql_request_duration_sec_sum{service_group=\"$services\", success=\"False\"}[5m])) \n/\nsum by (parent_type, operation_type, operation_name, field_name) (increase(backendai_graphql_request_duration_sec_count{service_group=\"$services\", success=\"False\"}[5m]))",
+          "expr": "sum by (parent_type, operation_type, field_name) (increase(backendai_graphql_request_duration_sec_sum{service_group=\"$services\", success=\"False\"}[5m])) \n/\nsum by (parent_type, operation_type, field_name) (increase(backendai_graphql_request_duration_sec_count{service_group=\"$services\", success=\"False\"}[5m]))",
           "hide": false,
-          "legendFormat": "{{parent_type}} / {{operation_type}} / {{operation_name}} / {{field_name}} : Fail",
+          "legendFormat": "{{parent_type}} / {{operation_type}} / {{field_name}} : Fail",
           "range": true,
           "refId": "B"
         }
@@ -878,8 +878,8 @@
             "uid": "prom_ds_001"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum(backendai_graphql_request_duration_sec_bucket{service_group=\"$services\", success=\"True\"}) by (le, parent_type, operation_type, operation_name, field_name))",
-          "legendFormat": "P95 {{parent_type}} / {{operation_type}} / {{operation_name}} / {{field_name}} : Success",
+          "expr": "histogram_quantile(0.95, sum(backendai_graphql_request_duration_sec_bucket{service_group=\"$services\", success=\"True\"}) by (le, parent_type, operation_type, field_name))",
+          "legendFormat": "P95 {{parent_type}} / {{operation_type}} / {{field_name}} : Success",
           "range": true,
           "refId": "A"
         },
@@ -889,9 +889,9 @@
             "uid": "prom_ds_001"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.90, sum(backendai_graphql_request_duration_sec_bucket{service_group=\"$services\", success=\"True\"}) by (le, parent_type, operation_type, operation_name, field_name))",
+          "expr": "histogram_quantile(0.90, sum(backendai_graphql_request_duration_sec_bucket{service_group=\"$services\", success=\"True\"}) by (le, parent_type, operation_type, field_name))",
           "hide": false,
-          "legendFormat": "P90 {{parent_type}} / {{operation_type}} / {{operation_name}} / {{field_name}} : Success",
+          "legendFormat": "P90 {{parent_type}} / {{operation_type}} / {{field_name}} : Success",
           "range": true,
           "refId": "B"
         },
@@ -901,9 +901,9 @@
             "uid": "prom_ds_001"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.90, sum(backendai_graphql_request_duration_sec_bucket{service_group=\"$services\", success=\"False\"}) by (le, parent_type, operation_type, operation_name, field_name))",
+          "expr": "histogram_quantile(0.90, sum(backendai_graphql_request_duration_sec_bucket{service_group=\"$services\", success=\"False\"}) by (le, parent_type, operation_type, field_name))",
           "hide": false,
-          "legendFormat": "P95 {{parent_type}} / {{operation_type}} / {{operation_name}} / {{field_name}} : Fail",
+          "legendFormat": "P95 {{parent_type}} / {{operation_type}} / {{field_name}} : Fail",
           "range": true,
           "refId": "C"
         },
@@ -913,9 +913,9 @@
             "uid": "prom_ds_001"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.90, sum(backendai_graphql_request_duration_sec_bucket{service_group=\"$services\", success=\"False\"}) by (le, parent_type, operation_type, operation_name, field_name))",
+          "expr": "histogram_quantile(0.90, sum(backendai_graphql_request_duration_sec_bucket{service_group=\"$services\", success=\"False\"}) by (le, parent_type, operation_type, field_name))",
           "hide": false,
-          "legendFormat": "P90 {{parent_type}} / {{operation_type}} / {{operation_name}} / {{field_name}} : Fail",
+          "legendFormat": "P90 {{parent_type}} / {{operation_type}} / {{field_name}} : Fail",
           "range": true,
           "refId": "D"
         }

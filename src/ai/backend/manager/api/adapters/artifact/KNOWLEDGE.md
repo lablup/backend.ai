@@ -1,26 +1,36 @@
 ---
 name: artifact-adapter-scenarios
 type: reference
-description: TODO - what the artifact adapter guarantees, as scenarios; nobody has written these yet
+description: what the artifact adapter guarantees for update, soft delete and restore, and for the bulk and legacy id-list calls; artifacts in no scope, the permission graph on single calls, the global role on the id-list calls, no purge
 scope: src/ai/backend/manager/api/adapters/artifact
-keywords: [artifact, scenario, adapter, todo]
+keywords: [artifact, scenario, adapter, partial_bulk, soft delete, restore]
 generated:
   by: claude-code/opus-5
-  at: 2026-09-10
+  at: 2026-10-15
 status: draft
 ---
-# artifact 어댑터 — 시나리오
+# artifact adapter: Knowledge
 
-TODO. 아직 아무도 적지 않았다.
+The rules are in `AGENTS.md` in the parent directory. When this document and a run result disagree, doubt the sentence first.
 
-규칙은 상위 디렉터리의 `AGENTS.md`에 있다. 이 파일이 이 모양으로 남아 있는 동안, 이 엔티티는
-시나리오 테스트가 없다.
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
-## 적는 법
+An artifact is created outside every scope. The permission graph protects the calls that update, delete and restore one artifact, and a global role protects the legacy calls that delete and restore several by an id list.
 
-1. `adapter.py`가 내놓는 호출을 전부 훑는다.
-2. 호출마다 무엇을 보장하는지 한 문장으로 적는다. 권한이 있는 경우와 없는 경우를 짝으로 둔다.
-3. 동작별로 표를 나눈다. 각 줄은 상황, 요청, 결과 셋을 갖는다.
-4. 어느 시나리오도 부르지 않는 호출은 "아직 적지 않은 것"에 남긴다.
+The framework contract tests verify the common contract (target existence, bulk composition). This document records only the representative success and the representative failure of each operation and the differences the artifact rules make.
 
-먼저 적힌 것을 보려면 `../domain/KNOWLEDGE.md`를 참고한다.
+## Update
+
+## Delete and restore
+
+There is no purge.
+
+## Updating several
+
+## Bulk delete and restore
+
+A bulk operation does not reject the whole call. Processed artifacts go into the processed list, and the operation records failures in the failure list with the id and the reason.
+
+## Bulk delete and restore by an id list
+
+This is the call from before the bulk operations existed. The old REST path and GQL mutation call it.

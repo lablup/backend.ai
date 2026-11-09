@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.dto.manager.field import VFolderPermissionField
 from ai.backend.common.dto.manager.vfolder import (
     GetVFolderIDReq,
     VFolderCreateReq,
@@ -18,8 +19,9 @@ from ai.backend.common.dto.manager.vfolder import (
     VFolderGetInfoResponse,
     VFolderListResponse,
 )
-from ai.backend.common.types import QuotaScopeID, QuotaScopeType
+from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderMountPolicy
 from ai.backend.manager.models.resource_policy.row import UserResourcePolicyRow
+from ai.backend.manager.models.vfolder.row import VFolderRow
 
 VFolderFixtureData = dict[str, Any]
 VFolderFactory = Callable[..., Coroutine[Any, Any, VFolderFixtureData]]
@@ -97,6 +99,55 @@ class TestVFolderCreateViaSDK:
                 cloneable=True,
             ),
         )
+
+
+class TestVFolderCreateMountLevel:
+    """The response carries the creator's mount level; the row keeps the folder default."""
+
+    async def _default_of(self, db_engine: SAEngine, vfolder_id: str) -> VFolderMountPolicy:
+        async with db_engine.begin() as conn:
+            return VFolderMountPolicy(
+                await conn.scalar(
+                    sa.select(VFolderRow.default_mount_permission).where(
+                        VFolderRow.id == uuid.UUID(vfolder_id)
+                    )
+                )
+            )
+
+    async def test_a_personal_folder_made_without_a_level_answers_read_write_to_its_owner(
+        self,
+        db_engine: SAEngine,
+        admin_registry: BackendAIClientRegistry,
+        vfolder_host_permission_fixture: None,
+    ) -> None:
+        result = await admin_registry.vfolder.create(
+            VFolderCreateReq(
+                name="crud-mount-default",
+                folder_host="local",
+                unmanaged_path="/mnt/external/mount-default",
+            ),
+        )
+
+        assert result.root.permission == VFolderPermissionField.READ_WRITE
+        assert await self._default_of(db_engine, result.root.id) == VFolderMountPolicy.NONE
+
+    async def test_a_named_level_becomes_the_default(
+        self,
+        db_engine: SAEngine,
+        admin_registry: BackendAIClientRegistry,
+        vfolder_host_permission_fixture: None,
+    ) -> None:
+        result = await admin_registry.vfolder.create(
+            VFolderCreateReq(
+                name="crud-mount-named",
+                folder_host="local",
+                unmanaged_path="/mnt/external/mount-named",
+                permission=VFolderPermissionField.READ_ONLY,
+            ),
+        )
+
+        assert result.root.permission == VFolderPermissionField.READ_WRITE
+        assert await self._default_of(db_engine, result.root.id) == VFolderMountPolicy.READ_ONLY
 
 
 class TestVFolderCreateErrors:

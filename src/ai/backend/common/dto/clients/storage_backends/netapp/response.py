@@ -1,0 +1,133 @@
+from __future__ import annotations
+
+from datetime import datetime
+from pathlib import Path
+from typing import Any
+from uuid import UUID
+
+from pydantic import ConfigDict
+
+from ai.backend.common.dto.clients.storage_backends.netapp.types import (
+    NetAppXCPEntryType,
+)
+from ai.backend.common.types import BackendAISchema
+
+
+class NetAppJobResult(BackendAISchema):
+    state: str
+    code: str | None
+    message: str | None
+
+
+class NetAppSpaceInfo(BackendAISchema):
+    model_config = ConfigDict(extra="allow")
+
+    size: int
+    used: int
+    available: int | None = None
+
+
+class NetAppSVMInfo(BackendAISchema):
+    model_config = ConfigDict(extra="allow")
+
+    uuid: str
+    name: str
+
+
+class NetAppVolumeInfo(BackendAISchema):
+    model_config = ConfigDict(extra="allow")
+
+    name: str
+    uuid: UUID
+    path: Path
+    space: NetAppSpaceInfo | None = None
+    statistics: dict[str, Any] | None = None
+    svm: NetAppSVMInfo | None = None
+
+
+class NetAppVolumeMetric(BackendAISchema):
+    model_config = ConfigDict(extra="allow")
+
+
+class NetAppQTreeInfo(BackendAISchema):
+    model_config = ConfigDict(extra="allow")
+
+    id: int
+    name: str
+    path: Path
+    security_style: str | None = None
+    export_policy: dict[str, Any] | None = None
+    statistics: dict[str, Any] | None = None
+
+
+class NetAppQuotaConfig(BackendAISchema):
+    limit_bytes: int
+
+
+class NetAppQuotaUsage(BackendAISchema):
+    used_bytes: int
+    limit_bytes: int
+
+
+class NetAppQoSFixedPolicy(BackendAISchema):
+    max_throughput_iops: int
+    max_throughput_mbps: int
+    min_throughput_iops: int
+    min_throughput_mbps: int
+    capacity_shared: bool
+
+
+class NetAppQoSPolicy(BackendAISchema):
+    uuid: str
+    name: str
+    fixed: NetAppQoSFixedPolicy
+    svm: NetAppSVMInfo
+
+
+class NetAppVolumeQoS(BackendAISchema):
+    model_config = ConfigDict(extra="allow")
+
+
+class NetAppCluster(BackendAISchema):
+    cluster_name: str
+    cluster_uuid: str
+    version: str
+
+
+class NetAppXCPStat(BackendAISchema):
+    size: int
+    owner: str
+    mode: int
+    modified: datetime
+    created: datetime
+
+
+class NetAppXCPEntry(BackendAISchema):
+    name: str
+    path: Path
+    type: NetAppXCPEntryType
+    stat: NetAppXCPStat
+    symlink_target: str
+
+
+class NetAppXCPTreeUsage(BackendAISchema):
+    file_count: int
+    used_bytes: int
+
+
+class NetAppQuotaSpaceLimit(BackendAISchema):
+    hard_limit: int
+    soft_limit: int
+
+
+class NetAppQuotaRuleSpace(BackendAISchema):
+    model_config = ConfigDict(extra="allow")
+
+    hard_limit: int | None = None
+
+
+class NetAppQuotaRule(BackendAISchema):
+    model_config = ConfigDict(extra="allow")
+
+    uuid: str
+    space: NetAppQuotaRuleSpace | None = None

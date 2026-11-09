@@ -24,9 +24,10 @@ from ai.backend.common.dto.manager.v2.user.request import (
 )
 from ai.backend.common.dto.manager.v2.user.types import OrderDirection, UserOrderField
 from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, PartialBulkResult
+from ai.backend.manager.actions.v2.ops.result import BulkLookupOpsResult
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
 from ai.backend.manager.data.user.types import UserData
-from ai.backend.manager.errors.common import GenericForbidden
+from ai.backend.manager.errors.common import GenericBadRequest, GenericForbidden
 
 
 def _create_user_data(
@@ -140,6 +141,56 @@ class TestBatchLoadByIds:
     async def test_no_ids_read_nothing(self, adapter: UserAdapter, processors: MagicMock) -> None:
         assert await adapter.batch_load_by_ids([]) == []
         processors.bulk_get.run.assert_not_awaited()
+
+
+class TestBatchLookupByEmails:
+    @pytest.fixture
+    def found_id(self) -> UserID:
+        return UserID(uuid4())
+
+    @pytest.fixture
+    def unresolvable(self) -> GenericBadRequest:
+        return GenericBadRequest("Cannot resolve the given user key")
+
+    @pytest.fixture
+    def processors(self, found_id: UserID, unresolvable: GenericBadRequest) -> MagicMock:
+        processors = MagicMock()
+        processors.bulk_lookup.run = AsyncMock(
+            return_value=BulkLookupOpsResult(
+                resolved={"found@example.com": found_id},
+                failures={"other@example.com": unresolvable},
+                key_results=[],
+            )
+        )
+        return processors
+
+    @pytest.fixture
+    def adapter(self, processors: MagicMock) -> UserAdapter:
+        return UserAdapter(processors, MagicMock(), MagicMock(), MagicMock())
+
+    async def test_answers_per_email_in_one_lookup(
+        self,
+        adapter: UserAdapter,
+        processors: MagicMock,
+        found_id: UserID,
+        unresolvable: GenericBadRequest,
+    ) -> None:
+        resolved, refused = await adapter.batch_lookup_by_emails([
+            "found@example.com",
+            "other@example.com",
+        ])
+
+        assert resolved == found_id
+        assert refused is unresolvable
+        processors.bulk_lookup.run.assert_awaited_once()
+        action = processors.bulk_lookup.run.await_args.args[0]
+        assert list(action.emails) == ["found@example.com", "other@example.com"]
+
+    async def test_no_emails_look_up_nothing(
+        self, adapter: UserAdapter, processors: MagicMock
+    ) -> None:
+        assert await adapter.batch_lookup_by_emails([]) == []
+        processors.bulk_lookup.run.assert_not_awaited()
 
 
 class TestUserOrderConversion:

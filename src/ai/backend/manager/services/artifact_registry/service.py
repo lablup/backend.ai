@@ -1,6 +1,13 @@
 import logging
+from collections.abc import Sequence
 
+from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, PartialBulkResult
+from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
+from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
+from ai.backend.manager.models.specs.types import BulkResultWithFailures
 from ai.backend.manager.repositories.artifact_registry.repository import ArtifactRegistryRepository
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
 from ai.backend.manager.repositories.reservoir_registry.repository import (
@@ -34,6 +41,12 @@ from ai.backend.manager.services.artifact_registry.actions.huggingface.list impo
     ListHuggingFaceRegistryAction,
     ListHuggingFaceRegistryActionResult,
 )
+from ai.backend.manager.services.artifact_registry.actions.huggingface.partial_bulk_purge import (
+    PartialBulkPurgeHuggingFaceRegistriesAction,
+)
+from ai.backend.manager.services.artifact_registry.actions.huggingface.partial_bulk_update import (
+    PartialBulkUpdateHuggingFaceRegistriesAction,
+)
 from ai.backend.manager.services.artifact_registry.actions.huggingface.search import (
     SearchHuggingFaceRegistriesAction,
     SearchHuggingFaceRegistriesActionResult,
@@ -61,6 +74,12 @@ from ai.backend.manager.services.artifact_registry.actions.reservoir.get_multi i
 from ai.backend.manager.services.artifact_registry.actions.reservoir.list import (
     ListReservoirRegistriesAction,
     ListReservoirRegistriesActionResult,
+)
+from ai.backend.manager.services.artifact_registry.actions.reservoir.partial_bulk_purge import (
+    PartialBulkPurgeReservoirRegistriesAction,
+)
+from ai.backend.manager.services.artifact_registry.actions.reservoir.partial_bulk_update import (
+    PartialBulkUpdateReservoirRegistriesAction,
 )
 from ai.backend.manager.services.artifact_registry.actions.reservoir.search import (
     SearchReservoirRegistriesAction,
@@ -122,6 +141,22 @@ class ArtifactRegistryService:
         log.trace("huggingface registry deleting", artifact_registry_id=action.registry_id)
         registry_data = await self._huggingface_registry_repository.delete(action.registry_id)
         return DeleteHuggingFaceRegistryActionResult(deleted_registry_id=registry_data)
+
+    async def partial_bulk_update_huggingface_registries(
+        self, action: PartialBulkUpdateHuggingFaceRegistriesAction
+    ) -> PartialBulkResult[HuggingFaceRegistryData]:
+        """Edit each named huggingface registry, answering for every one."""
+        result = await self._huggingface_registry_repository.partial_bulk_update([
+            (item.updater, item.meta) for item in action.items
+        ])
+        return self._to_partial_bulk_result(action.entity_ids(), result)
+
+    async def partial_bulk_purge_huggingface_registries(
+        self, action: PartialBulkPurgeHuggingFaceRegistriesAction
+    ) -> PartialBulkResult[ArtifactRegistryID]:
+        """Remove each named huggingface registry, answering for every one."""
+        result = await self._huggingface_registry_repository.partial_bulk_purge(action.ids)
+        return self._to_partial_bulk_result(action.entity_ids(), result)
 
     async def get_huggingface_registry(
         self, action: GetHuggingFaceRegistryAction
@@ -202,6 +237,22 @@ class ArtifactRegistryService:
         reservoir_data = await self._reservoir_repository.delete(action.registry_id)
         return DeleteReservoirActionResult(deleted_reservoir_id=reservoir_data)
 
+    async def partial_bulk_update_reservoir_registries(
+        self, action: PartialBulkUpdateReservoirRegistriesAction
+    ) -> PartialBulkResult[ReservoirRegistryData]:
+        """Edit each named reservoir registry, answering for every one."""
+        result = await self._reservoir_repository.partial_bulk_update([
+            (item.updater, item.meta) for item in action.items
+        ])
+        return self._to_partial_bulk_result(action.entity_ids(), result)
+
+    async def partial_bulk_purge_reservoir_registries(
+        self, action: PartialBulkPurgeReservoirRegistriesAction
+    ) -> PartialBulkResult[ArtifactRegistryID]:
+        """Remove each named reservoir registry, answering for every one."""
+        result = await self._reservoir_repository.partial_bulk_purge(action.ids)
+        return self._to_partial_bulk_result(action.entity_ids(), result)
+
     async def get_reservoir_registry(
         self, action: GetReservoirRegistryAction
     ) -> GetReservoirRegistryActionResult:
@@ -272,4 +323,16 @@ class ArtifactRegistryService:
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
+        )
+
+    def _to_partial_bulk_result[TData](
+        self, entity_ids: Sequence[EntityIdentifier], result: BulkResultWithFailures[TData]
+    ) -> PartialBulkResult[TData]:
+        return PartialBulkResult(
+            items=[
+                PartialBulkEntityResult[TData].succeeded(entity_id, result.successes[entity_id])
+                if entity_id in result.successes
+                else PartialBulkEntityResult[TData].failed(entity_id, result.errors[entity_id])
+                for entity_id in entity_ids
+            ]
         )

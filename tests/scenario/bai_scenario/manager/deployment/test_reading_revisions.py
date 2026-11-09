@@ -21,7 +21,7 @@ from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.base.field import FieldNotFoundError
 from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.deployment_revision import (
     ADeploymentToRevise,
@@ -32,11 +32,13 @@ from bai_scenario.components.deployment_revision import (
     TheRevisionNode,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type ReadingStep = Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
-type LoadingStep = Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, Loaded]
+type ReadingStep = Scenario[
+    TestSeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode
+]
+type LoadingStep = Scenario[TestSeedingSession, RevisionsAndACaller, DeploymentAdapter, Loaded]
 
 
 @dataclass(frozen=True)
@@ -51,12 +53,19 @@ class ReadingARevision(When[RevisionsAndACaller, DeploymentAdapter, RevisionNode
 
     @override
     def describe(self, laid: RevisionsAndACaller) -> str:
-        called = (
-            "아무것도 갖지 않은 id"
-            if self.named is not None
-            else f"{laid.deployment.metadata.name}의 첫 리비전 id"
+        if self.named is not None:
+            return Says(
+                f"{laid.caller.username} 이 아무것도 갖지 않은 id 로 리비전을 조회합니다",
+                english=(f"{laid.caller.username} reads a revision by an id nothing answers to"),
+            )
+        return Says(
+            f"{laid.caller.username} 이 {laid.deployment.metadata.name}의 첫 리비전 id 로 "
+            "리비전을 조회합니다",
+            english=(
+                f"{laid.caller.username} reads a revision by the id of the first revision of "
+                f"{laid.deployment.metadata.name}"
+            ),
         )
-        return f"{laid.caller.username}이 {called}로 리비전을 조회"
 
     @override
     async def call(self, adapter: DeploymentAdapter, laid: RevisionsAndACaller) -> RevisionNode:
@@ -75,9 +84,14 @@ class LoadingRevisionsById(When[RevisionsAndACaller, DeploymentAdapter, Loaded])
 
     @override
     def describe(self, laid: RevisionsAndACaller) -> str:
-        return (
-            f"{laid.caller.username}이 {laid.deployment.metadata.name}의 리비전, "
-            "다른 프로젝트 배포의 리비전, 아무것도 갖지 않은 id를 차례로 집음"
+        return Says(
+            f"{laid.caller.username} 이 {laid.deployment.metadata.name}의 리비전, "
+            "다른 프로젝트 배포의 리비전, 아무것도 갖지 않은 id 를 차례로 지정해 한 번에 조회합니다",
+            english=(
+                f"{laid.caller.username} loads the revision of {laid.deployment.metadata.name}, "
+                "the revision of a deployment in another project, and an id nothing answers to, "
+                "in that order, in one call"
+            ),
         )
 
     @override
@@ -91,7 +105,7 @@ class LoadingRevisionsById(When[RevisionsAndACaller, DeploymentAdapter, Loaded])
 
 @dataclass(frozen=True)
 class TheGrantedUserReadsIt(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
+    Scenario[TestSeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
 ):
     started: datetime
 
@@ -101,10 +115,16 @@ class TheGrantedUserReadsIt(
 
     @override
     def describe(self) -> str:
-        return "배포 읽기 권한을 받은 사용자가 그 배포의 리비전을 id로 조회하면, 그 리비전이 온다"
+        return Says(
+            "배포 읽기 권한을 받은 사용자가 그 배포의 리비전을 id 로 조회하면, 그 리비전이 옵니다",
+            english=(
+                "when a user granted deployment read reads a revision of that deployment by id, "
+                "that revision comes back"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RevisionsAndACaller]:
         return ADeploymentToRevise(granted=(Permission.READ,), revisions=1)
 
     @override
@@ -118,7 +138,7 @@ class TheGrantedUserReadsIt(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotReadIt(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
+    Scenario[TestSeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
 ):
     @override
     def summary(self) -> str:
@@ -126,13 +146,17 @@ class AUserGrantedNothingMayNotReadIt(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 배포 권한도 받지 않은 사용자가 리비전을 id로 조회하면, "
-            "키를 풀 수 없다는 이유로 거부된다"
+        return Says(
+            "아무 배포 권한도 받지 않은 사용자가 리비전을 id 로 조회하면, "
+            "키를 풀 수 없다는 이유로 거부됩니다",
+            english=(
+                "when a user with no deployment grant reads a revision by id, the call is rejected "
+                "because the key cannot be decrypted"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RevisionsAndACaller]:
         return ADeploymentToRevise(revisions=1)
 
     @override
@@ -146,7 +170,7 @@ class AUserGrantedNothingMayNotReadIt(
 
 @dataclass(frozen=True)
 class AnUnknownIdIsRefusedAsUnresolvable(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
+    Scenario[TestSeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
 ):
     @override
     def summary(self) -> str:
@@ -154,13 +178,17 @@ class AnUnknownIdIsRefusedAsUnresolvable(
 
     @override
     def describe(self) -> str:
-        return (
-            "배포 읽기 권한을 받은 사용자가 아무것도 갖지 않은 id로 리비전을 조회하면, "
-            "볼 수 없는 id와 같은 이유로 거부된다"
+        return Says(
+            "배포 읽기 권한을 받은 사용자가 아무것도 갖지 않은 id 로 리비전을 조회하면, "
+            "볼 수 없는 id 와 같은 이유로 거부됩니다",
+            english=(
+                "when a user granted deployment read reads a revision by an id nothing answers to, "
+                "the call is rejected for the same reason as an id the user cannot see"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RevisionsAndACaller]:
         return ADeploymentToRevise(granted=(Permission.READ,), revisions=1)
 
     @override
@@ -174,7 +202,7 @@ class AnUnknownIdIsRefusedAsUnresolvable(
 
 @dataclass(frozen=True)
 class AnUnknownIdIsNotFoundForASuperadmin(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
+    Scenario[TestSeedingSession, RevisionsAndACaller, DeploymentAdapter, RevisionNode]
 ):
     @override
     def summary(self) -> str:
@@ -182,13 +210,17 @@ class AnUnknownIdIsNotFoundForASuperadmin(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 아무것도 갖지 않은 id로 리비전을 조회하면, 대상이 없다는 것으로 "
-            "거부된다. 모든 검사를 지나가는 사람에게는 감출 것이 없다"
+        return Says(
+            "superadmin 이 아무것도 갖지 않은 id 로 리비전을 조회하면, 대상이 없다는 것으로 "
+            "거부됩니다. 모든 검사를 지나가는 사람에게는 감출 것이 없습니다",
+            english=(
+                "when a superadmin reads a revision by an id nothing answers to, the call is "
+                "rejected as not found; nothing is hidden from someone who passes every check"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RevisionsAndACaller]:
         return ADeploymentToRevise(role=UserRole.SUPERADMIN, revisions=1)
 
     @override
@@ -202,7 +234,7 @@ class AnUnknownIdIsNotFoundForASuperadmin(
 
 @dataclass(frozen=True)
 class EachNamedIdIsAnsweredOnItsOwn(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, Loaded]
+    Scenario[TestSeedingSession, RevisionsAndACaller, DeploymentAdapter, Loaded]
 ):
     started: datetime
 
@@ -212,14 +244,19 @@ class EachNamedIdIsAnsweredOnItsOwn(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "한 프로젝트에서만 배포 읽기 권한을 받은 사용자가 읽을 수 있는 리비전, 다른 "
-            "프로젝트의 리비전, 아무것도 갖지 않은 id를 한 번에 집으면, 이름 댄 순서대로 "
-            "리비전, 거부, 빈 자리가 온다"
+            "프로젝트의 리비전, 아무것도 갖지 않은 id 를 한 번에 조회하면, 지정한 순서대로 "
+            "리비전, 거부, 빈 항목이 옵니다",
+            english=(
+                "when a user granted deployment read in only one project loads a readable "
+                "revision, a revision of another project, and an id nothing answers to at once, a "
+                "revision, a rejection, and an empty entry come back in the order given"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RevisionsAndACaller]:
         return RevisionsInTwoProjects(granted=(Permission.READ,))
 
     @override

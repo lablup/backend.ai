@@ -5,6 +5,7 @@ import uuid
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.types import VFolderMountPolicy
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.services.vfolder.actions.base import VFolderFileAction
 from ai.backend.manager.services.vfolder.types import FileInfo
@@ -146,7 +147,7 @@ class CloneVFolderV2Action(_VFolderFileV2ActionBase):
     target_name: str = ""
     target_host: str | None = None
     usage_mode: str = "general"
-    permission: str = "rw"
+    permission: VFolderMountPolicy | None = None
     cloneable: bool = False
 
     @override

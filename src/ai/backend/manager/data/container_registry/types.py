@@ -2,7 +2,12 @@ from dataclasses import dataclass
 from typing import Any, override
 
 from ai.backend.common.container_registry import ContainerRegistryType
-from ai.backend.common.data.entity.container_registry import ContainerRegistryID
+from ai.backend.common.data.entity.container_registry import (
+    AssociationContainerRegistriesGroupsID,
+    ContainerRegistryID,
+)
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import EntityData
 
 
@@ -42,3 +47,27 @@ class ImageCommitRegistry:
 
     def to_json(self) -> dict[str, str | None]:
         return {"registry": self.registry_name, "project": self.project_name}
+
+
+@dataclass(frozen=True)
+class AssociationContainerRegistriesGroupsData:
+    id: AssociationContainerRegistriesGroupsID
+    project_id: ProjectID
+    registry_id: ContainerRegistryID
+    is_default: bool
+
+
+@dataclass(frozen=True)
+class DomainContainerRegistryRelationData:
+    """A container registry a domain is allowed on."""
+
+    domain_id: DomainID
+    container_registry_id: ContainerRegistryID
+
+
+@dataclass(frozen=True)
+class ProjectAllowedRegistryData:
+    """A registry a project is allowed on, and whether it is the project's default."""
+
+    registry: ContainerRegistryData
+    is_default: bool

@@ -1,9 +1,12 @@
 import logging
+from dataclasses import dataclass
 from typing import Any, cast
 
 import aiohttp
 from aiohttp.client_exceptions import ClientConnectorError
+from opentelemetry.propagate import inject
 
+from ai.backend.appproxy.common.config import ContentEncodingConfig
 from ai.backend.appproxy.common.errors import (
     CoordinatorConnectionError,
     InternalServerError,
@@ -17,7 +20,6 @@ from ai.backend.appproxy.common.types import (
     SerializableCircuit,
     Slot,
 )
-from ai.backend.appproxy.common.types import SerializableToken as Token
 from ai.backend.common.clients.http_client.client_pool import ClientKey
 from ai.backend.logging.structured import StructuredLogger
 
@@ -42,10 +44,12 @@ def _get_coordinator_session(root_ctx: RootContext) -> aiohttp.ClientSession:
 
 def _get_request_headers(root_ctx: RootContext, request_id: str) -> dict[str, str]:
     """Get request-specific headers for coordinator API calls."""
-    return {
+    headers = {
         "X-BackendAI-RequestID": request_id,
         "X-BackendAI-Token": root_ctx.local_config.secrets.api_secret,
     }
+    inject(headers)
+    return headers
 
 
 async def get_circuit_info(root_ctx: RootContext, request_id: str, circuit_id: str) -> Circuit:
@@ -93,7 +97,13 @@ async def destroy_circuit(root_ctx: RootContext, request_id: str, circuit_id: st
         raise InternalServerError from e
 
 
-async def register_worker(root_ctx: RootContext, request_id: str) -> list[Slot]:
+@dataclass(frozen=True)
+class WorkerRegistration:
+    slots: list[Slot]
+    content_encoding: ContentEncodingConfig
+
+
+async def register_worker(root_ctx: RootContext, request_id: str) -> WorkerRegistration:
     local_config = root_ctx.local_config
     sess = _get_coordinator_session(root_ctx)
     headers = _get_request_headers(root_ctx, request_id)
@@ -173,7 +183,12 @@ async def register_worker(root_ctx: RootContext, request_id: str) -> list[Slot]:
                 worker_id=root_ctx.worker_id,
                 coordinator_endpoint=str(root_ctx.local_config.proxy_worker.coordinator_endpoint),
             )
-            return cast(list[Slot], body["slots"])
+            return WorkerRegistration(
+                slots=cast(list[Slot], body["slots"]),
+                content_encoding=ContentEncodingConfig.model_validate(
+                    body.get("content_encoding", {})
+                ),
+            )
     except aiohttp.ClientResponseError as e:
         raise WorkerRegistrationError(
             extra_data={
@@ -214,11 +229,3 @@ async def ping_worker(root_ctx: RootContext, request_id: str) -> None:
                 "coordinator": str(worker_config.coordinator_endpoint),
             }
         ) from e
-
-
-async def get_token_data(root_ctx: RootContext, request_id: str, token_id: str) -> Token:
-    sess = _get_coordinator_session(root_ctx)
-    headers = _get_request_headers(root_ctx, request_id)
-    async with sess.get(f"/api/worker/token/{token_id}", headers=headers) as resp:
-        resp.raise_for_status()
-        return Token(**(await resp.json()))

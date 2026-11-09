@@ -21,7 +21,6 @@ from ai.backend.common.dto.manager.v2.service_catalog.response import (
     UpdateServiceCatalogPayload,
 )
 from ai.backend.common.dto.manager.v2.service_catalog.types import (
-    EndpointInfo,
     OrderDirection,
     ServiceCatalogOrderField,
     ServiceCatalogStatus,
@@ -30,7 +29,6 @@ from ai.backend.common.dto.manager.v2.service_catalog.types import (
 
 __all__ = (
     # Types
-    "EndpointInfo",
     "OrderDirection",
     "ServiceCatalogOrderField",
     "ServiceCatalogStatus",

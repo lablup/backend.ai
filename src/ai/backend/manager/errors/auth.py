@@ -78,19 +78,28 @@ class AuthorizationFailed(BackendAIError, web.HTTPUnauthorized):
         )
 
 
-class OpenIDAuthenticationFailed(BackendAIError, web.HTTPUnauthorized):
-    error_type = "https://api.backend.ai/probs/openid-not-authenticated"
-    error_title = "Not authenticated by OpenID Provider"
-
-    def __init__(self) -> None:
-        # Legacy reason phrase, kept for clients that already read it.
-        super().__init__(reason=self.error_title)
+class SuperadminRequired(BackendAIError, web.HTTPForbidden):
+    error_type = "https://api.backend.ai/probs/superadmin-required"
+    error_title = "Superadmin privilege is required."
 
     @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.USER,
-            operation=ErrorOperation.AUTH,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.FORBIDDEN,
+        )
+
+
+class AuthenticationRequired(BackendAIError, web.HTTPUnauthorized):
+    error_type = "https://api.backend.ai/probs/authentication-required"
+    error_title = "Authentication is required."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.USER,
+            operation=ErrorOperation.ACCESS,
             error_detail=ErrorDetail.UNAUTHORIZED,
         )
 

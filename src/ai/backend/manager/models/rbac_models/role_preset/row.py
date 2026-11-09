@@ -14,16 +14,28 @@ from ai.backend.manager.models.base import (
     GUID,
     Base,
 )
+from ai.backend.manager.models.mixins.soft_delete import SoftDeleteMixin
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
 
-class RolePresetRow(LifecycleTimestampsMixin, Base):
+class RolePresetRow(SoftDeleteMixin, LifecycleTimestampsMixin, Base):
     __tablename__ = "role_presets"
     __table_args__ = (
         sa.Index(
-            "ix_role_presets_scope_type_deleted",
+            "ix_role_presets_scope_type_deleted_at",
             "scope_type",
-            "deleted",
+            "deleted_at",
+        ),
+        # One preset name per scope. Soft-deleted rows count too, because restoring
+        # a preset brings it back under its old name.
+        sa.UniqueConstraint(
+            "name",
+            "scope_type",
+            "scope_id",
+            # scope_id is NULL for a preset that applies to every scope of its type.
+            # PostgreSQL treats NULLs as distinct by default, which would let two such
+            # presets share a name.
+            postgresql_nulls_not_distinct=True,
         ),
     )
 
@@ -44,8 +56,7 @@ class RolePresetRow(LifecycleTimestampsMixin, Base):
     auto_assign: Mapped[bool] = mapped_column(
         "auto_assign", sa.Boolean, nullable=False, server_default=sa.false()
     )
-    # Soft-delete flag. Toggled by the Delete / Restore service operations;
-    # the Update API never mutates this column directly.
-    deleted: Mapped[bool] = mapped_column(
-        "deleted", sa.Boolean, nullable=False, server_default=sa.false()
+    # Whether a personal project's owner is mapped to the role made from this preset.
+    auto_assign_to_owner: Mapped[bool] = mapped_column(
+        "auto_assign_to_owner", sa.Boolean, nullable=False, server_default=sa.false()
     )

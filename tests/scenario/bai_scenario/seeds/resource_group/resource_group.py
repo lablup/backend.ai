@@ -20,11 +20,12 @@ from ai.backend.manager.models.resource_group.creators import (
     ResourceGroupForKeypairRelationCreator,
     ResourceGroupForProjectRelationCreator,
 )
-from bai_scenario.seeds.seeder import Naming, SeedLink, SeedRow
+from ai.backend.testutils.scenario_steps import Says
+from bai_scenario.seeds.seeder import Naming, TestSeedLink, TestSeedRow, joined
 
 
 @dataclass(frozen=True)
-class SeedResourceGroup(SeedRow[ResourceGroupData]):
+class TestSeedResourceGroup(TestSeedRow[ResourceGroupData]):
     """The scope agents and sessions are created under."""
 
     name_hint: str = "resource-group"
@@ -35,16 +36,21 @@ class SeedResourceGroup(SeedRow[ResourceGroupData]):
 
     @override
     def kind(self) -> str:
-        return "리소스 그룹"
+        return Says("자원 그룹", english="Resource group")
 
     @override
     def detail(self) -> str:
-        parts = [f"{self.scheduler} 스케줄러를 쓴다"]
+        parts = [
+            Says(
+                f"{self.scheduler} 스케줄러를 사용합니다",
+                english=f"uses the {self.scheduler} scheduler",
+            )
+        ]
         if not self.is_active:
-            parts.append("비활성")
+            parts.append(Says("비활성", english="inactive"))
         if self.is_default:
-            parts.append("기본 그룹")
-        return ", ".join(parts)
+            parts.append(Says("기본 그룹", english="default group"))
+        return joined(parts)
 
     @override
     def name(self, naming: Naming) -> str:
@@ -63,12 +69,12 @@ class SeedResourceGroup(SeedRow[ResourceGroupData]):
 
 
 @dataclass(frozen=True)
-class LinkToDomain(SeedLink[DomainData, ResourceGroupData]):
+class LinkToDomain(TestSeedLink[DomainData, ResourceGroupData]):
     """Every session of that domain may schedule on the group."""
 
     @override
     def kind(self) -> str:
-        return "의 세션이 쓸 수 있는"
+        return Says("의 세션이 사용할 수 있는", english="whose sessions can use")
 
     @override
     def scope_id(self, scope: DomainData) -> DomainID:
@@ -84,12 +90,12 @@ class LinkToDomain(SeedLink[DomainData, ResourceGroupData]):
 
 
 @dataclass(frozen=True)
-class LinkToProject(SeedLink[ProjectData, ResourceGroupData]):
+class LinkToProject(TestSeedLink[ProjectData, ResourceGroupData]):
     """Every session of that project may schedule on the group."""
 
     @override
     def kind(self) -> str:
-        return "의 세션이 쓸 수 있는"
+        return Says("의 세션이 사용할 수 있는", english="whose sessions can use")
 
     @override
     def scope_id(self, scope: ProjectData) -> ProjectID:
@@ -105,14 +111,17 @@ class LinkToProject(SeedLink[ProjectData, ResourceGroupData]):
 
 
 @dataclass(frozen=True)
-class LinkToKeypair(SeedLink[UserData, ResourceGroupData]):
+class LinkToKeypair(TestSeedLink[UserData, ResourceGroupData]):
     """Only sessions asked for with that key may schedule on the group."""
 
     access_key: str
 
     @override
     def kind(self) -> str:
-        return "의 키로 요청한 세션만 쓸 수 있는"
+        return Says(
+            "의 키로 요청한 세션만 사용할 수 있는",
+            english="whose sessions requested with its key can use",
+        )
 
     @override
     def scope_id(self, scope: UserData) -> UserID:

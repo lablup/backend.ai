@@ -16,6 +16,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from ai.backend.common.auth.password import PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.user import UserEntityType
@@ -36,7 +37,6 @@ from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.entity_share.row import EntityShareRow
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow, ProjectType
 from ai.backend.manager.models.rbac_models.role.row import RoleRow

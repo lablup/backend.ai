@@ -12,11 +12,12 @@ from ai.backend.manager.data.keypair.types import KeyPairData, KeyPairSecrets
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.models.keypair.creators import KeypairCreator
 from ai.backend.manager.secret.types import SecretValue
-from bai_scenario.seeds.seeder import SeedField
+from ai.backend.testutils.scenario_steps import Language, Says, in_language
+from bai_scenario.seeds.seeder import TestSeedFieldCreator
 
 
 @dataclass(frozen=True)
-class SeedKeypair(SeedField[UserData, KeyPairData]):
+class TestSeedKeypair(TestSeedFieldCreator[UserData, KeyPairData]):
     """One more keypair under a user, held to the named policy.
 
     The one made with the user carries the default marker; this one never does, so
@@ -28,8 +29,16 @@ class SeedKeypair(SeedField[UserData, KeyPairData]):
 
     @override
     def kind(self) -> str:
-        state = "활성" if self.active else "비활성"
-        return f"{self.resource_policy} 정책이 할당된 {state} 키페어 하나 더"
+        state = (
+            Says("활성", english="active") if self.active else Says("비활성", english="inactive")
+        )
+        return Says(
+            f"{self.resource_policy} 정책이 할당된 {state} 키페어 하나 더",
+            english=(
+                f"One more {in_language(state, Language.ENGLISH)} keypair "
+                f"with the {self.resource_policy} policy assigned"
+            ),
+        )
 
     @override
     def owner_id(self, owner: UserData) -> UserID:

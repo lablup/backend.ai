@@ -150,7 +150,7 @@ class RolePresetWriteOps(PermissionWriteOps):
                 )
                 .where(
                     RolePresetRow.scope_id.is_not(None),
-                    RolePresetRow.deleted.is_(False),
+                    RolePresetRow.deleted_at.is_(None),
                     VirtualEntityRow.id.is_(None),
                 )
             )

@@ -5,15 +5,26 @@ from __future__ import annotations
 import logging
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
+from uuid import UUID
 
-from ai.backend.common.api_handlers import APIResponse, BodyParam
-from ai.backend.common.dto.manager.v2.audit_log.request import AdminSearchAuditLogsInput
+from pydantic import Field
+
+from ai.backend.common.api_handlers import APIResponse, BaseRequestModel, BodyParam, PathParam
+from ai.backend.common.data.entity.audit_log import AuditLogID
+from ai.backend.common.dto.manager.v2.audit_log.request import (
+    AdminSearchAuditLogsInput,
+    SearchAuditLogScopesInput,
+)
 from ai.backend.logging.structured import StructuredLogger
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.adapters.audit_log.adapter import AuditLogAdapter
 
 log: Final = StructuredLogger(logging.getLogger(__spec__.name))
+
+
+class AuditLogIdPathParam(BaseRequestModel):
+    audit_log_id: UUID = Field(description="Audit log ID.")
 
 
 class V2AuditLogHandler:
@@ -28,4 +39,15 @@ class V2AuditLogHandler:
     ) -> APIResponse:
         """Search audit logs with admin scope."""
         result = await self._adapter.admin_search(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def search_audit_log_scopes(
+        self,
+        path: PathParam[AuditLogIdPathParam],
+        body: BodyParam[SearchAuditLogScopesInput],
+    ) -> APIResponse:
+        """Search the scopes one audit log recorded."""
+        result = await self._adapter.search_scopes(
+            AuditLogID(path.parsed.audit_log_id), body.parsed
+        )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)

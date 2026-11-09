@@ -123,6 +123,25 @@ def gql_connection_type(
     )
 
 
+def _reject_schema_defaults(cls: type, type_name: str) -> None:
+    """Reject a schema default on a ``@oneOf`` input field.
+
+    GraphQL forbids a default there, and a default puts every key into the coerced
+    input, so the server rejects the request whatever the client sends.
+    """
+    definition = get_object_definition(cls, strict=True)
+    offenders = [
+        f"{field.python_name}={field.default_value!r}"
+        for field in definition.fields
+        if field.default_value is not strawberry.UNSET
+    ]
+    if offenders:
+        raise ValueError(
+            f"{type_name} is a @oneOf input, so every field must default to UNSET: "
+            + ", ".join(offenders)
+        )
+
+
 @dataclass_transform(
     order_default=True,
     kw_only_default=True,
@@ -151,15 +170,25 @@ def gql_pydantic_input(
     Always declare fields explicitly in the class body.
 
     When ``one_of=True``, injects the ``@oneOf`` directive so exactly one field
-    must be provided (mirrors ``@strawberry.input(one_of=True)`` behaviour).
+    must be provided (mirrors ``@strawberry.input(one_of=True)`` behaviour), and
+    rejects a field carrying a schema default at declaration time.
     """
     if one_of:
         directives = (*directives, OneOf())
-    return strawberry.input(
+    apply_input = strawberry.input(
         name=name,
         description=_build_description(meta),
         directives=directives,
     )
+    if not one_of:
+        return apply_input
+
+    def decorate(cls: type[T_input]) -> type[T_input]:
+        processed = apply_input(cls)
+        _reject_schema_defaults(processed, name or cls.__name__)
+        return processed
+
+    return decorate
 
 
 @dataclass_transform(

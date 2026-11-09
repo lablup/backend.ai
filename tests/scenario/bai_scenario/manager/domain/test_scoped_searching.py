@@ -19,6 +19,7 @@ from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
     Same,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -27,11 +28,11 @@ from ai.backend.testutils.scenario_steps import (
 from bai_scenario.components.answers import MissingResponse, TheCallIsRefused
 from bai_scenario.components.domain import DomainsOfAGroupAndACaller, DomainsOfAGroupAndSomeone
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Searched = AdminSearchDomainsPayload
-type DomainStep = Scenario[SeedingSession, DomainsOfAGroupAndACaller, DomainAdapter, Searched]
+type DomainStep = Scenario[TestSeedingSession, DomainsOfAGroupAndACaller, DomainAdapter, Searched]
 
 
 @dataclass(frozen=True)
@@ -44,7 +45,10 @@ class SearchingInTheGroup(When[DomainsOfAGroupAndACaller, DomainAdapter, Searche
 
     @override
     def describe(self, laid: DomainsOfAGroupAndACaller) -> str:
-        return f"{laid.caller.username}이 리소스 그룹 {laid.group.name} 범위에서 조회"
+        return Says(
+            f"{laid.caller.username}이 리소스 그룹 {laid.group.name} 범위에서 search 합니다",
+            english=(f"{laid.caller.username} searches in the resource group {laid.group.name}"),
+        )
 
     @override
     async def call(self, adapter: DomainAdapter, laid: DomainsOfAGroupAndACaller) -> Searched:
@@ -62,7 +66,10 @@ class OnlyTheLinkedDomainsAreLeft(Then[DomainsOfAGroupAndACaller, Searched]):
 
     @override
     def says(self) -> str:
-        return "그 그룹을 쓸 수 있는 도메인만 남는다"
+        return Says(
+            "그 그룹을 쓸 수 있는 도메인만 남습니다",
+            english="only the domains that can use the group are left",
+        )
 
     @override
     def look(self, laid: DomainsOfAGroupAndACaller, answered: Answered[Searched]) -> list[Verdict]:
@@ -83,7 +90,7 @@ class OnlyTheLinkedDomainsAreLeft(Then[DomainsOfAGroupAndACaller, Searched]):
 
 @dataclass(frozen=True)
 class TheSuperadminSearchesInAGroup(
-    Scenario[SeedingSession, DomainsOfAGroupAndACaller, DomainAdapter, Searched]
+    Scenario[TestSeedingSession, DomainsOfAGroupAndACaller, DomainAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -91,10 +98,17 @@ class TheSuperadminSearchesInAGroup(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 리소스 그룹 범위에서 search 하면, 그 그룹을 쓸 수 있는 도메인만 온다"
+        return Says(
+            "superadmin 이 리소스 그룹 범위에서 search 하면, "
+            "그 그룹을 쓸 수 있는 도메인만 응답으로 옵니다",
+            english=(
+                "when the superadmin searches in a resource group scope, "
+                "only the domains that can use the group come back"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, DomainsOfAGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, DomainsOfAGroupAndACaller]:
         return DomainsOfAGroupAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -108,7 +122,7 @@ class TheSuperadminSearchesInAGroup(
 
 @dataclass(frozen=True)
 class AUserReadingInTheGroupSearches(
-    Scenario[SeedingSession, DomainsOfAGroupAndACaller, DomainAdapter, Searched]
+    Scenario[TestSeedingSession, DomainsOfAGroupAndACaller, DomainAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -116,13 +130,17 @@ class AUserReadingInTheGroupSearches(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "리소스 그룹 범위에서 도메인 읽기 역할을 받은 사용자가 그 범위에서 search 하면, "
-            "슈퍼관리자와 같은 도메인들이 온다"
+            "superadmin 과 같은 도메인들이 응답으로 옵니다",
+            english=(
+                "when a user granted the domain read role in a resource group scope "
+                "searches in that scope, the same domains as the superadmin sees come back"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, DomainsOfAGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, DomainsOfAGroupAndACaller]:
         return DomainsOfAGroupAndSomeone(reading=True)
 
     @override
@@ -136,7 +154,7 @@ class AUserReadingInTheGroupSearches(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotSearchInTheGroup(
-    Scenario[SeedingSession, DomainsOfAGroupAndACaller, DomainAdapter, Searched]
+    Scenario[TestSeedingSession, DomainsOfAGroupAndACaller, DomainAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -144,12 +162,17 @@ class AUserGrantedNothingMayNotSearchInTheGroup(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 받지 않은 사용자가 리소스 그룹 범위에서 search 하면 권한 부족으로 거부된다"
+        return Says(
+            "아무 권한도 받지 않은 사용자가 리소스 그룹 범위에서 search 하면 "
+            "권한 부족으로 거부됩니다",
+            english=(
+                "when a user granted nothing searches in a resource group scope, "
+                "the call is rejected for lack of permission"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, DomainsOfAGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, DomainsOfAGroupAndACaller]:
         return DomainsOfAGroupAndSomeone()
 
     @override

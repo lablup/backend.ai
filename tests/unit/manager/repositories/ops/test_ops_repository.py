@@ -54,7 +54,6 @@ from ai.backend.manager.models.rbac_models.role_preset.searchable_fields import 
     RolePresetSearchableFields,
 )
 from ai.backend.manager.models.rbac_models.role_preset.updaters import (
-    RolePresetSoftDeleteUpdater,
     RolePresetUpdater,
 )
 from ai.backend.manager.models.resource_policy.row import UserResourcePolicyRow
@@ -70,6 +69,7 @@ from ai.backend.manager.models.specs.querier import (
 )
 from ai.backend.manager.models.specs.search.usage import UsedBy
 from ai.backend.manager.models.specs.searcher import ScopedSearcher, Searcher
+from ai.backend.manager.models.specs.soft_delete import RestoreUpdater, SoftDeleteUpdater
 from ai.backend.manager.models.specs.types import ConflictCheck, IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataBatchUpdater
 from ai.backend.manager.models.specs.upserter import GlobalEntityUpserter
@@ -147,7 +147,7 @@ class _PresetUpserter(GlobalEntityUpserter[RolePresetRow, RolePresetData]):
             "name": self.name,
             "scope_type": DomainEntityType(),
             "auto_assign": False,
-            "deleted": False,
+            "deleted_at": None,
         }
 
     @override
@@ -273,7 +273,7 @@ class _PresetBatchUpdater(DataBatchUpdater[RolePresetRow, RolePresetData]):
 
     @override
     def build_values(self) -> dict[str, Any]:
-        return {"deleted": self.deleted}
+        return {"deleted_at": sa.func.now() if self.deleted else None}
 
     @override
     def conditions(self) -> list[QueryCondition]:
@@ -417,7 +417,7 @@ class TestCreate:
 
         assert isinstance(created, RolePresetData)
         assert created.name == "analysts"
-        assert created.deleted is False
+        assert created.deleted_at is None
 
     async def test_created_row_is_readable_back(
         self, repository: OpsRepository[RolePresetData], preset: RolePresetData
@@ -561,11 +561,41 @@ class TestUpdate:
     async def test_soft_delete_is_an_update(
         self, repository: OpsRepository[RolePresetData], preset: RolePresetData
     ) -> None:
-        # What ``DeleteService`` runs: the domain's own deleted-flag updater, because
-        # which column marks a row deleted is not something ops can know.
-        deleted = await repository.update(RolePresetSoftDeleteUpdater(preset_id=preset.id))
+        # What ``DeleteService`` runs: the shared soft delete updater.
+        deleted = await repository.update(
+            SoftDeleteUpdater(
+                target_row=RolePresetRow,
+                target_column=RolePresetRow.id,
+                target_id=preset.id,
+                converter=RolePresetSearchableFields.own,
+            )
+        )
 
-        assert deleted.deleted is True
+        assert deleted.deleted_at is not None
+
+    async def test_restore_clears_the_soft_delete(
+        self, repository: OpsRepository[RolePresetData], preset: RolePresetData
+    ) -> None:
+        await repository.update(
+            SoftDeleteUpdater(
+                target_row=RolePresetRow,
+                target_column=RolePresetRow.id,
+                target_id=preset.id,
+                converter=RolePresetSearchableFields.own,
+            )
+        )
+
+        restored = await repository.update(
+            RestoreUpdater(
+                target_row=RolePresetRow,
+                target_column=RolePresetRow.id,
+                target_id=preset.id,
+                converter=RolePresetSearchableFields.own,
+            )
+        )
+
+        assert restored.deleted_at is None
+        assert (await repository.get(_PresetQuerier(target=preset.id))).deleted_at is None
 
     async def test_missing_row_raises(self, repository: OpsRepository[RolePresetData]) -> None:
         with pytest.raises(EntityNotFoundError):
@@ -628,7 +658,7 @@ class TestBatchUpdate:
 
         # The two domain-scoped rows, not the project-scoped one.
         assert sorted(u.name for u in updated) == ["default", "other"]
-        assert all(u.deleted for u in updated)
+        assert all(u.deleted_at is not None for u in updated)
 
     async def test_no_match_returns_nothing(
         self, repository: OpsRepository[RolePresetData]

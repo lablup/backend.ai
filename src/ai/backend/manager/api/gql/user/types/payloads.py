@@ -204,15 +204,21 @@ class BulkUpdateUsersV2PayloadGQL(PydanticOutputMixin[BulkUpdateUsersPayloadDTO]
     model=DeleteUserPayloadDTO,
     name="DeleteUserV2Payload",
 )
-class DeleteUserPayloadGQL:
+class DeleteUserPayloadGQL(PydanticOutputMixin[DeleteUserPayloadDTO]):
     """Payload for single user soft-delete."""
 
-    success: bool = gql_field(description="Whether the deletion was successful.")
+    success: bool = gql_field(
+        description="Whether the deletion was successful.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `user`.",
+    )
+    user: UserV2GQL = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="The soft-deleted user."),
+    )
 
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="Payload for single user restore mutation.",
     ),
     model=RestoreUserPayloadDTO,
@@ -300,7 +306,7 @@ class BulkPurgeUsersV2PayloadGQL:
 
     successes: list[UUID] = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description=(
                 "UUIDs of the users that were purged, in the order they were requested. "
                 "Together with `failed` this answers for every requested user exactly once."
@@ -310,7 +316,7 @@ class BulkPurgeUsersV2PayloadGQL:
     purged_count: int = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.3.0",
-            deprecated_version=NEXT_RELEASE_VERSION,
+            deprecated_version="26.9.0",
             description="Number of users successfully purged.",
         ),
         deprecation_reason="Use the length of successes.",

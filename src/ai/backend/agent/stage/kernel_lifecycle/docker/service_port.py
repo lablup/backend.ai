@@ -78,6 +78,13 @@ class ServiceProvisioner(Provisioner[ServicePortSpec, ServicePortResult]):
                 "host_ports": (None,),
                 "is_inference": False,
             },
+            {
+                "name": "etty",
+                "protocol": ServicePortProtocols.HTTP,
+                "container_ports": (7682,),
+                "host_ports": (None,),
+                "is_inference": False,
+            },
         ]
 
     def _prepare_preopen_port(self, spec: ServicePortSpec) -> list[ServicePort]:

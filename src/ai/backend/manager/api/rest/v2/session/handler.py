@@ -17,6 +17,7 @@ from ai.backend.common.dto.manager.v2.session.request import (
     ExcludeSessionIdleChecksInput,
     GetSessionLogsQuery,
     IncludeSessionIdleChecksInput,
+    PartialBulkTerminateSessionsInput,
     ScopedSearchSessionsInput,
     ShutdownSessionServiceInput,
     StartSessionServiceInput,
@@ -168,11 +169,19 @@ class V2SessionHandler:
         result = await self._adapter.project_search(path.parsed.project_id, body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
+    async def partial_bulk_terminate(
+        self,
+        body: BodyParam[PartialBulkTerminateSessionsInput],
+    ) -> APIResponse:
+        """Terminate several sessions, answering for each one."""
+        result = await self._adapter.partial_bulk_terminate(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
     async def terminate(
         self,
         body: BodyParam[TerminateSessionsInput],
     ) -> APIResponse:
-        """Terminate one or more sessions."""
+        """Deprecated. Use `POST /v2/sessions/partial-bulk-terminate`."""
         result = await self._adapter.terminate(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 

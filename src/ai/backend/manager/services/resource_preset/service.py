@@ -110,11 +110,9 @@ class ResourcePresetService:
         self, action: CheckResourcePresetsAction
     ) -> CheckResourcePresetsActionResult:
         result = await self._resource_preset_repository.check_presets(
-            access_key=action.access_key,
             user_id=action.user_id,
             group_name=action.group,
             domain_name=action.domain_name,
-            resource_policy=action.resource_policy,
             resource_group=action.resource_group,
         )
 

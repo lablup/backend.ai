@@ -9,11 +9,12 @@ from typing import override
 from ai.backend.common.data.retention.types import RetentionCategory
 from ai.backend.manager.data.retention.types import RetentionPolicyData
 from ai.backend.manager.models.retention.creators import RetentionPolicyCreator
-from bai_scenario.seeds.seeder import Naming, SeedRow
+from ai.backend.testutils.scenario_steps import Says
+from bai_scenario.seeds.seeder import Naming, TestSeedRow, joined
 
 
 @dataclass(frozen=True)
-class SeedRetentionPolicy(SeedRow[RetentionPolicyData]):
+class TestSeedRetentionPolicy(TestSeedRow[RetentionPolicyData]):
     """The one policy of a category. Its name is the category, which the manager fixes."""
 
     category: RetentionCategory = RetentionCategory.LOGS
@@ -22,14 +23,16 @@ class SeedRetentionPolicy(SeedRow[RetentionPolicyData]):
 
     @override
     def kind(self) -> str:
-        return "보존 정책"
+        return Says("보존 정책", english="Retention policy")
 
     @override
     def detail(self) -> str:
-        parts = [f"{self.retention_days}일 보존"]
+        parts = [
+            Says(f"{self.retention_days}일 보존", english=f"kept for {self.retention_days} days")
+        ]
         if not self.enabled:
-            parts.append("비활성")
-        return ", ".join(parts)
+            parts.append(Says("비활성", english="inactive"))
+        return joined(parts)
 
     @override
     def name(self, naming: Naming) -> str:

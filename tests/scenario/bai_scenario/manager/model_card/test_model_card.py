@@ -13,15 +13,15 @@ from ai.backend.common.dto.manager.v2.model_card.response import SearchModelCard
 from ai.backend.manager.api.adapters.model_card.adapter import ModelCardAdapter
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import NothingIsFound, TheCallIsRefused
 from bai_scenario.components.domain import ADomainAndACaller, ADomainAndSomeone
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Searched = SearchModelCardsPayload
-type CardStep = Scenario[SeedingSession, ADomainAndACaller, ModelCardAdapter, Searched]
+type CardStep = Scenario[TestSeedingSession, ADomainAndACaller, ModelCardAdapter, Searched]
 
 
 @dataclass(frozen=True)
@@ -34,7 +34,10 @@ class SearchingEveryCard(When[ADomainAndACaller, ModelCardAdapter, Searched]):
 
     @override
     def describe(self, laid: ADomainAndACaller) -> str:
-        return f"{laid.caller.username}이 필터 없이 전체 조회"
+        return Says(
+            f"{laid.caller.username}이 필터 없이 전체를 조회합니다",
+            english=f"{laid.caller.username} reads every card without a filter",
+        )
 
     @override
     async def call(self, adapter: ModelCardAdapter, laid: ADomainAndACaller) -> Searched:
@@ -44,7 +47,7 @@ class SearchingEveryCard(When[ADomainAndACaller, ModelCardAdapter, Searched]):
 
 @dataclass(frozen=True)
 class NoCardLaidMeansNoneFound(
-    Scenario[SeedingSession, ADomainAndACaller, ModelCardAdapter, Searched]
+    Scenario[TestSeedingSession, ADomainAndACaller, ModelCardAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -52,10 +55,16 @@ class NoCardLaidMeansNoneFound(
 
     @override
     def describe(self) -> str:
-        return "모델 카드를 하나도 심지 않은 상태에서 슈퍼관리자가 전체 조회를 하면, 답은 비어 있다"
+        return Says(
+            "모델 카드를 하나도 미리 저장하지 않은 상태에서 superadmin 이 전체를 조회하면 응답이 "
+            "비어 있습니다",
+            english=(
+                "with no model card seeded, a superadmin reading every card gets an empty answer"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
         return ADomainAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -69,7 +78,7 @@ class NoCardLaidMeansNoneFound(
 
 @dataclass(frozen=True)
 class APlainUserMayNotSearchEveryCard(
-    Scenario[SeedingSession, ADomainAndACaller, ModelCardAdapter, Searched]
+    Scenario[TestSeedingSession, ADomainAndACaller, ModelCardAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -77,10 +86,16 @@ class APlainUserMayNotSearchEveryCard(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 전체 모델 카드 조회를 요청하면 역할로 막힌다"
+        return Says(
+            "superadmin 이 아닌 사용자가 전체 모델 카드 조회를 요청하면 역할로 차단됩니다",
+            english=(
+                "when a user who is not the superadmin asks to read every model card, "
+                "the role blocks it"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
         return ADomainAndSomeone()
 
     @override

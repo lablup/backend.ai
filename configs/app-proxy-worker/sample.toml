@@ -83,6 +83,9 @@
   # bind address differs from the externally accessible address.
   # Added in 25.9.0
   ## api_advertised_addr = { host = "worker.example.com", port = 10201 }
+  # Maximum bytes of a single request header. Larger ones get 400.
+  # Added in 26.10.0
+  max_header_field_size = 8190
   # The HTTP(S) URL of the proxy coordinator's API endpoint. The worker connects
   # to this endpoint to register itself, receive proxy configuration updates,
   # and report status. Use https:// in production for secure communication.
@@ -143,7 +146,9 @@
   frontend_mode = "wildcard"
   # The protocol to use for proxied connections. 'http' for HTTP/1.1 traffic,
   # 'h2' for HTTP/2 traffic (requires http2 config), 'tcp' for raw TCP proxying.
-  # 'grpc' is not directly supported; use 'h2' instead for gRPC traffic.
+  # 'grpc' is not directly supported; use 'h2' instead for gRPC traffic. An 'h2'
+  # worker cannot check credentials or client addresses, so it serves only
+  # circuits that are open to public and have no 'allowed_client_ips'.
   # Added in 25.9.0
   protocol = "http"
   # The types of traffic this worker accepts. Use 'interactive' for user-facing
@@ -180,12 +185,11 @@
   # defaults to api_bind_addr. Required when behind NAT or containers.
   # Added in 25.9.0
   ## announce_addr = { host = "worker.example.com", port = 10201 }
-  # CIDR blocks (or bare IP addresses) of load balancers / reverse proxies that
-  # sit in front of this worker and may be trusted to set the 'X-Forwarded-For'
-  # header. Client-IP allowlist checks honor 'X-Forwarded-For' only when the
-  # immediate peer matches one of these networks; otherwise the direct
-  # connection address is used, so a directly-exposed worker cannot be spoofed
-  # by a forged header. Leave empty when clients connect directly to the worker.
+  # CIDR blocks (or bare IP addresses) of load balancers / reverse proxies in
+  # front of this worker, trusted to set 'X-Forwarded-For', 'X-Forwarded-Host'
+  # and 'X-Forwarded-Proto'. Leave empty when clients connect directly to the
+  # worker; the worker then ignores these headers and uses the connection
+  # address, the 'Host' header and its TLS configuration.
   # Added in 26.4.5
   trusted_proxies = ["10.0.0.0/8"]
 
@@ -323,6 +327,41 @@
   # sessions or users to dedicated workers for isolation or performance.
   # Added in 25.9.0
   [proxy_worker.app_filters]
+
+  # Where the worker reads the ingresses it serves.
+  # Added in 26.10.0
+  [proxy_worker.ingress]
+    # How ingresses are delivered to the worker, announced through service
+    # discovery. api takes what the coordinator sends to the API port, redis
+    # reads what the manager writes to Redis. Circuit events are written in
+    # either delivery mode.
+    # Added in 26.10.0
+    delivery_mode = "api"
+    # Where the worker reads ingresses, in lookup order. in-memory, when
+    # present, comes first.
+    # Added in 26.10.0
+    layers = ["in-memory", "redis"]
+
+    # In-memory layer settings. Read only when layers include in-memory.
+    # Added in 26.10.0
+    [proxy_worker.ingress.in-memory]
+      # Seconds an ingress filled from a later layer is held. Unset holds it
+      # until removed. Requires a layer after in-memory.
+      # Added in 26.10.0
+      ## ttl = 60.0
+      # Seconds a removed key is remembered as missing, so lookups right after
+      # the removal skip the later layers. Unset does not remember removals.
+      # Requires a layer after in-memory.
+      # Added in 26.10.0
+      ## negative-ttl = 5.0
+
+    # Redis layer settings. Read only when layers include redis.
+    # Added in 26.10.0
+    [proxy_worker.ingress.redis]
+      # Prefix of the Redis keys holding ingresses. The connection is the
+      # worker's redis config.
+      # Added in 26.10.0
+      key-prefix = "appproxy:ingress"
 
 # Performance profiling configuration for debugging and optimization. Includes
 # settings for cProfile and Pyroscope continuous profiling.
@@ -590,29 +629,6 @@
     # Added in 26.3.0
     # Replace <name> with your actual key (e.g., 'default', 'local')
     [service_discovery.endpoints.metadata.<name>]
-
-# etcd connection configuration for distributed coordination. Used for service
-# discovery (if etcd-based) and shared configuration management.
-# Added in 25.9.0
-[etcd]
-  # Namespace prefix for etcd keys used by Backend.AI. Allows multiple
-  # Backend.AI clusters to share the same etcd cluster. All Backend.AI related
-  # keys will be stored under this namespace.
-  # Added in 22.03.0
-  namespace = "backend"
-  # Network address of the etcd server. Default is the standard etcd port on
-  # localhost. In production, should point to one or more etcd instance
-  # endpoint(s).
-  # Added in 22.03.0
-  addr = { host = "etcd-cluster", port = 2379 }
-  # Username for authenticating with etcd. Optional if etcd doesn't require
-  # authentication. Should be set along with password for secure deployments.
-  # Added in 22.03.0
-  ## user = "backend"
-  # Password for authenticating with etcd. Should be kept secret in production
-  # environments. Set together with the user field for authentication.
-  # Added in 22.03.0
-  ## password = "ETCD_PASSWORD"
 
 # Pyroscope continuous profiling configuration for production performance
 # analysis. Sends CPU and memory profiling data to a Pyroscope server for flame

@@ -1,0 +1,30 @@
+import{r as y,n as a,N as c,bs as L,aK as k}from"./index-CwWAznqi.js";import{C as h}from"./SessionActionButtons-OpwSB8w_.js";import{S as f}from"./SessionDetailDrawer-Cl3e1zK4.js";import{r as m}from"./icons-BgdBQS0N.js";import"./lodash-RhKGq0BF.js";import"./TerminateSessionModal-Bj88xpmv.js";import"./useBackendAIAppLauncher-Dj1iRGeB.js";import"./BAIMetadataList-BYZUwKjA.js";import"./SourceCodeView-jXLvuWSO.js";import"./CodeBlock-CV2dJgqa.js";import"./useScrollableArea-Bsuw_xFk.js";import"./Grid-BAKellpz.js";import"./TagsInput-B_f8kLOn.js";import"./Tokenizer-Czn8bbzO.js";import"./groupItems-BfxkhRY8.js";import"./characters-DWaYg7k3.js";import"./Token-B6wppFPd.js";import"./CheckboxInput-Dvbz8RhO.js";import"./NumberInput-BX3bbN7A.js";import"./NumberInput-BAShrYzU.js";import"./useLocale-tF6sKPhr.js";import"./usePainKiller-BiH1iwVD.js";import"./SFTPConnectionInfoModal-D0lzKwMf.js";import"./BAIJupyterIcon-BjgUodlW.js";import"./ButtonGroup-DPQvGHtt.js";import"./AutoUpdateFetchKeyButton-MZ4HY-Ai.js";import"./BAIFetchKeyButton-DApd5OLT.js";import"./useControllableValue-BmgV_ECW.js";import"./unifiedAcceleratorSlot-DvOww2Yq.js";import"./reactPaginationQueryOptions-Bt4rkB5i.js";import"./useSessionNodeLiveStat-D4fXH5-b.js";import"./HoverCard-5uBx5TYH.js";import"./BAIId-C7PlhBcJ.js";import"./BAITable-BJsxYyy0.js";import"./Table-SIAPvWUk.js";import"./MenuBottomSheetActionList-DfgiyqqP.js";import"./Pagination-cBiGXF8Y.js";import"./astryxTagVariant-CibgwVXb.js";import"./useValidateSessionName-CuLTv8m3.js";import"./SessionUsageMonitor-Dj-fxRUF.js";import"./sessionTypeLabel-DAMPaqv3.js";import"./index-CIBhdd6O.js";import"./BAIImageNodeSimpleTagV2-grs0QBeV.js";import"./BAIDoubleToken-DmnYFlRB.js";import"./BAITextHighlighter-9-PRKuKt.js";import"./useBAIIconPath-kZbqwXZ-.js";import"./BAIProgressWithLabel-CnpA-yWW.js";import"./GridSpan-CXov5J6d.js";import"./SessionIdleChecks-CziR3NJf.js";import"./BAIQuestionIconWithTooltip-BVwNHmCw.js";import"./astryxPlacement-BxR6_qos.js";import"./SessionStatusBadge-MHSUzVAj.js";import"./ImageTags-CS4QBsFL.js";import"./FolderLink-DaaLvORM.js";import"./BAIVFolderIdenticon-PgyEX4dv.js";import"./ResourceNumbersOfSession-BGRYlXto.js";import"./BAIResourceNumberWithIcon-jmo0jZh2.js";import"./ScopedAuditLog-C2_m1MRT.js";import"./BAIBadge-9d3LJqR4.js";import"./BAIGraphQLPropertyFilter-BwM0Jjll.js";import"./BAIPowerSearchAdapters-Cpa0dtdE.js";import"./DateRangeInput-BafIu0I7.js";import"./BottomSheet-C7Cy7dyi.js";import"./BAISessionClusterMode-Dx7hBE1h.js";const g=(function(){var o=[{defaultValue:null,kind:"LocalArgument",name:"sessionId"}],e=[{kind:"Variable",name:"id",variableName:"sessionId"}],r={alias:null,args:null,kind:"ScalarField",name:"id",storageKey:null},n={alias:null,args:null,kind:"ScalarField",name:"row_id",storageKey:null};return{fragment:{argumentDefinitions:o,kind:"Fragment",metadata:null,name:"ContainerLogModalWithLazyQueryLoaderQuery",selections:[{alias:null,args:e,concreteType:"ComputeSessionNode",kind:"LinkedField",name:"compute_session_node",plural:!1,selections:[{args:null,kind:"FragmentSpread",name:"ContainerLogModalFragment"}],storageKey:null}],type:"Query",abstractKey:null},kind:"Request",operation:{argumentDefinitions:o,kind:"Operation",name:"ContainerLogModalWithLazyQueryLoaderQuery",selections:[{alias:null,args:e,concreteType:"ComputeSessionNode",kind:"LinkedField",name:"compute_session_node",plural:!1,selections:[r,n,{alias:null,args:null,kind:"ScalarField",name:"name",storageKey:null},{alias:null,args:null,kind:"ScalarField",name:"status",storageKey:null},{alias:null,args:null,kind:"ScalarField",name:"access_key",storageKey:null},{alias:null,args:null,concreteType:"KernelConnection",kind:"LinkedField",name:"kernel_nodes",plural:!1,selections:[{alias:null,args:null,concreteType:"KernelEdge",kind:"LinkedField",name:"edges",plural:!0,selections:[{alias:null,args:null,concreteType:"KernelNode",kind:"LinkedField",name:"node",plural:!1,selections:[r,n,{alias:null,args:null,kind:"ScalarField",name:"container_id",storageKey:null},{alias:null,args:null,kind:"ScalarField",name:"cluster_idx",storageKey:null},{alias:null,args:null,kind:"ScalarField",name:"cluster_role",storageKey:null},{alias:null,args:null,kind:"ScalarField",name:"cluster_hostname",storageKey:null}],storageKey:null}],storageKey:null}],storageKey:null}],storageKey:null}]},params:{cacheID:"89fc3e7f92ccd61c1a3e682390072ccb",id:null,metadata:{},name:"ContainerLogModalWithLazyQueryLoaderQuery",operationKind:"query",text:`query ContainerLogModalWithLazyQueryLoaderQuery(
+  $sessionId: GlobalIDField!
+) {
+  compute_session_node(id: $sessionId) {
+    ...ContainerLogModalFragment
+    id
+  }
+}
+
+fragment ContainerLogModalFragment on ComputeSessionNode {
+  id
+  row_id
+  name
+  status
+  access_key
+  kernel_nodes {
+    edges {
+      node {
+        id
+        row_id
+        container_id
+        cluster_idx
+        cluster_role
+        cluster_hostname
+      }
+    }
+  }
+}
+`}}})();g.hash="5e3c1a9c71ef2548c32579df194e26ee";const S=({sessionId:o,open:e,loading:r,onRequestClose:n})=>{const{compute_session_node:t}=y.useLazyLoadQuery(g,{sessionId:o},{fetchPolicy:o?"network-only":"store-only"});return a.jsx(c,{children:a.jsx(h,{sessionFrgmt:t||null,open:e,loading:r,onCancel:()=>{n&&n()}})})},De=({project:o})=>{const e=L(),r=k(),n=new URLSearchParams(e.search).get("sessionDetail"),t=s=>{const i=new URLSearchParams(e.search);i.delete("sessionDetail"),r({pathname:e.pathname,hash:e.hash,search:i.toString()},{replace:!0})},[d,l]=m.useState(),[u,p]=m.useTransition();return m.useEffect(()=>{const s=i=>{p(()=>{l(i.detail)})};return document.addEventListener("bai-open-session-log",s),()=>{document.removeEventListener("bai-open-session-log",s)}},[p,l]),a.jsxs(a.Fragment,{children:[a.jsx(c,{children:a.jsx(f,{open:!!n,sessionId:n||void 0,project:o,onClose:()=>{t()}})}),a.jsx(S,{open:!!d||u,loading:u,sessionId:d,onRequestClose:()=>{l(void 0)}})]})};export{De as default};
+//# sourceMappingURL=SessionDetailAndContainerLogOpenerLegacy-DVcUi0qb.js.map

@@ -20,11 +20,14 @@ from ai.backend.manager.models.app_config_fragment.upserters import (
     AppConfigFragmentUpserter,
     PublicAppConfigFragmentUpserter,
 )
-from bai_scenario.seeds.seeder import Naming, SeedRowFrom, SeedRowFromTwo
+from ai.backend.testutils.scenario_steps import Says
+from bai_scenario.seeds.seeder import Naming, TestSeedRowFrom, TestSeedRowFromTwo
 
 
 @dataclass(frozen=True)
-class SeedFragmentOf[Owner](SeedRowFromTwo[AppConfigAllowListData, Owner, AppConfigFragmentData]):
+class TestSeedFragmentOf[Owner](
+    TestSeedRowFromTwo[AppConfigAllowListData, Owner, AppConfigFragmentData]
+):
     """The fragment the given owner holds under the given entry's name."""
 
     owner_of: Callable[[Owner], EntityIdentifier]
@@ -33,11 +36,11 @@ class SeedFragmentOf[Owner](SeedRowFromTwo[AppConfigAllowListData, Owner, AppCon
 
     @override
     def kind(self) -> str:
-        return "설정 조각"
+        return Says("스코프별 앱 설정", english="app config fragment")
 
     @override
     def detail(self) -> str:
-        return f"값 {dict(self.config)!r}"
+        return Says(f"값 {dict(self.config)!r}", english=f"value {dict(self.config)!r}")
 
     @override
     def name(self, naming: Naming) -> str:
@@ -55,7 +58,7 @@ class SeedFragmentOf[Owner](SeedRowFromTwo[AppConfigAllowListData, Owner, AppCon
 
 
 @dataclass(frozen=True)
-class SeedPublicFragment(SeedRowFrom[AppConfigAllowListData, AppConfigFragmentData]):
+class TestSeedPublicFragment(TestSeedRowFrom[AppConfigAllowListData, AppConfigFragmentData]):
     """The public fragment under the given entry's name. It belongs to no one."""
 
     config: Mapping[str, Any]
@@ -63,11 +66,11 @@ class SeedPublicFragment(SeedRowFrom[AppConfigAllowListData, AppConfigFragmentDa
 
     @override
     def kind(self) -> str:
-        return "공개 설정 조각"
+        return Says("공개 스코프별 앱 설정", english="public app config fragment")
 
     @override
     def detail(self) -> str:
-        return f"값 {dict(self.config)!r}"
+        return Says(f"값 {dict(self.config)!r}", english=f"value {dict(self.config)!r}")
 
     @override
     def name(self, naming: Naming) -> str:

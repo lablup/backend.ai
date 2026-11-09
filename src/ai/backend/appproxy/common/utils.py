@@ -14,7 +14,6 @@ from pathlib import Path
 from typing import (
     Any,
     TypeVar,
-    cast,
     override,
 )
 from uuid import UUID
@@ -27,9 +26,7 @@ from aiohttp.web_log import AccessLogger
 from pydantic import BaseModel, ValidationError
 
 from ai.backend.appproxy.common.types import PydanticResponse
-from ai.backend.common import redis_helper
 from ai.backend.common.exception import BackendAISchemaValidationFailed
-from ai.backend.common.types import RedisConnectionInfo
 from ai.backend.logging.structured import StructuredLogger
 
 from .config import HostPortPair, PermitHashConfig
@@ -330,7 +327,3 @@ class BackendAIAccessLogger(AccessLogger):
             self._structured_logger.debug("{}", line, request_id=request.get("request_id"))
         except Exception:
             self._structured_logger.exception("failed to write the access log")
-
-
-async def ping_redis_connection(connection: RedisConnectionInfo) -> bool:
-    return cast(bool, await redis_helper.execute(connection, lambda r: r.ping()))

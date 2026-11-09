@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from uuid import UUID
 
+from strawberry import UNSET
+
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.vfolder.request import (
     BulkDeleteVFoldersInput as BulkDeleteInputDTO,
 )
@@ -41,7 +44,22 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     MoveFileInput as MoveFileInputDTO,
 )
 from ai.backend.common.dto.manager.v2.vfolder.request import (
+    PartialBulkDeleteVFoldersInput as PartialBulkDeleteInputDTO,
+)
+from ai.backend.common.dto.manager.v2.vfolder.request import (
+    PartialBulkRestoreVFoldersInput as PartialBulkRestoreInputDTO,
+)
+from ai.backend.common.dto.manager.v2.vfolder.request import (
+    PartialBulkUpdateVFolderItemInput as PartialBulkUpdateItemInputDTO,
+)
+from ai.backend.common.dto.manager.v2.vfolder.request import (
+    PartialBulkUpdateVFoldersInput as PartialBulkUpdateInputDTO,
+)
+from ai.backend.common.dto.manager.v2.vfolder.request import (
     PurgeVFolderOptions as PurgeVFolderOptionsDTO,
+)
+from ai.backend.common.dto.manager.v2.vfolder.request import (
+    UpdateVFolderInput as UpdateInputDTO,
 )
 from ai.backend.common.dto.manager.v2.vfolder.response import (
     BulkDeleteVFoldersPayload as BulkDeletePayloadDTO,
@@ -94,7 +112,14 @@ from ai.backend.common.dto.manager.v2.vfolder.response import (
 from ai.backend.common.dto.manager.v2.vfolder.response import (
     RestoreVFolderPayload as RestorePayloadDTO,
 )
+from ai.backend.common.dto.manager.v2.vfolder.response import (
+    UpdateVFolderPayload as UpdatePayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.vfolder.response import (
+    VFolderNode,
+)
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.common_types import PartialBulkFailureGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -134,8 +159,12 @@ class CreateVFolderInputGQL(PydanticInputMixin[CreateInputDTO]):
     usage_mode: str = gql_field(
         default="general", description="Usage mode of the vfolder (general, model, data)."
     )
-    permission: str = gql_field(
-        default="rw", description="Default permission of the vfolder (ro, rw, wd)."
+    permission: str | None = gql_field(
+        default=None,
+        description=(
+            "Default permission of the vfolder (ro, rw, wd). "
+            "The folder type's default when omitted."
+        ),
     )
     cloneable: bool = gql_field(default=False, description="Whether the vfolder is cloneable.")
 
@@ -156,11 +185,28 @@ class CreateVFolderInScopeInputGQL(PydanticInputMixin[CreateInScopeInputDTO]):
     usage_mode: VFolderUsageModeGQL = gql_field(
         default=VFolderUsageModeGQL.GENERAL, description="Usage mode of the vfolder."
     )
-    permission: VFolderMountPermissionGQL = gql_field(
-        default=VFolderMountPermissionGQL.READ_WRITE,
-        description="Default mount permission of the vfolder.",
+    permission: VFolderMountPermissionGQL | None = gql_field(
+        default=None,
+        description=(
+            "Default mount permission of the vfolder. The folder type's default when omitted."
+        ),
     )
     cloneable: bool = gql_field(default=False, description="Whether the vfolder is cloneable.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for updating a virtual folder. Only provided fields are updated.",
+    ),
+    name="UpdateVFolderV2Input",
+)
+class UpdateVFolderInputGQL(PydanticInputMixin[UpdateInputDTO]):
+    name: str | None = gql_field(default=UNSET, description="New vfolder name.")
+    cloneable: bool | None = gql_field(default=UNSET, description="New cloneable setting.")
+    permission: VFolderMountPermissionGQL | None = gql_field(
+        default=UNSET, description="New default mount permission."
+    )
 
 
 @gql_pydantic_input(
@@ -296,6 +342,18 @@ class CreateVFolderPayloadGQL(PydanticOutputMixin[CreatePayloadDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload returned after updating a virtual folder.",
+    ),
+    model=UpdatePayloadDTO,
+    name="UpdateVFolderV2Payload",
+)
+class UpdateVFolderPayloadGQL(PydanticOutputMixin[UpdatePayloadDTO]):
+    vfolder: VFolderGQL = gql_field(description="The updated virtual folder.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
         added_version="26.4.2",
         description="Payload returned after soft-deleting a virtual folder.",
     ),
@@ -303,7 +361,16 @@ class CreateVFolderPayloadGQL(PydanticOutputMixin[CreatePayloadDTO]):
     name="DeleteVFolderV2Payload",
 )
 class DeleteVFolderPayloadGQL(PydanticOutputMixin[DeletePayloadDTO]):
-    id: UUID = gql_field(description="ID of the deleted virtual folder.")
+    id: UUID = gql_field(
+        description="ID of the deleted virtual folder.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `vfolder`.",
+    )
+    vfolder: VFolderGQL = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The soft-deleted virtual folder.",
+        ),
+    )
 
 
 @gql_pydantic_type(
@@ -315,7 +382,16 @@ class DeleteVFolderPayloadGQL(PydanticOutputMixin[DeletePayloadDTO]):
     name="PurgeVFolderV2Payload",
 )
 class PurgeVFolderPayloadGQL(PydanticOutputMixin[PurgePayloadDTO]):
-    id: UUID = gql_field(description="ID of the purged virtual folder.")
+    id: UUID = gql_field(
+        description="ID of the purged virtual folder.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `vfolder`.",
+    )
+    vfolder: VFolderGQL = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The virtual folder being purged.",
+        ),
+    )
 
 
 @gql_pydantic_type(
@@ -436,7 +512,7 @@ class BulkDeleteVFoldersInputGQL(PydanticInputMixin[BulkDeleteInputDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="Failure detail for a single vfolder in a bulk soft-deletion.",
     ),
     model=BulkDeleteErrorDTO,
@@ -458,7 +534,7 @@ class BulkDeleteVFolderV2ErrorGQL(PydanticOutputMixin[BulkDeleteErrorDTO]):
 class BulkDeleteVFoldersPayloadGQL(PydanticOutputMixin[BulkDeletePayloadDTO]):
     items: list[VFolderGQL] = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description=(
                 "The vfolders that were soft-deleted, in the order they were requested. "
                 "A soft-deleted vfolder is still addressable, so it is returned whole. "
@@ -469,14 +545,14 @@ class BulkDeleteVFoldersPayloadGQL(PydanticOutputMixin[BulkDeletePayloadDTO]):
     deleted_count: int = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.2",
-            deprecated_version=NEXT_RELEASE_VERSION,
+            deprecated_version="26.9.0",
             description="Number of virtual folders successfully soft-deleted.",
         ),
         deprecation_reason="Use the length of items.",
     )
     failed: list[BulkDeleteVFolderV2ErrorGQL] = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="List of errors for vfolders that failed to be soft-deleted.",
         ),
     )
@@ -555,7 +631,7 @@ class BulkPurgeVFolderV2ErrorGQL(PydanticOutputMixin[BulkPurgeErrorDTO]):
 class BulkPurgeVFoldersPayloadGQL(PydanticOutputMixin[BulkPurgePayloadDTO]):
     successes: list[UUID] = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description=(
                 "UUIDs of the vfolders that were purged, in the order they were requested. "
                 "Together with `failed` this answers for every requested vfolder exactly once."
@@ -565,7 +641,7 @@ class BulkPurgeVFoldersPayloadGQL(PydanticOutputMixin[BulkPurgePayloadDTO]):
     purged_count: int = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.2",
-            deprecated_version=NEXT_RELEASE_VERSION,
+            deprecated_version="26.9.0",
             description="Number of virtual folders successfully purged.",
         ),
         deprecation_reason="Use the length of successes.",
@@ -619,3 +695,74 @@ class DeployVFolderInputGQL(PydanticInputMixin[DeployInputDTO]):
 class DeployVFolderPayloadGQL(PydanticOutputMixin[DeployPayloadDTO]):
     deployment_id: UUID = gql_field(description="ID of the created deployment.")
     deployment_name: str = gql_field(description="Name of the created deployment.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="One vfolder of a partial bulk update and the fields to update on it.",
+    ),
+    name="PartialBulkUpdateVFolderItemInput",
+)
+class PartialBulkUpdateVFolderItemInputGQL(PydanticInputMixin[PartialBulkUpdateItemInputDTO]):
+    id: UUID = gql_field(description="ID of the vfolder to update.")
+    input: UpdateVFolderInputGQL = gql_field(description="Fields to update on the vfolder.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for updating several vfolders, each answered for separately.",
+    ),
+    name="PartialBulkUpdateVFoldersInput",
+)
+class PartialBulkUpdateVFoldersInputGQL(PydanticInputMixin[PartialBulkUpdateInputDTO]):
+    items: list[PartialBulkUpdateVFolderItemInputGQL] = gql_field(
+        description="The vfolders to update, each with its fields."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for soft-deleting several vfolders, each answered for separately.",
+    ),
+    name="PartialBulkDeleteVFoldersInput",
+)
+class PartialBulkDeleteVFoldersInputGQL(PydanticInputMixin[PartialBulkDeleteInputDTO]):
+    ids: list[UUID] = gql_field(description="IDs of the vfolders to soft-delete.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Input for restoring several soft-deleted vfolders, each answered for separately."
+        ),
+    ),
+    name="PartialBulkRestoreVFoldersInput",
+)
+class PartialBulkRestoreVFoldersInputGQL(PydanticInputMixin[PartialBulkRestoreInputDTO]):
+    ids: list[UUID] = gql_field(description="IDs of the vfolders to restore.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Result of a partial bulk vfolder operation: the vfolders processed and the ones "
+            "that failed."
+        ),
+    ),
+    model=PartialBulkPayload[VFolderNode],
+    name="PartialBulkVFoldersPayload",
+)
+class PartialBulkVFoldersPayloadGQL(PydanticOutputMixin[PartialBulkPayload[VFolderNode]]):
+    """Payload for partial bulk vfolder mutations."""
+
+    successes: list[VFolderGQL] = gql_field(
+        description="The vfolders processed, as they now stand."
+    )
+    failed: list[PartialBulkFailureGQL] = gql_field(
+        description="The vfolders not processed, each with the reason."
+    )

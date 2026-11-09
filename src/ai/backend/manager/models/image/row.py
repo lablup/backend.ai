@@ -3,8 +3,7 @@ from __future__ import annotations
 import enum
 import functools
 import logging
-import uuid
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
@@ -27,7 +26,6 @@ from sqlalchemy.orm import (
     load_only,
     mapped_column,
     relationship,
-    selectinload,
 )
 from sqlalchemy.sql.expression import true
 
@@ -37,26 +35,20 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import (
     BinarySize,
-    ImageCanonical,
     ImageID,
     SlotName,
 )
 from ai.backend.common.utils import join_non_empty
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.image.types import (
-    ImageAliasData,
     ImageData,
     ImageDataWithDetails,
-    ImageIdentifier,
     ImageStatus,
     ImageType,
-    KVPair,
-    ResourceLimit,
     Resources,
 )
 from ai.backend.manager.data.permission.permission_defs import ImagePermission
 from ai.backend.manager.defs import INTRINSIC_SLOTS, INTRINSIC_SLOTS_MIN
-from ai.backend.manager.errors.image import ImagePurgeInProgress
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -88,13 +80,11 @@ log = StructuredLogger(logging.getLogger(__spec__.name))
 
 __all__ = (
     "ImageAliasRow",
-    "ImageIdentifier",
-    "ImageLoadFilter",
     "ImageRow",
-    "PublicImageLoadFilter",
 )
 
 
+# Used only by gql_legacy (schema.py). Delete it together with the gql_legacy cleanup.
 class PublicImageLoadFilter(enum.StrEnum):
     """Shorthand of `ImageLoadFilter` enum with `CUSTOMIZED_GLOBAL` removed (as it is not intended for API input)."""
 
@@ -106,6 +96,7 @@ class PublicImageLoadFilter(enum.StrEnum):
     """Include customized images owned or accessible by API callee."""
 
 
+# Used only by gql_legacy (schema.py, image.py). Delete it together with the gql_legacy cleanup.
 class ImageLoadFilter(enum.StrEnum):
     """Enum describing kind of a "search preset" when loading Image data via GQL. Not intended for declaring attributes of image data itself."""
 
@@ -215,8 +206,12 @@ class ImageRow(CreatedAtMixin, Base):
         server_default=sa.func.now(),
     )
 
-    aliases = relationship("ImageAliasRow", back_populates="image")
+    # Read only by gql_legacy (image.py, kernel.py); v2 reads aliases with ImageAliasSearcher.
+    # Delete it together with the gql_legacy cleanup.
+    aliases = relationship("ImageAliasRow")
     # sessions = relationship("SessionRow", back_populates="image_row")
+    # Read only by ImagePermissionContextBuilder (legacy RBAC) in this file; v2 joins
+    # ContainerRegistryRow directly. Delete it together with the legacy RBAC cleanup.
     registry_row = relationship(
         "ContainerRegistryRow",
         primaryjoin=_get_container_registry_join_condition,
@@ -279,6 +274,8 @@ class ImageRow(CreatedAtMixin, Base):
             image_name, self.project, tag, self.registry, self.architecture, self.is_local
         )
 
+    # Called only by gql_legacy (image.py) and from_optional_dataclass.
+    # Delete it together with the gql_legacy cleanup.
     @classmethod
     def from_dataclass(cls, image_data: ImageData) -> Self:
         image_row = cls(
@@ -303,6 +300,7 @@ class ImageRow(CreatedAtMixin, Base):
             image_row.created_at = image_data.created_at
         return image_row
 
+    # Called only by gql_legacy (image.py). Delete it together with the gql_legacy cleanup.
     @classmethod
     def from_dataclass_with_details(cls, image_data: ImageDataWithDetails) -> Self:
         resources: dict[str, dict[str, str | None]] = {}
@@ -329,6 +327,7 @@ class ImageRow(CreatedAtMixin, Base):
         image_row.id = image_data.id
         return image_row
 
+    # Called only by gql_legacy (endpoint.py). Delete it together with the gql_legacy cleanup.
     @classmethod
     def from_optional_dataclass(cls, image_data: ImageData | None) -> Self | None:
         if image_data is None:
@@ -399,61 +398,6 @@ class ImageRow(CreatedAtMixin, Base):
         result: dict[SlotName, dict[str, Any]] = ImageRow._resources.type._schema.check(resources)
         return result
 
-    def _parse_row(self) -> dict[str, Any]:
-        res_limits = []
-        for slot_key, slot_range in self.resources.items():
-            min_value = slot_range.get("min")
-            if min_value is None:
-                min_value = Decimal(0)
-            max_value = slot_range.get("max")
-            if max_value is None:
-                max_value = Decimal("Infinity")
-            res_limits.append({
-                "key": slot_key,
-                "min": min_value,
-                "max": max_value,
-            })
-
-        accels_str = self.accelerators
-        if accels_str is None:
-            accels: list[str] = []
-        else:
-            accels = accels_str.split(",")
-
-        return {
-            "canonical_ref": self.name,
-            "name": self.image,
-            "humanized_name": self.image,  # TODO: implement
-            "tag": self.tag,
-            "architecture": self.architecture,
-            "registry": self.registry,
-            "digest": self.trimmed_digest or None,
-            "labels": self.labels,
-            "size_bytes": self.size_bytes,
-            "resource_limits": res_limits,
-            "supported_accelerators": accels,
-        }
-
-    async def inspect(self) -> Mapping[str, Any]:
-        parsed_image_info = self._parse_row()
-        parsed_image_info["reverse_aliases"] = [x.alias for x in self.aliases]
-        return parsed_image_info
-
-    async def mark_as_deleted(self, db_session: AsyncSession) -> None:
-        self._reject_while_purging()
-        self.status = ImageStatus.DELETED
-        await db_session.flush()
-
-    async def mark_as_alive(self, db_session: AsyncSession) -> None:
-        self._reject_while_purging()
-        self.status = ImageStatus.ALIVE
-        await db_session.flush()
-
-    def _reject_while_purging(self) -> None:
-        """Refuse a status write while a purge is working through this image."""
-        if self.status in ImageStatus.purge_in_progress():
-            raise ImagePurgeInProgress(f"Image is being purged: {self.id}")
-
     def set_resource_limit(
         self,
         slot_type: str,
@@ -469,41 +413,6 @@ class ImageRow(CreatedAtMixin, Base):
 
         self._resources = resources
 
-    def to_detailed_dataclass(self) -> ImageDataWithDetails:
-        version, ptag_set = self.image_ref.tag_set
-        return ImageDataWithDetails(
-            id=self.id,
-            name=ImageCanonical(self.image),
-            namespace=self.image,
-            base_image_name=self.image_ref.name,
-            project=self.project or "",
-            humanized_name=self.image,
-            tag=self.tag,
-            tags=[KVPair(key=k, value=v) for k, v in ptag_set.items()],
-            version=version,
-            registry=self.registry,
-            registry_id=self.registry_id,
-            type=self.type,
-            architecture=self.architecture,
-            is_local=self.is_local,
-            digest=self.trimmed_digest or None,
-            labels=[KVPair(key=k, value=v) for k, v in self.labels.items() if v is not None],
-            aliases=[alias_row.alias for alias_row in self.aliases if alias_row.alias is not None],
-            size_bytes=self.size_bytes,
-            status=self.status,
-            resource_limits=[
-                ResourceLimit(key=str(k), min=v.get("min", Decimal(0)), max=Decimal("Infinity"))
-                for k, v in self.resources.items()
-            ],
-            supported_accelerators=self.accelerators.split(",") if self.accelerators else ["*"],
-            customized=self.customized,
-            creator_id=self.creator_id,
-            created_at=self.created_at,
-            last_used_at=self.last_used_at,
-            # legacy
-            hash=self.trimmed_digest or None,
-        )
-
 
 class ImageAliasRow(Base):
     __tablename__ = "image_aliases"
@@ -514,36 +423,10 @@ class ImageAliasRow(Base):
     image_id: Mapped[ImageID] = mapped_column(
         "image", GUID(ImageID), sa.ForeignKey("images.id", ondelete="CASCADE"), nullable=False
     )
-    image: Mapped[ImageRow] = relationship("ImageRow", back_populates="aliases")
-
-    @classmethod
-    async def create(
-        cls,
-        session: AsyncSession,
-        alias: str,
-        target: ImageRow,
-    ) -> ImageAliasRow:
-        existing_alias: ImageRow | None = await session.scalar(
-            sa.select(ImageAliasRow)
-            .where(ImageAliasRow.alias == alias)
-            .options(selectinload(ImageAliasRow.image)),
-        )
-        if existing_alias is not None:
-            raise ValueError(
-                f"alias already created with ({existing_alias.image})",
-            )
-        new_alias = ImageAliasRow(
-            alias=alias,
-            image_id=target.id,
-        )
-        session.add_all([new_alias])
-        return new_alias
-
-    @classmethod
-    def from_dataclass(cls, alias_data: ImageAliasData, image_id: uuid.UUID) -> Self:
-        return cls(id=alias_data.id, alias=alias_data.alias, image_id=image_id)
 
 
+# Everything below serves the legacy RBAC path alone: api/gql_legacy/image.py calls
+# get_permission_ctx, which is the way in. Delete the whole block together with gql_legacy.
 type WhereClauseType = sa.sql.expression.BinaryExpression[Any] | sa.sql.expression.BooleanClauseList
 # TypeAlias is deprecated since 3.12 but mypy does not follow up yet
 
@@ -925,7 +808,7 @@ class ImagePermissionContextBuilder(
                 )[0]
             else:
                 assoc_project_ids = [
-                    assoc.group_id
+                    assoc.project_id
                     for assoc in img_row.registry_row.association_container_registries_groups_rows
                 ]
                 for project_id in assoc_project_ids:
@@ -967,7 +850,7 @@ class ImagePermissionContextBuilder(
             project_ids: list[Any],
         ) -> sa.sql.elements.ColumnElement[Any]:
             return ContainerRegistryRow.association_container_registries_groups_rows.any(
-                AssociationContainerRegistriesGroupsRow.group_id.in_(project_ids)
+                AssociationContainerRegistriesGroupsRow.project_id.in_(project_ids)
             )
 
         return await self._in_project_scopes_by_registry_condition(
@@ -1010,6 +893,7 @@ class ImagePermissionContextBuilder(
         return MEMBER_PERMISSIONS
 
 
+# Called only by api/gql_legacy/image.py.
 async def get_permission_ctx(
     db_conn: AsyncConnection,
     ctx: ClientContext,

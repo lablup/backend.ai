@@ -17,11 +17,12 @@ from ai.backend.manager.data.agent.types import (
 )
 from ai.backend.manager.data.resource_group.types import ResourceGroupData
 from ai.backend.manager.models.agent.upserters import AgentHeartbeatUpserter
-from bai_scenario.seeds.seeder import Naming, SeedRowFrom
+from ai.backend.testutils.scenario_steps import Says
+from bai_scenario.seeds.seeder import Naming, TestSeedRowFrom
 
 
 @dataclass(frozen=True)
-class SeedAgent(SeedRowFrom[ResourceGroupData, AgentUUID]):
+class TestSeedAgent(TestSeedRowFrom[ResourceGroupData, AgentUUID]):
     """An agent of the given resource group, registered the way its first heartbeat
     registers it. It reports no slot; the slots it carries are laid under it."""
 
@@ -29,11 +30,14 @@ class SeedAgent(SeedRowFrom[ResourceGroupData, AgentUUID]):
 
     @override
     def kind(self) -> str:
-        return "에이전트"
+        return Says("에이전트", english="Agent")
 
     @override
     def detail(self) -> str:
-        return "살아 있고, 아직 보고한 슬롯이 없다"
+        return Says(
+            "살아 있고, 아직 보고한 슬롯이 없습니다",
+            english="alive, and has not reported any slot yet",
+        )
 
     @override
     def name(self, naming: Naming) -> str:

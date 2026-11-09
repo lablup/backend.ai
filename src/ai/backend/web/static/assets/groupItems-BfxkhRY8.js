@@ -1,0 +1,2 @@
+function l(u){const o=u.auxiliaryData;return typeof(o==null?void 0:o.group)=="string"?o.group:void 0}function i(u,{ungroupedFirst:o=!1}={}){var a;if(!u.some(n=>l(n)!=null))return[{heading:null,items:u}];const r=[],t=new Map,e=[];for(const n of u){const s=l(n);s!=null?(t.has(s)||(r.push(s),t.set(s,[])),(a=t.get(s))==null||a.push(n)):e.push(n)}const p=r.map(n=>({heading:n,items:t.get(n)??[]})),g=e.length>0?[{heading:null,items:e}]:[];return o?[...g,...p]:[...p,...g]}export{i as g};
+//# sourceMappingURL=groupItems-BfxkhRY8.js.map

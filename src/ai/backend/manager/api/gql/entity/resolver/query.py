@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from strawberry import Info
 
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_root_field,
@@ -19,7 +18,7 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
             "Every entity type the manager has operations wired for, in name order. "
             "What a field taking an entity type may be given is what this lists."
         ),
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
     )
 )  # type: ignore[misc]
 async def entity_types(

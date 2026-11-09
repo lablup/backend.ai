@@ -6,6 +6,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import UUIDFilter
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 from .types import KernelOrderField, KernelStatusFilter, OrderDirection
 
@@ -19,7 +20,14 @@ __all__ = (
 class KernelFilter(BaseRequestModel):
     """Filter conditions for kernel search."""
 
-    id: UUIDFilter | None = Field(default=None, description="Filter by kernel ID")
+    id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `field_id`.",
+        deprecated=True,
+    )
+    field_id: UUIDFilter | None = Field(
+        default=None, description=f"Added in {NEXT_RELEASE_VERSION}. Filter by kernel ID."
+    )
     session_id: UUIDFilter | None = Field(default=None, description="Filter by session ID")
     status: KernelStatusFilter | None = Field(default=None, description="Filter by status")
     AND: list[KernelFilter] | None = Field(default=None, description="AND logical operator")

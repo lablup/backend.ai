@@ -1,26 +1,33 @@
 ---
 name: vfs-storage-adapter-scenarios
 type: reference
-description: TODO - what the vfs storage adapter guarantees, as scenarios; nobody has written these yet
+description: what the vfs storage adapter guarantees: the row lives in global alone, so update, purge and their partial bulk forms pass only for a superadmin
 scope: src/ai/backend/manager/api/adapters/vfs_storage
-keywords: [vfs storage, scenario, adapter, todo]
+keywords: [vfs storage, scenario, adapter, superadmin, purge, partial bulk update, partial bulk purge]
 generated:
   by: claude-code/opus-5
   at: 2026-09-10
+updated:
+  by: claude-code/opus-5
+  at: 2026-10-16
 status: draft
 ---
-# vfs_storage 어댑터 — 시나리오
+# vfs_storage adapter: Knowledge
 
-TODO. 아직 아무도 적지 않았다.
+The rules are in `AGENTS.md` in the parent directory. When this document and a run result disagree, doubt the sentence first.
 
-규칙은 상위 디렉터리의 `AGENTS.md`에 있다. 이 파일이 이 모양으로 남아 있는 동안, 이 엔티티는
-시나리오 테스트가 없다.
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
-## 적는 법
+A VFS storage row is created only in global. A call that updates or purges one or several rows checks the permission granted on that row. That permission comes from global only, so only superadmin passes.
 
-1. `adapter.py`가 내놓는 호출을 전부 훑는다.
-2. 호출마다 무엇을 보장하는지 한 문장으로 적는다. 권한이 있는 경우와 없는 경우를 짝으로 둔다.
-3. 동작별로 표를 나눈다. 각 줄은 상황, 요청, 결과 셋을 갖는다.
-4. 어느 시나리오도 부르지 않는 호출은 "아직 적지 않은 것"에 남긴다.
+## Update
 
-먼저 적힌 것을 보려면 `../domain/KNOWLEDGE.md`를 참고한다.
+## purge
+
+The delete operation under the old name calls the same purge.
+
+## Bulk update
+
+## Bulk purge
+
+A bulk operation does not reject the whole call. Processed VFS storage rows go into the processed list, and items that fail go into the failure list with the id and the reason.

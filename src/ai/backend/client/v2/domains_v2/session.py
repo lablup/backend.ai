@@ -5,6 +5,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from ai.backend.client.v2.base_domain import BaseDomainClient
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.kernel.request import AdminSearchKernelsInput
 from ai.backend.common.dto.manager.v2.kernel.response import AdminSearchKernelsPayload
 from ai.backend.common.dto.manager.v2.scheduler.request import ComputeScheduleInput
@@ -14,6 +15,7 @@ from ai.backend.common.dto.manager.v2.session.request import (
     EnqueueSessionInput,
     ExcludeSessionIdleChecksInput,
     IncludeSessionIdleChecksInput,
+    PartialBulkTerminateSessionsInput,
     ShutdownSessionServiceInput,
     StartSessionServiceInput,
     TerminateSessionsInput,
@@ -26,6 +28,7 @@ from ai.backend.common.dto.manager.v2.session.response import (
     IncludeSessionIdleChecksPayload,
     SessionLogsPayload,
     SessionNode,
+    SessionTerminationInfo,
     StartSessionServicePayload,
     TerminateSessionsPayload,
     UpdateSessionPayload,
@@ -152,11 +155,22 @@ class V2SessionClient(BaseDomainClient):
             response_model=AdminSearchSessionsPayload,
         )
 
+    async def partial_bulk_terminate(
+        self, request: PartialBulkTerminateSessionsInput
+    ) -> PartialBulkPayload[SessionTerminationInfo]:
+        """Terminate several sessions, answering for each one."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/partial-bulk-terminate",
+            request=request,
+            response_model=PartialBulkPayload[SessionTerminationInfo],
+        )
+
     async def terminate(
         self,
         request: TerminateSessionsInput,
     ) -> TerminateSessionsPayload:
-        """Terminate one or more sessions."""
+        """Deprecated. Use :meth:`partial_bulk_terminate`."""
         return await self._client.typed_request(
             "POST",
             f"{_PATH}/terminate",

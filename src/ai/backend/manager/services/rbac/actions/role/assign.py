@@ -8,7 +8,7 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.relation.base import BaseRelationAction
 from ai.backend.manager.data.permission.role import (
-    UserRoleAssignmentData,
+    AssignedUserData,
     UserRoleAssignmentInput,
 )
 
@@ -36,4 +36,4 @@ class AssignRoleAction(BaseRelationAction):
 
 @dataclass(frozen=True)
 class AssignRoleActionResult:
-    data: UserRoleAssignmentData
+    data: AssignedUserData

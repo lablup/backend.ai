@@ -5,12 +5,9 @@ from typing import Any, override
 
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.types import (
-    AccessKey,
-    SlotQuantity,
-)
-from ai.backend.common.types import (
     LegacyResourceSlotState as ResourceSlotState,
 )
+from ai.backend.common.types import SlotQuantity
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
 from ai.backend.manager.services.resource_preset.actions.scope_base import (
@@ -22,12 +19,10 @@ from ai.backend.manager.services.resource_preset.actions.scope_base import (
 class CheckResourcePresetsAction(ResourcePresetScopeAction):
     """List the presets the named scopes offer, against the caller's own limits.
 
-    The occupancy it adds is the caller's own: the keypair, group and domain it reports
+    The occupancy it adds is the caller's own: the user, group and domain it reports
     on are theirs.
     """
 
-    access_key: AccessKey
-    resource_policy: Mapping[str, Any]
     domain_name: str
     user_id: uuid.UUID
     group: str

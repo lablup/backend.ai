@@ -7,6 +7,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
+from ai.backend.common.lock import RedisLock
+from ai.backend.manager.defs import LockID
 from ai.backend.manager.dependencies.domain.distributed_lock import (
     DistributedLockFactoryDependency,
     DistributedLockInput,
@@ -73,20 +76,25 @@ class TestCreateLockFactory:
         factory = create_lock_factory(config_provider, db, etcd)  # type: ignore[arg-type]
         assert callable(factory)
 
-    @patch("ai.backend.manager.dependencies.domain.distributed_lock.redis_helper")
-    def test_redlock_backend(self, mock_redis_helper: MagicMock) -> None:
-        """Should create a redlock factory."""
+    def test_redlock_backend(self) -> None:
+        """Should create a redlock factory on the given Valkey lock client."""
         config_provider = _make_config_provider("redlock")
-        mock_redis_target = MagicMock()
-        config_provider.config.redis.to_redis_profile_target = MagicMock(  # type: ignore[attr-defined]
-            return_value=mock_redis_target
-        )
+        db = MagicMock()
+        etcd = MagicMock()
+        valkey_lock = MagicMock()
+
+        factory = create_lock_factory(config_provider, db, etcd, valkey_lock)  # type: ignore[arg-type]
+        lock = factory(LockID.LOCKID_SCHEDULE, 10.0)
+        assert isinstance(lock, RedisLock)
+
+    def test_redlock_backend_without_client_raises_error(self) -> None:
+        """Should refuse redlock without a Valkey lock client."""
+        config_provider = _make_config_provider("redlock")
         db = MagicMock()
         etcd = MagicMock()
 
-        factory = create_lock_factory(config_provider, db, etcd)  # type: ignore[arg-type]
-        assert callable(factory)
-        mock_redis_helper.get_redis_object_for_lock.assert_called_once()
+        with pytest.raises(ValueError, match="requires a Valkey lock client"):
+            create_lock_factory(config_provider, db, etcd)  # type: ignore[arg-type]
 
     def test_etcd_backend(self) -> None:
         """Should create an etcd lock factory."""
@@ -120,11 +128,14 @@ class TestDistributedLockFactoryDependency:
         db = MagicMock()
         etcd = MagicMock()
 
+        config_provider.config.manager.distributed_lock = "pg_advisory"
+
         dependency = DistributedLockFactoryDependency()
         lock_input = DistributedLockInput(
             config_provider=config_provider,
             db=db,
             etcd=etcd,
+            sentinel_monitors=SentinelMonitorSet([]),
         )
 
         async with dependency.provide(lock_input) as factory:
@@ -133,6 +144,7 @@ class TestDistributedLockFactoryDependency:
                 config_provider=config_provider,
                 db=db,
                 etcd=etcd,
+                valkey_lock=None,
             )
 
     def test_stage_name(self) -> None:

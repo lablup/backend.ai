@@ -50,6 +50,7 @@ from ai.backend.testutils.scenario_steps import (
     Given,
     Refused,
     Same,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -58,12 +59,12 @@ from ai.backend.testutils.scenario_steps import (
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.resource_group import AGroupAndACaller, AGroupAndSomeone
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Deployed = ReplaceResourceGroupDefaultDeploymentOptionsPayload
 type Sessioned = ReplaceResourceGroupDefaultSessionOptionsPayload
-type OptionsStep = Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, Any]
+type OptionsStep = Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, Any]
 
 DEPLOYMENT_HANDLER = CheckReplicaDeploymentHandler.name()
 SESSION_HANDLER = TerminateSessionsLifecycleHandler.name()
@@ -87,7 +88,15 @@ class ReplacingDeploymentOptions(When[AGroupAndACaller, ResourceGroupAdapter, De
     @override
     def describe(self, laid: AGroupAndACaller) -> str:
         handler = UNREGISTERED if self.unregistered else DEPLOYMENT_HANDLER
-        return f"{laid.caller.username}이 {laid.group.name}의 기본 배포 옵션을 처리기 {handler}의 설정을 담아 갈아끼움"
+        return Says(
+            f"{laid.caller.username}이 {laid.group.name}의 기본 배포 옵션을 선택 정책 STRICT 와 "
+            f"처리기 {handler}의 설정을 담아 교체합니다",
+            english=(
+                f"{laid.caller.username} replaces the default deployment options of "
+                f"{laid.group.name} with the selection policy STRICT and the settings of "
+                f"handler {handler}"
+            ),
+        )
 
     @override
     async def call(self, adapter: ResourceGroupAdapter, laid: AGroupAndACaller) -> Deployed:
@@ -101,7 +110,8 @@ class ReplacingDeploymentOptions(When[AGroupAndACaller, ResourceGroupAdapter, De
                             timeout_sec=HANDLER_WAITS,
                         )
                     ],
-                )
+                ),
+                agent_selection_policy=AgentSelectionPolicyEnum.STRICT,
             )
         )
         with ActingAs(laid.caller):
@@ -123,7 +133,14 @@ class ReplacingSessionOptions(When[AGroupAndACaller, ResourceGroupAdapter, Sessi
     @override
     def describe(self, laid: AGroupAndACaller) -> str:
         handler = UNREGISTERED if self.unregistered else SESSION_HANDLER
-        return f"{laid.caller.username}이 {laid.group.name}의 기본 세션 옵션을 우선순위와 처리기 {handler}의 설정을 담아 갈아끼움"
+        return Says(
+            f"{laid.caller.username}이 {laid.group.name}의 기본 세션 옵션을 우선순위와 처리기 "
+            f"{handler}의 설정을 담아 교체합니다",
+            english=(
+                f"{laid.caller.username} replaces the default session options of "
+                f"{laid.group.name} with a priority and the settings of handler {handler}"
+            ),
+        )
 
     @override
     async def call(self, adapter: ResourceGroupAdapter, laid: AGroupAndACaller) -> Sessioned:
@@ -153,7 +170,10 @@ class TheDeploymentOptionsAreReplaced(Then[AGroupAndACaller, Deployed]):
 
     @override
     def says(self) -> str:
-        return "갈아끼운 배포 옵션만 반환된다"
+        return Says(
+            "교체한 배포 옵션만 반환됩니다",
+            english="only the replaced deployment options come back",
+        )
 
     @override
     def look(self, laid: AGroupAndACaller, answered: Answered[Deployed]) -> list[Verdict]:
@@ -178,6 +198,11 @@ class TheDeploymentOptionsAreReplaced(Then[AGroupAndACaller, Deployed]):
                 [(e.handler_name, e.timeout_sec, e.max_retry_count) for e in handler.by_handler],
                 [(DEPLOYMENT_HANDLER, HANDLER_WAITS, None)],
             ),
+            Same(
+                "default_deployment_options.agent_selection_policy",
+                payload.default_deployment_options.agent_selection_policy,
+                AgentSelectionPolicyEnum.STRICT,
+            ),
         ]
 
 
@@ -187,7 +212,10 @@ class TheSessionOptionsAreReplaced(Then[AGroupAndACaller, Sessioned]):
 
     @override
     def says(self) -> str:
-        return "갈아끼운 세션 옵션만 반환된다"
+        return Says(
+            "교체한 세션 옵션만 반환됩니다",
+            english="only the replaced session options come back",
+        )
 
     @override
     def look(self, laid: AGroupAndACaller, answered: Answered[Sessioned]) -> list[Verdict]:
@@ -240,7 +268,7 @@ class TheSessionOptionsAreReplaced(Then[AGroupAndACaller, Sessioned]):
 
 @dataclass(frozen=True)
 class TheSuperadminReplacesTheDeploymentOptions(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, Deployed]
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, Deployed]
 ):
     @override
     def summary(self) -> str:
@@ -248,10 +276,17 @@ class TheSuperadminReplacesTheDeploymentOptions(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 등록된 처리기 하나의 설정을 담아 기본 배포 옵션을 갈아끼우면 준 옵션이 통째로 반환된다"
+        return Says(
+            "superadmin 이 등록된 처리기 하나의 설정을 담아 기본 배포 옵션을 교체하면 지정한 "
+            "옵션 전체가 반환됩니다",
+            english=(
+                "when the superadmin replaces the default deployment options with the settings "
+                "of one registered handler, the options given come back whole"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -265,7 +300,7 @@ class TheSuperadminReplacesTheDeploymentOptions(
 
 @dataclass(frozen=True)
 class AnUnregisteredDeploymentHandlerIsRefused(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, Deployed]
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, Deployed]
 ):
     @override
     def summary(self) -> str:
@@ -273,10 +308,16 @@ class AnUnregisteredDeploymentHandlerIsRefused(
 
     @override
     def describe(self) -> str:
-        return "등록되지 않은 배포 처리기 이름을 담아 갈아끼우려 하면 잘못된 입력으로 거부된다"
+        return Says(
+            "등록되지 않은 배포 처리기 이름을 담아 교체하려 하면 잘못된 입력으로 거부됩니다",
+            english=(
+                "replacing the options with the name of an unregistered deployment handler is "
+                "rejected as invalid input"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -290,7 +331,7 @@ class AnUnregisteredDeploymentHandlerIsRefused(
 
 @dataclass(frozen=True)
 class AUserGrantedUpdateReplacesTheDeploymentOptions(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, Deployed]
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, Deployed]
 ):
     @override
     def summary(self) -> str:
@@ -298,10 +339,17 @@ class AUserGrantedUpdateReplacesTheDeploymentOptions(
 
     @override
     def describe(self) -> str:
-        return "그 그룹에 앉힌 역할로 수정 권한을 받은 사용자가 기본 배포 옵션을 갈아끼우면 준 옵션이 통째로 반환된다"
+        return Says(
+            "그 자원 그룹에 부여된 역할로 수정 권한을 받은 사용자가 기본 배포 옵션을 "
+            "교체하면 지정한 옵션 전체가 반환됩니다",
+            english=(
+                "a user granted update through the role granted on the resource group replacing "
+                "the default deployment options gets the options given whole"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone(granted=Permission.UPDATE)
 
     @override
@@ -315,7 +363,7 @@ class AUserGrantedUpdateReplacesTheDeploymentOptions(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotReplaceTheDeploymentOptions(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, Deployed]
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, Deployed]
 ):
     @override
     def summary(self) -> str:
@@ -323,10 +371,16 @@ class AUserGrantedNothingMayNotReplaceTheDeploymentOptions(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 없는 사용자가 기본 배포 옵션을 갈아끼우려 하면 권한 부족으로 거부된다"
+        return Says(
+            "아무 권한도 없는 사용자가 기본 배포 옵션을 교체하려 하면 권한 부족으로 거부됩니다",
+            english=(
+                "a user granted nothing trying to replace the default deployment options is "
+                "rejected for not enough permission"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone()
 
     @override
@@ -340,7 +394,7 @@ class AUserGrantedNothingMayNotReplaceTheDeploymentOptions(
 
 @dataclass(frozen=True)
 class TheSuperadminReplacesTheSessionOptions(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, Sessioned]
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, Sessioned]
 ):
     @override
     def summary(self) -> str:
@@ -348,13 +402,18 @@ class TheSuperadminReplacesTheSessionOptions(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 우선순위와 등록된 처리기 하나의 설정을 담아 기본 세션 옵션을 갈아끼우면 "
-            "준 옵션이 통째로 반환되고 주지 않은 자리는 코드의 기본값이다"
+        return Says(
+            "superadmin 이 우선순위와 등록된 처리기 하나의 설정을 담아 기본 세션 옵션을 "
+            "교체하면 지정한 옵션 전체가 반환되고 주지 않은 항목은 코드의 기본값입니다",
+            english=(
+                "when the superadmin replaces the default session options with a priority and "
+                "the settings of one registered handler, the options given come back whole and "
+                "the entries left out take the defaults in the code"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -368,7 +427,7 @@ class TheSuperadminReplacesTheSessionOptions(
 
 @dataclass(frozen=True)
 class AnUnregisteredSessionHandlerIsRefused(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, Sessioned]
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, Sessioned]
 ):
     @override
     def summary(self) -> str:
@@ -376,10 +435,16 @@ class AnUnregisteredSessionHandlerIsRefused(
 
     @override
     def describe(self) -> str:
-        return "등록되지 않은 세션 처리기 이름을 담아 갈아끼우려 하면 잘못된 입력으로 거부된다"
+        return Says(
+            "등록되지 않은 세션 처리기 이름을 담아 교체하려 하면 잘못된 입력으로 거부됩니다",
+            english=(
+                "replacing the options with the name of an unregistered session handler is "
+                "rejected as invalid input"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -393,7 +458,7 @@ class AnUnregisteredSessionHandlerIsRefused(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotReplaceTheSessionOptions(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, Sessioned]
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, Sessioned]
 ):
     @override
     def summary(self) -> str:
@@ -401,10 +466,16 @@ class AUserGrantedNothingMayNotReplaceTheSessionOptions(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 없는 사용자가 기본 세션 옵션을 갈아끼우려 하면 권한 부족으로 거부된다"
+        return Says(
+            "아무 권한도 없는 사용자가 기본 세션 옵션을 교체하려 하면 권한 부족으로 거부됩니다",
+            english=(
+                "a user granted nothing trying to replace the default session options is "
+                "rejected for not enough permission"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone()
 
     @override

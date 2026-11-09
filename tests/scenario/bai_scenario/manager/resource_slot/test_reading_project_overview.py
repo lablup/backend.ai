@@ -14,7 +14,7 @@ from ai.backend.common.dto.manager.v2.resource_slot.response import ActiveResour
 from ai.backend.manager.api.adapters.resource_slot.adapter import ResourceSlotAdapter
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Configured, Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.resource_allocation import (
     AKernelAndACaller,
@@ -24,13 +24,13 @@ from bai_scenario.components.resource_allocation import (
 )
 from bai_scenario.components.system import ENFORCEMENT
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 UNKNOWN = uuid.UUID(int=0)
 
 type Overview = ActiveResourceOverviewInfoDTO
-type OverviewStep = Scenario[SeedingSession, AKernelAndACaller, ResourceSlotAdapter, Overview]
+type OverviewStep = Scenario[TestSeedingSession, AKernelAndACaller, ResourceSlotAdapter, Overview]
 
 
 @dataclass(frozen=True)
@@ -45,10 +45,18 @@ class ReadingTheProjectOverview(When[AKernelAndACaller, ResourceSlotAdapter, Ove
 
     @override
     def describe(self, laid: AKernelAndACaller) -> str:
-        target = (
+        target_ko = (
             "존재하지 않는 프로젝트 id" if self.unknown else f"{laid.project.name} 프로젝트의 id"
         )
-        return f"{laid.caller.username}이 {target}로 개요 조회"
+        target_en = (
+            "a project id nothing answers to"
+            if self.unknown
+            else f"the id of the project {laid.project.name}"
+        )
+        return Says(
+            f"{laid.caller.username} 이 {target_ko} 로 개요를 조회합니다",
+            english=f"{laid.caller.username} reads the overview with {target_en}",
+        )
 
     @override
     async def call(self, adapter: ResourceSlotAdapter, laid: AKernelAndACaller) -> Overview:
@@ -60,7 +68,7 @@ class ReadingTheProjectOverview(When[AKernelAndACaller, ResourceSlotAdapter, Ove
 
 @dataclass(frozen=True)
 class TheSuperadminReadsAProjectOverview(
-    Scenario[SeedingSession, AKernelAndACaller, ResourceSlotAdapter, Overview]
+    Scenario[TestSeedingSession, AKernelAndACaller, ResourceSlotAdapter, Overview]
 ):
     @override
     def summary(self) -> str:
@@ -68,13 +76,20 @@ class TheSuperadminReadsAProjectOverview(
 
     @override
     def describe(self) -> str:
-        return (
-            "대기 중인 커널만 있는 프로젝트의 개요를 슈퍼관리자가 조회하면 점유된 슬롯이 없고 세션 수가 0이다. "
-            "개요는 자원을 점유했거나 배정받은 커널만 세고, 요구만 한 커널은 세지 않는다"
+        return Says(
+            "대기 중인 커널만 있는 프로젝트의 개요를 superadmin 이 조회하면 점유된 슬롯이 없고 "
+            "세션 수가 0입니다. 개요는 자원을 점유했거나 배정받은 커널만 세고, 요구만 한 커널은 "
+            "세지 않습니다",
+            english=(
+                "when the superadmin reads the overview of a project that holds only pending "
+                "kernels, no slot is occupied and the session count is 0. The overview counts "
+                "only kernels that occupied or were allocated a resource, not kernels that "
+                "only asked"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AKernelAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AKernelAndACaller]:
         return AKernelAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -88,7 +103,7 @@ class TheSuperadminReadsAProjectOverview(
 
 @dataclass(frozen=True)
 class AUserReadingSessionsInTheProjectReadsItsOverview(
-    Scenario[SeedingSession, AKernelAndACaller, ResourceSlotAdapter, Overview]
+    Scenario[TestSeedingSession, AKernelAndACaller, ResourceSlotAdapter, Overview]
 ):
     @override
     def summary(self) -> str:
@@ -96,10 +111,17 @@ class AUserReadingSessionsInTheProjectReadsItsOverview(
 
     @override
     def describe(self) -> str:
-        return "프로젝트 범위에서 세션을 읽을 수 있는 사용자가 그 프로젝트의 개요를 조회하면 개요가 반환된다"
+        return Says(
+            "프로젝트 범위에서 세션을 읽을 수 있는 사용자가 그 프로젝트의 개요를 조회하면 개요가 "
+            "반환됩니다",
+            english=(
+                "when a user who can read sessions in the project scope reads the overview of "
+                "that project, the overview comes back"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AKernelAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AKernelAndACaller]:
         return AKernelAndSomeone(granted=Granted.THE_PROJECT)
 
     @override
@@ -113,7 +135,7 @@ class AUserReadingSessionsInTheProjectReadsItsOverview(
 
 @dataclass(frozen=True)
 class AUserReadingSessionsInTheDomainReadsAProjectOverview(
-    Scenario[SeedingSession, AKernelAndACaller, ResourceSlotAdapter, Overview]
+    Scenario[TestSeedingSession, AKernelAndACaller, ResourceSlotAdapter, Overview]
 ):
     @override
     def summary(self) -> str:
@@ -121,13 +143,18 @@ class AUserReadingSessionsInTheDomainReadsAProjectOverview(
 
     @override
     def describe(self) -> str:
-        return (
-            "도메인 범위에서 세션을 읽을 수 있는 사용자가 그 도메인에 속한 프로젝트의 개요를 조회하면 개요가 반환된다. "
-            "도메인 범위의 권한은 그 안의 프로젝트에도 미친다"
+        return Says(
+            "도메인 범위에서 세션을 읽을 수 있는 사용자가 그 도메인에 속한 프로젝트의 개요를 "
+            "조회하면 개요가 반환됩니다. 도메인 범위의 권한은 그 안의 프로젝트에도 미칩니다",
+            english=(
+                "when a user who can read sessions in the domain scope reads the overview of a "
+                "project in that domain, the overview comes back. The permission in the domain "
+                "scope also applies to the projects in it"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AKernelAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AKernelAndACaller]:
         return AKernelAndSomeone(granted=Granted.THE_DOMAIN)
 
     @override
@@ -141,7 +168,7 @@ class AUserReadingSessionsInTheDomainReadsAProjectOverview(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotReadAProjectOverview(
-    Scenario[SeedingSession, AKernelAndACaller, ResourceSlotAdapter, Overview]
+    Scenario[TestSeedingSession, AKernelAndACaller, ResourceSlotAdapter, Overview]
 ):
     @override
     def summary(self) -> str:
@@ -149,10 +176,15 @@ class AUserGrantedNothingMayNotReadAProjectOverview(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 없는 사용자가 조회하면 권한 부족으로 거부된다"
+        return Says(
+            "아무 권한도 없는 사용자가 조회하면 권한 부족으로 거부됩니다",
+            english=(
+                "when a user granted nothing reads, the call is rejected for lack of permission"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AKernelAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AKernelAndACaller]:
         return AKernelAndSomeone()
 
     @override
@@ -166,7 +198,7 @@ class AUserGrantedNothingMayNotReadAProjectOverview(
 
 @dataclass(frozen=True)
 class AProjectIdNothingAnswersToIsEmpty(
-    Scenario[SeedingSession, AKernelAndACaller, ResourceSlotAdapter, Overview]
+    Scenario[TestSeedingSession, AKernelAndACaller, ResourceSlotAdapter, Overview]
 ):
     @override
     def summary(self) -> str:
@@ -174,13 +206,20 @@ class AProjectIdNothingAnswersToIsEmpty(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 존재하지 않는 프로젝트 id로 조회하면 점유된 슬롯이 없고 세션 수가 0인 개요가 반환된다. "
-            "도메인 개요와 달리 프로젝트는 id로 지정하므로 풀어내는 단계가 없고, 프로젝트가 있는지 확인하지 않는다"
+        return Says(
+            "superadmin 이 존재하지 않는 프로젝트 id 로 조회하면 점유된 슬롯이 없고 세션 수가 "
+            "0인 개요가 반환됩니다. 도메인 개요와 달리 프로젝트는 id 로 지정하므로 풀어내는 "
+            "단계가 없고, 프로젝트가 있는지 확인하지 않습니다",
+            english=(
+                "when the superadmin reads with a project id nothing answers to, an overview "
+                "with no occupied slot and a session count of 0 comes back. Unlike the domain "
+                "overview, a project is named by its id, so there is no resolution step and the "
+                "call does not check whether the project exists"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AKernelAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AKernelAndACaller]:
         return AKernelAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -194,7 +233,7 @@ class AProjectIdNothingAnswersToIsEmpty(
 
 @dataclass(frozen=True)
 class EnforcementOffLetsAnyoneReadAProjectOverview(
-    Scenario[SeedingSession, AKernelAndACaller, ResourceSlotAdapter, Overview], Configured
+    Scenario[TestSeedingSession, AKernelAndACaller, ResourceSlotAdapter, Overview], Configured
 ):
     @override
     def summary(self) -> str:
@@ -202,14 +241,20 @@ class EnforcementOffLetsAnyoneReadAProjectOverview(
 
     @override
     def describe(self) -> str:
-        return "권한 검사를 끄면 아무 권한도 없는 사용자도 프로젝트의 개요를 조회할 수 있다"
+        return Says(
+            "권한 검사를 끄면 아무 권한도 없는 사용자도 프로젝트의 개요를 조회할 수 있습니다",
+            english=(
+                "turning permission checks off lets a user granted nothing read the project "
+                "overview"
+            ),
+        )
 
     @override
     def config(self) -> Mapping[str, Any]:
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, AKernelAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AKernelAndACaller]:
         return AKernelAndSomeone()
 
     @override

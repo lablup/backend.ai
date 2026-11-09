@@ -13,7 +13,6 @@ from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.replica_group_history import ReplicaGroupHistoryID
 from ai.backend.common.dto.manager.pagination import PaginationInfo
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 from .types import SubStepResultInfo
 
@@ -39,7 +38,7 @@ class SessionHistoryNode(BaseResponseModel):
 
     id: UUID = Field(description="History record ID")
     field_id: UUID = Field(
-        description=f"UUID of the session scheduling history record. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the session scheduling history record. Added in 26.9.0.",
     )
     session_id: UUID = Field(description="Session ID this history belongs to")
     phase: str = Field(description="Scheduling phase")
@@ -64,7 +63,7 @@ class KernelHistoryNode(BaseResponseModel):
 
     id: UUID = Field(description="History record ID")
     field_id: UUID = Field(
-        description=f"UUID of the kernel scheduling history record. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the kernel scheduling history record. Added in 26.9.0.",
     )
     kernel_id: UUID = Field(description="Kernel ID this history belongs to")
     session_id: UUID = Field(description="Session owning the kernel")
@@ -90,7 +89,7 @@ class DeploymentHistoryNode(BaseResponseModel):
 
     id: UUID = Field(description="History record ID")
     field_id: UUID = Field(
-        description=f"UUID of the deployment history record. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the deployment history record. Added in 26.9.0.",
     )
     deployment_id: UUID = Field(description="Deployment ID this history belongs to")
     category: str = Field(
@@ -115,7 +114,7 @@ class RouteHistoryNode(BaseResponseModel):
 
     id: UUID = Field(description="History record ID")
     field_id: UUID = Field(
-        description=f"UUID of the route history record. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the route history record. Added in 26.9.0.",
     )
     route_id: UUID = Field(description="Route ID this history belongs to")
     deployment_id: UUID = Field(description="Deployment ID the route belongs to")
@@ -144,7 +143,7 @@ class ReplicaGroupHistoryNode(BaseResponseModel):
 
     id: ReplicaGroupHistoryID = Field(description="History record ID")
     field_id: UUID = Field(
-        description=f"UUID of the replica group history record. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the replica group history record. Added in 26.9.0.",
     )
     deployment_id: DeploymentID = Field(description="Deployment the replica group belongs to")
     category: str = Field(description="Handler category: 'lifecycle' or 'scaling'")

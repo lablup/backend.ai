@@ -35,6 +35,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Configured,
     Given,
+    Says,
     Scenario,
     Then,
     When,
@@ -47,7 +48,7 @@ from bai_scenario.components.prometheus_query_preset import (
 )
 from bai_scenario.fakes.prometheus import RANGE
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 from bai_scenario.seeds.prometheus_query_preset.preset import EMPTY_WITHOUT_LABELS
 
@@ -57,7 +58,7 @@ ASKED_WINDOW = "30s"
 
 type Result = QueryDefinitionResultInfo
 type ExecutingStep = Scenario[
-    SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result
+    TestSeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result
 ]
 
 
@@ -76,13 +77,21 @@ class Executing(When[APresetAndACaller, PrometheusQueryPresetAdapter, Result]):
     @override
     def describe(self, laid: APresetAndACaller) -> str:
         target = "존재하지 않는 id" if self.other is not None else laid.preset.name
+        target_en = "an absent id" if self.other is not None else laid.preset.name
         how: list[str] = []
+        how_en: list[str] = []
         if self.time_window is not None:
             how.append(f"시간 창 {self.time_window}")
+            how_en.append(f"time window {self.time_window}")
         if self.over_a_range:
             how.append("조회 구간 지정")
-        return (
-            f"{laid.caller.username}이 {target} 실행 ({', '.join(how) or '아무것도 지정하지 않음'})"
+            how_en.append("a query range given")
+        return Says(
+            f"{laid.caller.username}이 {target} 실행합니다 "
+            f"({', '.join(how) or '아무것도 지정하지 않음'})",
+            english=(
+                f"{laid.caller.username} runs {target_en} ({', '.join(how_en) or 'nothing given'})"
+            ),
         )
 
     @override
@@ -106,7 +115,7 @@ class Executing(When[APresetAndACaller, PrometheusQueryPresetAdapter, Result]):
 
 @dataclass(frozen=True)
 class TheSuperadminRunsItWithoutARange(
-    Scenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result]
+    Scenario[TestSeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result]
 ):
     @override
     def summary(self) -> str:
@@ -114,13 +123,18 @@ class TheSuperadminRunsItWithoutARange(
 
     @override
     def describe(self) -> str:
-        return (
-            "시간 창이 없는 프리셋을 슈퍼관리자가 시간 창을 지정하고 조회 구간 없이 실행하면, 순간 질의로 "
-            "응답하고 모의 서버가 받은 질의에 요청의 시간 창이 들어 있다"
+        return Says(
+            "시간 창이 없는 프리셋을 superadmin 이 시간 창을 지정하고 조회 구간 없이 실행하면, "
+            "순간 질의로 응답하고 모의 서버가 받은 질의에 요청의 시간 창이 들어 있습니다",
+            english=(
+                "when the superadmin runs a preset with no time window, giving a time window "
+                "and no query range, it answers with an instant query and the query the mock "
+                "server received carries the requested time window"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
         return APresetAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -134,7 +148,7 @@ class TheSuperadminRunsItWithoutARange(
 
 @dataclass(frozen=True)
 class RunningOverARangeIsARangeQuery(
-    Scenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result]
+    Scenario[TestSeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result]
 ):
     @override
     def summary(self) -> str:
@@ -142,10 +156,16 @@ class RunningOverARangeIsARangeQuery(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 시작·끝·간격을 지정해 실행하면, 모의 서버가 범위 질의로 응답한다"
+        return Says(
+            "superadmin 이 시작, 끝, 간격을 지정해 실행하면, 모의 서버가 범위 질의로 응답합니다",
+            english=(
+                "when the superadmin runs a preset giving a start, an end and a step, the "
+                "mock server answers with a range query"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
         return APresetAndSomeone(role=UserRole.SUPERADMIN, time_window=PRESET_WINDOW)
 
     @override
@@ -161,7 +181,7 @@ class RunningOverARangeIsARangeQuery(
 
 @dataclass(frozen=True)
 class PrometheusRefusingTheQueryIsPassedOn(
-    Scenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result]
+    Scenario[TestSeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result]
 ):
     @override
     def summary(self) -> str:
@@ -169,13 +189,19 @@ class PrometheusRefusingTheQueryIsPassedOn(
 
     @override
     def describe(self) -> str:
-        return (
-            "라벨 없이는 빈 질의로 렌더되는 프리셋을 슈퍼관리자가 라벨 없이 실행하면, "
-            "Prometheus가 그 질의를 거부하고 그 거부가 지표를 얻지 못했다는 이유로 그대로 전파된다"
+        return Says(
+            "라벨 없이는 빈 질의로 렌더되는 프리셋을 superadmin 이 라벨 없이 실행하면, "
+            "Prometheus 가 그 질의를 거부하고 그 거부가 지표를 얻지 못했다는 이유로 그대로 "
+            "전파됩니다",
+            english=(
+                "when the superadmin runs without labels a preset that renders an empty query "
+                "without them, Prometheus rejects the query and that rejection propagates as "
+                "a failure to get the metric"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
         return APresetAndSomeone(role=UserRole.SUPERADMIN, query_template=EMPTY_WITHOUT_LABELS)
 
     @override
@@ -189,7 +215,7 @@ class PrometheusRefusingTheQueryIsPassedOn(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotRun(
-    Scenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result]
+    Scenario[TestSeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result]
 ):
     @override
     def summary(self) -> str:
@@ -197,13 +223,17 @@ class AUserGrantedNothingMayNotRun(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 없는 사용자가 프리셋을 실행하면 권한 부족으로 거부된다. 실행은 조회와 "
-            "같은 권한을 묻는다"
+        return Says(
+            "아무 권한도 없는 사용자가 프리셋을 실행하면 권한 부족으로 거부됩니다. 실행은 "
+            "조회와 같은 권한을 요구합니다",
+            english=(
+                "when a user granted nothing runs a preset, it is rejected for lack of "
+                "permission. Run requires the same permission as read"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
         return APresetAndSomeone(reading_in_public=False)
 
     @override
@@ -217,7 +247,7 @@ class AUserGrantedNothingMayNotRun(
 
 @dataclass(frozen=True)
 class EnforcementOffLetsAnyoneRun(
-    Scenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result],
+    Scenario[TestSeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result],
     Configured,
 ):
     @override
@@ -226,14 +256,19 @@ class EnforcementOffLetsAnyoneRun(
 
     @override
     def describe(self) -> str:
-        return "권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 실행할 수 있다"
+        return Says(
+            "권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 실행할 수 있습니다",
+            english=(
+                "turning the permission check off lets even a user granted nothing run a preset"
+            ),
+        )
 
     @override
     def config(self) -> Mapping[str, Any]:
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
         return APresetAndSomeone(time_window=PRESET_WINDOW)
 
     @override
@@ -247,7 +282,7 @@ class EnforcementOffLetsAnyoneRun(
 
 @dataclass(frozen=True)
 class AnUnknownIdIsRefusedAsPermission(
-    Scenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result]
+    Scenario[TestSeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result]
 ):
     @override
     def summary(self) -> str:
@@ -255,13 +290,18 @@ class AnUnknownIdIsRefusedAsPermission(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 없는 사용자가 존재하지 않는 id로 실행하면, 대상 없음이 아니라 "
-            "권한 부족으로 거부된다. 없는 행에는 부여된 권한도 없기 때문이다"
+        return Says(
+            "아무 권한도 없는 사용자가 존재하지 않는 id 로 실행하면, 대상 없음이 아니라 권한 "
+            "부족으로 거부됩니다. 없는 행에는 부여된 권한도 없기 때문입니다",
+            english=(
+                "when a user granted nothing runs an id that does not exist, it is rejected "
+                "for lack of permission rather than as not found, because a row that does "
+                "not exist has no permission granted"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
         return APresetAndSomeone()
 
     @override
@@ -275,7 +315,7 @@ class AnUnknownIdIsRefusedAsPermission(
 
 @dataclass(frozen=True)
 class AnUnknownIdIsNotFoundForASuperadmin(
-    Scenario[SeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result]
+    Scenario[TestSeedingSession, APresetAndACaller, PrometheusQueryPresetAdapter, Result]
 ):
     @override
     def summary(self) -> str:
@@ -283,13 +323,20 @@ class AnUnknownIdIsNotFoundForASuperadmin(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 존재하지 않는 id로 실행하면, 대상을 찾을 수 없다는 이유로 거부된다. "
-            "실행은 서비스가 프리셋을 직접 읽어서 내는 오류라 수정과 삭제의 대상 없음과 종류가 다르다"
+        return Says(
+            "superadmin 이 존재하지 않는 id 로 실행하면, 대상을 찾을 수 없다는 이유로 거부됩니다. "
+            "실행은 서비스가 프리셋을 직접 읽어서 발생시키는 오류라 수정과 삭제의 대상 없음과 "
+            "종류가 다릅니다",
+            english=(
+                "when the superadmin runs an id that does not exist, it is rejected because "
+                "the target is not found. Run raises this error by reading the preset "
+                "directly in the service, so it differs in kind from the not-found of edit "
+                "and delete"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
         return APresetAndSomeone(role=UserRole.SUPERADMIN)
 
     @override

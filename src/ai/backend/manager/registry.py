@@ -73,7 +73,7 @@ from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.events.hub.propagators.cache import WithCachePropagator
 from ai.backend.common.events.types import EventCacheDomain, EventDomain
-from ai.backend.common.exception import AliasResolutionFailed
+from ai.backend.common.exception import AliasResolutionFailed, UserNotFound
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import (
     AbuseReport,
@@ -124,7 +124,14 @@ from ai.backend.manager.data.session.options import (
     ResourceOpts,
 )
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.data.vfolder.types import verify_mount_destination
 from ai.backend.manager.models.agent.row import AgentRow, agents
+from ai.backend.manager.models.bootstrap_script_revision.searchable_fields import (
+    BootstrapScriptRevisionSearchableFields,
+)
+from ai.backend.manager.models.bootstrap_script_revision.searchers import (
+    DefaultBootstrapScriptRevisionSearcher,
+)
 from ai.backend.manager.models.domain.row import domains
 from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.image.searchers import (
@@ -138,7 +145,6 @@ from ai.backend.manager.models.kernel.row import (
     KernelRow,
     kernels,
 )
-from ai.backend.manager.models.keypair.row import query_bootstrap_script
 from ai.backend.manager.models.network.row import NetworkRow, NetworkType
 from ai.backend.manager.models.resource_group.row import resource_groups
 from ai.backend.manager.models.resource_slot.row import ResourceAllocationRow
@@ -148,10 +154,8 @@ from ai.backend.manager.models.session.row import (
     SessionRow,
     handle_session_exception,
 )
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user.row import UserRow
-from ai.backend.manager.models.vfolder.row import (
-    verify_vfolder_name,
-)
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.resource_slot.repository import ResourceSlotRepository
@@ -174,7 +178,6 @@ from .errors.kernel import (
     TooManySessionsMatched,
 )
 from .errors.resource import (
-    DatabaseConnectionUnavailable,
     NoCurrentTaskContext,
     ResourceGroupNotFound,
     ResourceGroupSessionTypeNotAllowed,
@@ -274,15 +277,19 @@ class AgentRegistry:
         ``"1g"``) for memory-like slots; normalise them to plain decimal
         strings so downstream ``Decimal(quantity)`` calls in the scheduler
         and ``ResourceSlotEntry.to_resource_slot`` keep working unchanged.
+        Zero-quantity slots are dropped.
         """
         if not resources:
             return ()
-        return tuple(
-            ResourceSlotEntry(
-                resource_type=ResourceSlotName(str(k)), quantity=str(parse_quantity(v))
+        entries: list[ResourceSlotEntry] = []
+        for k, v in resources.items():
+            quantity = parse_quantity(v)
+            if quantity == 0:
+                continue
+            entries.append(
+                ResourceSlotEntry(resource_type=ResourceSlotName(str(k)), quantity=str(quantity))
             )
-            for k, v in resources.items()
-        )
+        return tuple(entries)
 
     def __init__(
         self,
@@ -500,7 +507,7 @@ class AgentRegistry:
                 alias_name = alias_name.replace("/home/work/", "")
             if alias_name == "":
                 raise InvalidAPIParameters("Alias name cannot be empty.")
-            if not verify_vfolder_name(alias_name):
+            if not verify_mount_destination(alias_name):
                 raise InvalidAPIParameters(str(alias_name) + " is reserved for internal path.")
             if alias_name in original_folders:
                 raise InvalidAPIParameters(
@@ -611,24 +618,28 @@ class AgentRegistry:
         session_creation_id = secrets.token_urlsafe(16)
 
         async with self.db.begin_readonly_session() as db_session:
-            conn = await db_session.connection()
-            if conn is None:
-                raise DatabaseConnectionUnavailable("Database connection not available")
             # check if network exists
             if _network_id := config.get("attach_network"):
                 network = await NetworkRow.get(db_session, _network_id)
             else:
                 network = None
 
-            # Use keypair bootstrap_script if it is not delivered as a parameter
-            if not bootstrap_script:
-                script, _ = await query_bootstrap_script(conn, owner_access_key)
-                bootstrap_script = script
-
             user_row = await db_session.scalar(
                 sa.select(UserRow).where(UserRow.uuid == user_scope.user_uuid)
             )
-            user_row = cast(UserRow, user_row)
+            if not user_row:
+                raise UserNotFound(f"User with UUID {user_scope.user_uuid} not found.")
+        if not bootstrap_script:
+            revision = BootstrapScriptRevisionSearchableFields.own
+            async with self._ops_provider.read_ops() as r:
+                revisions = await r.search_in_global(
+                    DefaultBootstrapScriptRevisionSearcher(
+                        user_id=UserID(user_scope.user_uuid),
+                        pagination=OffsetPagination(limit=1),
+                        orders=[revision.revision_number.order.apply(ascending=False)],
+                    )
+                )
+            bootstrap_script = revisions.items[0].script if revisions.items else ""
 
         public_sgroup_only = session_type not in PRIVATE_SESSION_TYPES
         if dry_run:

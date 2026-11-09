@@ -12,6 +12,12 @@ from .handler import V2ResourcePolicyHandler
 if TYPE_CHECKING:
     from ai.backend.manager.api.rest.types import RouteDeps
 
+# Matches a UUID only, so `PATCH /{name}` and `DELETE /{name}` (deprecated) still take every
+# other name.
+_POLICY_ID = (
+    "{policy_id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}"
+)
+
 
 def register_v2_resource_policy_routes(
     handler: V2ResourcePolicyHandler,
@@ -39,6 +45,31 @@ def register_v2_resource_policy_routes(
         handler.admin_create_keypair_resource_policy,
         middlewares=[superadmin_required],
     )
+    reg.add(
+        "PATCH",
+        f"/keypair/{_POLICY_ID}",
+        handler.update_keypair_resource_policy,
+        middlewares=[auth_required],
+    )
+    reg.add(
+        "DELETE",
+        f"/keypair/{_POLICY_ID}",
+        handler.purge_keypair_resource_policy,
+        middlewares=[auth_required],
+    )
+    reg.add(
+        "POST",
+        "/keypair/partial-bulk-update",
+        handler.partial_bulk_update_keypair_resource_policies,
+        middlewares=[auth_required],
+    )
+    reg.add(
+        "POST",
+        "/keypair/partial-bulk-purge",
+        handler.partial_bulk_purge_keypair_resource_policies,
+        middlewares=[auth_required],
+    )
+    # Deprecated since NEXT_RELEASE_VERSION.
     reg.add(
         "PATCH",
         "/keypair/{name}",
@@ -79,6 +110,31 @@ def register_v2_resource_policy_routes(
     )
     reg.add(
         "PATCH",
+        f"/user/{_POLICY_ID}",
+        handler.update_user_resource_policy,
+        middlewares=[auth_required],
+    )
+    reg.add(
+        "DELETE",
+        f"/user/{_POLICY_ID}",
+        handler.purge_user_resource_policy,
+        middlewares=[auth_required],
+    )
+    reg.add(
+        "POST",
+        "/user/partial-bulk-update",
+        handler.partial_bulk_update_user_resource_policies,
+        middlewares=[auth_required],
+    )
+    reg.add(
+        "POST",
+        "/user/partial-bulk-purge",
+        handler.partial_bulk_purge_user_resource_policies,
+        middlewares=[auth_required],
+    )
+    # Deprecated since NEXT_RELEASE_VERSION.
+    reg.add(
+        "PATCH",
         "/user/{name}",
         handler.admin_update_user_resource_policy,
         middlewares=[superadmin_required],
@@ -115,6 +171,31 @@ def register_v2_resource_policy_routes(
         handler.admin_create_project_resource_policy,
         middlewares=[superadmin_required],
     )
+    reg.add(
+        "PATCH",
+        f"/project/{_POLICY_ID}",
+        handler.update_project_resource_policy,
+        middlewares=[auth_required],
+    )
+    reg.add(
+        "DELETE",
+        f"/project/{_POLICY_ID}",
+        handler.purge_project_resource_policy,
+        middlewares=[auth_required],
+    )
+    reg.add(
+        "POST",
+        "/project/partial-bulk-update",
+        handler.partial_bulk_update_project_resource_policies,
+        middlewares=[auth_required],
+    )
+    reg.add(
+        "POST",
+        "/project/partial-bulk-purge",
+        handler.partial_bulk_purge_project_resource_policies,
+        middlewares=[auth_required],
+    )
+    # Deprecated since NEXT_RELEASE_VERSION.
     reg.add(
         "PATCH",
         "/project/{name}",

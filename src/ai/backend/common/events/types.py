@@ -44,6 +44,7 @@ class EventDomain(enum.StrEnum):
     LOG = "log"
     WORKFLOW = "workflow"
     SERVICE_DISCOVERY = "service_discovery"
+    STORAGE_STATUS = "storage_status"
 
 
 class EventCacheDomain(enum.StrEnum):

@@ -528,17 +528,6 @@
       },
       "ConfRequestModel": {
         "properties": {
-          "login_session_token": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Login Session Token"
-          },
           "kernel_host": {
             "title": "Kernel Host",
             "type": "string"
@@ -552,7 +541,6 @@
           }
         },
         "required": [
-          "login_session_token",
           "kernel_host",
           "kernel_port",
           "session"

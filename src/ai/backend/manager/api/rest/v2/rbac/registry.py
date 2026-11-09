@@ -12,6 +12,8 @@ from .handler import V2RBACHandler
 if TYPE_CHECKING:
     from ai.backend.manager.api.rest.types import RouteDeps
 
+_ROLE_ID = "{role_id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}"
+
 
 def register_v2_rbac_routes(
     handler: V2RBACHandler,
@@ -41,20 +43,64 @@ def register_v2_rbac_routes(
     )
     registry.add(
         "PATCH",
-        "/roles/{role_id}",
+        f"/roles/{_ROLE_ID}",
         handler.update_role,
-        middlewares=[superadmin_required],
+        middlewares=[auth_required],
     )
+    registry.add(
+        "POST",
+        f"/roles/{_ROLE_ID}/delete",
+        handler.delete_role,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
+        f"/roles/{_ROLE_ID}/restore",
+        handler.restore_role,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "DELETE",
+        f"/roles/{_ROLE_ID}",
+        handler.purge_role,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
+        "/roles/partial-bulk-update",
+        handler.partial_bulk_update_roles,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
+        "/roles/partial-bulk-delete",
+        handler.partial_bulk_delete_roles,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
+        "/roles/partial-bulk-restore",
+        handler.partial_bulk_restore_roles,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
+        "/roles/partial-bulk-purge",
+        handler.partial_bulk_purge_roles,
+        middlewares=[auth_required],
+    )
+    # Deprecated since NEXT_RELEASE_VERSION.
     registry.add(
         "POST",
         "/roles/delete",
-        handler.delete_role,
+        handler.admin_delete_role,
         middlewares=[superadmin_required],
     )
+    # Deprecated since NEXT_RELEASE_VERSION.
     registry.add(
         "POST",
         "/roles/purge",
-        handler.purge_role,
+        handler.admin_purge_role,
         middlewares=[superadmin_required],
     )
     registry.add(

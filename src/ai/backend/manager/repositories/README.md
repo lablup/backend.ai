@@ -4,7 +4,7 @@
 
 ## Overview
 
-The Repositories layer encapsulates and abstracts database access. This layer separates data access logic from business logic and is responsible for transaction management and query optimization.
+The Repositories layer encapsulates and abstracts database access. It separates data access logic from business logic and owns transaction management and query optimization.
 
 ## Architecture
 
@@ -22,16 +22,16 @@ Database
 
 Repositories implement 6 standard operations:
 
-1. **create** - Create new entity
-2. **get** - Retrieve single entity by ID
+1. **create** - Create a new entity
+2. **get** - Retrieve a single entity by ID
 3. **search** - Query with filters and pagination
-4. **update** - Update existing entity
-5. **delete** - Soft delete (status change)
-6. **purge** - Hard delete (permanent removal)
+4. **update** - Update an existing entity
+5. **delete** - Mark the row as deleted while keeping it (status change)
+6. **purge** - Permanent removal (the entity cannot be restored)
 
-**Multi-target operations** — two semantics:
-- **Batch** (`batch_*`): many rows in one SQL statement, **atomic** (all-or-nothing); returns only the affected-row count. e.g. `batch_update`, `batch_delete`, `batch_purge`.
-- **Bulk** (`bulk_*`): rows processed individually, **partial failures allowed** (returns successes + errors). e.g. `bulk_create`, `bulk_upsert`.
+**Multi-target operations** use two kinds of semantics:
+- **Batch** (`batch_*`): many rows in one SQL statement, **atomic** (all-or-nothing); returns only the affected-row count, for example `batch_update`, `batch_delete`, `batch_purge`.
+- **Bulk** (`bulk_*`): rows processed individually, **partial failures allowed** (returns successes and errors), for example `bulk_create`, `bulk_upsert`.
 
 **Method naming (no prefix):**
 ```python
@@ -48,17 +48,17 @@ await repository.bulk_create(specs)         # partial failures allowed
 await repository.bulk_upsert(specs)
 ```
 
-**Note:** Getter methods use entity name (e.g., `user(id)`, `session(id)`) instead of `get_entity(id)`.
+**Note:** Getter methods use the entity name (for example, `user(id)`, `session(id)`) instead of `get_entity(id)`.
 
 **See:** `/repository-guide` skill for detailed implementation patterns.
 
 ## Service Integration
 
-Repositories are called from the Services Layer to perform data access operations.
+The Services Layer calls repositories to perform data access operations.
 
 **Key Principles**:
-- Services do not create transactions (delegate to Repository)
-- Repository instances are dependency-injected when Services are created
+- Services do not create transactions; they delegate to the Repository
+- Repository instances are passed through dependency injection when Services are created
 - Public methods use standard operations (create, {entity}, search, update, delete, purge)
 
 ## Architecture Diagram
@@ -91,24 +91,24 @@ Repositories are called from the Services Layer to perform data access operation
 
 ### 1. Data Access Abstraction
 - Encapsulate database queries as Python methods
-- Protect upper layers from database structure changes
+- Protect upper layers from changes to the database structure
 - Provide consistent data access interfaces
 
 ### 2. Query Optimization
 - Write efficient queries (JOIN, index utilization)
 - Prevent N+1 problems
-- Selectively query only necessary columns
+- Select only the necessary columns
 - Perform aggregate operations in the database
 
 ### 3. Transaction Management
 - Create transactions at the public method level (only one db session per public method)
-- Private methods receive db session as parameter to maintain the same session
+- Private methods receive the db session as a parameter to keep the same session
 - Read-only sessions (`begin_readonly_session`)
 - Write sessions (`begin_session`)
 
 ### 4. Type Safety
 - Explicit type hints
-- Utilize domain types (SessionId, AgentId, etc.)
+- Use domain types (SessionId, AgentId, and so on)
 - Private methods can return Row objects
 - Public methods return dataclasses to prevent exposing ORM objects externally
 
@@ -121,7 +121,7 @@ Repositories are called from the Services Layer to perform data access operation
 
 ### 1. Source-Based Structure
 
-Repositories have db_source or cache_source as fields. Database is managed by db_source, and Redis is managed by cache_source or stateful_source.
+Repositories hold db_source or cache_source as fields. db_source manages the database, and cache_source or stateful_source manages Valkey.
 
 ```python
 class SessionDBSource:
@@ -198,11 +198,11 @@ class SessionRepository:
 
 **Pattern explanation:**
 
-- **DBSource**: Only handles database operations. Public methods create their own sessions, private methods receive sessions as parameters.
-- **CacheSource**: Only handles cache operations (no database dependency). Provides get/set methods for cached data.
-- **Repository**: Orchestrates both sources. Read operations check cache first and fall back to DB on cache miss. Write operations delegate to DB source and handle cache invalidation.
+- **DBSource**: Handles database operations only. Public methods create their own sessions, private methods receive sessions as parameters.
+- **CacheSource**: Handles cache operations only (no database dependency). Provides get and set methods for cached data.
+- **Repository**: Orchestrates both sources. Read operations check the cache first and fall back to DB on a cache miss. Write operations delegate to the DB source and handle cache invalidation.
 
-**Type hint recommendation**: Using `Optional[T]` is recommended over `| None`.
+**Type hint recommendation**: use `Optional[T]` rather than `| None`.
 
 ### 2. Resilience Application
 
@@ -253,17 +253,17 @@ class SessionDBSource:
 
 **Resilience Policies:**
 
-1. **MetricPolicy**: Automatically collect metrics for Repository method calls
-   - Call count, execution time, success/failure rate, etc.
+1. **MetricPolicy**: Collects metrics for Repository method calls automatically
+   - Call count, execution time, success/failure rate, and so on
 
-2. **RetryPolicy**: Automatic retry on transient errors
+2. **RetryPolicy**: Retries automatically on transient errors
    - Max retries: 10
    - Retry interval: 0.1 seconds (FIXED strategy)
    - Excluded exceptions: `BackendAIError` (business logic errors are not retried)
 
 ### 3. Metric Collection
 
-When the `@*_resilience.apply()` decorator is applied to Repository methods, Prometheus metrics are automatically collected by MetricPolicy.
+When a Repository method carries the `@*_resilience.apply()` decorator, MetricPolicy collects Prometheus metrics automatically.
 
 **Collected Metrics:**
 
@@ -293,16 +293,16 @@ When the `@*_resilience.apply()` decorator is applied to Repository methods, Pro
   - `"client"`: Client layer
   - `"valkey"`: Valkey client layer
 - `layer`: Layer type (actual value examples)
-  - Repository: `"session_repository"`, `"agent_repository"`, `"schedule_repository"`, etc.
-  - DB Source: `"agent_db_source"`, `"schedule_db_source"`, `"scheduler_db_source"`, etc.
-  - Cache Source: `"agent_cache_source"`, `"schedule_cache_source"`, etc.
-- `operation`: Method name (e.g., `"get_session_by_id"`, `"create_session"`)
+  - Repository: `"session_repository"`, `"agent_repository"`, `"schedule_repository"`, and so on
+  - DB Source: `"agent_db_source"`, `"schedule_db_source"`, `"scheduler_db_source"`, and so on
+  - Cache Source: `"agent_cache_source"`, `"schedule_cache_source"`, and so on
+- `operation`: Method name (for example, `"get_session_by_id"`, `"create_session"`)
 - `success`: `"true"` or `"false"`
-- `error_code`: Error code in the format `{domain}_{operation}_{error-detail}` (e.g., `"api_parsing_invalid-parameters"`, `"user_read_not-found"`, `"session_generic_mismatch"`)
+- `error_code`: Error code in the format `{domain}_{operation}_{error-detail}` (for example, `"api_parsing_invalid-parameters"`, `"user_read_not-found"`, `"session_generic_mismatch"`)
 
 ### 4. Explicit Return Types
 
-Public methods return dataclasses, and private methods can return Row objects. Row objects are allowed in private methods only for reuse within the same query.
+Public methods return dataclasses, and private methods can return Row objects. A private method returns Row objects only for reuse within the same query.
 
 ```python
 # Public method - recommend returning dataclass
@@ -338,7 +338,7 @@ async def _fetch_session(
 
 ### 5. Read/Write Separation
 
-Clearly distinguish between read-only and write operations.
+Distinguish read-only operations from write operations.
 
 ```python
 class SessionRepository:
@@ -366,7 +366,7 @@ class SessionRepository:
 
 ### 6. Single Responsibility Principle
 
-Each Repository is responsible for only one main entity.
+Each Repository handles a single main entity.
 
 ```python
 # Good example - Clear responsibility
@@ -384,7 +384,7 @@ class MixedRepository:
 
 ## Querier Pattern
 
-The Querier pattern provides a unified way to build database queries from API requests, supporting filtering, ordering, and pagination.
+The Querier pattern builds database queries from API requests in a unified way, with filtering, ordering, and pagination.
 
 ### Architecture
 
@@ -638,15 +638,13 @@ class NotificationChannelRepository:
 
 ### Scope Pattern for User APIs
 
-For user-facing APIs that require access control validation, use a `Scope` dataclass
-alongside `Querier`. The scope contains required parameters that must be validated
-before query execution.
+For user-facing APIs that require access control validation, use a `Scope` dataclass together with `Querier`. The scope holds the required parameters that the repository validates before it runs the query.
 
-**Pattern distinction:**
-- **User API**: `scope` (required, validated first) + `querier` (optional filters, pagination)
+The two kinds of API differ:
+- **User API**: `scope` (required, validated first) and `querier` (optional filters, pagination)
 - **Admin API**: `querier` only (admin has full access, no scope validation needed)
 
-**Scope placement**: Always place `scope` parameter before `querier` in method signatures.
+**Scope placement**: Always place the `scope` parameter before `querier` in method signatures.
 
 ```python
 @dataclass(frozen=True)
@@ -716,7 +714,7 @@ class FairShareRepository:
 **When to use Scope:**
 - User-facing APIs where access must be restricted
 - When invalid scope should result in an error, not empty results
-- When certain parameters define the "boundary" of allowed data
+- When certain parameters define the "boundary" of the allowed data
 
 **When to use Querier only:**
 - Admin APIs with unrestricted access
@@ -808,7 +806,7 @@ async def _update_session_status(
 
 ### 4. Read Once, Transform Many Times
 
-All DB queries are performed in a single private method, and transformations are processed in memory.
+A single private method runs all DB queries, and transformations run in memory.
 
 ```python
 async def get_scheduling_data(
@@ -874,9 +872,9 @@ class SessionDBSource:
 
 class SessionCacheSource:
     """Cache data access - only handles cache operations"""
-    _redis: RedisConnectionInfo
+    _redis: ValkeyLiveClient
 
-    def __init__(self, redis: RedisConnectionInfo) -> None:
+    def __init__(self, redis: ValkeyLiveClient) -> None:
         self._redis = redis
 
     async def get_session(self, session_id: SessionId) -> Optional[SessionInfo]:
@@ -896,7 +894,7 @@ class SessionRepository:
     def __init__(
         self,
         ops_provider: V2DBOpsProvider,
-        redis: RedisConnectionInfo,
+        redis: ValkeyLiveClient,
     ) -> None:
         self._db_source = SessionDBSource(ops_provider)
         self._cache_source = SessionCacheSource(redis)
@@ -930,7 +928,7 @@ class SessionRepository:
 
 ### 1. Non-existent Data
 
-In db_source, raising exceptions is recommended over returning None.
+In db_source, raise an exception rather than returning None.
 
 ```python
 # Recommended: Raise exception
@@ -1035,7 +1033,7 @@ async def get_widget(
 
 ### Repository Unit Testing
 
-DB fixtures for testing are created as fixture methods for each test class and used only in that file.
+Each test class creates its DB fixtures as fixture methods, and uses them only in that file.
 
 ```python
 # tests/manager/repositories/test_session_repository.py
@@ -1178,7 +1176,7 @@ async def fetch(self, params: dict) -> list:
 
 ## References
 
-### Related Documentation
+### Related documents
 - [Services Layer](../services/README.md): Business logic patterns and service implementation
 - [Sokovan Orchestration](../sokovan/README.md): Session scheduling and orchestration
 - [Manager Overview](../README.md): Manager component architecture

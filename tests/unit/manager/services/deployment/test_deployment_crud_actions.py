@@ -288,6 +288,7 @@ class TestDestroyDeployment(DeploymentCRUDBaseFixtures):
         result = await deployment_service.destroy_deployment(action)
 
         assert result.success is True
+        assert result.data.id == endpoint_id
         mock_deployment_controller.mark_lifecycle_needed.assert_called_once_with(
             DeploymentLifecycleType.DESTROYING
         )

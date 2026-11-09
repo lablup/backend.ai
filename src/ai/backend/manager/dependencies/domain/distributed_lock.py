@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, override
 
-from ai.backend.common import redis_helper
+from ai.backend.common.clients.valkey_client.valkey_lock.client import ValkeyLockClient
 from ai.backend.common.defs import REDIS_STREAM_LOCK, RedisRole
 from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
 from ai.backend.logging.structured import StructuredLogger
@@ -16,6 +16,9 @@ from ai.backend.manager.types import DistributedLockFactory
 from .base import DomainDependency
 
 if TYPE_CHECKING:
+    from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import (
+        SentinelMonitorSet,
+    )
     from ai.backend.common.etcd import AsyncEtcd
     from ai.backend.manager.config.provider import ManagerConfigProvider
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -30,12 +33,14 @@ class DistributedLockInput:
     config_provider: ManagerConfigProvider
     db: ExtendedAsyncSAEngine
     etcd: AsyncEtcd
+    sentinel_monitors: SentinelMonitorSet
 
 
 def create_lock_factory(
     config_provider: ManagerConfigProvider,
     db: ExtendedAsyncSAEngine,
     etcd: AsyncEtcd,
+    valkey_lock: ValkeyLockClient | None = None,
 ) -> DistributedLockFactory:
     """Create a distributed lock factory based on configuration.
 
@@ -58,16 +63,12 @@ def create_lock_factory(
                 db, lock_id
             )
         case "redlock":
+            if valkey_lock is None:
+                raise ValueError("redlock backend requires a Valkey lock client")
             redlock_config = config.manager.redlock_config
-            redis_profile_target = config.redis.to_redis_profile_target()
-            redis_lock = redis_helper.get_redis_object_for_lock(
-                redis_profile_target.profile_target(RedisRole.STREAM_LOCK),
-                name="lock",
-                db=REDIS_STREAM_LOCK,
-            )
             return lambda lock_id, lifetime_hint: RedisLock(
                 str(lock_id),
-                redis_lock,
+                valkey_lock,
                 lifetime=min(lifetime_hint * 2, lifetime_hint + 30),
                 lock_retry_interval=redlock_config["lock_retry_interval"],
             )
@@ -103,14 +104,30 @@ class DistributedLockFactoryDependency(
         """Initialize and provide a DistributedLockFactory.
 
         Args:
-            setup_input: Input containing config_provider, db, and etcd references.
+            setup_input: Input containing config_provider, db, etcd, and sentinel_monitors.
 
         Yields:
             A callable factory that creates distributed locks.
         """
-        factory = create_lock_factory(
-            config_provider=setup_input.config_provider,
-            db=setup_input.db,
-            etcd=setup_input.etcd,
-        )
-        yield factory
+        config = setup_input.config_provider.config
+        valkey_lock: ValkeyLockClient | None = None
+        if config.manager.distributed_lock == "redlock":
+            lock_target = config.redis.to_valkey_profile_target().profile_target(
+                RedisRole.STREAM_LOCK
+            )
+            valkey_lock = await ValkeyLockClient.create(
+                lock_target,
+                db_id=REDIS_STREAM_LOCK,
+                human_readable_name="lock",
+                sentinel_monitor=setup_input.sentinel_monitors.monitor_for(lock_target),
+            )
+        try:
+            yield create_lock_factory(
+                config_provider=setup_input.config_provider,
+                db=setup_input.db,
+                etcd=setup_input.etcd,
+                valkey_lock=valkey_lock,
+            )
+        finally:
+            if valkey_lock is not None:
+                await valkey_lock.close()

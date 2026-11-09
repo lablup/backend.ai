@@ -182,26 +182,32 @@ class TestDeleteContainerRegistryPayload:
 
     def test_creation_with_uuid(self) -> None:
         reg_id = uuid.uuid4()
-        payload = DeleteContainerRegistryPayload(id=reg_id)
+        payload = DeleteContainerRegistryPayload(id=reg_id, entity_id=reg_id)
         assert payload.id == reg_id
 
     def test_id_is_uuid_instance(self) -> None:
         reg_id = uuid.uuid4()
-        payload = DeleteContainerRegistryPayload(id=reg_id)
+        payload = DeleteContainerRegistryPayload(id=reg_id, entity_id=reg_id)
         assert isinstance(payload.id, uuid.UUID)
 
     def test_creation_from_uuid_string(self) -> None:
         reg_id = uuid.uuid4()
-        payload = DeleteContainerRegistryPayload.model_validate({"id": str(reg_id)})
+        payload = DeleteContainerRegistryPayload.model_validate({
+            "id": str(reg_id),
+            "entity_id": str(reg_id),
+        })
         assert payload.id == reg_id
 
     def test_invalid_uuid_raises_error(self) -> None:
         with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
-            DeleteContainerRegistryPayload.model_validate({"id": "not-a-uuid"})
+            DeleteContainerRegistryPayload.model_validate({
+                "id": "not-a-uuid",
+                "entity_id": "not-a-uuid",
+            })
 
     def test_round_trip_serialization(self) -> None:
         reg_id = uuid.uuid4()
-        payload = DeleteContainerRegistryPayload(id=reg_id)
+        payload = DeleteContainerRegistryPayload(id=reg_id, entity_id=reg_id)
         json_str = payload.model_dump_json()
         restored = DeleteContainerRegistryPayload.model_validate_json(json_str)
         assert restored.id == reg_id

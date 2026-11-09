@@ -24,7 +24,6 @@ class PurgeKeyPairResourcePolicyAction(
     Purge-shaped: the table carries no lifecycle column, so deleting one has
     always been the row leaving the table."""
 
-    name: str
     policy_id: KeyPairResourcePolicyUUID
 
     @override
@@ -38,4 +37,4 @@ class PurgeKeyPairResourcePolicyAction(
 
     @override
     def to_purger(self) -> KeyPairResourcePolicyPurger:
-        return KeyPairResourcePolicyPurger(name=self.name, policy_id=self.policy_id)
+        return KeyPairResourcePolicyPurger(policy_id=self.policy_id)

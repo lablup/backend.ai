@@ -1,7 +1,7 @@
 ---
 name: runtime-variant-service-shapes
 type: decision-table
-description: runtime_variant knowledge - why every read and the create and update run against ops, why the two purges keep a service, why the bulk purge is custom-backed and partial
+description: runtime_variant knowledge - why every read, the create and the single and partial bulk updates run against ops, why the two purges keep a service, why the bulk purge is custom-backed and partial
 scope: src/ai/backend/manager/services/runtime_variant
 keywords: [PurgeRuntimeVariantAction, BulkPurgeRuntimeVariantsAction, RuntimeVariantService, RuntimeVariantRepository, RuntimeVariantPresetsOfVariantPurger, partial_bulk, single_entity, RuntimeVariantEntityType]
 sources:
@@ -13,9 +13,11 @@ generated:
 status: draft
 ---
 
-# Runtime variant service — Knowledge
+# Runtime variant service: Knowledge
 
 > Rules: `../AGENTS.md`. Spec selection: `../../models/specs/KNOWLEDGE.md`.
+
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
 A runtime variant is a system-wide catalog entry naming the serving runtime a deployment
 revision runs on. The package exists for the two purges: everything else is a spec handed
@@ -23,14 +25,14 @@ to ops.
 
 ## The processor fields
 
-`backend.ai mgr ops list` prints the wired list. Its output answers the entity type,
+`backend.ai mgr ops list` prints the connected list. Its output gives the entity type,
 shape, operation, gate and backing.
 
 ## A variant is global and read by everyone
 
 - A `runtime_variants` row belongs to no scope, so nothing is granted per row and only
   a superadmin passes the entity gate on update and purge.
-- Every read — get, bulk get, search, lookup by name — is wired public: naming a runtime
+- Every read (get, bulk get, search, lookup by name) is public: naming a runtime
   costs no permission.
 
 ## The purges keep a service

@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import posixpath
 from decimal import Decimal
 from enum import StrEnum
 from functools import cached_property
+from pathlib import PurePosixPath
 from typing import Annotated
 from uuid import UUID
 
-from pydantic import Field, StringConstraints
+from pydantic import Field, StringConstraints, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel, BaseResponseModel
 
@@ -21,6 +23,8 @@ __all__ = (
     "EnvironmentVariablesInfo",
     "EnvironmentVariablesInput",
     "OrderDirection",
+    "PartialBulkFailure",
+    "PartialBulkPayload",
     "ResourceLimitEntryInfo",
     "ResourceSlotEntryInfo",
     "ResourceSlotEntryInput",
@@ -167,6 +171,23 @@ class MountItemInput(BaseRequestModel):
         ),
     )
 
+    @field_validator("mount_path")
+    @classmethod
+    def mount_path_must_not_contain_parent_segment(cls, v: str | None) -> str | None:
+        if v is not None and ".." in PurePosixPath(v).parts:
+            raise ValueError("mount_path must not contain a '..' segment")
+        return v
+
+    @field_validator("subpath")
+    @classmethod
+    def subpath_must_stay_in_vfolder(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        normed = posixpath.normpath(v)
+        if normed == ".." or normed.startswith("../") or PurePosixPath(normed).is_absolute():
+            raise ValueError("subpath must not escape the vfolder root")
+        return v
+
 
 class EnvironmentVariableEntryInput(BaseRequestModel):
     """A single environment variable entry with key and value.
@@ -198,4 +219,20 @@ class EnvironmentVariablesInfo(BaseResponseModel):
 
     entries: list[EnvironmentVariableEntryInfo] = Field(
         description="List of environment variable entries."
+    )
+
+
+class PartialBulkFailure(BaseResponseModel):
+    """One entity a partial bulk operation named and did not process."""
+
+    id: UUID = Field(description="ID of the entity the failed item named.")
+    message: str = Field(description="Reason the item failed.")
+
+
+class PartialBulkPayload[TNode: BaseResponseModel](BaseResponseModel):
+    """Result of a partial bulk operation: the entities processed and the ones that failed."""
+
+    successes: list[TNode] = Field(description="The entities processed, as they now stand.")
+    failed: list[PartialBulkFailure] = Field(
+        description="The entities not processed, each with the reason."
     )

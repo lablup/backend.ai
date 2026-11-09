@@ -399,6 +399,10 @@ class FairShareAggregator:
         Returns:
             List of usage record specs for each slice
         """
+        user_uuid = kernel.user_permission.user_uuid
+        if user_uuid is None:
+            # The owner was purged; usage has no one to be charged to.
+            return []
         specs: list[KernelUsageRecordCreator] = []
 
         current_start = start_time
@@ -425,7 +429,7 @@ class FairShareAggregator:
 
             spec = KernelUsageRecordCreator(
                 session_id=UUID(kernel.session.session_id),
-                user_uuid=kernel.user_permission.user_uuid,
+                user_uuid=user_uuid,
                 project_id=kernel.user_permission.group_id,
                 domain_name=kernel.user_permission.domain_name,
                 resource_group=resource_group,

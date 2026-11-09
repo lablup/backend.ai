@@ -8,24 +8,16 @@ on:
       - 'VERSION'
 
 jobs:
-  api-updated:
+  generate-api-schema:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
     steps:
-    - name: Calculate the fetch depth
-      run: |
-        if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
-          echo "GIT_FETCH_DEPTH=$(( ${{ github.event.pull_request.commits }} + 1 ))" >> "${GITHUB_ENV}"
-        else
-          echo "GIT_FETCH_DEPTH=2" >> "${GITHUB_ENV}"
-        fi
-    - name: Checkout the revision with minimal required history
+    - name: Checkout the pull request head
       uses: actions/checkout@v6
       with:
-        fetch-depth: ${{ env.GIT_FETCH_DEPTH }}
-        ref: ${{ github.head_ref }}
-        token: ${{ secrets.OCTODOG }}
+        ref: ${{ github.event.pull_request.head.sha }}
+        persist-credentials: false
         lfs: false
     - name: Extract Python version from pants.toml
       run: |
@@ -46,7 +38,7 @@ jobs:
         REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT_ARC }}
       if: ${{ env.REMOTE_CACHE_BACKEND_ENDPOINT != '' }}
     - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v11
+      uses: pantsbuild/actions/init-pants@0aaef864bd133c4055feb6adad0bfdce0de1c2e4  # v11
       # See: github.com/pantsbuild/actions/tree/main/init-pants/
       # ref) https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml#L30-L49
       with:
@@ -71,27 +63,73 @@ jobs:
         ./backend.ai mgr api dump-gql-schema --public --output docs/manager/graphql-reference/v2-public-schema.graphql
         ./backend.ai mgr api generate-supergraph --config configs/graphql/supergraph.yaml -o docs/manager/graphql-reference
         ./backend.ai mgr api dump-openapi --output docs/manager/rest-reference/openapi.json
-    - name: Make commit message for changing change log file
+    - name: Upload the api schema dump
+      uses: actions/upload-artifact@v5
+      with:
+        name: api-schema
+        path: |
+          docs/manager/graphql-reference/schema.graphql
+          docs/manager/graphql-reference/v2-schema.graphql
+          docs/manager/graphql-reference/v2-public-schema.graphql
+          docs/manager/graphql-reference/supergraph.graphql
+          docs/manager/rest-reference/openapi.json
+        if-no-files-found: error
+        retention-days: 1
+
+  # Holds the push token. Runs no code from the pull request (pants, repository
+  # scripts, local actions), so its steps stay inline in this file.
+  push-api-schema:
+    needs: generate-api-schema
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+    - name: Calculate the fetch depth
+      env:
+        PR_COMMITS: ${{ github.event.pull_request.commits }}
+      run: echo "GIT_FETCH_DEPTH=$(( PR_COMMITS + 1 ))" >> "${GITHUB_ENV}"
+    - name: Checkout the revision with minimal required history
+      uses: actions/checkout@v6
+      with:
+        fetch-depth: ${{ env.GIT_FETCH_DEPTH }}
+        ref: ${{ github.event.pull_request.head.sha }}
+        token: ${{ secrets.OCTODOG }}
+        lfs: false
+    - name: Download the api schema dump
+      uses: actions/download-artifact@v6
+      with:
+        name: api-schema
+        path: ${{ runner.temp }}/api-schema
+    - name: Commit and push the api schema dump
+      env:
+        SCHEMA_DIR: ${{ runner.temp }}/api-schema
+        HEAD_REF: ${{ github.head_ref }}
       run: |
-        git add docs/manager/graphql-reference/schema.graphql
-        git add docs/manager/graphql-reference/v2-schema.graphql
-        git add docs/manager/graphql-reference/v2-public-schema.graphql
-        git add docs/manager/graphql-reference/supergraph.graphql
-        git add docs/manager/rest-reference/openapi.json
+        # Stage through the index: the checked-out tree and the artifact are not trusted.
+        for file in \
+          graphql-reference/schema.graphql \
+          graphql-reference/v2-schema.graphql \
+          graphql-reference/v2-public-schema.graphql \
+          graphql-reference/supergraph.graphql \
+          rest-reference/openapi.json
+        do
+          blob=$(git hash-object -w --no-filters "$SCHEMA_DIR/$file")
+          git update-index --add --cacheinfo "100644,$blob,docs/manager/$file"
+        done
         author_name=$(git show -q --pretty='format:%an')
         author_email=$(git show -q --pretty='format:%ae')
         git config user.email "$author_email"
         git config user.name "$author_name"
-        if [ -n "$(git diff --staged)" ]; then
+        if ! git diff --staged --quiet; then
           git commit \
             -m "chore: update api schema dump" \
             --author="$author_name <$author_email>" \
             --trailer "Co-authored-by: octodog <mu001@lablup.com>"
-          git push
+          git push origin "HEAD:refs/heads/$HEAD_REF"
         fi
 
   graphql-inspector:
-    needs: api-updated
+    needs: push-api-schema
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -99,7 +137,7 @@ jobs:
       checks: write
     steps:
       - uses: actions/checkout@v6
-      - uses: graphql-hive/graphql-inspector@v4.0.0
+      - uses: graphql-hive/graphql-inspector@c0ecb19ad21de709b80ed897041a4976c079c718  # v4.0.0
         with:
           schema: '${{ github.base_ref }}:docs/manager/graphql-reference/supergraph.graphql'
           rules: |

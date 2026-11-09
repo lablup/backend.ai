@@ -13,7 +13,7 @@ from ai.backend.manager.models.retention.row import RetentionPolicyRow
 from ai.backend.manager.models.retention.searchable_fields import (
     RetentionPolicySearchableFields,
 )
-from ai.backend.manager.models.specs.querier import DataQuerier
+from ai.backend.manager.models.specs.querier import BulkEntityQuerier, DataQuerier
 
 
 @dataclass
@@ -32,6 +32,22 @@ class RetentionPolicyQuerier(DataQuerier[RetentionPolicyRow, RetentionPolicyData
     @override
     def entity_id_value(self) -> RetentionPolicyID:
         return self.policy_id
+
+    @override
+    def to_data(self, row: RetentionPolicyRow) -> RetentionPolicyData:
+        return RetentionPolicySearchableFields.own.to_data(row)
+
+
+class BulkRetentionPolicyQuerier(BulkEntityQuerier[RetentionPolicyRow, RetentionPolicyData]):
+    """The retention policies the caller named."""
+
+    @override
+    def row_class(self) -> type[RetentionPolicyRow]:
+        return RetentionPolicyRow
+
+    @override
+    def entity_id_column(self) -> InstrumentedAttribute[Any]:
+        return RetentionPolicyRow.id
 
     @override
     def to_data(self, row: RetentionPolicyRow) -> RetentionPolicyData:

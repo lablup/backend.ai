@@ -2,13 +2,16 @@ from __future__ import annotations
 
 import pytest
 
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.config import redis_config_iv
+from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import HostPortPair
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.dependencies.infrastructure.redis import (
     ValkeyClients,
     ValkeyDependency,
+    ValkeyInput,
 )
 
 
@@ -33,7 +36,8 @@ class TestValkeyDependency:
         redis_config = redis_config_iv.check(redis_config_data)
 
         # Create minimal ManagerUnifiedConfig with just redis settings
-        return ManagerUnifiedConfig(redis=redis_config)  # type: ignore[call-arg]
+        etcd_config = EtcdConfig.model_validate({"user": "test", "password": "test"})
+        return ManagerUnifiedConfig(redis=redis_config, etcd=etcd_config)  # type: ignore[call-arg]
 
     async def test_provide_valkey_clients(
         self,
@@ -42,7 +46,9 @@ class TestValkeyDependency:
         """Dependency should create and cleanup all Valkey clients."""
         dependency = ValkeyDependency()
 
-        async with dependency.provide(manager_config) as clients:
+        async with dependency.provide(
+            ValkeyInput(config=manager_config, sentinel_monitors=SentinelMonitorSet([]))
+        ) as clients:
             assert isinstance(clients, ValkeyClients)
             # Verify clients are functional
             assert clients.live is not None
@@ -66,7 +72,9 @@ class TestValkeyDependency:
         dependency = ValkeyDependency()
 
         with pytest.raises(RuntimeError):
-            async with dependency.provide(manager_config) as clients:
+            async with dependency.provide(
+                ValkeyInput(config=manager_config, sentinel_monitors=SentinelMonitorSet([]))
+            ) as clients:
                 assert isinstance(clients, ValkeyClients)
                 raise RuntimeError("Test error")
 

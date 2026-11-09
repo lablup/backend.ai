@@ -418,7 +418,9 @@ class TestImageAPIHandler:
         processors.image.search_with_install_status.wait_for_complete = AsyncMock(
             return_value=mock_get_result
         )
-        processors.image.scan_image.wait_for_complete = AsyncMock(return_value=mock_scan_result)
+        processors.image.scan_already_registered_image.wait_for_complete = AsyncMock(
+            return_value=mock_scan_result
+        )
         processors.image.alias_image_by_id.wait_for_complete = AsyncMock(
             return_value=mock_alias_result
         )
@@ -496,18 +498,18 @@ class TestImageAPIHandler:
         self,
         mock_processors: MagicMock,
     ) -> None:
-        """Rescan handler should call scan_image processor."""
-        await mock_processors.image.scan_image.wait_for_complete(
+        """Rescan handler should call scan_already_registered_image processor."""
+        await mock_processors.image.scan_already_registered_image.wait_for_complete(
             ScanImageAction(canonical="cr.backend.ai/stable/python:3.11", architecture="x86_64")
         )
-        mock_processors.image.scan_image.wait_for_complete.assert_called_once()
+        mock_processors.image.scan_already_registered_image.wait_for_complete.assert_called_once()
 
     async def test_scan_image_result_has_image_and_errors(
         self,
         mock_processors: MagicMock,
     ) -> None:
         """Scan result should have image data and errors list."""
-        result = await mock_processors.image.scan_image.wait_for_complete(
+        result = await mock_processors.image.scan_already_registered_image.wait_for_complete(
             ScanImageAction(canonical="cr.backend.ai/stable/python:3.11", architecture="x86_64")
         )
         adapter = ImageAdapter()

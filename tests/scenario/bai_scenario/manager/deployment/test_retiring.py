@@ -27,6 +27,7 @@ from ai.backend.testutils.scenario_steps import (
     Held,
     Refused,
     SameAs,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -39,11 +40,11 @@ from bai_scenario.components.deployment import (
     AnothersDeploymentAndASuperadmin,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type RetiringStep = Scenario[
-    SeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeleteDeploymentPayload
+    TestSeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeleteDeploymentPayload
 ]
 
 
@@ -59,10 +60,15 @@ class Retiring(When[ADeploymentAndACaller, DeploymentAdapter, DeleteDeploymentPa
 
     @override
     def describe(self, laid: ADeploymentAndACaller) -> str:
-        called = (
-            "아무것도 갖지 않은 id" if self.other is not None else laid.deployment.metadata.name
+        if self.other is not None:
+            return Says(
+                f"{laid.caller.username} 이 아무것도 갖지 않은 id 를 삭제합니다",
+                english=f"{laid.caller.username} deletes an id nothing answers to",
+            )
+        return Says(
+            f"{laid.caller.username} 이 {laid.deployment.metadata.name}를 삭제합니다",
+            english=f"{laid.caller.username} deletes {laid.deployment.metadata.name}",
         )
-        return f"{laid.caller.username}이 {called}를 지움"
 
     @override
     async def call(
@@ -79,7 +85,10 @@ class TheRetiredOneIsNamed(Then[ADeploymentAndACaller, DeleteDeploymentPayload])
 
     @override
     def says(self) -> str:
-        return "지우기 시작한 배포를 답한다"
+        return Says(
+            "삭제를 시작한 배포를 담아 응답합니다",
+            english="the response carries the deployment whose deletion has started",
+        )
 
     @override
     def look(
@@ -88,12 +97,21 @@ class TheRetiredOneIsNamed(Then[ADeploymentAndACaller, DeleteDeploymentPayload])
         payload = answered.response
         if payload is None:
             return [Refused(EntityNotFoundError, answered.raised)]
-        return [Held("id", payload.id, SameAs[UUID](laid.deployment.id, "심은 배포"))]
+        return [
+            Held(
+                "id",
+                payload.id,
+                SameAs[UUID](
+                    laid.deployment.id,
+                    Says("미리 저장한 배포", english="the deployment seeded in advance"),
+                ),
+            )
+        ]
 
 
 @dataclass(frozen=True)
 class TheGrantedUserRetiresIt(
-    Scenario[SeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeleteDeploymentPayload]
+    Scenario[TestSeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeleteDeploymentPayload]
 ):
     @override
     def summary(self) -> str:
@@ -101,10 +119,16 @@ class TheGrantedUserRetiresIt(
 
     @override
     def describe(self) -> str:
-        return "soft-delete 권한을 받은 사용자가 배포를 지우면, 그 배포를 지우기 시작했다고 답한다"
+        return Says(
+            "soft-delete 권한을 받은 사용자가 배포를 삭제하면, 그 배포의 삭제를 시작했다고 응답합니다",
+            english=(
+                "when a user granted soft-delete deletes a deployment, the response says the "
+                "deployment's deletion has started"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ADeploymentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:
         return ADeploymentInThatPlace(granted=(Permission.SOFT_DELETE,))
 
     @override
@@ -118,7 +142,7 @@ class TheGrantedUserRetiresIt(
 
 @dataclass(frozen=True)
 class TheSuperadminRetiresAnothers(
-    Scenario[SeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeleteDeploymentPayload]
+    Scenario[TestSeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeleteDeploymentPayload]
 ):
     @override
     def summary(self) -> str:
@@ -126,13 +150,18 @@ class TheSuperadminRetiresAnothers(
 
     @override
     def describe(self) -> str:
-        return (
-            "다른 사람이 만든 배포를 아무 권한도 받지 않은 슈퍼관리자가 지우면, "
-            "그 배포를 지우기 시작했다고 답한다. 역할이 권한 그래프를 지나간다"
+        return Says(
+            "다른 사람이 생성한 배포를 아무 권한도 받지 않은 superadmin 이 삭제하면, "
+            "그 배포의 삭제를 시작했다고 응답합니다. 역할이 권한 그래프를 지나갑니다",
+            english=(
+                "when a superadmin holding no grant deletes another user's deployment, the "
+                "response says the deployment's deletion has started; the role passes through the "
+                "permission graph"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ADeploymentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:
         return AnothersDeploymentAndASuperadmin()
 
     @override
@@ -146,7 +175,7 @@ class TheSuperadminRetiresAnothers(
 
 @dataclass(frozen=True)
 class UpdatingIsNotEnoughToRetire(
-    Scenario[SeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeleteDeploymentPayload]
+    Scenario[TestSeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeleteDeploymentPayload]
 ):
     @override
     def summary(self) -> str:
@@ -154,13 +183,18 @@ class UpdatingIsNotEnoughToRetire(
 
     @override
     def describe(self) -> str:
-        return (
-            "수정 권한만 받고 soft-delete 권한은 받지 않은 사용자가 배포를 지우면, "
-            "권한 부족으로 거부된다. 지우기는 수정과 다른 문이다"
+        return Says(
+            "수정 권한만 받고 soft-delete 권한은 받지 않은 사용자가 배포를 삭제하면, "
+            "권한 부족으로 거부됩니다. 삭제는 수정과 다른 동작입니다",
+            english=(
+                "when a user granted only update and not soft-delete deletes a deployment, the "
+                "call is rejected for lack of permission; deletion is a different operation from "
+                "update"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ADeploymentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:
         return ADeploymentInThatPlace(granted=(Permission.UPDATE,))
 
     @override
@@ -174,7 +208,7 @@ class UpdatingIsNotEnoughToRetire(
 
 @dataclass(frozen=True)
 class RetiringAnUnknownIdIsNotFoundForASuperadmin(
-    Scenario[SeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeleteDeploymentPayload]
+    Scenario[TestSeedingSession, ADeploymentAndACaller, DeploymentAdapter, DeleteDeploymentPayload]
 ):
     @override
     def summary(self) -> str:
@@ -182,10 +216,16 @@ class RetiringAnUnknownIdIsNotFoundForASuperadmin(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아무것도 갖지 않은 id를 지우면, 대상이 없다는 것으로 거부된다"
+        return Says(
+            "superadmin 이 아무것도 갖지 않은 id 를 삭제하면, 대상이 없다는 것으로 거부됩니다",
+            english=(
+                "when a superadmin deletes an id nothing answers to, the call is rejected as not "
+                "found"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ADeploymentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:
         return ADeploymentInThatPlace(role=UserRole.SUPERADMIN)
 
     @override

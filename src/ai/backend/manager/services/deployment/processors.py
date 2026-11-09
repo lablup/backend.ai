@@ -85,6 +85,12 @@ from ai.backend.manager.services.deployment.actions.auto_scaling_rule.get_auto_s
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.global_search_auto_scaling_rules import (
     GlobalSearchAutoScalingRulesAction,
 )
+from ai.backend.manager.services.deployment.actions.auto_scaling_rule.partial_bulk_purge_auto_scaling_rules import (
+    PartialBulkPurgeAutoScalingRulesAction,
+)
+from ai.backend.manager.services.deployment.actions.auto_scaling_rule.partial_bulk_update_auto_scaling_rules import (
+    PartialBulkUpdateAutoScalingRulesAction,
+)
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.search_auto_scaling_rules import (
     SearchAutoScalingRulesAction,
 )
@@ -107,6 +113,9 @@ from ai.backend.manager.services.deployment.actions.deployment_policy.bulk_get_d
 from ai.backend.manager.services.deployment.actions.deployment_policy.get_deployment_policy import (
     GetDeploymentPolicyAction,
     GetDeploymentPolicyActionResult,
+)
+from ai.backend.manager.services.deployment.actions.deployment_policy.partial_bulk_get_deployment_policies import (
+    PartialBulkGetDeploymentPoliciesAction,
 )
 from ai.backend.manager.services.deployment.actions.deployment_policy.search_deployment_policies import (
     SearchDeploymentPoliciesAction,
@@ -318,6 +327,12 @@ class DeploymentProcessors:
     bulk_delete_auto_scaling_rules: PartialBulkActionProcessor[
         BulkDeleteAutoScalingRulesAction, list[UUID]
     ]
+    partial_bulk_update_auto_scaling_rules: PartialBulkFieldActionProcessor[
+        PartialBulkUpdateAutoScalingRulesAction, ModelDeploymentAutoScalingRuleData
+    ]
+    partial_bulk_purge_auto_scaling_rules: PartialBulkFieldActionProcessor[
+        PartialBulkPurgeAutoScalingRulesAction, ModelDeploymentAutoScalingRuleData
+    ]
     search_auto_scaling_rules: BulkActionProcessor[
         SearchAutoScalingRulesAction, ScopedFieldsOpsResult[ModelDeploymentAutoScalingRuleData]
     ]
@@ -359,6 +374,9 @@ class DeploymentProcessors:
     ]
     bulk_get_deployment_policies: BulkActionProcessor[
         BulkGetDeploymentPoliciesAction, OwnedFieldsOpsResult[DeploymentID, DeploymentPolicyData]
+    ]
+    partial_bulk_get_deployment_policies: PartialBulkFieldActionProcessor[
+        PartialBulkGetDeploymentPoliciesAction, DeploymentPolicyData
     ]
 
     global_search_replicas: GlobalActionProcessor[
@@ -431,6 +449,9 @@ class DeploymentProcessors:
         )
         self.bulk_get_deployment_policies = policies.atomic_bulk_get_ops(
             BulkGetDeploymentPoliciesAction
+        )
+        self.partial_bulk_get_deployment_policies = policies.partial_bulk_get_ops(
+            PartialBulkGetDeploymentPoliciesAction
         )
         self.lookup_auto_scaling_rule_deployment = group.key_owner_lookup_ops(
             LookupAutoScalingRuleDeploymentAction
@@ -517,6 +538,14 @@ class DeploymentProcessors:
         )
         self.bulk_delete_auto_scaling_rules = group.partial_bulk(
             BulkDeleteAutoScalingRulesAction, service.bulk_delete_auto_scaling_rules
+        )
+        self.partial_bulk_update_auto_scaling_rules = auto_scaling_rules.partial_bulk_field(
+            PartialBulkUpdateAutoScalingRulesAction,
+            service.partial_bulk_update_auto_scaling_rules,
+        )
+        self.partial_bulk_purge_auto_scaling_rules = auto_scaling_rules.partial_bulk_field(
+            PartialBulkPurgeAutoScalingRulesAction,
+            service.partial_bulk_purge_auto_scaling_rules,
         )
         self.search_auto_scaling_rules = auto_scaling_rules.atomic_bulk_scoped_search_ops(
             SearchAutoScalingRulesAction

@@ -47,6 +47,7 @@ from ai.backend.testutils.scenario_steps import (
     Refused,
     Same,
     SameAs,
+    Says,
     Skipped,
     Then,
     Verdict,
@@ -59,16 +60,16 @@ from bai_scenario.components.deployment import (
 )
 from bai_scenario.components.domain import SomeoneOf, WrittenByThisRun
 from bai_scenario.components.vfolder import STORAGE_HOST, SomeoneReadingFoldersIn
-from bai_scenario.seeds.deployment.revision import SeedRevisionOf
-from bai_scenario.seeds.entity_share.share import SeedShareTaken, SeedVFolderShare
-from bai_scenario.seeds.image.image import SeedImage
-from bai_scenario.seeds.image.registry import SeedContainerRegistry
-from bai_scenario.seeds.project.project import SeedProject
-from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
-from bai_scenario.seeds.resource_slot.slot_type import SeedSlotType
-from bai_scenario.seeds.runtime_variant.runtime_variant import SeedRuntimeVariant
-from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
-from bai_scenario.seeds.vfolder.vfolder import SeedPersonalVFolder
+from bai_scenario.seeds.deployment.revision import TestSeedRevisionOf
+from bai_scenario.seeds.entity_share.share import TestSeedShareTaken, TestSeedVFolderShare
+from bai_scenario.seeds.image.image import TestSeedImage
+from bai_scenario.seeds.image.registry import TestSeedContainerRegistry
+from bai_scenario.seeds.project.project import TestSeedProject
+from bai_scenario.seeds.resource_policy.project import TestSeedProjectPolicy
+from bai_scenario.seeds.resource_slot.slot_type import TestSeedSlotType
+from bai_scenario.seeds.runtime_variant.runtime_variant import TestSeedRuntimeVariant
+from bai_scenario.seeds.seeder import Laid, TestSeeder, TestSeedNest
+from bai_scenario.seeds.vfolder.vfolder import TestSeedPersonalVFolder
 
 MOUNTED_AT = "/models"
 SERVED = "served"
@@ -118,7 +119,7 @@ class LaidMaterials:
 
 
 @dataclass(frozen=True)
-class WhatARevisionStandsOn(SeedNest[LaidMaterials]):
+class WhatARevisionStandsOn(TestSeedNest[LaidMaterials]):
     """리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입.
 
     모델 폴더는 ``folder_owner``의 개인 폴더다. ``folder_readable``이면 그 사람이 자기 개인
@@ -134,34 +135,40 @@ class WhatARevisionStandsOn(SeedNest[LaidMaterials]):
 
     @override
     def kind(self) -> str:
-        return "리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비"
+        return Says(
+            "리비전이 딛는 이미지, 모델 vfolder, 인퍼런스 런타임 종류, 자원 슬롯 유형 준비",
+            english=(
+                "Prepare the image, model vfolder, runtime variant and resource slot types "
+                "a revision stands on"
+            ),
+        )
 
     @override
-    def lay(self, seed: Seeder) -> LaidMaterials:
-        registry = seed.creating(SeedContainerRegistry())
-        image = seed.creating_from(SeedImage(), registry)
+    def lay(self, seed: TestSeeder) -> LaidMaterials:
+        registry = seed.creating(TestSeedContainerRegistry())
+        image = seed.creating_from(TestSeedImage(), registry)
         folder = self._folder(seed)
         if self.folder_readable:
             own = seed.personal_project_of(self.folder_owner)
             seed.within(SomeoneReadingFoldersIn(own, lambda p: ProjectID(p.id), self.folder_owner))
-        runtime = seed.creating(SeedRuntimeVariant())
-        cpu = seed.creating(SeedSlotType(IntrinsicSlotNames.CPU, required=self.cpu_required))
-        memory = seed.creating(SeedSlotType(IntrinsicSlotNames.MEMORY))
+        runtime = seed.creating(TestSeedRuntimeVariant())
+        cpu = seed.creating(TestSeedSlotType(IntrinsicSlotNames.CPU, required=self.cpu_required))
+        memory = seed.creating(TestSeedSlotType(IntrinsicSlotNames.MEMORY))
         return LaidMaterials(image=image, folder=folder, runtime=runtime, cpu=cpu, memory=memory)
 
-    def _folder(self, seed: Seeder) -> Laid[VFolderData]:
+    def _folder(self, seed: TestSeeder) -> Laid[VFolderData]:
         if self.lender is None:
-            return seed.creating_from(SeedPersonalVFolder(host=STORAGE_HOST), self.folder_owner)
+            return seed.creating_from(TestSeedPersonalVFolder(host=STORAGE_HOST), self.folder_owner)
         folder = seed.creating_from(
-            SeedPersonalVFolder(
+            TestSeedPersonalVFolder(
                 host=STORAGE_HOST, default_mount_permission=VFolderMountPolicy.READ_ONLY
             ),
             self.lender,
         )
         offer = seed.creating_from_three(
-            SeedVFolderShare(cap=Permission.READ), self.lender, folder, self.folder_owner
+            TestSeedVFolderShare(cap=Permission.READ), self.lender, folder, self.folder_owner
         )
-        seed.accepting(SeedShareTaken(), offer)
+        seed.accepting(TestSeedShareTaken(), offer)
         return folder
 
 
@@ -180,7 +187,7 @@ async def lay_revisions(
     made: list[ModelRevisionData] = []
     for _ in range(count):
         laid = await seeding.adding(
-            SeedRevisionOf(
+            TestSeedRevisionOf(
                 image_id=image.id,
                 folder_id=folder.id,
                 runtime_variant_id=runtime.id,
@@ -218,9 +225,9 @@ def _revisions_and_a_caller(
 class ADeploymentToRevise(Given[Any, RevisionsAndACaller]):
     """배포 하나와 거기 딸린 리비전들, 그리고 그 프로젝트 안의 사용자 한 명.
 
-    모델 폴더는 부르는 사람의 것이다. ``folder_readable``이면 부르는 사람은 그 폴더를 읽을
+    모델 폴더는 호출자의 것이다. ``folder_readable``이면 호출자는 그 폴더를 읽을
     수 있고, 거짓이면 그 폴더에 아무 권한도 없다. ``folder_lent``면 모델 폴더는 남의 것이고,
-    부르는 사람에게 읽기로 공유되어 읽기 전용으로 마운트된다.
+    호출자에게 읽기로 공유되어 읽기 전용으로 마운트된다.
     """
 
     granted: tuple[Permission, ...] = ()
@@ -232,17 +239,32 @@ class ADeploymentToRevise(Given[Any, RevisionsAndACaller]):
 
     @override
     def describe(self) -> str:
-        who = (
-            f"배포에 {_names(self.granted)} 권한을 받은 사용자 한 명"
+        names = _names(self.granted)
+        who_ko = (
+            f"배포에 {names} 권한을 받은 사용자 한 명"
             if self.granted
             else "아무 배포 권한도 받지 않은 사용자 한 명"
         )
-        if self.folder_lent:
-            folder = "남의 모델 폴더를 읽기 전용으로 빌린"
+        if self.granted:
+            grant_en = f"granted {names} on deployments"
         else:
-            readable = "읽을 수 있는" if self.folder_readable else "읽을 권한이 없는"
-            folder = f"자기 모델 폴더를 {readable}"
-        return f"리비전 {self.revisions}개가 딸린 배포 하나와, {folder} {who}"
+            grant_en = "with no deployment permission"
+        if self.folder_lent:
+            folder_ko = "남의 모델 폴더를 읽기 전용으로 빌린"
+            folder_en = "borrowing another user's model vfolder as read-only"
+        elif self.folder_readable:
+            folder_ko = "자기 모델 폴더를 읽을 수 있는"
+            folder_en = "who can read their own model vfolder"
+        else:
+            folder_ko = "자기 모델 폴더를 읽을 권한이 없는"
+            folder_en = "who has no permission to read their own model vfolder"
+        return Says(
+            f"리비전 {self.revisions}개가 딸린 배포 하나와, {folder_ko} {who_ko}",
+            english=(
+                f"one deployment holding {self.revisions} revisions and "
+                f"a user {grant_en} {folder_en}"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> RevisionsAndACaller:
@@ -275,8 +297,12 @@ class AnothersDeploymentToRevise(Given[Any, RevisionsAndACaller]):
 
     @override
     def describe(self) -> str:
-        return (
-            "다른 사람이 만든 배포 하나와, 배포에도 자기 모델 폴더에도 권한을 받지 않은 슈퍼관리자"
+        return Says(
+            "다른 사람이 만든 배포 하나와, 배포에도 자기 모델 vfolder 에도 권한을 받지 않은 superadmin",
+            english=(
+                "one deployment another user created and a superadmin with permission on "
+                "neither the deployment nor their own model vfolder"
+            ),
         )
 
     @override
@@ -309,21 +335,31 @@ class RevisionsInTwoProjects(Given[Any, RevisionsAndACaller]):
 
     @override
     def describe(self) -> str:
-        who = (
-            f"한쪽 프로젝트에서만 배포에 {_names(self.granted)} 권한을 받은 사용자 한 명"
+        names = _names(self.granted)
+        who_ko = (
+            f"한쪽 프로젝트에서만 배포에 {names} 권한을 받은 사용자 한 명"
             if self.granted
             else "아무 배포 권한도 받지 않은 사용자 한 명"
         )
-        return (
-            f"두 프로젝트의 배포에 리비전 {self.named}개와 {self.elsewhere}개가 나뉘어 있고, {who}"
+        who_en = (
+            f"one user granted {names} on deployments in one project only"
+            if self.granted
+            else "one user with no deployment permission"
+        )
+        return Says(
+            f"두 프로젝트의 배포에 리비전 {self.named}개와 {self.elsewhere}개가 나뉘어 있고, {who_ko}",
+            english=(
+                f"revisions are split between deployments in two projects, {self.named} and "
+                f"{self.elsewhere}, and {who_en}"
+            ),
         )
 
     @override
     async def lay(self, seeding: Any) -> RevisionsAndACaller:
         place = await lay_a_place(seeding, granted=self.granted, role=self.role)
-        policy = await seeding.once(SeedProjectPolicy())
+        policy = await seeding.once(TestSeedProjectPolicy())
         other = await seeding.creating_from_two(
-            SeedProject(name_hint="other"), place.domain, policy
+            TestSeedProject(name_hint="other"), place.domain, policy
         )
         beside = LaidPlace(
             domain=place.domain,
@@ -354,17 +390,39 @@ def revision_verdicts(
     runtime = node.model_runtime_config
     resources = node.resource_config
     identity: Verdict = (
-        Held(f"{at}id", node.id, SameAs[UUID](seeded.id, "심은 리비전"))
+        Held(
+            f"{at}id",
+            node.id,
+            SameAs[UUID](
+                seeded.id,
+                Says("미리 저장한 리비전", english="the revision seeded in advance"),
+            ),
+        )
         if seeded is not None
-        else Skipped(f"{at}id", "데이터베이스가 만든다")
+        else Skipped(
+            f"{at}id",
+            Says("데이터베이스가 생성합니다", english="the database generates it"),
+        )
     )
     return [
         identity,
         Held(
-            f"{at}deployment_id", node.deployment_id, SameAs[UUID](laid.deployment.id, "심은 배포")
+            f"{at}deployment_id",
+            node.deployment_id,
+            SameAs[UUID](
+                laid.deployment.id,
+                Says("미리 저장한 배포", english="the deployment seeded in advance"),
+            ),
         ),
         Same(f"{at}revision_number", node.revision_number, number),
-        Held(f"{at}image_id", node.image_id, SameAs[UUID | None](laid.image.id, "심은 이미지")),
+        Held(
+            f"{at}image_id",
+            node.image_id,
+            SameAs[UUID | None](
+                laid.image.id,
+                Says("미리 저장한 이미지", english="the image seeded in advance"),
+            ),
+        ),
         Same(
             f"{at}cluster_config",
             node.cluster_config,
@@ -384,7 +442,13 @@ def revision_verdicts(
         Held(
             f"{at}model_runtime_config.runtime_variant_id",
             runtime.runtime_variant_id,
-            SameAs[UUID](laid.runtime.id, "심은 런타임 변형"),
+            SameAs[UUID](
+                laid.runtime.id,
+                Says(
+                    "미리 저장한 인퍼런스 런타임 종류",
+                    english="the runtime variant seeded in advance",
+                ),
+            ),
         ),
         Same(
             f"{at}model_runtime_config.inference_runtime_config",
@@ -400,7 +464,10 @@ def revision_verdicts(
         Held(
             f"{at}model_mount_config.vfolder_id",
             mount.vfolder_id if mount is not None else None,
-            SameAs[str | None](str(laid.folder.id), "심은 모델 폴더"),
+            SameAs[str | None](
+                str(laid.folder.id),
+                Says("미리 저장한 모델 vfolder", english="the model vfolder seeded in advance"),
+            ),
         ),
         Same(
             f"{at}model_mount_config.mount_destination",
@@ -445,7 +512,7 @@ class TheRevisionNode(Then[RevisionsAndACaller, RevisionNode]):
 
     @override
     def says(self) -> str:
-        return "리비전 전체가 온다"
+        return Says("리비전 전체가 옵니다", english="the whole revision comes back")
 
     @override
     def look(self, laid: RevisionsAndACaller, answered: Answered[RevisionNode]) -> list[Verdict]:
@@ -474,7 +541,10 @@ class EachNamedRevisionIsAnswered(Then[RevisionsAndACaller, Loaded]):
 
     @override
     def says(self) -> str:
-        return "이름 댄 순서대로 리비전, 거부, 빈 자리가 온다"
+        return Says(
+            "지정한 순서대로 리비전, 거부, 빈 자리가 옵니다",
+            english="a revision, a rejection and an empty place come back in the order given",
+        )
 
     @override
     def look(self, laid: RevisionsAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
@@ -516,7 +586,10 @@ class EveryLaidRevisionIsCounted(Then[RevisionsAndACaller, AdminSearchRevisionsP
 
     @override
     def says(self) -> str:
-        return "심은 리비전이 모두, 그리고 그것만 세어진다"
+        return Says(
+            "미리 저장한 리비전이 모두, 그리고 그것만 세어집니다",
+            english="every revision seeded in advance is counted, and nothing else",
+        )
 
     @override
     def look(
@@ -532,7 +605,10 @@ class EveryLaidRevisionIsCounted(Then[RevisionsAndACaller, AdminSearchRevisionsP
             Held(
                 "items.id",
                 sorted(str(one.id) for one in payload.items),
-                SameAs(sorted(str(one.id) for one in wanted), "센 리비전들"),
+                SameAs(
+                    sorted(str(one.id) for one in wanted),
+                    Says("센 리비전들", english="the revisions counted"),
+                ),
             ),
             Same(
                 "items.revision_number",
@@ -551,7 +627,10 @@ class EveryRevisionSlotIsCounted(Then[RevisionsAndACaller, SearchAllocatedResour
 
     @override
     def says(self) -> str:
-        return "리비전이 잡은 슬롯이 모두 세어진다"
+        return Says(
+            "리비전이 잡은 슬롯이 모두 세어집니다",
+            english="every slot a revision holds is counted",
+        )
 
     @override
     def look(

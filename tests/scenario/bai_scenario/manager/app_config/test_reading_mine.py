@@ -18,7 +18,7 @@ from ai.backend.common.dto.manager.v2.app_config.response import GetAppConfigsPa
 from ai.backend.manager.api.adapters.app_config.adapter import AppConfigAdapter
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Configured, Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.app_config import (
     ENFORCEMENT,
@@ -28,11 +28,11 @@ from bai_scenario.components.app_config import (
     TheMergedConfigs,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type ReadingStep = Scenario[
-    SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload
+    TestSeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload
 ]
 
 PUBLIC = {"theme": "light", "menu": {"home": True, "docs": True}}
@@ -50,7 +50,10 @@ class ReadingMine(When[AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
 
     @override
     def describe(self, laid: AMergeAndACaller) -> str:
-        return f"{laid.caller.username}이 {', '.join(laid.names)}의 자기 설정을 조회"
+        return Says(
+            f"{laid.caller.username}이 {', '.join(laid.names)}의 자기 설정을 조회합니다",
+            english=(f"{laid.caller.username} reads its own config for {', '.join(laid.names)}"),
+        )
 
     @override
     async def call(self, adapter: AppConfigAdapter, laid: AMergeAndACaller) -> GetAppConfigsPayload:
@@ -60,7 +63,7 @@ class ReadingMine(When[AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
 
 @dataclass(frozen=True)
 class ANameWithNoFragmentAnswersEmpty(
-    Scenario[SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
+    Scenario[TestSeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
 ):
     @override
     def summary(self) -> str:
@@ -68,13 +71,18 @@ class ANameWithNoFragmentAnswersEmpty(
 
     @override
     def describe(self) -> str:
-        return (
-            "정의만 있고 허용 목록 항목도 조각도 없는 이름을 읽기 권한을 받은 사용자가 조회하면, "
-            "그 이름이 응답에서 빠지지 않고 빈 설정으로 반환된다"
+        return Says(
+            "정의만 있고 허용 목록 항목도 조각도 없는 이름을 읽기 권한을 받은 사용자가 "
+            "조회하면, 그 이름이 응답에서 빠지지 않고 빈 설정으로 반환됩니다",
+            english=(
+                "when a user granted read permission reads a name that has only a definition, "
+                "with neither an allow list entry nor a fragment, the name is not left out of "
+                "the answer and comes back as an empty config"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AMergeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AMergeAndACaller]:
         return AConfigLaidAcross()
 
     @override
@@ -88,7 +96,7 @@ class ANameWithNoFragmentAnswersEmpty(
 
 @dataclass(frozen=True)
 class AnUnregisteredNameAnswersEmpty(
-    Scenario[SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
+    Scenario[TestSeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
 ):
     @override
     def summary(self) -> str:
@@ -96,13 +104,19 @@ class AnUnregisteredNameAnswersEmpty(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "정의조차 없는 이름을 읽기 권한을 받은 사용자가 조회하면, 정의가 없다고 거부되지 "
-            "않고 빈 설정으로 반환된다. 이 조회는 정의를 확인하지 않고 조각만 본다"
+            "않고 빈 설정으로 반환됩니다. 이 조회는 정의를 확인하지 않고 조각만 봅니다",
+            english=(
+                "when a user granted read permission reads a name that has no definition at "
+                "all, the call is not rejected for the missing definition and comes back as "
+                "an empty config. This read does not check the definition and looks only at "
+                "fragments"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AMergeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AMergeAndACaller]:
         return AConfigLaidAcross(defined=False)
 
     @override
@@ -116,7 +130,7 @@ class AnUnregisteredNameAnswersEmpty(
 
 @dataclass(frozen=True)
 class OnlyAPublicFragmentAnswersItself(
-    Scenario[SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
+    Scenario[TestSeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
 ):
     @override
     def summary(self) -> str:
@@ -124,10 +138,16 @@ class OnlyAPublicFragmentAnswersItself(
 
     @override
     def describe(self) -> str:
-        return "공개 스코프에만 조각이 있는 이름을 조회하면, 그 조각의 값이 그대로 반환된다"
+        return Says(
+            "공개 스코프에만 조각이 있는 이름을 조회하면, 그 조각의 값이 그대로 반환됩니다",
+            english=(
+                "when a name has a fragment only in the public scope and is read, "
+                "the value of that fragment comes back as is"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AMergeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AMergeAndACaller]:
         return AConfigLaidAcross(public=PUBLIC)
 
     @override
@@ -141,7 +161,7 @@ class OnlyAPublicFragmentAnswersItself(
 
 @dataclass(frozen=True)
 class MyFragmentOverridesTheDomains(
-    Scenario[SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
+    Scenario[TestSeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
 ):
     @override
     def summary(self) -> str:
@@ -149,13 +169,18 @@ class MyFragmentOverridesTheDomains(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "같은 이름에 도메인 조각과 자기 조각이 모두 있고 허용 목록 항목이 기본 순위이면, "
-            "겹치는 키는 자기 값이 남고 겹치지 않는 키는 양쪽 모두 남는다"
+            "겹치는 키는 자기 값이 남고 겹치지 않는 키는 양쪽 모두 남습니다",
+            english=(
+                "when the same name has both a domain fragment and the user's own fragment, "
+                "and the allow list entry is at its default rank, the user's value stays for "
+                "overlapping keys and both values stay for keys that do not overlap"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AMergeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AMergeAndACaller]:
         return AConfigLaidAcross(domain=DOMAIN, user=MINE)
 
     @override
@@ -171,7 +196,7 @@ class MyFragmentOverridesTheDomains(
 
 @dataclass(frozen=True)
 class TheDomainsFragmentOverridesThePublic(
-    Scenario[SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
+    Scenario[TestSeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
 ):
     @override
     def summary(self) -> str:
@@ -179,13 +204,18 @@ class TheDomainsFragmentOverridesThePublic(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "같은 이름에 공개 조각과 도메인 조각이 모두 있고 허용 목록 항목이 기본 순위이면, "
-            "겹치는 키는 도메인 값이 남는다"
+            "겹치는 키는 도메인 값이 남습니다",
+            english=(
+                "when the same name has both a public fragment and a domain fragment, "
+                "and the allow list entry is at its default rank, the domain value stays "
+                "for overlapping keys"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AMergeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AMergeAndACaller]:
         return AConfigLaidAcross(public=PUBLIC, domain=DOMAIN)
 
     @override
@@ -201,7 +231,7 @@ class TheDomainsFragmentOverridesThePublic(
 
 @dataclass(frozen=True)
 class AFlippedRankLetsTheDomainWin(
-    Scenario[SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
+    Scenario[TestSeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
 ):
     @override
     def summary(self) -> str:
@@ -209,13 +239,20 @@ class AFlippedRankLetsTheDomainWin(
 
     @override
     def describe(self) -> str:
-        return (
-            "도메인 허용 목록 항목의 순위를 사용자 항목보다 크게 두면, 같은 조각들에서 겹치는 키의 "
-            "우선순위가 도메인으로 뒤바뀐다. 순위는 허용 목록 항목에 있고 값의 소유자는 바꿀 수 없다"
+        return Says(
+            "도메인 허용 목록 항목의 순위를 사용자 항목보다 크게 두면, 같은 조각들에서 겹치는 "
+            "키의 우선순위가 도메인으로 뒤바뀝니다. 순위는 허용 목록 항목에 있고 값의 소유자는 "
+            "변경할 수 없습니다",
+            english=(
+                "when the rank of the domain allow list entry is set higher than the user "
+                "entry, the priority of overlapping keys in the same fragments flips to the "
+                "domain. The rank lives on the allow list entry and the owner of the value "
+                "cannot be changed"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AMergeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AMergeAndACaller]:
         return AConfigLaidAcross(domain=DOMAIN, user=MINE, ranks={AppConfigScopeType.DOMAIN: 400})
 
     @override
@@ -231,7 +268,7 @@ class AFlippedRankLetsTheDomainWin(
 
 @dataclass(frozen=True)
 class AnotherUsersFragmentStaysOut(
-    Scenario[SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
+    Scenario[TestSeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
 ):
     @override
     def summary(self) -> str:
@@ -239,13 +276,18 @@ class AnotherUsersFragmentStaysOut(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "같은 도메인의 다른 사용자가 같은 이름에 조각을 두었어도, 자기 설정을 조회하면 "
-            "자기 조각의 값만 반환된다"
+            "자기 조각의 값만 반환됩니다",
+            english=(
+                "even when another user in the same domain has a fragment for the same name, "
+                "reading the user's own config brings back only the value of the user's own "
+                "fragment"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AMergeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AMergeAndACaller]:
         return AConfigLaidAcross(user=MINE, another_user={"theme": "theirs", "secret": 1})
 
     @override
@@ -259,7 +301,7 @@ class AnotherUsersFragmentStaysOut(
 
 @dataclass(frozen=True)
 class AnotherDomainsFragmentStaysOut(
-    Scenario[SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
+    Scenario[TestSeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
 ):
     @override
     def summary(self) -> str:
@@ -267,10 +309,17 @@ class AnotherDomainsFragmentStaysOut(
 
     @override
     def describe(self) -> str:
-        return "다른 도메인이 같은 이름에 조각을 두었어도, 자기 설정을 조회하면 자기 도메인 조각의 값만 반환된다"
+        return Says(
+            "다른 도메인이 같은 이름에 조각을 두었어도, 자기 설정을 조회하면 자기 도메인 조각의 "
+            "값만 반환됩니다",
+            english=(
+                "even when another domain has a fragment for the same name, reading the "
+                "user's own config brings back only the value of the user's own domain fragment"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AMergeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AMergeAndACaller]:
         return AConfigLaidAcross(domain=DOMAIN, another_domain={"theme": "elsewhere"})
 
     @override
@@ -284,7 +333,7 @@ class AnotherDomainsFragmentStaysOut(
 
 @dataclass(frozen=True)
 class SeveralNamesAnswerInRequestOrder(
-    Scenario[SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
+    Scenario[TestSeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
 ):
     publics: tuple[Mapping[str, Any], ...] = ({"n": 1}, {"n": 2}, {"n": 3})
 
@@ -294,10 +343,16 @@ class SeveralNamesAnswerInRequestOrder(
 
     @override
     def describe(self) -> str:
-        return "이름 셋을 한 번에 조회하면, 각각의 병합 결과가 요청한 순서대로 반환된다"
+        return Says(
+            "이름 셋을 한 번에 조회하면, 각각의 병합 결과가 요청한 순서대로 반환됩니다",
+            english=(
+                "when three names are read in one call, each merged result comes back in the "
+                "order requested"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AMergeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AMergeAndACaller]:
         return SeveralConfigsLaid(publics=self.publics)
 
     @override
@@ -311,7 +366,7 @@ class SeveralNamesAnswerInRequestOrder(
 
 @dataclass(frozen=True)
 class ANameAskedTwiceAnswersTwice(
-    Scenario[SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
+    Scenario[TestSeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
 ):
     @override
     def summary(self) -> str:
@@ -319,10 +374,13 @@ class ANameAskedTwiceAnswersTwice(
 
     @override
     def describe(self) -> str:
-        return "같은 이름을 두 번 지정해 조회하면, 같은 값이 두 번 반환된다"
+        return Says(
+            "같은 이름을 두 번 지정해 조회하면, 같은 값이 두 번 반환됩니다",
+            english="when the same name is named twice, the same value comes back twice",
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AMergeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AMergeAndACaller]:
         return AConfigLaidAcross(public=PUBLIC, asked=2)
 
     @override
@@ -336,7 +394,7 @@ class ANameAskedTwiceAnswersTwice(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotRead(
-    Scenario[SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
+    Scenario[TestSeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
 ):
     @override
     def summary(self) -> str:
@@ -344,10 +402,17 @@ class AUserGrantedNothingMayNotRead(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 없는 사용자가 자기 설정을 조회하면, 스코프 권한 검사에서 권한 부족으로 거부된다"
+        return Says(
+            "아무 권한도 없는 사용자가 자기 설정을 조회하면, 스코프 권한 검사에서 권한 부족으로 "
+            "거부됩니다",
+            english=(
+                "when a user granted nothing reads its own config, the scope permission check "
+                "rejects the call for lack of permission"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AMergeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AMergeAndACaller]:
         return AConfigLaidAcross(public=PUBLIC, granted=False)
 
     @override
@@ -361,7 +426,8 @@ class AUserGrantedNothingMayNotRead(
 
 @dataclass(frozen=True)
 class EnforcementOffLetsAnyoneRead(
-    Scenario[SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload], Configured
+    Scenario[TestSeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload],
+    Configured,
 ):
     @override
     def summary(self) -> str:
@@ -369,14 +435,19 @@ class EnforcementOffLetsAnyoneRead(
 
     @override
     def describe(self) -> str:
-        return "권한 검사를 끄면 아무 권한도 없는 사용자도 자기 설정을 조회할 수 있다"
+        return Says(
+            "권한 검사를 비활성화하면 아무 권한도 없는 사용자도 자기 설정을 조회할 수 있습니다",
+            english=(
+                "turning permission enforcement off lets a user granted nothing read its own config"
+            ),
+        )
 
     @override
     def config(self) -> Mapping[str, Any]:
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, AMergeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AMergeAndACaller]:
         return AConfigLaidAcross(public=PUBLIC, granted=False)
 
     @override

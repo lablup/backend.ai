@@ -9,6 +9,7 @@ Verifies the one-shot RG-default merge that replaces the prior split
     resource_opts / environ / mounts / startup_command /
     bootstrap_script / starts_at / batch_timeout_sec)
   * caller-supplied values always override the RG baseline
+  * the owner's default bootstrap script comes before the RG baseline
   * empty collections on the draft are treated as "not set"
 """
 
@@ -18,6 +19,7 @@ import uuid
 
 import pytest
 
+from ai.backend.common.data.entity.bootstrap_script import BootstrapScript
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.types import BinarySize, ClusterMode, ResourceSlotEntry
@@ -88,7 +90,9 @@ def rg_defaults(rg_image_id: ImageID) -> DefaultSessionOptions:
     )
 
 
-def _context(rg: DefaultSessionOptions) -> SessionSpecContext:
+def _context(
+    rg: DefaultSessionOptions, user_bootstrap_script: BootstrapScript | None = None
+) -> SessionSpecContext:
     return SessionSpecContext(
         resource_group=ResourceGroupEnqueueInfo(
             defaults=rg,
@@ -100,6 +104,7 @@ def _context(rg: DefaultSessionOptions) -> SessionSpecContext:
             policy=None,
             container_user=ContainerUserInfo(),
             dotfiles=DotfileBundle(),
+            default_bootstrap_script=user_bootstrap_script,
             pending_session_count=0,
             pending_session_resource_slots={},
             vfolder_mounts_by_role={},
@@ -228,3 +233,51 @@ class TestMergeResourceGroupDefaultsRule:
         assert result.options.priority == 7
         assert result.options.kernel_groups is not None
         assert result.options.kernel_groups[0].execution_spec.resource_input.image_id is None
+
+    @pytest.mark.parametrize(
+        ("requested", "user_script", "rg", "expected"),
+        [
+            pytest.param("caller", "user", "rg", "caller", id="request-wins"),
+            pytest.param(None, "user", "rg", "user", id="user-default-over-rg"),
+            pytest.param(None, None, "rg", "rg", id="rg-when-no-user-default"),
+            pytest.param(None, "user", None, "user", id="user-default-without-rg-baseline"),
+            pytest.param(None, None, None, None, id="nothing-set"),
+        ],
+    )
+    async def test_bootstrap_script_precedence(
+        self,
+        rule: MergeResourceGroupDefaultsRule,
+        requested: str | None,
+        user_script: str | None,
+        rg: str | None,
+        expected: str | None,
+    ) -> None:
+        defaults = DefaultSessionOptions(
+            default_kernel_execution_spec=(
+                KernelExecutionSpec(
+                    resource_input=KernelResourceConfig(image_id=ImageID(uuid.uuid4())),
+                    bootstrap_script=rg,
+                )
+                if rg is not None
+                else None
+            ),
+        )
+        draft = ResourceSpecDraft(
+            options=SessionOptionsDraft(
+                kernel_groups=(
+                    KernelGroupDraft(
+                        role="main",
+                        replica_count=1,
+                        execution_spec=KernelExecutionSpecDraft(bootstrap_script=requested),
+                    ),
+                ),
+            ),
+        )
+        context = _context(
+            defaults, BootstrapScript(user_script) if user_script is not None else None
+        )
+
+        result = await rule.prepare(draft, context)
+
+        assert result.options.kernel_groups is not None
+        assert result.options.kernel_groups[0].execution_spec.bootstrap_script == expected

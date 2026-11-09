@@ -22,7 +22,15 @@ from ai.backend.common.types import ServiceCatalogStatus
 from ai.backend.manager.api.adapters.service_catalog.adapter import ServiceCatalogAdapter
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import (
+    Given,
+    Language,
+    Says,
+    Scenario,
+    Then,
+    When,
+    in_language,
+)
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.service_catalog import (
     EveryLaidServiceComesWhole,
@@ -35,14 +43,15 @@ from bai_scenario.components.service_catalog import (
     TheFirstPageOfServices,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
+from bai_scenario.seeds.service_catalog.service import STATUS_NAMES
 
 DEFAULT_PAGE = 10
 
 type Searched = AdminSearchServiceCatalogsPayload
 type SearchingStep = Scenario[
-    SeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched
+    TestSeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched
 ]
 
 
@@ -56,7 +65,10 @@ class SearchingEveryService(When[ManyServicesAndACaller, ServiceCatalogAdapter, 
 
     @override
     def describe(self, laid: ManyServicesAndACaller) -> str:
-        return f"{laid.caller.username}이 필터 없이 전체 조회"
+        return Says(
+            f"{laid.caller.username} 이 필터 없이 전체를 조회합니다",
+            english=f"{laid.caller.username} reads everything without a filter",
+        )
 
     @override
     async def call(self, adapter: ServiceCatalogAdapter, laid: ManyServicesAndACaller) -> Searched:
@@ -74,7 +86,12 @@ class SearchingByGroup(When[ManyServicesAndACaller, ServiceCatalogAdapter, Searc
 
     @override
     def describe(self, laid: ManyServicesAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.named.service_group} 그룹으로 걸러 조회"
+        return Says(
+            f"{laid.caller.username} 이 {laid.named.service_group} 그룹으로 필터 기반 조회합니다",
+            english=(
+                f"{laid.caller.username} reads filtered by the {laid.named.service_group} group"
+            ),
+        )
 
     @override
     async def call(self, adapter: ServiceCatalogAdapter, laid: ManyServicesAndACaller) -> Searched:
@@ -100,7 +117,14 @@ class SearchingByStatusEquals(When[ManyServicesAndACaller, ServiceCatalogAdapter
 
     @override
     def describe(self, laid: ManyServicesAndACaller) -> str:
-        return f"{laid.caller.username}이 상태가 {self.status.value}인 것으로 걸러 조회"
+        status = STATUS_NAMES[self.status]
+        return Says(
+            f"{laid.caller.username} 이 상태가 {status} 인 것으로 필터 기반 조회합니다",
+            english=(
+                f"{laid.caller.username} reads filtered by the status "
+                f"{in_language(status, Language.ENGLISH)}"
+            ),
+        )
 
     @override
     async def call(self, adapter: ServiceCatalogAdapter, laid: ManyServicesAndACaller) -> Searched:
@@ -126,7 +150,14 @@ class SearchingByStatusNotEquals(When[ManyServicesAndACaller, ServiceCatalogAdap
 
     @override
     def describe(self, laid: ManyServicesAndACaller) -> str:
-        return f"{laid.caller.username}이 상태가 {self.status.value}이 아닌 것으로 걸러 조회"
+        status = STATUS_NAMES[self.status]
+        return Says(
+            f"{laid.caller.username} 이 상태가 {status} 이 아닌 것으로 필터 기반 조회합니다",
+            english=(
+                f"{laid.caller.username} reads filtered by a status other than "
+                f"{in_language(status, Language.ENGLISH)}"
+            ),
+        )
 
     @override
     async def call(self, adapter: ServiceCatalogAdapter, laid: ManyServicesAndACaller) -> Searched:
@@ -152,8 +183,14 @@ class SearchingByStatusIn(When[ManyServicesAndACaller, ServiceCatalogAdapter, Se
 
     @override
     def describe(self, laid: ManyServicesAndACaller) -> str:
-        listed = ", ".join(one.value for one in self.statuses)
-        return f"{laid.caller.username}이 상태가 {listed} 중 하나인 것으로 걸러 조회"
+        listed_ko = ", ".join(str(STATUS_NAMES[one]) for one in self.statuses)
+        listed_en = ", ".join(
+            in_language(STATUS_NAMES[one], Language.ENGLISH) for one in self.statuses
+        )
+        return Says(
+            f"{laid.caller.username} 이 상태가 {listed_ko} 중 하나인 것으로 필터 기반 조회합니다",
+            english=(f"{laid.caller.username} reads filtered by one of the statuses {listed_en}"),
+        )
 
     @override
     async def call(self, adapter: ServiceCatalogAdapter, laid: ManyServicesAndACaller) -> Searched:
@@ -179,8 +216,17 @@ class SearchingByStatusNotIn(When[ManyServicesAndACaller, ServiceCatalogAdapter,
 
     @override
     def describe(self, laid: ManyServicesAndACaller) -> str:
-        listed = ", ".join(one.value for one in self.statuses)
-        return f"{laid.caller.username}이 상태가 {listed} 중 어느 것도 아닌 것으로 걸러 조회"
+        listed_ko = ", ".join(str(STATUS_NAMES[one]) for one in self.statuses)
+        listed_en = ", ".join(
+            in_language(STATUS_NAMES[one], Language.ENGLISH) for one in self.statuses
+        )
+        return Says(
+            f"{laid.caller.username} 이 상태가 {listed_ko} 중 어느 것도 아닌 것으로 필터 기반 "
+            "조회합니다",
+            english=(
+                f"{laid.caller.username} reads filtered by a status that is none of {listed_en}"
+            ),
+        )
 
     @override
     async def call(self, adapter: ServiceCatalogAdapter, laid: ManyServicesAndACaller) -> Searched:
@@ -195,24 +241,28 @@ class SearchingByStatusNotIn(When[ManyServicesAndACaller, ServiceCatalogAdapter,
 
 
 @dataclass(frozen=True)
-class TheSuperadminCountsEveryServiceWithItsEndpoints(
-    Scenario[SeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
+class TheSuperadminCountsEveryServiceOnce(
+    Scenario[TestSeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
 ):
     started: datetime
 
     @override
     def summary(self) -> str:
-        return "the-superadmin-counts-every-service-laid-with-its-endpoints"
+        return "the-superadmin-counts-every-service-laid-once"
 
     @override
     def describe(self) -> str:
-        return (
-            "서비스 둘 중 하나가 엔드포인트를 가질 때 슈퍼관리자가 필터 없이 조회하면, "
-            "둘 다 집계되고 엔드포인트가 함께 담긴다"
+        return Says(
+            "서비스 둘 중 하나가 엔드포인트를 가질 때 superadmin 이 필터 없이 조회하면, "
+            "둘 다 한 번씩 집계됩니다",
+            english=(
+                "when one of two services holds an endpoint and the superadmin reads without a "
+                "filter, both are counted once"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyServicesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyServicesAndACaller]:
         return ManyServicesAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -226,7 +276,7 @@ class TheSuperadminCountsEveryServiceWithItsEndpoints(
 
 @dataclass(frozen=True)
 class AGroupFilterNarrows(
-    Scenario[SeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
+    Scenario[TestSeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -234,12 +284,17 @@ class AGroupFilterNarrows(
 
     @override
     def describe(self) -> str:
-        return (
-            "그룹이 다른 서비스 둘 중 한 그룹으로 걸러 조회하면, 답에는 그 그룹의 서비스만 남는다"
+        return Says(
+            "그룹이 다른 서비스 둘 중 한 그룹으로 필터 기반 조회하면, 응답에는 그 그룹의 서비스만 "
+            "남습니다",
+            english=(
+                "when a read is filtered by one group among two services of different groups, "
+                "only the services of that group remain in the answer"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyServicesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyServicesAndACaller]:
         return ServicesOfTwoGroupsAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -253,7 +308,7 @@ class AGroupFilterNarrows(
 
 @dataclass(frozen=True)
 class AStatusEqualsFilterKeepsThatStatus(
-    Scenario[SeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
+    Scenario[TestSeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -261,10 +316,17 @@ class AStatusEqualsFilterKeepsThatStatus(
 
     @override
     def describe(self) -> str:
-        return "상태마다 하나씩 있는 서비스를 비정상과 같은 것으로 걸러 조회하면 비정상 서비스만 반환된다"
+        return Says(
+            "상태마다 하나씩 있는 서비스를 비정상과 같은 것으로 필터 기반 조회하면 비정상 서비스만 "
+            "반환됩니다",
+            english=(
+                "when services with one of each status are read filtered by unhealthy, only the "
+                "unhealthy service comes back"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyServicesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyServicesAndACaller]:
         return ServicesOfEveryStatusAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -278,7 +340,7 @@ class AStatusEqualsFilterKeepsThatStatus(
 
 @dataclass(frozen=True)
 class AStatusNotEqualsFilterDropsThatStatus(
-    Scenario[SeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
+    Scenario[TestSeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -286,13 +348,17 @@ class AStatusNotEqualsFilterDropsThatStatus(
 
     @override
     def describe(self) -> str:
-        return (
-            "상태마다 하나씩 있는 서비스를 비정상과 다른 것으로 걸러 조회하면 "
-            "정상과 등록 해제 서비스만 반환된다"
+        return Says(
+            "상태마다 하나씩 있는 서비스를 비정상과 다른 것으로 필터 기반 조회하면 "
+            "정상과 등록 해제 서비스만 반환됩니다",
+            english=(
+                "when services with one of each status are read filtered by a status other than "
+                "unhealthy, only the healthy and deregistered services come back"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyServicesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyServicesAndACaller]:
         return ServicesOfEveryStatusAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -309,7 +375,7 @@ class AStatusNotEqualsFilterDropsThatStatus(
 
 @dataclass(frozen=True)
 class AStatusInFilterKeepsListedStatuses(
-    Scenario[SeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
+    Scenario[TestSeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -317,13 +383,18 @@ class AStatusInFilterKeepsListedStatuses(
 
     @override
     def describe(self) -> str:
-        return (
-            "상태마다 하나씩 있는 서비스를 비정상·등록 해제 목록에 든 것으로 걸러 조회하면 "
-            "비정상과 등록 해제 서비스만 반환된다"
+        return Says(
+            "상태마다 하나씩 있는 서비스를 비정상, 등록 해제 목록에 든 것으로 필터 기반 조회하면 "
+            "비정상과 등록 해제 서비스만 반환됩니다",
+            english=(
+                "when services with one of each status are read filtered by a status in the "
+                "unhealthy and deregistered list, only the unhealthy and deregistered services "
+                "come back"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyServicesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyServicesAndACaller]:
         return ServicesOfEveryStatusAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -343,7 +414,7 @@ class AStatusInFilterKeepsListedStatuses(
 
 @dataclass(frozen=True)
 class AStatusNotInFilterDropsListedStatuses(
-    Scenario[SeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
+    Scenario[TestSeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -351,13 +422,17 @@ class AStatusNotInFilterDropsListedStatuses(
 
     @override
     def describe(self) -> str:
-        return (
-            "상태마다 하나씩 있는 서비스를 비정상·등록 해제 목록에 들지 않은 것으로 걸러 조회하면 "
-            "정상 서비스만 반환된다"
+        return Says(
+            "상태마다 하나씩 있는 서비스를 비정상, 등록 해제 목록에 들지 않은 것으로 필터 기반 "
+            "조회하면 정상 서비스만 반환됩니다",
+            english=(
+                "when services with one of each status are read filtered by a status not in the "
+                "unhealthy and deregistered list, only the healthy service comes back"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyServicesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyServicesAndACaller]:
         return ServicesOfEveryStatusAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -374,7 +449,7 @@ class AStatusNotInFilterDropsListedStatuses(
 
 @dataclass(frozen=True)
 class OmittingThePageSizeGivesTen(
-    Scenario[SeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
+    Scenario[TestSeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -382,10 +457,17 @@ class OmittingThePageSizeGivesTen(
 
     @override
     def describe(self) -> str:
-        return "서비스 11개가 있을 때 크기 없이 조회하면 10건까지 반환되고 다음 페이지가 있다고 응답한다"
+        return Says(
+            "서비스 11개가 있을 때 크기 없이 조회하면 10건까지 반환되고 다음 페이지가 있다고 "
+            "응답합니다",
+            english=(
+                "when eleven services exist and the read names no size, ten services come back "
+                "and the answer says there is a next page"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyServicesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyServicesAndACaller]:
         return ManyServicesAndSomeone(role=UserRole.SUPERADMIN, besides=DEFAULT_PAGE)
 
     @override
@@ -399,7 +481,7 @@ class OmittingThePageSizeGivesTen(
 
 @dataclass(frozen=True)
 class TheMonitorSeesWhatTheSuperadminSees(
-    Scenario[SeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
+    Scenario[TestSeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
 ):
     started: datetime
 
@@ -409,13 +491,18 @@ class TheMonitorSeesWhatTheSuperadminSees(
 
     @override
     def describe(self) -> str:
-        return (
-            "모니터 역할이 필터 없이 조회하면 슈퍼관리자와 같은 답을 받는다. "
-            "이 검색은 읽기 연산이라 모니터 역할이 전역 역할 검사를 통과한다"
+        return Says(
+            "모니터 역할이 필터 없이 조회하면 superadmin 과 같은 응답을 받습니다. "
+            "이 검색은 읽기 연산이라 모니터 역할이 전역 역할 검사를 통과합니다",
+            english=(
+                "when the monitor role reads without a filter, it gets the same answer as the "
+                "superadmin. This search is a read operation, so the monitor role passes the "
+                "global role check"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyServicesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyServicesAndACaller]:
         return ManyServicesAndSomeone(role=UserRole.MONITOR)
 
     @override
@@ -429,7 +516,7 @@ class TheMonitorSeesWhatTheSuperadminSees(
 
 @dataclass(frozen=True)
 class AUserWhoIsNotTheSuperadminMayNotSearch(
-    Scenario[SeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
+    Scenario[TestSeedingSession, ManyServicesAndACaller, ServiceCatalogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -437,10 +524,16 @@ class AUserWhoIsNotTheSuperadminMayNotSearch(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 전체 조회를 요청하면 역할 부족으로 거부된다"
+        return Says(
+            "superadmin 이 아닌 사용자가 전체 조회를 요청하면 역할 부족으로 거부됩니다",
+            english=(
+                "when a user who is not the superadmin requests a global read, it is rejected "
+                "for lack of role"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyServicesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyServicesAndACaller]:
         return ManyServicesAndSomeone()
 
     @override
@@ -453,7 +546,7 @@ class AUserWhoIsNotTheSuperadminMayNotSearch(
 
 
 SCENARIOS: list[SearchingStep] = [
-    TheSuperadminCountsEveryServiceWithItsEndpoints(started=datetime.now(UTC)),
+    TheSuperadminCountsEveryServiceOnce(started=datetime.now(UTC)),
     AGroupFilterNarrows(),
     AStatusEqualsFilterKeepsThatStatus(),
     AStatusNotEqualsFilterDropsThatStatus(),

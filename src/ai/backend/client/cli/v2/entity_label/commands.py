@@ -47,6 +47,63 @@ def upsert(entity_type: str, entity_id: uuid.UUID, key: str, value: str) -> None
     asyncio.run(_run())
 
 
+@entity_label.command(name="bulk-upsert")
+@click.option("--entity-type", required=True, type=str, help="Type of the entities to label.")
+@click.option(
+    "--entity-id",
+    required=True,
+    multiple=True,
+    type=click.UUID,
+    help="ID of an entity to label. Repeat to name several.",
+)
+@click.option(
+    "--label",
+    "labels",
+    required=True,
+    multiple=True,
+    type=str,
+    help="A KEY=VALUE label to put on every entity named. Repeat to put several.",
+)
+def bulk_upsert(
+    entity_type: str, entity_id: tuple[uuid.UUID, ...], labels: tuple[str, ...]
+) -> None:
+    """Put every label named on every entity named, answering per entity."""
+    from ai.backend.common.dto.manager.v2.entity.types import EntityTarget
+    from ai.backend.common.dto.manager.v2.entity_label.request import (
+        PartialBulkUpsertEntityLabelInput,
+        UpsertEntityLabelInput,
+    )
+
+    pairs: list[tuple[str, str]] = []
+    for label in labels:
+        key, sep, value = label.partition("=")
+        if not sep or not key or not value:
+            raise click.BadParameter(f"{label!r} is not KEY=VALUE", param_hint="--label")
+        pairs.append((key, value))
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.entity_label.partial_bulk_upsert(
+                PartialBulkUpsertEntityLabelInput(
+                    items=[
+                        UpsertEntityLabelInput(
+                            target=EntityTarget(entity_type=entity_type, entity_id=one_id),
+                            key=key,
+                            value=value,
+                        )
+                        for one_id in entity_id
+                        for key, value in pairs
+                    ],
+                ),
+            )
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
 @entity_label.command()
 @click.argument("label_id", type=click.UUID)
 def purge(label_id: uuid.UUID) -> None:
@@ -56,6 +113,27 @@ def purge(label_id: uuid.UUID) -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.entity_label.purge(label_id)
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@entity_label.command(name="bulk-purge")
+@click.argument("label_ids", nargs=-1, required=True, type=click.UUID)
+def bulk_purge(label_ids: tuple[uuid.UUID, ...]) -> None:
+    """Take several labels off by ID, answering per label."""
+    from ai.backend.common.dto.manager.v2.entity_label.request import (
+        PartialBulkPurgeEntityLabelInput,
+    )
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.entity_label.partial_bulk_purge(
+                PartialBulkPurgeEntityLabelInput(ids=list(label_ids)),
+            )
             print_result(result)
         finally:
             await registry.close()

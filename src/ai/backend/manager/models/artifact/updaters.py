@@ -150,3 +150,69 @@ class ArtifactTouchUpdater(DataBatchUpdater[ArtifactRow, ArtifactData]):
     @override
     def to_data(self, row: ArtifactRow) -> ArtifactData:
         return ArtifactSearchableFields.own.to_data(row)
+
+
+@dataclass
+class ArtifactSoftDeleteUpdater(DataUpdater[ArtifactRow, ArtifactData]):
+    """Mark one artifact deleted."""
+
+    artifact_id: ArtifactID
+
+    @property
+    @override
+    def row_class(self) -> type[ArtifactRow]:
+        return ArtifactRow
+
+    @override
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return ArtifactRow.id
+
+    @override
+    def target_id_value(self) -> ArtifactID:
+        return self.artifact_id
+
+    @property
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return ()
+
+    @override
+    def build_values(self) -> dict[str, Any]:
+        return {"availability": ArtifactAvailability.DELETED.value}
+
+    @override
+    def to_data(self, row: ArtifactRow) -> ArtifactData:
+        return ArtifactSearchableFields.own.to_data(row)
+
+
+@dataclass
+class ArtifactRestoreUpdater(DataUpdater[ArtifactRow, ArtifactData]):
+    """Mark one deleted artifact alive again."""
+
+    artifact_id: ArtifactID
+
+    @property
+    @override
+    def row_class(self) -> type[ArtifactRow]:
+        return ArtifactRow
+
+    @override
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return ArtifactRow.id
+
+    @override
+    def target_id_value(self) -> ArtifactID:
+        return self.artifact_id
+
+    @property
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return ()
+
+    @override
+    def build_values(self) -> dict[str, Any]:
+        return {"availability": ArtifactAvailability.ALIVE.value}
+
+    @override
+    def to_data(self, row: ArtifactRow) -> ArtifactData:
+        return ArtifactSearchableFields.own.to_data(row)

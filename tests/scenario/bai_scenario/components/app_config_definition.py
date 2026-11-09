@@ -8,6 +8,7 @@ from typing import Any, override
 from uuid import UUID
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.data.entity.app_config_definition import AppConfigDefinitionEntityType
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.app_config_definition.response import (
     AppConfigDefinitionNode,
@@ -15,28 +16,41 @@ from ai.backend.common.dto.manager.v2.app_config_definition.response import (
 )
 from ai.backend.manager.data.app_config.types import AppConfigDefinitionData
 from ai.backend.manager.data.domain.types import DomainData
+from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
     Held,
+    Language,
     Refused,
     Same,
     SameAs,
+    Says,
     Skipped,
     Then,
     Verdict,
+    in_language,
+)
+from bai_scenario.components.app_config import (
+    SomeoneGrantedInGlobal,
+    names_of,
 )
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf, WrittenByThisRun
-from bai_scenario.seeds.app_config.allow_list import SeedAllowListEntry
-from bai_scenario.seeds.app_config.definition import SeedDefinition
-from bai_scenario.seeds.app_config.fragment import SeedPublicFragment
-from bai_scenario.seeds.domain.domain import SeedDomain
+from bai_scenario.seeds.app_config.allow_list import TestSeedAllowListEntry
+from bai_scenario.seeds.app_config.definition import TestSeedDefinition
+from bai_scenario.seeds.app_config.fragment import TestSeedPublicFragment
+from bai_scenario.seeds.domain.domain import TestSeedDomain
 
 
-def _who(role: UserRole) -> str:
-    return "슈퍼관리자 한 명" if role == UserRole.SUPERADMIN else "권한이 없는 일반 사용자 한 명"
+def _who(role: UserRole) -> Says:
+    if role == UserRole.SUPERADMIN:
+        return Says("superadmin 한 명", english="one superadmin")
+    return Says(
+        "권한이 없는 일반 사용자 한 명",
+        english="one Regular user with no permission",
+    )
 
 
 @dataclass(frozen=True)
@@ -60,22 +74,26 @@ class ADefinitionAndSomeone(Given[Any, ADefinitionAndACaller]):
 
     @override
     def describe(self) -> str:
-        what = (
-            "허용 목록 항목과 설정 조각이 딸린 설정 정의 하나"
-            if self.with_fragment
-            else "설정 정의 하나"
+        if self.with_fragment:
+            what_ko = "허용 목록 항목과 설정 조각이 딸린 설정 정의 하나"
+            what_en = "one config definition holding an allow-list entry and a config fragment"
+        else:
+            what_ko = "설정 정의 하나"
+            what_en = "one config definition"
+        return Says(
+            f"{what_ko}와, {_who(self.role)}",
+            english=f"{what_en}, and {in_language(_who(self.role), Language.ENGLISH)}",
         )
-        return f"{what}와, {_who(self.role)}"
 
     @override
     async def lay(self, seeding: Any) -> ADefinitionAndACaller:
-        home = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
-        definition = await seeding.creating(SeedDefinition())
+        home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+        definition = await seeding.creating(TestSeedDefinition())
         if self.with_fragment:
             entry = await seeding.creating_from(
-                SeedAllowListEntry(scope_type=AppConfigScopeType.PUBLIC), definition
+                TestSeedAllowListEntry(scope_type=AppConfigScopeType.PUBLIC), definition
             )
-            await seeding.creating_from(SeedPublicFragment(config={"theme": "light"}), entry)
+            await seeding.creating_from(TestSeedPublicFragment(config={"theme": "light"}), entry)
         caller = await seeding.within(SomeoneOf(home, role=self.role))
         return ADefinitionAndACaller(
             domain=seeding.made(home),
@@ -101,13 +119,19 @@ class ManyDefinitionsAndSomeone(Given[Any, ManyDefinitionsAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"설정 정의 {self.count}개와, {_who(self.role)}"
+        return Says(
+            f"설정 정의 {self.count}개와, {_who(self.role)}",
+            english=(
+                f"{self.count} config definitions, and "
+                f"{in_language(_who(self.role), Language.ENGLISH)}"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> ManyDefinitionsAndACaller:
-        home = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+        home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         laid = [
-            await seeding.creating(SeedDefinition(name_hint="definition"))
+            await seeding.creating(TestSeedDefinition(name_hint="definition"))
             for _ in range(self.count)
         ]
         caller = await seeding.within(SomeoneOf(home, role=self.role))
@@ -128,20 +152,43 @@ class TwoDefinitionsAndACaller:
 
 @dataclass(frozen=True)
 class TwoDefinitionsAndSomeone(Given[Any, TwoDefinitionsAndACaller]):
-    """설정 정의 둘과 슈퍼관리자 또는 권한이 없는 일반 사용자 한 명."""
+    """설정 정의 둘과 호출자를 준비한다.
+
+    ``granted``가 있으면 호출자가 global 스코프에서 그 권한을 받는다.
+    """
 
     role: UserRole = UserRole.USER
+    granted: tuple[Permission, ...] = ()
 
     @override
     def describe(self) -> str:
-        return f"설정 정의 둘과, {_who(self.role)}"
+        if self.granted:
+            who = Says(
+                f"global 스코프에서 설정 정의에 대한 {names_of(self.granted)} 권한을 "
+                "받은 일반 사용자 한 명",
+                english=(
+                    "one regular user granted the "
+                    f"{names_of(self.granted)} permission on config definitions in the global scope"
+                ),
+            )
+        else:
+            who = _who(self.role)
+        return Says(
+            f"설정 정의 둘과, {who}",
+            english=(f"two config definitions, and {in_language(who, Language.ENGLISH)}"),
+        )
 
     @override
     async def lay(self, seeding: Any) -> TwoDefinitionsAndACaller:
-        home = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
-        first = await seeding.creating(SeedDefinition(name_hint="first"))
-        second = await seeding.creating(SeedDefinition(name_hint="second"))
-        caller = await seeding.within(SomeoneOf(home, role=self.role))
+        home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+        first = await seeding.creating(TestSeedDefinition(name_hint="first"))
+        second = await seeding.creating(TestSeedDefinition(name_hint="second"))
+        if self.granted:
+            caller = await seeding.within(
+                SomeoneGrantedInGlobal(home, AppConfigDefinitionEntityType(), granted=self.granted)
+            )
+        else:
+            caller = await seeding.within(SomeoneOf(home, role=self.role))
         return TwoDefinitionsAndACaller(
             caller=seeding.made(caller),
             first=seeding.made(first),
@@ -157,7 +204,10 @@ class TheDefinitionNode(Then[ADefinitionAndACaller, AppConfigDefinitionNode]):
 
     @override
     def says(self) -> str:
-        return "미리 만들어 둔 설정 정의의 모든 필드가 반환된다"
+        return Says(
+            "미리 저장한 설정 정의의 모든 필드가 반환됩니다",
+            english="every field of the config definition made in advance comes back",
+        )
 
     @override
     def look(
@@ -168,7 +218,17 @@ class TheDefinitionNode(Then[ADefinitionAndACaller, AppConfigDefinitionNode]):
             return [Refused(NotEnoughPermission, answered.raised)]
         written = WrittenByThisRun(self.started)
         return [
-            Held("ID", node.id, SameAs[UUID](laid.definition.id, "미리 만들어 둔 설정 정의")),
+            Held(
+                "ID",
+                node.id,
+                SameAs[UUID](
+                    laid.definition.id,
+                    Says(
+                        "미리 저장한 설정 정의",
+                        english="the config definition made in advance",
+                    ),
+                ),
+            ),
             Same("config_name", node.config_name, laid.definition.config_name),
             Held("created_at", node.created_at, written),
             Held("updated_at", node.updated_at, written),
@@ -184,7 +244,10 @@ class TheNewDefinitionNode(Then[Any, AppConfigDefinitionNode]):
 
     @override
     def says(self) -> str:
-        return "등록한 설정 정의의 모든 필드가 반환된다"
+        return Says(
+            "등록한 설정 정의의 모든 필드가 반환됩니다",
+            english="every field of the registered config definition comes back",
+        )
 
     @override
     def look(self, laid: Any, answered: Answered[AppConfigDefinitionNode]) -> list[Verdict]:
@@ -193,7 +256,10 @@ class TheNewDefinitionNode(Then[Any, AppConfigDefinitionNode]):
             return [Refused(NotEnoughPermission, answered.raised)]
         written = WrittenByThisRun(self.started)
         return [
-            Skipped("ID", "데이터베이스가 만든다"),
+            Skipped(
+                "ID",
+                Says("데이터베이스가 생성합니다", english="the database generates it"),
+            ),
             Same("config_name", node.config_name, self.named),
             Held("created_at", node.created_at, written),
             Held("updated_at", node.updated_at, written),
@@ -208,7 +274,10 @@ class EveryLaidDefinitionIsFound(
 
     @override
     def says(self) -> str:
-        return "미리 만들어 둔 설정 정의가 모두, 그리고 그것만 집계된다"
+        return Says(
+            "미리 저장한 설정 정의가 모두, 그리고 그것만 집계됩니다",
+            english=("every config definition made in advance is counted, and only those"),
+        )
 
     @override
     def look(

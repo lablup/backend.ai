@@ -1,9 +1,9 @@
 import asyncio
 import json
 import logging
-import os
+import shlex
 import shutil
-from collections.abc import Iterable, Mapping, MutableMapping
+from collections.abc import Iterable, Mapping, MutableMapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -16,7 +16,10 @@ AGENT_HOST_KEY_PATH = Path("/home/config/ssh/dropbear_rsa_host_key")
 LEGACY_HOST_KEY_PATH = Path("/tmp/dropbear/dropbear_rsa_host_key")
 
 
-async def init_sshd_service(child_env: MutableMapping[str, str]) -> None:
+async def init_sshd_service(
+    child_env: MutableMapping[str, str],
+    cluster_roles: Sequence[str],
+) -> None:
     if Path("/tmp/dropbear").is_dir():
         shutil.rmtree("/tmp/dropbear")
     Path("/tmp/dropbear").mkdir(parents=True, exist_ok=True)
@@ -98,13 +101,6 @@ async def init_sshd_service(child_env: MutableMapping[str, str]) -> None:
     cluster_ssh_port_mapping_path = Path("/home/config/ssh/port-mapping.json")
     user_ssh_config_path = Path("/home/work/.ssh/config")
     if cluster_privkey_src_path.is_file():
-        replicas = {
-            k: v
-            for k, v in map(
-                lambda pair: pair.rsplit(":", maxsplit=1),
-                os.environ.get("BACKENDAI_CLUSTER_REPLICAS", "main:1").split(","),
-            )
-        }
         if cluster_ssh_port_mapping_path.is_file():
             cluster_ssh_port_mapping = json.loads(cluster_ssh_port_mapping_path.read_text())
 
@@ -119,7 +115,7 @@ async def init_sshd_service(child_env: MutableMapping[str, str]) -> None:
 
             await asyncio.to_thread(_write_ssh_config)
         else:
-            for role_name, role_replica in replicas.items():
+            for role_name in cluster_roles:
                 try:
                     existing_ssh_config = user_ssh_config_path.read_text()
                     if "\nHost {role_name}*\n" in existing_ssh_config:
@@ -179,7 +175,7 @@ async def prepare_sshd_service(service_info: Mapping[str, Any]) -> tuple[list[st
     return cmdargs, env
 
 
-async def prepare_ttyd_service(service_info: Mapping[str, Any]) -> tuple[list[str], dict[str, str]]:
+def _terminal_shell_command() -> list[str]:
     shell = "sh"
     if Path("/bin/zsh").exists():
         shell = "zsh"
@@ -188,7 +184,34 @@ async def prepare_ttyd_service(service_info: Mapping[str, Any]) -> tuple[list[st
     elif Path("/bin/ash").exists():
         shell = "ash"
 
-    cmdargs = ["/opt/kernel/ttyd", "-W", "-p", service_info["port"], f"/bin/{shell}"]
+    command = [f"/bin/{shell}"]
     if shell != "ash":  # Currently prebuilt tmux in Alpine-based containers is not supported.
-        cmdargs += ["-c", f"export SHELL=/bin/{shell}; /opt/kernel/tmux -2 attach"]
+        command += ["-c", f"export SHELL=/bin/{shell}; /opt/kernel/tmux -2 attach"]
+    return command
+
+
+async def prepare_ttyd_service(service_info: Mapping[str, Any]) -> tuple[list[str], dict[str, str]]:
+    cmdargs = [
+        "/opt/kernel/ttyd",
+        "-W",
+        "-p",
+        str(service_info["port"]),
+        *_terminal_shell_command(),
+    ]
+    return cmdargs, {}
+
+
+async def prepare_etty_service(service_info: Mapping[str, Any]) -> tuple[list[str], dict[str, str]]:
+    # etty joins positional arguments with spaces and re-splits them, so the command
+    # goes in as one shell-quoted string to keep the `-c` script intact.
+    cmdargs = [
+        "/opt/kernel/etty",
+        "-W",
+        "--bind",
+        "0.0.0.0",
+        "-p",
+        str(service_info["port"]),
+        "--command",
+        shlex.join(_terminal_shell_command()),
+    ]
     return cmdargs, {}

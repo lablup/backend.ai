@@ -15,6 +15,7 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.orm import aliased
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_policy import (
@@ -26,11 +27,9 @@ from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.types import AccessKey, ResourceSlot, SecretKey
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.models.base import ensure_all_tables_registered
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.resource_policy.row import (
@@ -43,6 +42,9 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
     EntityMembershipCapRow,
+)
+from ai.backend.manager.models.virtual_entity.entity_membership_field import (
+    EntityMembershipFieldRow,
 )
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
@@ -127,6 +129,7 @@ async def database(
             VirtualEntityRow,
             EntityMembershipRow,
             EntityMembershipCapRow,
+            EntityMembershipFieldRow,
             ScopeBindingRow,
             DomainRow,
             UserResourcePolicyRow,

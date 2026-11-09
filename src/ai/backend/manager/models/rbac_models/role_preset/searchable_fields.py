@@ -4,8 +4,17 @@ from __future__ import annotations
 
 from typing import override
 
+import sqlalchemy as sa
+
 from ai.backend.common.data.entity.role import RoleID
+from ai.backend.common.data.entity.role_preset import RolePresetEntityType
+from ai.backend.common.data.entity.types import GlobalEntityType
 from ai.backend.manager.data.role_preset.types import RolePresetData
+from ai.backend.manager.models.entity_label.searchable_fields import (
+    EntityLabelCorrelation,
+    EntityLabelSearchableFields,
+)
+from ai.backend.manager.models.global_entity.row import GlobalEntityRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
@@ -32,12 +41,26 @@ from ai.backend.manager.models.specs.search.usage import UsedByConditions
 
 __all__ = ("RolePresetSearchableFields",)
 
+_SCOPE_TYPE_OR_GLOBAL_ENTITY_NAME = sa.type_coerce(
+    sa.func.coalesce(
+        sa.select(GlobalEntityRow.name)
+        .where(
+            RolePresetRow.scope_type == GlobalEntityType(),
+            GlobalEntityRow.id == RolePresetRow.scope_id,
+        )
+        .scalar_subquery(),
+        RolePresetRow.scope_type,
+    ),
+    sa.String(),
+)
+
 
 class _RolePresetOwnFields(RowDataConverter[RolePresetRow, RolePresetData]):
     """The preset's own columns.
 
     ``role_name_template`` is ``sa.Text`` with no index serving a partial match, so it
-    carries equality and membership only.
+    carries equality and membership only. ``scope_type`` filters and orders on the value
+    the API shows: a ``global`` preset's global entity name.
     """
 
     id = SearchableField(
@@ -55,8 +78,8 @@ class _RolePresetOwnFields(RowDataConverter[RolePresetRow, RolePresetData]):
     )
     scope_type = SearchableField(
         RolePresetRow.scope_type,
-        StringConditions(RolePresetRow.scope_type),
-        ColumnOrder(RolePresetRow.scope_type),
+        StringConditions(_SCOPE_TYPE_OR_GLOBAL_ENTITY_NAME),
+        ColumnOrder(_SCOPE_TYPE_OR_GLOBAL_ENTITY_NAME),
     )
     scope_id = SearchableField(
         RolePresetRow.scope_id,
@@ -68,10 +91,15 @@ class _RolePresetOwnFields(RowDataConverter[RolePresetRow, RolePresetData]):
         BoolConditions(RolePresetRow.auto_assign),
         ColumnOrder(RolePresetRow.auto_assign),
     )
-    deleted = SearchableField(
-        RolePresetRow.deleted,
-        BoolConditions(RolePresetRow.deleted),
-        ColumnOrder(RolePresetRow.deleted),
+    auto_assign_to_owner = SearchableField(
+        RolePresetRow.auto_assign_to_owner,
+        BoolConditions(RolePresetRow.auto_assign_to_owner),
+        ColumnOrder(RolePresetRow.auto_assign_to_owner),
+    )
+    deleted_at = SearchableField(
+        RolePresetRow.deleted_at,
+        DateTimeConditions(RolePresetRow.deleted_at),
+        ColumnOrder(RolePresetRow.deleted_at),
     )
     created_at = SearchableField(
         RolePresetRow.created_at,
@@ -91,15 +119,18 @@ class _RolePresetOwnFields(RowDataConverter[RolePresetRow, RolePresetData]):
             name=self.name.read(row),
             role_name_template=self.role_name_template.read(row),
             scope_type=self.scope_type.read(row),
+            scope_id=self.scope_id.read(row),
             auto_assign=self.auto_assign.read(row),
-            deleted=self.deleted.read(row),
+            auto_assign_to_owner=self.auto_assign_to_owner.read(row),
+            deleted_at=self.deleted_at.read(row),
             created_at=self.created_at.read(row),
             updated_at=self.updated_at.read(row),
         )
 
 
 class _RolePresetNestedFields:
-    """The permission entries the preset owns, read under the preset's own permission.
+    """The permission entries and labels the preset owns, read under the preset's own
+    permission.
 
     A permission entry is the preset's field row, so one permission answers for the
     pair. Narrowing a preset search by permission does not replace the permission
@@ -113,6 +144,10 @@ class _RolePresetNestedFields:
             RolePresetRow,
             RolePermissionPresetRow.role_preset_id == RolePresetRow.id,
         ),
+    )
+    labels = NestedSearchableField(
+        EntityLabelSearchableFields.own,
+        EntityLabelCorrelation(RolePresetRow, RolePresetEntityType(), RolePresetRow.id),
     )
 
 

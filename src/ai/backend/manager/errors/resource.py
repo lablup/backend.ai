@@ -81,6 +81,20 @@ class PersonalProjectMemberAdditionError(EntityError, web.HTTPConflict):
         )
 
 
+class ProjectMemberNotJoinableError(EntityError, web.HTTPBadRequest):
+    """Raised when a user named for a project's roster does not exist or belongs to
+    another domain."""
+
+    error_type = "https://api.backend.ai/probs/project-member-not-joinable"
+    error_title = "User cannot join the project."
+
+    @override
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            ProjectEntityType(), ActionOperationType.UPDATE, ErrorDetail.INVALID_PARAMETERS
+        )
+
+
 class ModelStoreProjectLeaveError(EntityError, web.HTTPConflict):
     """Raised when a write would take a user off a model-store project's roster."""
 

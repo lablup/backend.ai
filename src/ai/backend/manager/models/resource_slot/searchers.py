@@ -42,16 +42,16 @@ class ResourceSlotTypeSearcher(Searcher[ResourceSlotTypeRow, ResourceSlotTypeDat
 
 @dataclass
 class AgentResourceSearcher(Searcher[AgentResourceRow, AgentResourceData]):
-    """Slot rows in the slot catalog's own rank order. Which agents' rows these are
-    is the operation scope's to say."""
+    """Slot rows ordered by the caller's choice, or by catalog rank by default."""
 
     @override
     def build_select(self) -> sa.sql.Select[Any]:
-        return (
-            sa.select(AgentResourceRow)
-            .join(ResourceSlotTypeRow, AgentResourceRow.slot_name == ResourceSlotTypeRow.slot_name)
-            .order_by(ResourceSlotTypeRow.rank)
+        query = sa.select(AgentResourceRow).join(
+            ResourceSlotTypeRow, AgentResourceRow.slot_name == ResourceSlotTypeRow.slot_name
         )
+        if not self.orders:
+            query = query.order_by(ResourceSlotTypeRow.rank)
+        return query
 
     @override
     def to_data(self, row: AgentResourceRow) -> AgentResourceData:

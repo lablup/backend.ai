@@ -60,8 +60,20 @@ class LogFieldNormalizer:
                 return str(value)
             case datetime():
                 return value.isoformat()
+            case str():
+                return str(value)
             case _:
                 return value
+
+    def normalized_fields_of(self, record: logging.LogRecord) -> dict[str, _NormalizedLogValue]:
+        return {
+            name: value
+            for name, value in vars(record).items()
+            if name.startswith(self._name_prefix)
+        }
+
+    def field_name_of(self, normalized_name: str) -> str:
+        return normalized_name.removeprefix(self._name_prefix)
 
 
 class StructuredLogger:

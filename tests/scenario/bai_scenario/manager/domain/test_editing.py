@@ -15,7 +15,15 @@ from ai.backend.manager.api.adapters.domain.adapter import DomainAdapter
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import (
+    Given,
+    Language,
+    Says,
+    Scenario,
+    Then,
+    When,
+    in_language,
+)
 from bai_scenario.components.domain import (
     ADomainAndACaller,
     ADomainAndSomeone,
@@ -23,12 +31,12 @@ from bai_scenario.components.domain import (
     TheDomainNode,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-EDITED = "고쳐 쓴 설명"
+EDITED = Says("수정한 설명", english="an edited description")
 
-type DomainStep = Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
+type DomainStep = Scenario[TestSeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
 
 
 @dataclass(frozen=True)
@@ -37,7 +45,7 @@ class Editing(When[ADomainAndACaller, DomainAdapter, DomainNode]):
 
     asked: UpdateDomainInput
     named: str | None = None
-    changing: str = "설명"
+    changing: Says = Says("설명", english="the description")
 
     @override
     def operation(self) -> str:
@@ -46,18 +54,57 @@ class Editing(When[ADomainAndACaller, DomainAdapter, DomainNode]):
     @override
     def describe(self, laid: ADomainAndACaller) -> str:
         target = self.named or laid.domain.name
-        return f"{laid.caller.username}이 {target}의 {self.changing}을 고침"
+        return Says(
+            f"{laid.caller.username}이 {target}의 {self.changing}을 수정합니다",
+            english=(
+                f"{laid.caller.username} edits "
+                f"{in_language(self.changing, Language.ENGLISH)} of {target}"
+            ),
+        )
 
     @override
     async def call(self, adapter: DomainAdapter, laid: ADomainAndACaller) -> DomainNode:
         with ActingAs(laid.caller):
-            payload = await adapter.update(self.named or laid.domain.name, self.asked)
+            payload = await adapter.update(
+                await adapter.lookup_name(self.named or laid.domain.name), self.asked
+            )
+        return payload.domain
+
+
+@dataclass(frozen=True)
+class EditingAfterSoftDeleting(When[ADomainAndACaller, DomainAdapter, DomainNode]):
+    """미리 만든 도메인을 soft delete 한 뒤 고친다. 수정의 답이 실은 노드를 벗겨서 준다."""
+
+    asked: UpdateDomainInput
+    changing: Says
+
+    @override
+    def operation(self) -> str:
+        return "update"
+
+    @override
+    def describe(self, laid: ADomainAndACaller) -> str:
+        return Says(
+            f"{laid.caller.username}이 {laid.domain.name}을 soft delete 한 뒤 "
+            f"{self.changing}을 수정합니다",
+            english=(
+                f"{laid.caller.username} soft deletes {laid.domain.name} and then edits "
+                f"{in_language(self.changing, Language.ENGLISH)}"
+            ),
+        )
+
+    @override
+    async def call(self, adapter: DomainAdapter, laid: ADomainAndACaller) -> DomainNode:
+        with ActingAs(laid.caller):
+            domain_id = await adapter.lookup_name(laid.domain.name)
+            await adapter.delete(domain_id)
+            payload = await adapter.update(domain_id, self.asked)
         return payload.domain
 
 
 @dataclass(frozen=True)
 class TheDescriptionChangesAndTheNameStays(
-    Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
+    Scenario[TestSeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
 ):
     started: datetime
 
@@ -67,10 +114,16 @@ class TheDescriptionChangesAndTheNameStays(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 도메인의 설명만 바꾸면, 설명은 새 값이 되고 이름은 그대로 남는다"
+        return Says(
+            "superadmin 이 도메인의 설명만 변경하면, 설명은 새 값이 되고 이름은 그대로 남습니다",
+            english=(
+                "when the superadmin changes only the description of a domain, "
+                "the description becomes the new value and the name stays"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
         return ADomainAndSomeone(role=UserRole.SUPERADMIN, name_hint="editable")
 
     @override
@@ -83,26 +136,36 @@ class TheDescriptionChangesAndTheNameStays(
 
 
 @dataclass(frozen=True)
-class ClearingTheActiveFlagDeactivates(
-    Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
+class ClearingTheActiveFlagSoftDeletes(
+    Scenario[TestSeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
 ):
     started: datetime
 
     @override
     def summary(self) -> str:
-        return "clearing-the-active-flag-deactivates-a-domain"
+        return "clearing-the-active-flag-soft-deletes-a-domain"
 
     @override
     def describe(self) -> str:
-        return "활성 플래그를 내리는 수정은 도메인을 비활성으로 만들고, 답이 그 상태를 실어 온다"
+        return Says(
+            "활성 플래그를 비활성화하는 수정은 도메인을 soft delete 하고, "
+            "응답이 비활성 상태를 담아 옵니다",
+            english=(
+                "an edit that turns the active flag off soft deletes the domain, "
+                "and the response carries the inactive state"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
         return ADomainAndSomeone(role=UserRole.SUPERADMIN, name_hint="to-deactivate")
 
     @override
     def when(self) -> When[ADomainAndACaller, DomainAdapter, DomainNode]:
-        return Editing(UpdateDomainInput(is_active=False), changing="활성 플래그")
+        return Editing(
+            UpdateDomainInput(is_active=False),
+            changing=Says("활성 플래그", english="the active flag"),
+        )
 
     @override
     def then(self) -> Then[ADomainAndACaller, DomainNode]:
@@ -110,8 +173,83 @@ class ClearingTheActiveFlagDeactivates(
 
 
 @dataclass(frozen=True)
+class RaisingTheActiveFlagRestores(
+    Scenario[TestSeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "raising-the-active-flag-restores-a-soft-deleted-domain"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "soft delete 된 도메인의 활성 플래그를 활성화하는 수정은 그 도메인을 restore 하고, "
+            "응답이 활성 상태를 담아 옵니다",
+            english=(
+                "an edit that turns the active flag on of a soft-deleted domain restores it, "
+                "and the response carries the active state"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
+        return ADomainAndSomeone(role=UserRole.SUPERADMIN, name_hint="to-restore")
+
+    @override
+    def when(self) -> When[ADomainAndACaller, DomainAdapter, DomainNode]:
+        return EditingAfterSoftDeleting(
+            UpdateDomainInput(is_active=True),
+            changing=Says("활성 플래그", english="the active flag"),
+        )
+
+    @override
+    def then(self) -> Then[ADomainAndACaller, DomainNode]:
+        return TheDomainNode(started=self.started, active=True)
+
+
+@dataclass(frozen=True)
+class LoweringTheFlagOfASoftDeletedDomainEditsTheRest(
+    Scenario[TestSeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "lowering-the-active-flag-of-a-soft-deleted-domain-edits-only-the-rest"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "soft delete 된 도메인의 활성 플래그를 비활성화하며 설명을 변경하면, "
+            "설명은 새 값이 되고 비활성 상태는 그대로입니다",
+            english=(
+                "when an edit turns the active flag off of a soft-deleted domain and "
+                "changes the description, the description becomes the new value and "
+                "the inactive state stays"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
+        return ADomainAndSomeone(role=UserRole.SUPERADMIN, name_hint="already-deleted")
+
+    @override
+    def when(self) -> When[ADomainAndACaller, DomainAdapter, DomainNode]:
+        return EditingAfterSoftDeleting(
+            UpdateDomainInput(is_active=False, description=EDITED),
+            changing=Says("활성 플래그와 설명", english="the active flag and the description"),
+        )
+
+    @override
+    def then(self) -> Then[ADomainAndACaller, DomainNode]:
+        return TheDomainNode(started=self.started, described=EDITED, active=False)
+
+
+@dataclass(frozen=True)
 class AUserGrantedNothingMayNotEdit(
-    Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
+    Scenario[TestSeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
 ):
     @override
     def summary(self) -> str:
@@ -119,10 +257,16 @@ class AUserGrantedNothingMayNotEdit(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 받지 않은 사용자가 도메인을 수정하려 하면 권한 부족으로 거부된다"
+        return Says(
+            "아무 권한도 받지 않은 사용자가 도메인을 수정하려 하면 권한 부족으로 거부됩니다",
+            english=(
+                "when a user granted nothing tries to edit a domain, "
+                "the call is rejected for lack of permission"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
         return ADomainAndSomeone()
 
     @override
@@ -136,7 +280,7 @@ class AUserGrantedNothingMayNotEdit(
 
 @dataclass(frozen=True)
 class ANameNothingAnswersToIsNotFound(
-    Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
+    Scenario[TestSeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
 ):
     @override
     def summary(self) -> str:
@@ -144,10 +288,13 @@ class ANameNothingAnswersToIsNotFound(
 
     @override
     def describe(self) -> str:
-        return "아무 도메인도 갖지 않은 이름을 수정하려 하면 대상이 없다는 것으로 거부된다"
+        return Says(
+            "아무 도메인도 갖지 않은 이름을 수정하려 하면 대상이 없다는 것으로 거부됩니다",
+            english="editing a name no domain answers to is rejected as not found",
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
         return ADomainAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -161,7 +308,9 @@ class ANameNothingAnswersToIsNotFound(
 
 SCENARIOS: list[DomainStep] = [
     TheDescriptionChangesAndTheNameStays(started=datetime.now(UTC)),
-    ClearingTheActiveFlagDeactivates(started=datetime.now(UTC)),
+    ClearingTheActiveFlagSoftDeletes(started=datetime.now(UTC)),
+    RaisingTheActiveFlagRestores(started=datetime.now(UTC)),
+    LoweringTheFlagOfASoftDeletedDomainEditsTheRest(started=datetime.now(UTC)),
     AUserGrantedNothingMayNotEdit(),
     ANameNothingAnswersToIsNotFound(),
 ]

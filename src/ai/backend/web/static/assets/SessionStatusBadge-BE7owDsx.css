@@ -1,0 +1,27 @@
+/*
+ @license
+ Copyright (c) 2015-2026 Lablup Inc. All rights reserved.
+
+ Co-located styles for <BAIProgressRing> (FR-3923), imported by the component
+ itself (P17). The ring is an ICON: it is handed to `Badge`'s `icon` slot, so
+ every value here is either geometry (resolved in the SVG user space, not CSS)
+ or motion timing.
+
+ The three durations are literals on purpose. `--duration-*` tops out at
+ 1300ms, so neither the 1s indeterminate spin — which must stay pixel-identical
+ to the `.bai-icon-spin` glyph this replaces, and that rule is a literal `1s`
+ in this same package — nor the 2.4s determinate turn has a token to name it.
+ The dash transition does have one and uses it.
+*/@keyframes bai-progress-ring-spin{to{transform:rotate(360deg)}}@layer components{.bai-progress-ring{display:inline-block}.bai-progress-ring-track{stroke:currentcolor;stroke-opacity:.25}.bai-progress-ring-arc{stroke:currentcolor;stroke-linecap:round;transform:rotate(-90deg);transform-box:fill-box;transform-origin:center;transition:stroke-dashoffset var(--duration-medium-min) var(--ease-standard)}.bai-progress-ring-spin,.bai-progress-ring-indeterminate{animation-name:bai-progress-ring-spin;animation-timing-function:linear;animation-iteration-count:infinite}.bai-progress-ring-spin{animation-duration:2.4s}.bai-progress-ring-indeterminate{animation-duration:1s}@media(prefers-reduced-motion:reduce){.bai-progress-ring-spin{animation:none}.bai-progress-ring-indeterminate{animation-duration:3s}.bai-progress-ring-arc{transition:none}}}/*
+ @license
+ Copyright (c) 2015-2026 Lablup Inc. All rights reserved.
+
+ Co-located styles for <BAIKernelProgressBreakdown> (FR-3924), imported by the
+ component itself (P17). Astryx has no segmented bar — `ProgressBar` carries a
+ single value — so the stacked track and the legend swatches are drawn here.
+
+ The five `data-variant` values are everything `badgeVariantForStatus('session',
+ …)` can return; there is no `--color-info`, so `info` resolves to the declared
+ blue icon token, the same substitution BAIBadgeCount.css makes, and
+ `neutral` likewise resolves to the solid gray icon token.
+*/@layer components{.bai-kernel-progress-breakdown{min-width:15rem}.bai-kernel-progress-breakdown-bar{display:flex;overflow:hidden;width:100%;height:var(--spacing-2);border-radius:var(--radius-full);background:var(--color-track)}.bai-kernel-progress-breakdown-segment{height:100%;transition:width var(--duration-medium-min) var(--ease-standard)}.bai-kernel-progress-breakdown-swatch{flex:none;width:var(--spacing-2);height:var(--spacing-2);border-radius:var(--radius-full)}.bai-kernel-progress-breakdown-segment[data-variant=neutral],.bai-kernel-progress-breakdown-swatch[data-variant=neutral]{background:var(--color-icon-gray)}.bai-kernel-progress-breakdown-segment[data-variant=info],.bai-kernel-progress-breakdown-swatch[data-variant=info]{background:var(--color-icon-blue)}.bai-kernel-progress-breakdown-segment[data-variant=success],.bai-kernel-progress-breakdown-swatch[data-variant=success]{background:var(--color-success)}.bai-kernel-progress-breakdown-segment[data-variant=warning],.bai-kernel-progress-breakdown-swatch[data-variant=warning]{background:var(--color-warning)}.bai-kernel-progress-breakdown-segment[data-variant=error],.bai-kernel-progress-breakdown-swatch[data-variant=error]{background:var(--color-error)}.bai-kernel-progress-breakdown-swatch[data-empty=true]{background:transparent;box-shadow:inset 0 0 0 var(--border-width) var(--color-border)}@media(prefers-reduced-motion:reduce){.bai-kernel-progress-breakdown-segment{transition:none}}}

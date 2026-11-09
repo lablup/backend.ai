@@ -222,7 +222,9 @@ class TestPurge:
         mock_response: AsyncMock,
         fragment_id: AppConfigFragmentID,
     ) -> None:
-        mock_response.json = AsyncMock(return_value={"id": str(fragment_id)})
+        mock_response.json = AsyncMock(
+            return_value={"id": str(fragment_id), "entity_id": str(fragment_id)}
+        )
 
         result = await client.purge(fragment_id)
 

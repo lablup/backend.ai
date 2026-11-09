@@ -116,7 +116,7 @@ class ImageHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Rescan an image from the registry."""
-        action_result = await self._image.scan_image.run(
+        action_result = await self._image.scan_already_registered_image.run(
             ScanImageAction(canonical=body.parsed.canonical, architecture=body.parsed.architecture)
         )
         resp = RescanImagesResponse(

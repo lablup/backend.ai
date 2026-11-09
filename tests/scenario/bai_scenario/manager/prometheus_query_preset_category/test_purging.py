@@ -13,10 +13,10 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.dto.manager.v2.prometheus_query_preset_category.request import (
-    DeleteCategoryInput,
+from ai.backend.common.data.entity.prometheus_query_preset_category import (
+    PrometheusQueryPresetCategoryID,
 )
+from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.prometheus_query_preset_category.response import (
     DeleteCategoryPayload,
 )
@@ -29,6 +29,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Configured,
     Given,
+    Says,
     Scenario,
     Then,
     When,
@@ -40,14 +41,14 @@ from bai_scenario.components.prometheus_query_preset_category import (
     TheRemovedOneIsNamed,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 ENFORCEMENT = "manager.rbac.enforcement_enabled"
 
 type Adapter = PrometheusQueryPresetCategoryAdapter
 type Removed = DeleteCategoryPayload
-type PurgingStep = Scenario[SeedingSession, ACategoryAndACaller, Adapter, Removed]
+type PurgingStep = Scenario[TestSeedingSession, ACategoryAndACaller, Adapter, Removed]
 
 
 @dataclass(frozen=True)
@@ -58,32 +59,44 @@ class Removing(When[ACategoryAndACaller, Adapter, Removed]):
 
     @override
     def operation(self) -> str:
-        return "delete"
+        return "purge"
 
     @override
     def describe(self, laid: ACategoryAndACaller) -> str:
-        called = "존재하지 않는 id" if self.other is not None else laid.category.name
-        return f"{laid.caller.username}이 {called} 삭제"
+        if self.other is not None:
+            called_ko, called_en = "존재하지 않는 id", "a missing id"
+        else:
+            called_ko = called_en = laid.category.name
+        return Says(
+            f"{laid.caller.username}이 {called_ko} 삭제합니다",
+            english=f"{laid.caller.username} deletes {called_en}",
+        )
 
     @override
     async def call(self, adapter: Adapter, laid: ACategoryAndACaller) -> Removed:
         wanted = self.other if self.other is not None else laid.category.id
         with ActingAs(laid.caller):
-            return await adapter.delete(DeleteCategoryInput(id=wanted))
+            return await adapter.purge(PrometheusQueryPresetCategoryID(wanted))
 
 
 @dataclass(frozen=True)
-class TheSuperadminRemovesIt(Scenario[SeedingSession, ACategoryAndACaller, Adapter, Removed]):
+class TheSuperadminRemovesIt(Scenario[TestSeedingSession, ACategoryAndACaller, Adapter, Removed]):
     @override
     def summary(self) -> str:
         return "the-superadmin-removes-a-category"
 
     @override
     def describe(self) -> str:
-        return "카테고리 하나가 있고 슈퍼관리자가 삭제하면, 삭제한 id를 담은 응답이 반환된다"
+        return Says(
+            "카테고리 하나가 있고 superadmin 이 삭제하면, 삭제한 id 를 담은 응답이 반환됩니다",
+            english=(
+                "with one category laid, when the superadmin deletes it, "
+                "the answer carries the id that was deleted"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ACategoryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ACategoryAndACaller]:
         return ACategoryAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -97,7 +110,7 @@ class TheSuperadminRemovesIt(Scenario[SeedingSession, ACategoryAndACaller, Adapt
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotRemove(
-    Scenario[SeedingSession, ACategoryAndACaller, Adapter, Removed]
+    Scenario[TestSeedingSession, ACategoryAndACaller, Adapter, Removed]
 ):
     @override
     def summary(self) -> str:
@@ -105,10 +118,16 @@ class AUserGrantedNothingMayNotRemove(
 
     @override
     def describe(self) -> str:
-        return "같은 카테고리가 있고 아무 권한도 없는 사용자가 삭제하면, 권한 부족으로 거부된다"
+        return Says(
+            "같은 카테고리가 있고 아무 권한도 없는 사용자가 삭제하면, 권한 부족으로 거부됩니다",
+            english=(
+                "with the same category laid, when a user granted nothing deletes it, "
+                "the call is rejected for lack of permission"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ACategoryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ACategoryAndACaller]:
         return ACategoryAndSomeone()
 
     @override
@@ -122,7 +141,7 @@ class AUserGrantedNothingMayNotRemove(
 
 @dataclass(frozen=True)
 class EnforcementOffLetsAnyoneRemove(
-    Scenario[SeedingSession, ACategoryAndACaller, Adapter, Removed], Configured
+    Scenario[TestSeedingSession, ACategoryAndACaller, Adapter, Removed], Configured
 ):
     @override
     def summary(self) -> str:
@@ -130,14 +149,19 @@ class EnforcementOffLetsAnyoneRemove(
 
     @override
     def describe(self) -> str:
-        return "권한 검사를 끄면 아무 권한도 없는 사용자도 카테고리를 삭제할 수 있다"
+        return Says(
+            "권한 검사를 비활성화하면 아무 권한도 없는 사용자도 카테고리를 삭제할 수 있습니다",
+            english=(
+                "turning permission enforcement off lets a user granted nothing delete a category"
+            ),
+        )
 
     @override
     def config(self) -> Mapping[str, Any]:
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, ACategoryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ACategoryAndACaller]:
         return ACategoryAndSomeone()
 
     @override
@@ -151,7 +175,7 @@ class EnforcementOffLetsAnyoneRemove(
 
 @dataclass(frozen=True)
 class AnUnknownIdIsNotFoundForASuperadmin(
-    Scenario[SeedingSession, ACategoryAndACaller, Adapter, Removed]
+    Scenario[TestSeedingSession, ACategoryAndACaller, Adapter, Removed]
 ):
     @override
     def summary(self) -> str:
@@ -159,10 +183,16 @@ class AnUnknownIdIsNotFoundForASuperadmin(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 존재하지 않는 id를 삭제하면, 대상을 찾을 수 없다는 이유로 거부된다"
+        return Says(
+            "superadmin 이 존재하지 않는 id 를 삭제하면, 대상을 찾을 수 없다는 이유로 거부됩니다",
+            english=(
+                "when the superadmin deletes a missing id, "
+                "the call is rejected because there is no such target"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ACategoryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ACategoryAndACaller]:
         return ACategoryAndSomeone(role=UserRole.SUPERADMIN)
 
     @override

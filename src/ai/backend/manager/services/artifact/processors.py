@@ -3,7 +3,7 @@ from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
 from ai.backend.manager.actions.v2.bulk.processor import BulkActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
-from ai.backend.manager.actions.v2.ops.result import ScopedFieldsOpsResult
+from ai.backend.manager.actions.v2.ops.result import EntityOpsResult, ScopedFieldsOpsResult
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.data.artifact.types import ArtifactData, ArtifactRevisionData
 from ai.backend.manager.services.artifact.actions.bulk_get import BulkGetArtifactsAction
@@ -11,6 +11,7 @@ from ai.backend.manager.services.artifact.actions.delegate_scan import (
     DelegateScanArtifactsAction,
     DelegateScanArtifactsActionResult,
 )
+from ai.backend.manager.services.artifact.actions.delete import DeleteArtifactAction
 from ai.backend.manager.services.artifact.actions.delete_multi import (
     DeleteArtifactsAction,
     DeleteArtifactsActionResult,
@@ -22,6 +23,16 @@ from ai.backend.manager.services.artifact.actions.get import (
 from ai.backend.manager.services.artifact.actions.get_revisions import (
     GetArtifactRevisionsAction,
 )
+from ai.backend.manager.services.artifact.actions.partial_bulk_delete_artifacts import (
+    PartialBulkDeleteArtifactsAction,
+)
+from ai.backend.manager.services.artifact.actions.partial_bulk_restore_artifacts import (
+    PartialBulkRestoreArtifactsAction,
+)
+from ai.backend.manager.services.artifact.actions.partial_bulk_update_artifacts import (
+    PartialBulkUpdateArtifactsAction,
+)
+from ai.backend.manager.services.artifact.actions.restore import RestoreArtifactAction
 from ai.backend.manager.services.artifact.actions.restore_multi import (
     RestoreArtifactsAction,
     RestoreArtifactsActionResult,
@@ -74,6 +85,13 @@ class ArtifactProcessors:
         GetArtifactRevisionsAction, ScopedFieldsOpsResult[ArtifactRevisionData]
     ]
     update: SingleEntityActionProcessor[UpdateArtifactAction, UpdateArtifactActionResult]
+    delete: SingleEntityActionProcessor[DeleteArtifactAction, EntityOpsResult[ArtifactData]]
+    restore: SingleEntityActionProcessor[RestoreArtifactAction, EntityOpsResult[ArtifactData]]
+    partial_bulk_update: PartialBulkActionProcessor[PartialBulkUpdateArtifactsAction, ArtifactData]
+    partial_bulk_delete: PartialBulkActionProcessor[PartialBulkDeleteArtifactsAction, ArtifactData]
+    partial_bulk_restore: PartialBulkActionProcessor[
+        PartialBulkRestoreArtifactsAction, ArtifactData
+    ]
     upsert_artifacts_with_revisions: GlobalActionProcessor[
         UpsertArtifactsAction, UpsertArtifactsActionResult
     ]
@@ -106,6 +124,13 @@ class ArtifactProcessors:
         )
         self.get_revisions = revisions.atomic_bulk_scoped_search_ops(GetArtifactRevisionsAction)
         self.update = group.single_entity(UpdateArtifactAction, service.update)
+        self.delete = group.single_delete_ops(DeleteArtifactAction)
+        self.restore = group.single_restore_ops(RestoreArtifactAction)
+        self.partial_bulk_update = group.partial_bulk_update_ops(PartialBulkUpdateArtifactsAction)
+        self.partial_bulk_delete = group.partial_bulk_delete_ops(PartialBulkDeleteArtifactsAction)
+        self.partial_bulk_restore = group.partial_bulk_restore_ops(
+            PartialBulkRestoreArtifactsAction
+        )
         self.upsert_artifacts_with_revisions = group.global_scope(
             UpsertArtifactsAction, service.upsert_artifacts_with_revisions
         )

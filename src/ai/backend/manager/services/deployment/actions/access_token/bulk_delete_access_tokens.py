@@ -25,7 +25,7 @@ class BulkDeleteAccessTokensAction(BasePartialBulkFieldAction[DeploymentTokenID,
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.UPDATE
+        return ActionOperationType.PURGE
 
     @override
     def field_ids(self) -> Sequence[DeploymentTokenID]:

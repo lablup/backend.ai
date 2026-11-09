@@ -1,0 +1,9 @@
+kind: prometheus_query_preset_category
+version: 1
+items:
+- id: 9a8382a2-73df-458f-ad40-a0797a9b0909
+  name: container
+  description: Container-level utilization metrics collected by Backend.AI agents
+- id: 8dd00ede-0381-45f5-87fd-5a28b1c3eb96
+  name: vllm-inference
+  description: vLLM inference runtime metrics scraped from model serving endpoints

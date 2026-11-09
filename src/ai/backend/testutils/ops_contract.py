@@ -494,11 +494,11 @@ class OpsHarness:
             ).all()
         scopes: dict[Any, set[tuple[str, str]]] = {}
         for audit_log_id, scope_type, scope_id in scope_rows:
-            scopes.setdefault(audit_log_id, set()).add((scope_type, scope_id))
+            scopes.setdefault(audit_log_id, set()).add((scope_type, str(scope_id)))
         return [
             AuditRecord(
                 entity_type=row.entity_type,
-                entity_id=row.entity_id,
+                entity_id=str(row.entity_id) if row.entity_id is not None else None,
                 operation=row.operation,
                 status=row.status,
                 description=row.description,

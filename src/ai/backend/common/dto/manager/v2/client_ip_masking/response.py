@@ -8,7 +8,6 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 from .types import ClientIPMaskingMode, ClientIPMaskingTarget
 
@@ -16,6 +15,7 @@ __all__ = (
     "AdminSearchClientIPMaskingPoliciesPayload",
     "ClientIPMaskingPolicyNode",
     "ClientIPMaskingPolicyPayload",
+    "PurgeClientIPMaskingPolicyPayload",
 )
 
 
@@ -24,7 +24,7 @@ class ClientIPMaskingPolicyNode(BaseResponseModel):
 
     id: UUID = Field(description="Policy ID")
     entity_id: UUID = Field(
-        description=f"UUID of the client IP masking policy. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the client IP masking policy. Added in 26.9.0.",
     )
     target_type: ClientIPMaskingTarget = Field(description="Which recorded client IP is governed")
     mode: ClientIPMaskingMode = Field(description="Masking applied before the address is stored")
@@ -51,3 +51,11 @@ class ClientIPMaskingPolicyPayload(BaseResponseModel):
     """Payload carrying the settled policy row."""
 
     policy: ClientIPMaskingPolicyNode = Field(description="The policy the operation left")
+
+
+class PurgeClientIPMaskingPolicyPayload(BaseResponseModel):
+    """Payload for client IP masking policy purge."""
+
+    entity_id: UUID = Field(
+        description="UUID of the purged client IP masking policy. Added in 26.10.0.",
+    )

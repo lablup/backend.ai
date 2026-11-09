@@ -9,9 +9,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from ai.backend.common.data.entity.project import ProjectID
-from ai.backend.common.data.entity.user import UserID
-from ai.backend.manager.data.permission.role import UserRoleRevocationData
+from ai.backend.manager.data.permission.role import (
+    BulkRoleAssignmentFailure,
+    BulkRoleAssignmentResultData,
+)
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
@@ -172,9 +173,7 @@ class RbacRoleService:
         When project_id is provided, also binds the user to the project.
         """
         if action.input.project_id is not None:
-            await self._roster_repository.join_member(
-                ProjectID(action.input.project_id), UserID(action.input.user_id)
-            )
+            await self._roster_repository.join_member(action.input.project_id, action.input.user_id)
         data = await self._repository.assign_role(action.input)
         return AssignRoleActionResult(data=data)
 
@@ -187,29 +186,28 @@ class RbacRoleService:
         result = await self._repository.revoke_role(action.input)
         for prc in result.project_remaining_roles:
             if prc.remaining_count == 0:
-                await self._roster_repository.leave_member(
-                    ProjectID(prc.project_id), UserID(action.input.user_id)
-                )
-        return RevokeRoleActionResult(
-            data=UserRoleRevocationData(
-                user_role_id=result.user_role_id,
-                user_id=action.input.user_id,
-                role_id=action.input.role_id,
-            )
-        )
+                await self._roster_repository.leave_member(prc.project_id, action.input.user_id)
+        return RevokeRoleActionResult(data=result.revoked)
 
     async def bulk_assign_role(self, action: BulkAssignRoleAction) -> BulkAssignRoleActionResult:
-        """Assigns a role to multiple users.
-
-        When project_id is provided, also binds each user to the project.
-        """
+        """Assigns a role to multiple users. When project_id is provided, also binds
+        each user to the project; a user who cannot join is reported as a failure and
+        not granted the role."""
+        user_ids = list(action.user_ids)
+        join_failures: list[BulkRoleAssignmentFailure] = []
         if action.project_id is not None:
-            for user_id in action.user_ids:
-                await self._roster_repository.join_member(ProjectID(action.project_id), user_id)
-        data = await self._repository.bulk_assign_role(
-            action.role_id, action.user_ids, action.granted_by
+            joined = await self._roster_repository.join_each(action.project_id, action.user_ids)
+            user_ids = joined.joined
+            join_failures = [
+                BulkRoleAssignmentFailure(user_id=f.user_id, message=f.message)
+                for f in joined.failures
+            ]
+        data = await self._repository.bulk_assign_role(action.role_id, user_ids, action.granted_by)
+        return BulkAssignRoleActionResult(
+            data=BulkRoleAssignmentResultData(
+                successes=data.successes, failures=join_failures + data.failures
+            )
         )
-        return BulkAssignRoleActionResult(data=data)
 
     async def bulk_revoke_role(self, action: BulkRevokeRoleAction) -> BulkRevokeRoleActionResult:
         """Revokes a role from multiple users with partial failure support."""

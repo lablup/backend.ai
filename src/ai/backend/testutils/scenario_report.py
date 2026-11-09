@@ -12,30 +12,42 @@ import ast
 import enum
 import json
 import pathlib
+import re
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass, field
 from typing import Any, ClassVar, override
 
-from ai.backend.testutils.scenario_steps import Refused
+from ai.backend.testutils.scenario_steps import Language, Refused, Says
 
 MARKS = {"passed": "pass", "failed": "FAIL", "skipped": "skip"}
+HANGUL = re.compile("[ᄀ-ᇿ㄰-㆏가-힣]")
+PARTICLE = re.compile(
+    r"([A-Za-z])(입니다|이며|이고|이란|이라는|에서는|에게는|으로는|으로|에서|에게|"
+    r"부터|까지|에는|에도|이|가|은|는|을|를|와|과|로|만|도|의|에|인|나|며|라)"
+)
 
 
 class OperationWords:
-    """The words the report says about each operation; translating the report is editing these."""
+    """The words the report says; translating the report is editing these."""
 
     GAP_MARK: ClassVar[str] = "SCENARIO-GAP"
     """붙은 연산은 기본 시나리오 행이 모자라다. 이 말로 검색한다."""
-    STATUS: ClassVar[str] = "시나리오"
-    COMPLETE: ClassVar[str] = "완성"
-    INCOMPLETE: ClassVar[str] = "미완"
-    REPRESENTATIVE_SUCCESS: ClassVar[str] = "대표 성공"
-    REPRESENTATIVE_REFUSAL: ClassVar[str] = "대표 실패"
-    SUCCESS: ClassVar[str] = "성공"
-    REFUSAL: ClassVar[str] = "실패"
-    PRESENT: ClassVar[str] = "있음"
-    ABSENT: ClassVar[str] = "없음"
+    STATUS: ClassVar[Says] = Says("시나리오", english="Scenario")
+    COMPLETE: ClassVar[Says] = Says("완성", english="complete")
+    INCOMPLETE: ClassVar[Says] = Says("미완성", english="incomplete")
+    REPRESENTATIVE_SUCCESS: ClassVar[Says] = Says("대표 성공", english="representative success")
+    REPRESENTATIVE_REFUSAL: ClassVar[Says] = Says("대표 거부", english="representative rejection")
+    SUCCESS: ClassVar[Says] = Says("성공", english="success")
+    REFUSAL: ClassVar[Says] = Says("거부", english="rejection")
+    SCENARIO: ClassVar[Says] = Says("시나리오", english="scenario")
+    VERDICT: ClassVar[Says] = Says("판정", english="verdict")
+    ANSWERED: ClassVar[Says] = Says("성공", english="answered")
+    REFUSED: ClassVar[Says] = Says("거부", english="rejected")
+    PRESENT: ClassVar[Says] = Says("있음", english="present")
+    ABSENT: ClassVar[Says] = Says("없음", english="absent")
+    BACKGROUND: ClassVar[Says] = Says("배경", english="background")
+    ADAPTER: ClassVar[Says] = Says("어댑터", english="adapter")
     COVERED: ClassVar[str] = "✓"
     MISSING: ClassVar[str] = "✗"
 
@@ -94,6 +106,10 @@ class ScenarioRecord:
         """이 행이 사는 파일. 레포트가 거기로 걸어준다."""
         return "/tests/scenario/" + self.module.replace(".", "/") + ".py"
 
+    def anchor(self) -> str:
+        """Where the report links to this row's details; a summary can repeat across modules."""
+        return f"{self.behaviour}-{self.summary}"
+
     def called(self) -> str:
         """어느 엔티티의 어느 호출인지. 이름만으로는 잘 안 보인다."""
         return f"{self.adapter}.{self.operation}" if self.adapter else self.operation
@@ -111,19 +127,28 @@ class ScenarioRecord:
         return any(line.says.startswith(Refused.PREFIX) for line in self.seen)
 
     def as_line(self) -> str:
-        return json.dumps(asdict(self), ensure_ascii=False)
+        return json.dumps(_jsonable(asdict(self)), ensure_ascii=False)
 
     @classmethod
     def from_line(cls, line: str) -> ScenarioRecord:
         raw: dict[str, Any] = json.loads(line)
         fields = {f: raw[f] for f in cls.__dataclass_fields__ if f in raw}
-        for name in ("config", "offers", "shows"):
+        for name in ("description", "when", "then"):
+            if name in fields:
+                fields[name] = Says.from_data(fields[name])
+        for name in ("offers", "shows"):
             if name in fields:
                 fields[name] = tuple(fields[name])
+        if "config" in fields:
+            fields["config"] = tuple(Says.from_data(one) for one in fields["config"])
         for name in ("given", "seen"):
             if name in fields:
                 fields[name] = tuple(
-                    Line(says=one["says"], nest=tuple(one["nest"])) for one in fields[name]
+                    Line(
+                        says=Says.from_data(one["says"]),
+                        nest=tuple(Says.from_data(nest) for nest in one["nest"]),
+                    )
+                    for one in fields[name]
                 )
         return cls(**fields)
 
@@ -139,10 +164,21 @@ class BehaviourReport:
 class Composition(enum.StrEnum):
     """How an adapter operation is built, in the order a report lists them."""
 
-    OPS = "ops 로 구성"
+    OPS = "ops 구성"
     MIXED = "ops + 직접 구현"
     CUSTOM = "직접 구현"
     NO_ACTION = "Action 없음"
+
+    def in_(self, language: Language) -> str:
+        """The label this composition gets in a report."""
+        if language is Language.KOREAN:
+            return self.value
+        return {
+            Composition.OPS: "built from ops",
+            Composition.MIXED: "ops + direct implementation",
+            Composition.CUSTOM: "direct implementation",
+            Composition.NO_ACTION: "no Action",
+        }[self]
 
 
 @dataclass(frozen=True)
@@ -171,14 +207,16 @@ class ComponentReport:
     adapter: str
     behaviours: tuple[BehaviourReport, ...]
     operations: tuple[OperationReport, ...]
+    knowledge_doc: str = ""
+    """The component's KNOWLEDGE.md, empty when the component has none."""
 
     @property
     def gaps(self) -> tuple[str, ...]:
         return tuple(one.operation for one in self.operations if not one.complete)
 
     def knowledge(self) -> str:
-        """그 엔티티가 무엇을 보장하는지 적어둔 자리."""
-        return f"/src/ai/backend/manager/api/adapters/{self.component}/KNOWLEDGE.md"
+        """Where the component's background is written."""
+        return self.knowledge_doc
 
     def adapter_source(self) -> str:
         return f"/src/ai/backend/manager/api/adapters/{self.component}/adapter.py"
@@ -186,6 +224,10 @@ class ComponentReport:
     @property
     def rows(self) -> tuple[ScenarioRecord, ...]:
         return tuple(row for behaviour in self.behaviours for row in behaviour.rows)
+
+    @property
+    def adapters(self) -> tuple[str, ...]:
+        return tuple(sorted({row.adapter for row in self.rows if row.adapter}))
 
     @property
     def failing(self) -> int:
@@ -226,6 +268,7 @@ class Report:
                         for behaviour in sorted(behaviours)
                     ),
                     operations=_operations(component, rows, wiring),
+                    knowledge_doc=wiring.knowledge_doc(component),
                 )
             )
         return cls(tuple(components))
@@ -299,6 +342,13 @@ class AdapterWiring:
     def __init__(self, manager: pathlib.Path) -> None:
         self._manager = manager
         self._processors = None
+
+    def knowledge_doc(self, component: str) -> str:
+        """The component's KNOWLEDGE.md, or empty when it has none."""
+        path = self._manager / "api" / "adapters" / component / "KNOWLEDGE.md"
+        if not path.is_file():
+            return ""
+        return f"/src/ai/backend/manager/api/adapters/{component}/KNOWLEDGE.md"
 
     def of(self, component: str, adapter: str) -> Mapping[str, OperationWiring]:
         """Every public operation the adapter class defines itself."""
@@ -462,6 +512,22 @@ class AdapterWiring:
         return parts[::-1]
 
 
+def _jsonable(value: Any) -> Any:
+    """The JSON a run writes: a sentence carries both languages, a label its value."""
+    match value:
+        case Says():
+            return value.as_data()
+        case enum.Enum():
+            return _jsonable(value.value)
+        case Mapping():
+            return {key: _jsonable(one) for key, one in value.items()}
+        case list() | tuple():
+            return [_jsonable(one) for one in value]
+        case str():
+            return str(value)
+    return value
+
+
 def records_of(lines: Iterable[str]) -> list[ScenarioRecord]:
     """Every record a run wrote, with the retried attempts of a scenario collapsed."""
     seen: dict[tuple[str, str], ScenarioRecord] = {}
@@ -477,9 +543,13 @@ class ReportFormat(ABC):
     """One way of writing a report out."""
 
     @abstractmethod
-    def suffix(self) -> str:
-        """The file extension a split report uses."""
+    def file_name(self) -> str:
+        """The file a split report writes for one component."""
         raise NotImplementedError
+
+    def variants(self) -> Mapping[str, ReportFormat]:
+        """The files a split report writes, keyed by file name; a bilingual format has two."""
+        return {self.file_name(): self}
 
     @abstractmethod
     def render(self, report: Report) -> str:
@@ -492,15 +562,43 @@ class ReportFormat(ABC):
 
 
 class MarkdownFormat(ReportFormat):
-    """The document a person reads, and a release pull request carries."""
+    """The document a person reads, and a release pull request carries.
+
+    Every sentence is written in both languages. A sentence whose English is not
+    written yet falls back to the Korean one.
+    """
+
+    _language: Language
+
+    def __init__(self, language: Language = Language.ENGLISH) -> None:
+        self._language = language
 
     @override
-    def suffix(self) -> str:
-        return "md"
+    def file_name(self) -> str:
+        return "report.md" if self._language is Language.ENGLISH else "report.ko.md"
+
+    @override
+    def variants(self) -> Mapping[str, ReportFormat]:
+        return {
+            one.file_name(): one
+            for one in (MarkdownFormat(Language.ENGLISH), MarkdownFormat(Language.KOREAN))
+        }
+
+    def _spoken(self, text: str) -> str:
+        return text.in_(self._language) if isinstance(text, Says) else text
 
     @override
     def render_one(self, component: ComponentReport) -> str:
-        return "\n".join(self._component(component))
+        text = "\n".join(self._component(component))
+        if self._language is Language.KOREAN:
+            text = PARTICLE.sub(r"\1 \2", text)
+        if self._language is Language.ENGLISH and HANGUL.search(text):
+            lines = [line for line in text.splitlines() if HANGUL.search(line)]
+            raise ValueError(
+                f"{component.component}: the English report still says {len(lines)} Korean "
+                f"line(s):\n" + "\n".join(lines)
+            )
+        return text
 
     @override
     def render(self, report: Report) -> str:
@@ -523,28 +621,36 @@ class MarkdownFormat(ReportFormat):
         return "\n".join(out)
 
     def _component(self, component: ComponentReport) -> list[str]:
+        words = OperationWords
         out = [f"## {component.component}", ""]
-        out.append(
-            f"[무엇을 보장하는가]({component.knowledge()}) · [어댑터]({component.adapter_source()})"
-        )
+        links = []
+        if doc := component.knowledge():
+            links.append(f"[{self._spoken(words.BACKGROUND)}]({doc})")
+        links.append(f"[{self._spoken(words.ADAPTER)}]({component.adapter_source()})")
+        out.append(" · ".join(links))
         out.append("")
         if component.operations:
             out.append(self._status(component))
             out.append("")
             out.extend(self._operations(component.operations))
             out.append("")
-        for behaviour in component.behaviours:
-            out.append(f"### {behaviour.behaviour}")
+        calls = self._calls(component)
+        for operation, rows in calls:
+            out.extend(self._table(operation, rows))
             out.append("")
-            for row in behaviour.rows:
+        for operation, rows in calls:
+            out.append(f"### {operation}")
+            out.append("")
+            for row in rows:
                 out.extend(self._row(row))
         return out
 
     def _status(self, component: ComponentReport) -> str:
+        words = OperationWords
         if not component.gaps:
-            return f"{OperationWords.STATUS}: {OperationWords.COMPLETE}"
+            return f"{self._spoken(words.STATUS)}: {self._spoken(words.COMPLETE)}"
         return (
-            f"{OperationWords.STATUS}: {OperationWords.INCOMPLETE}"
+            f"{self._spoken(words.STATUS)}: {self._spoken(words.INCOMPLETE)}"
             f" {len(component.gaps)} / {len(component.operations)}"
         )
 
@@ -559,7 +665,7 @@ class MarkdownFormat(ReportFormat):
             members = [one for one in operations if one.composition is composition]
             if not members:
                 continue
-            out.append(f"- {composition.value} ({len(members)})")
+            out.append(f"- {composition.in_(self._language)} ({len(members)})")
             for one in members:
                 out.append(f"  - {self._operation(one)}")
         return out
@@ -570,36 +676,72 @@ class MarkdownFormat(ReportFormat):
             succeeding = words.COVERED if one.succeeding else words.MISSING
             refused = words.COVERED if one.refused else words.MISSING
             says = (
-                f"{one.operation} — {words.REPRESENTATIVE_SUCCESS} {succeeding}"
-                f" · {words.REPRESENTATIVE_REFUSAL} {refused}"
+                f"{one.operation}: {self._spoken(words.REPRESENTATIVE_SUCCESS)} {succeeding}"
+                f" · {self._spoken(words.REPRESENTATIVE_REFUSAL)} {refused}"
             )
         else:
             says = (
-                f"{one.operation} — {words.SUCCESS} {self._count(one.succeeding)}"
-                f" · {words.REFUSAL} {self._count(one.refused)}"
+                f"{one.operation}: {self._spoken(words.SUCCESS)} {self._count(one.succeeding)}"
+                f" · {self._spoken(words.REFUSAL)} {self._count(one.refused)}"
             )
             if one.group_methods:
                 says += f" ({', '.join(one.group_methods)})"
         if not one.complete:
-            says += f" — {words.GAP_MARK}"
+            says += f": {words.GAP_MARK}"
         return says
 
     def _count(self, rows: int) -> str:
-        return f"{OperationWords.PRESENT} {rows}" if rows else OperationWords.ABSENT
+        words = OperationWords
+        return f"{self._spoken(words.PRESENT)} {rows}" if rows else self._spoken(words.ABSENT)
+
+    def _calls(self, component: ComponentReport) -> list[tuple[str, list[ScenarioRecord]]]:
+        """The rows by operation, in the order the list names them and then any it does not.
+
+        Successes come before refusals, each in summary order.
+        """
+        several_adapters = len(component.adapters) > 1
+        calls: dict[str, list[ScenarioRecord]] = {}
+        for row in sorted(component.rows, key=lambda r: (r.expects_refusal(), r.summary)):
+            name = row.called() if several_adapters else row.operation
+            calls.setdefault(name, []).append(row)
+        listed = [
+            one.operation
+            for composition in Composition
+            for one in component.operations
+            if one.composition is composition
+        ]
+        return [
+            (operation, calls[operation])
+            for operation in [*listed, *sorted(set(calls) - set(listed))]
+            if operation in calls
+        ]
+
+    def _table(self, operation: str, rows: Sequence[ScenarioRecord]) -> list[str]:
+        """One line per row, linking to its details below."""
+        words = OperationWords
+        header = f"| {self._spoken(words.SCENARIO)} | {self._spoken(words.VERDICT)} |"
+        out = [f"**{operation}**", "", header, "|---|---|"]
+        for row in rows:
+            verdict = words.REFUSED if row.expects_refusal() else words.ANSWERED
+            description = self._spoken(row.description).replace("|", "\\|")
+            out.append(f"| [{description}](#{row.anchor()}) | {self._spoken(verdict)} |")
+        return out
 
     def _row(self, row: ScenarioRecord) -> list[str]:
         out = [
-            f"#### [{row.summary}]({row.source()}) — {row.mark}",
+            f'<a id="{row.anchor()}"></a>',
             "",
-            row.description,
+            f"#### [{row.summary}]({row.source()}): {row.mark}",
+            "",
+            self._spoken(row.description),
             "",
             "Given",
             "",
         ]
         out.extend(self._situation(row))
-        out.extend(["", "When", "", f"- {row.called()} — {row.when}"])
+        out.extend(["", "When", "", f"- {row.called()}: {self._spoken(row.when)}"])
         out.extend(f"  - {one}" for one in row.shows)
-        out.extend(["", "Then", "", f"- {row.then}"])
+        out.extend(["", "Then", "", f"- {self._spoken(row.then)}"])
         out.extend(self._nested(row.seen, depth=1))
         out.append("")
         return out
@@ -617,8 +759,8 @@ class MarkdownFormat(ReportFormat):
             ):
                 shared += 1
             for at in range(shared, len(line.nest)):
-                out.append(f"{'  ' * (depth + at)}- {line.nest[at]}")
-            out.append(f"{'  ' * (depth + len(line.nest))}- {line.says}")
+                out.append(f"{'  ' * (depth + at)}- {self._spoken(line.nest[at])}")
+            out.append(f"{'  ' * (depth + len(line.nest))}- {self._spoken(line.says)}")
             open_nests = line.nest
         return out
 
@@ -628,24 +770,24 @@ class MarkdownFormat(ReportFormat):
 
 
 class JsonFormat(ReportFormat):
-    """The same report for a tool to read."""
+    """The same report for a tool to read, with every sentence in both languages."""
 
     @override
-    def suffix(self) -> str:
-        return "json"
+    def file_name(self) -> str:
+        return "report.json"
 
     @override
     def render_one(self, component: ComponentReport) -> str:
-        return json.dumps(asdict(component), indent=2, ensure_ascii=False)
+        return json.dumps(_jsonable(asdict(component)), indent=2, ensure_ascii=False)
 
     @override
     def render(self, report: Report) -> str:
         return json.dumps(
-            {
+            _jsonable({
                 "scenarios": len(report.rows),
                 "failing": report.failing,
                 "components": [asdict(component) for component in report.components],
-            },
+            }),
             indent=2,
             ensure_ascii=False,
         )
@@ -655,8 +797,8 @@ class SummaryFormat(ReportFormat):
     """The counts alone, for a line in a build log."""
 
     @override
-    def suffix(self) -> str:
-        return "txt"
+    def file_name(self) -> str:
+        return "report.txt"
 
     @override
     def render_one(self, component: ComponentReport) -> str:

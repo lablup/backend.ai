@@ -4,6 +4,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from decimal import Decimal
 
+from ai.backend.common.data.entity.bootstrap_script import BootstrapScript
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.types import (
     AgentSelectionStrategy,
@@ -36,6 +37,7 @@ class UserEnqueueFetch:
     policy: UserEnqueuePolicy | None
     container_user: ContainerUserInfo
     dotfiles: DotfileBundle
+    default_bootstrap_script: BootstrapScript | None
     pending_session_count: int
     pending_session_resource_slots: Mapping[ResourceSlotName, Decimal]
 
@@ -48,6 +50,7 @@ class UserEnqueueFetch:
             policy=self.policy,
             container_user=self.container_user,
             dotfiles=self.dotfiles,
+            default_bootstrap_script=self.default_bootstrap_script,
             pending_session_count=self.pending_session_count,
             pending_session_resource_slots=self.pending_session_resource_slots,
             vfolder_mounts_by_role=vfolder_mounts_by_role,

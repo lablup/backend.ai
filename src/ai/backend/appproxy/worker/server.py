@@ -45,6 +45,12 @@ from ai.backend.appproxy.common.defs import (
     ERROR_TEMPLATE_NAME,
     MEDIA_TYPE_HTML,
     MEDIA_TYPE_JSON,
+    WORKER_AUTHORITY_LABEL,
+    WORKER_HOSTNAME_LABEL,
+    WORKER_INGRESS_DELIVERY_MODE_LABEL,
+    WORKER_SERVICE_GROUP,
+    WORKER_TLS_LISTEN_LABEL,
+    WORKER_WILDCARD_DOMAIN_LABEL,
 )
 from ai.backend.appproxy.common.errors import (
     CoordinatorConnectionError,
@@ -74,10 +80,12 @@ from ai.backend.appproxy.common.utils import (
     ensure_json_serializable,
     mime_match,
 )
+from ai.backend.appproxy.worker.ingress.factory import IngressStateFactory
 from ai.backend.common.clients.http_client.client_pool import (
     ClientPool,
     tcp_client_session_factory,
 )
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.contexts.request_id import with_request_context
@@ -88,6 +96,7 @@ from ai.backend.common.defs import (
     REDIS_STREAM_DB,
     RedisRole,
 )
+from ai.backend.common.dto.appproxy.v2.ingress.types import IngressAuthority
 from ai.backend.common.dto.internal.health import (
     ConnectivityCheckResponse,
     HealthResponse,
@@ -100,8 +109,9 @@ from ai.backend.common.health_checker.probe import HealthProbe, HealthProbeOptio
 from ai.backend.common.health_checker.types import ComponentId
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
-from ai.backend.common.metrics.http import build_api_metric_middleware
+from ai.backend.common.metrics.http import SystemMetricUpdater, build_api_metric_middleware
 from ai.backend.common.metrics.multiprocess_setup import cleanup_prometheus_multiprocess_dir
+from ai.backend.common.middlewares.exception import client_closed_response, is_client_disconnect
 from ai.backend.common.middlewares.request_id import REQUEST_ID_HEADER
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.networking import force_threaded_dns_resolver
@@ -119,7 +129,12 @@ from ai.backend.common.service_discovery.service_discovery import (
 from ai.backend.common.types import AgentId, RedisProfileTarget, ServiceDiscoveryType
 from ai.backend.common.utils import env_info
 from ai.backend.logging import Logger, LogLevel
-from ai.backend.logging.otel import LegacyOtelLogging, OpenTelemetrySpec, apply_otel_tracer
+from ai.backend.logging.otel import (
+    LegacyOtelLogging,
+    OpenTelemetrySpec,
+    apply_otel_tracer,
+    build_otel_server_middleware,
+)
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.logging.structured_otel import StructuredOtelLogging
 
@@ -159,6 +174,7 @@ EVENT_DISPATCHER_CONSUMER_GROUP: Final[str] = "appproxy-worker"
 global_subapp_pkgs: Final[list[str]] = [
     ".health",
     ".setup",
+    ".ingress",
 ]
 
 
@@ -231,6 +247,13 @@ async def exception_middleware(
         log.debug("request cancelled ({} {})", request.method, request.rel_url)
         raise e
     except Exception as e:
+        if is_client_disconnect(request, e):
+            log.trace(
+                "client disconnected while writing the response",
+                http_method=request.method,
+                route_path=str(request.rel_url),
+            )
+            return client_closed_response()
         log.exception("uncaught exception in HTTP request handlers")
         if root_ctx.local_config.debug.enabled:
             raise InternalServerError(traceback.format_exc()) from e
@@ -286,18 +309,33 @@ async def last_used_time_marker(root_ctx: RootContext) -> None:
 
 
 @asynccontextmanager
+async def sentinel_monitor_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    redis_profile_target = RedisProfileTarget.from_dict(root_ctx.local_config.redis.to_dict())
+    root_ctx.sentinel_monitors = SentinelMonitorSet(redis_profile_target.valkey_targets())
+    await root_ctx.sentinel_monitors.start()
+    try:
+        yield
+    finally:
+        await root_ctx.sentinel_monitors.close()
+
+
+@asynccontextmanager
 async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     redis_profile_target = RedisProfileTarget.from_dict(root_ctx.local_config.redis.to_dict())
+    live_target = redis_profile_target.profile_target(RedisRole.LIVE).to_valkey_target()
+    stat_target = redis_profile_target.profile_target(RedisRole.STATISTICS).to_valkey_target()
 
     root_ctx.valkey_live = await ValkeyLiveClient.create(
-        valkey_target=redis_profile_target.profile_target(RedisRole.LIVE).to_valkey_target(),
+        valkey_target=live_target,
         db_id=REDIS_LIVE_DB,
         human_readable_name="appproxy-worker",
+        sentinel_monitor=root_ctx.sentinel_monitors.monitor_for(live_target),
     )
     root_ctx.valkey_stat = await ValkeyStatClient.create(
-        valkey_target=redis_profile_target.profile_target(RedisRole.STATISTICS).to_valkey_target(),
+        valkey_target=stat_target,
         db_id=REDIS_STATISTICS_DB,
         human_readable_name="appproxy-worker",
+        sentinel_monitor=root_ctx.sentinel_monitors.monitor_for(stat_target),
     )
     root_ctx.last_used_time_marker_redis_queue = asyncio.Queue()
     root_ctx.request_counter_redis_queue = asyncio.Queue()
@@ -314,6 +352,16 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
         await root_ctx.valkey_live.close()
         await root_ctx.valkey_stat.close()
+
+
+@asynccontextmanager
+async def ingress_state_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    root_ctx.ingress_state = IngressStateFactory(
+        root_ctx.local_config.proxy_worker.ingress,
+        IngressAuthority(root_ctx.local_config.proxy_worker.authority),
+        root_ctx.valkey_live,
+    ).create()
+    yield
 
 
 @asynccontextmanager
@@ -365,6 +413,7 @@ async def _make_message_queue(
     return await RedisQueue.create(
         stream_redis_target,
         args,
+        root_ctx.sentinel_monitors.monitor_for(stream_redis_target.to_valkey_target()),
     )
 
 
@@ -472,7 +521,7 @@ async def worker_registration_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     ):
         with attempt:
             try:
-                await register_worker(root_ctx, str(uuid.uuid4()))
+                registration = await register_worker(root_ctx, str(uuid.uuid4()))
             except CoordinatorConnectionError as e:
                 log.warning(
                     "failed to connect to the coordinator; retrying",
@@ -481,10 +530,20 @@ async def worker_registration_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                     ),
                 )
                 raise TryAgain from e
+            root_ctx.proxy_frontend.apply_content_encoding_config(registration.content_encoding)
 
     circuits = await list_worker_circuits(root_ctx, str(uuid.uuid4()))
+    registered_circuits: list[Circuit] = []
     for circuit in circuits:
-        await root_ctx.proxy_frontend.register_circuit(circuit, circuit.route_info)
+        if await root_ctx.proxy_frontend.register_circuit(circuit, circuit.route_info):
+            registered_circuits.append(circuit)
+    # Applied rather than replaced, so circuits from events handled meanwhile are kept.
+    ingress_writer = root_ctx.ingress_state.writer
+    if ingress_writer is not None:
+        ingress_authority = IngressAuthority(root_ctx.local_config.proxy_worker.authority)
+        await ingress_writer.apply([
+            circuit.to_ingress(ingress_authority) for circuit in registered_circuits
+        ])
 
     cron = LocalCron([WorkerHeartbeatTask(root_ctx)])
     await cron.start()
@@ -528,9 +587,14 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             redis_profile_target = RedisProfileTarget.from_dict(
                 root_ctx.local_config.redis.to_dict()
             )
-            live_redis_target = redis_profile_target.profile_target(RedisRole.LIVE)
+            live_valkey_target = redis_profile_target.profile_target(
+                RedisRole.LIVE
+            ).to_valkey_target()
             service_discovery = await RedisServiceDiscovery.create(
-                RedisServiceDiscoveryArgs(valkey_target=live_redis_target.to_valkey_target())
+                RedisServiceDiscoveryArgs(
+                    valkey_target=live_valkey_target,
+                    sentinel_monitor=root_ctx.sentinel_monitors.monitor_for(live_valkey_target),
+                )
             )
         case _:
             raise RuntimeError(f"Unsupported service discovery type: {sd_type}")
@@ -539,12 +603,24 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     announce_addr = root_ctx.local_config.proxy_worker.announce_addr
     if announce_addr is None:
         raise MissingAnnounceAddressError("Announce address is not configured")
+    proxy_worker_config = root_ctx.local_config.proxy_worker
+    service_discovery_labels = {
+        WORKER_AUTHORITY_LABEL: proxy_worker_config.authority,
+        WORKER_INGRESS_DELIVERY_MODE_LABEL: proxy_worker_config.ingress.delivery_mode,
+        WORKER_HOSTNAME_LABEL: (
+            proxy_worker_config.api_advertised_addr or proxy_worker_config.api_bind_addr
+        ).host,
+        WORKER_TLS_LISTEN_LABEL: str(proxy_worker_config.tls_listen).lower(),
+    }
+    served_wildcard_domain = proxy_worker_config.served_wildcard_domain()
+    if served_wildcard_domain is not None:
+        service_discovery_labels[WORKER_WILDCARD_DOMAIN_LABEL] = served_wildcard_domain
     sd_loop = ServiceDiscoveryLoop(
         sd_type,
         service_discovery,
         ServiceMetadata.for_endpoint(
             display_name=f"appproxy-worker-{root_ctx.local_config.proxy_worker.authority}",
-            service_group="appproxy-worker",
+            service_group=WORKER_SERVICE_GROUP,
             version=__version__,
             endpoint=ServiceEndpoint(
                 address=announce_addr.host,
@@ -553,6 +629,7 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 # It can be separated into an internal-purpose port later.
                 prometheus_address=str(announce_addr),
             ),
+            labels=service_discovery_labels,
         ),
     )
 
@@ -679,13 +756,22 @@ async def handle_proxy_route_event(
     if event.target_worker_authority != context.local_config.proxy_worker.authority:
         return
 
+    ingress_writer = context.ingress_state.writer
+    ingress_authority = IngressAuthority(context.local_config.proxy_worker.authority)
     match event:
         case AppProxyCircuitCreatedEvent():
             log.debug("circuits created: {}", [str(c.id) for c in event.circuits])
-            for circuit in event.circuits:
-                await context.proxy_frontend.register_circuit(
-                    Circuit.from_serialized_circuit(circuit), circuit.route_info
-                )
+            created_circuits = [Circuit.from_serialized_circuit(c) for c in event.circuits]
+            registered_circuits: list[Circuit] = []
+            for created_circuit in created_circuits:
+                if await context.proxy_frontend.register_circuit(
+                    created_circuit, created_circuit.route_info
+                ):
+                    registered_circuits.append(created_circuit)
+            if ingress_writer is not None:
+                await ingress_writer.apply([
+                    circuit.to_ingress(ingress_authority) for circuit in registered_circuits
+                ])
             await context.event_producer.broadcast_event(
                 AppProxyWorkerCircuitAddedEvent(
                     target_worker_authority=context.local_config.proxy_worker.authority,
@@ -694,13 +780,24 @@ async def handle_proxy_route_event(
             )
         case AppProxyCircuitRouteUpdatedEvent():
             log.debug("circuit routes updated: {}", event.circuit.id)
-            await context.proxy_frontend.update_circuit_route_info(
-                Circuit.from_serialized_circuit(event.circuit), event.routes
+            updated_circuit = Circuit.from_serialized_circuit(event.circuit)
+            await context.proxy_frontend.update_circuit_route_info(updated_circuit, event.routes)
+            # The frontend stores the new routes on the circuit of the backend it holds and skips a
+            # circuit it holds no backend of.
+            held_backend = context.proxy_frontend.backends.get(
+                context.proxy_frontend.get_circuit_key(updated_circuit)
             )
+            if ingress_writer is not None and held_backend is not None:
+                await ingress_writer.apply([held_backend.circuit.to_ingress(ingress_authority)])
         case AppProxyCircuitRemovedEvent():
             log.debug("circuits removed: {}", [str(c.id) for c in event.circuits])
-            for circuit in event.circuits:
-                await context.proxy_frontend.break_circuit(Circuit.from_serialized_circuit(circuit))
+            removed_circuits = [Circuit.from_serialized_circuit(c) for c in event.circuits]
+            for removed_circuit in removed_circuits:
+                await context.proxy_frontend.break_circuit(removed_circuit)
+            if ingress_writer is not None:
+                await ingress_writer.remove([
+                    circuit.to_ingress_key(ingress_authority) for circuit in removed_circuits
+                ])
 
 
 async def on_prepare(_request: web.Request, response: web.StreamResponse) -> None:
@@ -768,6 +865,8 @@ def build_root_app(
             build_api_metric_middleware(root_ctx.metrics.api),
         ]
     )
+    if local_config.otel.enabled:
+        app.middlewares.insert(0, build_otel_server_middleware())
     global_exception_handler = functools.partial(handle_loop_error, root_ctx)
     loop = asyncio.get_running_loop()
     loop.set_exception_handler(global_exception_handler)
@@ -790,7 +889,9 @@ def build_root_app(
             # traefik won't require event dispatcher
             cleanup_contexts = [
                 proxy_frontend_ctx,
+                sentinel_monitor_ctx,
                 redis_ctx,
+                ingress_state_ctx,
                 http_client_pool_ctx,
                 health_probe_ctx,
                 service_discovery_ctx,
@@ -799,7 +900,9 @@ def build_root_app(
         else:
             cleanup_contexts = [
                 proxy_frontend_ctx,
+                sentinel_monitor_ctx,
                 redis_ctx,
+                ingress_state_ctx,
                 http_client_pool_ctx,
                 event_dispatcher_ctx,
                 event_handler_ctx,
@@ -831,6 +934,7 @@ def build_root_app(
 
     app.on_shutdown.append(_trigger_shutdown)
     app.cleanup_ctx.append(_cleanup_context_wrapper)
+    app.cleanup_ctx.append(SystemMetricUpdater(root_ctx.metrics.system).cleanup_ctx)
     cors = aiohttp_cors.setup(app, defaults=root_ctx.cors_options)
     # should be done in create_app() in other modules.
     cors.add(app.router.add_route("GET", r"", hello))
@@ -862,7 +966,6 @@ async def server_main(
         # Start aiomonitor.
         m = aiomonitor.Monitor(
             loop,
-            host="0.0.0.0",
             termui_port=local_config.proxy_worker.aiomonitor_termui_port + pidx,
             webui_port=local_config.proxy_worker.aiomonitor_webui_port + pidx,
             console_enabled=False,
@@ -897,7 +1000,10 @@ async def server_main(
             )
 
         runner = web.AppRunner(
-            root_app, keepalive_timeout=30.0, access_log_class=BackendAIAccessLogger
+            root_app,
+            keepalive_timeout=30.0,
+            access_log_class=BackendAIAccessLogger,
+            max_field_size=local_config.proxy_worker.max_header_field_size,
         )
         await runner.setup()
         service_addr = local_config.proxy_worker.api_bind_addr

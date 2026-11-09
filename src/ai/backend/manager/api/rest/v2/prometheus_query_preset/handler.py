@@ -7,11 +7,14 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
+from ai.backend.common.data.entity.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     CreateQueryDefinitionInput,
     DeleteQueryDefinitionInput,
     ExecuteQueryDefinitionInput,
     ModifyQueryDefinitionInput,
+    PartialBulkPurgeQueryDefinitionsInput,
+    PartialBulkUpdateQueryDefinitionsInput,
     PreviewQueryDefinitionInput,
     SearchQueryDefinitionsInput,
 )
@@ -94,12 +97,36 @@ class V2PrometheusQueryPresetHandler:
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=payload)
 
+    async def purge(
+        self,
+        path: PathParam[PresetIdPathParam],
+    ) -> APIResponse:
+        """Permanently remove a query definition."""
+        result = await self._adapter.purge(PrometheusQueryPresetID(path.parsed.preset_id))
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_update(
+        self,
+        body: BodyParam[PartialBulkUpdateQueryDefinitionsInput],
+    ) -> APIResponse:
+        """Update several query definitions, answering for each one."""
+        result = await self._adapter.partial_bulk_update(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_purge(
+        self,
+        body: BodyParam[PartialBulkPurgeQueryDefinitionsInput],
+    ) -> APIResponse:
+        """Permanently remove several query definitions, answering for each one."""
+        result = await self._adapter.partial_bulk_purge(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
     async def delete(
         self,
         body: BodyParam[DeleteQueryDefinitionInput],
     ) -> APIResponse:
-        """Delete a query definition by ID."""
-        result = await self._adapter.delete(body.parsed)
+        """Deprecated. Use `DELETE /v2/prometheus-query-presets/{preset_id}`."""
+        result = await self._adapter.purge(PrometheusQueryPresetID(body.parsed.id))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def admin_preview(

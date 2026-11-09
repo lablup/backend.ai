@@ -11,6 +11,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT
+from ai.backend.common.dto.manager.v2.common import NonEmptyList
 from ai.backend.common.tristate.unset import UNSET, Unset
 
 from .types import AutoScalingMetricSource, AutoScalingRuleOrderField, OrderDirection
@@ -20,6 +21,8 @@ __all__ = (
     "AutoScalingRuleOrder",
     "CreateAutoScalingRuleInput",
     "DeleteAutoScalingRuleInput",
+    "PartialBulkPurgeAutoScalingRulesInput",
+    "PartialBulkUpdateAutoScalingRulesInput",
     "SearchAutoScalingRulesInput",
     "UpdateAutoScalingRuleInput",
 )
@@ -96,6 +99,20 @@ class BulkDeleteAutoScalingRulesInput(BaseRequestModel):
     """Input for bulk deleting auto-scaling rules."""
 
     ids: list[UUID] = Field(description="List of auto-scaling rule UUIDs to delete.")
+
+
+class PartialBulkUpdateAutoScalingRulesInput(BaseRequestModel):
+    """Input for updating several auto-scaling rules, each answered for separately."""
+
+    items: NonEmptyList[UpdateAutoScalingRuleInput] = Field(
+        description="The rules to update, each naming its rule by `id`."
+    )
+
+
+class PartialBulkPurgeAutoScalingRulesInput(BaseRequestModel):
+    """Input for permanently removing several auto-scaling rules, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the auto-scaling rules to purge.")
 
 
 class AutoScalingRuleFilter(BaseRequestModel):

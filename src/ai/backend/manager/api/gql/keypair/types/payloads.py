@@ -146,11 +146,10 @@ class AdminUpdateKeypairPayloadGQL(PydanticOutputMixin[AdminUpdateKeypairPayload
         description="Payload returned after admin deletes a keypair.",
     ),
     model=AdminDeleteKeypairPayloadDTO,
-    all_fields=True,
     name="AdminDeleteKeypairPayload",
 )
 class AdminDeleteKeypairPayloadGQL(PydanticOutputMixin[AdminDeleteKeypairPayloadDTO]):
-    pass
+    access_key: str = gql_field(description="The access key of the deleted keypair.")
 
 
 @gql_pydantic_type(

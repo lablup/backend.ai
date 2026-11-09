@@ -14,24 +14,34 @@ from ai.backend.manager.models.container_registry.creators import (
     ContainerRegistryCreator,
     ContainerRegistryProjectCreator,
 )
-from bai_scenario.seeds.seeder import Naming, SeedLink, SeedRow
+from ai.backend.testutils.scenario_steps import Says
+from bai_scenario.seeds.seeder import Naming, TestSeedLink, TestSeedRow, joined
 
 
 @dataclass(frozen=True)
-class SeedContainerRegistry(SeedRow[ContainerRegistryData]):
+class TestSeedContainerRegistry(TestSeedRow[ContainerRegistryData]):
     """A registry. An image joins the one it came from, so it is laid first."""
 
     name_hint: str = "registry"
     registry_type: ContainerRegistryType = ContainerRegistryType.DOCKER
     is_global: bool = True
+    project: str | None = None
 
     @override
     def kind(self) -> str:
-        return "컨테이너 레지스트리"
+        return Says("컨테이너 레지스트리", english="Container registry")
 
     @override
     def detail(self) -> str:
-        return "이미지를 가져오는 곳"
+        if self.project is not None:
+            return joined(
+                [
+                    Says("이미지를 가져오는 곳", english="image source"),
+                    Says(f"프로젝트는 {self.project}", english=f"project {self.project}"),
+                ],
+                ", ",
+            )
+        return Says("이미지를 가져오는 곳", english="image source")
 
     @override
     def name(self, naming: Naming) -> str:
@@ -44,14 +54,15 @@ class SeedContainerRegistry(SeedRow[ContainerRegistryData]):
             type=self.registry_type,
             registry_name=name,
             is_global=self.is_global,
+            project=self.project,
         )
 
 
 @dataclass(frozen=True)
-class AllowProject(SeedLink[ProjectData, ContainerRegistryData]):
+class AllowProject(TestSeedLink[ProjectData, ContainerRegistryData]):
     @override
     def kind(self) -> str:
-        return "을 허용한"
+        return Says("가 허용한", english="allows")
 
     @override
     def scope_id(self, scope: ProjectData) -> ProjectID:
@@ -64,3 +75,13 @@ class AllowProject(SeedLink[ProjectData, ContainerRegistryData]):
     @override
     def seed(self) -> ContainerRegistryProjectCreator:
         return ContainerRegistryProjectCreator()
+
+
+class AllowProjectAsDefault(AllowProject):
+    @override
+    def kind(self) -> str:
+        return Says("가 default 컨테이너 레지스트리로 허용한", english="defaults to")
+
+    @override
+    def seed(self) -> ContainerRegistryProjectCreator:
+        return ContainerRegistryProjectCreator(is_default=True)

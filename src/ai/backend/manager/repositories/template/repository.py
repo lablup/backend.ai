@@ -10,7 +10,7 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.manager.models.session_template.row import TemplateType
+from ai.backend.manager.data.session_template.types import TemplateType
 from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.template.db_source.db_source import TemplateDBSource

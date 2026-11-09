@@ -1,4 +1,4 @@
-"""Delete specs of the three resource policies, keyed by the policy name."""
+"""Delete specs of the three resource policies, keyed by the policy id."""
 
 from __future__ import annotations
 
@@ -37,7 +37,6 @@ from ai.backend.manager.models.specs.types import ConflictCheck
 class KeyPairResourcePolicyPurger(
     EntityPurger[KeyPairResourcePolicyRow, KeyPairResourcePolicyData]
 ):
-    name: str
     policy_id: KeyPairResourcePolicyUUID
 
     @override
@@ -63,7 +62,6 @@ class KeyPairResourcePolicyPurger(
 
 @dataclass
 class UserResourcePolicyPurger(EntityPurger[UserResourcePolicyRow, UserResourcePolicyData]):
-    name: str
     policy_id: UserResourcePolicyUUID
 
     @override
@@ -91,7 +89,6 @@ class UserResourcePolicyPurger(EntityPurger[UserResourcePolicyRow, UserResourceP
 class ProjectResourcePolicyPurger(
     EntityPurger[ProjectResourcePolicyRow, ProjectResourcePolicyData]
 ):
-    name: str
     policy_id: ProjectResourcePolicyUUID
 
     @override

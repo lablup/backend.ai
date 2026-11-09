@@ -22,6 +22,9 @@ from ai.backend.manager.services.prometheus_query_preset_category.actions.create
 from ai.backend.manager.services.prometheus_query_preset_category.actions.get import (
     GetCategoryAction,
 )
+from ai.backend.manager.services.prometheus_query_preset_category.actions.partial_bulk_purge import (
+    PartialBulkPurgeCategoriesAction,
+)
 from ai.backend.manager.services.prometheus_query_preset_category.actions.purge import (
     PurgeCategoryAction,
 )
@@ -53,6 +56,10 @@ class PrometheusQueryPresetCategoryProcessors:
         PurgeCategoryAction,
         EntityOpsResult[PrometheusQueryPresetCategoryData],
     ]
+    partial_bulk_purge_categories: PartialBulkActionProcessor[
+        PartialBulkPurgeCategoriesAction,
+        PrometheusQueryPresetCategoryData,
+    ]
 
     def __init__(self, group: ProcessorGroup[PrometheusQueryPresetCategoryData]) -> None:
         self.global_create_category = group.global_create_ops(CreateCategoryAction)
@@ -60,3 +67,6 @@ class PrometheusQueryPresetCategoryProcessors:
         self.bulk_get_categories = group.partial_bulk_get_ops(BulkGetCategoriesAction)
         self.scoped_search_categories = group.scoped_search_ops(ScopedSearchCategoriesAction)
         self.purge_category = group.entity_purge_ops(PurgeCategoryAction)
+        self.partial_bulk_purge_categories = group.entity_partial_bulk_purge_ops(
+            PartialBulkPurgeCategoriesAction
+        )

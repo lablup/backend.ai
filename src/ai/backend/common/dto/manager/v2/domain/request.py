@@ -5,12 +5,14 @@ Shared between Client SDK and Manager API.
 
 from __future__ import annotations
 
+from uuid import UUID
+
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
-from ai.backend.common.dto.manager.v2.common import String64
+from ai.backend.common.dto.manager.v2.common import NonEmptyList, String64
 from ai.backend.common.dto.manager.v2.domain.types import (
     DomainOrderField,
     DomainProjectFilter,
@@ -18,6 +20,7 @@ from ai.backend.common.dto.manager.v2.domain.types import (
     DomainUserFilter,
     OrderDirection,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.tristate.unset import UNSET, Unset
 
 __all__ = (
@@ -27,6 +30,10 @@ __all__ = (
     "RestoreDomainInput",
     "DomainFilter",
     "DomainOrder",
+    "PartialBulkDeleteDomainsInput",
+    "PartialBulkRestoreDomainsInput",
+    "PartialBulkUpdateDomainItemInput",
+    "PartialBulkUpdateDomainsInput",
     "PurgeDomainInput",
     "ScopedSearchDomainsInput",
     "SearchDomainsRequest",
@@ -72,7 +79,13 @@ class UpdateDomainInput(BaseRequestModel):
     )
     is_active: bool | None | Unset = Field(
         default=UNSET,
-        description="Updated active status. Omit to leave unchanged.",
+        description=(
+            f"Deprecated since {NEXT_RELEASE_VERSION}. Use the domain delete and restore "
+            "operations. false soft-deletes the domain and true restores it, as those "
+            "operations do; nothing happens when it is already in that state. Omit to "
+            "leave unchanged."
+        ),
+        deprecated=True,
     )
     allowed_docker_registries: list[str] | None | Unset = Field(
         default=UNSET,
@@ -102,11 +115,46 @@ class PurgeDomainInput(BaseRequestModel):
     name: str = Field(description="Name of the domain to permanently purge.")
 
 
+class PartialBulkUpdateDomainItemInput(BaseRequestModel):
+    """One domain of a partial bulk update and the fields to update on it."""
+
+    id: UUID = Field(description="ID of the domain to update.")
+    input: UpdateDomainInput = Field(description="Fields to update on the domain.")
+
+
+class PartialBulkUpdateDomainsInput(BaseRequestModel):
+    """Input for updating several domains, each answered for separately."""
+
+    items: NonEmptyList[PartialBulkUpdateDomainItemInput] = Field(
+        description="The domains to update, each with its fields."
+    )
+
+
+class PartialBulkDeleteDomainsInput(BaseRequestModel):
+    """Input for soft-deleting several domains, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the domains to soft-delete.")
+
+
+class PartialBulkRestoreDomainsInput(BaseRequestModel):
+    """Input for restoring several soft-deleted domains, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the domains to restore.")
+
+
 class DomainFilter(BaseRequestModel):
     """Filter criteria for searching domains."""
 
     name: StringFilter | None = Field(default=None, description="Filter by domain name.")
-    id: UUIDFilter | None = Field(default=None, description="Filter by domain uuid.")
+    id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `entity_id`.",
+        deprecated=True,
+    )
+    entity_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by domain ID.",
+    )
     description: StringFilter | None = Field(default=None, description="Filter by description.")
     is_active: bool | None = Field(default=None, description="Filter by active status.")
     created_at: DateTimeFilter | None = Field(default=None, description="Filter by creation time.")

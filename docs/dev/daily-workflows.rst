@@ -251,7 +251,7 @@ For example, the Ruff executable is exported as ``dist/export/bin/ruff``.
 Other tools that require Python virtualenv (e.g., Mypy) are still exported as virtualenvs.
 
 For Pantsbuild 2.23 or older, the tool binaries are exported as regular Python virtualenvs like
-``dist/export/python/virtualenvs/ruff/3.13.7/bin/ruff``.
+``dist/export/python/virtualenvs/ruff/3.13.18/bin/ruff``.
 
 Currently we have the following Python tools to configure in this way:
 
@@ -315,7 +315,7 @@ Set the following keys in the workspace settings to configure Python tools:
    * - Setting ID
      - Example value
    * - ``mypy-type-checker.interpreter``
-     - ``["/abs/path/to/dist/export/python/virtualenvs/mypy/3.13.7/bin/python"]`` (use the absolute path)
+     - ``["/abs/path/to/dist/export/python/virtualenvs/mypy/3.13.18/bin/python"]`` (use the absolute path)
    * - ``mypy-type-checker.importStrategy``
      - ``"fromEnvironment"``
    * - ``ruff.path``
@@ -349,7 +349,7 @@ Then put the followings in ``.vimrc`` (or ``.nvimrc`` for NeoVim) in the build r
 .. code-block:: vim
 
    let s:cwd = getcwd()
-   let g:ale_python_mypy_executable = s:cwd . '/dist/export/python/virtualenvs/mypy/3.13.7/bin/mypy'
+   let g:ale_python_mypy_executable = s:cwd . '/dist/export/python/virtualenvs/mypy/3.13.18/bin/mypy'
    let g:ale_python_ruff_executable = s:cwd . '/dist/export/bin/ruff'
    let g:ale_linters = { "python": ['ruff', 'mypy'] }
    let g:ale_fixers = {'python': ['ruff']}
@@ -366,10 +366,10 @@ as basedpyright shares most configurations with pyright).
    {
      "coc.preferences.formatOnType": true,
      "coc.preferences.formatOnSaveFiletypes": ["python"],
-     "python.pythonPath": "dist/export/python/virtualenvs/python-default/3.13.7/bin/python",
-     "python.analysis.extraPaths": ["dist/export/python/virtualenvs/pytest/3.13.7/lib/python3.13/site-packages"],
+     "python.pythonPath": "dist/export/python/virtualenvs/python-default/3.13.18/bin/python",
+     "python.analysis.extraPaths": ["dist/export/python/virtualenvs/pytest/3.13.18/lib/python3.13/site-packages"],
      "python.linting.mypyEnabled": true,
-     "python.linting.mypyPath": "dist/export/python/virtualenvs/mypy/3.13.7/bin/mypy",
+     "python.linting.mypyPath": "dist/export/python/virtualenvs/mypy/3.13.18/bin/mypy",
      "python.linting.ruffEnabled": true,
      "python.linting.ruffPath": "dist/export/bin/ruff",
      "python.formatting.provider": "ruff",
@@ -381,10 +381,10 @@ as basedpyright shares most configurations with pyright).
    {
      "coc.preferences.formatOnType": true,
      "coc.preferences.formatOnSaveFiletypes": ["python"],
-     "python.pythonPath": "dist/export/python/virtualenvs/python-default/3.13.7/bin/python",
-     "python.analysis.extraPaths": ["dist/export/python/virtualenvs/pytest/3.13.7/lib/python3.13/site-packages"],
+     "python.pythonPath": "dist/export/python/virtualenvs/python-default/3.13.18/bin/python",
+     "python.analysis.extraPaths": ["dist/export/python/virtualenvs/pytest/3.13.18/lib/python3.13/site-packages"],
      "python.linting.mypyEnabled": true,
-     "python.linting.mypyPath": "dist/export/python/virtualenvs/mypy/3.13.7/bin/mypy",
+     "python.linting.mypyPath": "dist/export/python/virtualenvs/mypy/3.13.18/bin/mypy",
      "python.linting.ruffEnabled": false,  // delegate to coc-ruff
      "python.formatting.provider": "none",  // delegate to coc-ruff
      "pyright.organizeimports.provider": "none",  // delegate to coc-ruff
@@ -814,10 +814,10 @@ What the script does, in the order that matters:
   receiving backports and drops out of the installer channel selection.  See
   :doc:`/dev/version-management-and-upgrades`.
 
-* After a sprint release (``X.Y.0``), ``NEXT_RELEASE_VERSION`` is advanced to the
-  next sprint as a separate ``chore:`` commit.  Set ``NEXT_DEV_VERSION`` to
-  override the computed default (e.g. ``NEXT_DEV_VERSION=27.1.0`` for a year
-  rollover).
+* ``NEXT_RELEASE_VERSION`` is not advanced here.  When an ``X.Y.0rc1`` cuts
+  ``X.Y``, ``create-version-branch.yml`` opens a PR advancing it on ``main`` to
+  ``X.(Y+1).0``.  For a year rollover, set the ``NEXT_DEV_VERSION`` repository
+  variable (e.g. ``27.1.0``) before the rc1 merges, and clear it afterwards.
 
 Then, by hand:
 

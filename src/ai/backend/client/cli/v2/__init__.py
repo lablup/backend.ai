@@ -180,6 +180,15 @@ def runtime_variant_preset() -> None:
     """Runtime variant preset commands."""
 
 
+@v2.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.system_session_environ:system_session_environ",
+    name="system-session-environ",
+)
+def system_session_environ() -> None:
+    """System session environ commands."""
+
+
 # ------------------------------------------------------------------ Model Store
 
 

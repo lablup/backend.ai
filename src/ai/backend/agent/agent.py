@@ -88,6 +88,7 @@ from ai.backend.agent.tasks import (
 from ai.backend.common.asyncio import cancel_tasks, current_loop, run_in_executor_with_context
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, BackgroundTaskManagerArgs
 from ai.backend.common.cgroup import CgroupController
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyBgtaskClient
 from ai.backend.common.clients.valkey_client.valkey_container_log.client import (
     ValkeyContainerLogClient,
@@ -114,6 +115,7 @@ from ai.backend.common.docker import (
     DEFAULT_KERNEL_FEATURE,
     MAX_KERNELSPEC,
     MIN_KERNELSPEC,
+    RUNNER_RESERVED_ENVIRON_KEYS,
     ImageRef,
     KernelFeatures,
     LabelName,
@@ -177,6 +179,7 @@ from ai.backend.common.events.types import (
 )
 from ai.backend.common.exception import (
     ConfigurationError,
+    InvalidVFolderMountSourceError,
     VolumeMountFailed,
 )
 from ai.backend.common.json import (
@@ -195,6 +198,7 @@ from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.runner.types import Runner
 from ai.backend.common.service_ports import parse_service_ports
+from ai.backend.common.storage.vfolder.subpath import VFolderSubpath, resolve_vfolder_subpath
 from ai.backend.common.typed_validators import HostPortPair
 from ai.backend.common.types import (
     AbuseReportValue,
@@ -243,6 +247,7 @@ from ai.backend.logging.structured import StructuredLogger, with_log_context
 from . import __version__ as VERSION
 from .affinity_map import AffinityMap
 from .config.unified import AgentUnifiedConfig, ContainerSandboxType
+from .defs import FALLBACK_KERNEL_PYTHON_VERSION
 from .errors import (
     ContainerCreationError,
     ContainerCreationFailedError,
@@ -263,8 +268,8 @@ from .kernel import (
     AbstractKernel,
     KernelRegistry,
     match_distro_data,
+    read_krunner_python_version,
 )
-from .kernel_registry.writer.types import KernelRegistrySaveMetadata
 from .observer.host_port import HostPortObserver
 from .observer.kernel_presence import KernelPresenceObserver
 from .observer.orphan_kernel_cleanup import OrphanKernelCleanupObserver
@@ -422,6 +427,17 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
         """
         self.kernel_config["bootstrap_script"] = script
 
+    def kernel_config_for_restart(self) -> KernelCreationConfig:
+        """
+        Return the kernel config to store for restarts, without the registry account.
+        """
+        image = self.kernel_config["image"]
+        registry = {**image["registry"], "username": None, "password": None}
+        return cast(
+            KernelCreationConfig,
+            {**self.kernel_config, "image": {**image, "registry": registry}},
+        )
+
     @property
     @abstractmethod
     def repl_ports(self) -> Sequence[int]:
@@ -530,23 +546,9 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
         matched_libc_style = "glibc"
         if distro.startswith("alpine"):
             matched_libc_style = "musl"
-        krunner_pyver = "3.6"  # fallback
-        if m := re.search(r"^([a-z-]+)(\d+(\.\d+)*)?$", matched_distro):
-            matched_distro_pkgname = m.group(1).replace("-", "_")
-            try:
-                krunner_pyver = (
-                    Path(
-                        str(
-                            files(f"ai.backend.krunner.{matched_distro_pkgname}").joinpath(
-                                f"krunner-python.{matched_distro}.txt"
-                            )
-                        )
-                    )
-                    .read_text()
-                    .strip()
-                )
-            except FileNotFoundError:
-                pass
+        krunner_pyver = (
+            read_krunner_python_version(matched_distro) or FALLBACK_KERNEL_PYTHON_VERSION
+        )
         log.debug(
             "krunner selected",
             krunner_distro=matched_distro,
@@ -557,6 +559,21 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
         arch = get_arch_name()
         return arch, matched_distro, matched_libc_style, krunner_volume, krunner_pyver
 
+    async def _resolve_vfolder_mount_source(self, vfolder: VFolderMount) -> Path:
+        host_path = Path(vfolder.host_path)
+        subpath_parts = vfolder.vfsubpath.parts
+        if not subpath_parts:
+            return host_path
+        if host_path.parts[-len(subpath_parts) :] != subpath_parts:
+            raise InvalidVFolderMountSourceError(
+                f"The host path {host_path} does not end with the subpath {vfolder.vfsubpath}"
+            )
+        target = VFolderSubpath(
+            base_path=Path(*host_path.parts[: -len(subpath_parts)]),
+            subpath=vfolder.vfsubpath,
+        )
+        return await run_in_executor_with_context(None, resolve_vfolder_subpath, target)
+
     async def mount_vfolders(
         self,
         vfolders: Sequence[VFolderMount],
@@ -566,9 +583,10 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
             if self.internal_data.get("prevent_vfolder_mounts", False):
                 if vfolder.name != ".logs":
                     continue
+            source = await self._resolve_vfolder_mount_source(vfolder)
             mount = Mount(
                 MountTypes.BIND,
-                Path(vfolder.host_path),
+                source,
                 Path(vfolder.kernel_path),
                 vfolder.mount_perm,
             )
@@ -638,6 +656,7 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
         mount_static_binary(f"dropbearmulti.{arch}.bin", "/opt/kernel/dropbearmulti")
         mount_static_binary(f"sftp-server.{arch}.bin", "/opt/kernel/sftp-server")
         mount_static_binary(f"tmux.{arch}.bin", "/opt/kernel/tmux")
+        mount_static_binary(f"etty.{arch}.bin", "/opt/kernel/etty")
         mount_static_binary(f"ttyd_linux.{arch}.bin", "/opt/kernel/ttyd")
         mount_static_binary("yank.sh", "/opt/kernel/yank.sh")
         mount_static_binary(f"all-smi.{arch}.bin", "/usr/local/bin/all-smi")
@@ -848,10 +867,13 @@ class AbstractAgent[
     port_pool: PortPool
 
     restarting_kernels: MutableMapping[KernelId, RestartTracker]
+    #: How many containers this agent may be building at once, shared by every request.
+    kernel_creation_sema: asyncio.Semaphore
     _local_cron: LocalCron | None
     container_lifecycle_queue: asyncio.Queue[ContainerLifecycleEvent | Sentinel]
 
     agent_public_key: PublicKey | None
+    _sentinel_monitors: SentinelMonitorSet
 
     stat_ctx: StatContext
     stat_sync_sockpath: Path
@@ -919,8 +941,10 @@ class AbstractAgent[
         computers: Mapping[DeviceName, ComputerContext],
         slots: Mapping[SlotName, Decimal],
         agent_class: AgentClass,
+        sentinel_monitors: SentinelMonitorSet,
     ) -> None:
         self._skip_initial_scan = skip_initial_scan
+        self._sentinel_monitors = sentinel_monitors
         self.loop = current_loop()
         self.etcd = etcd
         self.local_config = local_config
@@ -967,6 +991,9 @@ class AbstractAgent[
         """
         self.resource_lock = asyncio.Lock()
         self.registry_lock = asyncio.Lock()
+        self.kernel_creation_sema = asyncio.Semaphore(
+            self.local_config.agent.kernel_creation_concurrency
+        )
         self.container_lifecycle_queue = asyncio.Queue()
 
         if self.local_config.redis is None:
@@ -977,6 +1004,15 @@ class AbstractAgent[
         redis_profile_target = self.local_config.redis.to_redis_profile_target()
         stream_redis_target = redis_profile_target.profile_target(RedisRole.STREAM)
         mq = await self._make_message_queue(stream_redis_target)
+        sentinel_monitors = self._sentinel_monitors
+        container_log_target = redis_profile_target.profile_target(
+            RedisRole.CONTAINER_LOG
+        ).to_valkey_target()
+        stream_target = stream_redis_target.to_valkey_target()
+        stat_target = redis_profile_target.profile_target(RedisRole.STATISTICS).to_valkey_target()
+        bgtask_target = redis_profile_target.profile_target(RedisRole.BGTASK).to_valkey_target()
+        image_target = redis_profile_target.profile_target(RedisRole.IMAGE).to_valkey_target()
+        live_target = redis_profile_target.profile_target(RedisRole.LIVE).to_valkey_target()
         self.event_producer = EventProducer(
             mq,
             source=self.id,
@@ -988,34 +1024,40 @@ class AbstractAgent[
             event_observer=self._metric_registry.event,
         )
         self.valkey_container_log_client = await ValkeyContainerLogClient.create(
-            redis_profile_target.profile_target(RedisRole.CONTAINER_LOG).to_valkey_target(),
+            container_log_target,
             human_readable_name="agent.container_log",
             db_id=REDIS_CONTAINER_LOG,
+            sentinel_monitor=sentinel_monitors.monitor_for(container_log_target),
         )
         self.valkey_stream_client = await ValkeyStreamClient.create(
-            redis_profile_target.profile_target(RedisRole.STREAM).to_valkey_target(),
+            stream_target,
             human_readable_name="event_producer.stream",
             db_id=REDIS_STREAM_DB,
+            sentinel_monitor=sentinel_monitors.monitor_for(stream_target),
         )
         self.valkey_stat_client = await ValkeyStatClient.create(
-            redis_profile_target.profile_target(RedisRole.STATISTICS).to_valkey_target(),
+            stat_target,
             human_readable_name="agent.stat",
             db_id=REDIS_STATISTICS_DB,
+            sentinel_monitor=sentinel_monitors.monitor_for(stat_target),
         )
         self.valkey_bgtask_client = await ValkeyBgtaskClient.create(
-            redis_profile_target.profile_target(RedisRole.BGTASK).to_valkey_target(),
+            bgtask_target,
             human_readable_name="agent.bgtask",
             db_id=REDIS_BGTASK_DB,
+            sentinel_monitor=sentinel_monitors.monitor_for(bgtask_target),
         )
         self.valkey_image_client = await ValkeyImageClient.create(
-            redis_profile_target.profile_target(RedisRole.IMAGE).to_valkey_target(),
+            image_target,
             human_readable_name="agent.image",
             db_id=REDIS_IMAGE_DB,
+            sentinel_monitor=sentinel_monitors.monitor_for(image_target),
         )
         self.valkey_schedule_client = await ValkeyScheduleClient.create(
-            redis_profile_target.profile_target(RedisRole.LIVE).to_valkey_target(),
+            live_target,
             human_readable_name="agent.kernel_presence",
             db_id=REDIS_LIVE_DB,
+            sentinel_monitor=sentinel_monitors.monitor_for(live_target),
         )
         self.background_task_manager = BackgroundTaskManager(
             BackgroundTaskManagerArgs(
@@ -1117,6 +1159,7 @@ class AbstractAgent[
         return await RedisQueue.create(
             stream_redis_target,
             args,
+            self._sentinel_monitors.monitor_for(stream_redis_target.to_valkey_target()),
         )
 
     async def shutdown(self, stop_signal: signal.Signals) -> None:
@@ -1133,7 +1176,6 @@ class AbstractAgent[
                 if kernel_obj.runner is not None:
                     await kernel_obj.runner.close()
                 await kernel_obj.close()
-            await self.save_last_registry(force=True)
 
         # Stop timers.
         if self._local_cron is not None:
@@ -1169,11 +1211,7 @@ class AbstractAgent[
         raise NotImplementedError
 
     @abstractmethod
-    async def _write_kernel_registry_to_recovery(
-        self,
-        kernel_registry: MutableMapping[KernelId, AbstractKernel],
-        metadata: KernelRegistrySaveMetadata,
-    ) -> None:
+    async def _write_kernel_to_recovery(self, kernel: AbstractKernel) -> None:
         raise NotImplementedError
 
     async def _pre_anycast_event(self, event: AbstractEvent) -> None:
@@ -1191,8 +1229,6 @@ class AbstractAgent[
                             await t
                         except asyncio.CancelledError:
                             continue
-        if isinstance(event, (KernelStartedAnycastEvent, KernelTerminatedAnycastEvent)):
-            await self.save_last_registry()
 
     async def anycast_event(self, event: AbstractAnycastEvent) -> None:
         """
@@ -1632,7 +1668,6 @@ class AbstractAgent[
                 ev = await self.container_lifecycle_queue.get()
                 log.debug("lifecycle event received", lifecycle_event=str(ev))
                 if isinstance(ev, Sentinel):
-                    await self.save_last_registry(force=True)
                     return
                 # attrs currently does not support customizing getstate/setstate dunder methods
                 # until the next release.
@@ -1713,6 +1748,9 @@ class AbstractAgent[
                 kernel_id=kernel_id,
                 lifecycle_event=event,
             )
+        # The reason may be free text (RPC `status_info`, or a restored `termination_reason`); a
+        # non-enum value would kill the lifecycle task in `_handle_clean_event`.
+        reason = KernelLifecycleEventReason.from_value(reason) or KernelLifecycleEventReason.UNKNOWN
         await self.container_lifecycle_queue.put(
             ContainerLifecycleEvent(
                 kernel_id,
@@ -2602,7 +2640,12 @@ class AbstractAgent[
                     cluster_ssh_port_mapping=cluster_info.get("cluster_ssh_port_mapping"),
                 )
                 log.debug("kernel creation context initialized")
-                environ: dict[str, str] = {**kernel_config["environ"]}
+                # Drop the runner-reserved keys the caller sent; the agent sets them below.
+                environ: dict[str, str] = {
+                    k: v
+                    for k, v in kernel_config["environ"].items()
+                    if k not in RUNNER_RESERVED_ENVIRON_KEYS
+                }
 
                 # Inject Backend.AI-intrinsic env-variables for gosu
                 if (ouid := ctx.get_overriding_uid()) is not None:
@@ -2827,6 +2870,13 @@ class AbstractAgent[
                         "host_ports": (None,),
                         "is_inference": False,
                     })
+                    service_ports.append({
+                        "name": "etty",
+                        "protocol": ServicePortProtocols.HTTP,
+                        "container_ports": (7682,),
+                        "host_ports": (None,),
+                        "is_inference": False,
+                    })
 
                     model_definition: ModelDefinition | None = None
                     # Read model config
@@ -2911,6 +2961,9 @@ class AbstractAgent[
                         cmdargs += ["--"]
                     if self.local_config.debug.kernel_runner:
                         krunner_opts.append("--debug")
+                    krunner_opts += ["--session-id", str(session_id)]
+                    for cluster_role in cluster_info["replicas"]:
+                        krunner_opts += ["--cluster-role", cluster_role]
                     cmdargs += [
                         "/opt/backend.ai/bin/python",
                         "-s",
@@ -2930,14 +2983,13 @@ class AbstractAgent[
                     await self.restart_kernel__store_config(
                         kernel_id,
                         "kconfig.dat",
-                        pickle.dumps(ctx.kernel_config),
+                        pickle.dumps(ctx.kernel_config_for_restart()),
                     )
-                    if not restarting:
-                        await self.restart_kernel__store_config(
-                            kernel_id,
-                            "cluster.json",
-                            dump_json(cluster_info),
-                        )
+                    await self.restart_kernel__store_config(
+                        kernel_id,
+                        "cluster.json",
+                        dump_json(cluster_info),
+                    )
                     log.debug("kernel restart configs stored")
 
                     if self.local_config.debug.log_kernel_config:
@@ -3184,18 +3236,7 @@ class AbstractAgent[
                             resource_spec.allocations, attached_devices
                         ),
                     )
-                    await self.anycast_and_broadcast_event(
-                        KernelStartedAnycastEvent(
-                            kernel_id=kernel_id,
-                            session_id=session_id,
-                            creation_info=creation_info,
-                        ),
-                        KernelStartedBroadcastEvent(
-                            kernel_id=kernel_id,
-                            session_id=session_id,
-                            creation_info=creation_info,
-                        ),
-                    )
+                    await self._notify_kernel_started(kernel_obj, creation_info)
                     async with self.registry_lock:
                         kernel_obj.state = KernelLifecycleStatus.RUNNING
 
@@ -3208,6 +3249,28 @@ class AbstractAgent[
                 except Exception:
                     await self.reconstruct_resource_usage()
                     raise
+
+    async def _notify_kernel_started(
+        self,
+        kernel_obj: KernelObjectType,
+        creation_info: KernelCreationInfo,
+    ) -> None:
+        try:
+            await self._write_kernel_to_recovery(kernel_obj)
+        except Exception as e:
+            log.exception("kernel recovery data save failed", error_repr=repr(e))
+        await self.anycast_and_broadcast_event(
+            KernelStartedAnycastEvent(
+                kernel_id=kernel_obj.kernel_id,
+                session_id=kernel_obj.session_id,
+                creation_info=creation_info,
+            ),
+            KernelStartedBroadcastEvent(
+                kernel_id=kernel_obj.kernel_id,
+                session_id=kernel_obj.session_id,
+                creation_info=creation_info,
+            ),
+        )
 
     async def start_model_service_and_handle_failure(
         self,
@@ -3556,12 +3619,6 @@ class AbstractAgent[
     async def ping_kernel(self, kernel_id: KernelId) -> dict[str, float] | None:
         return await self._get_live_kernel(kernel_id).ping()
 
-    async def save_last_registry(self, force: bool = False) -> None:
-        await self._write_kernel_registry_to_recovery(
-            self.kernel_registry,
-            KernelRegistrySaveMetadata(force),
-        )
-
 
 async def handle_volume_mount(
     context: AbstractAgent[Any, Any],
@@ -3589,8 +3646,7 @@ async def handle_volume_mount(
             event.fs_type,
             event.cmd_options,
             event.edit_fstab,
-            event.fstab_path,
-            mount_prefix,
+            mount_prefix=mount_prefix,
         )
         if context.local_config.agent.mount_path_uid_gid is not None:
             await chown(
@@ -3637,7 +3693,6 @@ async def handle_volume_umount(
             str(real_path),
             mount_prefix,
             event.edit_fstab,
-            event.fstab_path,
             timeout_sec=float(timeout) if timeout is not None else None,
         )
     except VolumeMountFailed as e:

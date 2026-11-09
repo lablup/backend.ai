@@ -12,6 +12,8 @@ from dataclasses import dataclass
 
 import pytest
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
+from ai.backend.common.config import DefaultModelDefinition
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
@@ -21,7 +23,6 @@ from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.deployment.types import ModelDeploymentData
 from ai.backend.manager.data.deployment_revision_preset.types import (
     DeploymentRevisionPresetData,
@@ -49,7 +50,6 @@ from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.endpoint.searchable_fields import DeploymentSearchableFields
 from ai.backend.manager.models.endpoint.searchers import DeploymentSearcher
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.keypair.row import KeyPairRow
@@ -57,7 +57,8 @@ from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
 from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
-from ai.backend.manager.models.resource_group.row import ResourceGroupOpts, ResourceGroupRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -236,7 +237,11 @@ class TestDeploymentUsage:
             db_sess.add(image)
 
             variants = [
-                RuntimeVariantRow(id=RuntimeVariantID(uuid.uuid4()), name=f"variant-{label}")
+                RuntimeVariantRow(
+                    id=RuntimeVariantID(uuid.uuid4()),
+                    name=f"variant-{label}",
+                    default_model_definition=DefaultModelDefinition(),
+                )
                 for label in ("used", "unused")
             ]
             db_sess.add_all(variants)

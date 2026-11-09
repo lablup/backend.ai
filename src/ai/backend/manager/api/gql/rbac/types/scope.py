@@ -10,7 +10,6 @@ from ai.backend.common.dto.manager.v2.rbac.types import (
     PermissionBitDTO,
     ScopeInputDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -60,7 +59,7 @@ class EntityTypeScopeGQL(PydanticInputMixin[EntityTypeScope]):
 
 PermissionBitGQL: type[PermissionBitDTO] = gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="One bit of a permission mask.",
     ),
     PermissionBitDTO,
@@ -75,7 +74,7 @@ PermissionBitGQL: type[PermissionBitDTO] = gql_enum(
     BackendAIGQLMeta(
         added_version="26.3.0",
         description="Unified RBAC element type for scope-entity relationships.",
-        deprecated_version=NEXT_RELEASE_VERSION,
+        deprecated_version="26.9.0",
         deprecation_hint="an entity type string",
     ),
     name="RBACElementType",
@@ -135,7 +134,7 @@ class RBACElementTypeGQL(StrEnum):
             "Supports equals / in / not_equals / not_in."
         ),
         added_version="26.4.4",
-        deprecated_version=NEXT_RELEASE_VERSION,
+        deprecated_version="26.9.0",
         deprecation_hint="`StringFilter`",
     ),
     name="RBACElementTypeFilter",

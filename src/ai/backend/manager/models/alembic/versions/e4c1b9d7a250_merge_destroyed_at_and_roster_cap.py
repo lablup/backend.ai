@@ -12,7 +12,7 @@ Create Date: 2026-09-22
 from __future__ import annotations
 
 # revision identifiers, used by Alembic.
-revision = "e4c1b9d7a250"  # Part of: NEXT_RELEASE_VERSION
+revision = "e4c1b9d7a250"  # Part of: 26.9.0
 down_revision = ("d3a7c1e5b904", "d3f9a2c81b47")
 branch_labels = None
 depends_on = None

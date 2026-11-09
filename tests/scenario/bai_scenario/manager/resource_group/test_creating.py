@@ -16,7 +16,7 @@ from ai.backend.manager.api.adapters.resource_group.adapter import ResourceGroup
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.resource import DefaultResourceGroupAlreadyExists
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.resource_group import (
     AGroupAndACaller,
@@ -25,10 +25,10 @@ from bai_scenario.components.resource_group import (
 )
 from bai_scenario.components.system import ACaller, SomeoneAlone
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type CreatingStep = Scenario[SeedingSession, Any, ResourceGroupAdapter, ResourceGroupDetailNode]
+type CreatingStep = Scenario[TestSeedingSession, Any, ResourceGroupAdapter, ResourceGroupDetailNode]
 
 
 @dataclass(frozen=True)
@@ -44,8 +44,16 @@ class Creating(When[Any, ResourceGroupAdapter, ResourceGroupDetailNode]):
 
     @override
     def describe(self, laid: Any) -> str:
-        what = "기본 그룹으로 " if self.is_default else ""
-        return f"{laid.caller.username}이 {self.named or laid.group.name}을 {what}생성"
+        if self.is_default:
+            what_ko = "기본 그룹으로 "
+            what_en = " as the default group"
+        else:
+            what_ko = ""
+            what_en = ""
+        return Says(
+            f"{laid.caller.username}이 {self.named or laid.group.name}을 {what_ko}생성합니다",
+            english=f"{laid.caller.username} creates {self.named or laid.group.name}{what_en}",
+        )
 
     @override
     async def call(self, adapter: ResourceGroupAdapter, laid: Any) -> ResourceGroupDetailNode:
@@ -62,7 +70,7 @@ class Creating(When[Any, ResourceGroupAdapter, ResourceGroupDetailNode]):
 
 @dataclass(frozen=True)
 class TheSuperadminMakesAGroup(
-    Scenario[SeedingSession, ACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+    Scenario[TestSeedingSession, ACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
     started: datetime
 
@@ -72,13 +80,18 @@ class TheSuperadminMakesAGroup(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 이름만 주고 리소스 그룹을 만들면, "
-            "활성이고 공개이며 기본이 아닌 그룹 전체가 코드의 기본값으로 채워져 반환된다"
+        return Says(
+            "superadmin 이 이름만 주고 자원 그룹을 생성하면, 활성이고 공개이며 기본이 아닌 그룹 "
+            "전체가 코드의 기본값으로 채워져 반환됩니다",
+            english=(
+                "when the superadmin creates a resource group with only a name, the whole group "
+                "comes back active, public and not the default, filled from the defaults in "
+                "the code"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ACaller]:
+    def given(self) -> Given[TestSeedingSession, ACaller]:
         return SomeoneAlone(role=UserRole.SUPERADMIN)
 
     @override
@@ -92,7 +105,7 @@ class TheSuperadminMakesAGroup(
 
 @dataclass(frozen=True)
 class ADefaultGroupIsMade(
-    Scenario[SeedingSession, ACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+    Scenario[TestSeedingSession, ACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
     started: datetime
 
@@ -102,10 +115,16 @@ class ADefaultGroupIsMade(
 
     @override
     def describe(self) -> str:
-        return "기본 그룹이 없을 때 슈퍼관리자가 기본으로 지정해 만들면 기본인 그룹이 반환된다"
+        return Says(
+            "기본 그룹이 없을 때 superadmin 이 기본으로 지정해 생성하면 기본인 그룹이 반환됩니다",
+            english=(
+                "when no default group exists and the superadmin creates one designated as the "
+                "default, the group comes back as the default"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ACaller]:
+    def given(self) -> Given[TestSeedingSession, ACaller]:
         return SomeoneAlone(role=UserRole.SUPERADMIN)
 
     @override
@@ -119,7 +138,7 @@ class ADefaultGroupIsMade(
 
 @dataclass(frozen=True)
 class ANameAnotherGroupHoldsIsRefused(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
     @override
     def summary(self) -> str:
@@ -127,10 +146,16 @@ class ANameAnotherGroupHoldsIsRefused(
 
     @override
     def describe(self) -> str:
-        return "이미 어떤 그룹이 쓰고 있는 이름으로 만들려 하면 이름 중복으로 거부된다"
+        return Says(
+            "이미 어떤 자원 그룹이 쓰고 있는 이름으로 생성하려 하면 이름 중복으로 거부됩니다",
+            english=(
+                "creating with a name another resource group already holds is rejected as a "
+                "duplicate name"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -144,7 +169,7 @@ class ANameAnotherGroupHoldsIsRefused(
 
 @dataclass(frozen=True)
 class ASecondDefaultIsRefused(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
     @override
     def summary(self) -> str:
@@ -152,10 +177,17 @@ class ASecondDefaultIsRefused(
 
     @override
     def describe(self) -> str:
-        return "기본 그룹이 이미 있을 때 다른 이름으로 또 기본 그룹을 만들려 하면 기본 그룹이 이미 있다는 이유로 거부된다"
+        return Says(
+            "기본 그룹이 이미 있을 때 다른 이름으로 또 기본 그룹을 생성하려 하면 기본 그룹이 "
+            "이미 있다는 이유로 거부됩니다",
+            english=(
+                "when a default group already exists, creating another default group under a "
+                "different name is rejected because a default group already exists"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone(role=UserRole.SUPERADMIN, is_default=True)
 
     @override
@@ -169,7 +201,7 @@ class ASecondDefaultIsRefused(
 
 @dataclass(frozen=True)
 class AUserWhoIsNotTheSuperadminMayNotCreate(
-    Scenario[SeedingSession, ACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+    Scenario[TestSeedingSession, ACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
     @override
     def summary(self) -> str:
@@ -177,10 +209,16 @@ class AUserWhoIsNotTheSuperadminMayNotCreate(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 리소스 그룹을 만들려 하면 역할 부족으로 거부된다"
+        return Says(
+            "superadmin 이 아닌 사용자가 자원 그룹을 생성하려 하면 역할 부족으로 거부됩니다",
+            english=(
+                "when a user who is not the superadmin tries to create a resource group, the "
+                "call is rejected for lacking the role"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ACaller]:
+    def given(self) -> Given[TestSeedingSession, ACaller]:
         return SomeoneAlone()
 
     @override
@@ -194,7 +232,7 @@ class AUserWhoIsNotTheSuperadminMayNotCreate(
 
 @dataclass(frozen=True)
 class TheMonitorMayNotCreate(
-    Scenario[SeedingSession, ACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+    Scenario[TestSeedingSession, ACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
     @override
     def summary(self) -> str:
@@ -202,10 +240,17 @@ class TheMonitorMayNotCreate(
 
     @override
     def describe(self) -> str:
-        return "모니터가 리소스 그룹을 만들려 하면 역할 부족으로 거부된다. 모니터는 읽기만 통과한다"
+        return Says(
+            "모니터가 자원 그룹을 생성하려 하면 역할 부족으로 거부됩니다. 모니터는 읽기만 "
+            "통과합니다",
+            english=(
+                "when the monitor tries to create a resource group, the call is rejected for "
+                "lacking the role. the monitor passes reads only"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ACaller]:
+    def given(self) -> Given[TestSeedingSession, ACaller]:
         return SomeoneAlone(role=UserRole.MONITOR)
 
     @override

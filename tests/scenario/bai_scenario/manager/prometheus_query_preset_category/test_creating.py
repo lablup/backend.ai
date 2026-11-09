@@ -26,6 +26,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Configured,
     Given,
+    Says,
     Scenario,
     Then,
     When,
@@ -40,16 +41,16 @@ from bai_scenario.components.prometheus_query_preset_category import (
     TheNewCategoryNode,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 MADE = "cpu"
-FRESH = "새로 만든 카테고리"
+FRESH = Says("새로 만든 카테고리", english="a freshly created category")
 ENFORCEMENT = "manager.rbac.enforcement_enabled"
 
 type Adapter = PrometheusQueryPresetCategoryAdapter
-type CreatingStep = Scenario[SeedingSession, ACallerAlone, Adapter, CategoryNodeAnswer]
-type RepeatingStep = Scenario[SeedingSession, ACategoryAndACaller, Adapter, CategoryNodeAnswer]
+type CreatingStep = Scenario[TestSeedingSession, ACallerAlone, Adapter, CategoryNodeAnswer]
+type RepeatingStep = Scenario[TestSeedingSession, ACategoryAndACaller, Adapter, CategoryNodeAnswer]
 
 
 @dataclass(frozen=True)
@@ -65,7 +66,10 @@ class Creating(When[ACallerAlone, Adapter, CategoryNodeAnswer]):
 
     @override
     def describe(self, laid: ACallerAlone) -> str:
-        return f"{laid.caller.username}이 이름 {self.named}(으)로 생성"
+        return Says(
+            f"{laid.caller.username}이 이름 {self.named}(으)로 생성합니다",
+            english=f"{laid.caller.username} creates it with the name {self.named}",
+        )
 
     @override
     async def call(self, adapter: Adapter, laid: ACallerAlone) -> CategoryNodeAnswer:
@@ -86,7 +90,13 @@ class CreatingUnderTheSameName(When[ACategoryAndACaller, Adapter, CategoryNodeAn
 
     @override
     def describe(self, laid: ACategoryAndACaller) -> str:
-        return f"{laid.caller.username}이 이미 있는 이름 {laid.category.name}(으)로 다시 생성"
+        return Says(
+            f"{laid.caller.username}이 이미 있는 이름 {laid.category.name}(으)로 다시 생성합니다",
+            english=(
+                f"{laid.caller.username} creates it again with the name "
+                f"{laid.category.name}, which already exists"
+            ),
+        )
 
     @override
     async def call(self, adapter: Adapter, laid: ACategoryAndACaller) -> CategoryNodeAnswer:
@@ -97,7 +107,7 @@ class CreatingUnderTheSameName(When[ACategoryAndACaller, Adapter, CategoryNodeAn
 
 @dataclass(frozen=True)
 class TheNameAloneMakesAWholeNode(
-    Scenario[SeedingSession, ACallerAlone, Adapter, CategoryNodeAnswer]
+    Scenario[TestSeedingSession, ACallerAlone, Adapter, CategoryNodeAnswer]
 ):
     started: datetime
 
@@ -107,12 +117,16 @@ class TheNameAloneMakesAWholeNode(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 이름만 지정해 카테고리를 생성하면, 설명이 비어 있는 노드 전체가 반환된다"
+        return Says(
+            "superadmin 이 이름만 지정해 카테고리를 생성하면, 설명이 비어 있는 노드 전체가 반환됩니다",
+            english=(
+                "when the superadmin creates a category with only a name, "
+                "the whole node comes back with an empty description"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ACallerAlone]:
+    def given(self) -> Given[TestSeedingSession, ACallerAlone]:
         return JustSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -126,7 +140,7 @@ class TheNameAloneMakesAWholeNode(
 
 @dataclass(frozen=True)
 class TheDescriptionComesBackAsGiven(
-    Scenario[SeedingSession, ACallerAlone, Adapter, CategoryNodeAnswer]
+    Scenario[TestSeedingSession, ACallerAlone, Adapter, CategoryNodeAnswer]
 ):
     started: datetime
 
@@ -136,10 +150,16 @@ class TheDescriptionComesBackAsGiven(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 이름과 설명을 함께 지정해 생성하면, 지정한 값이 그대로 담긴 노드가 반환된다"
+        return Says(
+            "superadmin 이 이름과 설명을 함께 지정해 생성하면, 지정한 값이 그대로 담긴 노드가 반환됩니다",
+            english=(
+                "when the superadmin creates a category with a name and a description, "
+                "the node comes back carrying the values as given"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ACallerAlone]:
+    def given(self) -> Given[TestSeedingSession, ACallerAlone]:
         return JustSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -153,7 +173,7 @@ class TheDescriptionComesBackAsGiven(
 
 @dataclass(frozen=True)
 class ANameAnotherCategoryHoldsIsRefused(
-    Scenario[SeedingSession, ACategoryAndACaller, Adapter, CategoryNodeAnswer]
+    Scenario[TestSeedingSession, ACategoryAndACaller, Adapter, CategoryNodeAnswer]
 ):
     @override
     def summary(self) -> str:
@@ -161,13 +181,18 @@ class ANameAnotherCategoryHoldsIsRefused(
 
     @override
     def describe(self) -> str:
-        return (
-            "이미 다른 카테고리가 사용 중인 이름으로 슈퍼관리자가 다시 생성하면, 이름 중복으로 "
-            "거부된다. 저장소의 유일 제약이 막는 것이고 도메인 오류로 옮겨져 있지 않다"
+        return Says(
+            "이미 다른 카테고리가 사용 중인 이름으로 superadmin 이 다시 생성하면, 이름 중복으로 "
+            "거부됩니다. 저장소의 유일 제약이 차단하는 것이고 도메인 오류로 옮겨져 있지 않습니다",
+            english=(
+                "when the superadmin creates a category again with a name another category "
+                "already holds, it is rejected as a duplicate name. The unique constraint of "
+                "the repository rejects it and it is not translated into a domain error"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ACategoryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ACategoryAndACaller]:
         return ACategoryAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -180,17 +205,25 @@ class ANameAnotherCategoryHoldsIsRefused(
 
 
 @dataclass(frozen=True)
-class APlainUserMayNotCreate(Scenario[SeedingSession, ACallerAlone, Adapter, CategoryNodeAnswer]):
+class APlainUserMayNotCreate(
+    Scenario[TestSeedingSession, ACallerAlone, Adapter, CategoryNodeAnswer]
+):
     @override
     def summary(self) -> str:
         return "a-user-who-is-not-the-superadmin-may-not-create-a-category"
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 카테고리를 생성하려 하면, 역할 부족으로 거부된다"
+        return Says(
+            "superadmin 이 아닌 사용자가 카테고리를 생성하려 하면, 역할 부족으로 거부됩니다",
+            english=(
+                "when a user who is not the superadmin tries to create a category, "
+                "the role rejects it"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ACallerAlone]:
+    def given(self) -> Given[TestSeedingSession, ACallerAlone]:
         return JustSomeone()
 
     @override
@@ -204,7 +237,7 @@ class APlainUserMayNotCreate(Scenario[SeedingSession, ACallerAlone, Adapter, Cat
 
 @dataclass(frozen=True)
 class EnforcementOffChangesNothing(
-    Scenario[SeedingSession, ACallerAlone, Adapter, CategoryNodeAnswer], Configured
+    Scenario[TestSeedingSession, ACallerAlone, Adapter, CategoryNodeAnswer], Configured
 ):
     @override
     def summary(self) -> str:
@@ -212,14 +245,17 @@ class EnforcementOffChangesNothing(
 
     @override
     def describe(self) -> str:
-        return "권한 검사를 꺼도 카테고리 생성은 여전히 거부된다"
+        return Says(
+            "권한 검사를 비활성화해도 카테고리 생성은 여전히 거부됩니다",
+            english="turning permission enforcement off still rejects creating a category",
+        )
 
     @override
     def config(self) -> Mapping[str, Any]:
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, ACallerAlone]:
+    def given(self) -> Given[TestSeedingSession, ACallerAlone]:
         return JustSomeone()
 
     @override

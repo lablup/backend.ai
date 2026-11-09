@@ -1,6 +1,6 @@
 """배포 훑기 — 세 문이 서로 다른 것으로 막는다.
 
-전역 훑기는 역할이 지킨다. 프로젝트 훑기는 그 프로젝트에, 내 것 훑기는 부르는 사람 자신의
+전역 훑기는 역할이 지킨다. 프로젝트 훑기는 그 프로젝트에, 내 것 훑기는 호출자 자신의
 스코프에 걸린 읽기 권한이 지킨다.
 """
 
@@ -29,6 +29,7 @@ from ai.backend.testutils.scenario_steps import (
     Given,
     Refused,
     Same,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -42,12 +43,12 @@ from bai_scenario.components.deployment import (
     MineBesideAnothers,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Searched = AdminSearchDeploymentsPayload
 type SearchingStep = Scenario[
-    SeedingSession, ManyDeploymentsAndACaller, DeploymentAdapter, Searched
+    TestSeedingSession, ManyDeploymentsAndACaller, DeploymentAdapter, Searched
 ]
 
 
@@ -61,7 +62,10 @@ class SearchingEverything(When[ManyDeploymentsAndACaller, DeploymentAdapter, Sea
 
     @override
     def describe(self, laid: ManyDeploymentsAndACaller) -> str:
-        return f"{laid.caller.username}이 필터 없이 전체 조회"
+        return Says(
+            f"{laid.caller.username} 이 필터 없이 전체를 조회합니다",
+            english=f"{laid.caller.username} searches everything without a filter",
+        )
 
     @override
     async def call(self, adapter: DeploymentAdapter, laid: ManyDeploymentsAndACaller) -> Searched:
@@ -71,7 +75,7 @@ class SearchingEverything(When[ManyDeploymentsAndACaller, DeploymentAdapter, Sea
 
 @dataclass(frozen=True)
 class SearchingTheProject(When[ManyDeploymentsAndACaller, DeploymentAdapter, Searched]):
-    """부르는 사람이 속한 프로젝트 안을 훑는다."""
+    """호출자가 속한 프로젝트 안을 훑는다."""
 
     @override
     def operation(self) -> str:
@@ -79,7 +83,10 @@ class SearchingTheProject(When[ManyDeploymentsAndACaller, DeploymentAdapter, Sea
 
     @override
     def describe(self, laid: ManyDeploymentsAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.place.project.name} 안을 조회"
+        return Says(
+            f"{laid.caller.username} 이 {laid.place.project.name} 안을 조회합니다",
+            english=f"{laid.caller.username} searches inside {laid.place.project.name}",
+        )
 
     @override
     async def call(self, adapter: DeploymentAdapter, laid: ManyDeploymentsAndACaller) -> Searched:
@@ -91,7 +98,7 @@ class SearchingTheProject(When[ManyDeploymentsAndACaller, DeploymentAdapter, Sea
 
 @dataclass(frozen=True)
 class SearchingMine(When[ManyDeploymentsAndACaller, DeploymentAdapter, Searched]):
-    """부르는 사람이 만든 것을 훑는다."""
+    """호출자가 만든 것을 훑는다."""
 
     @override
     def operation(self) -> str:
@@ -99,7 +106,10 @@ class SearchingMine(When[ManyDeploymentsAndACaller, DeploymentAdapter, Searched]
 
     @override
     def describe(self, laid: ManyDeploymentsAndACaller) -> str:
-        return f"{laid.caller.username}이 자기 것을 조회"
+        return Says(
+            f"{laid.caller.username} 이 자기 것을 조회합니다",
+            english=f"{laid.caller.username} searches their own",
+        )
 
     @override
     async def call(self, adapter: DeploymentAdapter, laid: ManyDeploymentsAndACaller) -> Searched:
@@ -117,7 +127,10 @@ class EveryLaidDeploymentIsFound(Then[ManyDeploymentsAndACaller, Searched]):
 
     @override
     def says(self) -> str:
-        return "심은 배포가 모두, 그리고 그것만 세어진다"
+        return Says(
+            "미리 저장한 배포가 모두, 그리고 그것만 셉니다",
+            english="every deployment seeded in advance is counted, and nothing else",
+        )
 
     @override
     def look(self, laid: ManyDeploymentsAndACaller, answered: Answered[Searched]) -> list[Verdict]:
@@ -138,7 +151,7 @@ class EveryLaidDeploymentIsFound(Then[ManyDeploymentsAndACaller, Searched]):
 
 @dataclass(frozen=True)
 class TheSuperadminCountsEveryOne(
-    Scenario[SeedingSession, ManyDeploymentsAndACaller, DeploymentAdapter, Searched]
+    Scenario[TestSeedingSession, ManyDeploymentsAndACaller, DeploymentAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -146,10 +159,16 @@ class TheSuperadminCountsEveryOne(
 
     @override
     def describe(self) -> str:
-        return "배포 셋이 있고 슈퍼관리자가 필터 없이 전체를 훑으면, 셋을 모두 센다"
+        return Says(
+            "배포 셋이 있고 superadmin 이 필터 없이 전체를 조회하면, 셋을 모두 셉니다",
+            english=(
+                "when three deployments exist and a superadmin searches everything without a "
+                "filter, all three are counted"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyDeploymentsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyDeploymentsAndACaller]:
         return ManyDeploymentsInThatPlace(role=UserRole.SUPERADMIN)
 
     @override
@@ -163,7 +182,7 @@ class TheSuperadminCountsEveryOne(
 
 @dataclass(frozen=True)
 class AGrantDoesNotOpenTheGlobalDoor(
-    Scenario[SeedingSession, ManyDeploymentsAndACaller, DeploymentAdapter, Searched]
+    Scenario[TestSeedingSession, ManyDeploymentsAndACaller, DeploymentAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -171,13 +190,17 @@ class AGrantDoesNotOpenTheGlobalDoor(
 
     @override
     def describe(self) -> str:
-        return (
-            "배포 읽기 권한을 받았지만 슈퍼관리자가 아닌 사용자가 전체를 훑으면, 역할로 "
-            "거부된다. 이 문은 권한 그래프가 아니라 역할이 지킨다"
+        return Says(
+            "배포 읽기 권한을 받았지만 superadmin 이 아닌 사용자가 전체를 조회하면, 역할로 "
+            "거부됩니다. 이 동작은 권한 그래프가 아니라 역할이 검사합니다",
+            english=(
+                "when a user granted deployment read but not a superadmin searches everything, the "
+                "role rejects it; the role checks this operation, not the permission graph"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyDeploymentsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyDeploymentsAndACaller]:
         return ManyDeploymentsInThatPlace(granted=(Permission.READ,))
 
     @override
@@ -191,7 +214,7 @@ class AGrantDoesNotOpenTheGlobalDoor(
 
 @dataclass(frozen=True)
 class OnlyThatProjectsOnesAreFound(
-    Scenario[SeedingSession, ManyDeploymentsAndACaller, DeploymentAdapter, Searched]
+    Scenario[TestSeedingSession, ManyDeploymentsAndACaller, DeploymentAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -199,13 +222,17 @@ class OnlyThatProjectsOnesAreFound(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "두 프로젝트에 배포가 나뉘어 있고 한쪽에만 읽기 권한을 받은 사용자가 그 "
-            "프로젝트를 훑으면, 그 프로젝트의 것만 나온다"
+            "프로젝트를 조회하면, 그 프로젝트의 것만 나옵니다",
+            english=(
+                "when deployments are split across two projects and a user granted read on only "
+                "one side searches that project, only that project's deployments come back"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyDeploymentsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyDeploymentsAndACaller]:
         return DeploymentsInTwoProjects(granted=(Permission.READ,))
 
     @override
@@ -219,7 +246,7 @@ class OnlyThatProjectsOnesAreFound(
 
 @dataclass(frozen=True)
 class AProjectWithNoGrantIsRefused(
-    Scenario[SeedingSession, ManyDeploymentsAndACaller, DeploymentAdapter, Searched]
+    Scenario[TestSeedingSession, ManyDeploymentsAndACaller, DeploymentAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -227,10 +254,16 @@ class AProjectWithNoGrantIsRefused(
 
     @override
     def describe(self) -> str:
-        return "그 프로젝트에 읽기 권한이 없는 사용자가 프로젝트를 훑으면, 권한 부족으로 거부된다"
+        return Says(
+            "그 프로젝트에 읽기 권한이 없는 사용자가 프로젝트를 조회하면, 권한 부족으로 거부됩니다",
+            english=(
+                "when a user without read permission on the project searches the project, the call "
+                "is rejected for lack of permission"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyDeploymentsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyDeploymentsAndACaller]:
         return ManyDeploymentsInThatPlace()
 
     @override
@@ -244,7 +277,7 @@ class AProjectWithNoGrantIsRefused(
 
 @dataclass(frozen=True)
 class OnlyMyOwnAreFound(
-    Scenario[SeedingSession, ManyDeploymentsAndACaller, DeploymentAdapter, Searched]
+    Scenario[TestSeedingSession, ManyDeploymentsAndACaller, DeploymentAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -252,13 +285,17 @@ class OnlyMyOwnAreFound(
 
     @override
     def describe(self) -> str:
-        return (
-            "같은 프로젝트에 두 사람이 각자 배포를 만들었고 자기 스코프에서 읽기 권한을 받은 "
-            "사람이 자기 것을 훑으면, 자기가 만든 것만 나온다"
+        return Says(
+            "같은 프로젝트에 두 사람이 각자 배포를 생성했고 자기 스코프에서 읽기 권한을 받은 "
+            "사람이 자기 것을 조회하면, 자기가 생성한 것만 나옵니다",
+            english=(
+                "when two users each created a deployment in the same project and the one granted "
+                "read in their own scope searches their own, only what they created comes back"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyDeploymentsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyDeploymentsAndACaller]:
         return MineBesideAnothers(reads_own=True)
 
     @override
@@ -272,7 +309,7 @@ class OnlyMyOwnAreFound(
 
 @dataclass(frozen=True)
 class MyOwnNeedAGrantToo(
-    Scenario[SeedingSession, ManyDeploymentsAndACaller, DeploymentAdapter, Searched]
+    Scenario[TestSeedingSession, ManyDeploymentsAndACaller, DeploymentAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -280,13 +317,18 @@ class MyOwnNeedAGrantToo(
 
     @override
     def describe(self) -> str:
-        return (
-            "자기 스코프에서 읽기 권한을 받지 않은 사람이 자기 것을 훑으면, 권한 부족으로 "
-            "거부된다. 이 문도 범위를 좁히기만 하지 않고 권한이 지킨다"
+        return Says(
+            "자기 스코프에서 읽기 권한을 받지 않은 사람이 자기 것을 조회하면, 권한 부족으로 "
+            "거부됩니다. 이 동작도 범위를 좁히기만 하지 않고 권한이 검사합니다",
+            english=(
+                "when a user not granted read in their own scope searches their own, the call is "
+                "rejected for lack of permission; here too the permission checks it rather than "
+                "only narrowing the scope"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyDeploymentsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyDeploymentsAndACaller]:
         return MineBesideAnothers()
 
     @override

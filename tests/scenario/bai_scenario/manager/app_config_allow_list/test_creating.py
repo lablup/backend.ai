@@ -28,7 +28,16 @@ from ai.backend.manager.errors.app_config import AppConfigDefinitionNotFound
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import (
+    Configured,
+    Given,
+    Language,
+    Says,
+    Scenario,
+    Then,
+    When,
+    in_language,
+)
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.app_config import ENFORCEMENT
 from bai_scenario.components.app_config_allow_list import (
@@ -37,12 +46,12 @@ from bai_scenario.components.app_config_allow_list import (
     TheNewEntryNode,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 from bai_scenario.seeds.app_config.allow_list import SCOPE_NAMES
 
 type CreatingStep = Scenario[
-    SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode
+    TestSeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode
 ]
 
 
@@ -59,10 +68,16 @@ class Opening(When[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowL
 
     @override
     def describe(self, laid: AnEntryAndACaller) -> str:
-        how = f"순위 {self.rank}" if self.rank is not None else "순위 생략"
-        return (
-            f"{laid.caller.username}이 {laid.name}의 {SCOPE_NAMES[self.scope_type]} "
-            f"allow_list 생성 ({how})"
+        scope = SCOPE_NAMES[self.scope_type]
+        scope_en = in_language(scope, Language.ENGLISH)
+        how_ko = f"순위 {self.rank}" if self.rank is not None else "순위 생략"
+        how_en = f"rank {self.rank}" if self.rank is not None else "rank omitted"
+        return Says(
+            f"{laid.caller.username}이 {laid.name}의 {scope} allow_list 를 생성합니다 ({how_ko})",
+            english=(
+                f"{laid.caller.username} creates the {scope_en} allow_list for {laid.name} "
+                f"({how_en})"
+            ),
         )
 
     @override
@@ -80,7 +95,9 @@ class Opening(When[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowL
 
 @dataclass(frozen=True)
 class LeavingTheRankOutTakesTheDefault(
-    Scenario[SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]
+    Scenario[
+        TestSeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode
+    ]
 ):
     started: datetime
     scope_type: AppConfigScopeType
@@ -91,13 +108,19 @@ class LeavingTheRankOutTakesTheDefault(
 
     @override
     def describe(self) -> str:
-        return (
-            f"슈퍼관리자가 순위를 생략하고 {SCOPE_NAMES[self.scope_type]} 스코프 유형의 allow_list를 "
-            f"생성하면, 순위 {self.scope_type.default_rank()}이 적용된다"
+        scope = SCOPE_NAMES[self.scope_type]
+        scope_en = in_language(scope, Language.ENGLISH)
+        return Says(
+            f"superadmin 이 순위를 생략하고 {scope} 스코프 유형의 allow_list 를 생성하면, "
+            f"순위 {self.scope_type.default_rank()}이 적용됩니다",
+            english=(
+                f"when the superadmin creates an allow_list of the {scope_en} scope kind "
+                f"with no rank, rank {self.scope_type.default_rank()} applies"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnEntryAndACaller]:
         return AnEntryAndSomeone(opened=None, role=UserRole.SUPERADMIN)
 
     @override
@@ -113,7 +136,9 @@ class LeavingTheRankOutTakesTheDefault(
 
 @dataclass(frozen=True)
 class AGivenRankIsKept(
-    Scenario[SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]
+    Scenario[
+        TestSeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode
+    ]
 ):
     started: datetime
 
@@ -123,10 +148,16 @@ class AGivenRankIsKept(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 순위를 지정해 allow_list를 생성하면, 지정한 값이 그대로 저장된다"
+        return Says(
+            "superadmin 이 순위를 지정해 allow_list 를 생성하면, 지정한 값이 그대로 저장됩니다",
+            english=(
+                "when the superadmin creates an allow_list with a rank given, "
+                "the value is stored as given"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnEntryAndACaller]:
         return AnEntryAndSomeone(opened=None, role=UserRole.SUPERADMIN)
 
     @override
@@ -140,7 +171,9 @@ class AGivenRankIsKept(
 
 @dataclass(frozen=True)
 class AnUnregisteredNameIsRefused(
-    Scenario[SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]
+    Scenario[
+        TestSeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode
+    ]
 ):
     @override
     def summary(self) -> str:
@@ -148,10 +181,17 @@ class AnUnregisteredNameIsRefused(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 등록되지 않은 설정 이름으로 allow_list를 생성하면, 정의 없음 오류가 반환된다"
+        return Says(
+            "superadmin 이 등록되지 않은 설정 이름으로 allow_list 를 생성하면, "
+            "정의 없음 오류가 반환됩니다",
+            english=(
+                "when the superadmin creates an allow_list with a config name nothing "
+                "registers, the definition-not-found error comes back"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnEntryAndACaller]:
         return AnEntryAndSomeone(defined=False, role=UserRole.SUPERADMIN)
 
     @override
@@ -165,7 +205,9 @@ class AnUnregisteredNameIsRefused(
 
 @dataclass(frozen=True)
 class OpeningTheSameKindTwiceIsRefused(
-    Scenario[SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]
+    Scenario[
+        TestSeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode
+    ]
 ):
     @override
     def summary(self) -> str:
@@ -173,13 +215,17 @@ class OpeningTheSameKindTwiceIsRefused(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 같은 설정 이름과 스코프 유형으로 allow_list를 다시 생성하면, "
-            "데이터베이스의 고유 제약 오류가 반환된다"
+        return Says(
+            "superadmin 이 같은 설정 이름과 스코프 유형으로 allow_list 를 다시 생성하면, "
+            "데이터베이스의 고유 제약 오류가 반환됩니다",
+            english=(
+                "when the superadmin creates an allow_list again with the same config name "
+                "and scope kind, the database's unique constraint error comes back"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnEntryAndACaller]:
         return AnEntryAndSomeone(opened=AppConfigScopeType.PUBLIC, role=UserRole.SUPERADMIN)
 
     @override
@@ -193,7 +239,9 @@ class OpeningTheSameKindTwiceIsRefused(
 
 @dataclass(frozen=True)
 class APlainUserMayNotOpen(
-    Scenario[SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]
+    Scenario[
+        TestSeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode
+    ]
 ):
     @override
     def summary(self) -> str:
@@ -201,10 +249,16 @@ class APlainUserMayNotOpen(
 
     @override
     def describe(self) -> str:
-        return "일반 사용자가 allow_list를 생성하면, 슈퍼관리자 권한이 없어 거부된다"
+        return Says(
+            "일반 사용자가 allow_list 를 생성하면, superadmin 권한이 없어 거부됩니다",
+            english=(
+                "when a plain user creates an allow_list, "
+                "the call is rejected because the user is not the superadmin"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnEntryAndACaller]:
         return AnEntryAndSomeone(opened=None)
 
     @override
@@ -218,7 +272,9 @@ class APlainUserMayNotOpen(
 
 @dataclass(frozen=True)
 class EnforcementOffChangesNothing(
-    Scenario[SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode],
+    Scenario[
+        TestSeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode
+    ],
     Configured,
 ):
     @override
@@ -227,14 +283,19 @@ class EnforcementOffChangesNothing(
 
     @override
     def describe(self) -> str:
-        return "RBAC 강제를 꺼도 일반 사용자의 allow_list 생성은 거부된다"
+        return Says(
+            "RBAC 강제를 비활성화해도 일반 사용자의 allow_list 생성은 거부됩니다",
+            english=(
+                "turning RBAC enforcement off still rejects an allow_list creation by a plain user"
+            ),
+        )
 
     @override
     def config(self) -> Mapping[str, Any]:
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnEntryAndACaller]:
         return AnEntryAndSomeone(opened=None)
 
     @override

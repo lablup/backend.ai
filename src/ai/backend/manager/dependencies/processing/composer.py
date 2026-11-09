@@ -31,6 +31,7 @@ from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.v2.bulk.monitor.audit_log import BulkActionAuditLogMonitor
 from ai.backend.manager.actions.v2.bulk.monitor.prometheus import BulkActionPrometheusMonitor
 from ai.backend.manager.actions.v2.bulk.monitor.reporter import BulkActionReporterMonitor
+from ai.backend.manager.actions.v2.bulk.monitor.tracing import BulkActionTracingMonitor
 from ai.backend.manager.actions.v2.global_scope.monitor.audit_log import (
     GlobalActionAuditLogMonitor,
 )
@@ -40,13 +41,16 @@ from ai.backend.manager.actions.v2.global_scope.monitor.prometheus import (
 from ai.backend.manager.actions.v2.global_scope.monitor.reporter import (
     GlobalActionReporterMonitor,
 )
+from ai.backend.manager.actions.v2.global_scope.monitor.tracing import GlobalActionTracingMonitor
 from ai.backend.manager.actions.v2.lookup.bulk_monitor.audit_log import (
     BulkLookupActionAuditLogMonitor,
 )
+from ai.backend.manager.actions.v2.lookup.bulk_monitor.tracing import BulkLookupActionTracingMonitor
 from ai.backend.manager.actions.v2.lookup.monitor.audit_log import LookupActionAuditLogMonitor
 from ai.backend.manager.actions.v2.lookup.monitor.prometheus import (
     LookupActionPrometheusMonitor,
 )
+from ai.backend.manager.actions.v2.lookup.monitor.tracing import LookupActionTracingMonitor
 from ai.backend.manager.actions.v2.membership.monitor.audit_log import (
     MembershipActionAuditLogMonitor,
 )
@@ -56,6 +60,7 @@ from ai.backend.manager.actions.v2.membership.monitor.prometheus import (
 from ai.backend.manager.actions.v2.membership.monitor.reporter import (
     MembershipActionReporterMonitor,
 )
+from ai.backend.manager.actions.v2.membership.monitor.tracing import MembershipActionTracingMonitor
 from ai.backend.manager.actions.v2.relation.monitor.audit_log import (
     RelationActionAuditLogMonitor,
 )
@@ -65,9 +70,11 @@ from ai.backend.manager.actions.v2.relation.monitor.prometheus import (
 from ai.backend.manager.actions.v2.relation.monitor.reporter import (
     RelationActionReporterMonitor,
 )
+from ai.backend.manager.actions.v2.relation.monitor.tracing import RelationActionTracingMonitor
 from ai.backend.manager.actions.v2.scope.monitor.audit_log import ScopeActionAuditLogMonitor
 from ai.backend.manager.actions.v2.scope.monitor.prometheus import ScopeActionPrometheusMonitor
 from ai.backend.manager.actions.v2.scope.monitor.reporter import ScopeActionReporterMonitor
+from ai.backend.manager.actions.v2.scope.monitor.tracing import ScopeActionTracingMonitor
 from ai.backend.manager.actions.v2.single_entity.monitor.audit_log import (
     SingleEntityActionAuditLogMonitor,
 )
@@ -76,6 +83,9 @@ from ai.backend.manager.actions.v2.single_entity.monitor.prometheus import (
 )
 from ai.backend.manager.actions.v2.single_entity.monitor.reporter import (
     SingleEntityActionReporterMonitor,
+)
+from ai.backend.manager.actions.v2.single_entity.monitor.tracing import (
+    SingleEntityActionTracingMonitor,
 )
 from ai.backend.manager.actions.validators.build import build_action_validators
 from ai.backend.manager.agent_cache import AgentRPCCache
@@ -273,6 +283,7 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
         client_ip_masking_repository = setup_input.repositories.client_ip_masking.repository
         action_monitors = ActionMonitors(
             single_entity=[
+                SingleEntityActionTracingMonitor(),
                 SingleEntityActionReporterMonitor(reporter_hub),
                 SingleEntityActionPrometheusMonitor(),
                 SingleEntityActionAuditLogMonitor(
@@ -282,6 +293,7 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
                 ),
             ],
             bulk=[
+                BulkActionTracingMonitor(),
                 BulkActionReporterMonitor(reporter_hub),
                 BulkActionPrometheusMonitor(),
                 BulkActionAuditLogMonitor(
@@ -291,6 +303,7 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
                 ),
             ],
             scope=[
+                ScopeActionTracingMonitor(),
                 ScopeActionReporterMonitor(reporter_hub),
                 ScopeActionPrometheusMonitor(),
                 ScopeActionAuditLogMonitor(
@@ -300,6 +313,7 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
                 ),
             ],
             relation=[
+                RelationActionTracingMonitor(),
                 RelationActionReporterMonitor(reporter_hub),
                 RelationActionPrometheusMonitor(),
                 RelationActionAuditLogMonitor(
@@ -309,6 +323,7 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
                 ),
             ],
             membership=[
+                MembershipActionTracingMonitor(),
                 MembershipActionReporterMonitor(reporter_hub),
                 MembershipActionPrometheusMonitor(),
                 MembershipActionAuditLogMonitor(
@@ -318,6 +333,7 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
                 ),
             ],
             global_scope=[
+                GlobalActionTracingMonitor(),
                 GlobalActionReporterMonitor(reporter_hub),
                 GlobalActionPrometheusMonitor(),
                 GlobalActionAuditLogMonitor(
@@ -327,6 +343,7 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
                 ),
             ],
             lookup=[
+                LookupActionTracingMonitor(),
                 LookupActionPrometheusMonitor(),
                 LookupActionAuditLogMonitor(
                     audit_log_repository,
@@ -335,6 +352,7 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
                 ),
             ],
             bulk_lookup=[
+                BulkLookupActionTracingMonitor(),
                 BulkLookupActionAuditLogMonitor(
                     audit_log_repository,
                     audit_log_policy,

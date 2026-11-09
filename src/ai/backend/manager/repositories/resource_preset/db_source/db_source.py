@@ -19,7 +19,6 @@ from ai.backend.common.data.entity.resource_preset import ResourcePresetID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import (
-    AccessKey,
     DefaultForUnspecified,
     ResourceSlot,
     SlotName,
@@ -44,10 +43,12 @@ from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.domain.lookups import DomainNameLookup
 from ai.backend.manager.models.domain.row import domains
 from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.lookups import ProjectNameInDomainLookup
 from ai.backend.manager.models.project.row import groups
 from ai.backend.manager.models.resource_group.lookups import ResourceGroupNameLookup
 from ai.backend.manager.models.resource_group.searchers import AllowedResourceGroupsSearch
+from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
 from ai.backend.manager.models.resource_preset.creators import ResourcePresetCreator
 from ai.backend.manager.models.resource_preset.purgers import ResourcePresetPurger
 from ai.backend.manager.models.resource_preset.queriers import ResourcePresetQuerier
@@ -78,15 +79,16 @@ from ai.backend.manager.repositories.resource_slot.types import (
 )
 
 from .types import (
-    AccessKeyFilter,
     CheckPresetsDBData,
     DomainNameFilter,
     GroupIdFilter,
     KeypairResourceData,
+    NonPrivateSessionFilter,
     PerResourceGroupResourceData,
     PresetAllocatabilityData,
     ResourceOccupancyFilter,
     ResourceUsageData,
+    UserIdFilter,
 )
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
@@ -261,11 +263,9 @@ class ResourcePresetDBSource:
 
     async def check_presets_data(
         self,
-        access_key: AccessKey,
         user_id: UUID,
         group_name: str,
         domain_name: str,
-        resource_policy: Mapping[str, Any],
         known_slot_types: Mapping[SlotName, SlotTypes],
         resource_group: str | None = None,
     ) -> CheckPresetsDBData:
@@ -293,11 +293,9 @@ class ResourcePresetDBSource:
             return await self._fetch_all_check_presets_data(
                 conn,
                 [rg.name for rg in allowed.items],
-                access_key,
                 user_id,
                 group_name,
                 domain_name,
-                resource_policy,
                 known_slot_types,
                 resource_group,
             )
@@ -574,20 +572,47 @@ class ResourcePresetDBSource:
             ]
         return quantities
 
-    async def _get_keypair_resource_usage(
+    async def _get_user_resource_usage(
         self,
         db_sess: SASession,
-        access_key: AccessKey,
-        resource_policy: Mapping[str, Any],
+        user_id: UUID,
         known_slot_types: Mapping[SlotName, SlotTypes],
     ) -> ResourceUsageData:
-        """Get keypair resource usage (limits, occupied, remaining)."""
+        """User resource usage, counted as the scheduler does."""
+        policy_row = (
+            await db_sess.execute(
+                sa.select(
+                    KeyPairResourcePolicyRow.total_resource_slots,
+                    KeyPairResourcePolicyRow.default_for_unspecified,
+                )
+                .select_from(KeyPairRow)
+                .join(
+                    KeyPairResourcePolicyRow,
+                    KeyPairRow.resource_policy == KeyPairResourcePolicyRow.name,
+                )
+                .where((KeyPairRow.user == user_id) & KeyPairRow.is_default)
+            )
+        ).one_or_none()
+        # No default keypair: unlimited, as in the scheduler. The auth middleware already requires one.
+        resource_policy: Mapping[str, Any] = (
+            {
+                "total_resource_slots": policy_row.total_resource_slots,
+                "default_for_unspecified": policy_row.default_for_unspecified,
+            }
+            if policy_row is not None
+            else {
+                "total_resource_slots": ResourceSlot(),
+                "default_for_unspecified": DefaultForUnspecified.UNLIMITED,
+            }
+        )
         limits_slot = ResourceSlot.from_policy(
             resource_policy, cast(Mapping[str, Any], known_slot_types)
         )
         limits = resource_slot_to_quantities(limits_slot)
         occupied = await self._get_resource_occupancy(
-            db_sess, known_slot_types, filters=[AccessKeyFilter(access_key)]
+            db_sess,
+            known_slot_types,
+            filters=[UserIdFilter(user_id), NonPrivateSessionFilter()],
         )
         remaining = subtract_quantities(limits, occupied)
 
@@ -628,21 +653,16 @@ class ResourcePresetDBSource:
         self,
         conn: SASession,
         allowed_resource_group_names: list[str],
-        access_key: AccessKey,
         user_id: UUID,
         group_name: str,
         domain_name: str,
-        resource_policy: Mapping[str, Any],
         known_slot_types: Mapping[SlotName, SlotTypes],
         resource_group: str | None = None,
     ) -> CheckPresetsDBData:
         """
         Fetch all data needed for check_presets in a single method.
         """
-        # Get keypair resource usage
-        keypair_usage = await self._get_keypair_resource_usage(
-            conn, access_key, resource_policy, known_slot_types
-        )
+        keypair_usage = await self._get_user_resource_usage(conn, user_id, known_slot_types)
 
         # Get group info and resource usage
         group_id, group_resource_slots = await self._get_group_info(

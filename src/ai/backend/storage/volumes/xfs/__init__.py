@@ -3,12 +3,15 @@ import os
 from collections.abc import Mapping
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import Any, override
+from typing import Any, ClassVar, override
 
 import aiofiles
 import aiofiles.os
 
 from ai.backend.common.asyncio import run_in_executor_with_context
+from ai.backend.common.configs.volume_status_check import VolumeStatusCheckConfig
+from ai.backend.common.data.entity.storage_volume import StorageVolumeName
+from ai.backend.common.data.storage.types import StorageBackendCapability, StorageBackendType
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.exception import InvalidConfigError
@@ -26,7 +29,7 @@ from ai.backend.storage.types import (
     QuotaConfig,
     QuotaUsage,
 )
-from ai.backend.storage.volumes.abc import CAP_QUOTA, CAP_VFOLDER, AbstractQuotaModel
+from ai.backend.storage.volumes.abc import AbstractQuotaModel
 from ai.backend.storage.volumes.vfs import BaseQuotaModel, BaseVolume
 from ai.backend.storage.watcher import WatcherClient
 
@@ -283,7 +286,7 @@ class XfsVolume(BaseVolume):
     `xfs_quota` command and write to `/etc/projects` and `/etc/projid`.
     """
 
-    name = "xfs"
+    name: ClassVar[StorageBackendType] = StorageBackendType("xfs")
 
     project_registry: XfsProjectRegistry
 
@@ -297,6 +300,8 @@ class XfsVolume(BaseVolume):
         event_producer: EventProducer,
         watcher: WatcherClient | None = None,
         options: Mapping[str, Any] | None = None,
+        volume_name: StorageVolumeName,
+        status_check_config: VolumeStatusCheckConfig | None,
     ) -> None:
         super().__init__(
             local_config,
@@ -306,6 +311,8 @@ class XfsVolume(BaseVolume):
             event_producer=event_producer,
             watcher=watcher,
             options=options,
+            volume_name=volume_name,
+            status_check_config=status_check_config,
         )
         self._lock_path = Path(self.config.get("lock_file_path", DEFAULT_LOCK_FILE))
         try:
@@ -330,5 +337,5 @@ class XfsVolume(BaseVolume):
         )
 
     @override
-    async def get_capabilities(self) -> frozenset[str]:
-        return frozenset([CAP_VFOLDER, CAP_QUOTA])
+    async def get_capabilities(self) -> frozenset[StorageBackendCapability]:
+        return frozenset([StorageBackendCapability.VFOLDER, StorageBackendCapability.QUOTA])

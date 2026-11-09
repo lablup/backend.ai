@@ -14,6 +14,7 @@ import pytest
 from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.entity_share import EntityShareID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.user.types import UserData as ContextUserData
 from ai.backend.common.data.user.types import UserRole as ContextUserRole
@@ -158,6 +159,7 @@ def _make_vfolder_data(
     vf.id = vfolder_uuid
     vf.name = name
     vf.host = host
+    vf.domain_name = "default"
     vf.group = group or uuid.uuid4()
     vf.ownership_type = ownership_type
     vf.status = VFolderOperationStatus.READY
@@ -539,6 +541,7 @@ class TestInviteVFolderAction:
             keypair_resource_policy={},
             user_uuid=user_uuid,
             vfolder_uuid=VFolderUUID(vfolder_uuid),
+            owner_scope=UserID(user_uuid),
             mount_permission=VFolderMountPolicy.READ_ONLY,
             invitee_emails=["invitee@test.com"],
         )
@@ -564,6 +567,7 @@ class TestInviteVFolderAction:
             keypair_resource_policy={},
             user_uuid=user_uuid,
             vfolder_uuid=VFolderUUID(vfolder_uuid),
+            owner_scope=UserID(user_uuid),
             mount_permission=VFolderMountPolicy.READ_ONLY,
             invitee_emails=["invitee@test.com"],
         )
@@ -590,6 +594,7 @@ class TestInviteVFolderAction:
             keypair_resource_policy={},
             user_uuid=user_uuid,
             vfolder_uuid=VFolderUUID(vfolder_uuid),
+            owner_scope=UserID(user_uuid),
             mount_permission=VFolderMountPolicy.READ_ONLY,
             invitee_emails=["nobody@test.com"],
         )
@@ -619,6 +624,7 @@ class TestInviteVFolderAction:
             keypair_resource_policy={},
             user_uuid=user_uuid,
             vfolder_uuid=VFolderUUID(vfolder_uuid),
+            owner_scope=UserID(user_uuid),
             mount_permission=VFolderMountPolicy.READ_ONLY,
             invitee_emails=["invitee@test.com"],
         )
@@ -646,6 +652,7 @@ class TestInviteVFolderAction:
             keypair_resource_policy={},
             user_uuid=user_uuid,
             vfolder_uuid=VFolderUUID(vfolder_uuid),
+            owner_scope=UserID(user_uuid),
             mount_permission=VFolderMountPolicy.READ_ONLY,
             invitee_emails=["invitee@test.com"],
         )
@@ -675,9 +682,7 @@ class TestAcceptInvitationAction:
         invitation_data.permission = VFolderMountPolicy.READ_ONLY.value
 
         mock_vfolder_repo.get_invitation_by_id = AsyncMock(return_value=invitation_data)
-        mock_vfolder_repo.get_user_by_email = AsyncMock(
-            return_value=(invitee_uuid, "invitee@test.com")
-        )
+        mock_vfolder_repo.get_user_email_by_id = AsyncMock(return_value="invitee@test.com")
 
         vfolder_data = _make_vfolder_data(vfolder_uuid, name="accepted-folder")
         mock_vfolder_repo.get_by_id = AsyncMock(return_value=vfolder_data)
@@ -720,9 +725,7 @@ class TestAcceptInvitationAction:
         invitation_data.invitee = "invitee@test.com"
 
         mock_vfolder_repo.get_invitation_by_id = AsyncMock(return_value=invitation_data)
-        mock_vfolder_repo.get_user_by_email = AsyncMock(
-            return_value=(invitee_uuid, "invitee@test.com")
-        )
+        mock_vfolder_repo.get_user_email_by_id = AsyncMock(return_value="invitee@test.com")
         mock_vfolder_repo.get_by_id = AsyncMock(
             return_value=_make_vfolder_data(vfolder_uuid, name="existing-name")
         )
@@ -1168,6 +1171,7 @@ class TestEmptyEmailAccountInvitationScenarios:
             keypair_resource_policy={},
             user_uuid=user_uuid,
             vfolder_uuid=VFolderUUID(vfolder_uuid),
+            owner_scope=UserID(user_uuid),
             mount_permission=VFolderMountPolicy.READ_ONLY,
             invitee_emails=["invitee@test.com"],
         )
@@ -1199,7 +1203,7 @@ class TestEmptyEmailAccountInvitationScenarios:
         invitation_uuid: uuid.UUID,
     ) -> AcceptInvitationAction:
         mock_vfolder_repo.get_invitation_by_id = AsyncMock(return_value=empty_invitee_invitation)
-        mock_vfolder_repo.get_user_by_email = AsyncMock(return_value=(invitee_uuid, None))
+        mock_vfolder_repo.get_user_email_by_id = AsyncMock(return_value="")
         mock_vfolder_repo.get_by_id = AsyncMock(
             return_value=_make_vfolder_data(vfolder_uuid, name="shared-folder")
         )

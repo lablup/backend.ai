@@ -29,6 +29,7 @@ from ai.backend.testutils.scenario_steps import (
     Refused,
     Same,
     SameAs,
+    Says,
     Scenario,
     Skipped,
     Then,
@@ -44,13 +45,13 @@ from bai_scenario.components.vfolder import (
     SomeoneWithNoGrant,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 MADE = "work"
 
 type Answer = VFolderNode | SearchVFoldersPayload
-type FolderStep = Scenario[SeedingSession, AFolderMakerAndTheirDomain, VFolderAdapter, Answer]
+type FolderStep = Scenario[TestSeedingSession, AFolderMakerAndTheirDomain, VFolderAdapter, Answer]
 
 
 @dataclass(frozen=True)
@@ -65,7 +66,10 @@ class MakingAFolder(When[AFolderMakerAndTheirDomain, VFolderAdapter, Answer]):
 
     @override
     def describe(self, laid: AFolderMakerAndTheirDomain) -> str:
-        return f"{laid.caller.username}이 {self.named}이라는 폴더를 만듦"
+        return Says(
+            f"{laid.caller.username}이 {self.named} 이라는 이름으로 vfolder 를 생성합니다",
+            english=f"{laid.caller.username} creates a vfolder named {self.named}",
+        )
 
     @override
     async def call(self, adapter: VFolderAdapter, laid: AFolderMakerAndTheirDomain) -> Answer:
@@ -84,7 +88,10 @@ class ListingMyFolders(When[AFolderMakerAndTheirDomain, VFolderAdapter, Answer])
 
     @override
     def describe(self, laid: AFolderMakerAndTheirDomain) -> str:
-        return f"{laid.caller.username}이 자기 폴더를 조회"
+        return Says(
+            f"{laid.caller.username}이 자기 vfolder 를 조회합니다",
+            english=f"{laid.caller.username} lists their own vfolders",
+        )
 
     @override
     async def call(self, adapter: VFolderAdapter, laid: AFolderMakerAndTheirDomain) -> Answer:
@@ -104,7 +111,12 @@ class TheFolderBelongsToTheMaker(Then[AFolderMakerAndTheirDomain, Answer]):
 
     @override
     def says(self) -> str:
-        return "만든 폴더 전체가 오고, 소유는 만든 사람에게 있다"
+        return Says(
+            "만든 vfolder 전체가 응답으로 오고, 그 소유는 만든 사람에게 있습니다",
+            english=(
+                "the whole vfolder just created comes back and its ownership belongs to the creator"
+            ),
+        )
 
     @override
     def look(self, laid: AFolderMakerAndTheirDomain, answered: Answered[Answer]) -> list[Verdict]:
@@ -120,32 +132,66 @@ class TheFolderBelongsToTheMaker(Then[AFolderMakerAndTheirDomain, Answer]):
             Held(
                 "ownership.user_id",
                 node.ownership.user_id,
-                SameAs[UUID | None](laid.caller.id, "만든 사람"),
+                SameAs[UUID | None](laid.caller.id, Says("만든 사람", english="the creator")),
             ),
             Skipped(
                 "ownership.project_id",
-                "개인 폴더는 그 사람의 개인 프로젝트에 붙는다. 그 id는 사용자를 만들 때 생긴다",
+                Says(
+                    "개인 vfolder 는 그 사용자의 개인 프로젝트에 붙습니다. 그 id 는 사용자를 "
+                    "생성할 때 생깁니다",
+                    english=(
+                        "a personal vfolder belongs to the user's personal project. That id is "
+                        "made when the user is created"
+                    ),
+                ),
             ),
             Held(
                 "ownership.creator_id",
                 node.ownership.creator_id,
-                SameAs[UUID | None](laid.caller.id, "만든 사람"),
+                SameAs[UUID | None](laid.caller.id, Says("만든 사람", english="the creator")),
             ),
             Same("ownership.creator_email", node.ownership.creator_email, laid.caller.email),
             Same("unmanaged_path", node.unmanaged_path, None),
-            Skipped("id", "데이터베이스가 만든다"),
-            Skipped("status", "폴더가 만들어지는 동안 오가는 값이다"),
-            Skipped("metadata.usage_mode", "타입이 이미 값을 못박는다"),
-            Skipped("metadata.quota_scope_id", "저장소가 정한다"),
-            Skipped("access_control.permission", "만든 사람에게는 물어볼 것이 없다"),
-            Skipped("quota", "저장소가 답하는 값이라 여기서 말할 수 없다"),
+            Skipped(
+                "id",
+                Says("데이터베이스가 생성합니다", english="the database generates it"),
+            ),
+            Skipped(
+                "status",
+                Says(
+                    "vfolder 가 생성되는 동안 오가는 값입니다",
+                    english="a value that moves while the vfolder is being created",
+                ),
+            ),
+            Skipped(
+                "metadata.usage_mode",
+                Says("타입이 이미 값을 고정합니다", english="the type already fixes the value"),
+            ),
+            Skipped(
+                "metadata.quota_scope_id",
+                Says("저장소가 정합니다", english="the storage decides it"),
+            ),
+            Skipped(
+                "access_control.permission",
+                Says(
+                    "만든 사람에게는 확인할 것이 없습니다",
+                    english="there is nothing to check for the creator",
+                ),
+            ),
+            Skipped(
+                "quota",
+                Says(
+                    "저장소가 응답하는 값이라 여기서 말할 수 없습니다",
+                    english="the storage answers it, so it cannot be stated here",
+                ),
+            ),
             Held("metadata.created_at", node.metadata.created_at, WrittenByThisRun(self.started)),
         ]
 
 
 @dataclass(frozen=True)
 class AGrantedUserMakesAFolderOfTheirOwn(
-    Scenario[SeedingSession, AFolderMakerAndTheirDomain, VFolderAdapter, Answer]
+    Scenario[TestSeedingSession, AFolderMakerAndTheirDomain, VFolderAdapter, Answer]
 ):
     started: datetime
 
@@ -155,13 +201,17 @@ class AGrantedUserMakesAFolderOfTheirOwn(
 
     @override
     def describe(self) -> str:
-        return (
-            "자기 스코프에서 폴더 생성 권한을 받은 사용자가 폴더를 만들면, "
-            "그 폴더의 소유는 그 사용자에게 있다"
+        return Says(
+            "자기 스코프에서 vfolder 생성 권한을 받은 사용자가 vfolder 를 생성하면, 그 vfolder 의 "
+            "소유는 그 사용자에게 있습니다",
+            english=(
+                "when a user granted vfolder create in their own scope creates a vfolder, its "
+                "ownership belongs to that user"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AFolderMakerAndTheirDomain]:
+    def given(self) -> Given[TestSeedingSession, AFolderMakerAndTheirDomain]:
         return SomeoneWhoMayMakeFolders()
 
     @override
@@ -175,7 +225,7 @@ class AGrantedUserMakesAFolderOfTheirOwn(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotMakeAFolder(
-    Scenario[SeedingSession, AFolderMakerAndTheirDomain, VFolderAdapter, Answer]
+    Scenario[TestSeedingSession, AFolderMakerAndTheirDomain, VFolderAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -183,10 +233,16 @@ class AUserGrantedNothingMayNotMakeAFolder(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 받지 않은 사용자가 폴더를 만들려 하면 권한 부족으로 거부된다"
+        return Says(
+            "아무 권한도 받지 않은 사용자가 vfolder 를 생성하려 하면 권한 부족으로 거부됩니다",
+            english=(
+                "when a user granted nothing tries to create a vfolder, it is rejected for lack "
+                "of permission"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AFolderMakerAndTheirDomain]:
+    def given(self) -> Given[TestSeedingSession, AFolderMakerAndTheirDomain]:
         return SomeoneWithNoGrant()
 
     @override
@@ -200,7 +256,7 @@ class AUserGrantedNothingMayNotMakeAFolder(
 
 @dataclass(frozen=True)
 class AUserWhoMadeNoFolderListsNone(
-    Scenario[SeedingSession, AFolderMakerAndTheirDomain, VFolderAdapter, Answer]
+    Scenario[TestSeedingSession, AFolderMakerAndTheirDomain, VFolderAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -208,10 +264,16 @@ class AUserWhoMadeNoFolderListsNone(
 
     @override
     def describe(self) -> str:
-        return "폴더를 하나도 만들지 않은 사용자가 자기 폴더를 조회하면, 답은 비어 있다"
+        return Says(
+            "vfolder 를 하나도 생성하지 않은 사용자가 자기 vfolder 를 조회하면, 응답은 비어 있습니다",
+            english=(
+                "when a user who has created no vfolder lists their own vfolders, the answer "
+                "is empty"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AFolderMakerAndTheirDomain]:
+    def given(self) -> Given[TestSeedingSession, AFolderMakerAndTheirDomain]:
         return SomeoneWhoMayMakeFolders()
 
     @override

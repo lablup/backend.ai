@@ -9,7 +9,6 @@ from typing import override
 from uuid import UUID
 
 from ai.backend.common.data.entity.image import ImageID
-from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.session_dependency import SessionDependencyID
 from ai.backend.common.data.entity.types import EntityIdentifier
@@ -52,7 +51,7 @@ class SessionCreator(EntityCreator[SessionRow, SessionEntityData]):
 
     @override
     def created_in(self, row: SessionRow) -> Collection[EntityIdentifier]:
-        return [UserID(row.user_uuid), ProjectID(row.group_id)]
+        return [UserID(self.spec.resource_spec.identity.user_uuid), self.spec.scope.project_id]
 
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
@@ -85,10 +84,6 @@ class SessionCreator(EntityCreator[SessionRow, SessionEntityData]):
         session_environ = dict(main_kernel.execution_spec.environ) if main_kernel else {}
         session_bootstrap = main_kernel.execution_spec.bootstrap_script if main_kernel else None
         session_startup = main_kernel.execution_spec.startup_command if main_kernel else None
-
-        designated_agent_ids = [
-            str(agent) for agent in spec.resource_spec.options.scheduling_target.designated_agents
-        ] or None
 
         cluster_mode_value = (
             spec.resource_spec.options.cluster_mode.value
@@ -128,7 +123,6 @@ class SessionCreator(EntityCreator[SessionRow, SessionEntityData]):
             image_ids=session_image_ids,
             network_type=spec.resource_spec.network.network_type,
             network_id=spec.resource_spec.network.network_id,
-            designated_agent_ids=designated_agent_ids,
             options=SessionStoredOptions(
                 kernel_groups=spec.resource_spec.options.kernel_groups,
                 handler_options=spec.resource_spec.options.handler_options,

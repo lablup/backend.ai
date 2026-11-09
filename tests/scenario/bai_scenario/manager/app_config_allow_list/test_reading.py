@@ -26,7 +26,7 @@ from ai.backend.manager.api.adapters.app_config_allow_list.adapter import (
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Configured, Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.app_config import ENFORCEMENT
 from bai_scenario.components.app_config_allow_list import (
@@ -35,11 +35,11 @@ from bai_scenario.components.app_config_allow_list import (
     TheEntryNode,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type ReadingStep = Scenario[
-    SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode
+    TestSeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode
 ]
 
 
@@ -55,8 +55,15 @@ class ReadingById(When[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAl
 
     @override
     def describe(self, laid: AnEntryAndACaller) -> str:
-        called = "존재하지 않는 ID" if self.other is not None else f"{laid.name}의 allow_list"
-        return f"{laid.caller.username}이 {called} 조회"
+        if self.other is not None:
+            called_ko, called_en = "존재하지 않는 ID", "a missing ID"
+        else:
+            called_ko = f"{laid.name}의 allow_list"
+            called_en = f"the allow_list of {laid.name}"
+        return Says(
+            f"{laid.caller.username}이 {called_ko} 조회합니다",
+            english=f"{laid.caller.username} reads {called_en}",
+        )
 
     @override
     async def call(
@@ -74,7 +81,9 @@ class ReadingById(When[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAl
 
 @dataclass(frozen=True)
 class TheSuperadminReadsIt(
-    Scenario[SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]
+    Scenario[
+        TestSeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode
+    ]
 ):
     started: datetime
 
@@ -84,10 +93,17 @@ class TheSuperadminReadsIt(
 
     @override
     def describe(self) -> str:
-        return "allow_list 하나가 있고 슈퍼관리자가 ID로 조회하면, 그 allow_list의 모든 필드가 반환된다"
+        return Says(
+            "allow_list 하나가 있고 superadmin 이 ID 로 조회하면, "
+            "그 allow_list 의 모든 필드가 반환됩니다",
+            english=(
+                "with one allow_list laid, when the superadmin reads it by ID, "
+                "every field of that allow_list comes back"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnEntryAndACaller]:
         return AnEntryAndSomeone(opened=AppConfigScopeType.USER, role=UserRole.SUPERADMIN)
 
     @override
@@ -101,7 +117,9 @@ class TheSuperadminReadsIt(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotRead(
-    Scenario[SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]
+    Scenario[
+        TestSeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode
+    ]
 ):
     @override
     def summary(self) -> str:
@@ -109,12 +127,17 @@ class AUserGrantedNothingMayNotRead(
 
     @override
     def describe(self) -> str:
-        return (
-            "같은 allow_list를 권한이 없는 일반 사용자가 조회하면, 엔티티 읽기 권한이 없어 거부된다"
+        return Says(
+            "같은 allow_list 를 권한이 없는 일반 사용자가 조회하면, "
+            "엔티티 읽기 권한이 없어 거부됩니다",
+            english=(
+                "when a plain user without permission reads the same allow_list, "
+                "the call is rejected because the user has no entity read permission"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnEntryAndACaller]:
         return AnEntryAndSomeone(opened=AppConfigScopeType.USER)
 
     @override
@@ -128,7 +151,9 @@ class AUserGrantedNothingMayNotRead(
 
 @dataclass(frozen=True)
 class AnUnknownIdIsNotFoundForASuperadmin(
-    Scenario[SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]
+    Scenario[
+        TestSeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode
+    ]
 ):
     @override
     def summary(self) -> str:
@@ -136,13 +161,17 @@ class AnUnknownIdIsNotFoundForASuperadmin(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 존재하지 않는 ID로 조회하면, 대상을 찾을 수 없다는 이유로 거부된다. "
-            "권한 검사를 통과하는 사용자만 이 응답을 본다"
+        return Says(
+            "superadmin 이 존재하지 않는 ID 로 조회하면, 대상을 찾을 수 없다는 이유로 거부됩니다. "
+            "권한 검사를 통과하는 사용자만 이 응답을 봅니다",
+            english=(
+                "when the superadmin reads a missing ID, the call is rejected because there "
+                "is no such target. Only a user who passes the permission check sees this answer"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnEntryAndACaller]:
         return AnEntryAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -156,7 +185,9 @@ class AnUnknownIdIsNotFoundForASuperadmin(
 
 @dataclass(frozen=True)
 class EnforcementOffLetsAnyoneRead(
-    Scenario[SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode],
+    Scenario[
+        TestSeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode
+    ],
     Configured,
 ):
     started: datetime
@@ -167,14 +198,20 @@ class EnforcementOffLetsAnyoneRead(
 
     @override
     def describe(self) -> str:
-        return "RBAC 강제를 끄면 권한이 없는 일반 사용자도 allow_list를 조회할 수 있다"
+        return Says(
+            "RBAC 강제를 비활성화하면 권한이 없는 일반 사용자도 allow_list 를 조회할 수 있습니다",
+            english=(
+                "turning RBAC enforcement off lets a plain user without permission "
+                "read an allow_list"
+            ),
+        )
 
     @override
     def config(self) -> Mapping[str, Any]:
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnEntryAndACaller]:
         return AnEntryAndSomeone(opened=AppConfigScopeType.USER)
 
     @override

@@ -34,6 +34,14 @@ from ai.backend.manager.services.session.resource_allocation.actions.get_resourc
     GetResourceGroupUsageAction,
     GetResourceGroupUsageActionResult,
 )
+from ai.backend.manager.services.session.resource_allocation.actions.get_user_concurrency import (
+    GetUserConcurrencyAction,
+    GetUserConcurrencyActionResult,
+)
+from ai.backend.manager.services.session.resource_allocation.actions.get_user_usage import (
+    GetUserUsageAction,
+    GetUserUsageActionResult,
+)
 from ai.backend.manager.services.session.resource_allocation.actions.resolve_keypair_context import (
     ResolveKeypairContextAction,
     ResolveKeypairContextActionResult,
@@ -47,9 +55,13 @@ class ResourceAllocationProcessors:
     resolve_keypair_context: SingleEntityActionProcessor[
         ResolveKeypairContextAction, ResolveKeypairContextActionResult
     ]
+    get_user_concurrency: SingleEntityActionProcessor[
+        GetUserConcurrencyAction, GetUserConcurrencyActionResult
+    ]
     get_keypair_usage: SingleEntityActionProcessor[
         GetKeypairUsageAction, GetKeypairUsageActionResult
     ]
+    get_user_usage: SingleEntityActionProcessor[GetUserUsageAction, GetUserUsageActionResult]
     get_project_usage: SingleEntityActionProcessor[
         GetProjectUsageAction, GetProjectUsageActionResult
     ]
@@ -77,9 +89,13 @@ class ResourceAllocationProcessors:
         self.resolve_keypair_context = user.single_entity(
             ResolveKeypairContextAction, service.resolve_keypair_context
         )
+        self.get_user_concurrency = user.single_entity(
+            GetUserConcurrencyAction, service.get_user_concurrency
+        )
         self.get_keypair_usage = user.single_entity(
             GetKeypairUsageAction, service.get_keypair_usage
         )
+        self.get_user_usage = user.single_entity(GetUserUsageAction, service.get_user_usage)
         self.get_project_usage = project.single_entity(
             GetProjectUsageAction, service.get_project_usage
         )

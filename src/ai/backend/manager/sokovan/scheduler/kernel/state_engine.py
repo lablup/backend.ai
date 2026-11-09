@@ -138,6 +138,7 @@ class KernelStateEngine:
     async def mark_kernel_terminated(
         self,
         kernel_id: KernelId,
+        session_id: SessionId,
         reason: KernelLifecycleEventReason,
         exit_code: int | None = None,
     ) -> bool:
@@ -145,11 +146,17 @@ class KernelStateEngine:
         Mark a kernel as TERMINATED when it's terminated.
 
         :param kernel_id: The kernel ID
+        :param session_id: The session ID of the kernel
         :param reason: The reason for termination
         :param exit_code: Optional exit code
         :return: True if the update was successful
         """
-        log.debug("marking kernel as terminated", kernel_id=kernel_id, reason=reason)
+        log.debug(
+            "marking kernel as terminated",
+            kernel_id=kernel_id,
+            session_id=session_id,
+            reason=reason,
+        )
 
         return await self._repository.update_kernel_status_terminated(kernel_id, reason, exit_code)
 

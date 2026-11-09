@@ -12,6 +12,12 @@ from .handler import V2ResourceSlotHandler
 if TYPE_CHECKING:
     from ai.backend.manager.api.rest.types import RouteDeps
 
+# Matches a UUID only, so `DELETE /slot-types/{slot_name}` (deprecated) still takes every
+# other name.
+_SLOT_TYPE_ID = (
+    "{slot_type_id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}"
+)
+
 
 def register_v2_resource_slot_routes(
     handler: V2ResourceSlotHandler,
@@ -38,6 +44,19 @@ def register_v2_resource_slot_routes(
         handler.admin_update_slot_type,
         middlewares=[superadmin_required],
     )
+    registry.add(
+        "DELETE",
+        f"/slot-types/{_SLOT_TYPE_ID}",
+        handler.purge_slot_type,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
+        "/slot-types/partial-bulk-purge",
+        handler.partial_bulk_purge_slot_types,
+        middlewares=[auth_required],
+    )
+    # Deprecated since NEXT_RELEASE_VERSION.
     registry.add(
         "DELETE",
         "/slot-types/{slot_name}",

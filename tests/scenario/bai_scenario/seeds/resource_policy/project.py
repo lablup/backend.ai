@@ -11,11 +11,12 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.resource.types import ProjectResourcePolicyData
 from ai.backend.manager.models.project.creators import ProjectCreator
 from ai.backend.manager.models.resource_policy.creators import ProjectResourcePolicyCreator
-from bai_scenario.seeds.seeder import Naming, SeedRow
+from ai.backend.testutils.scenario_steps import Says
+from bai_scenario.seeds.seeder import Naming, TestSeedRow
 
 
 @dataclass(frozen=True)
-class SeedProjectPolicy(SeedRow[ProjectResourcePolicyData]):
+class TestSeedProjectPolicy(TestSeedRow[ProjectResourcePolicyData]):
     """프로젝트가 무엇을 허용받는지.
 
     이름은 시더가 아니라 매니저가 정한다. 사용자를 만들면 개인 프로젝트가 딸려 만들어지고,
@@ -28,11 +29,14 @@ class SeedProjectPolicy(SeedRow[ProjectResourcePolicyData]):
 
     @override
     def kind(self) -> str:
-        return "프로젝트 정책"
+        return Says("프로젝트 자원 정책", english="Project resource policy")
 
     @override
     def detail(self) -> str:
-        return "사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다"
+        return Says(
+            "사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다",
+            english="the personal project created along with a user looks it up by this name",
+        )
 
     @override
     def name(self, naming: Naming) -> str:
@@ -58,7 +62,7 @@ class SeedProjectPolicy(SeedRow[ProjectResourcePolicyData]):
 
 
 @dataclass(frozen=True)
-class SeedNamedProjectPolicy(SeedRow[ProjectResourcePolicyData]):
+class TestSeedNamedProjectPolicy(TestSeedRow[ProjectResourcePolicyData]):
     """A project policy under a name of its own. No personal project looks for it, so a
     scenario that reads, edits or purges a project policy targets this one."""
 
@@ -69,11 +73,14 @@ class SeedNamedProjectPolicy(SeedRow[ProjectResourcePolicyData]):
 
     @override
     def kind(self) -> str:
-        return "프로젝트 정책"
+        return Says("프로젝트 자원 정책", english="Project resource policy")
 
     @override
     def detail(self) -> str:
-        return f"프로젝트 하나당 폴더 {self.max_vfolder_count}개까지"
+        return Says(
+            f"프로젝트 하나당 vfolder {self.max_vfolder_count}개까지",
+            english=f"up to {self.max_vfolder_count} folders per project",
+        )
 
     @override
     def name(self, naming: Naming) -> str:

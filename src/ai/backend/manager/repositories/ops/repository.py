@@ -28,18 +28,21 @@ from ai.backend.manager.models.specs.creator import (
     FieldCreator,
     FieldToCreate,
     GlobalEntityCreator,
+    GuardedDanglingFieldCreator,
     NestedFieldCreator,
     RoleManagedEntityCreator,
     RoleManagedGlobalEntityCreator,
 )
 from ai.backend.manager.models.specs.lookup import (
     BulkDataLookup,
+    BulkFieldKeyLookup,
     DataLookup,
     FieldKeyLookup,
     FieldOwnerKeyLookup,
     FieldOwnerLookup,
     RuntimeFieldOwnerLookup,
 )
+from ai.backend.manager.models.specs.owner_candidates import FieldOwnerCandidates
 from ai.backend.manager.models.specs.purger import (
     EntityBatchPurger,
     GuardedEntityPurger,
@@ -192,6 +195,13 @@ class OpsRepository[TData]:
         async with self._ops.read_ops() as r:
             return await r.lookup_runtime_field_owners(lookup, field_ids)
 
+    async def field_owner_candidates(
+        self, candidates: FieldOwnerCandidates[Any], field_ids: Sequence[FieldIdentifier]
+    ) -> Mapping[FieldIdentifier, Sequence[RuntimeEntityID]]:
+        """Read the owner candidates of each named field row."""
+        async with self._ops.read_ops() as r:
+            return await r.read_field_owner_candidates(candidates, field_ids)
+
     async def runtime_field_owner(
         self, lookup: RuntimeFieldOwnerLookup[Any], field_id: FieldIdentifier
     ) -> RuntimeEntityID:
@@ -241,6 +251,14 @@ class OpsRepository[TData]:
                 operation=ActionOperationType.LOOKUP,
             )
         return resolved
+
+    async def fields_by_keys[TKey, TFieldID: FieldIdentifier, TOwnerID: EntityIdentifier](
+        self, lookup: BulkFieldKeyLookup[TKey, TFieldID, TOwnerID], keys: Sequence[TKey]
+    ) -> Mapping[TKey, tuple[TFieldID, TOwnerID]]:
+        """Resolve several keys into the field rows they name and their owners; a key
+        naming nothing is absent."""
+        async with self._ops.read_ops() as r:
+            return await r.lookup_fields_by_keys(lookup, keys)
 
     async def search_in_scopes(
         self,
@@ -382,7 +400,7 @@ class OpsRepository[TData]:
             return await w.atomic_create_field_entities(owner_id, creators)
 
     async def create_dangling_field[TFieldData: FieldData](
-        self, creator: DanglingFieldCreator[Any, TFieldData]
+        self, creator: GuardedDanglingFieldCreator[Any, TFieldData]
     ) -> TFieldData:
         async with self._ops.write_ops() as w:
             return await w.create_dangling_field(creator)
@@ -500,6 +518,13 @@ class OpsRepository[TData]:
         """Insert or update a field row on conflict, under its owner. Never absent."""
         async with self._ops.write_ops() as w:
             return await w.upsert_field_entity(owner_id, upserter)
+
+    async def partial_bulk_upsert_field_entities[TFieldData: FieldData](
+        self, upserters: Mapping[Any, Sequence[FieldUpserter[Any, Any, TFieldData]]]
+    ) -> BulkResultWithFailures[list[TFieldData]]:
+        """Insert or update each owner's field rows independently, answering per owner."""
+        async with self._ops.write_ops() as w:
+            return await w.partial_bulk_upsert_field_entities(upserters)
 
     async def update(self, updater: GuardedDataUpdater[Any, TData]) -> TData:
         """Apply the update, telling a missing row from a refused one.

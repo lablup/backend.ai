@@ -7,7 +7,6 @@ from uuid import UUID
 from strawberry import Info
 
 from ai.backend.common.exception import DeprecatedAPI
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
@@ -28,12 +27,10 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
 
 _QUERY_REASON = (
-    f"Deprecated since {NEXT_RELEASE_VERSION}. Role invitations are removed;"
-    " this connection is always empty."
+    "Deprecated since 26.9.0. Role invitations are removed; this connection is always empty."
 )
 _MUTATION_REASON = (
-    f"Deprecated since {NEXT_RELEASE_VERSION}. Role invitations are removed;"
-    " this mutation always fails."
+    "Deprecated since 26.9.0. Role invitations are removed; this mutation always fails."
 )
 _REMOVED_MESSAGE = "Role invitations are removed."
 
@@ -42,7 +39,7 @@ def _meta(description: str) -> BackendAIGQLMeta:
     return BackendAIGQLMeta(
         added_version="26.4.4",
         description=description,
-        deprecated_version=NEXT_RELEASE_VERSION,
+        deprecated_version="26.9.0",
     )
 
 

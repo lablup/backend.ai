@@ -35,6 +35,12 @@ from ai.backend.manager.services.deployment_revision_preset.actions.lookup_slot_
     LookupBulkPresetResourceSlotOwnerAction,
     LookupPresetResourceSlotOwnerAction,
 )
+from ai.backend.manager.services.deployment_revision_preset.actions.partial_bulk_purge import (
+    PartialBulkPurgeDeploymentPresetsAction,
+)
+from ai.backend.manager.services.deployment_revision_preset.actions.partial_bulk_update import (
+    PartialBulkUpdateDeploymentPresetsAction,
+)
 from ai.backend.manager.services.deployment_revision_preset.actions.purge import (
     PurgeDeploymentPresetAction,
 )
@@ -51,8 +57,8 @@ from ai.backend.manager.services.deployment_revision_preset.service import Deplo
 
 
 class DeploymentPresetProcessors:
-    """An update restates the preset's slots, so it goes through the service; the rest
-    run straight against ops."""
+    """An update restates the preset's slots, so it and its partial bulk form go through
+    the service; the rest run straight against ops."""
 
     create: GlobalActionProcessor[
         CreateDeploymentPresetAction,
@@ -74,6 +80,12 @@ class DeploymentPresetProcessors:
     purge: SingleEntityActionProcessor[
         PurgeDeploymentPresetAction, EntityOpsResult[DeploymentRevisionPresetData]
     ]
+    partial_bulk_update: PartialBulkActionProcessor[
+        PartialBulkUpdateDeploymentPresetsAction, DeploymentRevisionPresetData
+    ]
+    partial_bulk_purge: PartialBulkActionProcessor[
+        PartialBulkPurgeDeploymentPresetsAction, DeploymentRevisionPresetData
+    ]
     search_resource_slots: BulkActionProcessor[
         SearchPresetResourceSlotsAction, ScopedFieldsOpsResult[PresetResourceSlotData]
     ]
@@ -89,6 +101,12 @@ class DeploymentPresetProcessors:
         self.bulk_get = group.partial_bulk_get_ops(BulkGetDeploymentPresetsAction)
         self.update = group.single_entity(UpdateDeploymentPresetAction, service.update)
         self.purge = group.entity_purge_ops(PurgeDeploymentPresetAction)
+        self.partial_bulk_update = group.partial_bulk(
+            PartialBulkUpdateDeploymentPresetsAction, service.partial_bulk_update
+        )
+        self.partial_bulk_purge = group.entity_partial_bulk_purge_ops(
+            PartialBulkPurgeDeploymentPresetsAction
+        )
 
         slots: LookupFieldGroup[PresetResourceSlotData] = group.field_group(
             FieldGroupMeta(DeploymentPresetResourceSlotFieldType()),

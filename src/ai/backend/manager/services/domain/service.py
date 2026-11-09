@@ -3,12 +3,11 @@ from __future__ import annotations
 import logging
 
 from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.dotfile import DotfilePath
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.actions.v2.ops.result import CreatedEntityOpsResult
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.dotfile.types import DotfileEntries
-from ai.backend.manager.models.domain.row import verify_dotfile_name
 from ai.backend.manager.models.domain.updaters import DomainDotfilesUpdater
 from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.services.domain.actions.create_domain import CreateDomainAction
@@ -52,8 +51,7 @@ class DomainService:
     async def create_dotfile(
         self, action: CreateDomainDotfileAction
     ) -> CreateDomainDotfileActionResult:
-        if not verify_dotfile_name(action.entry.path):
-            raise InvalidAPIParameters("dotfile path is reserved for internal operations.")
+        DotfilePath(action.entry.path)
         domain_id, current = await self._read_dotfiles(action.name)
         entries = current.added(action.entry)
         await self._write_dotfiles(domain_id, entries)
@@ -62,6 +60,7 @@ class DomainService:
     async def update_dotfile(
         self, action: UpdateDomainDotfileAction
     ) -> UpdateDomainDotfileActionResult:
+        DotfilePath(action.entry.path)
         domain_id, current = await self._read_dotfiles(action.name)
         entries = current.replaced(action.entry)
         await self._write_dotfiles(domain_id, entries)

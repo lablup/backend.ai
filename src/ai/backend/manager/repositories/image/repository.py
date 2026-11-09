@@ -25,6 +25,7 @@ from ai.backend.manager.data.image.types import (
     RescanImagesResult,
     ResourceLimitInput,
 )
+from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.models.image.creators import ImageAliasCreator
 from ai.backend.manager.models.image.scopes import ImageTarget
 from ai.backend.manager.models.image.searchers import ImageSearcher
@@ -182,6 +183,10 @@ class ImageRepository:
         return await self._db_source.remove_image_alias(alias)
 
     @image_repository_resilience.apply()
+    async def scan_image(self, canonical: str, architecture: str) -> ImageData:
+        return await self._db_source.scan_image(canonical, architecture)
+
+    @image_repository_resilience.apply()
     async def scan_image_by_identifier(
         self, image_canonical: str, architecture: str
     ) -> RescanImagesResult:
@@ -196,7 +201,7 @@ class ImageRepository:
             image_id
         )
         if registry_row.type != ContainerRegistryType.HARBOR2:
-            raise NotImplementedError("This feature is only supported for Harbor 2 registries")
+            raise InvalidAPIParameters("This feature is only supported for Harbor 2 registries")
         scanner = HarborRegistry_v2(self._db, image_ref.registry, registry_row)
         await scanner.untag(image_ref)
         return image_data

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ai.backend.manager.api.rest.middleware.auth import superadmin_required
+from ai.backend.manager.api.rest.middleware.auth import auth_required, superadmin_required
 from ai.backend.manager.api.rest.routing import RouteRegistry
 
 from .handler import V2FairShareHandler
@@ -36,9 +36,16 @@ def register_v2_fair_share_routes(
     registry.add(
         "POST",
         "/domains/upsert",
-        handler.admin_upsert_domain,
-        middlewares=[superadmin_required],
+        handler.upsert_domain,
+        middlewares=[auth_required],
     )
+    registry.add(
+        "POST",
+        "/domains/atomic-bulk-upsert",
+        handler.atomic_bulk_upsert_domain,
+        middlewares=[auth_required],
+    )
+    # Deprecated since NEXT_RELEASE_VERSION.
     registry.add(
         "POST",
         "/domains/bulk-upsert",
@@ -62,9 +69,16 @@ def register_v2_fair_share_routes(
     registry.add(
         "POST",
         "/projects/upsert",
-        handler.admin_upsert_project,
-        middlewares=[superadmin_required],
+        handler.upsert_project,
+        middlewares=[auth_required],
     )
+    registry.add(
+        "POST",
+        "/projects/atomic-bulk-upsert",
+        handler.atomic_bulk_upsert_project,
+        middlewares=[auth_required],
+    )
+    # Deprecated since NEXT_RELEASE_VERSION.
     registry.add(
         "POST",
         "/projects/bulk-upsert",
@@ -88,9 +102,16 @@ def register_v2_fair_share_routes(
     registry.add(
         "POST",
         "/users/upsert",
-        handler.admin_upsert_user,
-        middlewares=[superadmin_required],
+        handler.upsert_user,
+        middlewares=[auth_required],
     )
+    registry.add(
+        "POST",
+        "/users/atomic-bulk-upsert",
+        handler.atomic_bulk_upsert_user,
+        middlewares=[auth_required],
+    )
+    # Deprecated since NEXT_RELEASE_VERSION.
     registry.add(
         "POST",
         "/users/bulk-upsert",

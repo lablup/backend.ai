@@ -11,18 +11,19 @@ from ai.backend.manager.data.app_config.types import (
     AppConfigDefinitionData,
 )
 from ai.backend.manager.models.app_config_allow_list.creators import AppConfigAllowListCreator
-from bai_scenario.seeds.seeder import Naming, SeedRowFrom
+from ai.backend.testutils.scenario_steps import Language, Says, in_language
+from bai_scenario.seeds.seeder import Naming, TestSeedRowFrom, joined
 
 SCOPE_NAMES = {
-    AppConfigScopeType.PUBLIC: "공개",
-    AppConfigScopeType.DOMAIN: "도메인",
-    AppConfigScopeType.USER: "사용자",
+    AppConfigScopeType.PUBLIC: Says("공개", english="public"),
+    AppConfigScopeType.DOMAIN: Says("도메인", english="domain"),
+    AppConfigScopeType.USER: Says("사용자", english="user"),
 }
 """레포트에서 스코프 종류를 가리키는 이름."""
 
 
 @dataclass(frozen=True)
-class SeedAllowListEntry(SeedRowFrom[AppConfigDefinitionData, AppConfigAllowListData]):
+class TestSeedAllowListEntry(TestSeedRowFrom[AppConfigDefinitionData, AppConfigAllowListData]):
     """The entry opening the given definition's name to one scope kind.
 
     The row carries no name of its own; the seeder's name only tells the rows apart in
@@ -35,14 +36,23 @@ class SeedAllowListEntry(SeedRowFrom[AppConfigDefinitionData, AppConfigAllowList
 
     @override
     def kind(self) -> str:
-        return "허용 목록 항목"
+        return Says("허용 목록 항목", english="Allow-list entry")
 
     @override
     def detail(self) -> str:
-        opened = f"{SCOPE_NAMES[self.scope_type]} 스코프에서 이 이름의 설정을 지정할 수 있다"
+        scope = SCOPE_NAMES[self.scope_type]
+        scope_name = in_language(scope, Language.ENGLISH)
+        opened = Says(
+            f"{scope} 스코프에서 이 이름의 설정을 지정할 수 있습니다",
+            english=f"the config of this name can be set in the {scope_name} scope",
+        )
         if self.rank is None:
-            return f"{opened}, 순위는 그 스코프 종류의 기본값"
-        return f"{opened}, 순위 {self.rank}"
+            rank = Says(
+                "순위는 그 스코프 종류의 기본값", english="rank is the default of the scope kind"
+            )
+        else:
+            rank = Says(f"순위 {self.rank}", english=f"rank {self.rank}")
+        return joined([opened, rank])
 
     @override
     def name(self, naming: Naming) -> str:

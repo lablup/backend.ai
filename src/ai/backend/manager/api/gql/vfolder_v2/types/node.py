@@ -13,7 +13,12 @@ from ai.backend.common.data.entity.types import RuntimeEntityID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
 from ai.backend.common.dto.manager.v2.model_card.request import SearchModelCardsInput
 from ai.backend.common.dto.manager.v2.model_card.types import ModelCardUsage, ModelCardUses
+from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.dto.manager.v2.vfolder.response import VFolderNode
+from ai.backend.common.dto.manager.v2.vfolder_auto_mount.request import (
+    ScopedSearchVFolderAutoMountsInput,
+)
+from ai.backend.common.dto.manager.v2.vfolder_auto_mount.types import VFolderAutoMountScope
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.common_types import BinarySizeInfoGQL
@@ -40,7 +45,18 @@ from ai.backend.manager.api.gql.model_card.types import (
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.rbac.types.scope import PermissionBitGQL
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
-from ai.backend.manager.api.gql.vfolder_v2.types.enum import VFolderOperationStatusGQL
+from ai.backend.manager.api.gql.vfolder_auto_mount.resolver import (
+    build_vfolder_auto_mount_connection,
+)
+from ai.backend.manager.api.gql.vfolder_auto_mount.types import (
+    VFolderAutoMountConnectionGQL,
+    VFolderAutoMountFilterGQL,
+    VFolderAutoMountOrderByGQL,
+)
+from ai.backend.manager.api.gql.vfolder_v2.types.enum import (
+    VFolderMountPermissionGQL,
+    VFolderOperationStatusGQL,
+)
 
 from .nested import (
     VFolderAccessControlInfoGQL,
@@ -69,14 +85,14 @@ class VFolderGQL(PydanticNodeMixin[VFolderNode]):
     id: NodeID[str] = gql_field(description="Unique identifier of the virtual folder.")
     entity_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the vfolder.",
         ),
     )
     status: VFolderOperationStatusGQL = gql_field(
         description=(
             "Current operation status. "
-            "READY, CLONING, "
+            "READY, CREATING, CLONING, "
             "DELETE_PENDING, DELETE_ONGOING, DELETE_COMPLETE, or DELETE_ERROR."
         )
     )
@@ -87,7 +103,10 @@ class VFolderGQL(PydanticNodeMixin[VFolderNode]):
         description="Descriptive metadata including name, usage mode, quota scope, timestamps, and clone eligibility."
     )
     access_control: VFolderAccessControlInfoGQL = gql_field(
-        description="Access control including permission level and ownership type."
+        description=(
+            "Access control including the folder's default mount permission level "
+            "and ownership type."
+        )
     )
     ownership: VFolderOwnershipInfoGQL = gql_field(
         description=(
@@ -132,12 +151,11 @@ class VFolderGQL(PydanticNodeMixin[VFolderNode]):
         BackendAIGQLMeta(
             added_version="26.4.4",
             description="Model cards backed by this vfolder.",
-            deprecated_version=NEXT_RELEASE_VERSION,
+            deprecated_version="26.9.0",
             deprecation_hint="a model card search narrowed by `usedBy: { vfolder }`",
         ),
         deprecation_reason=(
-            f"Deprecated since {NEXT_RELEASE_VERSION}. Use a model card search narrowed by "
-            "`usedBy: { vfolder }`."
+            "Deprecated since 26.9.0. Use a model card search narrowed by `usedBy: { vfolder }`."
         ),
     )  # type: ignore[misc]
     async def model_cards(
@@ -184,7 +202,7 @@ class VFolderGQL(PydanticNodeMixin[VFolderNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="The labels on this vfolder.",
         )
     )  # type: ignore[misc]
@@ -215,8 +233,12 @@ class VFolderGQL(PydanticNodeMixin[VFolderNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
-            description="The permission bits the current user holds on this vfolder.",
+            added_version="26.9.0",
+            description=(
+                "The permission bits the current user holds on this vfolder. On a folder shared "
+                "to them, capped by the share's `EntityShare.permissions`. Separate from the "
+                "mount level (`mountPermission`)."
+            ),
         )
     )  # type: ignore[misc]
     async def permissions(
@@ -226,6 +248,62 @@ class VFolderGQL(PydanticNodeMixin[VFolderNode]):
         return await info.context.data_loaders.vfolder_permission_loader.load(
             VFolderUUID(UUID(self.id))
         )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "The level the current user mounts this vfolder at: NONE without read access, "
+                "READ_WRITE on a personal folder they own, otherwise their own mount policy "
+                "or the folder's default (`accessControl.permission`)."
+            ),
+        )
+    )  # type: ignore[misc]
+    async def mount_permission(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> VFolderMountPermissionGQL | None:
+        mount_permission = await info.context.data_loaders.vfolder_mount_permission_loader.load(
+            VFolderUUID(UUID(self.id))
+        )
+        if mount_permission is None:
+            return None
+        return VFolderMountPermissionGQL(mount_permission.value)
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "The auto-mounts set on this vfolder, in every project or user they are set on."
+            ),
+        )
+    )  # type: ignore[misc]
+    async def vfolder_auto_mounts(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: VFolderAutoMountFilterGQL | None = None,
+        order_by: list[VFolderAutoMountOrderByGQL] | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> VFolderAutoMountConnectionGQL | None:
+        payload = await info.context.adapters.vfolder_auto_mount.scoped_search(
+            ScopedSearchVFolderAutoMountsInput(
+                scope=VFolderAutoMountScope(vfolder=[UUIDScope(value=UUID(self.id))]),
+                filter=filter.to_pydantic() if filter else None,
+                order=[o.to_pydantic() for o in order_by] if order_by else None,
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+                limit=limit,
+                offset=offset,
+            )
+        )
+        return build_vfolder_auto_mount_connection(payload)
 
     @classmethod
     @override

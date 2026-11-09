@@ -745,7 +745,6 @@ type ScalingGroupNode implements Node @key(fields: "id") {
   is_public: Boolean
   created_at: DateTime
   wsproxy_addr: String
-  wsproxy_api_token: String
   driver: String
   driver_opts: JSONString
   scheduler: String
@@ -2347,9 +2346,9 @@ type Mutation {
     """Agent ID to rescan GPU alloc map"""
     agent_id: String!
   ): RescanGPUAllocMaps
-  create_keypair(props: KeyPairInput!, user_id: String!): CreateKeyPair
-  modify_keypair(access_key: String!, props: ModifyKeyPairInput!): ModifyKeyPair
-  delete_keypair(access_key: String!): DeleteKeyPair
+  create_keypair(props: KeyPairInput!, user_id: String!): CreateKeyPair @deprecated(reason: "Deprecated since 26.10.0. Use `adminCreateKeypairV2` instead.")
+  modify_keypair(access_key: String!, props: ModifyKeyPairInput!): ModifyKeyPair @deprecated(reason: "Deprecated since 26.10.0. Use `adminUpdateKeypairV2` instead.")
+  delete_keypair(access_key: String!): DeleteKeyPair @deprecated(reason: "Deprecated since 26.10.0. Use `adminDeleteKeypairV2` instead.")
   rescan_images(
     """Added in 25.1.0."""
     project: String
@@ -2745,7 +2744,7 @@ input ModifyGroupInput {
   resource_policy: String
 
   """Added in 24.03.0"""
-  container_registry: JSONString = "{}"
+  container_registry: JSONString
 }
 
 """Instead of deleting the group, just mark it as inactive."""

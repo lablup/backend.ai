@@ -50,6 +50,8 @@ class VFolderServiceProtocol(Protocol):
 
 
 class VFolderHandler:
+    """Deprecated: the storage API that addresses volumes by `VolumeID`."""
+
     _storage_service: VFolderServiceProtocol
 
     def __init__(self, storage_service: VFolderServiceProtocol) -> None:

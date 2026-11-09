@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.defs import RedisRole
 from ai.backend.common.dependencies import NonMonitorableDependencyProvider
 from ai.backend.common.etcd import AsyncEtcd
@@ -34,6 +35,7 @@ class ServiceDiscoveryInput:
     config: ManagerUnifiedConfig
     etcd: AsyncEtcd
     valkey_profile_target: ValkeyProfileTarget
+    sentinel_monitors: SentinelMonitorSet
 
 
 @dataclass
@@ -71,7 +73,12 @@ class ServiceDiscoveryDependency(
                     RedisRole.LIVE
                 )
                 sd = await RedisServiceDiscovery.create(
-                    RedisServiceDiscoveryArgs(valkey_target=live_valkey_target)
+                    RedisServiceDiscoveryArgs(
+                        valkey_target=live_valkey_target,
+                        sentinel_monitor=setup_input.sentinel_monitors.monitor_for(
+                            live_valkey_target
+                        ),
+                    )
                 )
 
         sd_loop = ServiceDiscoveryLoop(

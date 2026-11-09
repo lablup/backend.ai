@@ -6,6 +6,7 @@ from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.registry.types import FieldGroupMeta
 from ai.backend.manager.actions.v2.bulk.processor import BulkActionProcessor
+from ai.backend.manager.actions.v2.field.bulk_processor import PartialBulkFieldActionProcessor
 from ai.backend.manager.actions.v2.field.processor import SingleFieldActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import (
     AnonymousGlobalActionProcessor,
@@ -21,6 +22,12 @@ from ai.backend.manager.data.auth.login_session_types import LoginHistoryData, L
 from ai.backend.manager.services.auth.actions.authorize import (
     AuthorizeAction,
     AuthorizeActionResult,
+)
+from ai.backend.manager.services.auth.actions.bulk_get_login_history import (
+    BulkGetLoginHistoryAction,
+)
+from ai.backend.manager.services.auth.actions.bulk_get_login_sessions import (
+    BulkGetLoginSessionsAction,
 )
 from ai.backend.manager.services.auth.actions.generate_ssh_keypair import (
     GenerateSSHKeypairAction,
@@ -138,6 +145,12 @@ class AuthProcessors:
     search_login_history: BulkActionProcessor[
         SearchLoginHistoryAction, ScopedFieldsOpsResult[LoginHistoryData]
     ]
+    bulk_get_login_sessions: PartialBulkFieldActionProcessor[
+        BulkGetLoginSessionsAction, LoginSessionData
+    ]
+    bulk_get_login_history: PartialBulkFieldActionProcessor[
+        BulkGetLoginHistoryAction, LoginHistoryData
+    ]
     global_search_login_sessions: GlobalActionProcessor[
         GlobalSearchLoginSessionsAction, BatchOpsResult[LoginSessionData]
     ]
@@ -203,6 +216,12 @@ class AuthProcessors:
         )
         self.search_login_history = self.login_history.atomic_bulk_scoped_search_ops(
             SearchLoginHistoryAction
+        )
+        self.bulk_get_login_sessions = self.login_sessions.partial_bulk_get_ops(
+            BulkGetLoginSessionsAction
+        )
+        self.bulk_get_login_history = self.login_history.partial_bulk_get_ops(
+            BulkGetLoginHistoryAction
         )
         self.global_search_login_sessions = self.login_sessions.global_searcher_ops(
             GlobalSearchLoginSessionsAction

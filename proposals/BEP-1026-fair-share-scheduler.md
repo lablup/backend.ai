@@ -402,7 +402,7 @@ Result: Historical ratios remain stable despite capacity changes
 │  - fair_share_factor: F = 2^(-UH/S) calculation result           │
 └────────────────────────────┬────────────────────────────────────┘
                              │
-                             │ Scheduling time (2-second cycle)
+                             │ Scheduling time (1-second cycle)
                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                     FairShareSequencer                           │
@@ -424,7 +424,7 @@ Result: Historical ratios remain stable despite capacity changes
 
 | Operation | Cycle | Content | Complexity |
 |------|------|------|--------|
-| Scheduling | 2 sec | Read from fair_shares table (cached factor) | O(pending_users) |
+| Scheduling | 1 sec | Read from fair_shares table (cached factor) | O(pending_users) |
 | Batch aggregation | 5 min | raw → buckets → fair_shares update | O(kernels) |
 | Cache recalculation | On config change | Regenerate all buckets from raw | O(records) |
 

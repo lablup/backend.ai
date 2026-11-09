@@ -5,6 +5,8 @@ __all__: tuple[str, ...] = (
     "APIVersionWarning",
     "BackendAPIError",
     "BackendClientError",
+    "BackendConnectError",
+    "BackendConnectionRefusedError",
     "BackendError",
 )
 
@@ -60,7 +62,13 @@ class BackendClientError(BackendError):
     errors and connection failures.
     """
 
-    pass
+
+class BackendConnectError(BackendClientError):
+    """The connection to the server was not established, so the request was not sent."""
+
+
+class BackendConnectionRefusedError(BackendConnectError):
+    """The server refused the connection."""
 
 
 class APIVersionWarning(UserWarning):

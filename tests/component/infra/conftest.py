@@ -21,6 +21,8 @@ from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
+    Concern,
+    ConcernMeta,
     GroupMeta,
 )
 from ai.backend.manager.actions.v2.bulk.validator.rbac import BulkOwnCheck
@@ -127,11 +129,10 @@ def etcd_config_processors(
 def resource_preset_processors(
     database_engine: ExtendedAsyncSAEngine,
     config_provider: ManagerConfigProvider,
-    valkey_clients: ValkeyClients,
     processor_registry: ProcessorRegistry[Any],
 ) -> ResourcePresetProcessors:
     repo = ResourcePresetRepository(
-        database_engine, valkey_clients.stat, config_provider, ShareOpsProvider(database_engine)
+        database_engine, config_provider, ShareOpsProvider(database_engine)
     )
     service = ResourcePresetService(repo)
     return ResourcePresetProcessors(
@@ -199,7 +200,11 @@ def project_processors(
     )
     group_repos = ProjectRepositories(repository=group_repo)
     service = ProjectService(storage_manager, config_provider, valkey_clients.stat, group_repos)
-    return ProjectProcessors(processor_registry.group(GroupMeta(ProjectEntityType())), service)
+    return ProjectProcessors(
+        processor_registry.group(GroupMeta(ProjectEntityType())),
+        processor_registry.concern(ConcernMeta(Concern.ORGANIZATION)).relation_group(),
+        service,
+    )
 
 
 @pytest.fixture()

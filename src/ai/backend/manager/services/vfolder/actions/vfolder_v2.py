@@ -1,6 +1,5 @@
 """V2 vfolder action definitions."""
 
-import uuid
 from dataclasses import dataclass
 from typing import override
 
@@ -58,4 +57,4 @@ class PurgeVFolderV2Action(VFolderAction):
 
 @dataclass
 class PurgeVFolderV2ActionResult:
-    vfolder_id: uuid.UUID
+    vfolder: VFolderData

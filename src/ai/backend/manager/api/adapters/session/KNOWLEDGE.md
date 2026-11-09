@@ -1,7 +1,7 @@
 ---
 name: session-adapter-scenarios
 type: reference
-description: what the session adapter guarantees, as scenarios; the tests in tests/scenario/bai_scenario/manager/session match these
+description: what the session adapter guarantees: project scope permissions, and how bulk terminate and terminate report their results
 scope: src/ai/backend/manager/api/adapters/session
 keywords: [session, scenario, adapter, rbac, enqueue]
 generated:
@@ -9,33 +9,22 @@ generated:
   at: 2026-09-10
 status: draft
 ---
-# 세션 어댑터 — 시나리오
+# session adapter: Knowledge
 
-규칙은 상위 디렉터리의 `AGENTS.md`에 있다.
+The rules are in `AGENTS.md` in the parent directory.
 
-세션은 자기가 속한 프로젝트를 이름으로 댄다. 그래서 세션 권한은 프로젝트 스코프에 앉고, 그
-역할을 주는 일이 곧 그 사람을 프로젝트 명부에 올리는 일이 된다.
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
-## 조회
+A session refers to the project it belongs to by name. The session permission therefore is on the project scope, and granting that role is the same as adding the user to the project member list.
 
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 세션이 하나도 없을 때 슈퍼관리자가 훑는다 | 세션 없음 | 전체 조회 | 비어 있음 |
-| 아무 권한도 받지 않은 사용자가 훑는다 | 권한 없음 | 전체 조회 | 역할 부족으로 거부 |
+## Get
 
-필터 없는 전체 조회는 슈퍼관리자 역할로 막힌다. 스코프 권한으로 막히는 조회는 스코프를
-받는 검색이다.
+The full get without a filter is blocked by the superadmin role. The get blocked by a scope permission is the search that takes a scope.
 
-## 아직 적지 않은 것
+## Bulk terminate
 
-`enqueue`가 가장 크다. 스케줄러가 "리소스 슬롯을 제공하는 에이전트가 그 리소스 그룹에
-없다"로 막는데, 에이전트 행은 write spec이 없다. 하트비트로 등록되기 때문이다. 시나리오로
-세우려면 그 경로를 먼저 열어야 한다.
+Bulk terminate does not reject the whole call. Processed sessions enter the processed list with the finished status (cancelled, terminating, force-terminated, skipped), and failures are recorded in the failure list with the id and the reason. A session already finished or missing enters the processed list as skipped.
 
-`admin_search_kernels`, `batch_load_by_ids`, `batch_load_fields`,
-`batch_load_kernels_by_ids`, `batch_resource_allocation_by_kernel`,
-`batch_resource_allocation_by_session`, `compute_schedule`, `enqueue`,
-`exclude_idle_checks`, `get`, `get_logs`, `gql_search_by_project`,
-`include_idle_checks`, `project_search`, `search_kernels_by_agent`,
-`search_kernels_by_session`, `search_sessions_by_agent`, `shutdown_service`,
-`start_service`, `terminate`, `update`.
+## Terminate (old name)
+
+The old terminate calls the same processing as bulk terminate and splits the response into lists by finished status. When even one session is rejected, the whole call is rejected.

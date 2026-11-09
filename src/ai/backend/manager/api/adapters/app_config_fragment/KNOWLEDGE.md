@@ -1,7 +1,7 @@
 ---
 name: app-config-fragment-adapter-scenarios
 type: reference
-description: what the app config fragment adapter guarantees, as scenarios; one config name holds a fragment per scope (public, each domain, each user) that the app_config adapter merges by allow-list rank, and this adapter writes, reads, searches and purges those fragments one by one at their owner's scope, the public fragment written behind the superadmin role and read by anyone signed in, and the allow-list entry as the write gate; the tests in tests/scenario/bai_scenario/manager/app_config_fragment match these one for one
+description: what the app config fragment adapter guarantees; one config name holds a fragment per scope (public, each domain, each user) that the app_config adapter merges by allow-list rank, and this adapter writes, reads, searches and purges those fragments one by one at their owner's scope, the public fragment written behind the superadmin role and read by anyone signed in, and the allow-list entry as the write gate
 scope: src/ai/backend/manager/api/adapters/app_config_fragment
 keywords: [app config fragment, scenario, adapter, upsert, scope, public, rbac]
 generated:
@@ -9,200 +9,78 @@ generated:
   at: 2026-09-11
 status: draft
 ---
-# app_config_fragment 어댑터 — 시나리오
+# app_config_fragment adapter: Knowledge
 
-규칙은 상위 디렉터리의 `AGENTS.md`에 있다. 여기 적힌 내용과 실행 결과가 어긋나면 문장 쪽을 먼저
-의심한다.
+The rules are in `AGENTS.md` in the parent directory. When this document and a run result disagree, doubt the sentence first.
 
-`config_name` 하나에는 스코프마다 `app_config_fragment` 하나가 있다. 공개 `fragment` 하나, 도메인마다
-하나, 사용자마다 하나가 같은 이름 아래 함께 있고, 설정을 읽는 `app_config` 어댑터는 그 `fragment` 행을
-`app_config_allow_list` 항목의 `rank` 값 순으로 병합한 값을 반환한다. 이 어댑터는 병합 전의 `fragment`
-하나하나를 쓰고 조회하고 검색하고 삭제한다. 소유자는 도메인이거나 사용자이고, 소유자가 없으면 공개
-`fragment`에 해당한다. `scope_type` 필드는 소유자의 종류에서 결정되므로 따로 저장하지 않는다. 한
-스코프에서 같은 이름을 다시 쓰면 그 스코프의 `fragment` 행이 바뀐다.
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
-`allow_list` 항목이 쓰기의 전제 조건이다. 그 이름을 그 `scope_type` 값에 허용하는 항목이 있어야 쓸 수
-있고, 항목이 사라지면 `fragment` 행도 함께 사라진다. 그래서 허용되지 않은 `fragment` 행이 남아 있는
-상황은 생기지 않는다.
+One `config_name` holds one `app_config_fragment` per scope. One public fragment, one per domain and one per user sit together under the same name, and the `app_config` adapter that reads config returns those fragment rows merged in the order of the `rank` value of the `app_config_allow_list` entry. This adapter writes, reads, searches and deletes each fragment before the merge. The owner is a domain or a user, and a fragment with no owner is the public fragment. The `scope_type` field is decided by the kind of owner and is not stored separately. Writing the same name again in one scope changes the fragment row of that scope.
 
-권한 검사 방식은 소유자가 있는지에 따라 다르다. 소유자가 있는 쓰기와 한 스코프 조회는 그 소유자의
-스코프에 부여된 권한을 검사한다. 공개 `fragment`는 대응하는 스코프가 없어, 쓰기는 호출한 사용자가
-슈퍼관리자인지 검사하고 스코프로 조회할 때는 인증만 확인한다. 하나를 id로 조회하고 삭제하는 호출은 권한 그래프를
-검사하고, 여러 id를 한 번에 조회하고 삭제하는 호출은 항목마다 결과를 따로 반환한다. 전체 검색은
-슈퍼관리자인지 검사한다.
+An `allow_list` entry is the precondition of a write. A write needs an entry that allows the name for that `scope_type` value, and when the entry disappears the fragment row disappears with it. So a fragment row that is not allowed does not remain.
 
-쓰기 권한은 생성 권한과 수정 권한 둘 다 필요하다. 쓰기가 새 `fragment` 행을 만들 수도 있고 기존
-`fragment` 행을 바꿀 수도 있으므로 한쪽만으로는 통과하지 못한다.
+The permission check differs by whether an owner exists. A write with an owner and a read of one scope check the permission granted on that owner's scope. The public fragment has no corresponding scope, so a write checks whether the calling user is superadmin, and a read by scope checks authentication only. A call that gets and deletes one by id checks the permission graph, and a call that gets and deletes several ids returns a result per entry. The unscoped search checks whether the caller is superadmin.
 
-응답 필드는 id, `config_name`, `scope_type`, `scope_id`, `config`, 시각이다. 공개 `fragment`의 `scope_id`
-필드는 비어 있다. 쓰기의 응답에는 `failed` 필드가 있지만 언제나 비어 있다. 쓰기는 하나라도 실패하면
-전부 실패하므로 일부만 실패한 응답이 없다. 시나리오를 적기 전에 그 필드를 없앨 것인지 정한다.
+A write needs both create permission and update permission. A write may create a new fragment row or change an existing one, so one of the two alone does not pass.
 
-## 자기 `fragment` 쓰기
+The response fields are id, `config_name`, `scope_type`, `scope_id`, `config` and time. The `scope_id` field of the public fragment is empty. A write fails entirely when any `fragment` fails. The writes are `scoped_atomic_bulk_upsert` and `my_atomic_bulk_upsert`, and the response holds only the written nodes. The old GQL mutation and REST path are deprecated and return the same write with a `failed` field that is always empty.
 
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 쓰기 권한을 받은 사용자가 자기 `fragment`를 처음 쓴다 | 도메인 하나, 그 도메인의 사용자 하나, `app_config_definition` 하나, 사용자 `allow_list` 항목 하나, 자기 스코프에 쓰기 권한 있음 | 이름 하나와 `config` 값으로 쓰기 | 노드 하나. `scope_type` 값은 `user`, `scope_id` 값은 자기 자신의 id, `config` 값은 지정한 그대로, id와 시각은 서버가 채운다 |
-| 같은 이름에 다시 쓰면 `config` 값이 통째로 바뀐다 | 위와 같고 자기 `fragment`가 이미 있음 | 다른 키를 담은 `config` 값으로 다시 쓰기 | 같은 id, `config` 값은 새 값뿐이다. 이전 키가 남지 않고 `updated_at` 값이 갱신된다 |
-| 여러 이름을 한 번에 쓴다 | `definition` 둘, 각각의 사용자 `allow_list` 항목, 쓰기 권한 있음 | 이름 둘로 쓰기 | 둘 다 쓰이고 요청 순서대로 반환된다 |
-| 허용되지 않은 이름이 섞이면 아무것도 쓰이지 않는다 | `definition` 둘 중 하나에만 사용자 `allow_list` 항목 있음, 쓰기 권한 있음 | 이름 둘로 쓰기 | 쓰기 허용 안 됨으로 거부 |
-| 등록되지 않은 이름에 쓴다 | `definition` 없음, 쓰기 권한 있음 | 쓰기 | 쓰기 허용 안 됨으로 거부 |
-| `scope_type` 값이 `user`일 때 허용되지 않은 이름에 쓴다 | `definition` 하나, 도메인 `allow_list` 항목만 있음, 쓰기 권한 있음 | 쓰기 | 쓰기 허용 안 됨으로 거부 |
-| 생성 권한만 받은 사용자가 쓴다 | 자기 스코프에 생성 권한만 있고 수정 권한 없음 | 쓰기 | 권한 부족으로 거부 |
-| 아무 권한도 없는 사용자가 쓴다 | 사용자 `allow_list` 항목 있음, 권한 없음 | 쓰기 | 권한 부족으로 거부 |
-| 권한 검사를 끄면 권한 없이도 쓴다 | 권한 검사 비활성화, 권한 없음 | 쓰기 | 쓰인다 |
+## Writing one's own fragment
 
-허용되지 않은 이름이 섞이는 시나리오는 쓰기가 하나라도 실패하면 전부 실패한다는 것을 확인한다. 허용
-검사는 항목 하나마다 실행하지만, 하나가 거부되면 나머지도 롤백되어 허용된 이름의 `fragment`도 남지
-않는다. 시나리오는 응답만 확인하므로 남지 않는 것은 시나리오에 적지 않는다.
+The scenario where a disallowed name is in the request checks that a write fails entirely when any `fragment` fails. The allowance check runs per entry, but one rejection rolls back the rest, so the fragment of an allowed name does not remain either. Scenarios check the response only, so they do not state what does not remain.
 
-등록되지 않은 이름도, `scope_type` 값이 `user`일 때 허용되지 않은 이름도 같은 이유로 거부된다. 검사는
-하나이고, 그 이름을 그 `scope_type` 값에 허용하는 `allow_list` 항목이 있는지만 확인한다.
+An unregistered name and, when the `scope_type` value is `user`, a disallowed name are rejected for the same reason. There is one check, and it looks only for an `allow_list` entry that allows the name for that `scope_type` value.
 
-빈 항목 목록과 이름이 비어 있거나 너무 긴 요청은 시나리오로 두지 않는다. 요청 타입의 검증이 이미
-거부하기 때문이다.
+An empty entry list and a request with an empty or too-long name are not scenarios. The validation of the request type already rejects them.
 
-## 지정한 스코프에 쓰기
+## Writing to a specified scope
 
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 쓰기 권한을 받은 사용자가 도메인 `fragment`를 쓴다 | 도메인 하나, `definition` 하나, 도메인 `allow_list` 항목 하나, 그 도메인 스코프에 쓰기 권한 있음 | 도메인을 지정해 쓰기 | `scope_type` 값은 `domain`, `scope_id` 값은 그 도메인의 id |
-| 슈퍼관리자가 공개 `fragment`를 쓴다 | `definition` 하나, 공개 `allow_list` 항목 하나, 슈퍼관리자 | 공개 스코프를 지정해 쓰기 | `scope_type` 값은 `public`, `scope_id` 필드는 비어 있다 |
-| 슈퍼관리자가 아닌 사용자가 공개 `fragment`를 쓴다 | 슈퍼관리자 아님, 자기 도메인 스코프에 쓰기 권한 있음 | 공개 스코프를 지정해 쓰기 | 역할 부족으로 거부 |
-| 권한 검사를 꺼도 슈퍼관리자가 아니면 공개 `fragment`를 쓸 수 없다 | 권한 검사 비활성화, 슈퍼관리자 아님 | 공개 스코프를 지정해 쓰기 | 역할 부족으로 거부 |
-| 남의 스코프에 쓴다 | 사용자 둘, 사용자 `allow_list` 항목 하나, 자기 스코프에만 쓰기 권한 있음 | 다른 사용자를 지정해 쓰기 | 권한 부족으로 거부 |
-| 슈퍼관리자가 존재하지 않는 소유자를 지정해 쓴다 | `definition` 하나, 사용자 `allow_list` 항목 하나, 슈퍼관리자 | 존재하지 않는 사용자 id를 지정해 쓰기 | 소유자 없음으로 거부 |
+The scenario where a user who is not superadmin writes a public fragment and the scenario that cannot write even with the permission check off have the opposite result to the section on writing one's own fragment. The public write is protected by the superadmin check, not by the permission graph, so it does not pass even with the scope permission.
 
-슈퍼관리자가 아닌 사용자가 공개 `fragment`를 쓰는 시나리오와 권한 검사를 꺼도 쓸 수 없는 시나리오는
-자기 `fragment` 쓰기 절과 반대 결과를 갖는다. 공개 쓰기는 권한 그래프가 아니라 슈퍼관리자 검사로 보호되므로
-스코프 권한이 있어도 통과하지 못한다.
+Whether an owner exists is checked in the permission graph. The row is written first and rolled back when the graph has no owner, so no fragment row remains after the rejection. This rejection responds with a server error, not the current request error. Before writing the scenario, settle whether to change it to a rejection for a missing target.
 
-소유자가 있는지는 권한 그래프에서 확인한다. 행은 먼저 쓰이고 그래프에 소유자가 없어 롤백되므로,
-거부돼도 `fragment` 행은 남지 않는다. 이 거부는 현재 요청 오류가 아니라 서버 오류로 응답한다.
-시나리오를 적기 전에 "대상을 찾을 수 없어 거부"로 바꿀 것인지 정한다.
+A request with a `scope_type` value of `public` that sets a `scope_id` value and a request with a `scope_type` value of `domain` or `user` that omits the `scope_id` value are not scenarios. The validation of the request type already rejects them.
 
-`scope_type` 값이 `public`인데 `scope_id` 값을 지정한 요청과 `scope_type` 값이 `domain`이나 `user`인데
-`scope_id` 값을 생략한 요청은 시나리오로 두지 않는다. 요청 타입의 검증이 이미 거부하기 때문이다.
+## Getting one's own fragment by name
 
-## 자기 `fragment`를 이름으로 조회
+This read targets one user scope only. It exists to read the config value the user wrote before updating it, not the merged `config` value, so there is a scenario where a domain fragment and the public fragment are not mixed in.
 
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 읽기 권한을 받은 사용자가 이름 셋으로 조회한다 | `definition` 셋, 각각의 사용자 `allow_list` 항목, 그중 둘에 자기 `fragment` 있음, 자기 스코프에 읽기 권한 있음 | 이름 셋으로 조회 | 세 항목, 요청 순서대로. `fragment`가 있는 항목은 노드, 없는 항목은 비어 있음 |
-| 남의 `fragment`는 응답에 없다 | 사용자 둘, 같은 이름에 각자의 `fragment`, 읽기 권한 있음 | 그 이름으로 조회 | 자기 `fragment`만 |
-| 도메인 `fragment`는 섞이지 않는다 | 같은 이름에 자기 도메인의 `fragment`와 자기 `fragment`, 읽기 권한 있음 | 그 이름으로 조회 | 자기 `fragment`만 |
-| 아무 권한도 없는 사용자가 조회한다 | 자기 `fragment` 하나, 권한 없음 | 이름으로 조회 | 권한 부족으로 거부 |
+## Getting a fragment of a specified scope by name
 
-이 조회는 사용자 스코프 하나만 대상으로 한다. 병합된 `config` 값이 아니라 자기가 쓴 `config` 값을
-수정하기 전에 읽는 용도이므로, 도메인 `fragment`와 공개 `fragment`가 섞이지 않는 시나리오를 둔다.
+The scenario where anyone reads the public fragment exists because the public fragment has no scope to protect. That `config` value is merged and visible even before sign-in, so the read checks authentication only and responds. The public fragment scenario in the get section requires the same result.
 
-## 지정한 스코프의 `fragment`를 이름으로 조회
+A non-existent domain is rejected for different reasons for superadmin and for other users. The permission check runs first and whether an owner exists is checked after it, so only superadmin, who passes that check, is rejected for a missing target. The scenario that names a non-existent owner in the next section is the same.
 
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 읽기 권한을 받은 사용자가 도메인 `fragment`를 조회한다 | 도메인 `fragment` 하나, 그 도메인 스코프에 읽기 권한 있음 | 도메인을 지정해 이름으로 조회 | 그 `fragment` |
-| 로그인한 누구나 공개 `fragment`를 조회한다 | 공개 `fragment` 하나, 아무 권한도 없는 사용자 | 공개 스코프를 지정해 이름으로 조회 | 그 `fragment` |
-| 남의 스코프를 조회한다 | 사용자 둘, 자기 스코프에만 읽기 권한 있음 | 다른 사용자를 지정해 조회 | 권한 부족으로 거부 |
-| 슈퍼관리자가 존재하지 않는 도메인을 지정해 조회한다 | 슈퍼관리자 | 존재하지 않는 도메인 id를 지정해 조회 | 대상을 찾을 수 없어 거부 |
-| 존재하지 않는 도메인을 지정해 조회한다 | 자기 도메인에 읽기 권한 있음 | 존재하지 않는 도메인 id를 지정해 조회 | 권한 부족으로 거부 |
+## Search in one scope
 
-공개 `fragment`를 누구나 조회하는 시나리오가 있는 이유는, 공개 `fragment`에는 보호할 스코프가 없기
-때문이다. 그 `config` 값은 로그인 전에도 병합되어 보이는 값이므로 인증만 확인하고 응답한다. 조회 절의
-공개 `fragment` 시나리오가 같은 결과를 요구한다.
+The adapter rejects a scenario that names two scopes. The request type accepts several scopes, but this search runs in one scope only, so the adapter rejects the rest instead of ignoring them silently. A request that names no scope is not a scenario because the validation of the request type rejects it.
 
-존재하지 않는 도메인은 슈퍼관리자와 그 밖의 사용자에게 서로 다른 이유로 거부된다. 권한 검사가 먼저
-실행되고 소유자가 있는지는 그 뒤에 확인하므로, 그 검사를 통과하는 슈퍼관리자만 대상을 찾을 수 없어
-거부된다. 아래 절에서 존재하지 않는 소유자를 지정하는 시나리오도 같다.
+## Unscoped search
 
-## 한 스코프 검색
+The scenario where a user who is not superadmin searches also includes read permission in its situation, to check that the search in one scope and the unscoped search check permission differently.
 
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 읽기 권한을 받은 사용자가 자기 스코프를 검색한다 | 자기 `fragment` 둘, 다른 사용자의 `fragment` 하나, 자기 스코프에 읽기 권한 있음 | 자기 스코프를 지정해 전체 조회 | 자기 `fragment` 둘만 반환된다 |
-| 로그인한 누구나 공개 스코프를 검색한다 | 공개 `fragment` 둘, 아무 권한도 없는 사용자 | 공개 스코프를 지정해 전체 조회 | 둘 다 반환된다 |
-| 스코프를 둘 지정한다 | 읽기 권한 있음 | 도메인과 사용자를 함께 지정해 조회 | 잘못된 입력으로 거부 |
-| 남의 스코프를 검색한다 | 사용자 둘, 자기 스코프에만 읽기 권한 있음 | 다른 사용자를 지정해 조회 | 권한 부족으로 거부 |
-| 슈퍼관리자가 존재하지 않는 도메인을 검색한다 | 슈퍼관리자 | 존재하지 않는 도메인 id를 지정해 조회 | 대상을 찾을 수 없어 거부 |
+Filter, sort and pagination are the common search contract, so a scenario of this adapter does not verify them.
 
-스코프를 둘 지정하는 시나리오는 어댑터가 막는다. 요청 타입은 여러 스코프를 받지만 이 검색은 한
-스코프에서만 실행되므로, 나머지를 조용히 무시하는 대신 거부한다. 아무 스코프도 지정하지 않은 요청은
-요청 타입의 검증이 거부하므로 시나리오로 두지 않는다.
+## Get
 
-## 전체 검색
+The scenario that gets the public fragment by id fails in the current code and was taken out of the run (BA-7933). A read by scope has no scope that corresponds to the public fragment and passes with authentication only, but a read by id checks the permission granted on that fragment itself. The public fragment belongs to no scope, so no role grants a permission on it other than a role attached directly to that fragment, and every user who is not superadmin is rejected for insufficient permission. A public fragment must respond with authentication only, as in a read by scope, and the scenario records that expected result. Return it to the run when it is fixed.
 
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 슈퍼관리자가 전체를 검색한다 | 공개·도메인·사용자 스코프에 `fragment` 넷, 슈퍼관리자 | 전체 조회 | 넷 다 반환된다 |
-| 슈퍼관리자가 아닌 사용자가 검색한다 | 슈퍼관리자 아님, 자기 도메인 스코프에 읽기 권한 있음 | 전체 조회 | 역할 부족으로 거부 |
+## Getting by several ids
 
-슈퍼관리자가 아닌 사용자가 검색하는 시나리오의 상황에 읽기 권한을 함께 두는 이유는, 한 스코프 검색과
-전체 검색의 권한 검사가 다르다는 것을 확인하기 위해서다.
+A missing id is also an entry rejected for a user who is not superadmin. The permission check runs per entry first, and a missing row has no granted permission, so only superadmin, who passes that check, receives an empty entry for the missing id.
 
-필터·정렬·페이지네이션은 검색 공통 계약이라 이 어댑터의 시나리오로 검증하지 않는다.
+## Delete
 
-## 조회
+Delete does not check the `allow_list` entry. A fragment row exists only while the `allow_list` entry exists, so an existing fragment row can always be deleted in its own scope.
 
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 읽기 권한을 받은 사용자가 자기 `fragment`를 조회한다 | 자기 `fragment` 하나, 자기 스코프에 읽기 권한 있음 | id로 조회 | 그 `fragment` 전체 |
-| 남의 `fragment`를 조회한다 | 사용자 둘, 다른 사용자의 `fragment`, 자기 스코프에만 읽기 권한 있음 | id로 조회 | 권한 부족으로 거부 |
-| 권한 없이 공개 `fragment`를 id로 조회한다 | 공개 `fragment` 하나, 아무 권한도 없는 사용자 | id로 조회 | 그 `fragment` 전체 (실행에서 뺌, 아래 참고) |
-| 존재하지 않는 id로 조회한다 | 자기 스코프에 읽기 권한 있음 | 없는 id로 조회 | 권한 부족으로 거부 |
-| 슈퍼관리자가 존재하지 않는 id로 조회한다 | 슈퍼관리자 | 없는 id로 조회 | 대상을 찾을 수 없어 거부 |
+The merge read document covers how, after a fragment is deleted, that `config` value drops out of the merge result and the `config` value of the scope with the next `rank` value appears instead. That document builds without the fragment from the start, so this document does not check the merge again after a delete.
 
-공개 `fragment`를 id로 조회하는 시나리오는 현재 코드에서 실패하므로 실행에서 뺐다 (BA-7933). 스코프
-조회는 공개 `fragment`에 대응하는 스코프가 없어 인증만 확인하고 통과시키지만, id 조회는 그 `fragment`
-자체에 부여된 권한을 검사한다. 공개 `fragment`는 어느 스코프에도 속하지 않아 그 `fragment`에 직접
-부여된 역할 말고는 권한을 부여하는 역할이 없으므로, 슈퍼관리자가 아닌 누구에게나 권한 부족으로
-거부된다. 공개 `fragment`는 스코프로 조회할 때와 같이 인증만 확인하고 응답해야 하고, 시나리오에는 그
-기대 결과를 적어 두었다. 고쳐지면 실행에 되돌린다.
+This adapter has no delete that keeps the row. Deleting makes the row disappear, and there is no call that restores it.
 
-## 여러 id로 조회
+## Deleting several
 
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 있는 것, 없는 것, 볼 수 없는 것을 섞어 조회한다 | 자기 `fragment` 하나, 다른 사용자의 `fragment` 하나, 자기 스코프에만 읽기 권한 있음 | 그 둘과 없는 id 하나를 한 번에 | 목록 순서대로. 자기 것은 노드, 남의 것과 없는 id는 그 항목만 거부 |
-| 슈퍼관리자가 섞어 조회한다 | `fragment` 둘 | 그 둘과 없는 id 하나를 한 번에 | 둘은 노드, 없는 id에 해당하는 항목은 비어 있음 |
-| 빈 목록을 준다 | `fragment` 하나 | 빈 id 목록 | 빈 응답. 하위 계층을 호출하지 않는다 |
+Without permission the whole request is not rejected; only that entry enters the `failed` list, and another user's fragment remains. A missing id and an id that cannot be deleted enter the same `failed` list, so the scenario mixes one's own fragment, another user's fragment and a missing id in one request and checks the order. The failure reason is returned as a string and a string may change, so the scenario does not check it.
 
-없는 id도 슈퍼관리자가 아닌 사용자에게는 거부되는 항목이다. 권한 검사가 항목마다 먼저 실행되는데 없는
-행에는 부여된 권한도 없기 때문이고, 그 검사를 통과하는 슈퍼관리자에게만 없는 id가 빈 항목으로 반환된다.
+An empty list is not a scenario. The validation of the request type already rejects it.
 
-## 삭제
-
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 삭제 권한을 받은 사용자가 자기 `fragment`를 삭제한다 | 자기 `fragment` 하나, 자기 스코프에 삭제 권한 있음 | id로 삭제 | 삭제한 id를 담은 응답 |
-| 남의 `fragment`를 삭제한다 | 사용자 둘, 다른 사용자의 `fragment`, 자기 스코프에만 삭제 권한 있음 | id로 삭제 | 권한 부족으로 거부 |
-| 읽기 권한만 받은 사용자가 삭제한다 | 자기 `fragment` 하나, 읽기 권한만 있음 | id로 삭제 | 권한 부족으로 거부 |
-| 슈퍼관리자가 존재하지 않는 id를 삭제한다 | 슈퍼관리자 | 없는 id를 삭제 | 대상을 찾을 수 없어 거부 |
-
-삭제는 `allow_list` 항목을 확인하지 않는다. `fragment` 행은 `allow_list` 항목이 있는 동안만 존재하므로,
-있는 `fragment` 행은 언제나 자기 스코프에서 삭제할 수 있다.
-
-`fragment`를 삭제한 뒤 병합 결과에서 그 `config` 값이 빠지고 `rank` 값이 그 아래인 스코프의 `config` 값이 대신
-나타나는 것은 병합 조회 문서가 다룬다. 그 문서는 `fragment`를 처음부터 빼고 만들어 두므로, 여기서
-삭제한 뒤 병합을 다시 확인하지 않는다.
-
-이 어댑터에는 soft delete가 없다. 삭제하면 행이 사라지고 되살리는 호출도 없다.
-
-## 여러 개 삭제
-
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 있는 것, 없는 것, 삭제할 수 없는 것을 섞어 삭제한다 | 자기 `fragment` 둘, 다른 사용자의 `fragment` 하나, 자기 스코프에만 삭제 권한 있음 | 그 셋과 없는 id 하나를 한 번에 | 자기 둘은 `items` 목록에, 남의 것과 없는 id는 `failed` 목록에 이유와 함께 |
-| 슈퍼관리자가 섞어 삭제한다 | `fragment` 둘 | 그 둘과 없는 id 하나를 한 번에 | 둘은 `items` 목록에, 없는 id는 `failed` 목록에 |
-
-권한이 없으면 요청 전체가 거부되지 않고 그 항목만 `failed` 목록에 들어가며, 남의 `fragment`는 남는다.
-없는 id와 삭제할 수 없는 id가 같은 `failed` 목록에 들어가므로 자기 `fragment`, 남의 `fragment`, 없는 id를
-한 요청에 섞어 순서를 확인한다. 실패 이유는 문자열로 반환되고 문자열은 바뀌어도 되는 값이므로
-시나리오가 확인하지 않는다.
-
-빈 목록은 시나리오로 두지 않는다. 요청 타입의 검증이 이미 거부하기 때문이다.
-
-## 아직 적지 않은 것
-
-어댑터가 제공하는 `scoped_upsert_app_config_fragments`, `my_upsert_app_config_fragments`, `get`,
-`purge`, `bulk_purge`, `batch_load_by_ids`, `scoped_app_config_fragments_by_names`,
-`my_app_config_fragments_by_names`, `admin_search`, `scoped_search`가 모두 위에 있다. 실행 결과에
-남는 `batch_load_fields`는 어댑터 공통 기반 클래스에서 상속한 필드 읽기이고, 이 엔티티는 필드를 갖지 않아 호출할 일이 없다.
+Deleting several is `partial_bulk_purge` and returns the deleted nodes. The old REST `POST /bulk-delete` is deprecated and returns the ids of the same delete only.

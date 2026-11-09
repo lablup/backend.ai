@@ -6,6 +6,7 @@ import ipaddress
 import json
 import logging
 import uuid
+import warnings
 from collections.abc import (
     Callable,
     Mapping,
@@ -38,7 +39,9 @@ from sqlalchemy.types import CHAR, SchemaType, TypeDecorator, TypeEngine, Unicod
 
 from ai.backend.common import validators as tx
 from ai.backend.common.auth import PublicKey
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.exception import InvalidIpAddressValue
 from ai.backend.common.types import (
     AbstractPermission,
@@ -53,11 +56,9 @@ from ai.backend.common.types import (
     VFolderHostPermissionMap,
 )
 from ai.backend.logging.structured import StructuredLogger
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.resource import DataTransformationFailed
 from ai.backend.manager.errors.secret import InvalidSecretBinding
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.secret.types import SecretValue
 
 if TYPE_CHECKING:
@@ -624,7 +625,8 @@ class PydanticColumn[TBaseModel: BaseModel](TypeDecorator[TBaseModel]):
     cache_ok = True
 
     def __init__(self, schema: type[TBaseModel], *, exclude_unset: bool = False) -> None:
-        super().__init__()
+        # Without none_as_null, JSONB binds None as the JSON value 'null' instead of SQL NULL.
+        super().__init__(none_as_null=True)
         self._schema = schema
         self._exclude_unset = exclude_unset
 
@@ -1028,6 +1030,25 @@ class SecretColumn(TypeDecorator[SecretValue]):
         return SecretValue.parse(value)
 
 
+class EntityTypeColumn(TypeDecorator[EntityType]):
+    """A string column read back as an :class:`EntityType`."""
+
+    impl = sa.String
+    cache_ok = True
+
+    @override
+    def process_bind_param(self, value: Any | None, _dialect: Dialect) -> str | None:
+        if value is None:
+            return None
+        return str(value)
+
+    @override
+    def process_result_value(self, value: Any | None, _dialect: Dialect) -> EntityType | None:
+        if value is None:
+            return None
+        return EntityType(value)
+
+
 class SlugType(TypeDecorator[str]):
     """
     A type wrapper for slug type string
@@ -1056,14 +1077,18 @@ class SlugType(TypeDecorator[str]):
     def coerce_compared_value(self, _op: Any, _value: Any) -> Unicode:
         return Unicode()
 
-    @override
-    def process_bind_param(self, value: Any | None, _dialect: Dialect) -> str | None:
-        if value is None:
-            return value
+    def check(self, value: str) -> None:
+        """Raise :class:`ValueError` unless the value fits the column."""
         try:
             self._tx_slug.check(value)
         except t.DataError as e:
             raise ValueError(e.error, value) from e
+
+    @override
+    def process_bind_param(self, value: Any | None, _dialect: Dialect) -> str | None:
+        if value is None:
+            return value
+        self.check(value)
         return cast(str, value)
 
 
@@ -1126,6 +1151,18 @@ async def populate_fixture(
     engine: SAEngine,
     fixture_data: Mapping[str, str | Sequence[dict[str, Any]]],
 ) -> None:
+    """Deprecated: write seed files with `mgr seed apply` instead. Removed in the next LTS.
+
+    A fixture without the RBAC rows of the entities it writes may leave them unreachable through
+    permission checks."""
+    warnings.warn(
+        "populate_fixture() is deprecated and will be removed in the next LTS; use"
+        " `mgr seed apply`. A fixture without the RBAC rows (virtual_entities,"
+        " entity_memberships, scope_bindings) of the entities it writes may leave them"
+        " unreachable through permission checks.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     ensure_all_tables_registered()
     op_mode = FixtureOpModes(cast(str, fixture_data.get("__mode", "insert")))
     for table_name, rows in fixture_data.items():
@@ -1233,10 +1270,19 @@ async def populate_fixture(
 
             match op_mode:
                 case FixtureOpModes.INSERT:
-                    insert_stmt = (
-                        sa.dialects.postgresql.insert(table).values(rows).on_conflict_do_nothing()
-                    )
-                    await conn.execute(insert_stmt)
+                    # A multi-row INSERT takes its column list from the FIRST row, silently
+                    # dropping keys that only later rows carry. Group the rows by attribute
+                    # set so every row's own columns reach the server.
+                    row_groups: dict[tuple[str, ...], list[dict[str, Any]]] = {}
+                    for row in rows:
+                        row_groups.setdefault(tuple(sorted(row)), []).append(row)
+                    for row_group in row_groups.values():
+                        insert_stmt = (
+                            sa.dialects.postgresql.insert(table)
+                            .values(row_group)
+                            .on_conflict_do_nothing()
+                        )
+                        await conn.execute(insert_stmt)
                 case FixtureOpModes.UPDATE:
                     update_stmt = sa.update(table)
                     pkcols = []

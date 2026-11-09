@@ -1,6 +1,8 @@
 from ai.backend.common.data.idle_checker.types import IdleCheckerSpec
 from ai.backend.common.exception import PrometheusQueryPresetInvalidLabel
+from ai.backend.common.metrics.types import CONTAINER_UTILIZATION_METRIC_LABEL_NAME
 from ai.backend.manager.actions.v2.ops.result import CreatedEntityOpsResult, EntityOpsResult
+from ai.backend.manager.clients.prometheus.metric_types import ensure_container_metric_name
 from ai.backend.manager.data.idle_checker.types import IdleCheckerData
 from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
 from ai.backend.manager.repositories.ops.repository import OpsRepository
@@ -44,6 +46,9 @@ class IdleCheckerService:
         if spec.utilization is None:
             return
         threshold = spec.utilization.threshold
+        for label in threshold.filter_labels:
+            if label.key == CONTAINER_UTILIZATION_METRIC_LABEL_NAME:
+                ensure_container_metric_name(label.value)
         preset = await self._prometheus_query_preset_repository.get_by_id(threshold.preset_id)
         if preset.filter_labels:
             invalid = {label.key for label in threshold.filter_labels} - set(preset.filter_labels)

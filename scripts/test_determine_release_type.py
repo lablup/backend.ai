@@ -11,7 +11,7 @@ SCRIPT = Path(__file__).with_name("determine-release-type.py")
 
 CLASSIFIED = [
     ("26.9.0a4", "internal", "true"),
-    ("26.9.0rc1", "public", "true"),
+    ("26.9.0rc1", "internal", "true"),
     ("26.9.0", "public", "false"),
     ("26.9.1.post1", "public", "false"),
 ]

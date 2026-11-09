@@ -23,6 +23,7 @@ from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyIm
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.agent.types import AgentInfo
+from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.entity.agent import AgentEntityType, AgentUUID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType, ResourceGroupID
@@ -49,12 +50,14 @@ from ai.backend.manager.errors.agent import (
     AgentNotFound,
 )
 from ai.backend.manager.errors.resource import ResourceGroupNotFound, UnresolvableResourceGroup
+from ai.backend.manager.errors.resource_slot import ResourceSlotTypeNotFound
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.agent.updaters import AgentExitStatusUpdater
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy.row import (
     DeploymentAutoScalingPolicyRow,
 )
+from ai.backend.manager.models.deployment_designated_agent.row import DeploymentDesignatedAgentRow
 from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
@@ -67,7 +70,8 @@ from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
 from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
-from ai.backend.manager.models.resource_group.row import ResourceGroupOpts, ResourceGroupRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -78,6 +82,7 @@ from ai.backend.manager.models.resource_slot.row import AgentResourceRow, Resour
 from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
 from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.session_designated_agent.row import SessionDesignatedAgentRow
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder.row import VFolderRow
@@ -642,6 +647,35 @@ class TestAgentRepositoryDB:
         assert result.need_resource_slot_update is True
         mock_config_provider.legacy_etcd_config_loader.update_resource_slots.assert_called_once()
 
+    async def test_sync_agent_heartbeat_unregistered_slot_type_names_the_slot(
+        self,
+        agent_repository: AgentRepository,
+        sample_agent_info: AgentInfo,
+    ) -> None:
+        agent_id = AgentId("agent-unregistered-slot")
+        agent_info = sample_agent_info.model_copy(
+            update={
+                "available_resource_slots": [
+                    *sample_agent_info.available_resource_slots,
+                    ResourceSlotEntry(
+                        resource_type=ResourceSlotName("tt-n300.device"), quantity="0"
+                    ),
+                ],
+                "slot_key_and_units": {
+                    **sample_agent_info.slot_key_and_units,
+                    ResourceSlotName("tt-n300.device"): SlotTypes.COUNT,
+                },
+            }
+        )
+        upsert_data = AgentHeartbeatUpsert.from_agent_info(
+            agent_id=agent_id,
+            agent_info=agent_info,
+            heartbeat_received=datetime.now(tzutc()),
+        )
+
+        with pytest.raises(ResourceSlotTypeNotFound, match=r"'tt-n300\.device'"):
+            await agent_repository.sync_agent_heartbeat(agent_id, upsert_data)
+
     # ==================== upsert_agent_with_state tests ====================
 
     @pytest.fixture
@@ -1199,6 +1233,8 @@ class TestAgentDBSourceKernelFiltering:
                 EntityMembershipRow,
                 EntityMembershipCapRow,
                 ScopeBindingRow,
+                DeploymentDesignatedAgentRow,
+                SessionDesignatedAgentRow,
             ],
         ):
             # Seed default resource slot types
@@ -1272,6 +1308,39 @@ class TestAgentDBSourceKernelFiltering:
         yield (str(group_id), test_domain)
 
     @pytest.fixture
+    async def test_user(
+        self,
+        db_with_tables: ExtendedAsyncSAEngine,
+        test_domain: str,
+        test_domain_id: DomainID,
+    ) -> AsyncGenerator[UUID, None]:
+        """Create a user to own the seeded sessions and kernels"""
+        policy_name = str(uuid4())
+        user_uuid = uuid4()
+        async with db_with_tables.begin_session() as db_sess:
+            db_sess.add(
+                UserResourcePolicyRow(
+                    name=policy_name,
+                    max_vfolder_count=0,
+                    max_quota_scope_size=-1,
+                    max_session_count_per_model_session=10,
+                    max_customized_image_count=10,
+                )
+            )
+            await db_sess.flush()
+            db_sess.add(
+                UserRow(
+                    uuid=user_uuid,
+                    username=f"testuser-{user_uuid.hex[:8]}",
+                    email=f"{user_uuid.hex[:8]}@example.com",
+                    domain_name=test_domain,
+                    domain_id=test_domain_id,
+                    resource_policy=policy_name,
+                )
+            )
+        yield user_uuid
+
+    @pytest.fixture
     async def resource_group(
         self,
         db_with_tables: ExtendedAsyncSAEngine,
@@ -1312,7 +1381,7 @@ class TestAgentDBSourceKernelFiltering:
         agent_id: AgentId,
         resource_group_name: str,
         resource_group_id: ResourceGroupID,
-    ) -> None:
+    ) -> AgentUUID:
         agent_uuid = AgentUUID(uuid4())
         async with db.begin_session() as db_sess:
             db_sess.add(
@@ -1342,6 +1411,7 @@ class TestAgentDBSourceKernelFiltering:
                 agent_uuid,
                 [(ResourceGroupEntityType(), resource_group_id)],
             )
+        return agent_uuid
 
     async def _seed_target_group(self, db: ExtendedAsyncSAEngine) -> tuple[str, ResourceGroupID]:
         name = str(uuid4())
@@ -1373,6 +1443,7 @@ class TestAgentDBSourceKernelFiltering:
         domain_id: DomainID,
         domain_name: str,
         group_id: UUID,
+        user_uuid: UUID,
     ) -> SessionId:
         session_id = SessionId(uuid4())
         async with db.begin_session() as db_sess:
@@ -1384,7 +1455,7 @@ class TestAgentDBSourceKernelFiltering:
                     domain_id=domain_id,
                     domain_name=domain_name,
                     group_id=group_id,
-                    user_uuid=uuid4(),
+                    user_uuid=user_uuid,
                     resource_group_id=resource_group_id,
                     scaling_group_name=resource_group_name,
                     status=SessionStatus.RUNNING,
@@ -1416,7 +1487,7 @@ class TestAgentDBSourceKernelFiltering:
                     status=KernelStatus.RUNNING,
                     domain_name=domain_name,
                     group_id=group_id,
-                    user_uuid=uuid4(),
+                    user_uuid=user_uuid,
                     access_key="AKTEST" + uuid4().hex[:12],
                     environ={},
                     mounts=[],
@@ -1472,6 +1543,7 @@ class TestAgentDBSourceKernelFiltering:
         test_domain: str,
         test_domain_id: DomainID,
         test_group: tuple[str, str],
+        test_user: UUID,
     ) -> None:
         group_id_str, domain_name = test_group
         agent_id = AgentId(str(uuid4()))
@@ -1485,6 +1557,7 @@ class TestAgentDBSourceKernelFiltering:
             test_domain_id,
             domain_name,
             UUID(group_id_str),
+            test_user,
         )
 
         # force unset: rejected, agent group left unchanged
@@ -1499,6 +1572,250 @@ class TestAgentDBSourceKernelFiltering:
         result = await db_source.update_resource_group(agent_id, target_id, force=True)
         assert [kernel.session.session_id for kernel in result] == [str(session_id)]
         assert await self._agent_group(db_with_tables, agent_id) == (target_name, target_id)
+
+    async def _seed_designating_session(
+        self,
+        db: ExtendedAsyncSAEngine,
+        agent_uuid: AgentUUID,
+        resource_group_name: str,
+        resource_group_id: ResourceGroupID,
+        domain_id: DomainID,
+        domain_name: str,
+        group_id: UUID,
+        user_uuid: UUID,
+        status: SessionStatus = SessionStatus.PENDING,
+    ) -> SessionId:
+        """A session of the resource group designating the agent."""
+        session_id = SessionId(uuid4())
+        async with db.begin_session() as db_sess:
+            db_sess.add(
+                SessionRow(
+                    id=session_id,
+                    name=f"test-session-{uuid4().hex[:8]}",
+                    session_type=SessionTypes.INTERACTIVE,
+                    domain_id=domain_id,
+                    domain_name=domain_name,
+                    group_id=group_id,
+                    user_uuid=user_uuid,
+                    resource_group_id=resource_group_id,
+                    scaling_group_name=resource_group_name,
+                    status=status,
+                    status_info="test",
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    created_at=datetime.now(tzutc()),
+                    images=["python:3.11"],
+                    vfolder_mounts=[],
+                    environ={},
+                    result=SessionResult.UNDEFINED,
+                )
+            )
+            await db_sess.flush()
+            db_sess.add(SessionDesignatedAgentRow(session_id=session_id, agent_uuid=agent_uuid))
+        return session_id
+
+    async def _seed_designating_deployment(
+        self,
+        db: ExtendedAsyncSAEngine,
+        agent_uuid: AgentUUID,
+        resource_group_name: str,
+        domain_name: str,
+        group_id: UUID,
+        user_uuid: UUID,
+        lifecycle_stage: EndpointLifecycle = EndpointLifecycle.CREATED,
+    ) -> UUID:
+        """A deployment of the resource group designating the agent."""
+        deployment_id = uuid4()
+        async with db.begin_session() as db_sess:
+            db_sess.add(
+                EndpointRow(
+                    id=deployment_id,
+                    name=f"ep-{deployment_id.hex[:8]}",
+                    created_user=user_uuid,
+                    session_owner=user_uuid,
+                    domain=domain_name,
+                    project=group_id,
+                    resource_group=resource_group_name,
+                    lifecycle_stage=lifecycle_stage,
+                    replicas=1,
+                )
+            )
+            await db_sess.flush()
+            db_sess.add(
+                DeploymentDesignatedAgentRow(endpoint_id=deployment_id, agent_uuid=agent_uuid)
+            )
+        return deployment_id
+
+    async def _deployment_designators(
+        self, db: ExtendedAsyncSAEngine, agent_uuid: AgentUUID
+    ) -> set[UUID]:
+        """The deployments designating the agent."""
+        async with db.begin_readonly_session() as db_sess:
+            return set(
+                await db_sess.scalars(
+                    sa.select(DeploymentDesignatedAgentRow.endpoint_id).where(
+                        DeploymentDesignatedAgentRow.agent_uuid == agent_uuid
+                    )
+                )
+            )
+
+    async def _session_designators(
+        self, db: ExtendedAsyncSAEngine, agent_uuid: AgentUUID
+    ) -> set[UUID]:
+        """The sessions designating the agent."""
+        async with db.begin_readonly_session() as db_sess:
+            return set(
+                await db_sess.scalars(
+                    sa.select(SessionDesignatedAgentRow.session_id).where(
+                        SessionDesignatedAgentRow.agent_uuid == agent_uuid
+                    )
+                )
+            )
+
+    @pytest.mark.parametrize(
+        ("session_status", "lifecycle_stage"),
+        [
+            (SessionStatus.PENDING, EndpointLifecycle.CREATED),
+            (SessionStatus.RUNNING, EndpointLifecycle.DESTROYING),
+        ],
+        ids=["pending-session-created-deployment", "running-session-destroying-deployment"],
+    )
+    async def test_update_resource_group_unterminated_designations_gate_on_force(
+        self,
+        db_source: AgentDBSource,
+        db_with_tables: ExtendedAsyncSAEngine,
+        resource_group: str,
+        test_scaling_group_id: ResourceGroupID,
+        test_domain_id: DomainID,
+        test_group: tuple[str, str],
+        test_user: UUID,
+        session_status: SessionStatus,
+        lifecycle_stage: EndpointLifecycle,
+    ) -> None:
+        group_id_str, domain_name = test_group
+        agent_id = AgentId(str(uuid4()))
+        agent_uuid = await self._seed_agent(
+            db_with_tables, agent_id, resource_group, test_scaling_group_id
+        )
+        target_name, target_id = await self._seed_target_group(db_with_tables)
+        deployment_id = await self._seed_designating_deployment(
+            db_with_tables,
+            agent_uuid,
+            resource_group,
+            domain_name,
+            UUID(group_id_str),
+            test_user,
+            lifecycle_stage=lifecycle_stage,
+        )
+        session_id = await self._seed_designating_session(
+            db_with_tables,
+            agent_uuid,
+            resource_group,
+            test_scaling_group_id,
+            test_domain_id,
+            domain_name,
+            UUID(group_id_str),
+            test_user,
+            status=session_status,
+        )
+
+        with pytest.raises(AgentHasConflictingSessions) as exc_info:
+            await db_source.update_resource_group(agent_id, target_id, force=False)
+        assert exc_info.value.allocated_session_count == 0
+        assert exc_info.value.designating_session_count == 1
+        assert exc_info.value.designating_deployment_count == 1
+        assert await self._agent_group(db_with_tables, agent_id) == (
+            resource_group,
+            test_scaling_group_id,
+        )
+        assert await self._deployment_designators(db_with_tables, agent_uuid) == {deployment_id}
+        assert await self._session_designators(db_with_tables, agent_uuid) == {session_id}
+
+        await db_source.update_resource_group(agent_id, target_id, force=True)
+
+        assert await self._agent_group(db_with_tables, agent_id) == (target_name, target_id)
+        assert await self._deployment_designators(db_with_tables, agent_uuid) == set()
+        assert await self._session_designators(db_with_tables, agent_uuid) == set()
+
+    async def test_update_resource_group_keeps_designations_of_terminated_sessions_and_deployments(
+        self,
+        db_source: AgentDBSource,
+        db_with_tables: ExtendedAsyncSAEngine,
+        resource_group: str,
+        test_scaling_group_id: ResourceGroupID,
+        test_domain_id: DomainID,
+        test_group: tuple[str, str],
+        test_user: UUID,
+    ) -> None:
+        group_id_str, domain_name = test_group
+        agent_id = AgentId(str(uuid4()))
+        agent_uuid = await self._seed_agent(
+            db_with_tables, agent_id, resource_group, test_scaling_group_id
+        )
+        target_name, target_id = await self._seed_target_group(db_with_tables)
+        deployment_id = await self._seed_designating_deployment(
+            db_with_tables,
+            agent_uuid,
+            resource_group,
+            domain_name,
+            UUID(group_id_str),
+            test_user,
+            lifecycle_stage=EndpointLifecycle.DESTROYED,
+        )
+        session_ids = {
+            await self._seed_designating_session(
+                db_with_tables,
+                agent_uuid,
+                resource_group,
+                test_scaling_group_id,
+                test_domain_id,
+                domain_name,
+                UUID(group_id_str),
+                test_user,
+                status=status,
+            )
+            for status in SessionStatus.terminal_statuses()
+        }
+
+        await db_source.update_resource_group(agent_id, target_id, force=False)
+
+        assert await self._agent_group(db_with_tables, agent_id) == (target_name, target_id)
+        assert await self._deployment_designators(db_with_tables, agent_uuid) == {deployment_id}
+        assert await self._session_designators(db_with_tables, agent_uuid) == session_ids
+
+    async def test_update_resource_group_keeps_designations_in_the_target_group(
+        self,
+        db_source: AgentDBSource,
+        db_with_tables: ExtendedAsyncSAEngine,
+        resource_group: str,
+        test_scaling_group_id: ResourceGroupID,
+        test_domain_id: DomainID,
+        test_group: tuple[str, str],
+        test_user: UUID,
+    ) -> None:
+        group_id_str, domain_name = test_group
+        agent_id = AgentId(str(uuid4()))
+        agent_uuid = await self._seed_agent(
+            db_with_tables, agent_id, resource_group, test_scaling_group_id
+        )
+        target_name, target_id = await self._seed_target_group(db_with_tables)
+        deployment_id = await self._seed_designating_deployment(
+            db_with_tables, agent_uuid, target_name, domain_name, UUID(group_id_str), test_user
+        )
+        session_id = await self._seed_designating_session(
+            db_with_tables,
+            agent_uuid,
+            target_name,
+            target_id,
+            test_domain_id,
+            domain_name,
+            UUID(group_id_str),
+            test_user,
+        )
+
+        await db_source.update_resource_group(agent_id, target_id, force=False)
+
+        assert await self._deployment_designators(db_with_tables, agent_uuid) == {deployment_id}
+        assert await self._session_designators(db_with_tables, agent_uuid) == {session_id}
 
     async def test_update_resource_group_nonexistent_agent_raises(
         self,

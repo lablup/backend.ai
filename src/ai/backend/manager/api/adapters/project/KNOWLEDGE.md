@@ -1,36 +1,47 @@
 ---
 name: project-adapter-scenarios
 type: reference
-description: what the project adapter guarantees, as scenarios; the tests in tests/scenario/bai_scenario/manager/project match these
+description: what the project adapter guarantees; domain-scope authorization on create, the active flag mapped to soft delete and restore, partial bulk results, and image commit registries
 scope: src/ai/backend/manager/api/adapters/project
 keywords: [project, scenario, adapter, rbac, roster]
 generated:
   by: claude-code/opus-5
   at: 2026-09-10
+updated:
+  by: claude-code/opus-5.5
+  at: 2026-11-02
 status: draft
 ---
-# 프로젝트 어댑터 — 시나리오
+# project adapter: Knowledge
 
-규칙은 상위 디렉터리의 `AGENTS.md`에 있다.
+The rules are in `AGENTS.md` in the parent directory.
 
-프로젝트는 도메인 아래에 생긴다. 생성을 지키는 것은 전역 역할이 아니라 그 도메인 스코프의
-권한이다. 도메인 생성과 여기가 다르므로 짝을 따로 적는다.
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
-## 만들기
+A project is created under a domain. Create requires the permission of that domain scope, not a global role. This differs from domain creation, so the pair is written separately.
 
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 슈퍼관리자가 도메인 아래에 만든다 | 도메인과 프로젝트 정책이 있음 | 만들기 | 그 이름의 프로젝트가 그 도메인 아래에 |
-| 아무 권한도 받지 않은 사용자가 만든다 | 권한 없음 | 만들기 | 권한 부족으로 거부 |
+## Create
 
-## 명부
+## Member list
 
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 사용자를 배정한다 | 프로젝트와 그 스코프의 역할이 있음 | 사용자 배정 | 그 사용자가 명부에 오름 |
+## Update
 
-## 아직 적지 않은 것
+The active flag of update is deprecated. Deactivating it calls delete, activating it calls restore, and it is not called when the project is already in that state. The update applies the other fields. The status is not carried on the node, so scenarios read it through the active flag.
 
-`admin_delete`, `admin_purge`, `admin_restore`, `admin_search`, `admin_update`,
-`batch_load_by_ids`, `batch_load_fields`, `get`, `scoped_search`,
-`search_by_domain_name`, `search_by_user`, `unassign_users`.
+## Updating several
+
+Updating several performs the same write as the single update for each project. It updates the project row and then rewrites the resource policy share the project follows.
+
+The active flag calls delete and restore by the same rule as the single update per entry. A failure is added to the failure list for each entry.
+
+## Deleting and restoring several
+
+A bulk operation does not reject the whole call. Processed projects go into the processed list, and failures are recorded in the failure list with the id and the reason. There is no bulk purge.
+
+## Container Registry read for image commit
+
+A general project read does not include the Container Registry read for image commit. When the GraphQL request asks for that field, the adapter reads it in a separate bulk read.
+
+- It reads the project's default registry: the `association_container_registries_groups` row with
+  `is_default` set. The `groups.container_registry` JSON is not read.
+- Read permission is checked per project. A project without a default registry answers empty.

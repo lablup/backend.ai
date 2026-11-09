@@ -33,6 +33,7 @@ import aiohttp_cors
 import aiotools
 import click
 import jinja2
+import jwt
 import tomli
 import uvloop
 from aiohttp import web
@@ -41,12 +42,14 @@ from yarl import URL
 
 from ai.backend.client.config import APIConfig
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
+from ai.backend.client.request import Request
 from ai.backend.client.session import AsyncSession as APISession
 from ai.backend.client.v2.auth import NoAuth
 from ai.backend.client.v2.config import ClientConfig as V2ClientConfig
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common import config
 from ai.backend.common.clients.http_client.client_pool import ClientPool
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
 from ai.backend.common.defs import REDIS_RATE_LIMIT_DB, REDIS_STATISTICS_DB, RedisRole
@@ -83,7 +86,13 @@ from ai.backend.common.web.session import (
 from ai.backend.common.web.session import setup as setup_session
 from ai.backend.common.web.session.redis_storage import RedisStorage
 from ai.backend.logging import Logger, LogLevel
-from ai.backend.logging.otel import LegacyOtelLogging, OpenTelemetrySpec, apply_otel_tracer
+from ai.backend.logging.otel import (
+    LegacyOtelLogging,
+    OpenTelemetrySpec,
+    apply_otel_tracer,
+    build_otel_server_middleware,
+    instrument_aiohttp_client,
+)
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.logging.structured_otel import StructuredOtelLogging
 from ai.backend.web.clients.apollo_router_pool import (
@@ -95,12 +104,17 @@ from ai.backend.web.clients.manager_pool import (
     ManagerPoolGateHealthChecker,
 )
 from ai.backend.web.config.unified import EventLoopType, ServiceMode, WebServerUnifiedConfig
-from ai.backend.web.errors import ManagerConnectionUnavailable
+from ai.backend.web.errors import ManagerConnectionUnavailable, UnauthenticatedError
 from ai.backend.web.ratelimit import manager_proxy_rate_limited
 from ai.backend.web.security import SecurityPolicy, csp_nonce_var, security_policy_middleware
 
 from . import __version__, user_agent
-from .auth import build_forwarding_headers, fill_forwarding_hdrs_to_api_session, get_client_ip
+from .auth import (
+    build_forwarding_headers,
+    fill_forwarding_hdrs_to_api_session,
+    get_api_session,
+    get_client_ip,
+)
 from .errors import (
     AlreadyLoggedInError,
     InvalidAPIConfigurationError,
@@ -120,8 +134,7 @@ from .proxy import (
 from .proxy import (
     pipeline_handler as pipeline_request_handler,
 )
-from .stats import WebStats, track_active_handlers, view_stats
-from .template import toml_scalar
+from .template import build_template_environment
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
@@ -158,42 +171,28 @@ def apply_cache_headers(response: web.StreamResponse, path: str) -> web.StreamRe
 
 
 async def static_handler(request: web.Request) -> web.StreamResponse:
-    stats: WebStats = request.app["stats"]
-    stats.active_static_handlers.add(asyncio.current_task())
     request_path = request.match_info["path"]
     config = cast(WebServerUnifiedConfig, request.app["config"])
     static_path = config.service.static_path
     file_path = (static_path / request_path).resolve()
     try:
-        file_path.relative_to(static_path)
+        relative_path = file_path.relative_to(static_path)
     except (ValueError, FileNotFoundError) as e:
         raise StaticFileNotFoundError() from e
+    if relative_path.as_posix() in {"stats", "config.ini"} or file_path.name.endswith((
+        ".js.map",
+        ".css.map",
+    )):
+        raise StaticFileNotFoundError()
     if file_path.is_file():
         return apply_cache_headers(web.FileResponse(file_path), request_path)
     raise StaticFileNotFoundError()
 
 
-async def config_ini_handler(request: web.Request) -> web.Response:
-    stats: WebStats = request.app["stats"]
-    stats.active_config_handlers.add(asyncio.current_task())
-    config = cast(WebServerUnifiedConfig, request.app["config"])
-    force_protocol = config.service.force_endpoint_protocol
-    if force_protocol is None:
-        scheme = request.scheme
-    else:
-        scheme = str(force_protocol)
-    j2env: jinja2.Environment = request.app["j2env"]
-    tpl = j2env.get_template("config_ini.toml.j2")
-    config_content = tpl.render({
-        "endpoint_url": f"{scheme}://{request.host}",  # must be absolute
-        "config": config.model_dump(by_alias=True),
-    })
-    return web.Response(text=config_content, content_type="text/plain")
-
-
 async def config_toml_handler(request: web.Request) -> web.Response:
-    stats: WebStats = request.app["stats"]
-    stats.active_config_handlers.add(asyncio.current_task())
+    """Serve the WebUI config. Before login only the fields the login screen reads are
+    rendered; the rest appears once the session is authenticated."""
+    session = await get_session(request)
     config = cast(WebServerUnifiedConfig, request.app["config"])
     force_protocol = config.service.force_endpoint_protocol
     if force_protocol is None:
@@ -205,20 +204,22 @@ async def config_toml_handler(request: web.Request) -> web.Response:
     config_content = tpl.render({
         "endpoint_url": f"{scheme}://{request.host}",  # must be absolute
         "config": config.model_dump(by_alias=True),
+        "authenticated": bool(session.get("authenticated", False)),
     })
-    return web.Response(text=config_content, content_type="text/plain")
+    response = web.Response(text=config_content, content_type="text/plain")
+    # The body depends on the session, so a shared cache must not keep it.
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 async def console_handler(request: web.Request) -> web.StreamResponse:
-    stats: WebStats = request.app["stats"]
-    stats.active_webui_handlers.add(asyncio.current_task())
     request_path = request.match_info["path"]
     config = cast(WebServerUnifiedConfig, request.app["config"])
     static_path = config.service.static_path
     file_path = (static_path / request_path).resolve()
     # SECURITY: only allow reading files under static_path
     try:
-        file_path.relative_to(static_path)
+        relative_path = file_path.relative_to(static_path)
     except (ValueError, FileNotFoundError) as e:
         raise web.HTTPNotFound(
             text=json.dumps({
@@ -227,6 +228,11 @@ async def console_handler(request: web.Request) -> web.StreamResponse:
             }),
             content_type="application/problem+json",
         ) from e
+    if relative_path.as_posix() in {"stats", "config.ini"} or file_path.name.endswith((
+        ".js.map",
+        ".css.map",
+    )):
+        raise StaticFileNotFoundError()
     index_path = (static_path / "index.html").resolve()
     if file_path.is_file() and file_path != index_path:
         return apply_cache_headers(web.FileResponse(file_path), request_path)
@@ -298,6 +304,7 @@ async def update_password_no_auth(request: web.Request) -> web.Response:
             "title": e.data.get("title"),
             "details": e.data.get("msg"),
         }
+        return web.json_response(result, status=e.status)
     return web.json_response(result)
 
 
@@ -312,10 +319,20 @@ def _bind_session_to_manager_token(session: Session, session_token: str | None) 
     session._new = True
 
 
+def build_cors_options(
+    allowed_origins: Sequence[str], *, allow_all_origins: bool = False
+) -> dict[str, aiohttp_cors.ResourceOptions]:
+    origins: Sequence[str] = ["*"] if allow_all_origins else allowed_origins
+    return {
+        origin: aiohttp_cors.ResourceOptions(  # type: ignore[no-untyped-call]
+            allow_credentials=True, allow_methods="*", expose_headers="*", allow_headers="*"
+        )
+        for origin in origins
+    }
+
+
 async def login_check_handler(request: web.Request) -> web.Response:
     session = await get_session(request)
-    stats: WebStats = request.app["stats"]
-    stats.active_login_check_handlers.add(asyncio.current_task())
     authenticated = bool(session.get("authenticated", False))
     public_data = None
     if authenticated:
@@ -368,8 +385,6 @@ async def _authorize_via_anonymous_session(
 
 async def login_handler(request: web.Request) -> web.Response:
     config = cast(WebServerUnifiedConfig, request.app["config"])
-    stats: WebStats = request.app["stats"]
-    stats.active_login_handlers.add(asyncio.current_task())
     session = await get_session(request)
     if session.get("authenticated", False):
         raise web.HTTPBadRequest(
@@ -558,28 +573,26 @@ async def login_handler(request: web.Request) -> web.Response:
 
 
 async def logout_handler(request: web.Request) -> web.Response:
-    stats: WebStats = request.app["stats"]
-    stats.active_logout_handlers.add(asyncio.current_task())
     session = await get_session(request)
     session_token = session.identity
-    session.invalidate()
 
-    # Invalidate login session in Manager DB
-    if session_token:
-        config = cast(WebServerUnifiedConfig, request.app["config"])
+    # The manager authenticates /auth/logout, so sign it with the session's keypair
+    # before invalidating the session drops that keypair.
+    if session_token and session.get("authenticated", False):
         manager_pool = cast(HealthyEndpointPool, request.app["manager_pool"])
         try:
             async with manager_pool.acquire() as acquired:
-                async with aiohttp.ClientSession() as http_session:
-                    await http_session.post(
-                        f"{acquired.endpoint}/auth/logout",
-                        json={"session_token": session_token},
-                        headers=build_forwarding_headers(request),
-                        ssl=config.api.ssl_verify,
-                    )
+                api_session = await get_api_session(request, acquired)
+                async with api_session:
+                    fill_forwarding_hdrs_to_api_session(request, api_session)
+                    rqst = Request("POST", "/auth/logout")
+                    rqst.set_json({"session_token": session_token})
+                    async with rqst.fetch():
+                        pass
         except Exception:
             log.warning("failed to invalidate the login session on the manager", exc_info=True)
 
+    session.invalidate()
     return web.Response()
 
 
@@ -589,6 +602,8 @@ async def extend_login_session(request: web.Request) -> web.Response:
 
     current = get_time()
     session = await get_session(request)
+    if not session.get("authenticated", False):
+        raise UnauthenticatedError()
 
     session.expiration_dt = current + login_session_extension_sec
     expires = datetime.fromtimestamp(session.expiration_dt, tz=UTC).isoformat()
@@ -648,9 +663,7 @@ async def check_readyz(request: web.Request) -> web.Response:
     return _build_web_probe_response(connectivity)
 
 
-async def webserver_healthcheck(request: web.Request) -> web.Response:
-    stats: WebStats = request.app["stats"]
-    stats.active_healthcheck_handlers.add(asyncio.current_task())
+async def webserver_healthcheck(_request: web.Request) -> web.Response:
     result = {
         "version": __version__,
         "details": "Success",
@@ -658,10 +671,17 @@ async def webserver_healthcheck(request: web.Request) -> web.Response:
     return web.json_response(result)
 
 
+def _claimed_user_id(auth_token: str) -> uuid.UUID | None:
+    try:
+        # Skip signature verification only to read the claimed user ID for logging.
+        payload = jwt.decode(auth_token, options={"verify_signature": False})
+        return uuid.UUID(payload["user"])
+    except (jwt.PyJWTError, KeyError, ValueError, TypeError, AttributeError):
+        return None
+
+
 async def token_login_handler(request: web.Request) -> web.Response:
     config = cast(WebServerUnifiedConfig, request.app["config"])
-    stats: WebStats = request.app["stats"]
-    stats.active_token_login_handlers.add(asyncio.current_task())
 
     # Check browser session exists.
     session = await get_session(request)
@@ -756,7 +776,9 @@ async def token_login_handler(request: web.Request) -> web.Response:
     except BackendClientError as e:
         raise ProxyTargetUnreachableError(str(e)) from e
     except BackendAPIError as e:
-        log.trace("token login failed: {}", e)
+        log.trace(
+            "token login failed", status=e.status, claimed_user_id=_claimed_user_id(auth_token)
+        )
         result["authenticated"] = False
         result["data"] = {
             "type": e.data.get("type"),
@@ -811,40 +833,48 @@ async def redis_ctx(
 
     valkey_profile_target = config.session.redis.to_valkey_profile_target()
     valkey_target = valkey_profile_target.profile_target(RedisRole.STATISTICS)
-
-    # Create ValkeySessionClient for session management
-    valkey_session_client = await ValkeySessionClient.create(
-        valkey_target=valkey_target,
-        db_id=REDIS_STATISTICS_DB,  # Use default database for session storage
-        human_readable_name="web.session",
-    )
-    # Keep app["redis"] key for compatibility
-    app["redis"] = valkey_session_client
-
-    valkey_rate_limit_client = await ValkeyRateLimitClient.create(
-        valkey_target=valkey_profile_target.profile_target(RedisRole.RATE_LIMIT),
-        db_id=REDIS_RATE_LIMIT_DB,
-        human_readable_name="web.ratelimit",
-    )
-    app["valkey_rate_limit"] = valkey_rate_limit_client
-
-    if pidx == 0 and config.session.flush_on_startup:
-        await valkey_session_client.flush_all_sessions()
-        log.info("session storage flushed")
-
-    if config.session.login_session_extension_sec is None:
-        config.session.login_session_extension_sec = config.session.max_age
-    redis_storage = RedisStorage(
-        valkey_session_client,
-        max_age=config.session.max_age,
-        secure=config.security.cookie_secure,
-    )
-    setup_session(app, redis_storage)
+    rate_limit_valkey_target = valkey_profile_target.profile_target(RedisRole.RATE_LIMIT)
+    sentinel_monitors = SentinelMonitorSet(valkey_profile_target.targets())
+    await sentinel_monitors.start()
     try:
-        yield
+        # Create ValkeySessionClient for session management
+        valkey_session_client = await ValkeySessionClient.create(
+            valkey_target=valkey_target,
+            db_id=REDIS_STATISTICS_DB,  # Use default database for session storage
+            human_readable_name="web.session",
+            sentinel_monitor=sentinel_monitors.monitor_for(valkey_target),
+        )
+        # Keep app["redis"] key for compatibility
+        app["redis"] = valkey_session_client
+
+        valkey_rate_limit_client = await ValkeyRateLimitClient.create(
+            valkey_target=rate_limit_valkey_target,
+            db_id=REDIS_RATE_LIMIT_DB,
+            human_readable_name="web.ratelimit",
+            sentinel_monitor=sentinel_monitors.monitor_for(rate_limit_valkey_target),
+        )
+        app["valkey_rate_limit"] = valkey_rate_limit_client
+
+        if pidx == 0 and config.session.flush_on_startup:
+            await valkey_session_client.flush_all_sessions()
+            log.info("session storage flushed")
+
+        if config.session.login_session_extension_sec is None:
+            config.session.login_session_extension_sec = config.session.max_age
+        redis_storage = RedisStorage(
+            valkey_session_client,
+            max_age=config.session.max_age,
+            secure=config.security.cookie_secure,
+            samesite=config.security.cookie_samesite.value,
+        )
+        setup_session(app, redis_storage)
+        try:
+            yield
+        finally:
+            await valkey_rate_limit_client.close()
+            await valkey_session_client.close()
     finally:
-        await valkey_rate_limit_client.close()
-        await valkey_session_client.close()
+        await sentinel_monitors.close()
 
 
 @asynccontextmanager
@@ -860,6 +890,7 @@ async def client_ctx(
             ),
             base_url=key.endpoint,
             auto_decompress=False,
+            cookie_jar=aiohttp.DummyCookieJar(),
         )
     )
 
@@ -1003,15 +1034,7 @@ async def webapp_ctx(
     app["security_policy"] = SecurityPolicy.from_config(
         request_policy_config, response_policy_config, csp_policy_config
     )
-    j2env = jinja2.Environment(
-        extensions=[
-            "ai.backend.web.template.TOMLField",
-            "ai.backend.web.template.TOMLStringListField",
-        ],
-        loader=jinja2.PackageLoader("ai.backend.web", "templates"),
-    )
-    j2env.filters["toml_scalar"] = toml_scalar
-    app["j2env"] = j2env
+    app["j2env"] = build_template_environment()
 
     manager_pool = cast(HealthyEndpointPool, app["manager_pool"])
 
@@ -1047,12 +1070,18 @@ async def webapp_ctx(
         static_endpoint=pipeline_api_endpoint,
     )
 
-    cors_options = {
-        "*": aiohttp_cors.ResourceOptions(  # type: ignore[no-untyped-call]
-            allow_credentials=True, allow_methods="*", expose_headers="*", allow_headers="*"
+    if config.security.cors_allow_all_origins:
+        log.warning(
+            "CORS accepts all origins with credentials; development environments only, "
+            "do not enable this in production"
+        )
+    cors = aiohttp_cors.setup(
+        app,
+        defaults=build_cors_options(
+            config.security.cors_allowed_origins,
+            allow_all_origins=config.security.cors_allow_all_origins,
         ),
-    }
-    cors = aiohttp_cors.setup(app, defaults=cors_options)
+    )
     app.router.add_route("HEAD", "/func/{path:folders/_/tus/upload/.*$}", anon_web_plugin_handler)
     app.router.add_route("PATCH", "/func/{path:folders/_/tus/upload/.*$}", anon_web_plugin_handler)
     app.router.add_route(
@@ -1066,7 +1095,6 @@ async def webapp_ctx(
         app.router.add_route("POST", "/server/update-password-no-auth", update_password_no_auth)
     )
     cors.add(app.router.add_route("POST", "/server/extend-login-session", extend_login_session))
-    cors.add(app.router.add_route("GET", "/stats", view_stats))
     cors.add(app.router.add_route("GET", "/health", check_health))
     cors.add(app.router.add_route("GET", "/livez", check_livez))
     cors.add(app.router.add_route("GET", "/readyz", check_readyz))
@@ -1118,7 +1146,6 @@ async def webapp_ctx(
     cors.add(app.router.add_route("PATCH", "/pipeline/{path:.*$}", pipeline_handler))
     cors.add(app.router.add_route("DELETE", "/pipeline/{path:.*$}", pipeline_handler))
     if config.service.mode == ServiceMode.WEBUI:
-        cors.add(app.router.add_route("GET", "/config.ini", config_ini_handler))
         cors.add(app.router.add_route("GET", "/config.toml", config_toml_handler))
         app["webui_index_template"] = (config.service.static_path / "index.html").read_text()
         fallback_handler = console_handler
@@ -1184,13 +1211,16 @@ async def server_main(
             middlewares=[
                 request_id_middleware,
                 decrypt_payload,
-                track_active_handlers,
                 security_policy_middleware,
                 general_exception_middleware,
             ],
         )
+        if config.otel.enabled:
+            instrument_aiohttp_client()
+            app.middlewares.insert(
+                0, build_otel_server_middleware(untraced_handlers={console_handler, static_handler})
+            )
         app["config"] = config
-        app["stats"] = WebStats()
         app["client_pool"] = await web_init_stack.enter_async_context(client_ctx(config, app))
         app["manager_pool"] = await web_init_stack.enter_async_context(
             manager_pool_ctx(config, app)

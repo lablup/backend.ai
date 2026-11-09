@@ -26,7 +26,7 @@ from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.errors.resource import ResourceGroupNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.resource_group import (
     ADomainGroupsAndACaller,
@@ -43,10 +43,10 @@ from bai_scenario.components.resource_group import (
     TheOtherGroupIsAllowed,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type AllowingStep = Scenario[SeedingSession, Any, ResourceGroupAdapter, Any]
+type AllowingStep = Scenario[TestSeedingSession, Any, ResourceGroupAdapter, Any]
 
 UNKNOWN_GROUP = "no-such-group"
 UNKNOWN_DOMAIN = "no-such-domain"
@@ -70,13 +70,26 @@ class AllowingForTheDomain(
 
     @override
     def describe(self, laid: ADomainGroupsAndACaller) -> str:
-        what = (
-            "없는 그룹 이름"
-            if self.unknown
-            else (laid.linked.name if self.remove else laid.other.name)
+        if self.unknown:
+            what_ko = "없는 자원 그룹 이름을"
+            what_en = "an unknown resource group name"
+        else:
+            name = laid.linked.name if self.remove else laid.other.name
+            what_ko = f"{name} 을"
+            what_en = name
+        if self.remove:
+            verb_ko = "제거합니다"
+            verb_en = "removes"
+        else:
+            verb_ko = "추가합니다"
+            verb_en = "adds"
+        return Says(
+            f"{laid.caller.username}이 도메인 {laid.domain.name}의 허용 목록에 {what_ko} {verb_ko}",
+            english=(
+                f"{laid.caller.username} {verb_en} {what_en} in the allow list of "
+                f"domain {laid.domain.name}"
+            ),
         )
-        verb = "제거" if self.remove else "추가"
-        return f"{laid.caller.username}이 도메인 {laid.domain.name}의 허용 목록에 {what} {verb}"
 
     @override
     async def call(
@@ -110,8 +123,12 @@ class ReadingTheDomainsAllowed(
 
     @override
     def describe(self, laid: ADomainGroupsAndACaller) -> str:
-        target = "존재하지 않는 도메인" if self.unknown else f"도메인 {laid.domain.name}"
-        return f"{laid.caller.username}이 {target}의 허용 목록 조회"
+        target_ko = "존재하지 않는 도메인" if self.unknown else f"도메인 {laid.domain.name}"
+        target_en = "a domain that does not exist" if self.unknown else f"domain {laid.domain.name}"
+        return Says(
+            f"{laid.caller.username}이 {target_ko}의 허용 목록을 조회합니다",
+            english=f"{laid.caller.username} reads the allow list of {target_en}",
+        )
 
     @override
     async def call(
@@ -138,7 +155,14 @@ class AllowingForTheProject(
 
     @override
     def describe(self, laid: AProjectAGroupAndACaller) -> str:
-        return f"{laid.caller.username}이 프로젝트 {laid.project.name}의 허용 목록에 {laid.group.name} 추가"
+        return Says(
+            f"{laid.caller.username}이 프로젝트 {laid.project.name}의 허용 목록에 "
+            f"{laid.group.name} 을 추가합니다",
+            english=(
+                f"{laid.caller.username} adds {laid.group.name} to the allow list of "
+                f"project {laid.project.name}"
+            ),
+        )
 
     @override
     async def call(
@@ -164,7 +188,10 @@ class ReadingTheProjectsAllowed(
 
     @override
     def describe(self, laid: AProjectAGroupAndACaller) -> str:
-        return f"{laid.caller.username}이 프로젝트 {laid.project.name}의 허용 목록 조회"
+        return Says(
+            f"{laid.caller.username}이 프로젝트 {laid.project.name}의 허용 목록을 조회합니다",
+            english=(f"{laid.caller.username} reads the allow list of project {laid.project.name}"),
+        )
 
     @override
     async def call(
@@ -192,9 +219,21 @@ class AllowingADomainForTheGroup(
 
     @override
     def describe(self, laid: ADomainGroupsAndACaller) -> str:
-        what = "없는 도메인 이름" if self.unknown else laid.domain.name
-        verb = "제거" if self.remove else "추가"
-        return f"{laid.caller.username}이 {laid.other.name}의 허용 도메인에 {what} {verb}"
+        what_ko = "없는 도메인 이름을" if self.unknown else f"{laid.domain.name} 을"
+        what_en = "an unknown domain name" if self.unknown else laid.domain.name
+        if self.remove:
+            verb_ko = "제거합니다"
+            verb_en = "removes"
+        else:
+            verb_ko = "추가합니다"
+            verb_en = "adds"
+        return Says(
+            f"{laid.caller.username}이 {laid.other.name}의 허용 도메인에 {what_ko} {verb_ko}",
+            english=(
+                f"{laid.caller.username} {verb_en} {what_en} in the allowed domains of "
+                f"{laid.other.name}"
+            ),
+        )
 
     @override
     async def call(
@@ -223,7 +262,10 @@ class ReadingTheGroupsDomains(
 
     @override
     def describe(self, laid: ADomainGroupsAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.linked.name}의 허용 도메인 조회"
+        return Says(
+            f"{laid.caller.username}이 {laid.linked.name}의 허용 도메인을 조회합니다",
+            english=(f"{laid.caller.username} reads the allowed domains of {laid.linked.name}"),
+        )
 
     @override
     async def call(
@@ -245,8 +287,13 @@ class AllowingAProjectForTheGroup(
 
     @override
     def describe(self, laid: AProjectAGroupAndACaller) -> str:
-        return (
-            f"{laid.caller.username}이 {laid.group.name}의 허용 프로젝트에 {laid.project.name} 추가"
+        return Says(
+            f"{laid.caller.username}이 {laid.group.name}의 허용 프로젝트에 "
+            f"{laid.project.name} 을 추가합니다",
+            english=(
+                f"{laid.caller.username} adds {laid.project.name} to the allowed projects of "
+                f"{laid.group.name}"
+            ),
         )
 
     @override
@@ -273,7 +320,10 @@ class ReadingTheGroupsProjects(
 
     @override
     def describe(self, laid: AProjectAGroupAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.group.name}의 허용 프로젝트 조회"
+        return Says(
+            f"{laid.caller.username}이 {laid.group.name}의 허용 프로젝트를 조회합니다",
+            english=(f"{laid.caller.username} reads the allowed projects of {laid.group.name}"),
+        )
 
     @override
     async def call(
@@ -295,7 +345,10 @@ class ReadingTheOwnGroupsDomains(
 
     @override
     def describe(self, laid: AGroupAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.group.name}의 허용 도메인 조회"
+        return Says(
+            f"{laid.caller.username}이 {laid.group.name}의 허용 도메인을 조회합니다",
+            english=f"{laid.caller.username} reads the allowed domains of {laid.group.name}",
+        )
 
     @override
     async def call(
@@ -311,7 +364,10 @@ class ReadingTheOwnGroupsDomains(
 @dataclass(frozen=True)
 class TheSuperadminAllowsAGroupForADomain(
     Scenario[
-        SeedingSession, ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload
+        TestSeedingSession,
+        ADomainGroupsAndACaller,
+        ResourceGroupAdapter,
+        AllowedResourceGroupsPayload,
     ]
 ):
     @override
@@ -320,10 +376,16 @@ class TheSuperadminAllowsAGroupForADomain(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 도메인의 허용 목록에 그룹을 더하면 그 그룹 이름이 담긴 목록이 반환된다"
+        return Says(
+            "superadmin 이 도메인의 허용 목록에 자원 그룹을 추가하면 그 그룹 이름이 담긴 목록이 반환됩니다",
+            english=(
+                "when the superadmin adds a resource group to the allow list of a domain, "
+                "the list holding that group name comes back"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainGroupsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADomainGroupsAndACaller]:
         return ADomainGroupsAndSomeone(role=UserRole.SUPERADMIN, linked=False)
 
     @override
@@ -340,7 +402,10 @@ class TheSuperadminAllowsAGroupForADomain(
 @dataclass(frozen=True)
 class TheSuperadminDisallowsAGroupForADomain(
     Scenario[
-        SeedingSession, ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload
+        TestSeedingSession,
+        ADomainGroupsAndACaller,
+        ResourceGroupAdapter,
+        AllowedResourceGroupsPayload,
     ]
 ):
     @override
@@ -349,10 +414,16 @@ class TheSuperadminDisallowsAGroupForADomain(
 
     @override
     def describe(self) -> str:
-        return "도메인에 건 그룹을 슈퍼관리자가 허용 목록에서 빼면 빈 목록이 반환된다"
+        return Says(
+            "도메인에 건 자원 그룹을 superadmin 이 허용 목록에서 제거하면 빈 목록이 반환됩니다",
+            english=(
+                "when the superadmin removes the resource group linked to a domain from the "
+                "allow list, an empty list comes back"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainGroupsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADomainGroupsAndACaller]:
         return ADomainGroupsAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -369,7 +440,10 @@ class TheSuperadminDisallowsAGroupForADomain(
 @dataclass(frozen=True)
 class AllowingAnUnknownGroupForADomainIsNotFound(
     Scenario[
-        SeedingSession, ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload
+        TestSeedingSession,
+        ADomainGroupsAndACaller,
+        ResourceGroupAdapter,
+        AllowedResourceGroupsPayload,
     ]
 ):
     @override
@@ -378,10 +452,17 @@ class AllowingAnUnknownGroupForADomainIsNotFound(
 
     @override
     def describe(self) -> str:
-        return "존재하지 않는 그룹 이름을 도메인의 허용 목록에 더하려 하면 대상을 찾을 수 없다는 이유로 거부된다"
+        return Says(
+            "존재하지 않는 자원 그룹 이름을 도메인의 허용 목록에 추가하려 하면 "
+            "대상을 찾을 수 없다는 이유로 거부됩니다",
+            english=(
+                "adding a resource group name nothing answers to to the allow list of a "
+                "domain is rejected because no target answers to it"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainGroupsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADomainGroupsAndACaller]:
         return ADomainGroupsAndSomeone(role=UserRole.SUPERADMIN, linked=False)
 
     @override
@@ -398,7 +479,10 @@ class AllowingAnUnknownGroupForADomainIsNotFound(
 @dataclass(frozen=True)
 class DisallowingAnUnknownGroupForADomainIsSkipped(
     Scenario[
-        SeedingSession, ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload
+        TestSeedingSession,
+        ADomainGroupsAndACaller,
+        ResourceGroupAdapter,
+        AllowedResourceGroupsPayload,
     ]
 ):
     @override
@@ -407,10 +491,17 @@ class DisallowingAnUnknownGroupForADomainIsSkipped(
 
     @override
     def describe(self) -> str:
-        return "존재하지 않는 그룹 이름을 도메인의 허용 목록에서 빼려 하면 그 이름은 건너뛰고 빈 목록이 반환된다"
+        return Says(
+            "존재하지 않는 자원 그룹 이름을 도메인의 허용 목록에서 제거하려 하면 그 이름은 "
+            "건너뛰고 빈 목록이 반환됩니다",
+            english=(
+                "removing a resource group name nothing answers to from the allow list of a "
+                "domain skips that name and an empty list comes back"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainGroupsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADomainGroupsAndACaller]:
         return ADomainGroupsAndSomeone(role=UserRole.SUPERADMIN, linked=False)
 
     @override
@@ -427,7 +518,10 @@ class DisallowingAnUnknownGroupForADomainIsSkipped(
 @dataclass(frozen=True)
 class AUserWhoIsNotTheSuperadminMayNotAllowForADomain(
     Scenario[
-        SeedingSession, ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload
+        TestSeedingSession,
+        ADomainGroupsAndACaller,
+        ResourceGroupAdapter,
+        AllowedResourceGroupsPayload,
     ]
 ):
     @override
@@ -436,13 +530,19 @@ class AUserWhoIsNotTheSuperadminMayNotAllowForADomain(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 아닌 사용자가 도메인의 허용 목록에 그룹을 더하려 하면 역할 부족으로 거부된다. "
-            "그룹 이름을 id로 바꾸는 자리가 슈퍼관리자 검사를 거친다"
+        return Says(
+            "superadmin 이 아닌 사용자가 도메인의 허용 목록에 자원 그룹을 추가하려 하면 "
+            "역할 부족으로 거부됩니다. 자원 그룹 이름을 id 로 바꾸는 단계가 superadmin 검사를 "
+            "거칩니다",
+            english=(
+                "when a user who is not the superadmin tries to add a resource group to the "
+                "allow list of a domain, the call is rejected for lacking the role. the step "
+                "that turns the resource group name into an id goes through the superadmin check"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainGroupsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADomainGroupsAndACaller]:
         return ADomainGroupsAndSomeone(linked=False)
 
     @override
@@ -459,7 +559,10 @@ class AUserWhoIsNotTheSuperadminMayNotAllowForADomain(
 @dataclass(frozen=True)
 class TheSuperadminReadsADomainsAllowed(
     Scenario[
-        SeedingSession, ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload
+        TestSeedingSession,
+        ADomainGroupsAndACaller,
+        ResourceGroupAdapter,
+        AllowedResourceGroupsPayload,
     ]
 ):
     @override
@@ -468,10 +571,17 @@ class TheSuperadminReadsADomainsAllowed(
 
     @override
     def describe(self) -> str:
-        return "도메인에 건 그룹과 걸지 않은 그룹이 있을 때 슈퍼관리자가 도메인의 허용 목록을 읽으면 건 그룹 이름만 담긴다"
+        return Says(
+            "도메인에 건 자원 그룹과 걸지 않은 자원 그룹이 있을 때 superadmin 이 도메인의 허용 "
+            "목록을 읽으면 건 자원 그룹 이름만 담깁니다",
+            english=(
+                "when one resource group is linked to a domain and one is not, reading the "
+                "allow list of that domain as the superadmin answers only the linked group name"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainGroupsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADomainGroupsAndACaller]:
         return ADomainGroupsAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -488,7 +598,10 @@ class TheSuperadminReadsADomainsAllowed(
 @dataclass(frozen=True)
 class AUserReadingInTheDomainReadsItsAllowed(
     Scenario[
-        SeedingSession, ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload
+        TestSeedingSession,
+        ADomainGroupsAndACaller,
+        ResourceGroupAdapter,
+        AllowedResourceGroupsPayload,
     ]
 ):
     @override
@@ -497,10 +610,17 @@ class AUserReadingInTheDomainReadsItsAllowed(
 
     @override
     def describe(self) -> str:
-        return "도메인 범위에서 리소스 그룹 읽기 역할을 받은 사용자가 그 도메인의 허용 목록을 읽으면 건 그룹 이름만 담긴다"
+        return Says(
+            "도메인 범위에서 자원 그룹 읽기 역할을 받은 사용자가 그 도메인의 허용 목록을 읽으면 "
+            "건 자원 그룹 이름만 담깁니다",
+            english=(
+                "a user granted the resource group read role in the domain scope reading the "
+                "allow list of that domain gets only the linked group name"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainGroupsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADomainGroupsAndACaller]:
         return ADomainGroupsAndSomeone(reading=True)
 
     @override
@@ -517,7 +637,10 @@ class AUserReadingInTheDomainReadsItsAllowed(
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotReadADomainsAllowed(
     Scenario[
-        SeedingSession, ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload
+        TestSeedingSession,
+        ADomainGroupsAndACaller,
+        ResourceGroupAdapter,
+        AllowedResourceGroupsPayload,
     ]
 ):
     @override
@@ -526,12 +649,17 @@ class AUserGrantedNothingMayNotReadADomainsAllowed(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 없는 사용자가 자기 도메인의 허용 목록을 읽으려 하면 권한 부족으로 거부된다"
+        return Says(
+            "아무 권한도 없는 사용자가 자기 도메인의 허용 목록을 읽으려 하면 권한 부족으로 "
+            "거부됩니다",
+            english=(
+                "a user granted nothing trying to read the allow list of their own domain is "
+                "rejected for not enough permission"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainGroupsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADomainGroupsAndACaller]:
         return ADomainGroupsAndSomeone()
 
     @override
@@ -548,7 +676,10 @@ class AUserGrantedNothingMayNotReadADomainsAllowed(
 @dataclass(frozen=True)
 class ReadingAnUnknownDomainsAllowedIsNotFound(
     Scenario[
-        SeedingSession, ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload
+        TestSeedingSession,
+        ADomainGroupsAndACaller,
+        ResourceGroupAdapter,
+        AllowedResourceGroupsPayload,
     ]
 ):
     @override
@@ -557,10 +688,17 @@ class ReadingAnUnknownDomainsAllowedIsNotFound(
 
     @override
     def describe(self) -> str:
-        return "존재하지 않는 도메인 이름의 허용 목록을 읽으려 하면 대상을 찾을 수 없다는 이유로 거부된다"
+        return Says(
+            "존재하지 않는 도메인 이름의 허용 목록을 읽으려 하면 대상을 찾을 수 없다는 이유로 "
+            "거부됩니다",
+            english=(
+                "reading the allow list of a domain name nothing answers to is rejected "
+                "because no target answers to it"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainGroupsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADomainGroupsAndACaller]:
         return ADomainGroupsAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -580,7 +718,10 @@ class ReadingAnUnknownDomainsAllowedIsNotFound(
 @dataclass(frozen=True)
 class TheSuperadminAllowsAGroupForAProject(
     Scenario[
-        SeedingSession, AProjectAGroupAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload
+        TestSeedingSession,
+        AProjectAGroupAndACaller,
+        ResourceGroupAdapter,
+        AllowedResourceGroupsPayload,
     ]
 ):
     @override
@@ -589,12 +730,17 @@ class TheSuperadminAllowsAGroupForAProject(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 프로젝트의 허용 목록에 그룹을 더하면 그 그룹 이름이 담긴 목록이 반환된다"
+        return Says(
+            "superadmin 이 프로젝트의 허용 목록에 자원 그룹을 추가하면 그 그룹 이름이 담긴 "
+            "목록이 반환됩니다",
+            english=(
+                "when the superadmin adds a resource group to the allow list of a project, "
+                "the list holding that group name comes back"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AProjectAGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AProjectAGroupAndACaller]:
         return AProjectAGroupAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -611,7 +757,10 @@ class TheSuperadminAllowsAGroupForAProject(
 @dataclass(frozen=True)
 class AUserWhoIsNotTheSuperadminMayNotAllowForAProject(
     Scenario[
-        SeedingSession, AProjectAGroupAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload
+        TestSeedingSession,
+        AProjectAGroupAndACaller,
+        ResourceGroupAdapter,
+        AllowedResourceGroupsPayload,
     ]
 ):
     @override
@@ -620,10 +769,17 @@ class AUserWhoIsNotTheSuperadminMayNotAllowForAProject(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 프로젝트의 허용 목록에 그룹을 더하려 하면 역할 부족으로 거부된다"
+        return Says(
+            "superadmin 이 아닌 사용자가 프로젝트의 허용 목록에 자원 그룹을 추가하려 하면 "
+            "역할 부족으로 거부됩니다",
+            english=(
+                "when a user who is not the superadmin tries to add a resource group to the "
+                "allow list of a project, the call is rejected for lacking the role"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AProjectAGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AProjectAGroupAndACaller]:
         return AProjectAGroupAndSomeone()
 
     @override
@@ -640,7 +796,10 @@ class AUserWhoIsNotTheSuperadminMayNotAllowForAProject(
 @dataclass(frozen=True)
 class TheSuperadminReadsAProjectsAllowed(
     Scenario[
-        SeedingSession, AProjectAGroupAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload
+        TestSeedingSession,
+        AProjectAGroupAndACaller,
+        ResourceGroupAdapter,
+        AllowedResourceGroupsPayload,
     ]
 ):
     @override
@@ -649,10 +808,17 @@ class TheSuperadminReadsAProjectsAllowed(
 
     @override
     def describe(self) -> str:
-        return "프로젝트에 건 그룹이 있을 때 슈퍼관리자가 프로젝트의 허용 목록을 읽으면 건 그룹 이름이 담긴다"
+        return Says(
+            "프로젝트에 건 자원 그룹이 있을 때 superadmin 이 프로젝트의 허용 목록을 읽으면 "
+            "건 자원 그룹 이름이 담깁니다",
+            english=(
+                "when a resource group is linked to a project, reading the allow list of that "
+                "project as the superadmin answers the linked group name"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AProjectAGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AProjectAGroupAndACaller]:
         return AProjectAGroupAndSomeone(role=UserRole.SUPERADMIN, linked=True)
 
     @override
@@ -669,7 +835,10 @@ class TheSuperadminReadsAProjectsAllowed(
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotReadAProjectsAllowed(
     Scenario[
-        SeedingSession, AProjectAGroupAndACaller, ResourceGroupAdapter, AllowedResourceGroupsPayload
+        TestSeedingSession,
+        AProjectAGroupAndACaller,
+        ResourceGroupAdapter,
+        AllowedResourceGroupsPayload,
     ]
 ):
     @override
@@ -678,13 +847,19 @@ class AUserGrantedNothingMayNotReadAProjectsAllowed(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 없는 사용자가 프로젝트의 허용 목록을 읽으려 하면 권한 부족으로 거부된다. "
-            "자기 도메인, 그 프로젝트, 자기 자신 세 스코프 모두에서 읽을 수 있어야 한다"
+        return Says(
+            "아무 권한도 없는 사용자가 프로젝트의 허용 목록을 읽으려 하면 권한 부족으로 "
+            "거부됩니다. 자기 도메인, 그 프로젝트, 자기 자신 세 스코프 모두에서 읽을 수 있어야 "
+            "합니다",
+            english=(
+                "a user granted nothing trying to read the allow list of a project is rejected "
+                "for not enough permission. reading has to be allowed in all three scopes, the "
+                "caller's domain, the project and the caller themself"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AProjectAGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AProjectAGroupAndACaller]:
         return AProjectAGroupAndSomeone(linked=True)
 
     @override
@@ -703,7 +878,9 @@ class AUserGrantedNothingMayNotReadAProjectsAllowed(
 
 @dataclass(frozen=True)
 class TheSuperadminAllowsADomainForAGroup(
-    Scenario[SeedingSession, ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedDomainsPayload]
+    Scenario[
+        TestSeedingSession, ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedDomainsPayload
+    ]
 ):
     @override
     def summary(self) -> str:
@@ -711,10 +888,17 @@ class TheSuperadminAllowsADomainForAGroup(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 그룹의 허용 도메인에 도메인을 더하면 그 도메인 이름이 담긴 목록이 반환된다"
+        return Says(
+            "superadmin 이 자원 그룹의 허용 도메인에 도메인을 추가하면 그 도메인 이름이 담긴 "
+            "목록이 반환됩니다",
+            english=(
+                "when the superadmin adds a domain to the allowed domains of a resource group, "
+                "the list holding that domain name comes back"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainGroupsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADomainGroupsAndACaller]:
         return ADomainGroupsAndSomeone(role=UserRole.SUPERADMIN, linked=False)
 
     @override
@@ -728,7 +912,9 @@ class TheSuperadminAllowsADomainForAGroup(
 
 @dataclass(frozen=True)
 class AllowingAnUnknownDomainForAGroupIsNotFound(
-    Scenario[SeedingSession, ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedDomainsPayload]
+    Scenario[
+        TestSeedingSession, ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedDomainsPayload
+    ]
 ):
     @override
     def summary(self) -> str:
@@ -736,10 +922,17 @@ class AllowingAnUnknownDomainForAGroupIsNotFound(
 
     @override
     def describe(self) -> str:
-        return "존재하지 않는 도메인 이름을 그룹의 허용 도메인에 더하려 하면 대상을 찾을 수 없다는 이유로 거부된다"
+        return Says(
+            "존재하지 않는 도메인 이름을 자원 그룹의 허용 도메인에 추가하려 하면 대상을 찾을 수 "
+            "없다는 이유로 거부됩니다",
+            english=(
+                "adding a domain name nothing answers to to the allowed domains of a resource "
+                "group is rejected because no target answers to it"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainGroupsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADomainGroupsAndACaller]:
         return ADomainGroupsAndSomeone(role=UserRole.SUPERADMIN, linked=False)
 
     @override
@@ -753,7 +946,9 @@ class AllowingAnUnknownDomainForAGroupIsNotFound(
 
 @dataclass(frozen=True)
 class DisallowingAnUnknownDomainForAGroupIsNotFound(
-    Scenario[SeedingSession, ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedDomainsPayload]
+    Scenario[
+        TestSeedingSession, ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedDomainsPayload
+    ]
 ):
     @override
     def summary(self) -> str:
@@ -761,13 +956,19 @@ class DisallowingAnUnknownDomainForAGroupIsNotFound(
 
     @override
     def describe(self) -> str:
-        return (
-            "존재하지 않는 도메인 이름을 그룹의 허용 도메인에서 빼려 하면 건너뛰지 않고 대상을 찾을 수 "
-            "없다는 이유로 거부된다. 도메인 쪽에서 없는 그룹 이름을 빼는 것은 건너뛴다"
+        return Says(
+            "존재하지 않는 도메인 이름을 자원 그룹의 허용 도메인에서 제거하려 하면 건너뛰지 않고 "
+            "대상을 찾을 수 없다는 이유로 거부됩니다. 도메인 쪽에서 없는 자원 그룹 이름을 "
+            "제거하는 것은 건너뜁니다",
+            english=(
+                "removing a domain name nothing answers to from the allowed domains of a "
+                "resource group is rejected because no target answers to it instead of being "
+                "skipped. removing an unknown resource group name on the domain side is skipped"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainGroupsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADomainGroupsAndACaller]:
         return ADomainGroupsAndSomeone(role=UserRole.SUPERADMIN, linked=False)
 
     @override
@@ -781,7 +982,9 @@ class DisallowingAnUnknownDomainForAGroupIsNotFound(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotAllowADomainForAGroup(
-    Scenario[SeedingSession, ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedDomainsPayload]
+    Scenario[
+        TestSeedingSession, ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedDomainsPayload
+    ]
 ):
     @override
     def summary(self) -> str:
@@ -789,13 +992,18 @@ class AUserGrantedNothingMayNotAllowADomainForAGroup(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 없는 사용자가 그룹의 허용 도메인에 도메인을 더하려 하면 권한 부족으로 거부된다. "
-            "관계를 쓰는 자리가 양쪽 스코프의 권한을 검사한다"
+        return Says(
+            "아무 권한도 없는 사용자가 자원 그룹의 허용 도메인에 도메인을 추가하려 하면 권한 "
+            "부족으로 거부됩니다. 관계를 사용하는 단계가 양쪽 스코프의 권한을 검사합니다",
+            english=(
+                "a user granted nothing trying to add a domain to the allowed domains of a "
+                "resource group is rejected for not enough permission. the step that writes "
+                "the relation checks the permission of both scopes"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainGroupsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADomainGroupsAndACaller]:
         return ADomainGroupsAndSomeone(linked=False)
 
     @override
@@ -809,7 +1017,9 @@ class AUserGrantedNothingMayNotAllowADomainForAGroup(
 
 @dataclass(frozen=True)
 class TheSuperadminReadsAGroupsDomains(
-    Scenario[SeedingSession, ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedDomainsPayload]
+    Scenario[
+        TestSeedingSession, ADomainGroupsAndACaller, ResourceGroupAdapter, AllowedDomainsPayload
+    ]
 ):
     @override
     def summary(self) -> str:
@@ -817,10 +1027,16 @@ class TheSuperadminReadsAGroupsDomains(
 
     @override
     def describe(self) -> str:
-        return "도메인에 건 그룹의 허용 도메인을 슈퍼관리자가 읽으면 그 도메인 이름이 담긴다"
+        return Says(
+            "도메인에 건 자원 그룹의 허용 도메인을 superadmin 이 읽으면 그 도메인 이름이 담깁니다",
+            english=(
+                "when the superadmin reads the allowed domains of a resource group linked to a "
+                "domain, that domain name comes back"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainGroupsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADomainGroupsAndACaller]:
         return ADomainGroupsAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -834,7 +1050,7 @@ class TheSuperadminReadsAGroupsDomains(
 
 @dataclass(frozen=True)
 class AUserGrantedReadOnTheGroupReadsItsDomains(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, AllowedDomainsPayload]
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, AllowedDomainsPayload]
 ):
     @override
     def summary(self) -> str:
@@ -842,10 +1058,17 @@ class AUserGrantedReadOnTheGroupReadsItsDomains(
 
     @override
     def describe(self) -> str:
-        return "그 그룹에 앉힌 역할로 읽기 권한을 받은 사용자가 그룹의 허용 도메인을 읽으면 걸린 도메인이 없어 빈 목록이 반환된다"
+        return Says(
+            "그 자원 그룹에 부여된 역할로 읽기 권한을 받은 사용자가 자원 그룹의 허용 도메인을 "
+            "읽으면 걸린 도메인이 없어 빈 목록이 반환됩니다",
+            english=(
+                "a user granted read through the role granted on the resource group reading the "
+                "allowed domains of the group gets an empty list because no domain is linked"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone(granted=Permission.READ)
 
     @override
@@ -859,7 +1082,7 @@ class AUserGrantedReadOnTheGroupReadsItsDomains(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotReadAGroupsDomains(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, AllowedDomainsPayload]
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, AllowedDomainsPayload]
 ):
     @override
     def summary(self) -> str:
@@ -867,10 +1090,17 @@ class AUserGrantedNothingMayNotReadAGroupsDomains(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 없는 사용자가 그룹의 허용 도메인을 읽으려 하면 권한 부족으로 거부된다"
+        return Says(
+            "아무 권한도 없는 사용자가 자원 그룹의 허용 도메인을 읽으려 하면 권한 부족으로 "
+            "거부됩니다",
+            english=(
+                "a user granted nothing trying to read the allowed domains of a resource group "
+                "is rejected for not enough permission"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone()
 
     @override
@@ -884,7 +1114,9 @@ class AUserGrantedNothingMayNotReadAGroupsDomains(
 
 @dataclass(frozen=True)
 class TheSuperadminAllowsAProjectForAGroup(
-    Scenario[SeedingSession, AProjectAGroupAndACaller, ResourceGroupAdapter, AllowedProjectsPayload]
+    Scenario[
+        TestSeedingSession, AProjectAGroupAndACaller, ResourceGroupAdapter, AllowedProjectsPayload
+    ]
 ):
     @override
     def summary(self) -> str:
@@ -892,10 +1124,17 @@ class TheSuperadminAllowsAProjectForAGroup(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 그룹의 허용 프로젝트에 프로젝트를 더하면 그 프로젝트 id가 담긴 목록이 반환된다"
+        return Says(
+            "superadmin 이 자원 그룹의 허용 프로젝트에 프로젝트를 추가하면 그 프로젝트 id 가 "
+            "담긴 목록이 반환됩니다",
+            english=(
+                "when the superadmin adds a project to the allowed projects of a resource "
+                "group, the list holding that project id comes back"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AProjectAGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AProjectAGroupAndACaller]:
         return AProjectAGroupAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -909,7 +1148,9 @@ class TheSuperadminAllowsAProjectForAGroup(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotAllowAProjectForAGroup(
-    Scenario[SeedingSession, AProjectAGroupAndACaller, ResourceGroupAdapter, AllowedProjectsPayload]
+    Scenario[
+        TestSeedingSession, AProjectAGroupAndACaller, ResourceGroupAdapter, AllowedProjectsPayload
+    ]
 ):
     @override
     def summary(self) -> str:
@@ -917,10 +1158,17 @@ class AUserGrantedNothingMayNotAllowAProjectForAGroup(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 없는 사용자가 그룹의 허용 프로젝트에 프로젝트를 더하려 하면 권한 부족으로 거부된다"
+        return Says(
+            "아무 권한도 없는 사용자가 자원 그룹의 허용 프로젝트에 프로젝트를 추가하려 하면 "
+            "권한 부족으로 거부됩니다",
+            english=(
+                "a user granted nothing trying to add a project to the allowed projects of a "
+                "resource group is rejected for not enough permission"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AProjectAGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AProjectAGroupAndACaller]:
         return AProjectAGroupAndSomeone()
 
     @override
@@ -934,7 +1182,9 @@ class AUserGrantedNothingMayNotAllowAProjectForAGroup(
 
 @dataclass(frozen=True)
 class TheSuperadminReadsAGroupsProjects(
-    Scenario[SeedingSession, AProjectAGroupAndACaller, ResourceGroupAdapter, AllowedProjectsPayload]
+    Scenario[
+        TestSeedingSession, AProjectAGroupAndACaller, ResourceGroupAdapter, AllowedProjectsPayload
+    ]
 ):
     @override
     def summary(self) -> str:
@@ -942,10 +1192,17 @@ class TheSuperadminReadsAGroupsProjects(
 
     @override
     def describe(self) -> str:
-        return "프로젝트에 건 그룹의 허용 프로젝트를 슈퍼관리자가 읽으면 그 프로젝트 id가 담긴다"
+        return Says(
+            "프로젝트에 건 자원 그룹의 허용 프로젝트를 superadmin 이 읽으면 그 프로젝트 id 가 "
+            "담깁니다",
+            english=(
+                "when the superadmin reads the allowed projects of a resource group linked to a "
+                "project, that project id comes back"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AProjectAGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AProjectAGroupAndACaller]:
         return AProjectAGroupAndSomeone(role=UserRole.SUPERADMIN, linked=True)
 
     @override
@@ -959,7 +1216,9 @@ class TheSuperadminReadsAGroupsProjects(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotReadAGroupsProjects(
-    Scenario[SeedingSession, AProjectAGroupAndACaller, ResourceGroupAdapter, AllowedProjectsPayload]
+    Scenario[
+        TestSeedingSession, AProjectAGroupAndACaller, ResourceGroupAdapter, AllowedProjectsPayload
+    ]
 ):
     @override
     def summary(self) -> str:
@@ -967,10 +1226,17 @@ class AUserGrantedNothingMayNotReadAGroupsProjects(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 없는 사용자가 그룹의 허용 프로젝트를 읽으려 하면 권한 부족으로 거부된다"
+        return Says(
+            "아무 권한도 없는 사용자가 자원 그룹의 허용 프로젝트를 읽으려 하면 권한 부족으로 "
+            "거부됩니다",
+            english=(
+                "a user granted nothing trying to read the allowed projects of a resource group "
+                "is rejected for not enough permission"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AProjectAGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AProjectAGroupAndACaller]:
         return AProjectAGroupAndSomeone(linked=True)
 
     @override

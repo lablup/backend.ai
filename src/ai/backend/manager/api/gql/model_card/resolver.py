@@ -29,7 +29,7 @@ from ai.backend.common.dto.manager.v2.model_card.types import ModelCardOrderFiel
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.base import encode_cursor, to_global_id
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_mutation, gql_root_field
 from ai.backend.manager.api.gql.deployment.types.revision_preset import (
     DeploymentRevisionPresetConnection,
@@ -55,7 +55,11 @@ from ai.backend.manager.api.gql.model_card.types import (
     ModelCardUsageGQL,
     ModelCardV2Connection,
     ModelCardV2Edge,
+    PartialBulkModelCardsPayloadGQL,
+    PartialBulkPurgeModelCardsInputGQL,
+    PartialBulkUpdateModelCardsInputGQL,
     ProjectModelCardScopeGQL,
+    PurgeModelCardPayloadGQL,
     ScanProjectModelCardsPayloadGQL,
     UpdateModelCardInputGQL,
     UpdateModelCardPayloadGQL,
@@ -76,7 +80,7 @@ async def admin_model_cards_v2(
         ModelCardUsageGQL | None,
         strawberry.argument(
             description=(
-                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "Added in 26.9.0. Uses narrowing the result. Each listed "
                 "entity must be readable by the caller; model cards the caller cannot "
                 "read are left out."
             )
@@ -101,7 +105,7 @@ async def admin_model_cards_v2(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description=(
             "Page through the model cards the named scopes reach, combined with OR. "
             "Every scope is authorized before the read runs."
@@ -115,7 +119,7 @@ async def scoped_model_cards_v2(
         ModelCardUsageGQL | None,
         strawberry.argument(
             description=(
-                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "Added in 26.9.0. Uses narrowing the result. Each listed "
                 "entity must be readable by the caller; model cards the caller cannot "
                 "read are left out."
             )
@@ -206,7 +210,7 @@ async def project_model_cards_v2(
         ModelCardUsageGQL | None,
         strawberry.argument(
             description=(
-                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "Added in 26.9.0. Uses narrowing the result. Each listed "
                 "entity must be readable by the caller; model cards the caller cannot "
                 "read are left out."
             )
@@ -260,9 +264,72 @@ async def admin_create_model_card_v2(
 
 @gql_mutation(
     BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Update a model card. Only provided fields will be updated.",
+    )
+)
+async def update_model_card_v2(
+    info: Info[StrawberryGQLContext],
+    input: UpdateModelCardInputGQL,
+) -> UpdateModelCardPayloadGQL:
+    payload = await info.context.adapters.model_card.update(input.to_pydantic())
+    return UpdateModelCardPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Purge a model card. The options decide whether its vfolder is moved to the trash."
+        ),
+    )
+)
+async def purge_model_card_v2(
+    info: Info[StrawberryGQLContext],
+    id: UUID,
+    options: DeleteModelCardOptionsGQL | None = None,
+) -> PurgeModelCardPayloadGQL:
+    options_dto = options.to_pydantic() if options is not None else DeleteModelCardOptions()
+    payload = await info.context.adapters.model_card.purge(id, options=options_dto)
+    return PurgeModelCardPayloadGQL.from_pydantic(
+        payload, extra={"purged_id": to_global_id(ModelCardGQL, payload.entity_id)}
+    )
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Update several model cards, answering for each one.",
+    )
+)
+async def partial_bulk_update_model_cards_v2(
+    info: Info[StrawberryGQLContext],
+    input: PartialBulkUpdateModelCardsInputGQL,
+) -> PartialBulkModelCardsPayloadGQL:
+    payload = await info.context.adapters.model_card.partial_bulk_update(input.to_pydantic())
+    return PartialBulkModelCardsPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Purge several model cards, answering for each one.",
+    )
+)
+async def partial_bulk_purge_model_cards_v2(
+    info: Info[StrawberryGQLContext],
+    input: PartialBulkPurgeModelCardsInputGQL,
+) -> PartialBulkModelCardsPayloadGQL:
+    payload = await info.context.adapters.model_card.partial_bulk_purge(input.to_pydantic())
+    return PartialBulkModelCardsPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
         added_version="26.4.2",
         description="Update a model card (admin only).",
-    )
+    ),
+    deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `updateModelCardV2`.",
 )
 async def admin_update_model_card_v2(
     info: Info[StrawberryGQLContext],
@@ -278,7 +345,8 @@ async def admin_update_model_card_v2(
     BackendAIGQLMeta(
         added_version="26.4.2",
         description="Delete a model card (admin only).",
-    )
+    ),
+    deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `purgeModelCardV2`.",
 )
 async def admin_delete_model_card_v2(
     info: Info[StrawberryGQLContext],
@@ -287,7 +355,7 @@ async def admin_delete_model_card_v2(
 ) -> DeleteModelCardPayloadGQL | None:
     check_admin_only()
     options_dto = options.to_pydantic() if options is not None else DeleteModelCardOptions()
-    payload = await info.context.adapters.model_card.delete(id, options=options_dto)
+    payload = await info.context.adapters.model_card.purge(id, options=options_dto)
     return DeleteModelCardPayloadGQL.from_pydantic(payload)
 
 
@@ -295,6 +363,9 @@ async def admin_delete_model_card_v2(
     BackendAIGQLMeta(
         added_version="26.4.4",
         description="Bulk-delete model cards (admin only) with per-card partial-failure reporting.",
+    ),
+    deprecation_reason=(
+        f"Deprecated since {NEXT_RELEASE_VERSION}. Use `partialBulkPurgeModelCardsV2`."
     ),
 )
 async def admin_bulk_delete_model_cards_v2(

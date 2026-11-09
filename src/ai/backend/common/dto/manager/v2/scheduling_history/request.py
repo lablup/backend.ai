@@ -11,6 +11,7 @@ from pydantic import Field
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 from .types import (
     DeploymentHistoryOrderField,
@@ -64,7 +65,14 @@ class SchedulingResultFilter(BaseRequestModel):
 class SessionHistoryFilter(BaseRequestModel):
     """Filter conditions for session scheduling history search."""
 
-    id: UUIDFilter | None = Field(default=None, description="Filter by history record ID")
+    id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `field_id`.",
+        deprecated=True,
+    )
+    field_id: UUIDFilter | None = Field(
+        default=None, description=f"Added in {NEXT_RELEASE_VERSION}. Filter by history record ID."
+    )
     session_id: UUIDFilter | None = Field(default=None, description="Filter by session ID")
     phase: StringFilter | None = Field(default=None, description="Filter by scheduling phase")
     from_status: list[str] | None = Field(default=None, description="Filter by from_status values")
@@ -107,7 +115,14 @@ class SearchSessionHistoryInput(BaseRequestModel):
 class KernelHistoryFilter(BaseRequestModel):
     """Filter conditions for kernel scheduling history search."""
 
-    id: UUIDFilter | None = Field(default=None, description="Filter by history record ID")
+    id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `field_id`.",
+        deprecated=True,
+    )
+    field_id: UUIDFilter | None = Field(
+        default=None, description=f"Added in {NEXT_RELEASE_VERSION}. Filter by history record ID."
+    )
     kernel_id: UUIDFilter | None = Field(default=None, description="Filter by kernel ID")
     session_id: UUIDFilter | None = Field(default=None, description="Filter by session ID")
     phase: StringFilter | None = Field(default=None, description="Filter by scheduling phase")
@@ -138,7 +153,14 @@ class KernelHistoryOrder(BaseRequestModel):
 class DeploymentHistoryFilter(BaseRequestModel):
     """Filter conditions for deployment scheduling history search."""
 
-    id: UUIDFilter | None = Field(default=None, description="Filter by history record ID")
+    id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `field_id`.",
+        deprecated=True,
+    )
+    field_id: UUIDFilter | None = Field(
+        default=None, description=f"Added in {NEXT_RELEASE_VERSION}. Filter by history record ID."
+    )
     deployment_id: UUIDFilter | None = Field(default=None, description="Filter by deployment ID")
     phase: StringFilter | None = Field(default=None, description="Filter by scheduling phase")
     from_status: list[str] | None = Field(default=None, description="Filter by from_status values")
@@ -181,7 +203,14 @@ class SearchDeploymentHistoryInput(BaseRequestModel):
 class RouteHistoryFilter(BaseRequestModel):
     """Filter conditions for route scheduling history search."""
 
-    id: UUIDFilter | None = Field(default=None, description="Filter by history record ID")
+    id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `field_id`.",
+        deprecated=True,
+    )
+    field_id: UUIDFilter | None = Field(
+        default=None, description=f"Added in {NEXT_RELEASE_VERSION}. Filter by history record ID."
+    )
     route_id: UUIDFilter | None = Field(default=None, description="Filter by route ID")
     deployment_id: UUIDFilter | None = Field(default=None, description="Filter by deployment ID")
     phase: StringFilter | None = Field(default=None, description="Filter by scheduling phase")
@@ -223,7 +252,14 @@ class SearchRouteHistoryInput(BaseRequestModel):
 class ReplicaGroupHistoryFilter(BaseRequestModel):
     """Filter conditions for replica-group scheduling history search."""
 
-    id: UUIDFilter | None = Field(default=None, description="Filter by history record ID")
+    id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `field_id`.",
+        deprecated=True,
+    )
+    field_id: UUIDFilter | None = Field(
+        default=None, description=f"Added in {NEXT_RELEASE_VERSION}. Filter by history record ID."
+    )
     deployment_id: UUIDFilter | None = Field(
         default=None, description="Filter by owning deployment ID"
     )

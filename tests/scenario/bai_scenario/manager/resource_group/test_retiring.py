@@ -15,7 +15,7 @@ from ai.backend.manager.api.adapters.resource_group.adapter import ResourceGroup
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.resource_group import (
     AGroupAndACaller,
@@ -24,11 +24,11 @@ from bai_scenario.components.resource_group import (
     TheGroupNode,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type RetiringStep = Scenario[
-    SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode
+    TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode
 ]
 
 UNKNOWN = "no-such-group"
@@ -46,20 +46,26 @@ class Purging(When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNo
 
     @override
     def describe(self, laid: AGroupAndACaller) -> str:
-        target = "존재하지 않는 이름" if self.unknown else laid.group.name
-        return f"{laid.caller.username}이 {target} 완전 삭제"
+        target_ko = "존재하지 않는 이름" if self.unknown else laid.group.name
+        target_en = "a name that does not exist" if self.unknown else laid.group.name
+        return Says(
+            f"{laid.caller.username}이 {target_ko}을 완전 삭제합니다",
+            english=f"{laid.caller.username} purges {target_en}",
+        )
 
     @override
     async def call(
         self, adapter: ResourceGroupAdapter, laid: AGroupAndACaller
     ) -> ResourceGroupDetailNode:
         with ActingAs(laid.caller):
-            return await adapter.purge(UNKNOWN if self.unknown else laid.group.name)
+            return await adapter.purge(
+                await adapter.lookup_name(UNKNOWN if self.unknown else laid.group.name)
+            )
 
 
 @dataclass(frozen=True)
 class TheSuperadminPurgesAGroup(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
     started: datetime
 
@@ -69,10 +75,16 @@ class TheSuperadminPurgesAGroup(
 
     @override
     def describe(self) -> str:
-        return "리소스 그룹 하나가 있고 슈퍼관리자가 완전 삭제하면 지운 그룹 전체가 반환된다"
+        return Says(
+            "자원 그룹 하나가 있고 superadmin 이 완전 삭제하면 삭제한 그룹 전체가 반환됩니다",
+            english=(
+                "one resource group exists and the superadmin purges it, so the whole deleted "
+                "group comes back"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -86,7 +98,7 @@ class TheSuperadminPurgesAGroup(
 
 @dataclass(frozen=True)
 class AUserGrantedHardDeleteOnTheGroupPurgesIt(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
     started: datetime
 
@@ -96,10 +108,17 @@ class AUserGrantedHardDeleteOnTheGroupPurgesIt(
 
     @override
     def describe(self) -> str:
-        return "그 그룹에 앉힌 역할로 완전 삭제 권한을 받은 사용자가 완전 삭제하면 지운 그룹 전체가 반환된다"
+        return Says(
+            "그 자원 그룹에 부여된 역할로 완전 삭제 권한을 받은 사용자가 완전 삭제하면 삭제한 "
+            "그룹 전체가 반환됩니다",
+            english=(
+                "a user granted hard delete through the role granted on the resource group "
+                "purging it gets the whole deleted group"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone(granted=Permission.HARD_DELETE)
 
     @override
@@ -113,7 +132,7 @@ class AUserGrantedHardDeleteOnTheGroupPurgesIt(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotPurge(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
     @override
     def summary(self) -> str:
@@ -121,10 +140,15 @@ class AUserGrantedNothingMayNotPurge(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 없는 사용자가 완전 삭제하려 하면 권한 부족으로 거부된다"
+        return Says(
+            "아무 권한도 없는 사용자가 완전 삭제하려 하면 권한 부족으로 거부됩니다",
+            english=(
+                "a user granted nothing trying to purge is rejected for not enough permission"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone()
 
     @override
@@ -138,7 +162,7 @@ class AUserGrantedNothingMayNotPurge(
 
 @dataclass(frozen=True)
 class TheSuperadminPurgingAnUnknownNameIsNotFound(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
     @override
     def summary(self) -> str:
@@ -146,12 +170,17 @@ class TheSuperadminPurgingAnUnknownNameIsNotFound(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 존재하지 않는 이름을 완전 삭제하면 대상을 찾을 수 없다는 이유로 거부된다"
+        return Says(
+            "superadmin 이 존재하지 않는 이름을 완전 삭제하면 대상을 찾을 수 없다는 이유로 "
+            "거부됩니다",
+            english=(
+                "when the superadmin purges a name nothing answers to, the call is rejected "
+                "because no target answers to it"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone(role=UserRole.SUPERADMIN)
 
     @override

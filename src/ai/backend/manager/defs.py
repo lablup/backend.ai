@@ -17,6 +17,10 @@ def is_noop_host(vfolder_host: str) -> bool:
     return volume_name == NOOP_STORAGE_VOLUME_NAME
 
 
+def is_unmanaged(unmanaged_path: str | None) -> bool:
+    return (unmanaged_path is not None) and unmanaged_path != ""
+
+
 INTRINSIC_SLOTS: Final = {
     SlotName("cpu"): SlotTypes("count"),
     SlotName("mem"): SlotTypes("bytes"),
@@ -40,8 +44,8 @@ DEFAULT_CHUNK_SIZE: Final = 16 * (2**20)  # 16 MiB
 DEFAULT_ROLE: Final = "main"
 
 PASSWORD_PLACEHOLDER: Final = "*****"
+SECRET_KEY_PLACEHOLDER: Final = "*****"
 
-RESERVED_DOTFILES = [".terminfo", ".jupyter", ".ssh", ".ssh/authorized_keys", ".local", ".config"]
 
 # Mapping between vfolder names and their in-container paths.
 VFOLDER_DSTPATHS_MAP = {

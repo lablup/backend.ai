@@ -38,7 +38,8 @@ from ai.backend.manager.models.rbac_models.permission.permission import Permissi
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
 from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
-from ai.backend.manager.models.resource_group.row import ResourceGroupOpts, ResourceGroupRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -275,9 +276,7 @@ class TestResourceSlotTypePurger:
         db_with_referencing_tables: ExtendedAsyncSAEngine,
         existing_slot_type: ResourceSlotTypeData,
     ) -> None:
-        purger = ResourceSlotTypePurger(
-            slot_name=existing_slot_type.slot_name, slot_type_id=existing_slot_type.uuid
-        )
+        purger = ResourceSlotTypePurger(slot_type_id=existing_slot_type.uuid)
         async with V2DBOpsProvider(db_with_referencing_tables).write_ops() as w:
             data = await w.purge_entity(purger)
             assert data is not None
@@ -340,9 +339,7 @@ class TestResourceSlotTypePurger:
                 )
             )
 
-        purger = ResourceSlotTypePurger(
-            slot_name=existing_slot_type.slot_name, slot_type_id=existing_slot_type.uuid
-        )
+        purger = ResourceSlotTypePurger(slot_type_id=existing_slot_type.uuid)
         with pytest.raises(ResourceSlotTypeInUse):
             async with V2DBOpsProvider(db_with_referencing_tables).write_ops() as w:
                 await w.purge_entity(purger)

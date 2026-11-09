@@ -6,6 +6,7 @@ Retype the column from ``String`` to native ``UUID`` so the DB type matches the 
 already holds and the exposed type. ``triggered_by`` intentionally stays ``String``.
 
 Existing text values are valid UUID strings, so the cast is total; NULLs stay NULL.
+The cast rebuilds the table (``AuditLogRebuild``) instead of rewriting it in place.
 
 Revision ID: b13d304bf1fd
 Revises: a3c1d8e5b294
@@ -17,6 +18,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
+from ai.backend.manager.models.alembic.audit_log_rebuild import AuditLogRebuild
+
 # revision identifiers, used by Alembic.
 revision = "b13d304bf1fd"
 down_revision = "a3c1d8e5b294"
@@ -26,14 +29,9 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.alter_column(
-        "audit_logs",
-        "acted_as",
-        existing_type=sa.String(),
-        type_=postgresql.UUID(as_uuid=True),
-        existing_nullable=True,
-        postgresql_using="acted_as::uuid",
-    )
+    rebuild = AuditLogRebuild(op.get_bind())
+    if rebuild.columns().get("acted_as") != "uuid":
+        rebuild.run()
 
 
 def downgrade() -> None:

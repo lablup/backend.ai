@@ -6,7 +6,7 @@ This guide covers the Backend.AI resource usage CLI commands for viewing histori
 
 The resource usage history tracks how resources have been consumed over time by domains, projects, and users. This data is stored in time-based buckets and is used by the fair share scheduler to calculate scheduling priorities.
 
-**Note**: All resource usage commands require **superadmin privileges**.
+**Note**: All resource usage commands require **superadmin** privileges.
 
 ## Quick Start
 
@@ -164,7 +164,7 @@ Each usage bucket contains:
 
 ### ResourceSlot Format
 
-Usage data is stored as ResourceSlot with fields like:
+Usage data is stored as ResourceSlot with fields such as:
 - **cpu**: CPU core-seconds used
 - **mem**: Memory byte-seconds used
 - **cuda.device**: GPU device-seconds used (if applicable)
@@ -214,13 +214,13 @@ Use `--json` flag for machine-readable output:
 
 **Permission denied:**
 - Resource usage commands require superadmin privileges
-- Verify your user account has superadmin role
+- Check that your user account has superadmin privileges
 
 **Empty ResourceSlot values:**
 - Zero usage indicates no sessions ran during that period
 - Check session history for the time range
 
-## Related Commands
+## Related commands
 
 - `./backend.ai fair-share domain list`: View domain fair share factors
 - `./backend.ai fair-share user list`: View user fair share factors

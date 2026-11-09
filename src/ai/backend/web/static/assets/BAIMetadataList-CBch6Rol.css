@@ -1,0 +1,43 @@
+/*
+ @license
+ Copyright (c) 2015-2026 Lablup Inc. All rights reserved.
+
+ `BAIMetadataList` paint: a lightened item label and top-aligned side labels
+ (always), plus the `bordered` variant — outer frame + a 1px rule between
+ items, on the list's own layout (no forced side labels, no label-column
+ fill).
+
+ ## Why CSS, not a theme variant
+
+ `defineTheme({ components })` can't express it: a custom variant key only
+ renders if the component reflects that prop, and `MetadataList` reflects
+ `columns`/`orientation` only; `metadata-list-item.base` is flat per-component,
+ so it would repaint every list, but bordered is opt-in. So this uses
+ `className` + tokens over the stable `.astryx-*` surface (the preferred
+ surface for new CSS). The rules are unlayered, so they win over Astryx's
+ `@layer astryx-base` atomics without `!important`.
+
+ ## How the rules are drawn
+
+ The `<dl>` is a GRID, and its last row is not addressable (with `columns={2}`
+ a row holds several cells, so no `:nth-last-of-type()` formula drops the final
+ row's rule without hard-coding the column count). So the frame and rules are
+ painted as the GRID GAP: the `<dl>` takes `--color-border` as its background
+ plus a 1px gap and 1px padding, and every direct grid child covers it with an
+ opaque fill. What shows through is exactly a 1px lattice plus a 1px frame, for
+ any column count and any number of rows. Two consequences, both accepted:
+
+  - Cells need an OPAQUE fill (`--bai-metadata-list-cell-bg`, default
+    `--color-background-card`); override it when the list sits on a surface
+    that is not card-coloured.
+  - The frame is padding, not a `border`: `--color-border` is an alpha token,
+    so a border over the background would composite the colour twice and read
+    heavier than the interior rules.
+
+ The direct grid child differs by layout — the item wrapper `<div>` for stacked
+ labels (multi-column default), the `<dt>`/`<dd>` pair for side labels — so the
+ cell rule targets `> dl > *` rather than a specific tag.
+
+ Cell padding: `--spacing-4`/`--spacing-6` (16/24px), stepped down by `size`
+ to 12/24 (`middle`) and 8/16 (`small`).
+*/.bai-metadata-list{--bai-metadata-list-label-color: color-mix( in srgb, var(--color-text-secondary) 83%, transparent )}.bai-metadata-list>dl>dt,.bai-metadata-list>dl>*>dt{color:var(--bai-metadata-list-label-color)}.bai-metadata-list>dl>dt{align-items:baseline}.bai-metadata-list>dl>dt>span:first-child:not(.bai-metadata-list-item__label){align-self:flex-start;height:1lh}.bai-metadata-list-item__label{display:contents}.bai-metadata-list--bordered{--bai-metadata-list-cell-bg: var(--color-background-card);--bai-metadata-list-cell-padding-block: var(--spacing-4);--bai-metadata-list-cell-padding-inline: var(--spacing-6)}.bai-metadata-list--bordered-middle{--bai-metadata-list-cell-padding-block: var(--spacing-3)}.bai-metadata-list--bordered-small{--bai-metadata-list-cell-padding-block: var(--spacing-2);--bai-metadata-list-cell-padding-inline: var(--spacing-4)}.bai-metadata-list--bordered>dl{gap:var(--border-width);padding:var(--border-width);background-color:var(--color-border);border-radius:var(--radius-element);align-items:stretch;overflow:hidden}.bai-metadata-list--bordered>dl>*{padding:var(--bai-metadata-list-cell-padding-block) var(--bai-metadata-list-cell-padding-inline);background-color:var(--bai-metadata-list-cell-bg);min-height:0}

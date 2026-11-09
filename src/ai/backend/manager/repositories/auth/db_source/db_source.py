@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import secrets
 import uuid as uuid_mod
 from collections.abc import Collection
@@ -13,6 +14,7 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
 
+from ai.backend.common.auth.password import HashInfo, PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
@@ -41,11 +43,10 @@ from ai.backend.manager.errors.auth import (
 from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.errors.user import KeyPairNotFound, UserCreationBadRequest
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.hasher.types import HashInfo, PasswordInfo
+from ai.backend.manager.models.hasher.factory import compare_to_hashed_password
 from ai.backend.manager.models.keypair.queriers import DefaultKeypairQuerier
 from ai.backend.manager.models.keypair.row import (
     KEYPAIR_SECRET_KEY_CONTEXT,
-    generate_keypair_data,
     keypairs,
 )
 from ai.backend.manager.models.login_session.row import LoginHistoryRow, LoginSessionRow
@@ -56,16 +57,16 @@ from ai.backend.manager.models.user.row import (
     UserRole,
     UserRow,
     UserStatus,
-    check_credential,
-    compare_to_hashed_password,
     users,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
+from ai.backend.manager.repositories.auth.keypair_secrets import generate_keypair_data
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.user.provider import UserOpsProvider
 from ai.backend.manager.repositories.ops.v2.user.write import FullUserCreator
 from ai.backend.manager.secret.pool import KeyProviderPool
+from ai.backend.manager.views.auth import UserCredential
 
 auth_db_source_resilience = Resilience(
     policies=[
@@ -286,17 +287,18 @@ class AuthDBSource:
 
     @auth_db_source_resilience.apply()
     async def fetch_keypair_signing_material(self, access_key: str) -> KeyPairSigningMaterial:
-        """Read the owner and the decrypted secret key of a keypair."""
+        """Read the owner and the decrypted secret key of an active keypair."""
         async with self._db.begin_readonly() as conn:
             row = (
                 await conn.execute(
                     sa.select(keypairs.c.user, keypairs.c.secret_key).where(
-                        keypairs.c.access_key == access_key
+                        keypairs.c.access_key == access_key,
+                        keypairs.c.is_active.is_(True),
                     )
                 )
             ).first()
         if row is None or row.secret_key is None:
-            raise KeyPairNotFound(f"No keypair holds the access key {access_key}")
+            raise KeyPairNotFound(f"No active keypair holds the access key {access_key}")
         return KeyPairSigningMaterial(
             user_id=row.user,
             secret_key=await self._key_provider_pool.decrypt(
@@ -389,7 +391,6 @@ class AuthDBSource:
 
     async def _check_password(
         self,
-        conn: sa.ext.asyncio.AsyncConnection,
         row: sa.Row[Any],
         target_password_info: PasswordInfo,
     ) -> None:
@@ -397,7 +398,9 @@ class AuthDBSource:
         if row.password is None:
             raise AuthorizationFailed("User credential mismatch.")
         try:
-            if not compare_to_hashed_password(target_password_info.password, row.password):
+            if not await asyncio.to_thread(
+                compare_to_hashed_password, target_password_info.password, row.password
+            ):
                 raise AuthorizationFailed("User credential mismatch.")
         except ValueError:
             raise AuthorizationFailed("User credential mismatch.") from None
@@ -489,7 +492,7 @@ class AuthDBSource:
             if row is None:
                 raise AuthorizationFailed("User credential mismatch.")
 
-            await self._check_password(conn, row, target_password_info)
+            await self._check_password(row, target_password_info)
             await self._migrate_password_hash(conn, row, domain_name, email, target_password_info)
 
             # Fetch active sessions for the user within the same connection
@@ -601,15 +604,20 @@ class AuthDBSource:
         self,
         domain_name: str,
         email: str,
-        password: str,
-    ) -> sa.RowMapping:
+        target_password_info: PasswordInfo,
+    ) -> UserCredential:
         """Verify credentials without password migration (for signout, etc.)"""
-        return await check_credential(
-            db=self._db,
-            domain=domain_name,
-            email=email,
-            password=password,
-        )
+        async with self._db.begin_readonly_read_committed() as conn:
+            result = await conn.execute(
+                sa.select(users.c.uuid, users.c.password).where(
+                    (users.c.email == email) & (users.c.domain_name == domain_name)
+                ),
+            )
+            row = result.first()
+            if row is None:
+                raise AuthorizationFailed("User credential mismatch.")
+            await self._check_password(row, target_password_info)
+        return UserCredential(user_id=UserID(row.uuid), hashed_password=row.password)
 
     @auth_db_source_resilience.apply()
     async def fetch_default_keypair(self, user_uuid: UUID) -> KeyPairData:
@@ -672,25 +680,28 @@ class AuthDBSource:
             ]
 
     @auth_db_source_resilience.apply()
-    async def delete_session_by_token(
+    async def delete_owned_session_by_token(
         self,
         session_token: str,
+        user_id: UserID,
         result: LoginAttemptResult,
         client_ip: str | None = None,
     ) -> None:
-        """Delete a single login session by its token and record history.
-
-        Uses a CTE to atomically DELETE + INSERT into login_history with a
-        JOIN on users to obtain domain_name. No-op if the session is not found.
+        """Validate ownership, delete the session, and record history in one transaction.
+        Raise LoginSessionNotFoundError if the token is missing or belongs to another user.
         """
         ls = LoginSessionRow.__table__
         lh = LoginHistoryRow.__table__
-        async with self._db.connect() as conn:
+        async with self._db.begin() as conn:
+            session_id = await conn.scalar(
+                sa.select(ls.c.id)
+                .where((ls.c.session_token == session_token) & (ls.c.user_id == user_id))
+                .with_for_update()
+            )
+            if session_id is None:
+                raise LoginSessionNotFoundError()
             deleted = (
-                sa.delete(ls)
-                .where(ls.c.session_token == session_token)
-                .returning(ls.c.user_id)
-                .cte("deleted")
+                sa.delete(ls).where(ls.c.id == session_id).returning(ls.c.user_id).cte("deleted")
             )
             insert_query = lh.insert().from_select(
                 ["user_id", "domain_name", "result", "client_ip"],
@@ -702,7 +713,6 @@ class AuthDBSource:
                 ).select_from(deleted.join(users, deleted.c.user_id == users.c.uuid)),
             )
             await conn.execute(insert_query)
-            await conn.commit()
 
     @auth_db_source_resilience.apply()
     async def delete_sessions_by_user(
@@ -786,12 +796,18 @@ class AuthDBSource:
             return session_token
 
     @auth_db_source_resilience.apply()
-    async def invalidate_active_login_sessions(self, user_id: UserID) -> None:
-        """Mark every active login session of a user invalidated."""
-        ls = LoginSessionRow.__table__
-        async with self._db.begin() as conn:
-            await conn.execute(
-                sa.update(ls)
-                .where((ls.c.user_id == user_id) & (ls.c.status == LoginSessionStatus.ACTIVE))
+    async def invalidate_active_login_sessions(self, user_id: UserID) -> list[str]:
+        """Invalidate the user's active sessions and return only their newly invalidated tokens.
+        Exclude already invalidated sessions and sessions belonging to other users.
+        """
+        async with self._db.begin_session() as db_session:
+            result = await db_session.execute(
+                sa.update(LoginSessionRow)
+                .where(
+                    (LoginSessionRow.user_id == user_id)
+                    & (LoginSessionRow.status == LoginSessionStatus.ACTIVE)
+                )
                 .values(status=LoginSessionStatus.INVALIDATED, invalidated_at=sa.func.now())
+                .returning(LoginSessionRow.session_token)
             )
+            return list(result.scalars())

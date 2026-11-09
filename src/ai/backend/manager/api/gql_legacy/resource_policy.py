@@ -444,7 +444,7 @@ class DeleteKeyPairResourcePolicy(graphene.Mutation):  # type: ignore[misc]
             LookupKeypairResourcePolicyAction(name=name)
         )
         await graph_ctx.processors.keypair_resource_policy.purge.run(
-            PurgeKeyPairResourcePolicyAction(name=name, policy_id=target.entity_id())
+            PurgeKeyPairResourcePolicyAction(policy_id=target.entity_id())
         )
         return DeleteKeyPairResourcePolicy(
             ok=True,
@@ -706,7 +706,7 @@ class DeleteUserResourcePolicy(graphene.Mutation):  # type: ignore[misc]
             LookupUserResourcePolicyAction(name=name)
         )
         await graph_ctx.processors.user_resource_policy.purge.run(
-            PurgeUserResourcePolicyAction(name=name, policy_id=target.entity_id())
+            PurgeUserResourcePolicyAction(policy_id=target.entity_id())
         )
 
         return DeleteUserResourcePolicy(
@@ -961,7 +961,7 @@ class DeleteProjectResourcePolicy(graphene.Mutation):  # type: ignore[misc]
             LookupProjectResourcePolicyAction(name=name)
         )
         await graph_ctx.processors.project_resource_policy.purge.run(
-            PurgeProjectResourcePolicyAction(name=name, policy_id=target.entity_id())
+            PurgeProjectResourcePolicyAction(policy_id=target.entity_id())
         )
 
         return DeleteProjectResourcePolicy(

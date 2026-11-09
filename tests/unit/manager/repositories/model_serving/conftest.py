@@ -6,21 +6,16 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-import yarl
 from pytest_mock import MockerFixture
 
-from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.types import (
-    ClusterMode,
-    ResourceSlot,
     VFolderMountPolicy,
     VFolderUsageMode,
 )
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
-from ai.backend.manager.data.model_serving.types import EndpointData, EndpointLifecycle
 from ai.backend.manager.data.vfolder.types import (
     VFolderOperationStatus,
     VFolderOwnershipType,
@@ -222,22 +217,6 @@ def setup_writable_session(mock_db_engine: MagicMock, mock_session: AsyncMock) -
 
 
 @pytest.fixture
-def patch_endpoint_get(mocker: MockerFixture) -> AsyncMock:
-    """Patch EndpointRow.get method using mocker."""
-    return mocker.patch(
-        "ai.backend.manager.models.endpoint.row.EndpointRow.get", new_callable=AsyncMock
-    )
-
-
-@pytest.fixture
-def patch_routing_get(mocker: MockerFixture) -> AsyncMock:
-    """Patch RoutingRow.get method using mocker."""
-    return mocker.patch(
-        "ai.backend.manager.models.routing.row.RoutingRow.get", new_callable=AsyncMock
-    )
-
-
-@pytest.fixture
 def patch_user_get(mocker: MockerFixture) -> AsyncMock:
     """Patch UserRow.get method using mocker."""
     return mocker.patch("ai.backend.manager.models.user.row.UserRow.get", new_callable=AsyncMock)
@@ -248,23 +227,6 @@ def patch_session_get(mocker: MockerFixture) -> AsyncMock:
     """Patch SessionRow.get_session method using mocker."""
     return mocker.patch(
         "ai.backend.manager.models.session.row.SessionRow.get_session", new_callable=AsyncMock
-    )
-
-
-@pytest.fixture
-def patch_auto_scaling_rule_get(mocker: MockerFixture) -> AsyncMock:
-    """Patch EndpointAutoScalingRuleRow.get method using mocker."""
-    return mocker.patch(
-        "ai.backend.manager.models.endpoint.row.EndpointAutoScalingRuleRow.get",
-        new_callable=AsyncMock,
-    )
-
-
-@pytest.fixture
-def patch_resolve_group_name_or_id(mocker: MockerFixture) -> MagicMock:
-    """Patch resolve_group_name_or_id function using mocker."""
-    return mocker.patch(
-        "ai.backend.manager.repositories.model_serving.repository.resolve_group_name_or_id"
     )
 
 
@@ -306,58 +268,8 @@ def assert_update_query_executed(
         assert expected_field in str(executed_query)
 
 
-def assert_basic_endpoint_result(result: EndpointData, endpoint_row: EndpointRow) -> None:
-    """Helper function to validate basic endpoint result"""
-    assert result is not None
-    assert isinstance(result, EndpointData)
-    assert result.id == endpoint_row.id
-    assert result.name == endpoint_row.name
-
-
 def assert_endpoint_creation_operations(mock_session: AsyncMock, endpoint_row: EndpointRow) -> None:
     """Helper function to verify database operations related to endpoint creation"""
     mock_session.add.assert_called_once_with(endpoint_row)
     mock_session.flush.assert_called_once()
     mock_session.refresh.assert_called_once_with(endpoint_row)
-
-
-def create_full_featured_endpoint(
-    sample_user: UserRow, sample_image: ImageRow, sample_vfolder: VFolderRow
-) -> EndpointRow:
-    endpoint_row = EndpointRow(
-        name="full-featured-endpoint",
-        domain="test-domain",
-        project=uuid.uuid4(),
-        resource_group="gpu-cluster",
-        model=sample_vfolder.id,
-        model_mount_destination="/models/custom",
-        model_definition_path="model_definition.py",
-        session_owner=sample_user.uuid,
-        tag="v1.0.0",
-        startup_command="python -m model_server",
-        bootstrap_script="pip install -r requirements.txt",
-        callback_url=yarl.URL("https://webhook.example.com/callback"),
-        environ={"API_KEY": "secret", "DEBUG": "false"},
-        resource_slots=ResourceSlot({"cpu": "4", "mem": "8g", "cuda.device": "1"}),
-        resource_opts={"shmem": "2g"},
-        image=sample_image,
-        replicas=3,
-        cluster_mode=ClusterMode.MULTI_NODE,
-        cluster_size=3,
-        extra_mounts=[],
-        created_user=sample_user.uuid,
-    )
-
-    # Set attributes normally set by database
-    endpoint_row.id = DeploymentID(uuid.uuid4())
-    endpoint_row.created_at = datetime.now(tz=UTC)
-    endpoint_row.destroyed_at = None
-    endpoint_row.lifecycle_stage = EndpointLifecycle.CREATED
-    endpoint_row.retries = 0
-    endpoint_row.url = "https://api.example.com/v1/models/full-featured"
-    endpoint_row.open_to_public = False
-    endpoint_row.session_owner_row = sample_user
-    endpoint_row.created_user_row = sample_user
-    endpoint_row.routings = []
-
-    return endpoint_row

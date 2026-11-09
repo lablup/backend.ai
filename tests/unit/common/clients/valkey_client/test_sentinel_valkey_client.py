@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator, AsyncIterator, Callable
 from contextlib import asynccontextmanager
+from typing import override
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from glide import ClosingError, GlideClient
+from glide import ClosingError, GlideClient, RequestError
+from glide import ConnectionError as GlideConnectionError
+from glide import TimeoutError as GlideTimeoutError
 
 from ai.backend.common.clients.valkey_client.client import (
     MonitoringValkeyClient,
@@ -17,15 +20,72 @@ from ai.backend.common.clients.valkey_client.client import (
     ValkeyStandaloneTarget,
     create_valkey_client,
 )
+from ai.backend.common.clients.valkey_client.sentinel_monitor.base import AbstractSentinelMonitor
 from ai.backend.common.exception import (
     ClientNotConnectedError,
     ValkeyRoleMismatchError,
     ValkeySentinelMasterNotFound,
+    ValkeySentinelMonitorNotFound,
 )
-from ai.backend.common.types import ValkeyTarget
+from ai.backend.common.types import HostPortPair, ValkeyTarget
 
-INITIAL_MASTER = ("127.0.0.1", 6379)
-NEW_MASTER = ("10.0.0.2", 6379)
+INITIAL_MASTER = HostPortPair("127.0.0.1", 6379)
+NEW_MASTER = HostPortPair("10.0.0.2", 6379)
+
+
+class _FakeSentinelMonitor(AbstractSentinelMonitor):
+    """Reports `master` and lets a test switch it."""
+
+    master: HostPortPair
+    check_master_calls: list[HostPortPair]
+    _changed: asyncio.Event
+    _closed: bool
+
+    def __init__(self, master: HostPortPair) -> None:
+        self.master = master
+        self.check_master_calls = []
+        self._changed = asyncio.Event()
+        self._closed = False
+
+    @override
+    async def start(self) -> None:
+        pass
+
+    @override
+    async def close(self) -> None:
+        self._closed = True
+        self._changed.set()
+
+    @override
+    async def get_master(self) -> HostPortPair:
+        return self.master
+
+    @override
+    async def watch_master(self) -> AsyncGenerator[HostPortPair]:
+        last: HostPortPair | None = None
+        while not self._closed:
+            changed = self._changed
+            if self.master != last:
+                last = self.master
+                yield last
+            await changed.wait()
+
+    @override
+    async def check_master(self, address: HostPortPair) -> HostPortPair:
+        self.check_master_calls.append(address)
+        return self.master
+
+    def switch(self, master: HostPortPair) -> None:
+        self.master = master
+        changed = self._changed
+        self._changed = asyncio.Event()
+        changed.set()
+
+
+async def _wait_until(condition: Callable[[], bool], timeout: float = 1.0) -> None:
+    async with asyncio.timeout(timeout):
+        while not condition():
+            await asyncio.sleep(0.01)
 
 
 # ---- shared fixtures ----
@@ -54,24 +114,21 @@ def mock_glide_client() -> AsyncMock:
 
 
 @pytest.fixture
-def mock_sentinel() -> MagicMock:
-    sentinel = MagicMock()
-    sentinel.discover_master = AsyncMock(return_value=INITIAL_MASTER)
-    return sentinel
+def sentinel_monitor() -> _FakeSentinelMonitor:
+    return _FakeSentinelMonitor(INITIAL_MASTER)
 
 
 @pytest.fixture
 def sentinel_client(
     sentinel_target: ValkeySentinelTarget,
-    mock_sentinel: MagicMock,
+    sentinel_monitor: _FakeSentinelMonitor,
 ) -> ValkeySentinelClient:
-    client = ValkeySentinelClient(
+    return ValkeySentinelClient(
         target=sentinel_target,
         db_id=0,
         human_readable_name="test.sentinel",
+        sentinel_monitor=sentinel_monitor,
     )
-    client._sentinel = mock_sentinel
-    return client
 
 
 @pytest.fixture
@@ -84,17 +141,26 @@ def connected_sentinel_client(
     return sentinel_client
 
 
-def _create_mock_sentinel_client() -> AsyncMock:
+def _create_mock_sentinel_client(sentinel_monitor: _FakeSentinelMonitor) -> AsyncMock:
+    """A Sentinel client connecting to the master `sentinel_monitor` reports."""
     mock_glide = AsyncMock()
     mock_glide.ping = AsyncMock(return_value=b"PONG")
     mock_glide.custom_command = AsyncMock(return_value=[b"master", 0, []])
 
     client = AsyncMock(spec=ValkeySentinelClient)
-    client.need_reconnect = AsyncMock(return_value=False)
+    address: list[HostPortPair | None] = [sentinel_monitor.master]
+
+    async def connect() -> None:
+        address[0] = sentinel_monitor.master
+
+    async def disconnect() -> None:
+        address[0] = None
+
     client.ping = AsyncMock()
     client.check_health = AsyncMock()
-    client.connect = AsyncMock()
-    client.disconnect = AsyncMock()
+    client.connect = AsyncMock(side_effect=connect)
+    client.disconnect = AsyncMock(side_effect=disconnect)
+    client.connected_address = MagicMock(side_effect=lambda: address[0])
 
     @asynccontextmanager
     async def mock_client_cm() -> AsyncIterator[AsyncMock]:
@@ -105,104 +171,52 @@ def _create_mock_sentinel_client() -> AsyncMock:
     return client
 
 
-# ---- ValkeySentinelClient.need_reconnect() ----
-
-
-class TestValkeySentinelClientNeedReconnect:
-    """Tests for ValkeySentinelClient.need_reconnect() detecting master address changes."""
-
-    async def test_returns_true_when_client_is_none(
-        self, sentinel_client: ValkeySentinelClient
-    ) -> None:
-        assert await sentinel_client.need_reconnect() is True
-
-    async def test_returns_true_when_master_address_is_none(
-        self,
-        sentinel_client: ValkeySentinelClient,
-        mock_glide_client: AsyncMock,
-    ) -> None:
-        sentinel_client._valkey_client = mock_glide_client
-        sentinel_client._master_address = None
-        assert await sentinel_client.need_reconnect() is True
-
-    async def test_returns_true_when_master_address_changed(
-        self,
-        connected_sentinel_client: ValkeySentinelClient,
-        mock_sentinel: MagicMock,
-    ) -> None:
-        mock_sentinel.discover_master.return_value = NEW_MASTER
-        assert await connected_sentinel_client.need_reconnect() is True
-
-    async def test_returns_false_when_master_address_unchanged(
-        self, connected_sentinel_client: ValkeySentinelClient
-    ) -> None:
-        assert await connected_sentinel_client.need_reconnect() is False
-
-    async def test_returns_false_when_discovery_fails(
-        self,
-        connected_sentinel_client: ValkeySentinelClient,
-        mock_sentinel: MagicMock,
-    ) -> None:
-        """When Sentinel discovery fails, keep the current connection (conservative strategy)."""
-        mock_sentinel.discover_master.side_effect = ConnectionError("Sentinel unreachable")
-        assert await connected_sentinel_client.need_reconnect() is False
-
-
-# ---- ValkeySentinelClient._get_master_address() ----
-
-
-class TestValkeySentinelClientGetMasterAddress:
-    """Tests for ValkeySentinelClient._get_master_address() Sentinel discovery."""
-
-    async def test_returns_address_on_success(self, sentinel_client: ValkeySentinelClient) -> None:
-        result = await sentinel_client._get_master_address()
-        assert result == INITIAL_MASTER
-
-    async def test_returns_none_on_discovery_failure(
-        self,
-        sentinel_client: ValkeySentinelClient,
-        mock_sentinel: MagicMock,
-    ) -> None:
-        mock_sentinel.discover_master.side_effect = ConnectionError("All sentinels down")
-        result = await sentinel_client._get_master_address()
-        assert result is None
-
-
 # ---- ValkeySentinelClient.connect() / disconnect() ----
 
 
 class TestValkeySentinelClientConnect:
     """Tests for ValkeySentinelClient.connect() lifecycle."""
 
-    async def test_raises_master_not_found_when_discovery_fails(
-        self,
-        sentinel_client: ValkeySentinelClient,
-        mock_sentinel: MagicMock,
-    ) -> None:
-        mock_sentinel.discover_master.side_effect = ConnectionError("Sentinel unreachable")
-        with pytest.raises(ValkeySentinelMasterNotFound):
-            await sentinel_client.connect()
-
-    async def test_creates_client_on_successful_discovery(
+    async def test_connects_to_master_from_sentinel_monitor(
         self,
         sentinel_client: ValkeySentinelClient,
         mock_glide_client: AsyncMock,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        monkeypatch.setattr(GlideClient, "create", AsyncMock(return_value=mock_glide_client))
+        mock_create = AsyncMock(return_value=mock_glide_client)
+        monkeypatch.setattr(GlideClient, "create", mock_create)
         await sentinel_client.connect()
 
         assert sentinel_client._valkey_client is mock_glide_client
-        assert sentinel_client._master_address == INITIAL_MASTER
+        assert sentinel_client.connected_address() == INITIAL_MASTER
+        address = mock_create.call_args.args[0].addresses[0]
+        assert (address.host, address.port) == (str(INITIAL_MASTER.host), INITIAL_MASTER.port)
+
+    async def test_raises_master_not_found_from_sentinel_monitor(
+        self,
+        sentinel_client: ValkeySentinelClient,
+        sentinel_monitor: _FakeSentinelMonitor,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(
+            sentinel_monitor,
+            "get_master",
+            AsyncMock(side_effect=ValkeySentinelMasterNotFound("no master")),
+        )
+        with pytest.raises(ValkeySentinelMasterNotFound):
+            await sentinel_client.connect()
+        assert sentinel_client.connected_address() is None
 
     async def test_skips_if_already_connected(
         self,
         connected_sentinel_client: ValkeySentinelClient,
-        mock_sentinel: MagicMock,
+        sentinel_monitor: _FakeSentinelMonitor,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        mock_sentinel.discover_master.reset_mock()
+        get_master = AsyncMock(return_value=NEW_MASTER)
+        monkeypatch.setattr(sentinel_monitor, "get_master", get_master)
         await connected_sentinel_client.connect()
-        mock_sentinel.discover_master.assert_not_called()
+        get_master.assert_not_called()
 
     async def test_disconnect_closes_client(
         self,
@@ -213,6 +227,7 @@ class TestValkeySentinelClientConnect:
 
         mock_glide_client.close.assert_called_once()
         assert connected_sentinel_client._valkey_client is None
+        assert connected_sentinel_client.connected_address() is None
 
 
 # ---- ValkeySentinelClient.ping() ----
@@ -241,34 +256,36 @@ class TestMonitoringValkeyClientWithSentinel:
     """Tests for MonitoringValkeyClient wrapping ValkeySentinelClient (mock-based)."""
 
     @pytest.fixture
-    def mock_sentinel_operation_client(self) -> AsyncMock:
-        return _create_mock_sentinel_client()
+    def mock_sentinel_operation_client(self, sentinel_monitor: _FakeSentinelMonitor) -> AsyncMock:
+        return _create_mock_sentinel_client(sentinel_monitor)
 
     @pytest.fixture
-    def mock_sentinel_monitor_client(self) -> AsyncMock:
-        return _create_mock_sentinel_client()
+    def mock_sentinel_monitor_client(self, sentinel_monitor: _FakeSentinelMonitor) -> AsyncMock:
+        return _create_mock_sentinel_client(sentinel_monitor)
 
     @pytest.fixture
     def monitoring_client(
         self,
         mock_sentinel_operation_client: AsyncMock,
         mock_sentinel_monitor_client: AsyncMock,
+        sentinel_monitor: _FakeSentinelMonitor,
     ) -> MonitoringValkeyClient:
         spec = MonitoringValkeyClientSpec(monitor_interval=0.01)
         return MonitoringValkeyClient(
             operation_client=mock_sentinel_operation_client,
             monitor_client=mock_sentinel_monitor_client,
             spec=spec,
+            sentinel_monitor=sentinel_monitor,
         )
 
-    # -- _check_connection / _check_health --
+    # -- _check_connection --
 
     async def test_check_connection_no_reconnect_when_healthy(
         self, monitoring_client: MonitoringValkeyClient
     ) -> None:
         assert await monitoring_client._check_connection() is False
 
-    async def test_check_health_triggers_reconnect_on_role_mismatch(
+    async def test_check_connection_triggers_reconnect_on_role_mismatch(
         self,
         monitoring_client: MonitoringValkeyClient,
         mock_sentinel_monitor_client: AsyncMock,
@@ -277,7 +294,7 @@ class TestMonitoringValkeyClientWithSentinel:
         mock_sentinel_monitor_client.check_health.side_effect = ValkeyRoleMismatchError(
             "Connected node role is 'slave', expected 'master'"
         )
-        assert await monitoring_client._check_health() is True
+        assert await monitoring_client._check_connection() is True
         assert monitoring_client._monitor_consecutive_failure_count == 0
 
     @pytest.mark.parametrize(
@@ -289,7 +306,7 @@ class TestMonitoringValkeyClientWithSentinel:
         ],
         ids=["ClosingError", "ClientNotConnectedError", "ValkeyRoleMismatchError"],
     )
-    async def test_check_health_returns_true_on_reconnectable_exception(
+    async def test_check_connection_returns_true_on_reconnectable_exception(
         self,
         monitoring_client: MonitoringValkeyClient,
         mock_sentinel_monitor_client: AsyncMock,
@@ -298,10 +315,10 @@ class TestMonitoringValkeyClientWithSentinel:
         """Reconnectable exceptions trigger immediate reconnection."""
         mock_sentinel_monitor_client.check_health.side_effect = exception
 
-        assert await monitoring_client._check_health() is True
+        assert await monitoring_client._check_connection() is True
         assert monitoring_client._monitor_consecutive_failure_count == 0
 
-    async def test_check_health_accumulates_failures_until_threshold(
+    async def test_check_connection_accumulates_failures_until_threshold(
         self,
         monitoring_client: MonitoringValkeyClient,
         mock_sentinel_monitor_client: AsyncMock,
@@ -309,17 +326,17 @@ class TestMonitoringValkeyClientWithSentinel:
         """General exceptions accumulate; reconnect triggers at threshold (3)."""
         mock_sentinel_monitor_client.check_health.side_effect = TimeoutError("Timed out")
 
-        assert await monitoring_client._check_health() is False
+        assert await monitoring_client._check_connection() is False
         assert monitoring_client._monitor_consecutive_failure_count == 1
 
-        assert await monitoring_client._check_health() is False
+        assert await monitoring_client._check_connection() is False
         assert monitoring_client._monitor_consecutive_failure_count == 2
 
         # Third failure: threshold reached → reconnect
-        assert await monitoring_client._check_health() is True
+        assert await monitoring_client._check_connection() is True
         assert monitoring_client._monitor_consecutive_failure_count == 0
 
-    async def test_check_health_resets_failure_count_on_success(
+    async def test_check_connection_resets_failure_count_on_success(
         self,
         monitoring_client: MonitoringValkeyClient,
         mock_sentinel_monitor_client: AsyncMock,
@@ -327,15 +344,15 @@ class TestMonitoringValkeyClientWithSentinel:
         """Successful health check resets the consecutive failure counter."""
         mock_sentinel_monitor_client.check_health.side_effect = TimeoutError("Timed out")
 
-        await monitoring_client._check_health()
-        await monitoring_client._check_health()
+        await monitoring_client._check_connection()
+        await monitoring_client._check_connection()
         assert monitoring_client._monitor_consecutive_failure_count == 2
 
         # Recovery: health check succeeds
         mock_sentinel_monitor_client.check_health.side_effect = None
         mock_sentinel_monitor_client.check_health.return_value = None
 
-        assert await monitoring_client._check_health() is False
+        assert await monitoring_client._check_connection() is False
         assert monitoring_client._monitor_consecutive_failure_count == 0
 
     # -- _reconnect --
@@ -366,19 +383,6 @@ class TestMonitoringValkeyClientWithSentinel:
 
         mock_sentinel_operation_client.connect.assert_called_once()
         mock_sentinel_monitor_client.connect.assert_called_once()
-
-    # -- need_reconnect delegation --
-
-    async def test_need_reconnect_delegates_to_monitor_client(
-        self,
-        monitoring_client: MonitoringValkeyClient,
-        mock_sentinel_monitor_client: AsyncMock,
-    ) -> None:
-        mock_sentinel_monitor_client.need_reconnect.return_value = True
-        assert await monitoring_client.need_reconnect() is True
-
-        mock_sentinel_monitor_client.need_reconnect.return_value = False
-        assert await monitoring_client.need_reconnect() is False
 
     # -- monitor loop --
 
@@ -452,6 +456,185 @@ class TestMonitoringValkeyClientWithSentinel:
         assert reconnect_call_count == 2
 
 
+# ---- MonitoringValkeyClient following master changes ----
+
+
+class TestMonitoringValkeyClientMasterChange:
+    """Reconnection to the master the Sentinel monitor reports."""
+
+    @pytest.fixture
+    def mock_sentinel_operation_client(self, sentinel_monitor: _FakeSentinelMonitor) -> AsyncMock:
+        return _create_mock_sentinel_client(sentinel_monitor)
+
+    @pytest.fixture
+    def mock_sentinel_monitor_client(self, sentinel_monitor: _FakeSentinelMonitor) -> AsyncMock:
+        return _create_mock_sentinel_client(sentinel_monitor)
+
+    @pytest.fixture
+    async def monitoring_client(
+        self,
+        mock_sentinel_operation_client: AsyncMock,
+        mock_sentinel_monitor_client: AsyncMock,
+        sentinel_monitor: _FakeSentinelMonitor,
+    ) -> AsyncIterator[MonitoringValkeyClient]:
+        # A long interval keeps the periodic health check out of the way.
+        spec = MonitoringValkeyClientSpec(monitor_interval=60.0)
+        client = MonitoringValkeyClient(
+            operation_client=mock_sentinel_operation_client,
+            monitor_client=mock_sentinel_monitor_client,
+            spec=spec,
+            sentinel_monitor=sentinel_monitor,
+        )
+        yield client
+        await client.disconnect()
+
+    async def test_reconnects_when_watched_master_changes(
+        self,
+        monitoring_client: MonitoringValkeyClient,
+        sentinel_monitor: _FakeSentinelMonitor,
+        mock_sentinel_monitor_client: AsyncMock,
+    ) -> None:
+        await monitoring_client.connect()
+        sentinel_monitor.switch(NEW_MASTER)
+
+        await _wait_until(lambda: monitoring_client.connected_address() == NEW_MASTER)
+        assert mock_sentinel_monitor_client.connected_address() == NEW_MASTER
+
+    async def test_does_not_reconnect_when_watched_master_is_connected(
+        self,
+        monitoring_client: MonitoringValkeyClient,
+        mock_sentinel_operation_client: AsyncMock,
+    ) -> None:
+        await monitoring_client.connect()
+        await asyncio.sleep(0.1)
+
+        mock_sentinel_operation_client.connect.assert_called_once()
+        mock_sentinel_operation_client.disconnect.assert_not_called()
+
+    @pytest.mark.parametrize(
+        "error",
+        [
+            ConnectionError("connection refused"),
+            GlideConnectionError("connection lost"),
+            GlideTimeoutError("timed out"),
+            RequestError("READONLY You can't write against a read only replica."),
+        ],
+        ids=["ConnectionError", "GlideConnectionError", "GlideTimeoutError", "READONLY"],
+    )
+    async def test_request_error_reconnects_when_master_moved(
+        self,
+        monitoring_client: MonitoringValkeyClient,
+        sentinel_monitor: _FakeSentinelMonitor,
+        error: Exception,
+    ) -> None:
+        """A switch whose notification never arrived is caught by the first failed request."""
+        await monitoring_client.connect()
+        assert monitoring_client._watch_task is not None
+        monitoring_client._watch_task.cancel()
+        sentinel_monitor.master = NEW_MASTER
+
+        with pytest.raises(type(error)):
+            async with monitoring_client.client() as _conn:
+                raise error
+
+        await _wait_until(lambda: monitoring_client.connected_address() == NEW_MASTER)
+        assert sentinel_monitor.check_master_calls == [INITIAL_MASTER]
+
+    async def test_request_error_keeps_connection_when_master_unchanged(
+        self,
+        monitoring_client: MonitoringValkeyClient,
+        sentinel_monitor: _FakeSentinelMonitor,
+        mock_sentinel_operation_client: AsyncMock,
+    ) -> None:
+        await monitoring_client.connect()
+
+        with pytest.raises(GlideTimeoutError):
+            async with monitoring_client.client() as _conn:
+                raise GlideTimeoutError("timed out")
+
+        await _wait_until(lambda: sentinel_monitor.check_master_calls == [INITIAL_MASTER])
+        mock_sentinel_operation_client.disconnect.assert_not_called()
+
+    async def test_unrelated_request_error_does_not_check_master(
+        self,
+        monitoring_client: MonitoringValkeyClient,
+    ) -> None:
+        with pytest.raises(RequestError):
+            async with monitoring_client.client() as _conn:
+                raise RequestError("WRONGTYPE Operation against a key holding the wrong kind")
+
+        assert not monitoring_client._master_check_requested
+        assert not monitoring_client._wake_event.is_set()
+
+    async def test_request_errors_coalesce_into_one_master_check(
+        self,
+        monitoring_client: MonitoringValkeyClient,
+        sentinel_monitor: _FakeSentinelMonitor,
+    ) -> None:
+        for _ in range(5):
+            with pytest.raises(GlideTimeoutError):
+                async with monitoring_client.client() as _conn:
+                    raise GlideTimeoutError("timed out")
+
+        assert await monitoring_client._needs_reconnect(woken=True) is False
+        assert sentinel_monitor.check_master_calls == [INITIAL_MASTER]
+
+    async def test_request_wakeup_skips_health_check(
+        self,
+        monitoring_client: MonitoringValkeyClient,
+        mock_sentinel_monitor_client: AsyncMock,
+    ) -> None:
+        """A slow health check on an unreachable master must not delay the next master check."""
+        with pytest.raises(GlideTimeoutError):
+            async with monitoring_client.client() as _conn:
+                raise GlideTimeoutError("timed out")
+
+        assert await monitoring_client._needs_reconnect(woken=True) is False
+        mock_sentinel_monitor_client.check_health.assert_not_called()
+
+    async def test_health_check_failure_reconnects_at_once_when_master_moved(
+        self,
+        monitoring_client: MonitoringValkeyClient,
+        sentinel_monitor: _FakeSentinelMonitor,
+        mock_sentinel_monitor_client: AsyncMock,
+    ) -> None:
+        """A timeout on the old master does not wait for the failure threshold."""
+        mock_sentinel_monitor_client.check_health.side_effect = TimeoutError("ROLE timed out")
+        sentinel_monitor.master = NEW_MASTER
+
+        assert await monitoring_client._check_connection() is True
+        assert monitoring_client._monitor_consecutive_failure_count == 0
+
+    async def test_health_check_failure_counts_when_master_check_fails(
+        self,
+        monitoring_client: MonitoringValkeyClient,
+        sentinel_monitor: _FakeSentinelMonitor,
+        mock_sentinel_monitor_client: AsyncMock,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        mock_sentinel_monitor_client.check_health.side_effect = TimeoutError("ROLE timed out")
+        monkeypatch.setattr(
+            sentinel_monitor,
+            "check_master",
+            AsyncMock(side_effect=ValkeySentinelMasterNotFound("no Sentinel answered")),
+        )
+
+        assert await monitoring_client._check_connection() is False
+        assert monitoring_client._monitor_consecutive_failure_count == 1
+
+    async def test_watch_task_ends_when_sentinel_monitor_closes(
+        self,
+        monitoring_client: MonitoringValkeyClient,
+        sentinel_monitor: _FakeSentinelMonitor,
+    ) -> None:
+        await monitoring_client.connect()
+        await sentinel_monitor.close()
+
+        watch_task = monitoring_client._watch_task
+        assert watch_task is not None
+        await asyncio.wait_for(watch_task, timeout=1.0)
+
+
 # ---- MonitoringValkeyClient.client() context manager with Sentinel ----
 
 
@@ -459,18 +642,19 @@ class TestMonitoringValkeyClientContextManagerWithSentinel:
     """Tests for the client() context manager with Sentinel-backed operation client."""
 
     @pytest.fixture
-    def mock_sentinel_operation_client(self) -> AsyncMock:
-        return _create_mock_sentinel_client()
+    def mock_sentinel_operation_client(self, sentinel_monitor: _FakeSentinelMonitor) -> AsyncMock:
+        return _create_mock_sentinel_client(sentinel_monitor)
 
     @pytest.fixture
-    def mock_sentinel_monitor_client(self) -> AsyncMock:
-        return _create_mock_sentinel_client()
+    def mock_sentinel_monitor_client(self, sentinel_monitor: _FakeSentinelMonitor) -> AsyncMock:
+        return _create_mock_sentinel_client(sentinel_monitor)
 
     @pytest.fixture
     def monitoring_client(
         self,
         mock_sentinel_operation_client: AsyncMock,
         mock_sentinel_monitor_client: AsyncMock,
+        sentinel_monitor: _FakeSentinelMonitor,
     ) -> MonitoringValkeyClient:
         spec = MonitoringValkeyClientSpec(
             operation_failure_threshold=3,
@@ -480,6 +664,7 @@ class TestMonitoringValkeyClientContextManagerWithSentinel:
             operation_client=mock_sentinel_operation_client,
             monitor_client=mock_sentinel_monitor_client,
             spec=spec,
+            sentinel_monitor=sentinel_monitor,
         )
 
     async def test_client_yields_glide_client(
@@ -514,10 +699,10 @@ class TestMonitoringValkeyClientContextManagerWithSentinel:
                 raise ValueError("business logic error")
         assert monitoring_client._operation_failure_count == 0
 
-    async def test_client_sets_reconnect_event_at_threshold(
+    async def test_client_requests_reconnect_at_threshold(
         self, monitoring_client: MonitoringValkeyClient
     ) -> None:
-        """When operation failure threshold is reached, reconnect event is set."""
+        """When operation failure threshold is reached, a reconnect is requested."""
         threshold = monitoring_client._operation_failure_threshold
 
         for _ in range(threshold):
@@ -526,9 +711,9 @@ class TestMonitoringValkeyClientContextManagerWithSentinel:
                     raise ConnectionError("failure")
 
         assert monitoring_client._operation_failure_count == 0
-        assert monitoring_client._reconnect_event.is_set()
+        assert monitoring_client._reconnect_requested
 
-    async def test_client_does_not_set_reconnect_event_below_threshold(
+    async def test_client_does_not_request_reconnect_below_threshold(
         self, monitoring_client: MonitoringValkeyClient
     ) -> None:
         threshold = monitoring_client._operation_failure_threshold
@@ -539,14 +724,14 @@ class TestMonitoringValkeyClientContextManagerWithSentinel:
                     raise ConnectionError("failure")
 
         assert monitoring_client._operation_failure_count == threshold - 1
-        assert not monitoring_client._reconnect_event.is_set()
+        assert not monitoring_client._reconnect_requested
 
-    async def test_reconnect_event_wakes_monitor_loop(
+    async def test_reconnect_request_wakes_monitor_loop(
         self,
         monitoring_client: MonitoringValkeyClient,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """When client() sets _reconnect_event, the monitor loop wakes up and reconnects."""
+        """When client() requests a reconnect, the monitor loop wakes up and reconnects."""
         reconnect_called = asyncio.Event()
         original_reconnect = monitoring_client._reconnect
 
@@ -565,7 +750,7 @@ class TestMonitoringValkeyClientContextManagerWithSentinel:
                     async with monitoring_client.client() as _conn:
                         raise ConnectionError("failure")
 
-            # Wait for monitor loop to pick up the reconnect event
+            # Wait for monitor loop to pick up the reconnect request
             await asyncio.wait_for(reconnect_called.wait(), timeout=1.0)
             assert reconnect_called.is_set()
         finally:
@@ -613,13 +798,25 @@ class TestCreateValkeyClientFactory:
         )
 
     def test_creates_sentinel_clients_when_sentinel_config_provided(
-        self, sentinel_valkey_target: ValkeyTarget
+        self, sentinel_valkey_target: ValkeyTarget, sentinel_monitor: _FakeSentinelMonitor
     ) -> None:
-        client = create_valkey_client(sentinel_valkey_target, db_id=0, human_readable_name="test")
+        client = create_valkey_client(
+            sentinel_valkey_target,
+            db_id=0,
+            human_readable_name="test",
+            sentinel_monitor=sentinel_monitor,
+        )
 
         assert isinstance(client, MonitoringValkeyClient)
         assert isinstance(client._operation_client, ValkeySentinelClient)
         assert isinstance(client._monitor_client, ValkeySentinelClient)
+        assert client._sentinel_monitor is sentinel_monitor
+
+    def test_raises_when_sentinel_monitor_is_missing(
+        self, sentinel_valkey_target: ValkeyTarget
+    ) -> None:
+        with pytest.raises(ValkeySentinelMonitorNotFound):
+            create_valkey_client(sentinel_valkey_target, db_id=0, human_readable_name="test")
 
     def test_creates_standalone_clients_when_no_sentinel_config(
         self, standalone_valkey_target: ValkeyTarget
@@ -629,12 +826,18 @@ class TestCreateValkeyClientFactory:
         assert isinstance(client, MonitoringValkeyClient)
         assert isinstance(client._operation_client, ValkeyStandaloneClient)
         assert isinstance(client._monitor_client, ValkeyStandaloneClient)
+        assert client._sentinel_monitor is None
 
     def test_monitor_client_uses_fixed_timeout(
-        self, sentinel_valkey_target_with_custom_timeout: ValkeyTarget
+        self,
+        sentinel_valkey_target_with_custom_timeout: ValkeyTarget,
+        sentinel_monitor: _FakeSentinelMonitor,
     ) -> None:
         client = create_valkey_client(
-            sentinel_valkey_target_with_custom_timeout, db_id=0, human_readable_name="test"
+            sentinel_valkey_target_with_custom_timeout,
+            db_id=0,
+            human_readable_name="test",
+            sentinel_monitor=sentinel_monitor,
         )
 
         assert isinstance(client, MonitoringValkeyClient)

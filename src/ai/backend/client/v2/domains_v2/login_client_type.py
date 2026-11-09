@@ -6,8 +6,11 @@ from typing import Final
 from uuid import UUID
 
 from ai.backend.client.v2.base_domain import BaseDomainClient
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.login_client_type.request import (
     CreateLoginClientTypeInput,
+    PartialBulkPurgeLoginClientTypesInput,
+    PartialBulkUpdateLoginClientTypesInput,
     SearchLoginClientTypesInput,
     UpdateLoginClientTypeInput,
 )
@@ -15,6 +18,7 @@ from ai.backend.common.dto.manager.v2.login_client_type.response import (
     CreateLoginClientTypePayload,
     DeleteLoginClientTypePayload,
     LoginClientTypeNode,
+    PurgeLoginClientTypePayload,
     SearchLoginClientTypesPayload,
     UpdateLoginClientTypePayload,
 )
@@ -25,9 +29,7 @@ _PATH: Final = "/v2/login-client-types"
 class V2LoginClientTypeClient(BaseDomainClient):
     """SDK client for login client type CRUD operations.
 
-    Mirrors the REST v2 surface introduced in BA-5630. Mutating calls
-    require super-admin privileges; the read calls are open to any
-    authenticated user.
+    Mirrors the REST v2 surface introduced in BA-5630.
     """
 
     async def admin_create(
@@ -62,12 +64,55 @@ class V2LoginClientTypeClient(BaseDomainClient):
             response_model=LoginClientTypeNode,
         )
 
+    async def update(
+        self,
+        login_client_type_id: UUID,
+        request: UpdateLoginClientTypeInput,
+    ) -> UpdateLoginClientTypePayload:
+        """Update a login client type."""
+        return await self._client.typed_request(
+            "PATCH",
+            f"{_PATH}/{login_client_type_id}",
+            request=request,
+            response_model=UpdateLoginClientTypePayload,
+        )
+
+    async def purge(self, login_client_type_id: UUID) -> PurgeLoginClientTypePayload:
+        """Permanently remove a login client type."""
+        return await self._client.typed_request(
+            "DELETE",
+            f"{_PATH}/{login_client_type_id}",
+            response_model=PurgeLoginClientTypePayload,
+        )
+
+    async def partial_bulk_update(
+        self, request: PartialBulkUpdateLoginClientTypesInput
+    ) -> PartialBulkPayload[LoginClientTypeNode]:
+        """Update several login client types, answering for each one."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/partial-bulk-update",
+            request=request,
+            response_model=PartialBulkPayload[LoginClientTypeNode],
+        )
+
+    async def partial_bulk_purge(
+        self, request: PartialBulkPurgeLoginClientTypesInput
+    ) -> PartialBulkPayload[LoginClientTypeNode]:
+        """Permanently remove several login client types, answering for each one."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/partial-bulk-purge",
+            request=request,
+            response_model=PartialBulkPayload[LoginClientTypeNode],
+        )
+
     async def admin_update(
         self,
         login_client_type_id: UUID,
         request: UpdateLoginClientTypeInput,
     ) -> UpdateLoginClientTypePayload:
-        """Update a login client type (superadmin only)."""
+        """Deprecated. Use :meth:`update`."""
         return await self._client.typed_request(
             "PATCH",
             f"{_PATH}/{login_client_type_id}",
@@ -79,7 +124,7 @@ class V2LoginClientTypeClient(BaseDomainClient):
         self,
         login_client_type_id: UUID,
     ) -> DeleteLoginClientTypePayload:
-        """Delete a login client type (superadmin only)."""
+        """Deprecated. Use :meth:`purge`."""
         return await self._client.typed_request(
             "DELETE",
             f"{_PATH}/{login_client_type_id}",

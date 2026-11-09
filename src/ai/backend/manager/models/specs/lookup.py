@@ -234,3 +234,27 @@ class FieldKeyLookup[TFieldID: FieldIdentifier, TOwnerID: EntityIdentifier](ABC)
     def to_entity_id(self, value: UUID) -> TOwnerID:
         """Convert the second selected value into the owning entity's identifier."""
         raise NotImplementedError
+
+
+class BulkFieldKeyLookup[TKey, TFieldID: FieldIdentifier, TOwnerID: EntityIdentifier](ABC):
+    """Resolves several caller-facing keys into the field rows they name and their owners.
+
+    The plural :class:`FieldKeyLookup`. It selects the key with the pair, so which row
+    each key named survives the batch. A key matching no row is absent from the answer.
+    """
+
+    @abstractmethod
+    def build_query(self, keys: Sequence[TKey]) -> sa.sql.Select[Any]:
+        """Build the query selecting each key, its field row's id and its owner's, in
+        that order."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def to_field_id(self, value: UUID) -> TFieldID:
+        """Convert the second selected value into the field row's identifier."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def to_entity_id(self, value: UUID) -> TOwnerID:
+        """Convert the third selected value into the owning entity's identifier."""
+        raise NotImplementedError

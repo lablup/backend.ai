@@ -16,7 +16,7 @@ from ai.backend.common.dto.manager.v2.app_config.request import PublicGetAppConf
 from ai.backend.common.dto.manager.v2.app_config.response import GetAppConfigsPayload
 from ai.backend.manager.api.adapters.app_config.adapter import AppConfigAdapter
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.app_config import (
     AConfigLaidAcross,
     AMergeAndACaller,
@@ -24,11 +24,11 @@ from bai_scenario.components.app_config import (
     TheMergedConfigs,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type ReadingStep = Scenario[
-    SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload
+    TestSeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload
 ]
 
 PUBLIC = {"theme": "light", "menu": {"home": True}}
@@ -48,8 +48,14 @@ class ReadingPublic(When[AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayloa
 
     @override
     def describe(self, laid: AMergeAndACaller) -> str:
-        who = laid.caller.username if self.signed_in else "로그인하지 않은 호출자"
-        return f"{who}가 {', '.join(laid.names)}의 공개 설정을 조회"
+        if self.signed_in:
+            who_ko = who_en = laid.caller.username
+        else:
+            who_ko, who_en = "로그인하지 않은 호출자", "a caller who is not signed in"
+        return Says(
+            f"{who_ko}가 {', '.join(laid.names)}의 공개 설정을 조회합니다",
+            english=f"{who_en} reads the public config for {', '.join(laid.names)}",
+        )
 
     @override
     async def call(self, adapter: AppConfigAdapter, laid: AMergeAndACaller) -> GetAppConfigsPayload:
@@ -62,7 +68,7 @@ class ReadingPublic(When[AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayloa
 
 @dataclass(frozen=True)
 class AnonymousReadsThePublicValueOnly(
-    Scenario[SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
+    Scenario[TestSeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
 ):
     @override
     def summary(self) -> str:
@@ -70,13 +76,18 @@ class AnonymousReadsThePublicValueOnly(
 
     @override
     def describe(self) -> str:
-        return (
-            "공개·도메인·사용자 조각이 모두 있는 이름을 로그인 없이 조회하면, 공개 조각의 값만 "
-            "반환된다. 도메인과 사용자 조각은 섞이지 않는다"
+        return Says(
+            "공개, 도메인, 사용자 조각이 모두 있는 이름을 로그인 없이 조회하면, 공개 조각의 "
+            "값만 반환됩니다. 도메인과 사용자 조각은 섞이지 않습니다",
+            english=(
+                "when a name with public, domain, and user fragments is read without signing "
+                "in, only the value of the public fragment comes back. The domain and user "
+                "fragments do not merge in"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AMergeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AMergeAndACaller]:
         return AConfigLaidAcross(public=PUBLIC, domain=DOMAIN, user=MINE, granted=False)
 
     @override
@@ -90,7 +101,7 @@ class AnonymousReadsThePublicValueOnly(
 
 @dataclass(frozen=True)
 class ANameWithNoPublicFragmentAnswersEmpty(
-    Scenario[SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
+    Scenario[TestSeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
 ):
     @override
     def summary(self) -> str:
@@ -98,10 +109,16 @@ class ANameWithNoPublicFragmentAnswersEmpty(
 
     @override
     def describe(self) -> str:
-        return "사용자 조각만 있는 이름을 로그인 없이 조회하면, 빈 설정이 반환된다"
+        return Says(
+            "사용자 조각만 있는 이름을 로그인 없이 조회하면, 빈 설정이 반환됩니다",
+            english=(
+                "when a name that has only a user fragment is read without signing in, "
+                "an empty config comes back"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AMergeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AMergeAndACaller]:
         return AConfigLaidAcross(user=MINE, granted=False)
 
     @override
@@ -115,7 +132,7 @@ class ANameWithNoPublicFragmentAnswersEmpty(
 
 @dataclass(frozen=True)
 class AnUnregisteredNameAnswersEmptyToo(
-    Scenario[SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
+    Scenario[TestSeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
 ):
     @override
     def summary(self) -> str:
@@ -123,13 +140,18 @@ class AnUnregisteredNameAnswersEmptyToo(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "정의조차 없는 이름을 로그인 없이 조회하면, 공개 조각이 없는 이름과 같은 빈 설정이 "
-            "반환된다. 이 조회로는 어떤 이름이 등록돼 있는지 알 수 없다"
+            "반환됩니다. 이 조회로는 어떤 이름이 등록되었는지 알 수 없습니다",
+            english=(
+                "when a name that has no definition at all is read without signing in, the "
+                "same empty config comes back as for a name with no public fragment. This "
+                "read cannot tell which names are registered"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AMergeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AMergeAndACaller]:
         return AConfigLaidAcross(defined=False, granted=False)
 
     @override
@@ -143,7 +165,7 @@ class AnUnregisteredNameAnswersEmptyToo(
 
 @dataclass(frozen=True)
 class ASignedInUserGetsTheSameAnswer(
-    Scenario[SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
+    Scenario[TestSeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
 ):
     @override
     def summary(self) -> str:
@@ -151,13 +173,18 @@ class ASignedInUserGetsTheSameAnswer(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "같은 조각 셋을 아무 권한도 없는 사용자가 로그인한 채 공개 조회로 조회해도, 공개 "
-            "조각의 값만 반환된다. 이 조회는 호출자를 아예 보지 않는다"
+            "조각의 값만 반환됩니다. 이 조회는 호출자를 아예 보지 않습니다",
+            english=(
+                "even when a user granted nothing reads the same three fragments through the "
+                "public read while signed in, only the value of the public fragment comes "
+                "back. This read does not look at the caller at all"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AMergeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AMergeAndACaller]:
         return AConfigLaidAcross(public=PUBLIC, domain=DOMAIN, user=MINE, granted=False)
 
     @override
@@ -171,7 +198,7 @@ class ASignedInUserGetsTheSameAnswer(
 
 @dataclass(frozen=True)
 class SeveralNamesAnswerInRequestOrder(
-    Scenario[SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
+    Scenario[TestSeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
 ):
     publics: tuple[Mapping[str, Any], ...] = ({"n": 1}, {"n": 2}, {"n": 3})
 
@@ -181,10 +208,16 @@ class SeveralNamesAnswerInRequestOrder(
 
     @override
     def describe(self) -> str:
-        return "이름 셋을 한 번에 로그인 없이 조회하면, 각각의 공개 값이 요청한 순서대로 반환된다"
+        return Says(
+            "이름 셋을 한 번에 로그인 없이 조회하면, 각각의 공개 값이 요청한 순서대로 반환됩니다",
+            english=(
+                "when three names are read in one call without signing in, each public value "
+                "comes back in the order requested"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AMergeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AMergeAndACaller]:
         return SeveralConfigsLaid(publics=self.publics, granted=False)
 
     @override

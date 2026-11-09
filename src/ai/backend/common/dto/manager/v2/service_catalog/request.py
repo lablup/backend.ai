@@ -11,7 +11,8 @@ from uuid import UUID
 from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
-from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.tristate.unset import UNSET, Unset
 from ai.backend.common.types import ServiceCatalogStatus
 
@@ -138,6 +139,10 @@ class ServiceCatalogFilter(BaseRequestModel):
     )
     status: ServiceCatalogStatusFilter | None = Field(
         default=None, description="Filter by health status."
+    )
+    entity_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by service ID.",
     )
     AND: list[ServiceCatalogFilter] | None = Field(
         default=None, description="Logical AND of multiple filter conditions."

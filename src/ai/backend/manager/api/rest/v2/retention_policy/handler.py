@@ -9,6 +9,8 @@ from ai.backend.common.api_handlers import APIResponse, BaseRequestModel, BodyPa
 from ai.backend.common.data.entity.retention_policy import RetentionPolicyID
 from ai.backend.common.dto.manager.v2.retention_policy.request import (
     CreateRetentionPolicyInput,
+    PartialBulkPurgeRetentionPoliciesInput,
+    PartialBulkUpdateRetentionPoliciesInput,
     SearchRetentionPoliciesInput,
     UpdateRetentionPolicyInput,
 )
@@ -44,25 +46,44 @@ class V2RetentionPolicyHandler:
         result = await self._adapter.get(RetentionPolicyID(path.parsed.policy_id))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
-    async def admin_update(
+    async def update(
         self,
         path: PathParam[RetentionPolicyIdPathParam],
         body: BodyParam[UpdateRetentionPolicyInput],
     ) -> APIResponse:
+        """Update a retention policy."""
         merged = body.parsed.model_copy(update={"id": RetentionPolicyID(path.parsed.policy_id)})
         result = await self._adapter.update(merged)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
-    async def admin_delete(
+    async def purge(
         self,
         path: PathParam[RetentionPolicyIdPathParam],
     ) -> APIResponse:
-        result = await self._adapter.delete(RetentionPolicyID(path.parsed.policy_id))
+        """Purge (permanently remove) a retention policy."""
+        result = await self._adapter.purge(RetentionPolicyID(path.parsed.policy_id))
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_update(
+        self,
+        body: BodyParam[PartialBulkUpdateRetentionPoliciesInput],
+    ) -> APIResponse:
+        """Update several retention policies, answering for each one."""
+        result = await self._adapter.partial_bulk_update(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_purge(
+        self,
+        body: BodyParam[PartialBulkPurgeRetentionPoliciesInput],
+    ) -> APIResponse:
+        """Purge several retention policies, answering for each one."""
+        result = await self._adapter.partial_bulk_purge(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def admin_purge(
         self,
         path: PathParam[RetentionPolicyIdPathParam],
     ) -> APIResponse:
+        """Deprecated. Use `DELETE /v2/retention-policies/{policy_id}`."""
         result = await self._adapter.purge(RetentionPolicyID(path.parsed.policy_id))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)

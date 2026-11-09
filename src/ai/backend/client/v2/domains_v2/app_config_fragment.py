@@ -11,17 +11,20 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     BulkPurgeAppConfigFragmentInput,
     MyAppConfigFragmentsByNamesInput,
     MyUpsertAppConfigFragmentsInput,
+    PartialBulkPurgeAppConfigFragmentsInput,
     ScopedAppConfigFragmentsByNamesInput,
     ScopedUpsertAppConfigFragmentsInput,
 )
 from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
     AppConfigFragmentNode,
     AppConfigFragmentsByNamesPayload,
+    AtomicBulkUpsertAppConfigFragmentsPayload,
     BulkPurgeAppConfigFragmentPayload,
     PurgeAppConfigFragmentPayload,
     SearchAppConfigFragmentPayload,
     UpsertAppConfigFragmentsPayload,
 )
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 
 _PATH: Final = "/v2/app-config-fragments"
 
@@ -53,11 +56,23 @@ class V2AppConfigFragmentClient(BaseDomainClient):
             response_model=AppConfigFragmentsByNamesPayload,
         )
 
+    async def scoped_atomic_bulk_upsert_app_config_fragments(
+        self,
+        request: ScopedUpsertAppConfigFragmentsInput,
+    ) -> AtomicBulkUpsertAppConfigFragmentsPayload:
+        """Upsert many fragments at one scope, all or none."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/scoped/atomic-bulk-upsert",
+            request=request,
+            response_model=AtomicBulkUpsertAppConfigFragmentsPayload,
+        )
+
     async def scoped_bulk_upsert_app_config_fragments(
         self,
         request: ScopedUpsertAppConfigFragmentsInput,
     ) -> UpsertAppConfigFragmentsPayload:
-        """Upsert many fragments at one scope, all-or-nothing."""
+        """Deprecated. Use :meth:`scoped_atomic_bulk_upsert_app_config_fragments`."""
         return await self._client.typed_request(
             "POST",
             f"{_PATH}/scoped/bulk-upsert",
@@ -79,11 +94,23 @@ class V2AppConfigFragmentClient(BaseDomainClient):
             response_model=AppConfigFragmentsByNamesPayload,
         )
 
+    async def my_atomic_bulk_upsert_app_config_fragments(
+        self,
+        request: MyUpsertAppConfigFragmentsInput,
+    ) -> AtomicBulkUpsertAppConfigFragmentsPayload:
+        """Upsert many fragments at the caller's own user scope, all or none."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/my/atomic-bulk-upsert",
+            request=request,
+            response_model=AtomicBulkUpsertAppConfigFragmentsPayload,
+        )
+
     async def my_bulk_upsert_app_config_fragments(
         self,
         request: MyUpsertAppConfigFragmentsInput,
     ) -> UpsertAppConfigFragmentsPayload:
-        """Upsert many fragments at the caller's own user scope, all-or-nothing."""
+        """Deprecated. Use :meth:`my_atomic_bulk_upsert_app_config_fragments`."""
         return await self._client.typed_request(
             "POST",
             f"{_PATH}/my/bulk-upsert",
@@ -111,11 +138,22 @@ class V2AppConfigFragmentClient(BaseDomainClient):
             response_model=PurgeAppConfigFragmentPayload,
         )
 
+    async def partial_bulk_purge(
+        self, request: PartialBulkPurgeAppConfigFragmentsInput
+    ) -> PartialBulkPayload[AppConfigFragmentNode]:
+        """Purge several fragments, answering for each one."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/partial-bulk-purge",
+            request=request,
+            response_model=PartialBulkPayload[AppConfigFragmentNode],
+        )
+
     async def bulk_purge(
         self,
         request: BulkPurgeAppConfigFragmentInput,
     ) -> BulkPurgeAppConfigFragmentPayload:
-        """Purge many fragments by id, reporting per-item success and failure."""
+        """Deprecated. Use :meth:`partial_bulk_purge`."""
         return await self._client.typed_request(
             "POST",
             f"{_PATH}/bulk-delete",

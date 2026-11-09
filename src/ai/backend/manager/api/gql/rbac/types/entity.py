@@ -24,7 +24,6 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
 from ai.backend.common.dto.manager.v2.rbac.request import (
     EntityOrderBy as EntityOrderByDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -48,7 +47,7 @@ from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQ
     BackendAIGQLMeta(
         added_version="26.3.0",
         description="Entity ordering field",
-        deprecated_version=NEXT_RELEASE_VERSION,
+        deprecated_version="26.9.0",
         deprecation_hint="`Role.scope`",
     )
 )
@@ -64,7 +63,7 @@ class EntityOrderField(StrEnum):
     BackendAIGQLMeta(
         added_version="26.3.0",
         description="A role and the scope it belongs to.",
-        deprecated_version=NEXT_RELEASE_VERSION,
+        deprecated_version="26.9.0",
         deprecation_hint="`Role.scope`",
     ),
     name="EntityRef",
@@ -135,7 +134,7 @@ class EntityRefGQL(PydanticNodeMixin[Any]):
     BackendAIGQLMeta(
         description="Filter for entity associations",
         added_version="26.3.0",
-        deprecated_version=NEXT_RELEASE_VERSION,
+        deprecated_version="26.9.0",
         deprecation_hint="`Role.scope`",
     ),
     name="EntityFilter",
@@ -169,7 +168,7 @@ class EntityFilterGQL(PydanticInputMixin[EntityFilterDTO], GQLFilter):
     BackendAIGQLMeta(
         description="Order by specification for entity associations",
         added_version="26.3.0",
-        deprecated_version=NEXT_RELEASE_VERSION,
+        deprecated_version="26.9.0",
         deprecation_hint="`Role.scope`",
     ),
     name="EntityOrderBy",
@@ -188,7 +187,7 @@ EntityEdge = Edge[EntityRefGQL]
     BackendAIGQLMeta(
         added_version="26.3.0",
         description="Entity connection.",
-        deprecated_version=NEXT_RELEASE_VERSION,
+        deprecated_version="26.9.0",
         deprecation_hint="`Role.scope`",
     )
 )

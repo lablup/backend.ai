@@ -27,6 +27,7 @@ from ai.backend.testutils.scenario_steps import (
     Refused,
     Same,
     SameAs,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -37,12 +38,12 @@ from bai_scenario.components.app_config_fragment import (
     SomeFragmentsAndSomeone,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Loaded = list[AppConfigFragmentNode | Exception | None]
 type LoadingStep = Scenario[
-    SeedingSession, SomeFragmentsAndACaller, AppConfigFragmentAdapter, Loaded
+    TestSeedingSession, SomeFragmentsAndACaller, AppConfigFragmentAdapter, Loaded
 ]
 
 
@@ -59,8 +60,18 @@ class LoadingByIds(When[SomeFragmentsAndACaller, AppConfigFragmentAdapter, Loade
     @override
     def describe(self, laid: SomeFragmentsAndACaller) -> str:
         if self.nothing:
-            return f"{laid.caller.username}이 빈 id 목록으로 조회"
-        return f"{laid.caller.username}이 자기 조각, 다른 사용자의 조각, 존재하지 않는 id를 한 번에 조회"
+            return Says(
+                f"{laid.caller.username} 이 빈 id 목록으로 조회합니다",
+                english=f"{laid.caller.username} reads with an empty id list",
+            )
+        return Says(
+            f"{laid.caller.username} 이 자기 조각, 다른 사용자의 조각, 존재하지 않는 id 를 "
+            "한 번에 조회합니다",
+            english=(
+                f"{laid.caller.username} reads their own fragment, another user's fragment "
+                "and a missing id at once"
+            ),
+        )
 
     @override
     async def call(
@@ -79,7 +90,13 @@ class OneNodeAndTwoRefused(Then[SomeFragmentsAndACaller, Loaded]):
 
     @override
     def says(self) -> str:
-        return "자기 것은 노드, 남의 것과 없는 id는 그 항목만 거부된다"
+        return Says(
+            "자기 것은 노드, 남의 것과 없는 id 는 그 항목만 거부됩니다",
+            english=(
+                "the user's own comes back as a node, and another user's and the missing id "
+                "are rejected for that item alone"
+            ),
+        )
 
     @override
     def look(self, laid: SomeFragmentsAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
@@ -95,7 +112,13 @@ class OneNodeAndTwoRefused(Then[SomeFragmentsAndACaller, Loaded]):
             Held[object](
                 "items[0].id",
                 getattr(items[0], "id", items[0]),
-                SameAs[object](laid.mine[0].id, "미리 만들어 둔 자기 조각"),
+                SameAs[object](
+                    laid.mine[0].id,
+                    Says(
+                        "미리 저장한 자기 조각",
+                        english="the user's own fragment made in advance",
+                    ),
+                ),
             ),
             Refused(NotEnoughPermission, second if isinstance(second, BaseException) else None),
             Refused(NotEnoughPermission, third if isinstance(third, BaseException) else None),
@@ -108,7 +131,12 @@ class TwoNodesOneMissing(Then[SomeFragmentsAndACaller, Loaded]):
 
     @override
     def says(self) -> str:
-        return "있는 둘은 노드로 반환되고, 없는 id에 해당하는 항목은 비어 있다"
+        return Says(
+            "있는 둘은 노드로 반환되고, 없는 id 에 해당하는 항목은 비어 있습니다",
+            english=(
+                "the two existing items come back as nodes and the item for the missing id is empty"
+            ),
+        )
 
     @override
     def look(self, laid: SomeFragmentsAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
@@ -123,12 +151,24 @@ class TwoNodesOneMissing(Then[SomeFragmentsAndACaller, Loaded]):
             Held[object](
                 "items[0].id",
                 getattr(items[0], "id", items[0]),
-                SameAs[object](laid.mine[0].id, "미리 만들어 둔 자기 조각"),
+                SameAs[object](
+                    laid.mine[0].id,
+                    Says(
+                        "미리 저장한 자기 조각",
+                        english="the user's own fragment made in advance",
+                    ),
+                ),
             ),
             Held[object](
                 "items[1].id",
                 getattr(items[1], "id", items[1]),
-                SameAs[object](laid.theirs.id, "미리 만들어 둔 남의 조각"),
+                SameAs[object](
+                    laid.theirs.id,
+                    Says(
+                        "미리 저장한 남의 조각",
+                        english="another user's fragment made in advance",
+                    ),
+                ),
             ),
             Same("items[2]", items[2], None),
         ]
@@ -140,7 +180,7 @@ class NothingIsAnswered(Then[SomeFragmentsAndACaller, Loaded]):
 
     @override
     def says(self) -> str:
-        return "빈 응답이 반환된다"
+        return Says("빈 응답이 반환됩니다", english="an empty answer comes back")
 
     @override
     def look(self, laid: SomeFragmentsAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
@@ -152,7 +192,7 @@ class NothingIsAnswered(Then[SomeFragmentsAndACaller, Loaded]):
 
 @dataclass(frozen=True)
 class MixedIdsAreAnsweredEach(
-    Scenario[SeedingSession, SomeFragmentsAndACaller, AppConfigFragmentAdapter, Loaded]
+    Scenario[TestSeedingSession, SomeFragmentsAndACaller, AppConfigFragmentAdapter, Loaded]
 ):
     @override
     def summary(self) -> str:
@@ -160,14 +200,20 @@ class MixedIdsAreAnsweredEach(
 
     @override
     def describe(self) -> str:
-        return (
-            "자기 스코프에만 읽기 권한을 받은 사용자가 자기 조각, 다른 사용자의 조각, 없는 id를 "
-            "한 번에 조회하면, 목록 순서대로 자기 것은 노드, 남의 것과 없는 id는 그 항목만 권한 "
-            "부족으로 거부된다"
+        return Says(
+            "자기 스코프에만 읽기 권한을 받은 사용자가 자기 조각, 다른 사용자의 조각, 없는 id 를 "
+            "한 번에 조회하면, 목록 순서대로 자기 것은 노드, 남의 것과 없는 id 는 그 항목만 권한 "
+            "부족으로 거부됩니다",
+            english=(
+                "when a user granted read permission only on their own scope reads their own "
+                "fragment, another user's fragment and a missing id at once, in list order the "
+                "own one comes back as a node and the others are rejected for that item alone "
+                "for lack of permission"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, SomeFragmentsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, SomeFragmentsAndACaller]:
         return SomeFragmentsAndSomeone(granted=(Permission.READ,))
 
     @override
@@ -181,7 +227,7 @@ class MixedIdsAreAnsweredEach(
 
 @dataclass(frozen=True)
 class TheSuperadminSeesBoth(
-    Scenario[SeedingSession, SomeFragmentsAndACaller, AppConfigFragmentAdapter, Loaded]
+    Scenario[TestSeedingSession, SomeFragmentsAndACaller, AppConfigFragmentAdapter, Loaded]
 ):
     @override
     def summary(self) -> str:
@@ -189,13 +235,18 @@ class TheSuperadminSeesBoth(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 조각 둘과 없는 id 하나를 한 번에 조회하면, 둘은 노드로 반환되고 없는 id에 "
-            "해당하는 항목은 비어 있다. 권한 검사를 통과하는 사용자만 빈 항목을 본다"
+        return Says(
+            "superadmin 이 조각 둘과 없는 id 하나를 한 번에 조회하면, 둘은 노드로 반환되고 "
+            "없는 id 에 해당하는 항목은 비어 있습니다. 권한 검사를 통과하는 사용자만 빈 항목을 봅니다",
+            english=(
+                "when the superadmin reads two fragments and one missing id at once, the two "
+                "come back as nodes and the item for the missing id is empty. Only a user who "
+                "passes the permission check sees an empty item"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, SomeFragmentsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, SomeFragmentsAndACaller]:
         return SomeFragmentsAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -209,7 +260,7 @@ class TheSuperadminSeesBoth(
 
 @dataclass(frozen=True)
 class AnEmptyListAnswersEmpty(
-    Scenario[SeedingSession, SomeFragmentsAndACaller, AppConfigFragmentAdapter, Loaded]
+    Scenario[TestSeedingSession, SomeFragmentsAndACaller, AppConfigFragmentAdapter, Loaded]
 ):
     @override
     def summary(self) -> str:
@@ -217,10 +268,13 @@ class AnEmptyListAnswersEmpty(
 
     @override
     def describe(self) -> str:
-        return "빈 id 목록을 주면 빈 응답이 반환된다. 하위 계층을 호출하지 않는다"
+        return Says(
+            "빈 id 목록을 주면 빈 응답이 반환됩니다. 하위 계층을 호출하지 않습니다",
+            english="an empty id list answers empty without calling anything below",
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, SomeFragmentsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, SomeFragmentsAndACaller]:
         return SomeFragmentsAndSomeone()
 
     @override

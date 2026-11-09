@@ -53,7 +53,11 @@ from ai.backend.manager.actions.v2.bulk.validator.base import (
     PartialBulkActionValidator,
 )
 from ai.backend.manager.actions.v2.field.bulk_base import BaseBulkFieldAction
-from ai.backend.manager.actions.v2.field.bulk_lookup import LookupBulkFieldOwnerOpsAction
+from ai.backend.manager.actions.v2.field.bulk_lookup import (
+    BulkFieldKeyLookupOpsResult,
+    LookupBulkFieldByKeyOpsAction,
+    LookupBulkFieldOwnerOpsAction,
+)
 from ai.backend.manager.actions.v2.field.bulk_processor import (
     AtomicFieldResultJudge,
     BulkFieldActionProcessor,
@@ -79,6 +83,9 @@ from ai.backend.manager.actions.v2.lookup.base import BaseLookupAction, BaseLook
 from ai.backend.manager.actions.v2.lookup.bulk_monitor.base import BulkLookupActionMonitor
 from ai.backend.manager.actions.v2.lookup.bulk_processor import BulkLookupActionProcessor
 from ai.backend.manager.actions.v2.lookup.monitor.base import LookupActionMonitor
+from ai.backend.manager.actions.v2.lookup.partial_bulk_processor import (
+    PartialBulkLookupActionProcessor,
+)
 from ai.backend.manager.actions.v2.lookup.processor import (
     LookupActionProcessor,
 )
@@ -153,6 +160,7 @@ from ai.backend.manager.errors.common import ServerMisconfiguredError
 from ai.backend.manager.services.ops.service import (
     BatchPurgeService,
     BatchUpdateService,
+    BulkFieldKeyLookupService,
     BulkFieldOwnerLookupService,
     BulkLookupService,
     DeleteService,
@@ -523,14 +531,14 @@ class ProcessorGroup[TData: EntityData]:
         action_cls: type[TAction],
         *,
         monitors: Sequence[BulkLookupActionMonitor] = (),
-    ) -> BulkLookupActionProcessor[TAction, BulkLookupOpsResult[Any, Any]]:
-        """Several keys resolved at once, each answered for; the entities they named
-        are then checked together, as a bulk read of them would be."""
+    ) -> PartialBulkLookupActionProcessor[TAction]:
+        """Several keys resolved at once, each answered for; the entity each key named
+        is checked on its own, so a denied key fails alone."""
         self._record(action_cls, ActionKind.LOOKUP, ActionGate.PERMISSION, ActionBacking.GENERIC)
-        return BulkLookupActionProcessor(
+        return PartialBulkLookupActionProcessor(
             BulkLookupService(self._deps.repository).execute,
+            partial_validators=self._deps.validators.partial_bulk,
             monitors=(*self._deps.monitors.bulk_lookup, *monitors),
-            post_validators=self._deps.validators.atomic_bulk,
         )
 
     def public_bulk_lookup_ops[TAction: BulkLookupEntityOpsAction[Any, Any]](
@@ -585,6 +593,23 @@ class ProcessorGroup[TData: EntityData]:
             monitors=(*self._deps.monitors.lookup, *monitors),
             validators=self._deps.validators.lookup,
             post_validators=self._deps.validators.single_entity,
+        )
+
+    def public_bulk_key_field_lookup_ops[TAction: LookupBulkFieldByKeyOpsAction[Any, Any, Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        monitors: Sequence[BulkLookupActionMonitor] = (),
+    ) -> BulkLookupActionProcessor[TAction, BulkFieldKeyLookupOpsResult[Any, Any]]:
+        """The field rows several keys name, refusing nothing past authentication.
+
+        Wired only before a partial field read: that read checks each row's owner, so a
+        denied key fails as its own item instead of refusing the batch.
+        """
+        self._record(action_cls, ActionKind.LOOKUP, ActionGate.PUBLIC, ActionBacking.GENERIC)
+        return BulkLookupActionProcessor(
+            BulkFieldKeyLookupService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.bulk_lookup, *monitors),
         )
 
     def field_group[TFieldData: FieldData](

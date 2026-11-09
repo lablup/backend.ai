@@ -1,0 +1,483 @@
+kind: runtime_variant_preset
+version: 1
+items:
+- id: 77309dff-3a8f-4a63-ae1d-048aba37c883
+  runtime_variant_id: 00aa51c5-4aac-4bc8-9b77-f95da44a6cbe  # sglang
+  name: model
+  description: HuggingFace model name or local path.
+  rank: 100
+  preset_target: args
+  value_type: str
+  default_value: null
+  key: --model-path
+  category: model_loading
+  display_name: Model
+  ui_option:
+    ui_type: text_input
+    text:
+      placeholder: meta-llama/Llama-3.3-70B
+- id: 50795035-844f-4748-b628-b4035e759eab
+  runtime_variant_id: 00aa51c5-4aac-4bc8-9b77-f95da44a6cbe  # sglang
+  name: dtype
+  description: Data type for model weights and activations.
+  rank: 200
+  preset_target: args
+  value_type: str
+  default_value: auto
+  key: --dtype
+  category: model_loading
+  display_name: DType
+  ui_option:
+    ui_type: select
+    choices:
+      items:
+      - value: auto
+        label: Auto
+      - value: half
+        label: Half
+      - value: float
+        label: Float
+      - value: bfloat16
+        label: BFloat16
+      - value: float16
+        label: Float16
+      - value: float32
+        label: Float32
+- id: cd0afb2f-6a08-4273-83b9-99e02f2ca4f3
+  runtime_variant_id: 00aa51c5-4aac-4bc8-9b77-f95da44a6cbe  # sglang
+  name: quantization
+  description: Quantization method.
+  rank: 300
+  preset_target: args
+  value_type: str
+  default_value: null
+  key: --quantization
+  category: model_loading
+  display_name: Quantization
+  ui_option:
+    ui_type: text_input
+    text:
+      placeholder: awq / gptq / fp8
+- id: b63b0006-f19d-4817-bd7b-8a2694e5fa4d
+  runtime_variant_id: 00aa51c5-4aac-4bc8-9b77-f95da44a6cbe  # sglang
+  name: context-length
+  description: Maximum context length.
+  rank: 400
+  preset_target: args
+  value_type: int
+  default_value: null
+  key: --context-length
+  category: model_loading
+  display_name: Context Length
+  ui_option:
+    ui_type: number_input
+    number:
+      min: 256
+      max: 131072
+- id: 9f2853ee-c7c0-4b22-b50a-e38b21de7d52
+  runtime_variant_id: 00aa51c5-4aac-4bc8-9b77-f95da44a6cbe  # sglang
+  name: served-model-name
+  description: Overridden model name returned by the v1/models endpoint in the OpenAI API server.
+  rank: 500
+  preset_target: args
+  value_type: str
+  default_value: null
+  key: --served-model-name
+  category: model_loading
+  display_name: Served Model Name
+  ui_option:
+    ui_type: text_input
+- id: cfdbe97a-dab6-4bfe-bf70-f897e0b2e575
+  runtime_variant_id: 00aa51c5-4aac-4bc8-9b77-f95da44a6cbe  # sglang
+  name: trust-remote-code
+  description: Whether or not to allow for custom models defined on the Hub in their own modeling files.
+  rank: 600
+  preset_target: args
+  value_type: flag
+  default_value: null
+  key: --trust-remote-code
+  category: model_loading
+  display_name: Trust Remote Code
+  ui_option:
+    ui_type: checkbox
+- id: b0e6fc81-e912-4e07-aff5-519d760bd814
+  runtime_variant_id: 00aa51c5-4aac-4bc8-9b77-f95da44a6cbe  # sglang
+  name: gpu-memory-utilization
+  description: Fraction of the memory used for static allocation.
+  rank: 700
+  preset_target: args
+  value_type: float
+  default_value: '0.9'
+  key: --mem-fraction-static
+  category: resource_memory
+  display_name: Memory Fraction Static
+  ui_option:
+    ui_type: slider
+    slider:
+      min: 0.1
+      max: 1.0
+      step: 0.05
+- id: f25bbea0-6b95-44aa-b344-68aca1b14baf
+  runtime_variant_id: 00aa51c5-4aac-4bc8-9b77-f95da44a6cbe  # sglang
+  name: tensor-parallel-size
+  description: Number of GPUs for tensor parallelism.
+  rank: 800
+  preset_target: args
+  value_type: int
+  default_value: '1'
+  key: --tp-size
+  category: resource_memory
+  display_name: Tensor Parallel Size
+  ui_option:
+    ui_type: select
+    choices:
+      items:
+      - value: '1'
+        label: '1'
+      - value: '2'
+        label: '2'
+      - value: '4'
+        label: '4'
+      - value: '8'
+        label: '8'
+- id: 7c7dbaab-80d1-4190-aea8-92243cfd3452
+  runtime_variant_id: 00aa51c5-4aac-4bc8-9b77-f95da44a6cbe  # sglang
+  name: pipeline-parallel-size
+  description: Pipeline parallel stage count.
+  rank: 900
+  preset_target: args
+  value_type: int
+  default_value: '1'
+  key: --pp-size
+  category: resource_memory
+  display_name: Pipeline Parallel Size
+  ui_option:
+    ui_type: number_input
+    number:
+      min: 1
+      max: 16
+- id: 12379345-76ea-4a49-8430-9d67a44758d9
+  runtime_variant_id: 00aa51c5-4aac-4bc8-9b77-f95da44a6cbe  # sglang
+  name: data-parallel-size
+  description: Data parallel replica count.
+  rank: 1000
+  preset_target: args
+  value_type: int
+  default_value: '1'
+  key: --dp-size
+  category: resource_memory
+  display_name: Data Parallel Size
+  ui_option:
+    ui_type: number_input
+    number:
+      min: 1
+      max: 64
+- id: deb20683-0a54-4cbe-92da-153e1cba2c38
+  runtime_variant_id: 00aa51c5-4aac-4bc8-9b77-f95da44a6cbe  # sglang
+  name: kv-cache-dtype
+  description: Data type for kv cache storage.
+  rank: 1100
+  preset_target: args
+  value_type: str
+  default_value: auto
+  key: --kv-cache-dtype
+  category: resource_memory
+  display_name: KV Cache DType
+  ui_option:
+    ui_type: select
+    choices:
+      items:
+      - value: auto
+        label: Auto
+      - value: fp8_e5m2
+        label: FP8 E5M2
+      - value: fp8_e4m3
+        label: FP8 E4M3
+      - value: fp4_e2m1
+        label: FP4 E2M1
+      - value: bf16
+        label: BF16
+- id: 2d3823af-f215-4f14-8f18-16111f1efd86
+  runtime_variant_id: 00aa51c5-4aac-4bc8-9b77-f95da44a6cbe  # sglang
+  name: disable-radix-cache
+  description: Disable RadixAttention prefix caching.
+  rank: 1200
+  preset_target: args
+  value_type: flag
+  default_value: null
+  key: --disable-radix-cache
+  category: resource_memory
+  display_name: Disable Prefix Caching
+  ui_option:
+    ui_type: checkbox
+- id: ec65d299-cc1b-4b52-9d1f-24f9d793860c
+  runtime_variant_id: 00aa51c5-4aac-4bc8-9b77-f95da44a6cbe  # sglang
+  name: max-running-requests
+  description: Maximum number of running requests.
+  rank: 1300
+  preset_target: args
+  value_type: int
+  default_value: null
+  key: --max-running-requests
+  category: serving_performance
+  display_name: Max Running Requests
+  ui_option:
+    ui_type: number_input
+    number:
+      min: 1
+      max: 1024
+- id: 1b516a1c-673e-478b-be82-29f355c209f0
+  runtime_variant_id: 00aa51c5-4aac-4bc8-9b77-f95da44a6cbe  # sglang
+  name: max-total-tokens
+  description: Maximum number of tokens in the memory pool.
+  rank: 1400
+  preset_target: args
+  value_type: int
+  default_value: null
+  key: --max-total-tokens
+  category: serving_performance
+  display_name: Max Total Tokens
+  ui_option:
+    ui_type: number_input
+    number:
+      min: 256
+      max: 131072
+- id: 352db481-3d3d-4c91-9a32-e5c9e133ae04
+  runtime_variant_id: 00aa51c5-4aac-4bc8-9b77-f95da44a6cbe  # sglang
+  name: chunked-prefill-size
+  description: Maximum number of tokens in a chunk for chunked prefill. Use -1 to disable.
+  rank: 1500
+  preset_target: args
+  value_type: int
+  default_value: null
+  key: --chunked-prefill-size
+  category: serving_performance
+  display_name: Chunked Prefill Size
+  ui_option:
+    ui_type: number_input
+    number:
+      min: -1
+      max: 131072
+- id: 1cc98b9d-f057-453e-8890-8271d9a12e01
+  runtime_variant_id: 00aa51c5-4aac-4bc8-9b77-f95da44a6cbe  # sglang
+  name: scheduling-policy
+  description: Scheduling policy for request handling.
+  rank: 1600
+  preset_target: args
+  value_type: str
+  default_value: fcfs
+  key: --schedule-policy
+  category: serving_performance
+  display_name: Scheduling Policy
+  ui_option:
+    ui_type: select
+    choices:
+      items:
+      - value: fcfs
+        label: FCFS
+      - value: lpm
+        label: LPM
+      - value: priority
+        label: Priority
+      - value: random
+        label: Random
+      - value: dfs-weight
+        label: DFS-Weight
+      - value: lof
+        label: LOF
+      - value: routing-key
+        label: Routing-Key
+- id: ffa4300c-ca88-4670-bf10-9cb13f3936eb
+  runtime_variant_id: 00aa51c5-4aac-4bc8-9b77-f95da44a6cbe  # sglang
+  name: tool-call-parser
+  description: Tool call parser implementation.
+  rank: 1700
+  preset_target: args
+  value_type: str
+  default_value: null
+  key: --tool-call-parser
+  category: tool_reasoning
+  display_name: Tool Call Parser
+  ui_option:
+    ui_type: text_input
+    text:
+      placeholder: qwen / pythonic / deepseekv3 / glm / gpt-oss
+- id: 2a1565f7-72b1-4b2b-b5af-cbffc50c1603
+  runtime_variant_id: 00aa51c5-4aac-4bc8-9b77-f95da44a6cbe  # sglang
+  name: reasoning-parser
+  description: Parser for reasoning model output.
+  rank: 1800
+  preset_target: args
+  value_type: str
+  default_value: null
+  key: --reasoning-parser
+  category: tool_reasoning
+  display_name: Reasoning Parser
+  ui_option:
+    ui_type: select
+    choices:
+      items:
+      - value: deepseek-r1
+        label: DeepSeek R1
+      - value: deepseek-v3
+        label: DeepSeek V3
+      - value: qwen3
+        label: Qwen3
+      - value: qwen3-thinking
+        label: Qwen3 Thinking
+      - value: kimi
+        label: Kimi
+      - value: gpt-oss
+        label: GPT-OSS
+      - value: glm45
+        label: GLM 4.5
+      - value: step3
+        label: STEP3
+- id: feffa60e-ac58-46a4-8e97-510eed3274ae
+  runtime_variant_id: 00aa51c5-4aac-4bc8-9b77-f95da44a6cbe  # sglang
+  name: host
+  description: Listen host.
+  rank: 1900
+  preset_target: args
+  value_type: str
+  default_value: 127.0.0.1
+  key: --host
+  category: network
+  display_name: Host
+  ui_option:
+    ui_type: text_input
+    text:
+      placeholder: 127.0.0.1
+- id: 11680348-cc34-498f-a838-27a1c379c5e9
+  runtime_variant_id: 00aa51c5-4aac-4bc8-9b77-f95da44a6cbe  # sglang
+  name: port
+  description: Listen port.
+  rank: 2000
+  preset_target: args
+  value_type: int
+  default_value: '30000'
+  key: --port
+  category: network
+  display_name: Port
+  ui_option:
+    ui_type: number_input
+    number:
+      min: 1
+      max: 65535
+- id: af4bfc6b-e52e-4904-abaa-8d7178235429
+  runtime_variant_id: 00aa51c5-4aac-4bc8-9b77-f95da44a6cbe  # sglang
+  name: log-level
+  description: The logging level of all loggers.
+  rank: 2400
+  preset_target: args
+  value_type: str
+  default_value: info
+  key: --log-level
+  category: monitoring
+  display_name: Log Level
+  ui_option:
+    ui_type: select
+    choices:
+      items:
+      - value: debug
+        label: Debug
+      - value: info
+        label: Info
+      - value: warning
+        label: Warning
+      - value: error
+        label: Error
+- id: 7280451b-0d5f-4a8d-bb7a-2716ffa66d2f
+  runtime_variant_id: 00aa51c5-4aac-4bc8-9b77-f95da44a6cbe  # sglang
+  name: log-requests
+  description: Log metadata, inputs, outputs of all requests. The verbosity is decided by --log-requests-level.
+  rank: 2100
+  preset_target: args
+  value_type: flag
+  default_value: null
+  key: --log-requests
+  category: monitoring
+  display_name: Log Requests
+  ui_option:
+    ui_type: checkbox
+- id: 68db8b53-853a-44bb-9b17-b1ebc784cd86
+  runtime_variant_id: 00aa51c5-4aac-4bc8-9b77-f95da44a6cbe  # sglang
+  name: log-requests-level
+  description: 'Request logging verbosity. 0: metadata only, 1: metadata and sampling parameters, 2: partial
+    input/output, 3: full input/output.'
+  rank: 2200
+  preset_target: args
+  value_type: int
+  default_value: null
+  key: --log-requests-level
+  category: monitoring
+  display_name: Log Requests Level
+  ui_option:
+    ui_type: select
+    choices:
+      items:
+      - value: '0'
+        label: 0 - Metadata only
+      - value: '1'
+        label: 1 - Metadata + sampling params
+      - value: '2'
+        label: 2 - Metadata + sampling params + Partial input/output
+      - value: '3'
+        label: 3 - Full input/output
+- id: 0ca44222-1f4f-4d71-bd80-099813cff256
+  runtime_variant_id: 00aa51c5-4aac-4bc8-9b77-f95da44a6cbe  # sglang
+  name: enable-lora
+  description: Enable LoRA support.
+  rank: 2300
+  preset_target: args
+  value_type: flag
+  default_value: null
+  key: --enable-lora
+  category: lora
+  display_name: Enable LoRA
+  ui_option:
+    ui_type: checkbox
+- id: d7726729-b89b-46a5-93bc-1b74c9b6eef5
+  runtime_variant_id: 00aa51c5-4aac-4bc8-9b77-f95da44a6cbe  # sglang
+  name: lora-modules
+  description: 'LoRA adapter definitions. Each adapter must be specified in one of the following formats:
+    <PATH> | <NAME>=<PATH> | JSON with schema {"lora_name": str, "lora_path": str, "pinned": bool}.'
+  rank: 2400
+  preset_target: args
+  value_type: str
+  default_value: null
+  key: --lora-paths
+  category: lora
+  display_name: LoRA Paths
+  ui_option:
+    ui_type: text_input
+    text:
+      placeholder: adapter1=/path/to/adapter1
+- id: 63903fc7-af8b-409b-86af-1937f26c99ca
+  runtime_variant_id: 00aa51c5-4aac-4bc8-9b77-f95da44a6cbe  # sglang
+  name: cuda-visible-devices
+  description: CUDA device visibility override.
+  rank: 2500
+  preset_target: env
+  value_type: str
+  default_value: null
+  key: CUDA_VISIBLE_DEVICES
+  category: environment
+  display_name: CUDA Visible Devices
+  ui_option:
+    ui_type: text_input
+    text:
+      placeholder: 0,1,2,3
+- id: 80e7b231-27b8-433c-9903-037926b5e0c4
+  runtime_variant_id: 00aa51c5-4aac-4bc8-9b77-f95da44a6cbe  # sglang
+  name: hf-token-env
+  description: HuggingFace token for gated model downloads.
+  rank: 2600
+  preset_target: env
+  value_type: str
+  default_value: null
+  key: HF_TOKEN
+  category: environment
+  display_name: HF Token
+  ui_option:
+    ui_type: text_input

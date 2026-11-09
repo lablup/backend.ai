@@ -36,6 +36,7 @@ from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.adapter import PaginationSpec
 from ai.backend.manager.api.gql.base import (
     OrderDirection,
+    UUIDFilter,
     to_global_id,
 )
 from ai.backend.manager.api.gql.decorators import (
@@ -109,7 +110,7 @@ class Route(PydanticNodeMixin[RouteNodeDTO]):
     id: NodeID[str]
     field_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the route.",
         ),
     )
@@ -230,7 +231,7 @@ class RouteOrderField(StrEnum):
 
 
 _ROUTE_STATUS_DEPRECATION = (
-    f"Deprecated since {NEXT_RELEASE_VERSION}. A bare list only asks for membership."
+    "Deprecated since 26.9.0. A bare list only asks for membership."
     " Read the same rows through a deployment's `replicas` with `ReplicaFilter`, which"
     " also offers equals / notEquals / notIn."
 )
@@ -255,6 +256,10 @@ class RouteFilter(PydanticInputMixin[RouteFilterDTO]):
         description="Route traffic statuses to match.",
         default=None,
         deprecation_reason=_ROUTE_STATUS_DEPRECATION,
+    )
+    field_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter by route ID."),
+        default=None,
     )
 
     AND: list[Self] | None = None

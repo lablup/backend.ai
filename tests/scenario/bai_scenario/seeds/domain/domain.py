@@ -9,11 +9,12 @@ from typing import override
 from ai.backend.common.types import VFolderHostPermission
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.models.domain.creators import DomainCreator
-from bai_scenario.seeds.seeder import Naming, SeedRow
+from ai.backend.testutils.scenario_steps import Says
+from bai_scenario.seeds.seeder import Naming, TestSeedRow, joined
 
 
 @dataclass(frozen=True)
-class SeedDomain(SeedRow[DomainData]):
+class TestSeedDomain(TestSeedRow[DomainData]):
     """A domain. The name is the seeder's; the hint only says which row made it.
 
     ``vfolder_hosts`` are the storage hosts folders of this domain may land on. A
@@ -21,20 +22,26 @@ class SeedDomain(SeedRow[DomainData]):
     """
 
     name_hint: str = "domain"
-    description: str = "심어둔 도메인"
+    description: str = Says("미리 저장한 도메인", english="a domain seeded in advance")
     is_active: bool = True
     vfolder_hosts: Sequence[str] = field(default_factory=tuple)
 
     @override
     def kind(self) -> str:
-        return "도메인"
+        return Says("도메인", english="Domain")
 
     @override
     def detail(self) -> str:
-        allows = [] if self.is_active else ["비활성 상태"]
+        allows = [] if self.is_active else [Says("비활성 상태", english="inactive")]
         if self.vfolder_hosts:
-            allows.append(f"이 도메인의 폴더는 {', '.join(self.vfolder_hosts)}에 놓을 수 있다")
-        return ", ".join(allows)
+            hosts = ", ".join(self.vfolder_hosts)
+            allows.append(
+                Says(
+                    f"이 도메인의 vfolder 는 {hosts}에 놓을 수 있습니다",
+                    english=f"vfolders of this domain can be placed on {hosts}",
+                )
+            )
+        return joined(allows)
 
     @override
     def name(self, naming: Naming) -> str:

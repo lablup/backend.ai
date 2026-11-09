@@ -7,12 +7,12 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "AdminSearchReservoirRegistriesPayload",
     "CreateReservoirRegistryPayload",
     "DeleteReservoirRegistryPayload",
+    "PurgeReservoirRegistryPayload",
     "ReservoirRegistryNode",
     "UpdateReservoirRegistryPayload",
 )
@@ -23,7 +23,7 @@ class ReservoirRegistryNode(BaseResponseModel):
 
     id: UUID = Field(description="Registry ID")
     entity_id: UUID = Field(
-        description=f"UUID of the reservoir registry. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the reservoir registry. Added in 26.9.0.",
     )
     name: str = Field(description="Registry name")
     endpoint: str = Field(description="Reservoir endpoint URL")
@@ -48,6 +48,14 @@ class DeleteReservoirRegistryPayload(BaseResponseModel):
     """Payload for Reservoir registry deletion mutation result."""
 
     id: UUID = Field(description="ID of the deleted Reservoir registry")
+    entity_id: UUID = Field(description="UUID of the deleted Reservoir registry. Added in 26.10.0.")
+
+
+class PurgeReservoirRegistryPayload(BaseResponseModel):
+    """Payload for Reservoir registry purge result."""
+
+    id: UUID = Field(description="ID of the purged Reservoir registry")
+    entity_id: UUID = Field(description="UUID of the purged Reservoir registry. Added in 26.10.0.")
 
 
 class AdminSearchReservoirRegistriesPayload(BaseResponseModel):

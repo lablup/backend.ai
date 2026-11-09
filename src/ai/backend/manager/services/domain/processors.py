@@ -31,6 +31,15 @@ from ai.backend.manager.services.domain.actions.delete_domain_dotfile import (
 )
 from ai.backend.manager.services.domain.actions.get import GetDomainAction
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
+from ai.backend.manager.services.domain.actions.partial_bulk_delete_domains import (
+    PartialBulkDeleteDomainsAction,
+)
+from ai.backend.manager.services.domain.actions.partial_bulk_restore_domains import (
+    PartialBulkRestoreDomainsAction,
+)
+from ai.backend.manager.services.domain.actions.partial_bulk_update_domains import (
+    PartialBulkUpdateDomainsAction,
+)
 from ai.backend.manager.services.domain.actions.purge_domain import (
     PurgeDomainAction,
     PurgeDomainActionResult,
@@ -61,6 +70,9 @@ class DomainProcessors:
     delete: SingleEntityActionProcessor[DeleteDomainAction, EntityOpsResult[DomainData]]
     restore: SingleEntityActionProcessor[RestoreDomainAction, EntityOpsResult[DomainData]]
     purge: SingleEntityActionProcessor[PurgeDomainAction, PurgeDomainActionResult]
+    partial_bulk_update: PartialBulkActionProcessor[PartialBulkUpdateDomainsAction, DomainData]
+    partial_bulk_delete: PartialBulkActionProcessor[PartialBulkDeleteDomainsAction, DomainData]
+    partial_bulk_restore: PartialBulkActionProcessor[PartialBulkRestoreDomainsAction, DomainData]
     create_dotfile: SingleEntityActionProcessor[
         CreateDomainDotfileAction, CreateDomainDotfileActionResult
     ]
@@ -87,6 +99,9 @@ class DomainProcessors:
         self.delete = group.single_delete_ops(DeleteDomainAction)
         self.restore = group.single_restore_ops(RestoreDomainAction)
         self.purge = group.single_entity(PurgeDomainAction, service.purge)
+        self.partial_bulk_update = group.partial_bulk_update_ops(PartialBulkUpdateDomainsAction)
+        self.partial_bulk_delete = group.partial_bulk_delete_ops(PartialBulkDeleteDomainsAction)
+        self.partial_bulk_restore = group.partial_bulk_restore_ops(PartialBulkRestoreDomainsAction)
         self.create_dotfile = group.single_entity(CreateDomainDotfileAction, service.create_dotfile)
         self.update_dotfile = group.single_entity(UpdateDomainDotfileAction, service.update_dotfile)
         self.delete_dotfile = group.single_entity(DeleteDomainDotfileAction, service.delete_dotfile)

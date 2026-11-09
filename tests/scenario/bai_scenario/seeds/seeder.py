@@ -13,6 +13,12 @@ Which ops path writes a row follows from the spec's type, so no scenario names a
     EntityUpserter                  -> upsert_entity
     GlobalEntityUpserter            -> upsert_global_entity
     GuardedDataUpdater              -> update_data
+    DataBatchUpdater                -> batch_update_in_global
+    TestSeedRegistryPair            -> create_registry
+
+A field row is written under an owner, so it has its own entry, ``adding``. A
+``TestSeedFieldCreator`` runs ``create_field`` for its ``FieldCreator`` and a
+``TestSeedFieldUpserter`` runs ``upsert_field_entity`` for its ``FieldUpserter``.
 
 Taking a share is an update too, but the settle and the share are one operation, so it
 has its own entry: ``accepting`` runs ``accept_share``.
@@ -24,7 +30,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
-from typing import Any, Final, cast
+from typing import Any, Final, cast, override
 
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.role import RoleID
@@ -33,27 +39,49 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.entity_share.types import EntityShareData
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.user.types import UserData
+from ai.backend.manager.models.artifact_registries.creators import ArtifactRegistryMetaCreator
 from ai.backend.manager.models.entity_share.updaters import EntityShareAcceptUpdater
 from ai.backend.manager.models.specs.creator import (
+    EntityCreator,
     FieldCreator,
     FieldToCreate,
     GlobalEntityCreator,
     GuardedEntityCreator,
     NestedFieldCreator,
+    NestedFieldToCreate,
     RoleManagedEntityCreator,
     RoleManagedGlobalEntityCreator,
 )
 from ai.backend.manager.models.specs.relation import RelationCreator
-from ai.backend.manager.models.specs.updater import GuardedDataUpdater
-from ai.backend.manager.models.specs.upserter import EntityUpserter, GlobalEntityUpserter
+from ai.backend.manager.models.specs.updater import DataBatchUpdater, GuardedDataUpdater
+from ai.backend.manager.models.specs.upserter import (
+    DanglingFieldUpserter,
+    EntityUpserter,
+    FieldUpserter,
+    GlobalEntityUpserter,
+)
 from ai.backend.manager.repositories.ops.v2.user.write import (
     FullUserCreator,
     FullUserCreatorResult,
 )
-from bai_scenario.seeds.ops import SeedOps
+from ai.backend.testutils.scenario_steps import Language, Says, in_language
+from bai_scenario.seeds.ops import TestSeedOps
+
+
+@dataclass(frozen=True)
+class TestSeedRegistryPair[D]:
+    """An artifact registry: its per-type row and the row naming it, written by the
+    registry ops in one go."""
+
+    __test__ = False
+
+    creator: EntityCreator[Any, D]
+    meta: ArtifactRegistryMetaCreator
+
 
 type WriteSpec[D] = (
-    GlobalEntityCreator[Any, D]
+    TestSeedRegistryPair[D]
+    | GlobalEntityCreator[Any, D]
     | GuardedEntityCreator[Any, D]
     | RoleManagedGlobalEntityCreator[Any, D]
     | RoleManagedEntityCreator[Any, D]
@@ -67,8 +95,10 @@ type Naming = Callable[[str], str]
 """Turns a hint into a name no other row of the same scenario holds."""
 
 
-class Seed(ABC):
+class TestSeed(ABC):
     """What the report says about one row a scenario lays."""
+
+    __test__ = False
 
     @abstractmethod
     def kind(self) -> str:
@@ -90,7 +120,7 @@ class Seed(ABC):
         raise NotImplementedError
 
 
-class SeedRow[D](Seed, ABC):
+class TestSeedRow[D](TestSeed, ABC):
     """A row that needs nothing but its own name."""
 
     @abstractmethod
@@ -98,7 +128,7 @@ class SeedRow[D](Seed, ABC):
         raise NotImplementedError
 
 
-class SeedRowFrom[A, D](Seed, ABC):
+class TestSeedRowFrom[A, D](TestSeed, ABC):
     """A row that reads one row laid before it."""
 
     @abstractmethod
@@ -106,7 +136,7 @@ class SeedRowFrom[A, D](Seed, ABC):
         raise NotImplementedError
 
 
-class SeedRowFromTwo[A, B, D](Seed, ABC):
+class TestSeedRowFromTwo[A, B, D](TestSeed, ABC):
     """A row that reads two rows laid before it."""
 
     @abstractmethod
@@ -114,7 +144,7 @@ class SeedRowFromTwo[A, B, D](Seed, ABC):
         raise NotImplementedError
 
 
-class SeedRowFromThree[A, B, C, D](Seed, ABC):
+class TestSeedRowFromThree[A, B, C, D](TestSeed, ABC):
     """A row that reads three rows laid before it."""
 
     @abstractmethod
@@ -122,7 +152,22 @@ class SeedRowFromThree[A, B, C, D](Seed, ABC):
         raise NotImplementedError
 
 
-class SeedUser[A, B, C](Seed, ABC):
+class TestSeedBatchUpdate[A, D](TestSeed, ABC):
+    """A row the manager stamps in one batch across the table.
+
+    A retention boundary is written this way: the spec selects the rows, the batch
+    update answers with the rows it changed.
+    """
+
+    __test__ = False
+
+    @abstractmethod
+    def updater(self, source: A) -> DataBatchUpdater[Any, D]:
+        """The update spec, built from the row laid before it."""
+        raise NotImplementedError
+
+
+class TestSeedUser[A, B, C](TestSeed, ABC):
     """A user, provisioned through the path the manager provisions one through.
 
     The row, its graph, its preset roles, its keypair and its personal project are one
@@ -134,13 +179,15 @@ class SeedUser[A, B, C](Seed, ABC):
         raise NotImplementedError
 
 
-class SeedFieldWithNestedRows[A, D: FieldData](ABC):
+class TestSeedFieldWithNestedRows[A, D: FieldData](ABC):
     """A field row together with the rows it owns, written in one transaction.
 
     A monitor that records a scope action writes the record and its scope rows atomically;
     a seed that lays such a record takes that whole write rather than splitting it. Like
-    :class:`SeedField`, the row's name and report line come from the owner it is laid under.
+    :class:`TestSeedFieldCreator`, the row's name and report line come from the owner it is laid under.
     """
+
+    __test__ = False
 
     @abstractmethod
     def kind(self) -> str:
@@ -160,15 +207,17 @@ class SeedFieldWithNestedRows[A, D: FieldData](ABC):
         raise NotImplementedError
 
 
-class SeedNest[D](ABC):
+class TestSeedNest[D](ABC):
     """seed 여러 개를 함께 심어 전제 하나를 준비한다.
 
     단위가 행 하나가 아니라 "폴더를 만들 수 있는 사용자" 같은 전제다. 무엇을 준비하는지는
     ``kind``가 말하고, 어떤 seed와 어떤 nest를 딛는지는 ``lay`` 안이 보여준다.
 
-    ``Seeder``를 받지만 그 입구가 전부 seed 객체를 요구하므로, nest가 행을 직접 쓰는
+    ``TestSeeder``를 받지만 그 입구가 전부 seed 객체를 요구하므로, nest가 행을 직접 쓰는
     길은 없다.
     """
+
+    __test__ = False
 
     @abstractmethod
     def kind(self) -> str:
@@ -176,16 +225,18 @@ class SeedNest[D](ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def lay(self, seed: Seeder) -> D:
+    def lay(self, seed: TestSeeder) -> D:
         raise NotImplementedError
 
 
-class SeedField[A, D: FieldData](ABC):
+class TestSeedField[A, D: FieldData](ABC):
     """A field row written under an owner the scenario already laid.
 
     A field grants nothing of its own and dies with its owner, so it is never laid on
     its own: the owner comes with it, and its name with the owner.
     """
+
+    __test__ = False
 
     @abstractmethod
     def kind(self) -> str:
@@ -197,17 +248,76 @@ class SeedField[A, D: FieldData](ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def seed(self) -> FieldCreator[Any, Any, D]:
+    async def write(self, ops: TestSeedOps, owner_id: Any) -> D:
         raise NotImplementedError
 
 
-class SeedLink[S, T](ABC):
+class TestSeedFieldCreator[A, D: FieldData](TestSeedField[A, D]):
+    """A field row the manager inserts."""
+
+    @abstractmethod
+    def seed(self) -> FieldCreator[Any, Any, D]:
+        raise NotImplementedError
+
+    @override
+    async def write(self, ops: TestSeedOps, owner_id: Any) -> D:
+        return await ops.create_field(owner_id, self.seed())
+
+
+class TestSeedFieldUpserter[A, D: FieldData](TestSeedField[A, D]):
+    """A field row the manager upserts, such as the slot rows an agent reports."""
+
+    @abstractmethod
+    def seed(self) -> FieldUpserter[Any, Any, D]:
+        raise NotImplementedError
+
+    @override
+    async def write(self, ops: TestSeedOps, owner_id: Any) -> D:
+        return await ops.upsert_field_entity(owner_id, self.seed())
+
+
+class TestSeedDanglingFieldUpserter[A, D: FieldData](TestSeedField[A, D]):
+    """A field row the manager upserts whose owner is a value on the row, such as a fair
+    share keyed by a resource group."""
+
+    @abstractmethod
+    def seed(self, owner_id: Any) -> DanglingFieldUpserter[Any, D]:
+        raise NotImplementedError
+
+    @override
+    async def write(self, ops: TestSeedOps, owner_id: Any) -> D:
+        return await ops.upsert_dangling_field(self.seed(owner_id))
+
+
+class TestSeedNestedFieldCreator[A, D: FieldData](TestSeedField[A, D]):
+    """A field row another field row owns, such as a kernel group's environ rows.
+
+    The manager writes these under the owner's settled id with
+    ``atomic_create_nested_fields``; laying one takes that same write.
+    """
+
+    @abstractmethod
+    def seed(self) -> NestedFieldCreator[Any, Any, D]:
+        raise NotImplementedError
+
+    @override
+    async def write(self, ops: TestSeedOps, owner_id: Any) -> D:
+        return (
+            await ops.atomic_create_nested_fields([
+                NestedFieldToCreate(owner_id=owner_id, creator=self.seed())
+            ])
+        )[0]
+
+
+class TestSeedLink[S, T](ABC):
     """A row that links two entities and belongs to neither.
 
     A resource group reaches a session only through one of these: the group is linked
     to a domain, a project, or a user's keypair, and the session's scope has to find it
     on one of those three paths.
     """
+
+    __test__ = False
 
     @abstractmethod
     def kind(self) -> str:
@@ -227,11 +337,13 @@ class SeedLink[S, T](ABC):
         raise NotImplementedError
 
 
-class SeedShareAcceptance[A](ABC):
+class TestSeedShareAcceptance[A](ABC):
     """The recipient taking an offer the scenario already laid.
 
     The settle and the share it grants are one operation, and a seed takes it whole.
     """
+
+    __test__ = False
 
     @abstractmethod
     def kind(self) -> str:
@@ -262,7 +374,7 @@ class Laid[D]:
     states: str
     """What laying this row establishes, as a sentence, for the report."""
     sources: tuple[Laid[Any], ...]
-    write: Callable[[SeedOps, Sequence[Any]], Awaitable[D]]
+    write: Callable[[TestSeedOps, Sequence[Any]], Awaitable[D]]
 
 
 SKEW: Final = timedelta(seconds=30)
@@ -280,16 +392,37 @@ def _since(start: datetime) -> Callable[[datetime], bool]:
     return condition
 
 
-def _there_is(seed: Seed, name: str) -> str:
-    return f"{seed.kind()} {name}"
+def _english(text: str) -> str:
+    return in_language(text, Language.ENGLISH)
 
 
-def _states(sentence: str, detail: str) -> str:
-    return f"{sentence}: {detail}" if detail else sentence
+def _pair(korean: str, english: str) -> Says:
+    return Says(korean, english=english)
 
 
-async def _write(ops: SeedOps, spec: WriteSpec[Any]) -> Any:
+def joined(parts: Sequence[str], separator: str = ", ") -> Says:
+    """``parts`` in order, each in the language the report asks for."""
+    return _pair(
+        separator.join(str(one) for one in parts),
+        separator.join(_english(one) for one in parts),
+    )
+
+
+def _there_is(seed: TestSeed, name: str) -> Says:
+    kind = seed.kind()
+    return _pair(f"{kind} {name}", f"{_english(kind)} {name}")
+
+
+def _states(sentence: str, detail: str) -> Says:
+    if not detail:
+        return _pair(str(sentence), _english(sentence))
+    return _pair(f"{sentence}: {detail}", f"{_english(sentence)}: {_english(detail)}")
+
+
+async def _write(ops: TestSeedOps, spec: WriteSpec[Any]) -> Any:
     """Run one spec down the ops path its own type calls for."""
+    if isinstance(spec, TestSeedRegistryPair):
+        return await ops.create_registry(spec.creator, spec.meta)
     if isinstance(spec, RoleManagedGlobalEntityCreator):
         return await ops.create_role_managed_global_entity(spec)
     if isinstance(spec, RoleManagedEntityCreator):
@@ -306,12 +439,14 @@ async def _write(ops: SeedOps, spec: WriteSpec[Any]) -> Any:
 
 
 @dataclass
-class Seeder:
+class TestSeeder:
     """The rows one scenario lays, and the names it gives them.
 
     A scenario builder is handed a fresh one, so the numbering restarts at every row of
     the table and a name says which row of this scenario made it.
     """
+
+    __test__ = False
 
     _counts: dict[str, int] = field(default_factory=dict)
     _laid: list[Laid[Any]] = field(default_factory=list)
@@ -328,7 +463,7 @@ class Seeder:
         """
         return _since(self._started)
 
-    def within[D](self, nest: SeedNest[D]) -> D:
+    def within[D](self, nest: TestSeedNest[D]) -> D:
         """Lay what this nest lays, remembering that it laid them."""
         self._nesting.append(nest.kind())
         try:
@@ -340,7 +475,7 @@ class Seeder:
         """Every row asked for so far, in the order it was asked."""
         return tuple(self._laid)
 
-    def once[D](self, seed: SeedRow[D], /) -> Laid[D]:
+    def once[D](self, seed: TestSeedRow[D], /) -> Laid[D]:
         """The one row of its kind this scenario has.
 
         A row whose name the manager fixes is a singleton: laying it twice collides on
@@ -361,49 +496,53 @@ class Seeder:
         self._counts[hint] = self._counts.get(hint, 0) + 1
         return f"{hint}-{self._counts[hint]}"
 
-    def creating[D](self, seed: SeedRow[D], /) -> Laid[D]:
+    def creating[D](self, seed: TestSeedRow[D], /) -> Laid[D]:
         """Lay a row that needs nothing but its own name."""
         name = seed.name(self.name)
 
-        async def write(ops: SeedOps, values: Sequence[Any]) -> Any:
+        async def write(ops: TestSeedOps, values: Sequence[Any]) -> Any:
             return await _write(ops, seed.seed(name))
 
         return self._remember(self._given(seed, name, (), write, _there_is(seed, name)))
 
-    def creating_from[A, D](self, seed: SeedRowFrom[A, D], a: Laid[A], /) -> Laid[D]:
+    def creating_from[A, D](
+        self, seed: TestSeedRowFrom[A, D] | TestSeedBatchUpdate[A, D], a: Laid[A], /
+    ) -> Laid[D]:
         """Lay a row that reads one row laid before it."""
         name = seed.name(self.name)
 
-        async def write(ops: SeedOps, values: Sequence[Any]) -> Any:
+        async def write(ops: TestSeedOps, values: Sequence[Any]) -> Any:
+            if isinstance(seed, TestSeedBatchUpdate):
+                return (await ops.batch_update_in_global(seed.updater(values[0])))[0]
             return await _write(ops, seed.seed(name, values[0]))
 
         return self._remember(self._given(seed, name, (a,), write, _there_is(seed, name)))
 
     def creating_from_two[A, B, D](
-        self, seed: SeedRowFromTwo[A, B, D], a: Laid[A], b: Laid[B], /
+        self, seed: TestSeedRowFromTwo[A, B, D], a: Laid[A], b: Laid[B], /
     ) -> Laid[D]:
         """Lay a row that reads two rows laid before it."""
         name = seed.name(self.name)
 
-        async def write(ops: SeedOps, values: Sequence[Any]) -> Any:
+        async def write(ops: TestSeedOps, values: Sequence[Any]) -> Any:
             return await _write(ops, seed.seed(name, values[0], values[1]))
 
         return self._remember(self._given(seed, name, (a, b), write, _there_is(seed, name)))
 
     def creating_from_three[A, B, C, D](
-        self, seed: SeedRowFromThree[A, B, C, D], a: Laid[A], b: Laid[B], c: Laid[C], /
+        self, seed: TestSeedRowFromThree[A, B, C, D], a: Laid[A], b: Laid[B], c: Laid[C], /
     ) -> Laid[D]:
         """Lay a row that reads three rows laid before it."""
         name = seed.name(self.name)
 
-        async def write(ops: SeedOps, values: Sequence[Any]) -> Any:
+        async def write(ops: TestSeedOps, values: Sequence[Any]) -> Any:
             return await _write(ops, seed.seed(name, values[0], values[1], values[2]))
 
         return self._remember(self._given(seed, name, (a, b, c), write, _there_is(seed, name)))
 
     def provisioning[A, B, C](
         self,
-        seed: SeedUser[A, B, C],
+        seed: TestSeedUser[A, B, C],
         a: Laid[A],
         b: Laid[B],
         c: Laid[C],
@@ -412,10 +551,10 @@ class Seeder:
         """Provision what the manager provisions as one operation."""
         name = seed.name(self.name)
 
-        async def provision(ops: SeedOps, values: Sequence[Any]) -> FullUserCreatorResult:
+        async def provision(ops: TestSeedOps, values: Sequence[Any]) -> FullUserCreatorResult:
             return await ops.create_user(seed.seed(name, *values))
 
-        async def user(ops: SeedOps, values: Sequence[Any]) -> UserData:
+        async def user(ops: TestSeedOps, values: Sequence[Any]) -> UserData:
             return cast("FullUserCreatorResult", values[0]).user
 
         provisioned = self._given(seed, name, (a, b, c), provision, _there_is(seed, name))
@@ -427,43 +566,52 @@ class Seeder:
         """The personal project provisioning made for this user. It writes nothing of its own."""
         provisioned = self._provisioned[user]
 
-        async def project(ops: SeedOps, values: Sequence[Any]) -> ProjectData:
+        async def project(ops: TestSeedOps, values: Sequence[Any]) -> ProjectData:
             return cast("FullUserCreatorResult", values[0]).personal_project
 
         return Laid(
             name=user.name,
             kind=user.kind,
             nest=tuple(self._nesting),
-            describe=f"{user.describe}의 개인 프로젝트",
+            describe=_pair(
+                f"{user.describe}의 개인 프로젝트",
+                f"personal project of {_english(user.describe)}",
+            ),
             states="",
             sources=(provisioned,),
             write=project,
         )
 
-    def adding[A, D: FieldData](self, seed: SeedField[A, D], owner: Laid[A], /) -> Laid[D]:
+    def adding[A, D: FieldData](self, seed: TestSeedField[A, D], owner: Laid[A], /) -> Laid[D]:
         """Lay one field row under the owner the scenario already laid."""
 
-        async def write(ops: SeedOps, values: Sequence[Any]) -> Any:
-            return await ops.create_field(seed.owner_id(values[0]), seed.seed())
+        async def write(ops: TestSeedOps, values: Sequence[Any]) -> Any:
+            return await seed.write(ops, seed.owner_id(values[0]))
 
         return self._remember(
             Laid(
                 name=owner.name,
                 kind=owner.kind,
                 nest=tuple(self._nesting),
-                describe=f"{owner.describe}({seed.kind()})",
-                states=f"{owner.describe}: {seed.kind()}",
+                describe=_pair(
+                    f"{owner.describe}({seed.kind()})",
+                    f"{_english(owner.describe)}({_english(seed.kind())})",
+                ),
+                states=_pair(
+                    f"{owner.describe}: {seed.kind()}",
+                    f"{_english(owner.describe)}: {_english(seed.kind())}",
+                ),
                 sources=(owner,),
                 write=write,
             )
         )
 
     def adding_with_nested[A, D: FieldData](
-        self, seed: SeedFieldWithNestedRows[A, D], owner: Laid[A], /
+        self, seed: TestSeedFieldWithNestedRows[A, D], owner: Laid[A], /
     ) -> Laid[D]:
         """Lay one field row and the rows it owns, in the one write a monitor uses."""
 
-        async def write(ops: SeedOps, values: Sequence[Any]) -> Any:
+        async def write(ops: TestSeedOps, values: Sequence[Any]) -> Any:
             created = await ops.atomic_create_fields_with_nested(
                 [FieldToCreate(owner_id=seed.owner_id(values[0]), creator=seed.field())],
                 list(seed.nested()),
@@ -475,17 +623,25 @@ class Seeder:
                 name=owner.name,
                 kind=owner.kind,
                 nest=tuple(self._nesting),
-                describe=f"{owner.describe}({seed.kind()})",
-                states=f"{owner.describe}: {seed.kind()}",
+                describe=_pair(
+                    f"{owner.describe}({seed.kind()})",
+                    f"{_english(owner.describe)}({_english(seed.kind())})",
+                ),
+                states=_pair(
+                    f"{owner.describe}: {seed.kind()}",
+                    f"{_english(owner.describe)}: {_english(seed.kind())}",
+                ),
                 sources=(owner,),
                 write=write,
             )
         )
 
-    def linking[S, T](self, seed: SeedLink[S, T], scope: Laid[S], target: Laid[T], /) -> Laid[None]:
+    def linking[S, T](
+        self, seed: TestSeedLink[S, T], scope: Laid[S], target: Laid[T], /
+    ) -> Laid[None]:
         """Link the two rows this scenario laid, the way an operator would."""
 
-        async def write(ops: SeedOps, values: Sequence[Any]) -> None:
+        async def write(ops: TestSeedOps, values: Sequence[Any]) -> None:
             await ops.create_relations(
                 seed.seed(), [(seed.scope_id(values[0]), seed.target_id(values[1]))]
             )
@@ -496,18 +652,21 @@ class Seeder:
                 kind=target.kind,
                 nest=tuple(self._nesting),
                 describe=target.describe,
-                states=f"{scope.describe} {seed.kind()} {target.describe}",
+                states=_pair(
+                    f"{scope.describe} {seed.kind()} {target.describe}",
+                    f"{_english(scope.describe)} {_english(seed.kind())} {_english(target.describe)}",
+                ),
                 sources=(scope, target),
                 write=write,
             )
         )
 
     def accepting[A](
-        self, seed: SeedShareAcceptance[A], offer: Laid[A], /
+        self, seed: TestSeedShareAcceptance[A], offer: Laid[A], /
     ) -> Laid[EntityShareData]:
         """Take the offer the way its recipient would."""
 
-        async def write(ops: SeedOps, values: Sequence[Any]) -> EntityShareData:
+        async def write(ops: TestSeedOps, values: Sequence[Any]) -> EntityShareData:
             taken = await ops.accept_share(seed.seed(values[0]))
             if taken is None:
                 raise LookupError("the offer was not open to its recipient")
@@ -519,7 +678,10 @@ class Seeder:
                 kind=offer.kind,
                 nest=tuple(self._nesting),
                 describe=offer.describe,
-                states=f"{offer.describe}: {seed.kind()}",
+                states=_pair(
+                    f"{offer.describe}: {seed.kind()}",
+                    f"{_english(offer.describe)}: {_english(seed.kind())}",
+                ),
                 sources=(offer,),
                 write=write,
             )
@@ -535,7 +697,7 @@ class Seeder:
     ) -> Laid[None]:
         """Give the user the role, the way an operator would."""
 
-        async def write(ops: SeedOps, values: Sequence[Any]) -> None:
+        async def write(ops: TestSeedOps, values: Sequence[Any]) -> None:
             await ops.grant_roles(user_id(values[1]), [role_id(values[0])])
 
         return self._remember(
@@ -544,7 +706,10 @@ class Seeder:
                 kind=to.kind,
                 nest=tuple(self._nesting),
                 describe=to.describe,
-                states=f"{to.describe}: {role.describe} 보유",
+                states=_pair(
+                    f"{to.describe}: {role.describe} 보유",
+                    f"{_english(to.describe)}: holds {_english(role.describe)}",
+                ),
                 sources=(role, to),
                 write=write,
             )
@@ -560,7 +725,7 @@ class Seeder:
     ) -> Laid[None]:
         """Put the user on the project's roster, the way an operator would."""
 
-        async def write(ops: SeedOps, values: Sequence[Any]) -> None:
+        async def write(ops: TestSeedOps, values: Sequence[Any]) -> None:
             await ops.join_member(project_id(values[0]), user_id(values[1]))
 
         return self._remember(
@@ -569,7 +734,11 @@ class Seeder:
                 kind=member.kind,
                 nest=tuple(self._nesting),
                 describe=member.describe,
-                states=f"{member.describe}: {project.describe} 명부에 오름",
+                states=_pair(
+                    f"{member.describe}: {project.describe} 멤버 목록에 추가됨",
+                    f"{_english(member.describe)}: added to the member list of "
+                    f"{_english(project.describe)}",
+                ),
                 sources=(project, member),
                 write=write,
             )
@@ -577,24 +746,24 @@ class Seeder:
 
     def _given[D](
         self,
-        seed: Seed,
+        seed: TestSeed,
         name: str,
         sources: Sequence[Laid[Any]],
-        write: Callable[[SeedOps, Sequence[Any]], Awaitable[D]],
+        write: Callable[[TestSeedOps, Sequence[Any]], Awaitable[D]],
         sentence: str,
     ) -> Laid[D]:
         return Laid(
             name=name,
             kind=seed.kind(),
             nest=tuple(self._nesting),
-            describe=f"{seed.kind()} {name}",
+            describe=_there_is(seed, name),
             states=_states(sentence, seed.detail()),
             sources=tuple(sources),
             write=write,
         )
 
 
-async def lay(ops: SeedOps, wanted: Sequence[Laid[Any]], made: dict[Laid[Any], Any]) -> None:
+async def lay(ops: TestSeedOps, wanted: Sequence[Laid[Any]], made: dict[Laid[Any], Any]) -> None:
     """Write every row the wanted rows rest on, each once, in this session.
 
     What has been written is carried in ``made`` rather than answered, so a caller that

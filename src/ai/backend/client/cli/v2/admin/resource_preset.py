@@ -229,7 +229,7 @@ def delete(preset_id: uuid.UUID) -> None:
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.resource_preset.delete(preset_id)
+            result = await registry.resource_preset.purge(preset_id)
             print_result(result)
         finally:
             await registry.close()

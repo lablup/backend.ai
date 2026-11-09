@@ -31,6 +31,17 @@ class UserPurgeInProgress(EntityError, web.HTTPConflict):
         return EntityErrorCode(UserEntityType(), ActionOperationType.UPDATE, ErrorDetail.CONFLICT)
 
 
+class UserDeleted(EntityError, web.HTTPConflict):
+    """Raised when an update names a soft-deleted user; restore it first."""
+
+    error_type = "https://api.backend.ai/probs/user-deleted"
+    error_title = "The user is deleted."
+
+    @override
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(UserEntityType(), ActionOperationType.UPDATE, ErrorDetail.CONFLICT)
+
+
 class UserConflict(EntityError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/user-conflict"
     error_title = "The user already exists."

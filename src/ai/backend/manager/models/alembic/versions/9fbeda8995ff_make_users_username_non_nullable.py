@@ -12,7 +12,7 @@ from alembic import op
 # revision identifiers, used by Alembic.
 revision = "9fbeda8995ff"
 down_revision = "857c4d02c4b9"
-# Part of: NEXT_RELEASE_VERSION
+# Part of: 26.9.0
 branch_labels = None
 depends_on = None
 

@@ -9,16 +9,18 @@ from dateutil.relativedelta import relativedelta
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.dotfile import DotfilePath
 from ai.backend.common.exception import (
     InvalidAPIParameters,
 )
 from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, PartialBulkResult
 from ai.backend.manager.actions.v2.ops.result import CreatedEntityOpsResult
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.container_registry.types import ProjectAllowedRegistryData
 from ai.backend.manager.data.dotfile.types import DotfileEntries
 from ai.backend.manager.data.project.types import ProjectData
-from ai.backend.manager.models.domain.row import verify_dotfile_name
 from ai.backend.manager.models.project.updaters import ProjectDotfilesUpdater
 from ai.backend.manager.models.resource_usage import (
     ProjectResourceUsage,
@@ -27,6 +29,13 @@ from ai.backend.manager.models.resource_usage import (
 )
 from ai.backend.manager.repositories.project.repositories import ProjectRepositories
 from ai.backend.manager.repositories.project.repository import ProjectRepository
+from ai.backend.manager.services.project.actions.bulk_get_registries import (
+    BulkGetProjectRegistriesAction,
+)
+from ai.backend.manager.services.project.actions.clear_default_registry import (
+    ClearProjectDefaultRegistryAction,
+    ClearProjectDefaultRegistryActionResult,
+)
 from ai.backend.manager.services.project.actions.create_project import CreateProjectAction
 from ai.backend.manager.services.project.actions.create_project_dotfile import (
     CreateProjectDotfileAction,
@@ -36,9 +45,16 @@ from ai.backend.manager.services.project.actions.delete_project_dotfile import (
     DeleteProjectDotfileAction,
     DeleteProjectDotfileActionResult,
 )
+from ai.backend.manager.services.project.actions.partial_bulk_update_projects import (
+    PartialBulkUpdateProjectsAction,
+)
 from ai.backend.manager.services.project.actions.purge_project import (
     PurgeProjectAction,
     PurgeProjectActionResult,
+)
+from ai.backend.manager.services.project.actions.switch_default_registry import (
+    SwitchProjectDefaultRegistryAction,
+    SwitchProjectDefaultRegistryActionResult,
 )
 from ai.backend.manager.services.project.actions.update_project import (
     UpdateProjectAction,
@@ -91,9 +107,51 @@ class ProjectService:
         group_data = await self._group_repository.modify_validated(action.updater)
         return UpdateProjectActionResult(data=group_data)
 
+    async def partial_bulk_update(
+        self, action: PartialBulkUpdateProjectsAction
+    ) -> PartialBulkResult[ProjectData]:
+        result = await self._group_repository.partial_bulk_modify_validated(action.updaters)
+        return PartialBulkResult(
+            items=[
+                PartialBulkEntityResult[ProjectData].succeeded(
+                    updater.project_id, result.successes[updater.project_id]
+                )
+                if updater.project_id in result.successes
+                else PartialBulkEntityResult[ProjectData].failed(
+                    updater.project_id, result.errors[updater.project_id]
+                )
+                for updater in action.updaters
+            ]
+        )
+
     async def purge_group(self, action: PurgeProjectAction) -> PurgeProjectActionResult:
         await self._group_repository.purge_group(action.project_id)
         return PurgeProjectActionResult(project_id=action.project_id)
+
+    async def bulk_get_registries(
+        self, action: BulkGetProjectRegistriesAction
+    ) -> PartialBulkResult[list[ProjectAllowedRegistryData]]:
+        found = await self._group_repository.fetch_registries(action.project_ids)
+        items: list[PartialBulkEntityResult[list[ProjectAllowedRegistryData]]] = []
+        for project_id in action.project_ids:
+            items.append(
+                PartialBulkEntityResult[list[ProjectAllowedRegistryData]].succeeded(
+                    project_id, found.get(project_id, [])
+                )
+            )
+        return PartialBulkResult(items=items)
+
+    async def switch_default_registry(
+        self, action: SwitchProjectDefaultRegistryAction
+    ) -> SwitchProjectDefaultRegistryActionResult:
+        await self._group_repository.switch_default_registry(action.project_id, action.registry_id)
+        return SwitchProjectDefaultRegistryActionResult(registry_id=action.registry_id)
+
+    async def clear_default_registry(
+        self, action: ClearProjectDefaultRegistryAction
+    ) -> ClearProjectDefaultRegistryActionResult:
+        await self._group_repository.clear_default_registry(action.project_id)
+        return ClearProjectDefaultRegistryActionResult(project_id=action.project_id)
 
     async def _get_project_stats_for_period(
         self,
@@ -159,8 +217,7 @@ class ProjectService:
     async def create_dotfile(
         self, action: CreateProjectDotfileAction
     ) -> CreateProjectDotfileActionResult:
-        if not verify_dotfile_name(action.entry.path):
-            raise InvalidAPIParameters("dotfile path is reserved for internal operations.")
+        DotfilePath(action.entry.path)
         entries = (await self._read_dotfiles(action.project_id)).added(action.entry)
         await self._write_dotfiles(action.project_id, entries)
         return CreateProjectDotfileActionResult(entries=entries.entries)
@@ -168,6 +225,7 @@ class ProjectService:
     async def update_dotfile(
         self, action: UpdateProjectDotfileAction
     ) -> UpdateProjectDotfileActionResult:
+        DotfilePath(action.entry.path)
         entries = (await self._read_dotfiles(action.project_id)).replaced(action.entry)
         await self._write_dotfiles(action.project_id, entries)
         return UpdateProjectDotfileActionResult(entries=entries.entries)

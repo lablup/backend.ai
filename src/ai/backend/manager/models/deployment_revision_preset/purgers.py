@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
+from dataclasses import dataclass
 from typing import Any, override
 
 import sqlalchemy as sa
@@ -22,6 +23,7 @@ from ai.backend.manager.models.specs.types import ConflictCheck
 __all__ = (
     "DeploymentPresetPurger",
     "PresetResourceSlotBatchPurger",
+    "PresetResourceSlotUnstatedPurger",
 )
 
 
@@ -66,6 +68,35 @@ class PresetResourceSlotBatchPurger(
         self, owner_id: DeploymentPresetID
     ) -> sa.sql.Select[tuple[PresetResourceSlotRow]]:
         return sa.select(PresetResourceSlotRow).where(PresetResourceSlotRow.preset_id == owner_id)
+
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()
+
+    @override
+    def to_data(self, row: PresetResourceSlotRow) -> ResourceSlotEntryData:
+        return ResourceSlotEntryData(
+            resource_type=row.slot_name,
+            quantity=str(row.quantity),
+        )
+
+
+@dataclass
+class PresetResourceSlotUnstatedPurger(
+    FieldBatchPurger[DeploymentPresetID, PresetResourceSlotRow, ResourceSlotEntryData]
+):
+    """Clear the slot rows of one preset whose slot name is not among ``slot_names``."""
+
+    slot_names: Collection[str]
+
+    @override
+    def build_subquery(
+        self, owner_id: DeploymentPresetID
+    ) -> sa.sql.Select[tuple[PresetResourceSlotRow]]:
+        return sa.select(PresetResourceSlotRow).where(
+            PresetResourceSlotRow.preset_id == owner_id,
+            PresetResourceSlotRow.slot_name.not_in(list(self.slot_names)),
+        )
 
     @override
     def conflict_checks(self) -> Sequence[ConflictCheck]:

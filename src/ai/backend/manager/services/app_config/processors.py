@@ -31,6 +31,12 @@ from ai.backend.manager.services.app_config.actions.allow_list.create import (
 from ai.backend.manager.services.app_config.actions.allow_list.get import (
     GetAppConfigAllowListAction,
 )
+from ai.backend.manager.services.app_config.actions.allow_list.partial_bulk_purge import (
+    PartialBulkPurgeAppConfigAllowListsAction,
+)
+from ai.backend.manager.services.app_config.actions.allow_list.partial_bulk_update import (
+    PartialBulkUpdateAppConfigAllowListsAction,
+)
 from ai.backend.manager.services.app_config.actions.allow_list.purge import (
     PurgeAppConfigAllowListAction,
 )
@@ -48,6 +54,9 @@ from ai.backend.manager.services.app_config.actions.definition.create import (
 )
 from ai.backend.manager.services.app_config.actions.definition.get import (
     GetAppConfigDefinitionAction,
+)
+from ai.backend.manager.services.app_config.actions.definition.partial_bulk_purge import (
+    PartialBulkPurgeAppConfigDefinitionsAction,
 )
 from ai.backend.manager.services.app_config.actions.definition.purge import (
     PurgeAppConfigDefinitionAction,
@@ -113,6 +122,9 @@ class AppConfigProcessors:
     definition_purge: SingleEntityActionProcessor[
         PurgeAppConfigDefinitionAction, EntityOpsResult[AppConfigDefinitionData]
     ]
+    definition_partial_bulk_purge: PartialBulkActionProcessor[
+        PartialBulkPurgeAppConfigDefinitionsAction, AppConfigDefinitionData
+    ]
     definition_global_search: GlobalActionProcessor[
         AdminSearchAppConfigDefinitionsAction, BatchOpsResult[AppConfigDefinitionData]
     ]
@@ -131,6 +143,12 @@ class AppConfigProcessors:
     ]
     allow_list_purge: SingleEntityActionProcessor[
         PurgeAppConfigAllowListAction, EntityOpsResult[AppConfigAllowListData]
+    ]
+    allow_list_partial_bulk_update: PartialBulkActionProcessor[
+        PartialBulkUpdateAppConfigAllowListsAction, AppConfigAllowListData
+    ]
+    allow_list_partial_bulk_purge: PartialBulkActionProcessor[
+        PartialBulkPurgeAppConfigAllowListsAction, AppConfigAllowListData
     ]
     allow_list_global_search: GlobalActionProcessor[
         AdminSearchAppConfigAllowListAction, BatchOpsResult[AppConfigAllowListData]
@@ -187,6 +205,9 @@ class AppConfigProcessors:
         self.definition_purge = definition_group.single_entity(
             PurgeAppConfigDefinitionAction, service.purge_definition
         )
+        self.definition_partial_bulk_purge = definition_group.partial_bulk(
+            PartialBulkPurgeAppConfigDefinitionsAction, service.partial_bulk_purge_definitions
+        )
         self.definition_global_search = definition_group.global_searcher_ops(
             AdminSearchAppConfigDefinitionsAction
         )
@@ -201,6 +222,12 @@ class AppConfigProcessors:
         self.allow_list_update = allow_list_group.single_update_ops(UpdateAppConfigAllowListAction)
         self.allow_list_purge = allow_list_group.single_entity(
             PurgeAppConfigAllowListAction, service.purge_allow_list
+        )
+        self.allow_list_partial_bulk_update = allow_list_group.partial_bulk_update_ops(
+            PartialBulkUpdateAppConfigAllowListsAction
+        )
+        self.allow_list_partial_bulk_purge = allow_list_group.partial_bulk(
+            PartialBulkPurgeAppConfigAllowListsAction, service.partial_bulk_purge_allow_lists
         )
         self.allow_list_global_search = allow_list_group.global_searcher_ops(
             AdminSearchAppConfigAllowListAction

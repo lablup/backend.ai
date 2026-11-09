@@ -1,0 +1,72 @@
+kind: storage_backend_type
+version: 1
+items:
+- name: vfs
+  capabilities:
+  - vfolder
+- name: xfs
+  capabilities:
+  - vfolder
+  - quota
+- name: cephfs
+  capabilities:
+  - vfolder
+  - quota
+  - fast-size
+- name: purestorage
+  capabilities:
+  - vfolder
+  - metric
+  - fast-fs-size
+  - fast-scan
+- name: netapp
+  capabilities:
+  - vfolder
+  - metric
+  - quota
+  - fast-fs-size
+  - fast-size
+- name: weka
+  capabilities:
+  - vfolder
+  - metric
+  - quota
+  - fast-fs-size
+- name: gpfs
+  capabilities:
+  - vfolder
+  - metric
+  - quota
+  - fast-fs-size
+- name: spectrumscale
+  capabilities:
+  - vfolder
+  - metric
+  - quota
+  - fast-fs-size
+- name: dellemc-onefs
+  capabilities:
+  - vfolder
+  - metric
+  - quota
+  - fast-fs-size
+- name: vast
+  capabilities:
+  - vfolder
+  - metric
+  - quota
+  - fast-fs-size
+  - fast-size
+- name: exascaler
+  capabilities:
+  - vfolder
+  - quota
+- name: hammerspace
+  capabilities:
+  - vfolder
+  - quota
+- name: hammerspace-base
+  capabilities:
+  - vfolder
+- name: noop
+  capabilities: []

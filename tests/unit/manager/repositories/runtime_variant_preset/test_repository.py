@@ -8,6 +8,7 @@ from collections.abc import AsyncGenerator
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.config import DefaultModelDefinition
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     PresetTarget,
@@ -81,6 +82,7 @@ async def runtime_variant_id(
                 id=variant_id,
                 name=f"test-variant-{variant_id.hex[:8]}",
                 description=None,
+                default_model_definition=DefaultModelDefinition(),
             )
         )
         await db_sess.flush()

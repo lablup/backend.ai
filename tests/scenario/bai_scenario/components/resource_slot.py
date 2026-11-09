@@ -25,11 +25,14 @@ from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
+    Language,
     Refused,
     Same,
+    Says,
     Skipped,
     Then,
     Verdict,
+    in_language,
 )
 from bai_scenario.components.system import (
     KEPT,
@@ -37,9 +40,9 @@ from bai_scenario.components.system import (
     lay_a_public_reader,
     role_named,
 )
-from bai_scenario.seeds.resource_slot.slot_type import SeedResourceSlotType
+from bai_scenario.seeds.resource_slot.slot_type import TestSeedResourceSlotType
 
-DISPLAYED = "미리 만들어 둔 슬롯"
+DISPLAYED = Says("미리 저장한 슬롯", english="a slot type seeded in advance")
 """시드가 미리 만들어 두는 슬롯 종류의 표시 이름. 시나리오가 기대값으로 다시 쓰므로 한 곳에 둔다."""
 
 DECIMAL = NumberFormatInfo(binary=False, round_length=0)
@@ -72,11 +75,15 @@ class ASlotTypeAndSomeone(Given[Any, ASlotTypeAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"자원 슬롯 종류 하나와, {role_named(self.role)} 한 명"
+        named = role_named(self.role)
+        return Says(
+            f"자원 슬롯 종류 하나와, {named} 한 명",
+            english=f"one resource slot type and one {in_language(named, Language.ENGLISH)}",
+        )
 
     @override
     async def lay(self, seeding: Any) -> ASlotTypeAndACaller:
-        slot_type = await seeding.creating(SeedResourceSlotType(enabled=self.enabled))
+        slot_type = await seeding.creating(TestSeedResourceSlotType(enabled=self.enabled))
         caller = await lay_a_public_reader(seeding, ResourceSlotTypeEntityType(), self.role)
         return ASlotTypeAndACaller(seeding.made(slot_type), seeding.made(caller))
 
@@ -92,19 +99,26 @@ class ManySlotTypesAndSomeone(Given[Any, ManySlotTypesAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"자원 슬롯 종류 {self.besides + 1}개와, {role_named(self.role)} 한 명"
+        named = role_named(self.role)
+        return Says(
+            f"자원 슬롯 종류 {self.besides + 1}개와, {named} 한 명",
+            english=(
+                f"{self.besides + 1} resource slot types and "
+                f"one {in_language(named, Language.ENGLISH)}"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> ManySlotTypesAndACaller:
         wanted = await seeding.creating(
-            SeedResourceSlotType(
+            TestSeedResourceSlotType(
                 name_hint="wanted",
                 slot_type=self.named_kind,
                 display_name=self.named_display_name,
             )
         )
         others = [
-            await seeding.creating(SeedResourceSlotType(name_hint="other"))
+            await seeding.creating(TestSeedResourceSlotType(name_hint="other"))
             for _ in range(self.besides)
         ]
         caller = await lay_a_public_reader(seeding, ResourceSlotTypeEntityType(), self.role)
@@ -128,21 +142,24 @@ def slot_type_verdicts(
     display_icon: str,
     number_format: NumberFormatInfo,
     rank: int,
+    at: str = "",
 ) -> list[Verdict]:
     """Every place of one slot type node. The id is the name, so it is seen and the uuid is not."""
     return [
-        Same("id", node.id, named),
-        Skipped("uuid", "데이터베이스가 만든다"),
-        Same("slot_name", node.slot_name, named),
-        Same("slot_type", node.slot_type, slot_type.value),
-        Same("required", node.required, required),
-        Same("enabled", node.enabled, enabled),
-        Same("display_name", node.display_name, display_name),
-        Same("description", node.description, description),
-        Same("display_unit", node.display_unit, display_unit),
-        Same("display_icon", node.display_icon, display_icon),
-        Same("number_format", node.number_format, number_format),
-        Same("rank", node.rank, rank),
+        Same(f"{at}id", node.id, named),
+        Skipped(
+            f"{at}uuid", Says("데이터베이스가 생성합니다", english="the database generates it")
+        ),
+        Same(f"{at}slot_name", node.slot_name, named),
+        Same(f"{at}slot_type", node.slot_type, slot_type.value),
+        Same(f"{at}required", node.required, required),
+        Same(f"{at}enabled", node.enabled, enabled),
+        Same(f"{at}display_name", node.display_name, display_name),
+        Same(f"{at}description", node.description, description),
+        Same(f"{at}display_unit", node.display_unit, display_unit),
+        Same(f"{at}display_icon", node.display_icon, display_icon),
+        Same(f"{at}number_format", node.number_format, number_format),
+        Same(f"{at}rank", node.rank, rank),
     ]
 
 
@@ -163,7 +180,10 @@ class TheNewSlotTypeNode(Then[Any, ResourceSlotTypeNode]):
 
     @override
     def says(self) -> str:
-        return "생성한 슬롯 종류 전체가 반환된다"
+        return Says(
+            "생성한 슬롯 종류 전체가 반환됩니다",
+            english="the whole slot type just created comes back",
+        )
 
     @override
     def look(self, laid: Any, answered: Answered[ResourceSlotTypeNode]) -> list[Verdict]:
@@ -194,7 +214,10 @@ class TheSlotTypeNode(Then[ASlotTypeAndACaller, ResourceSlotTypeNode]):
 
     @override
     def says(self) -> str:
-        return "미리 만들어 둔 슬롯 종류 전체가 반환된다"
+        return Says(
+            "미리 저장한 슬롯 종류 전체가 반환됩니다",
+            english="the whole slot type seeded in advance comes back",
+        )
 
     @override
     def look(
@@ -231,7 +254,10 @@ class EveryLaidSlotTypeIsCounted(
 
     @override
     def says(self) -> str:
-        return "미리 만들어 둔 슬롯 종류가 모두 집계된다"
+        return Says(
+            "미리 저장한 슬롯 종류가 모두 집계됩니다",
+            english="every slot type seeded in advance is counted",
+        )
 
     @override
     def look(
@@ -262,7 +288,10 @@ class OnlyTheNamedSlotTypeIsLeft(
 
     @override
     def says(self) -> str:
-        return "필터에 맞는 슬롯 종류 하나만 반환된다"
+        return Says(
+            "필터에 맞는 슬롯 종류 하나만 반환됩니다",
+            english="only the one slot type the filter names comes back",
+        )
 
     @override
     def look(
@@ -289,7 +318,10 @@ class TheFirstPageOfSlotTypes(Then[ManySlotTypesAndACaller, AdminSearchResourceS
 
     @override
     def says(self) -> str:
-        return "기본 크기의 첫 페이지가 반환된다"
+        return Says(
+            "기본 크기의 첫 페이지가 반환됩니다",
+            english="the first page of the default size comes back",
+        )
 
     @override
     def look(
@@ -314,7 +346,10 @@ class TheDeletedSlotName(Then[ASlotTypeAndACaller, PurgeResourceSlotTypePayload]
 
     @override
     def says(self) -> str:
-        return "삭제한 슬롯 종류의 이름이 반환된다"
+        return Says(
+            "삭제한 슬롯 종류의 이름이 반환됩니다",
+            english="the name of the deleted slot type comes back",
+        )
 
     @override
     def look(

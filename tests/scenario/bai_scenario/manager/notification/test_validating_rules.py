@@ -21,7 +21,7 @@ from ai.backend.manager.errors.notification import (
 )
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.notification import (
     AnOrphanRuleAndSomeone,
@@ -30,11 +30,11 @@ from bai_scenario.components.notification import (
     TheRenderedMessage,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Validated = ValidateNotificationRulePayload
-type ValidatingStep = Scenario[SeedingSession, ARuleAndACaller, NotificationAdapter, Any]
+type ValidatingStep = Scenario[TestSeedingSession, ARuleAndACaller, NotificationAdapter, Any]
 
 SESSION_STARTED_DATA: Mapping[str, Any] = {
     "session_id": "sess-1",
@@ -60,8 +60,16 @@ class Validating(When[ARuleAndACaller, NotificationAdapter, Validated]):
 
     @override
     def describe(self, laid: ARuleAndACaller) -> str:
-        target = "존재하지 않는 id" if self.unknown else f"규칙 {laid.rule.name}"
-        return f"{laid.caller.username}이 {target}을 시험 데이터로 검증"
+        if self.unknown:
+            target_ko = "존재하지 않는 id"
+            target_en = "an unknown id"
+        else:
+            target_ko = f"규칙 {laid.rule.name}"
+            target_en = f"the rule {laid.rule.name}"
+        return Says(
+            f"{laid.caller.username}이 {target_ko} 를 시험 데이터로 검증합니다",
+            english=(f"{laid.caller.username} validates {target_en} with test data"),
+        )
 
     @override
     async def call(self, adapter: NotificationAdapter, laid: ARuleAndACaller) -> Validated:
@@ -76,7 +84,7 @@ class Validating(When[ARuleAndACaller, NotificationAdapter, Validated]):
 
 @dataclass(frozen=True)
 class TheSuperadminValidatesARule(
-    Scenario[SeedingSession, ARuleAndACaller, NotificationAdapter, Validated]
+    Scenario[TestSeedingSession, ARuleAndACaller, NotificationAdapter, Validated]
 ):
     @override
     def summary(self) -> str:
@@ -84,13 +92,18 @@ class TheSuperadminValidatesARule(
 
     @override
     def describe(self) -> str:
-        return (
-            "세션 시작 규칙 하나가 있고 슈퍼관리자가 그 종류에 맞는 시험 데이터로 검증하면, "
-            "템플릿에 데이터를 넣어 만든 문자열이 반환된다"
+        return Says(
+            "세션 시작 규칙 하나가 있고 superadmin 이 그 종류에 맞는 시험 데이터로 "
+            "검증하면, 템플릿에 데이터를 넣어 생성한 문자열이 반환됩니다",
+            english=(
+                "with one session-started rule, when the superadmin validates it with "
+                "test data of that type, the string made by putting the data into the "
+                "template comes back"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ARuleAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ARuleAndACaller]:
         return ARuleAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -104,7 +117,7 @@ class TheSuperadminValidatesARule(
 
 @dataclass(frozen=True)
 class ARuleWhoseChannelIsGoneIsRefused(
-    Scenario[SeedingSession, ARuleAndACaller, NotificationAdapter, Validated]
+    Scenario[TestSeedingSession, ARuleAndACaller, NotificationAdapter, Validated]
 ):
     @override
     def summary(self) -> str:
@@ -112,10 +125,16 @@ class ARuleWhoseChannelIsGoneIsRefused(
 
     @override
     def describe(self) -> str:
-        return "없는 채널 id를 가리키는 규칙을 검증하면 채널을 찾을 수 없다는 이유로 거부된다"
+        return Says(
+            "없는 채널 id 를 가리키는 규칙을 검증하면 채널을 찾을 수 없다는 이유로 거부됩니다",
+            english=(
+                "validating a rule pointing at an unknown channel id is rejected "
+                "because no channel is found"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ARuleAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ARuleAndACaller]:
         return AnOrphanRuleAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -129,7 +148,7 @@ class ARuleWhoseChannelIsGoneIsRefused(
 
 @dataclass(frozen=True)
 class TheSuperadminValidatingAnUnknownIdIsNotFound(
-    Scenario[SeedingSession, ARuleAndACaller, NotificationAdapter, Validated]
+    Scenario[TestSeedingSession, ARuleAndACaller, NotificationAdapter, Validated]
 ):
     @override
     def summary(self) -> str:
@@ -137,10 +156,16 @@ class TheSuperadminValidatingAnUnknownIdIsNotFound(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 존재하지 않는 id를 검증하면 대상을 찾을 수 없다는 이유로 거부된다"
+        return Says(
+            "superadmin 이 존재하지 않는 id 를 검증하면 대상을 찾을 수 없다는 이유로 거부됩니다",
+            english=(
+                "when the superadmin validates an id nothing answers to, "
+                "it is rejected because no target is found"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ARuleAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ARuleAndACaller]:
         return ARuleAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -154,7 +179,7 @@ class TheSuperadminValidatingAnUnknownIdIsNotFound(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotValidate(
-    Scenario[SeedingSession, ARuleAndACaller, NotificationAdapter, Validated]
+    Scenario[TestSeedingSession, ARuleAndACaller, NotificationAdapter, Validated]
 ):
     @override
     def summary(self) -> str:
@@ -162,10 +187,16 @@ class AUserGrantedNothingMayNotValidate(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 없는 사용자가 검증하려 하면 권한 부족으로 거부된다"
+        return Says(
+            "아무 권한도 없는 사용자가 검증하려 하면 권한 부족으로 거부됩니다",
+            english=(
+                "when a user granted nothing validates a rule, "
+                "it is rejected for not enough permission"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ARuleAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ARuleAndACaller]:
         return ARuleAndSomeone()
 
     @override

@@ -19,7 +19,7 @@ from ai.backend.manager.api.adapters.runtime_variant_preset.adapter import (
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Configured, Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.runtime_variant_preset import (
     APresetAndACaller,
@@ -28,12 +28,12 @@ from bai_scenario.components.runtime_variant_preset import (
 )
 from bai_scenario.components.system import ENFORCEMENT
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Deleted = DeleteRuntimeVariantPresetPayload
 type RetiringStep = Scenario[
-    SeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, Deleted
+    TestSeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, Deleted
 ]
 
 
@@ -45,22 +45,26 @@ class Deleting(When[APresetAndACaller, RuntimeVariantPresetAdapter, Deleted]):
 
     @override
     def operation(self) -> str:
-        return "delete"
+        return "purge"
 
     @override
     def describe(self, laid: APresetAndACaller) -> str:
         target = "존재하지 않는 ID" if self.unknown else laid.preset.name
-        return f"{laid.caller.username}의 삭제 요청 — 대상: {target}"
+        target_en = "an unknown id" if self.unknown else laid.preset.name
+        return Says(
+            f"{laid.caller.username}의 삭제 요청: 대상: {target}",
+            english=f"delete request from {laid.caller.username}: target: {target_en}",
+        )
 
     @override
     async def call(self, adapter: RuntimeVariantPresetAdapter, laid: APresetAndACaller) -> Deleted:
         with ActingAs(laid.caller):
-            return await adapter.delete(uuid4() if self.unknown else laid.preset.id)
+            return await adapter.purge(uuid4() if self.unknown else laid.preset.id)
 
 
 @dataclass(frozen=True)
 class TheSuperadminDeletesAPreset(
-    Scenario[SeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, Deleted]
+    Scenario[TestSeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, Deleted]
 ):
     @override
     def summary(self) -> str:
@@ -68,10 +72,17 @@ class TheSuperadminDeletesAPreset(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 프리셋을 삭제하면 삭제한 프리셋의 ID를 담은 응답이 반환된다"
+        return Says(
+            "superadmin 이 런타임 파라미터를 삭제하면 삭제한 런타임 파라미터의 ID 를 담은 응답이 "
+            "반환됩니다",
+            english=(
+                "when the superadmin deletes a preset, a response carrying the id of the deleted "
+                "preset comes back"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
         return APresetAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -85,7 +96,7 @@ class TheSuperadminDeletesAPreset(
 
 @dataclass(frozen=True)
 class AnIdNothingAnswersToIsNotFound(
-    Scenario[SeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, Deleted]
+    Scenario[TestSeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, Deleted]
 ):
     @override
     def summary(self) -> str:
@@ -93,10 +104,16 @@ class AnIdNothingAnswersToIsNotFound(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 존재하지 않는 ID를 삭제하면 대상을 찾을 수 없어 요청이 거부된다"
+        return Says(
+            "superadmin 이 존재하지 않는 ID 를 삭제하면 대상을 찾을 수 없어 요청이 거부됩니다",
+            english=(
+                "when the superadmin deletes an unknown id, the request is rejected because the "
+                "target cannot be found"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
         return APresetAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -110,7 +127,7 @@ class AnIdNothingAnswersToIsNotFound(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotDelete(
-    Scenario[SeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, Deleted]
+    Scenario[TestSeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, Deleted]
 ):
     @override
     def summary(self) -> str:
@@ -118,10 +135,17 @@ class AUserGrantedNothingMayNotDelete(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 없는 사용자가 프리셋을 삭제하면 권한이 부족하여 요청이 거부된다"
+        return Says(
+            "아무 권한도 없는 사용자가 런타임 파라미터를 삭제하면 권한이 부족하여 요청이 "
+            "거부됩니다",
+            english=(
+                "when a user granted nothing deletes a preset, the request is rejected for lack "
+                "of permission"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
         return APresetAndSomeone()
 
     @override
@@ -135,7 +159,8 @@ class AUserGrantedNothingMayNotDelete(
 
 @dataclass(frozen=True)
 class EnforcementOffLetsAnyoneDelete(
-    Scenario[SeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, Deleted], Configured
+    Scenario[TestSeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, Deleted],
+    Configured,
 ):
     @override
     def summary(self) -> str:
@@ -143,14 +168,19 @@ class EnforcementOffLetsAnyoneDelete(
 
     @override
     def describe(self) -> str:
-        return "권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 삭제할 수 있다"
+        return Says(
+            "권한 검사를 끄면 아무 권한도 없는 사용자도 런타임 파라미터를 삭제할 수 있습니다",
+            english=(
+                "turning the permission check off lets even a user granted nothing delete a preset"
+            ),
+        )
 
     @override
     def config(self) -> Mapping[str, Any]:
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
         return APresetAndSomeone()
 
     @override

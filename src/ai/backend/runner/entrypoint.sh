@@ -100,14 +100,14 @@ else
         adduser -s /bin/ash -h "/home/$USER_NAME" -H -D -u $USER_ID -G $GROUP_NAME -g "User" $USER_NAME \
           || echo "WARNING: failed to create the user '$USER_NAME' with uid $USER_ID"
       fi
-      usermod -aG shadow $USER_NAME
+      addgroup $USER_NAME shadow
       if ! getent group grpread > /dev/null 2>&1; then
         addgroup -g 1002 grpread
       fi
-      usermod -aG grpread $USER_NAME
+      addgroup $USER_NAME grpread
     else
       renumber_user $USER_NAME $USER_ID $GROUP_ID
-      usermod -aG shadow $USER_NAME
+      addgroup $USER_NAME shadow
     fi
     export SHELL=/bin/ash
   else  # for other distros (ubuntu, centos, etc.)

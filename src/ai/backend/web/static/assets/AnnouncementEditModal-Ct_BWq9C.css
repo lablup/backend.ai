@@ -1,0 +1,8 @@
+/**
+ @license
+ Copyright (c) 2015-2026 Lablup Inc. All rights reserved.
+
+ Co-located styles for AnnouncementEditModal. The markdown-preview typography
+ that used to live here is gone — Astryx `Markdown` styles its own output
+ (FR-3494). What remains is the formatting toolbar above the editor.
+*/.announcement-toolbar{padding:var(--spacing-0-5) var(--spacing-1);border:1px solid var(--color-border);border-bottom:none;border-top-left-radius:var(--radius-container);border-top-right-radius:var(--radius-container);background:var(--color-background-muted)}

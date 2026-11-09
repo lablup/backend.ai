@@ -1,26 +1,24 @@
 ---
 name: deployment-revision-preset-adapter-scenarios
 type: reference
-description: TODO - what the deployment revision preset adapter guarantees, as scenarios; nobody has written these yet
+description: what the deployment revision preset adapter guarantees; the preset lives in the public scope, general users read it, and the bulk purge answers per preset
 scope: src/ai/backend/manager/api/adapters/deployment_revision_preset
-keywords: [deployment revision preset, scenario, adapter, todo]
+keywords: [deployment revision preset, scenario, adapter, partial bulk]
 generated:
   by: claude-code/opus-5
-  at: 2026-09-10
+  at: 2026-10-16
 status: draft
 ---
-# deployment_revision_preset 어댑터 — 시나리오
+# deployment_revision_preset adapter: Knowledge
 
-TODO. 아직 아무도 적지 않았다.
+The rules are in `AGENTS.md` in the parent directory. When this document and a run result disagree, doubt the sentence first.
 
-규칙은 상위 디렉터리의 `AGENTS.md`에 있다. 이 파일이 이 모양으로 남아 있는 동안, 이 엔티티는
-시나리오 테스트가 없다.
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
-## 적는 법
+A preset lives in the public scope. A general user receives read permission only, and only a user who passes the permission check on the preset updates or purges it.
 
-1. `adapter.py`가 내놓는 호출을 전부 훑는다.
-2. 호출마다 무엇을 보장하는지 한 문장으로 적는다. 권한이 있는 경우와 없는 경우를 짝으로 둔다.
-3. 동작별로 표를 나눈다. 각 줄은 상황, 요청, 결과 셋을 갖는다.
-4. 어느 시나리오도 부르지 않는 호출은 "아직 적지 않은 것"에 남긴다.
+## Bulk update
 
-먼저 적힌 것을 보려면 `../domain/KNOWLEDGE.md`를 참고한다.
+## Bulk purge
+
+A bulk operation does not reject the whole call. Processed presets go into the processed list, and failures carry the id and the reason in the failure list.

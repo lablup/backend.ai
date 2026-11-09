@@ -32,6 +32,7 @@ from ai.backend.manager.data.deployment.types import (
     ExecutionSpec,
     LegacyDeploymentData,
     ModelDeploymentAccessTokenData,
+    ModelDeploymentAutoScalingRuleData,
     ModelDeploymentData,
     ModelDeploymentMetadataInfo,
     ModelRevisionData,
@@ -41,7 +42,11 @@ from ai.backend.manager.data.deployment.types import (
     RevisionRefreshResult,
 )
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.errors.service import EndpointTokenNotFound, RoutingNotFound
+from ai.backend.manager.errors.service import (
+    AutoScalingRuleNotFound,
+    EndpointTokenNotFound,
+    RoutingNotFound,
+)
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.endpoint.creators import EndpointTokenCreator
 from ai.backend.manager.models.endpoint.searchable_fields import DeploymentSearchableFields
@@ -79,6 +84,12 @@ from ai.backend.manager.services.deployment.actions.auto_scaling_rule.delete_aut
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.get_auto_scaling_rule import (
     GetAutoScalingRuleAction,
     GetAutoScalingRuleActionResult,
+)
+from ai.backend.manager.services.deployment.actions.auto_scaling_rule.partial_bulk_purge_auto_scaling_rules import (
+    PartialBulkPurgeAutoScalingRulesAction,
+)
+from ai.backend.manager.services.deployment.actions.auto_scaling_rule.partial_bulk_update_auto_scaling_rules import (
+    PartialBulkUpdateAutoScalingRulesAction,
 )
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.update_auto_scaling_rule import (
     UpdateAutoScalingRuleAction,
@@ -187,6 +198,7 @@ def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentDat
         deploying_revision_id=info.deploying_revision_id,
         scaling_rule_ids=[],  # Not available in DeploymentInfo
         replica_state=ReplicaStateData(
+            replica_count=info.replica.replica_count,
             desired_replica_count=_deployment_desired_replica_count(info),
             replica_ids=[],  # Not available in DeploymentInfo
         ),
@@ -222,6 +234,7 @@ def _convert_deployment_info_to_legacy_data(info: DeploymentInfo) -> LegacyDeplo
         network_access=info.network,
         revision=info.current_revision,
         replica_state=ReplicaStateData(
+            replica_count=info.replica.replica_count,
             desired_replica_count=_deployment_desired_replica_count(info),
             replica_ids=[],  # Not available in DeploymentInfo
         ),
@@ -395,12 +408,11 @@ class DeploymentService:
         """Replace the ``options`` surface of a deployment in full.
 
         The repository returns the persisted :class:`DeploymentOptions`
-        via ``UPDATE ... RETURNING`` so this path does a single round-trip
-        and does not re-materialise the surrounding deployment node.
+        without re-materialising the surrounding deployment node.
         """
         log.trace("deployment options replace requested", deployment_id=action.deployment_id)
         options = await self._deployment_repository.replace_deployment_options(
-            action.deployment_id, action.options
+            action.deployment_id, action.handler_options, action.agent_selection_policy
         )
         return ReplaceDeploymentOptionsActionResult(options=options)
 
@@ -423,7 +435,10 @@ class DeploymentService:
         await self._deployment_repository.get_endpoint_info(action.deployment_id)
         success = await self._deployment_controller.destroy_deployment(action.deployment_id)
         await self._deployment_controller.mark_lifecycle_needed(DeploymentLifecycleType.DESTROYING)
-        return DestroyDeploymentActionResult(success=success)
+        deployment_info = await self._deployment_repository.get_endpoint_info(action.deployment_id)
+        return DestroyDeploymentActionResult(
+            success=success, data=_convert_deployment_info_to_data(deployment_info)
+        )
 
     async def search_legacy_deployments(
         self, action: GlobalSearchLegacyDeploymentsAction
@@ -761,6 +776,45 @@ class DeploymentService:
                 for deployment_id, rule_ids in by_deployment.items()
             ]
         )
+
+    async def partial_bulk_update_auto_scaling_rules(
+        self, action: PartialBulkUpdateAutoScalingRulesAction
+    ) -> BulkFieldOpsResult[ModelDeploymentAutoScalingRuleData]:
+        """Update each named rule in its own transaction, answering for every one."""
+        successes: dict[FieldIdentifier, ModelDeploymentAutoScalingRuleData] = {}
+        errors: dict[FieldIdentifier, Exception] = {}
+        for rule_id, modifier in action.modifiers.items():
+            try:
+                successes[
+                    rule_id
+                ] = await self._deployment_repository.update_model_deployment_autoscaling_rule(
+                    rule_id, modifier
+                )
+            except BackendAIError as e:
+                errors[rule_id] = e
+        return BulkFieldOpsResult(successes=successes, errors=errors)
+
+    async def partial_bulk_purge_auto_scaling_rules(
+        self, action: PartialBulkPurgeAutoScalingRulesAction
+    ) -> BulkFieldOpsResult[ModelDeploymentAutoScalingRuleData]:
+        """Delete the named rules, answering for every one with the rule as it stood."""
+        found: dict[FieldIdentifier, ModelDeploymentAutoScalingRuleData] = {}
+        errors: dict[FieldIdentifier, Exception] = {}
+        for rule_id in action.rule_ids:
+            try:
+                found[
+                    rule_id
+                ] = await self._deployment_repository.get_model_deployment_autoscaling_rule(rule_id)
+            except BackendAIError as e:
+                errors[rule_id] = e
+        deleted = set(await self._deployment_repository.bulk_delete_autoscaling_rules(list(found)))
+        successes: dict[FieldIdentifier, ModelDeploymentAutoScalingRuleData] = {}
+        for found_id, data in found.items():
+            if found_id in deleted:
+                successes[found_id] = data
+            else:
+                errors[found_id] = AutoScalingRuleNotFound(f"Autoscaling rule {found_id} not found")
+        return BulkFieldOpsResult(successes=successes, errors=errors)
 
     # ========== Access Token ==========
 

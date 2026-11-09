@@ -1,7 +1,6 @@
 """Types for database source operations."""
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -13,14 +12,6 @@ from ai.backend.manager.models.session.row import SessionRow
 
 type AgentResourcesByAgent = Mapping[AgentId, Sequence[AgentResourceRow]]
 """The ``agent_resources`` rows an agent holds, keyed by the agent's name column."""
-
-
-@dataclass
-class KeypairConcurrencyData:
-    """Data class for keypair concurrency counts."""
-
-    regular_count: int
-    sftp_count: int
 
 
 class SessionRowCache:

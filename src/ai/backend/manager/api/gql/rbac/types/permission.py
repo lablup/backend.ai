@@ -125,19 +125,14 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.gql.rbac.types.role import RoleGQL
 
 _REMOVED_SCOPE_REASON = (
-    f"Deprecated since {NEXT_RELEASE_VERSION}. A permission follows the scope of its role;"
+    "Deprecated since 26.9.0. A permission follows the scope of its role;"
     " this field is always null."
 )
-_REMOVED_OPERATION_REASON = (
-    f"Deprecated since {NEXT_RELEASE_VERSION}. Use `permission`; this field is always null."
-)
+_REMOVED_OPERATION_REASON = "Deprecated since 26.9.0. Use `permission`; this field is always null."
 _IGNORED_SCOPE_REASON = (
-    f"Deprecated since {NEXT_RELEASE_VERSION}. A permission follows the scope of its role;"
-    " the value is ignored."
+    "Deprecated since 26.9.0. A permission follows the scope of its role; the value is ignored."
 )
-_IGNORED_OPERATION_REASON = (
-    f"Deprecated since {NEXT_RELEASE_VERSION}. Use `permission`; the value is ignored."
-)
+_IGNORED_OPERATION_REASON = "Deprecated since 26.9.0. Use `permission`; the value is ignored."
 
 # ==================== Enums ====================
 
@@ -146,7 +141,7 @@ _IGNORED_OPERATION_REASON = (
     BackendAIGQLMeta(
         added_version="26.3.0",
         description="RBAC operation type",
-        deprecated_version=NEXT_RELEASE_VERSION,
+        deprecated_version="26.9.0",
         deprecation_hint="`PermissionBit`",
     ),
     name="OperationType",
@@ -170,7 +165,7 @@ class OperationTypeGQL(StrEnum):
             "Filter for permission operation columns. Supports equals / in / not_equals / not_in."
         ),
         added_version="26.4.4",
-        deprecated_version=NEXT_RELEASE_VERSION,
+        deprecated_version="26.9.0",
         deprecation_hint="`PermissionBitFilter`",
     ),
     name="OperationTypeFilter",
@@ -197,7 +192,7 @@ class OperationTypeFilterGQL(PydanticInputMixin[Any]):
         description=(
             "Filter for a permission-bit column. Supports equals / in / not_equals / not_in."
         ),
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
     ),
     name="PermissionBitFilter",
 )
@@ -236,7 +231,7 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
     id: NodeID[str]
     field_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the permission row.",
         ),
     )
@@ -245,7 +240,7 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
     created_at: datetime
     permission: PermissionBitGQL = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="The permission bit the row holds.",
         )
     )
@@ -343,7 +338,7 @@ class PermissionFilter(PydanticInputMixin[PermissionFilterDTO], GQLFilter):
     entity_type: StringFilter | None = None
     permission: PermissionBitFilterGQL | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="Filter by the permission bit the entry grants.",
         ),
         default=None,
@@ -355,6 +350,12 @@ class PermissionFilter(PydanticInputMixin[PermissionFilterDTO], GQLFilter):
     scope_id: StringFilter | None = gql_field(
         description="Scope ID.", default=None, deprecation_reason=_IGNORED_SCOPE_REASON
     )
+    field_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by permission ID."
+        ),
+        default=None,
+    )
     AND: list[Self] | None = None
     OR: list[Self] | None = None
     NOT: list[Self] | None = None
@@ -363,7 +364,7 @@ class PermissionFilter(PydanticInputMixin[PermissionFilterDTO], GQLFilter):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Filter roles by conditions on the permission entries they carry.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
     ),
     name="RolePermissionNestedFilter",
 )
@@ -497,6 +498,19 @@ class ReplaceRolePermissionsInputGQL(PydanticInputMixin[ReplaceRolePermissionsIn
 )
 class DeletePermissionPayload(PydanticOutputMixin[DeletePermissionPayloadDTO]):
     id: UUID = gql_field(description="ID of the deleted permission.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for permission purge.",
+    ),
+    model=DeletePermissionPayloadDTO,
+    name="PurgePermissionPayload",
+)
+class PurgePermissionPayload(PydanticOutputMixin[DeletePermissionPayloadDTO]):
+    purged_id: strawberry.ID = gql_field(description="Global ID of the purged permission.")
+    field_id: UUID = gql_field(description="UUID of the purged permission.")
 
 
 # -------- Bulk role-permission payloads --------
@@ -737,7 +751,7 @@ class PermissionConnection(Connection[PermissionGQL]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="One scope and entity type to answer the caller's permissions for.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
     ),
     name="PermissionTarget",
 )
@@ -750,7 +764,7 @@ class PermissionTargetGQL(PydanticInputMixin[PermissionTargetDTO]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Input for the caller's permissions on one scope and entity type.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
     ),
     name="MyScopePermissionsInput",
 )
@@ -761,7 +775,7 @@ class MyScopePermissionsInputGQL(PydanticInputMixin[MyScopePermissionsInputDTO])
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Input for the caller's permissions on several scopes and entity types.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
     ),
     name="MyAtomicBulkScopePermissionsInput",
 )
@@ -778,7 +792,7 @@ class MyAtomicBulkScopePermissionsInputGQL(
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="The bits the caller holds on one entity type within one scope.",
     ),
     model=ScopeEntityPermissionDTO,
@@ -800,7 +814,7 @@ class ScopeEntityPermissionGQL(PydanticOutputMixin[ScopeEntityPermissionDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="Payload for the caller's permissions on one scope and entity type.",
     ),
     model=MyScopePermissionsPayloadDTO,
@@ -812,7 +826,7 @@ class MyScopePermissionsPayloadGQL(PydanticOutputMixin[MyScopePermissionsPayload
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="Payload for the caller's permissions on several scopes and entity types.",
     ),
     model=MyAtomicBulkScopePermissionsPayloadDTO,

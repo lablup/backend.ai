@@ -13,8 +13,8 @@ from typing import Any, Self, override
 import glide
 from aiotools.server import process_index
 
+from ai.backend.common.clients.valkey_client.sentinel_monitor.base import AbstractSentinelMonitor
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
-from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.message_queue.abc import AbstractConsumer
 from ai.backend.common.message_queue.exceptions import InvalidMessagePayloadError
 from ai.backend.common.message_queue.message import MessageId, MQMessage
@@ -77,6 +77,8 @@ class RedisConsumer(AbstractConsumer):
     _group_name: str
     _consumer_id: str
     _redis_target: RedisTarget
+    _sentinel_monitor: AbstractSentinelMonitor | None
+    _db: int
     _autoclaim_idle_timeout: int
     _closed: bool
     _loop_tasks: list[asyncio.Task[Any]]
@@ -90,6 +92,7 @@ class RedisConsumer(AbstractConsumer):
         client: ValkeyStreamClient,
         redis_target: RedisTarget,
         args: RedisConsumerArgs,
+        sentinel_monitor: AbstractSentinelMonitor | None = None,
     ) -> None:
         """
         Initialize the Redis consumer.
@@ -109,6 +112,8 @@ class RedisConsumer(AbstractConsumer):
         self._group_name = args.group_name
         self._consumer_id = _generate_consumer_id(args.node_id)
         self._redis_target = redis_target
+        self._sentinel_monitor = sentinel_monitor
+        self._db = args.db
         self._autoclaim_idle_timeout = args.autoclaim_idle_timeout
         self._closed = False
 
@@ -135,6 +140,7 @@ class RedisConsumer(AbstractConsumer):
         cls,
         redis_target: RedisTarget,
         args: RedisConsumerArgs,
+        sentinel_monitor: AbstractSentinelMonitor | None = None,
     ) -> Self:
         """
         Create a new RedisConsumer instance.
@@ -155,6 +161,7 @@ class RedisConsumer(AbstractConsumer):
             redis_target.to_valkey_target(),
             human_readable_name="redis_consumer",
             db_id=args.db,
+            sentinel_monitor=sentinel_monitor,
         )
 
         # Create consumer groups if they don't exist
@@ -169,6 +176,7 @@ class RedisConsumer(AbstractConsumer):
             client,
             redis_target,
             args,
+            sentinel_monitor,
         )
 
     @override
@@ -256,7 +264,8 @@ class RedisConsumer(AbstractConsumer):
         client = await ValkeyStreamClient.create(
             target,
             human_readable_name="redis_consumer_reader",
-            db_id=REDIS_STREAM_DB,
+            db_id=self._db,
+            sentinel_monitor=self._sentinel_monitor,
         )
 
         try:

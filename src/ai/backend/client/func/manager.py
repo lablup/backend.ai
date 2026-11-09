@@ -67,38 +67,6 @@ class Manager(BaseFunction):
 
     @api_function
     @classmethod
-    async def get_announcement(cls) -> dict[str, Any]:
-        """
-        Get current announcement.
-        """
-        rqst = Request("GET", "/manager/announcement")
-        async with rqst.fetch() as resp:
-            result: dict[str, Any] = await resp.json()
-
-            return result
-
-    @api_function
-    @classmethod
-    async def update_announcement(cls, enabled: bool = True, message: str | None = None) -> None:
-        """
-        Update the announcement.
-
-        :param enabled: If set ``False``, hide the announcement while keeping the
-            stored message.
-        :param message: Announcement message. Required if ``enabled`` is True.
-            If omitted, the stored message is kept as-is; pass an empty string to
-            clear it.
-        """
-        rqst = Request("POST", "/manager/announcement")
-        rqst.set_json({
-            "enabled": enabled,
-            "message": message,
-        })
-        async with rqst.fetch():
-            pass
-
-    @api_function
-    @classmethod
     async def scheduler_op(cls, op: str, args: Any) -> None:
         """
         Perform a scheduler operation.

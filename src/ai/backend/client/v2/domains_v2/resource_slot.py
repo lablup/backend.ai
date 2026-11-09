@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+from uuid import UUID
+
 from ai.backend.client.v2.base_domain import BaseDomainClient
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.resource_slot.request import (
     AdminSearchAgentResourcesInput,
     AdminSearchResourceAllocationsInput,
     AdminSearchResourceSlotTypesInput,
     CreateResourceSlotTypeInput,
+    PartialBulkPurgeResourceSlotTypesInput,
     UpdateResourceSlotTypeInput,
 )
 from ai.backend.common.dto.manager.v2.resource_slot.response import (
@@ -16,6 +20,7 @@ from ai.backend.common.dto.manager.v2.resource_slot.response import (
     AdminSearchResourceSlotTypesPayload,
     CreateResourceSlotTypePayload,
     PurgeResourceSlotTypePayload,
+    ResourceSlotTypeNode,
     UpdateResourceSlotTypePayload,
 )
 
@@ -58,8 +63,27 @@ class V2ResourceSlotClient(BaseDomainClient):
             response_model=UpdateResourceSlotTypePayload,
         )
 
+    async def purge_slot_type(self, slot_type_id: UUID) -> PurgeResourceSlotTypePayload:
+        """Remove a resource slot type."""
+        return await self._client.typed_request(
+            "DELETE",
+            f"{_PATH}/slot-types/{slot_type_id}",
+            response_model=PurgeResourceSlotTypePayload,
+        )
+
+    async def partial_bulk_purge_slot_types(
+        self, request: PartialBulkPurgeResourceSlotTypesInput
+    ) -> PartialBulkPayload[ResourceSlotTypeNode]:
+        """Remove several resource slot types, answering for each one."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/slot-types/partial-bulk-purge",
+            request=request,
+            response_model=PartialBulkPayload[ResourceSlotTypeNode],
+        )
+
     async def admin_purge_slot_type(self, slot_name: str) -> PurgeResourceSlotTypePayload:
-        """Remove a resource slot type by slot name (superadmin only)."""
+        """Deprecated. Use :meth:`purge_slot_type`."""
         return await self._client.typed_request(
             "DELETE",
             f"{_PATH}/slot-types/{slot_name}",

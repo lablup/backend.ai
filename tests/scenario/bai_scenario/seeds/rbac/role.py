@@ -18,11 +18,12 @@ from ai.backend.manager.data.permission.role import RoleData
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.models.rbac_models.permission.creators import RolePermissionCreator
 from ai.backend.manager.models.rbac_models.role.creators import RoleCreator
-from bai_scenario.seeds.seeder import Naming, SeedField, SeedRowFrom
+from ai.backend.testutils.scenario_steps import Says
+from bai_scenario.seeds.seeder import Naming, TestSeedFieldCreator, TestSeedRowFrom
 
 
 @dataclass(frozen=True)
-class SeedRole[S](SeedRowFrom[S, RoleData]):
+class TestSeedRole[S](TestSeedRowFrom[S, RoleData]):
     """A custom role in the scope of the row it is given."""
 
     scope_of: Callable[[S], EntityIdentifier]
@@ -30,11 +31,14 @@ class SeedRole[S](SeedRowFrom[S, RoleData]):
 
     @override
     def kind(self) -> str:
-        return "역할"
+        return Says("역할", english="Role")
 
     @override
     def detail(self) -> str:
-        return "이 역할이 앉은 스코프 안에서만 통한다"
+        return Says(
+            "부여된 스코프 안에서만 적용됩니다",
+            english="applies only within the scope it is granted in",
+        )
 
     @override
     def name(self, naming: Naming) -> str:
@@ -46,7 +50,7 @@ class SeedRole[S](SeedRowFrom[S, RoleData]):
 
 
 @dataclass(frozen=True)
-class SeedPermission(SeedField[RoleData, PermissionData]):
+class TestSeedPermission(TestSeedFieldCreator[RoleData, PermissionData]):
     """One operation the role may perform on one entity type."""
 
     entity_type: EntityType
@@ -54,7 +58,11 @@ class SeedPermission(SeedField[RoleData, PermissionData]):
 
     @override
     def kind(self) -> str:
-        return f"{self.entity_type} 전체에 {self.permission.name or int(self.permission)} 허용"
+        permission = self.permission.name or int(self.permission)
+        return Says(
+            f"{self.entity_type} 전체에 {permission} 허용",
+            english=f"{permission} allowed on every {self.entity_type}",
+        )
 
     @override
     def owner_id(self, owner: RoleData) -> RoleID:

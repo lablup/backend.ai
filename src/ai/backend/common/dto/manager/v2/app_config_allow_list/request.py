@@ -9,17 +9,20 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.app_config.types import AppConfigScopeType
-from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
+from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.app_config_allow_list.types import (
     AppConfigAllowListOrderField,
     AppConfigScopeTypeFilter,
 )
-from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.dto.manager.v2.common import NonEmptyList, OrderDirection
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "AppConfigAllowListFilter",
     "AppConfigAllowListOrder",
     "CreateAppConfigAllowListInput",
+    "PartialBulkPurgeAppConfigAllowListsInput",
+    "PartialBulkUpdateAppConfigAllowListsInput",
     "PurgeAppConfigAllowListInput",
     "SearchAppConfigAllowListInput",
     "UpdateAppConfigAllowListInput",
@@ -69,6 +72,20 @@ class PurgeAppConfigAllowListInput(BaseRequestModel):
     id: UUID = Field(description="App config allow-list entry id to purge.")
 
 
+class PartialBulkUpdateAppConfigAllowListsInput(BaseRequestModel):
+    """Input for updating several allow-list entries, each answered for separately."""
+
+    items: NonEmptyList[UpdateAppConfigAllowListInput] = Field(
+        description="The allow-list entries to update, each with its id and fields."
+    )
+
+
+class PartialBulkPurgeAppConfigAllowListsInput(BaseRequestModel):
+    """Input for purging several allow-list entries, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the allow-list entries to purge.")
+
+
 class AppConfigAllowListFilter(BaseRequestModel):
     """Filter for app config allow-list search."""
 
@@ -81,6 +98,10 @@ class AppConfigAllowListFilter(BaseRequestModel):
     )
     updated_at: DateTimeFilter | None = Field(
         default=None, description="Filter by last update datetime."
+    )
+    entity_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by allow-list entry ID.",
     )
     AND: list[Self] | None = Field(default=None, description="Match all of the given sub-filters.")
     OR: list[Self] | None = Field(default=None, description="Match any of the given sub-filters.")

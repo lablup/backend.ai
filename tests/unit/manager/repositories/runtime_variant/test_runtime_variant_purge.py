@@ -8,6 +8,7 @@ from collections.abc import AsyncGenerator
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.config import DefaultModelDefinition
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantEntityType, RuntimeVariantID
 from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetEntityType
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
@@ -79,7 +80,12 @@ async def _add_variant(database: ExtendedAsyncSAEngine) -> RuntimeVariantID:
     variant_id = RuntimeVariantID(uuid.uuid4())
     async with database.begin_session() as sess:
         sess.add(
-            RuntimeVariantRow(id=variant_id, name=f"variant-{variant_id.hex[:8]}", description=None)
+            RuntimeVariantRow(
+                id=variant_id,
+                name=f"variant-{variant_id.hex[:8]}",
+                description=None,
+                default_model_definition=DefaultModelDefinition(),
+            )
         )
         await sess.flush()
         await VirtualEntitySeeder().provision(sess, RuntimeVariantEntityType(), variant_id)

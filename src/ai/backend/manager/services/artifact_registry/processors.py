@@ -6,8 +6,14 @@ from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.ops.result import LookupOpsResult
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
-from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryConnectionData
-from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryConnectionData
+from ai.backend.manager.data.huggingface_registry.types import (
+    HuggingFaceRegistryConnectionData,
+    HuggingFaceRegistryData,
+)
+from ai.backend.manager.data.reservoir_registry.types import (
+    ReservoirRegistryConnectionData,
+    ReservoirRegistryData,
+)
 from ai.backend.manager.services.artifact_registry.actions.common.get_meta import (
     GetArtifactRegistryMetaAction,
     GetArtifactRegistryMetaActionResult,
@@ -41,6 +47,12 @@ from ai.backend.manager.services.artifact_registry.actions.huggingface.get_multi
 from ai.backend.manager.services.artifact_registry.actions.huggingface.list import (
     ListHuggingFaceRegistryAction,
     ListHuggingFaceRegistryActionResult,
+)
+from ai.backend.manager.services.artifact_registry.actions.huggingface.partial_bulk_purge import (
+    PartialBulkPurgeHuggingFaceRegistriesAction,
+)
+from ai.backend.manager.services.artifact_registry.actions.huggingface.partial_bulk_update import (
+    PartialBulkUpdateHuggingFaceRegistriesAction,
 )
 from ai.backend.manager.services.artifact_registry.actions.huggingface.search import (
     SearchHuggingFaceRegistriesAction,
@@ -76,6 +88,12 @@ from ai.backend.manager.services.artifact_registry.actions.reservoir.list import
     ListReservoirRegistriesAction,
     ListReservoirRegistriesActionResult,
 )
+from ai.backend.manager.services.artifact_registry.actions.reservoir.partial_bulk_purge import (
+    PartialBulkPurgeReservoirRegistriesAction,
+)
+from ai.backend.manager.services.artifact_registry.actions.reservoir.partial_bulk_update import (
+    PartialBulkUpdateReservoirRegistriesAction,
+)
 from ai.backend.manager.services.artifact_registry.actions.reservoir.search import (
     SearchReservoirRegistriesAction,
     SearchReservoirRegistriesActionResult,
@@ -99,6 +117,12 @@ class ArtifactRegistryProcessors:
     delete_huggingface_registry: SingleEntityActionProcessor[
         DeleteHuggingFaceRegistryAction, DeleteHuggingFaceRegistryActionResult
     ]
+    partial_bulk_update_huggingface_registries: PartialBulkActionProcessor[
+        PartialBulkUpdateHuggingFaceRegistriesAction, HuggingFaceRegistryData
+    ]
+    partial_bulk_purge_huggingface_registries: PartialBulkActionProcessor[
+        PartialBulkPurgeHuggingFaceRegistriesAction, ArtifactRegistryID
+    ]
     get_huggingface_registry: SingleEntityActionProcessor[
         GetHuggingFaceRegistryAction, GetHuggingFaceRegistryActionResult
     ]
@@ -119,6 +143,12 @@ class ArtifactRegistryProcessors:
     ]
     delete_reservoir_registry: SingleEntityActionProcessor[
         DeleteReservoirRegistryAction, DeleteReservoirActionResult
+    ]
+    partial_bulk_update_reservoir_registries: PartialBulkActionProcessor[
+        PartialBulkUpdateReservoirRegistriesAction, ReservoirRegistryData
+    ]
+    partial_bulk_purge_reservoir_registries: PartialBulkActionProcessor[
+        PartialBulkPurgeReservoirRegistriesAction, ArtifactRegistryID
     ]
     get_reservoir_registry: SingleEntityActionProcessor[
         GetReservoirRegistryAction, GetReservoirRegistryActionResult
@@ -198,6 +228,23 @@ class ArtifactRegistryProcessors:
         )
         self.get_reservoir_registry = group.single_entity(
             GetReservoirRegistryAction, service.get_reservoir_registry
+        )
+
+        self.partial_bulk_update_huggingface_registries = group.partial_bulk(
+            PartialBulkUpdateHuggingFaceRegistriesAction,
+            service.partial_bulk_update_huggingface_registries,
+        )
+        self.partial_bulk_purge_huggingface_registries = group.partial_bulk(
+            PartialBulkPurgeHuggingFaceRegistriesAction,
+            service.partial_bulk_purge_huggingface_registries,
+        )
+        self.partial_bulk_update_reservoir_registries = group.partial_bulk(
+            PartialBulkUpdateReservoirRegistriesAction,
+            service.partial_bulk_update_reservoir_registries,
+        )
+        self.partial_bulk_purge_reservoir_registries = group.partial_bulk(
+            PartialBulkPurgeReservoirRegistriesAction,
+            service.partial_bulk_purge_reservoir_registries,
         )
 
         self.get_registry_meta = group.single_entity(

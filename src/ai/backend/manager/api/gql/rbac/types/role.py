@@ -14,8 +14,10 @@ from strawberry import UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.entity.role import RoleID
+from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.types import EntityType, RuntimeEntityID
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.rbac.request import (
     AdminSearchPermissionsGQLInput,
     SearchRoleAssignmentsInput,
@@ -37,6 +39,21 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
     MappedScopeNestedFilter as MappedScopeNestedFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    PartialBulkDeleteRolesInput as PartialBulkDeleteRolesInputDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    PartialBulkPurgeRolesInput as PartialBulkPurgeRolesInputDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    PartialBulkRestoreRolesInput as PartialBulkRestoreRolesInputDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    PartialBulkUpdateRoleItemInput as PartialBulkUpdateRoleItemInputDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    PartialBulkUpdateRolesInput as PartialBulkUpdateRolesInputDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
     PurgeRoleInput as PurgeRoleInputDTO,
@@ -90,6 +107,9 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
     PurgeRolePayload as PurgeRolePayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.response import (
+    RestoreRolePayload as RestoreRolePayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.response import (
     RoleAssignmentNode,
     RoleNode,
 )
@@ -105,6 +125,7 @@ from ai.backend.common.dto.manager.v2.rbac.types import (
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter, encode_cursor
+from ai.backend.manager.api.gql.common_types import PartialBulkFailureGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -116,6 +137,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_input,
     gql_pydantic_type,
 )
+from ai.backend.manager.api.gql.entity_label.types.filters import EntityLabelNestedFilterGQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.rbac.types.scope import (
     ScopeInputGQL,
@@ -139,6 +161,7 @@ if TYPE_CHECKING:
         PermissionOrderBy,
         RolePermissionNestedFilterGQL,
     )
+    from ai.backend.manager.api.gql.role_preset.types.node import RolePresetGQL
     from ai.backend.manager.api.gql.user.types.filters import UserFilterGQL, UserOrderByGQL
     from ai.backend.manager.api.gql.user.types.node import UserV2Connection, UserV2GQL
 
@@ -172,7 +195,7 @@ class RoleGQL(PydanticNodeMixin[RoleNode]):
     id: NodeID[str]
     entity_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the role.",
         ),
     )
@@ -194,20 +217,30 @@ class RoleGQL(PydanticNodeMixin[RoleNode]):
     )
     scope_type: str = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="Type of the scope the role belongs to.",
         )
     )
     scope_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="ID of the scope the role belongs to.",
         )
+    )
+    role_preset_id: UUID | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description=(
+                "ID of the role preset the role was instantiated from. Null when the role "
+                "was not created from a preset or the preset has been purged."
+            ),
+        ),
+        default=None,
     )
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="The scope the role belongs to.",
         )
     )  # type: ignore[misc]
@@ -223,6 +256,31 @@ class RoleGQL(PydanticNodeMixin[RoleNode]):
     ):
         return await info.context.data_loaders.entity_node_loader.load(
             RuntimeEntityID(EntityType.from_name(self.scope_type), self.scope_id)
+        )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description=(
+                "The role preset the role was instantiated from. Null when the role "
+                "was not created from a preset or the preset has been purged."
+            ),
+        )
+    )  # type: ignore[misc]
+    async def role_preset(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            RolePresetGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.role_preset.types.node"),
+        ]
+        | None
+    ):
+        if self.role_preset_id is None:
+            return None
+        return await info.context.data_loaders.role_preset_loader.load(
+            RolePresetID(self.role_preset_id)
         )
 
     @classmethod
@@ -315,12 +373,11 @@ class RoleGQL(PydanticNodeMixin[RoleNode]):
         BackendAIGQLMeta(
             added_version="26.3.0",
             description="Users assigned to this role, as assignment rows.",
-            deprecated_version=NEXT_RELEASE_VERSION,
+            deprecated_version="26.9.0",
             deprecation_hint="`usersV2`",
         ),
         deprecation_reason=(
-            f"Deprecated since {NEXT_RELEASE_VERSION}. Use `usersV2`, which answers with the "
-            "users themselves."
+            "Deprecated since 26.9.0. Use `usersV2`, which answers with the users themselves."
         ),
     )  # type: ignore[misc]
     async def users(
@@ -368,7 +425,7 @@ class RoleGQL(PydanticNodeMixin[RoleNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="Users holding this role.",
         )
     )  # type: ignore[misc]
@@ -440,11 +497,11 @@ class RoleGQL(PydanticNodeMixin[RoleNode]):
         BackendAIGQLMeta(
             added_version="26.4.2",
             description="Scopes this role is registered in.",
-            deprecated_version=NEXT_RELEASE_VERSION,
+            deprecated_version="26.9.0",
             deprecation_hint="`scope`",
         ),
         deprecation_reason=(
-            f"Deprecated since {NEXT_RELEASE_VERSION}. Use `scope`. A role belongs to one "
+            "Deprecated since 26.9.0. Use `scope`. A role belongs to one "
             "scope, so this connection holds that one scope and ignores `filter` and `order_by`."
         ),
     )  # type: ignore[misc]
@@ -653,7 +710,7 @@ class RoleMappedScopeNestedFilterGQL(PydanticInputMixin[MappedScopeNestedFilterD
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Entities a role uses, whose ids narrow the read.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
     ),
     name="RoleUses",
 )
@@ -672,7 +729,7 @@ class RoleUsesGQL(PydanticInputMixin[RoleUsesDTO]):
             "to read each listed entity, or the request is refused. Only roles the caller "
             "can read are returned, even when a listed entity is tied to others."
         ),
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
     ),
     name="RoleUsage",
 )
@@ -696,7 +753,7 @@ class RoleFilter(PydanticInputMixin[RoleFilterDTO], GQLFilter):
         default=None,
         description="Filter roles by the users holding them.",
         deprecation_reason=(
-            f"Deprecated since {NEXT_RELEASE_VERSION}. A filter reaching the rows that join"
+            "Deprecated since 26.9.0. A filter reaching the rows that join"
             " a role to a user cannot check whether the caller may read that user. Search"
             " roles within that user's scope instead."
         ),
@@ -710,8 +767,19 @@ class RoleFilter(PydanticInputMixin[RoleFilterDTO], GQLFilter):
         | None
     ) = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="Filter by conditions on the role's permission entries.",
+        ),
+        default=None,
+    )
+    entity_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter by role ID."),
+        default=None,
+    )
+    labels: EntityLabelNestedFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Select entities by the labels on them.",
         ),
         default=None,
     )
@@ -739,7 +807,7 @@ class RoleAssignmentRoleNestedFilterGQL(PydanticInputMixin[RoleNestedFilterDTO])
 
 
 _ASSIGNMENT_ROLE_DEPRECATION = (
-    f"Deprecated since {NEXT_RELEASE_VERSION}. A filter on the role an assignment names, or"
+    "Deprecated since 26.9.0. A filter on the role an assignment names, or"
     " on what that role carries, cannot check whether the caller may read it. Search roles"
     " first and narrow by `roleId`."
 )
@@ -817,9 +885,7 @@ class CreateRoleInput(PydanticInputMixin[CreateRoleInputDTO]):
     source: RoleSourceGQL | None = gql_field(
         description="Deprecated and ignored: a created role is always custom.",
         default=None,
-        deprecation_reason=(
-            f"Deprecated since {NEXT_RELEASE_VERSION}. Ignored: a created role is always custom."
-        ),
+        deprecation_reason=("Deprecated since 26.9.0. Ignored: a created role is always custom."),
     )
     auto_assign: bool = gql_added_field(
         BackendAIGQLMeta(
@@ -833,7 +899,7 @@ class CreateRoleInput(PydanticInputMixin[CreateRoleInputDTO]):
     )
     scope: ScopeInputGQL | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="The scope the role belongs to.",
         ),
         default=None,
@@ -841,7 +907,7 @@ class CreateRoleInput(PydanticInputMixin[CreateRoleInputDTO]):
     scopes: list[ScopeInputGQL] | None = gql_field(
         description="Deprecated: use `scope`. Accepts exactly one entry.",
         default=None,
-        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `scope`.",
+        deprecation_reason="Deprecated since 26.9.0. Use `scope`.",
     )
 
 
@@ -849,10 +915,26 @@ class CreateRoleInput(PydanticInputMixin[CreateRoleInputDTO]):
     BackendAIGQLMeta(description="Input for updating a role", added_version="26.3.0"),
 )
 class UpdateRoleInput(PydanticInputMixin[UpdateRoleInputDTO]):
-    id: UUID
+    id: UUID | None = gql_field(
+        description="ID of the role to update. Required by `adminUpdateRole`.",
+        default=UNSET,
+        deprecation_reason=(
+            f"Deprecated since {NEXT_RELEASE_VERSION}. Pass the role ID as the `id` argument "
+            "of `updateRole`."
+        ),
+    )
     name: str | None = UNSET
     description: str | None = UNSET
-    status: RoleStatusGQL | None = UNSET
+    status: RoleStatusGQL | None = gql_field(
+        description=(
+            "DELETED is handled as `deleteRole`, ACTIVE on a deleted role as `restoreRole`; "
+            "other values are ignored."
+        ),
+        default=UNSET,
+        deprecation_reason=(
+            f"Deprecated since {NEXT_RELEASE_VERSION}. Use `deleteRole` or `restoreRole`."
+        ),
+    )
     auto_assign: bool | None = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.4",
@@ -919,6 +1001,64 @@ class PurgeRoleInput(PydanticInputMixin[PurgeRoleInputDTO]):
     id: UUID
 
 
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="One role of a partial bulk update and the fields to update on it.",
+    ),
+    name="PartialBulkUpdateRoleItemInput",
+)
+class PartialBulkUpdateRoleItemInputGQL(PydanticInputMixin[PartialBulkUpdateRoleItemInputDTO]):
+    id: UUID = gql_field(description="ID of the role to update.")
+    input: UpdateRoleInput = gql_field(description="Fields to update on the role.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for updating several roles, each answered for separately.",
+    ),
+    name="PartialBulkUpdateRolesInput",
+)
+class PartialBulkUpdateRolesInputGQL(PydanticInputMixin[PartialBulkUpdateRolesInputDTO]):
+    items: list[PartialBulkUpdateRoleItemInputGQL] = gql_field(
+        description="The roles to update, each with its fields."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for soft-deleting several roles, each answered for separately.",
+    ),
+    name="PartialBulkDeleteRolesInput",
+)
+class PartialBulkDeleteRolesInputGQL(PydanticInputMixin[PartialBulkDeleteRolesInputDTO]):
+    ids: list[UUID] = gql_field(description="IDs of the roles to soft-delete.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for restoring several soft-deleted roles, each answered for separately.",
+    ),
+    name="PartialBulkRestoreRolesInput",
+)
+class PartialBulkRestoreRolesInputGQL(PydanticInputMixin[PartialBulkRestoreRolesInputDTO]):
+    ids: list[UUID] = gql_field(description="IDs of the roles to restore.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=("Input for permanently removing several roles, each answered for separately."),
+    ),
+    name="PartialBulkPurgeRolesInput",
+)
+class PartialBulkPurgeRolesInputGQL(PydanticInputMixin[PartialBulkPurgeRolesInputDTO]):
+    ids: list[UUID] = gql_field(description="IDs of the roles to purge.")
+
+
 # ==================== Payload Types ====================
 
 
@@ -928,7 +1068,16 @@ class PurgeRoleInput(PydanticInputMixin[PurgeRoleInputDTO]):
     name="DeleteRolePayload",
 )
 class DeleteRolePayload(PydanticOutputMixin[DeleteRolePayloadDTO]):
-    id: UUID = gql_field(description="ID of the deleted role.")
+    id: UUID = gql_field(
+        description="ID of the deleted role.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `role`.",
+    )
+    role: RoleGQL = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The soft-deleted role.",
+        ),
+    )
 
 
 @gql_pydantic_type(
@@ -937,7 +1086,57 @@ class DeleteRolePayload(PydanticOutputMixin[DeleteRolePayloadDTO]):
     name="PurgeRolePayload",
 )
 class PurgeRolePayload(PydanticOutputMixin[PurgeRolePayloadDTO]):
-    id: UUID = gql_field(description="ID of the purged role.")
+    id: UUID = gql_field(
+        description="ID of the purged role.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `purgedId` or `entityId`.",
+    )
+    purged_id: strawberry.ID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Global ID of the purged role.",
+        ),
+    )
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="UUID of the purged role."
+        ),
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION, description="Payload for restore role mutation."
+    ),
+    model=RestoreRolePayloadDTO,
+    name="RestoreRolePayload",
+)
+class RestoreRolePayload(PydanticOutputMixin[RestoreRolePayloadDTO]):
+    id: UUID = gql_field(
+        description="ID of the restored role.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `role`.",
+    )
+    role: RoleGQL = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="The restored role."),
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Result of a partial bulk role operation: the roles processed and the ones that failed."
+        ),
+    ),
+    model=PartialBulkPayload[RoleNode],
+    name="PartialBulkRolesPayload",
+)
+class PartialBulkRolesPayloadGQL(PydanticOutputMixin[PartialBulkPayload[RoleNode]]):
+    """Payload for partial bulk role mutations."""
+
+    successes: list[RoleGQL] = gql_field(description="The roles processed, as they now stand.")
+    failed: list[PartialBulkFailureGQL] = gql_field(
+        description="The roles not processed, each with the reason."
+    )
 
 
 @gql_pydantic_type(
@@ -965,9 +1164,9 @@ class BulkAssignRolePayloadGQL(PydanticOutputMixin[BulkAssignRoleResultPayloadDT
         description="List of successfully created role assignments."
     )
     failed: list[BulkAssignRoleErrorGQL] = gql_field(
-        description="List of errors for users that failed to be assigned.",
-        deprecation_reason=(
-            "Always empty. A user already holding the role keeps it; every other refusal raises."
+        description=(
+            "Users already holding the role, whose assignments are left as they stand. "
+            "Every other refusal raises."
         ),
     )
 

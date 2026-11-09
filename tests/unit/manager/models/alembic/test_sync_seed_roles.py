@@ -17,11 +17,11 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy import Table
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID, DomainName
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import RoleSource
 from ai.backend.manager.models.alembic.versions.dc61fa027fc1_assign_every_user_their_user_owner_role import (
@@ -41,7 +41,6 @@ from ai.backend.manager.models.alembic.versions.f4a1c9d20b73_sync_seed_roles_wit
     downgrade,
 )
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.project.row import (
     ProjectRow,
     ProjectType,
@@ -97,6 +96,13 @@ async def db(
     database_connection: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
     async with with_tables(database_connection, _TABLES):
+        async with database_connection.begin() as conn:
+            await conn.execute(
+                sa.text(
+                    "ALTER TABLE role_presets "
+                    "ADD COLUMN IF NOT EXISTS deleted BOOLEAN NOT NULL DEFAULT false"
+                )
+            )
         yield database_connection
 
 
@@ -218,9 +224,10 @@ async def seeded(db: ExtendedAsyncSAEngine) -> dict[str, uuid.UUID]:
                     name=f"preset_{preset.name}",
                     scope_type=preset.scope_type,
                     auto_assign=preset.auto_assign,
-                    deleted=True,
                 )
             )
+        await session.flush()
+        await session.execute(sa.text("UPDATE role_presets SET deleted = true"))
         roles = {
             "project_admin": RoleRow(
                 name=f"role_project_{str(project_id)[:8]}_admin",
@@ -469,9 +476,10 @@ async def seeded_from_fixture(db: ExtendedAsyncSAEngine) -> dict[str, Any]:
                     name=f"preset_{preset.name}",
                     scope_type=preset.scope_type,
                     auto_assign=preset.auto_assign,
-                    deleted=True,
                 )
             )
+        await session.flush()
+        await session.execute(sa.text("UPDATE role_presets SET deleted = true"))
         roles = {
             name: RoleRow(
                 name=name,
@@ -544,7 +552,9 @@ class TestSyncSeedRoles:
         self, db: ExtendedAsyncSAEngine, migrated: dict[str, uuid.UUID]
     ) -> None:
         async with db.begin_readonly_session() as session:
-            rows = (await session.execute(sa.select(RolePresetRow))).scalars().all()
+            rows = (
+                await session.execute(sa.text("SELECT id, name, deleted FROM role_presets"))
+            ).all()
         assert {(row.id, row.name, row.deleted) for row in rows} == {
             (uuid.UUID(preset.id), preset.name, False) for preset in _PRESETS
         }

@@ -18,6 +18,7 @@ from ai.backend.testutils.scenario_steps import (
     Given,
     Refused,
     Same,
+    Says,
     Scenario,
     Skipped,
     Then,
@@ -31,12 +32,12 @@ from bai_scenario.components.container_registry import (
     ManyRegistriesAndSomeone,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Loaded = list[ContainerRegistryNode | Exception | None]
 type ReadingScenario = Scenario[
-    SeedingSession, ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded
+    TestSeedingSession, ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded
 ]
 
 
@@ -52,8 +53,17 @@ class Loading(When[ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded]):
     def describe(self, laid: ManyRegistriesAndACaller) -> str:
         who = laid.caller.username
         if self.empty:
-            return f"{who}이 빈 id 목록으로 조회"
-        return f"{who}이 미리 만들어 둔 레지스트리 둘과 존재하지 않는 id 하나를 한 번에 조회"
+            return Says(
+                f"{who}이 빈 id 목록으로 조회합니다",
+                english=f"{who} loads with an empty id list",
+            )
+        return Says(
+            f"{who}이 미리 저장한 컨테이너 레지스트리 둘과 존재하지 않는 id 하나를 한 번에 조회합니다",
+            english=(
+                f"{who} loads two container registries seeded in advance and one id that "
+                "does not exist at once"
+            ),
+        )
 
     def registry_ids(self, laid: ManyRegistriesAndACaller) -> list[ContainerRegistryID]:
         if self.empty:
@@ -82,7 +92,14 @@ def registry_name_of(one: ContainerRegistryNode | Exception | None) -> str | Non
 class TheOrderIsKept(Then[ManyRegistriesAndACaller, Loaded]):
     @override
     def says(self) -> str:
-        return "미리 만들어 둔 레지스트리는 요청한 순서대로 반환되고, 존재하지 않는 id의 항목은 검사하지 않는다"
+        return Says(
+            "미리 저장한 컨테이너 레지스트리는 요청한 순서대로 반환되고, 존재하지 않는 id 의 "
+            "항목은 검사하지 않습니다",
+            english=(
+                "the container registries seeded in advance come back in the requested order, "
+                "and the entry for the id that does not exist is not checked"
+            ),
+        )
 
     @override
     def look(self, laid: ManyRegistriesAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
@@ -94,7 +111,16 @@ class TheOrderIsKept(Then[ManyRegistriesAndACaller, Loaded]):
         return [
             Same("length", len(got), 3),
             Same("[0].registry_name", registry_name_of(got[0]), laid.registries[0].registry_name),
-            Skipped("[1]", "존재하지 않는 id에 슈퍼관리자가 받는 응답은 아직 정해지지 않았다"),
+            Skipped(
+                "[1]",
+                Says(
+                    "존재하지 않는 id 에 superadmin 이 받는 응답은 아직 정해지지 않았습니다",
+                    english=(
+                        "the response a superadmin gets for an id that does not exist is not "
+                        "decided yet"
+                    ),
+                ),
+            ),
             Same("[2].registry_name", registry_name_of(got[2]), laid.registries[1].registry_name),
         ]
 
@@ -103,7 +129,10 @@ class TheOrderIsKept(Then[ManyRegistriesAndACaller, Loaded]):
 class EveryIdIsRefused(Then[ManyRegistriesAndACaller, Loaded]):
     @override
     def says(self) -> str:
-        return "항목마다 권한 부족 거부가 담겨 반환된다"
+        return Says(
+            "항목마다 권한 부족 거부가 담겨 반환됩니다",
+            english="every entry comes back holding a rejection for lack of permission",
+        )
 
     @override
     def look(self, laid: ManyRegistriesAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
@@ -123,7 +152,7 @@ class EveryIdIsRefused(Then[ManyRegistriesAndACaller, Loaded]):
 class AnEmptyListComesBack(Then[ManyRegistriesAndACaller, Loaded]):
     @override
     def says(self) -> str:
-        return "빈 응답이 반환된다"
+        return Says("빈 응답이 반환됩니다", english="an empty answer comes back")
 
     @override
     def look(self, laid: ManyRegistriesAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
@@ -135,7 +164,7 @@ class AnEmptyListComesBack(Then[ManyRegistriesAndACaller, Loaded]):
 
 @dataclass(frozen=True)
 class LoadingKeepsTheOrder(
-    Scenario[SeedingSession, ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded]
+    Scenario[TestSeedingSession, ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded]
 ):
     @override
     def summary(self) -> str:
@@ -143,14 +172,20 @@ class LoadingKeepsTheOrder(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 미리 만들어 둔 레지스트리 둘과 존재하지 않는 id 하나를 한 번에 조회하면, "
-            "미리 만들어 둔 레지스트리는 요청한 순서대로 반환된다. "
-            "존재하지 않는 id의 항목에 무엇이 반환되는지는 아직 정해지지 않았다"
+        return Says(
+            "superadmin 이 미리 저장한 컨테이너 레지스트리 둘과 존재하지 않는 id 하나를 한 번에 "
+            "조회하면, 미리 저장한 컨테이너 레지스트리는 요청한 순서대로 반환됩니다. 존재하지 않는 "
+            "id 의 항목에 무엇이 반환되는지는 아직 정해지지 않았습니다",
+            english=(
+                "when the superadmin loads two container registries seeded in advance and one "
+                "id that does not exist at once, the container registries seeded in advance "
+                "come back in the requested order. What comes back for the entry of the id that "
+                "does not exist is not decided yet"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyRegistriesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyRegistriesAndACaller]:
         return ManyRegistriesAndSomeone()
 
     @override
@@ -164,7 +199,7 @@ class LoadingKeepsTheOrder(
 
 @dataclass(frozen=True)
 class AnEmptyListAsksNothing(
-    Scenario[SeedingSession, ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded]
+    Scenario[TestSeedingSession, ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded]
 ):
     @override
     def summary(self) -> str:
@@ -172,10 +207,15 @@ class AnEmptyListAsksNothing(
 
     @override
     def describe(self) -> str:
-        return "빈 id 목록으로 조회하면 하위 계층을 호출하지 않고 빈 응답이 반환된다"
+        return Says(
+            "빈 id 목록으로 조회하면 하위 계층을 호출하지 않고 빈 응답이 반환됩니다",
+            english=(
+                "loading with an empty id list calls no lower layer and an empty answer comes back"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyRegistriesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyRegistriesAndACaller]:
         return ManyRegistriesAndSomeone()
 
     @override
@@ -189,7 +229,7 @@ class AnEmptyListAsksNothing(
 
 @dataclass(frozen=True)
 class APlainUserIsRefusedOnEveryId(
-    Scenario[SeedingSession, ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded]
+    Scenario[TestSeedingSession, ManyRegistriesAndACaller, ContainerRegistryAdapter, Loaded]
 ):
     @override
     def summary(self) -> str:
@@ -197,14 +237,20 @@ class APlainUserIsRefusedOnEveryId(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "권한을 받지 않은 사용자가 id 여럿을 한 번에 조회하면, 요청 전체가 거부되는 대신 "
-            "항목마다 권한 부족 거부가 담겨 반환된다. "
-            "존재하지 않는 id도 같은 거부로 반환되어 있는지 없는지가 드러나지 않는다"
+            "항목마다 권한 부족 거부가 담겨 반환됩니다. 존재하지 않는 id 도 같은 거부로 반환되어 "
+            "있는지 없는지가 드러나지 않습니다",
+            english=(
+                "when a user granted nothing loads several ids at once, instead of the whole "
+                "request being rejected, every entry comes back holding a rejection for lack of "
+                "permission. The id that does not exist also comes back with the same rejection, "
+                "so whether it exists is not revealed"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyRegistriesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyRegistriesAndACaller]:
         return ManyRegistriesAndSomeone(role=UserRole.USER)
 
     @override

@@ -35,29 +35,32 @@ from ai.backend.testutils.scenario_steps import (
     Condition,
     Given,
     Held,
+    Language,
     Refused,
     Same,
     SameAs,
+    Says,
     Scenario,
     Skipped,
     Then,
     Told,
     Verdict,
     When,
+    in_language,
 )
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.domain import WAS_HERE, WrittenByThisRun
 from bai_scenario.components.user import AGrant, KeypairNodeLook, UserNodeLook
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
-from bai_scenario.seeds.domain.domain import SeedDomain
-from bai_scenario.seeds.resource_policy.keypair import SeedKeypairPolicy
-from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
-from bai_scenario.seeds.resource_policy.user import SeedUserPolicy
-from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
-from bai_scenario.seeds.user.fields import SeedKeypairOf
-from bai_scenario.seeds.user.user import SeedUserOf
+from bai_scenario.seeds.domain.domain import TestSeedDomain
+from bai_scenario.seeds.resource_policy.keypair import TestSeedKeypairPolicy
+from bai_scenario.seeds.resource_policy.project import TestSeedProjectPolicy
+from bai_scenario.seeds.resource_policy.user import TestSeedUserPolicy
+from bai_scenario.seeds.seeder import Laid, TestSeeder, TestSeedNest
+from bai_scenario.seeds.user.fields import TestSeedKeypairOf
+from bai_scenario.seeds.user.user import TestSeedUserOf
 
 SERVER_RATE_LIMIT = 10000
 """키 행의 요청 한도 기본값. 시드는 한도를 적지 않으므로 컬럼 기본값이 들어간다."""
@@ -108,21 +111,26 @@ type Answer = object
 
 
 @dataclass(frozen=True)
-class SomeoneAndTheirKeyPolicy(SeedNest[tuple[Laid[KeyPairResourcePolicyData], Laid[UserData]]]):
+class SomeoneAndTheirKeyPolicy(
+    TestSeedNest[tuple[Laid[KeyPairResourcePolicyData], Laid[UserData]]]
+):
     """그 도메인의 사용자 한 명과, 그 사람 기본 키가 딛는 키 정책."""
 
     domain: Laid[Any]
 
     @override
     def kind(self) -> str:
-        return "키 정책을 아는 사용자 한 명 준비"
+        return Says(
+            "키 정책을 아는 사용자 한 명 준비",
+            english="Prepare one user whose key policy is known",
+        )
 
     @override
-    def lay(self, seed: Seeder) -> tuple[Laid[KeyPairResourcePolicyData], Laid[UserData]]:
-        seed.once(SeedProjectPolicy())
-        policy = seed.creating(SeedUserPolicy())
-        key_policy = seed.creating(SeedKeypairPolicy())
-        user = seed.provisioning(SeedUserOf(), self.domain, policy, key_policy)
+    def lay(self, seed: TestSeeder) -> tuple[Laid[KeyPairResourcePolicyData], Laid[UserData]]:
+        seed.once(TestSeedProjectPolicy())
+        policy = seed.creating(TestSeedUserPolicy())
+        key_policy = seed.creating(TestSeedKeypairPolicy())
+        user = seed.provisioning(TestSeedUserOf(), self.domain, policy, key_policy)
         return key_policy, user
 
 
@@ -136,27 +144,45 @@ class SomeoneWithKeys(Given[Any, Keyholder]):
 
     @override
     def describe(self) -> str:
-        granted = (
-            f"자기 사용자에 {', '.join(str(p.name) for p in self.permissions)} 권한을 받았다"
-            if self.permissions
-            else "아무 권한도 받지 않았다"
+        if self.permissions:
+            names = ", ".join(str(p.name) for p in self.permissions)
+            granted = Says(
+                f"자기 사용자에 {names} 권한을 받았습니다",
+                english=f"the user holds the {names} permission on their own user",
+            )
+        else:
+            granted = Says(
+                "아무 권한도 받지 않았습니다",
+                english="the user holds no permission",
+            )
+        others_ko = ", 기본 아닌 키를 가진 다른 사용자 한 명" if self.other_holds_a_key else ""
+        others_en = (
+            ", one other user holding an extra key that is not the default"
+            if self.other_holds_a_key
+            else ""
         )
-        others = ", 기본 아닌 키를 가진 다른 사용자 한 명" if self.other_holds_a_key else ""
-        return f"도메인 하나와 기본 아닌 키 {self.extra_keys}개를 가진 사용자 한 명{others}, 그 사용자는 {granted}"
+        return Says(
+            f"도메인 하나와 기본 아닌 키 {self.extra_keys}개를 가진 사용자 한 명{others_ko}, "
+            f"그 사용자는 {granted}",
+            english=(
+                f"one domain and one user holding {self.extra_keys} extra keys that are not "
+                f"the default{others_en}, and {in_language(granted, Language.ENGLISH)}"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> Keyholder:
-        domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         key_policy, caller = await seeding.within(SomeoneAndTheirKeyPolicy(domain))
         policy_name = seeding.made(key_policy).name
         extra = [
-            await seeding.adding(SeedKeypairOf(resource_policy=policy_name), caller)
+            await seeding.adding(TestSeedKeypairOf(resource_policy=policy_name), caller)
             for _ in range(self.extra_keys)
         ]
         other_key = None
         if self.other_holds_a_key:
             _, other = await seeding.within(SomeoneAndTheirKeyPolicy(domain))
-            other_key = await seeding.adding(SeedKeypairOf(resource_policy=policy_name), other)
+            other_key = await seeding.adding(TestSeedKeypairOf(resource_policy=policy_name), other)
         if self.permissions:
             await seeding.within(AGrant.on_user(caller, caller, *self.permissions))
         return Keyholder(
@@ -182,7 +208,10 @@ class Issuing(When[Keyholder, UserAdapter, Answer]):
 
     @override
     def describe(self, laid: Keyholder) -> str:
-        return f"{laid.caller.username}이 자기 키를 발급"
+        return Says(
+            f"{laid.caller.username}이 자기 키를 발급합니다",
+            english=f"{laid.caller.username} issues their own key",
+        )
 
     @override
     async def call(self, adapter: UserAdapter, laid: Keyholder) -> Answer:
@@ -198,7 +227,13 @@ class RevokingTheExtraKey(When[Keyholder, UserAdapter, Answer]):
 
     @override
     def describe(self, laid: Keyholder) -> str:
-        return f"{laid.caller.username}이 기본 아닌 자기 키를 회수하고 자기 키를 다시 훑음"
+        return Says(
+            f"{laid.caller.username}이 기본 아닌 자기 키를 회수하고 자기 키를 다시 조회합니다",
+            english=(
+                f"{laid.caller.username} revokes their own extra key and searches their own "
+                "keys again"
+            ),
+        )
 
     @override
     async def call(self, adapter: UserAdapter, laid: Keyholder) -> Answer:
@@ -216,7 +251,13 @@ class RevokingTheDefaultKey(When[Keyholder, UserAdapter, Answer]):
 
     @override
     def describe(self, laid: Keyholder) -> str:
-        return f"{laid.caller.username}이 자기 키 검색으로 기본 키를 찾아 그 키를 회수"
+        return Says(
+            f"{laid.caller.username}이 자기 키 검색으로 기본 키를 찾아 그 키를 회수합니다",
+            english=(
+                f"{laid.caller.username} finds the default key through their own key search "
+                "and revokes it"
+            ),
+        )
 
     @override
     async def call(self, adapter: UserAdapter, laid: Keyholder) -> Answer:
@@ -232,7 +273,10 @@ class RevokingAKeyNobodyHolds(When[Keyholder, UserAdapter, Answer]):
 
     @override
     def describe(self, laid: Keyholder) -> str:
-        return f"{laid.caller.username}이 어떤 키도 아닌 값으로 회수"
+        return Says(
+            f"{laid.caller.username}이 어떤 키도 아닌 값으로 회수합니다",
+            english=f"{laid.caller.username} revokes with an access key nobody holds",
+        )
 
     @override
     async def call(self, adapter: UserAdapter, laid: Keyholder) -> Answer:
@@ -248,7 +292,10 @@ class TurningOffTheExtraKey(When[Keyholder, UserAdapter, Answer]):
 
     @override
     def describe(self, laid: Keyholder) -> str:
-        return f"{laid.caller.username}이 기본 아닌 자기 키를 비활성으로 바꿈"
+        return Says(
+            f"{laid.caller.username}이 기본 아닌 자기 키를 비활성으로 변경합니다",
+            english=f"{laid.caller.username} turns their own extra key inactive",
+        )
 
     @override
     async def call(self, adapter: UserAdapter, laid: Keyholder) -> Answer:
@@ -265,7 +312,13 @@ class TurningOffTheDefaultKey(When[Keyholder, UserAdapter, Answer]):
 
     @override
     def describe(self, laid: Keyholder) -> str:
-        return f"{laid.caller.username}이 자기 키 검색으로 기본 키를 찾아 비활성으로 바꿈"
+        return Says(
+            f"{laid.caller.username}이 자기 키 검색으로 기본 키를 찾아 비활성으로 변경합니다",
+            english=(
+                f"{laid.caller.username} finds the default key through their own key search "
+                "and turns it inactive"
+            ),
+        )
 
     @override
     async def call(self, adapter: UserAdapter, laid: Keyholder) -> Answer:
@@ -281,8 +334,13 @@ class SwitchingToTheExtraKey(When[Keyholder, UserAdapter, Answer]):
 
     @override
     def describe(self, laid: Keyholder) -> str:
-        return (
-            f"{laid.caller.username}이 기본 아닌 자기 키로 기본 키를 옮기고 자기 사용자를 다시 읽음"
+        return Says(
+            f"{laid.caller.username}이 기본 아닌 자기 키로 기본 키를 옮기고 자기 사용자를 "
+            "다시 읽습니다",
+            english=(
+                f"{laid.caller.username} moves the default key to their own extra key and "
+                "reads their own user again"
+            ),
         )
 
     @override
@@ -303,7 +361,10 @@ class SwitchingToAnExtraKeyWithoutRereading(When[Keyholder, UserAdapter, Answer]
 
     @override
     def describe(self, laid: Keyholder) -> str:
-        return f"{laid.caller.username}이 기본 아닌 자기 키로 기본 키를 옮김"
+        return Says(
+            f"{laid.caller.username}이 기본 아닌 자기 키로 기본 키를 옮깁니다",
+            english=f"{laid.caller.username} moves the default key to their own extra key",
+        )
 
     @override
     async def call(self, adapter: UserAdapter, laid: Keyholder) -> Answer:
@@ -321,7 +382,10 @@ class SwitchingToSomeoneElsesKey(When[Keyholder, UserAdapter, Answer]):
 
     @override
     def describe(self, laid: Keyholder) -> str:
-        return f"{laid.caller.username}이 다른 사용자의 키로 기본 키를 옮김"
+        return Says(
+            f"{laid.caller.username}이 다른 사용자의 키로 기본 키를 옮깁니다",
+            english=f"{laid.caller.username} moves the default key to another user's key",
+        )
 
     @override
     async def call(self, adapter: UserAdapter, laid: Keyholder) -> Answer:
@@ -340,7 +404,10 @@ class SearchingMyKeys(When[Keyholder, UserAdapter, Answer]):
 
     @override
     def describe(self, laid: Keyholder) -> str:
-        return f"{laid.caller.username}이 페이지 인자 없이 자기 키를 훑음"
+        return Says(
+            f"{laid.caller.username}이 페이지 인자 없이 자기 키를 조회합니다",
+            english=f"{laid.caller.username} searches their own keys without page arguments",
+        )
 
     @override
     async def call(self, adapter: UserAdapter, laid: Keyholder) -> Answer:
@@ -356,9 +423,14 @@ class IssuingThenSwitchingThenRevoking(When[Keyholder, UserAdapter, Answer]):
 
     @override
     def describe(self, laid: Keyholder) -> str:
-        return (
-            f"{laid.caller.username}이 자기 키 검색으로 기본 키를 찾고, 키를 발급해 그 키로 기본 키를 "
-            "옮긴 다음 원래 기본 키를 회수하고 자기 키를 다시 훑음"
+        return Says(
+            f"{laid.caller.username}이 자기 키 검색으로 기본 키를 찾고, 키를 발급해 그 키로 "
+            "기본 키를 옮긴 다음 원래 기본 키를 회수하고 자기 키를 다시 조회합니다",
+            english=(
+                f"{laid.caller.username} finds the default key through their own key search, "
+                "issues a key, moves the default key to it, revokes the original default key, "
+                "and searches their own keys again"
+            ),
         )
 
     @override
@@ -385,7 +457,10 @@ class At(Verdict):
     def told(self) -> Told:
         told = self.inner.told()
         return Told(
-            f"{self.prefix}{told.says}",
+            Says(
+                f"{self.prefix}{told.says}",
+                english=f"{self.prefix}{in_language(told.says, Language.ENGLISH)}",
+            ),
             problems=tuple(f"{self.prefix}{one}" for one in told.problems),
         )
 
@@ -396,9 +471,13 @@ def _at(prefix: str, verdicts: Sequence[Verdict]) -> list[Verdict]:
 
 def _default_key(started: datetime, node: KeypairNode, laid: Keyholder) -> list[Verdict]:
     written = WrittenByThisRun(started)
+    random_key = Says(
+        "시드가 매번 새로 만든 access key 입니다",
+        english="it is an access key the seed makes anew every time",
+    )
     return [
-        Skipped("id", "시드가 매번 새로 만든 access key다"),
-        Skipped("access_key", "시드가 매번 새로 만든다"),
+        Skipped("id", random_key),
+        Skipped("access_key", random_key),
         Same("is_active", node.is_active, True),
         Same("is_admin", node.is_admin, False),
         Same("is_default", node.is_default, True),
@@ -407,7 +486,11 @@ def _default_key(started: datetime, node: KeypairNode, laid: Keyholder) -> list[
         Same("ssh_public_key", node.ssh_public_key, ""),
         Same("num_queries", node.num_queries, 0),
         Same("last_used", node.last_used, None),
-        Held("user_id", node.user_id, SameAs(laid.caller.id, "키의 주인")),
+        Held(
+            "user_id",
+            node.user_id,
+            SameAs(laid.caller.id, Says("키 소유자", english="the key owner")),
+        ),
         Held("created_at", node.created_at, written),
         Held("modified_at", node.modified_at, written),
     ]
@@ -425,7 +508,13 @@ class TheIssuedKey(Then[Keyholder, Answer]):
 
     @override
     def says(self) -> str:
-        return "기본 키를 따르는 기본 아닌 새 키와 secret이 온다"
+        return Says(
+            "기본 키를 따르는 기본 아닌 새 키와 secret 이 응답으로 옵니다",
+            english=(
+                "a new key that is not the default, following the default key, and its "
+                "secret come back"
+            ),
+        )
 
     @override
     def look(self, laid: Keyholder, answered: Answered[Answer]) -> list[Verdict]:
@@ -442,7 +531,13 @@ class TheIssuedKey(Then[Keyholder, Answer]):
                 rate_limit=SERVER_RATE_LIMIT,
                 resource_policy=laid.key_policy,
             ),
-            Skipped("secret_key", "매번 새로 만든다"),
+            Skipped(
+                "secret_key",
+                Says(
+                    "매니저가 매번 새로 생성합니다",
+                    english="the manager makes it anew every time",
+                ),
+            ),
         ]
 
 
@@ -452,7 +547,13 @@ class OnlyTheDefaultKeyIsLeft(Then[Keyholder, Answer]):
 
     @override
     def says(self) -> str:
-        return "회수에 성공하고, 뒤이은 자기 키 검색에 기본 키만 남는다"
+        return Says(
+            "회수에 성공하고, 뒤이은 자기 키 검색에 기본 키만 남습니다",
+            english=(
+                "the revoke succeeds and only the default key is left in the own key search "
+                "that follows"
+            ),
+        )
 
     @override
     def look(self, laid: Keyholder, answered: Answered[Answer]) -> list[Verdict]:
@@ -478,7 +579,10 @@ class TheKeyIsOff(Then[Keyholder, Answer]):
 
     @override
     def says(self) -> str:
-        return "활성만 바뀐 키 노드 전체가 온다"
+        return Says(
+            "활성만 변경된 키 노드 전체가 응답으로 옵니다",
+            english="the whole key node with only the active flag changed comes back",
+        )
 
     @override
     def look(self, laid: Keyholder, answered: Answered[Answer]) -> list[Verdict]:
@@ -496,7 +600,12 @@ class TheDefaultKeyMoved(Then[Keyholder, Answer]):
 
     @override
     def says(self) -> str:
-        return "전환에 성공하고, 뒤이은 읽기에서 기본 키가 추가한 키다"
+        return Says(
+            "전환에 성공하고, 뒤이은 읽기에서 기본 키가 추가한 키입니다",
+            english=(
+                "the switch succeeds and the default key in the read that follows is the extra key"
+            ),
+        )
 
     @override
     def look(self, laid: Keyholder, answered: Answered[Answer]) -> list[Verdict]:
@@ -510,7 +619,10 @@ class TheDefaultKeyMoved(Then[Keyholder, Answer]):
                 UserNodeLook(self.started).verdicts(
                     result.node,
                     laid.caller,
-                    main_access_key=SameAs(str(laid.extra[0].access_key), "추가한 키"),
+                    main_access_key=SameAs(
+                        str(laid.extra[0].access_key),
+                        Says("추가한 키", english="the extra key"),
+                    ),
                 ),
             ),
         ]
@@ -522,7 +634,10 @@ class OnlyMyTwoKeys(Then[Keyholder, Answer]):
 
     @override
     def says(self) -> str:
-        return "자기 키 둘만 온다"
+        return Says(
+            "자기 키 둘만 옵니다",
+            english="only their own two keys come back",
+        )
 
     @override
     def look(self, laid: Keyholder, answered: Answered[Answer]) -> list[Verdict]:
@@ -535,7 +650,7 @@ class OnlyMyTwoKeys(Then[Keyholder, Answer]):
             Same("has_next_page", page.has_next_page, False),
             Same("has_previous_page", page.has_previous_page, False),
             Same(
-                "items.is_default(기본 아닌 키 먼저)",
+                "items.is_default(extra key first)",
                 [one.is_default for one in items],
                 [False, True],
             ),
@@ -543,13 +658,13 @@ class OnlyMyTwoKeys(Then[Keyholder, Answer]):
         if len(items) == 2:
             seen.extend(
                 _at(
-                    "items[추가한 키].",
+                    "items[the extra key].",
                     KeypairNodeLook(self.started).verdicts(
                         items[0], _extra_key(laid.extra[0]), laid.caller
                     ),
                 )
             )
-            seen.extend(_at("items[기본 키].", _default_key(self.started, items[1], laid)))
+            seen.extend(_at("items[the default key].", _default_key(self.started, items[1], laid)))
         return seen
 
 
@@ -559,7 +674,10 @@ class NewestFirst(Condition[list[tuple[datetime, UUID]]]):
 
     @override
     def says(self) -> str:
-        return "생성 시각 내림차순, 같은 시각이면 field id 오름차순"
+        return Says(
+            "생성 시각 내림차순, 같은 시각이면 field id 오름차순입니다",
+            english="descending creation time, then ascending field id for the same time",
+        )
 
     @override
     def holds(self, got: list[tuple[datetime, UUID]]) -> bool:
@@ -572,7 +690,10 @@ class TheFirstTenOfEleven(Then[Keyholder, Answer]):
 
     @override
     def says(self) -> str:
-        return "자기 키 열한 개 중 열 개가 최근순으로 오고 다음 페이지가 있다"
+        return Says(
+            "자기 키 열한 개 중 열 개가 최근순으로 오고 다음 페이지가 있습니다",
+            english=("ten of their eleven keys come back newest first and there is a next page"),
+        )
 
     @override
     def look(self, laid: Keyholder, answered: Answered[Answer]) -> list[Verdict]:
@@ -593,7 +714,9 @@ class TheFirstTenOfEleven(Then[Keyholder, Answer]):
             Held(
                 "items.user_id",
                 [one.user_id for one in items],
-                SameAs([laid.caller.id] * len(items), "모두 부른 사람"),
+                SameAs(
+                    [laid.caller.id] * len(items), Says("모두 부른 사람", english="all the caller")
+                ),
             ),
             Held(
                 "items.created_at",
@@ -601,7 +724,13 @@ class TheFirstTenOfEleven(Then[Keyholder, Answer]):
                 WrittenByThisRun(self.started),
             ),
             Skipped(
-                "items의 나머지 자리", "순서와 개수를 보는 행이다. 키 노드 전체는 다른 행이 본다"
+                "the remaining item fields",
+                Says(
+                    "순서와 개수를 보는 행입니다. 키 노드 전체는 다른 행이 봅니다",
+                    english=(
+                        "this row looks at order and count; another row looks at the whole key node"
+                    ),
+                ),
             ),
         ]
 
@@ -612,7 +741,10 @@ class OnlyTheIssuedKeyIsLeft(Then[Keyholder, Answer]):
 
     @override
     def says(self) -> str:
-        return "세 호출이 통과하고 발급한 키 하나만 남는다"
+        return Says(
+            "세 호출이 통과하고 발급한 키 하나만 남습니다",
+            english="all three calls pass and only the issued key is left",
+        )
 
     @override
     def look(self, laid: Keyholder, answered: Answered[Answer]) -> list[Verdict]:
@@ -634,7 +766,13 @@ class OnlyTheIssuedKeyIsLeft(Then[Keyholder, Answer]):
                     resource_policy=laid.key_policy,
                 ),
             ),
-            Skipped("issued.secret_key", "매번 새로 만든다"),
+            Skipped(
+                "issued.secret_key",
+                Says(
+                    "매니저가 매번 새로 생성합니다",
+                    english="the manager makes it anew every time",
+                ),
+            ),
             Same("switched", chain.switched, True),
             Same("revoked", chain.revoked, True),
             Same("after.total_count", after.total_count, 1),
@@ -643,7 +781,7 @@ class OnlyTheIssuedKeyIsLeft(Then[Keyholder, Answer]):
             Held(
                 "after.items.access_key",
                 [one.access_key for one in after.items],
-                SameAs([issued], "발급한 키"),
+                SameAs([issued], Says("발급한 키", english="the key issued")),
             ),
         ]
         if after.items:
@@ -658,10 +796,20 @@ class OnlyTheIssuedKeyIsLeft(Then[Keyholder, Answer]):
                         Same("is_default", left.is_default, True),
                         Same("rate_limit", left.rate_limit, SERVER_RATE_LIMIT),
                         Same("resource_policy", left.resource_policy, laid.key_policy),
-                        Skipped("ssh_public_key", "매니저가 만든 RSA 키다"),
+                        Skipped(
+                            "ssh_public_key",
+                            Says(
+                                "매니저가 생성한 RSA 키입니다",
+                                english="it is the RSA key the manager created",
+                            ),
+                        ),
                         Same("num_queries", left.num_queries, 0),
                         Same("last_used", left.last_used, None),
-                        Held("user_id", left.user_id, SameAs(laid.caller.id, "키의 주인")),
+                        Held(
+                            "user_id",
+                            left.user_id,
+                            SameAs(laid.caller.id, Says("키 소유자", english="the key owner")),
+                        ),
                         Held("created_at", left.created_at, written),
                         Held("modified_at", left.modified_at, written),
                     ],
@@ -672,11 +820,11 @@ class OnlyTheIssuedKeyIsLeft(Then[Keyholder, Answer]):
 
 RW = (Permission.READ, Permission.UPDATE)
 
-type Row = Scenario[SeedingSession, Keyholder, UserAdapter, Answer]
+type Row = Scenario[TestSeedingSession, Keyholder, UserAdapter, Answer]
 
 
 @dataclass(frozen=True)
-class OwnKeyRow(Scenario[SeedingSession, Keyholder, UserAdapter, Answer]):
+class OwnKeyRow(Scenario[TestSeedingSession, Keyholder, UserAdapter, Answer]):
     """표의 한 행. 이름, 보장하는 것, 세 단계를 값으로 받는다."""
 
     name: str
@@ -694,7 +842,7 @@ class OwnKeyRow(Scenario[SeedingSession, Keyholder, UserAdapter, Answer]):
         return self.guarantee
 
     @override
-    def given(self) -> Given[SeedingSession, Keyholder]:
+    def given(self) -> Given[TestSeedingSession, Keyholder]:
         return self.situation
 
     @override
@@ -711,129 +859,247 @@ NOW = datetime.now(UTC)
 SCENARIOS: list[Row] = [
     OwnKeyRow(
         "a-user-granted-update-on-themself-issues-a-key-that-follows-their-default-key",
-        "자기 사용자 스코프에서 UPDATE를 받은 사용자가 발급하면, 기본 키의 관리자 표시, 정책, "
-        "요청 한도를 따르고 기본 표시는 없는 키와 secret이 온다",
+        Says(
+            "자기 사용자 스코프에서 UPDATE 를 받은 사용자가 발급하면, 기본 키의 관리자 표시, "
+            "정책, 요청 한도를 따르고 기본 표시는 없는 키와 secret 이 응답으로 옵니다",
+            english=(
+                "when a user granted UPDATE in their own user scope issues a key, the key "
+                "follows the admin flag, policy, and rate limit of the default key, holds no "
+                "default flag, and comes back with its secret"
+            ),
+        ),
         SomeoneWithKeys(permissions=(Permission.UPDATE,)),
         Issuing(),
         TheIssuedKey(started=NOW),
     ),
     OwnKeyRow(
         "a-user-granted-nothing-may-not-issue-their-own-key",
-        "역할을 받지 않은 사용자가 자기 키를 발급하려 하면, 본인이어도 엔티티 권한 문이 막는다",
+        Says(
+            "역할을 받지 않은 사용자가 자기 키를 발급하려 하면, 본인이어도 엔티티 권한 문이 "
+            "막습니다",
+            english=(
+                "a user holding no role who tries to issue their own key is rejected by the "
+                "entity permission gate even for themselves"
+            ),
+        ),
         SomeoneWithKeys(),
         Issuing(),
         TheCallIsRefused(NotEnoughPermission),
     ),
     OwnKeyRow(
         "a-user-granted-read-and-update-revokes-a-non-default-key",
-        "권한 받은 사용자가 자기의 기본 아닌 키를 회수하면, 성공이 오고 자기 키 검색에서 그 키가 빠진다",
+        Says(
+            "권한 받은 사용자가 자기의 기본 아닌 키를 회수하면, 성공이 오고 자기 키 검색에서 "
+            "그 키가 빠집니다",
+            english=(
+                "when a user holding the permission revokes their own extra key, success comes "
+                "back and that key leaves their own key search"
+            ),
+        ),
         SomeoneWithKeys(permissions=RW, extra_keys=1),
         RevokingTheExtraKey(),
         OnlyTheDefaultKeyIsLeft(started=NOW),
     ),
     OwnKeyRow(
         "a-user-granted-nothing-may-not-revoke-their-own-key",
-        "역할을 받지 않은 사용자가 회수하려 하면, 소유자 조회 단계가 없는 키와 같은 예외로 막는다",
+        Says(
+            "역할을 받지 않은 사용자가 회수하려 하면, "
+            "소유자 조회 단계가 없는 키와 같은 예외로 막습니다",
+            english=(
+                "a user holding no role who tries to revoke a key is rejected at the owner "
+                "lookup step with the same exception as a key that does not exist"
+            ),
+        ),
         SomeoneWithKeys(extra_keys=1),
         RevokingTheExtraKey(),
         TheCallIsRefused(GenericBadRequest),
     ),
     OwnKeyRow(
         "a-user-granted-only-read-may-not-revoke-their-own-key",
-        "자기 스코프에서 READ만 받은 사용자가 회수하려 하면, 소유자 조회는 지나고 엔티티 권한 문이 막는다",
+        Says(
+            "자기 스코프에서 READ 만 받은 사용자가 회수하려 하면, "
+            "소유자 조회는 지나고 엔티티 권한 문이 막습니다",
+            english=(
+                "a user granted only READ in their own scope who tries to revoke a key passes "
+                "the owner lookup and is rejected by the entity permission gate"
+            ),
+        ),
         SomeoneWithKeys(permissions=(Permission.READ,), extra_keys=1),
         RevokingTheExtraKey(),
         TheCallIsRefused(NotEnoughPermission),
     ),
     OwnKeyRow(
         "the-default-key-may-not-be-revoked",
-        "권한 받은 사용자가 자기 기본 키를 회수하려 하면, 입력 검증이 막는다",
+        Says(
+            "권한 받은 사용자가 자기 기본 키를 회수하려 하면, 입력 검증이 막습니다",
+            english=(
+                "when a user holding the permission tries to revoke their own default key, "
+                "input validation rejects it"
+            ),
+        ),
         SomeoneWithKeys(permissions=RW),
         RevokingTheDefaultKey(),
         TheCallIsRefused(KeyPairForbidden),
     ),
     OwnKeyRow(
         "an-access-key-nobody-holds-may-not-be-revoked",
-        "권한 받은 사용자가 어떤 키도 아닌 값을 주면, 소유자 조회 단계가 권한 없음과 같은 예외로 막는다",
+        Says(
+            "권한 받은 사용자가 어떤 키도 아닌 값을 주면, "
+            "소유자 조회 단계가 권한 없음과 같은 예외로 막습니다",
+            english=(
+                "when a user holding the permission gives a value that is no key, the owner "
+                "lookup step rejects it with the same exception as a missing permission"
+            ),
+        ),
         SomeoneWithKeys(permissions=RW),
         RevokingAKeyNobodyHolds(),
         TheCallIsRefused(GenericBadRequest),
     ),
     OwnKeyRow(
         "a-user-granted-read-and-update-turns-off-a-non-default-key",
-        "자기 스코프에서 READ와 UPDATE를 받은 사용자가 기본 아닌 키를 비활성으로 바꾸면, 활성만 바뀐 키 노드가 온다",
+        Says(
+            "자기 스코프에서 READ 와 UPDATE 를 받은 사용자가 기본 아닌 키를 비활성으로 변경하면, "
+            "활성만 변경된 키 노드가 응답으로 옵니다",
+            english=(
+                "when a user granted READ and UPDATE in their own scope turns an extra key "
+                "inactive, the key node comes back with only the active flag changed"
+            ),
+        ),
         SomeoneWithKeys(permissions=RW, extra_keys=1),
         TurningOffTheExtraKey(),
         TheKeyIsOff(started=NOW),
     ),
     OwnKeyRow(
         "a-user-granted-nothing-may-not-turn-off-their-own-key",
-        "역할 없이 키를 끄려 하면, 소유자 조회 단계가 막는다",
+        Says(
+            "역할 없이 키를 비활성으로 변경하려 하면, 소유자 조회 단계가 막습니다",
+            english=(
+                "a user holding no role who tries to turn a key inactive is rejected at the "
+                "owner lookup step"
+            ),
+        ),
         SomeoneWithKeys(extra_keys=1),
         TurningOffTheExtraKey(),
         TheCallIsRefused(GenericBadRequest),
     ),
     OwnKeyRow(
         "a-user-granted-only-read-may-not-turn-off-their-own-key",
-        "READ만 받고 키를 끄려 하면, 엔티티 권한 문이 막는다",
+        Says(
+            "READ 만 받고 키를 비활성으로 변경하려 하면, 엔티티 권한 문이 막습니다",
+            english=(
+                "a user holding only READ who tries to turn a key inactive is rejected by the "
+                "entity permission gate"
+            ),
+        ),
         SomeoneWithKeys(permissions=(Permission.READ,), extra_keys=1),
         TurningOffTheExtraKey(),
         TheCallIsRefused(NotEnoughPermission),
     ),
     OwnKeyRow(
         "the-default-key-may-not-be-turned-off",
-        "권한 받은 사용자가 자기 기본 키를 비활성으로 바꾸려 하면, 입력 검증이 막는다",
+        Says(
+            "권한 받은 사용자가 자기 기본 키를 비활성으로 변경하려 하면, 입력 검증이 막습니다",
+            english=(
+                "when a user holding the permission tries to turn their own default key "
+                "inactive, input validation rejects it"
+            ),
+        ),
         SomeoneWithKeys(permissions=RW),
         TurningOffTheDefaultKey(),
         TheCallIsRefused(KeyPairForbidden),
     ),
     OwnKeyRow(
         "a-user-granted-read-and-update-moves-their-default-key",
-        "자기 스코프에서 UPDATE를 받은 사용자가 기본 아닌 활성 키로 기본 키를 옮기면, 성공이 오고 "
-        "사용자 노드의 기본 키가 그 키가 된다",
+        Says(
+            "자기 스코프에서 UPDATE 를 받은 사용자가 기본 아닌 활성 키로 기본 키를 옮기면, "
+            "성공이 오고 사용자 노드의 기본 키가 그 키가 됩니다",
+            english=(
+                "when a user granted UPDATE in their own scope moves the default key to an "
+                "extra key that is active, success comes back and the default key of the user "
+                "node becomes that key"
+            ),
+        ),
         SomeoneWithKeys(permissions=RW, extra_keys=1),
         SwitchingToTheExtraKey(),
         TheDefaultKeyMoved(started=NOW),
     ),
     OwnKeyRow(
         "a-user-granted-nothing-may-not-move-their-default-key",
-        "역할 없이 기본 키를 옮기려 하면, 엔티티 권한 문이 막는다",
+        Says(
+            "역할 없이 기본 키를 옮기려 하면, 엔티티 권한 문이 막습니다",
+            english=(
+                "a user holding no role who tries to move the default key is rejected by the "
+                "entity permission gate"
+            ),
+        ),
         SomeoneWithKeys(extra_keys=1),
         SwitchingToAnExtraKeyWithoutRereading(),
         TheCallIsRefused(NotEnoughPermission),
     ),
     OwnKeyRow(
         "someone-elses-key-may-not-become-the-default-key",
-        "권한 받은 사용자가 다른 사용자의 키를 주면, 입력 검증이 막는다",
+        Says(
+            "권한 받은 사용자가 다른 사용자의 키를 주면, 입력 검증이 막습니다",
+            english=(
+                "when a user holding the permission gives another user's key, input "
+                "validation rejects it"
+            ),
+        ),
         SomeoneWithKeys(permissions=(Permission.UPDATE,), other_holds_a_key=True),
         SwitchingToSomeoneElsesKey(),
         TheCallIsRefused(KeyPairForbidden),
     ),
     OwnKeyRow(
         "a-user-granted-read-searching-their-keys-sees-only-their-own",
-        "자기 스코프에서 READ를 받은 사용자가 자기 키를 훑으면, 다른 사용자의 키는 빠진다",
+        Says(
+            "자기 스코프에서 READ 를 받은 사용자가 자기 키를 조회하면, 다른 사용자의 키는 빠집니다",
+            english=(
+                "when a user granted READ in their own scope searches their own keys, the keys "
+                "of other users are left out"
+            ),
+        ),
         SomeoneWithKeys(permissions=(Permission.READ,), extra_keys=1, other_holds_a_key=True),
         SearchingMyKeys(),
         OnlyMyTwoKeys(started=NOW),
     ),
     OwnKeyRow(
         "a-user-granted-nothing-may-not-search-their-own-keys",
-        "역할 없이 자기 키를 훑으려 하면, 스코프 권한 문이 막는다",
+        Says(
+            "역할 없이 자기 키를 조회하려 하면, 스코프 권한 문이 막습니다",
+            english=(
+                "a user holding no role who tries to search their own keys is rejected by the "
+                "scope permission gate"
+            ),
+        ),
         SomeoneWithKeys(),
         SearchingMyKeys(),
         TheCallIsRefused(NotEnoughPermission),
     ),
     OwnKeyRow(
         "searching-own-keys-without-page-arguments-answers-the-ten-newest",
-        "권한 받은 사용자가 페이지 인자 없이 훑으면, 생성 시각 내림차순 열 개와 다음 페이지 여부가 온다",
+        Says(
+            "권한 받은 사용자가 페이지 인자 없이 조회하면, "
+            "생성 시각 내림차순 열 개와 다음 페이지 여부가 응답으로 옵니다",
+            english=(
+                "when a user holding the permission searches without page arguments, ten keys "
+                "in descending creation time and the next page flag come back"
+            ),
+        ),
         SomeoneWithKeys(permissions=(Permission.READ,), extra_keys=10),
         SearchingMyKeys(),
         TheFirstTenOfEleven(started=NOW),
     ),
     OwnKeyRow(
         "an-issued-key-made-default-lets-the-original-default-key-be-revoked",
-        "권한 받은 사용자가 키를 발급하고 그 키로 기본 키를 옮긴 다음 원래 기본 키를 회수하면, "
-        "세 호출이 차례로 통과하고 발급한 키 하나만 남는다",
+        Says(
+            "권한 받은 사용자가 키를 발급하고 그 키로 기본 키를 옮긴 다음 원래 기본 키를 "
+            "회수하면, 세 호출이 차례로 통과하고 발급한 키 하나만 남습니다",
+            english=(
+                "when a user holding the permission issues a key, moves the default key to it, "
+                "and revokes the original default key, all three calls pass in turn and only "
+                "the issued key is left"
+            ),
+        ),
         SomeoneWithKeys(permissions=RW),
         IssuingThenSwitchingThenRevoking(),
         OnlyTheIssuedKeyIsLeft(started=NOW),

@@ -13,6 +13,7 @@ from uuid import UUID
 
 from ai.backend.common.data.retention.types import RetentionCategory
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.retention_policy.response import (
     RetentionPolicyNode,
     SearchRetentionPoliciesPayload,
@@ -20,20 +21,24 @@ from ai.backend.common.dto.manager.v2.retention_policy.response import (
 from ai.backend.manager.data.retention.types import RetentionPolicyData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
     Held,
+    Language,
     Refused,
     Same,
     SameAs,
+    Says,
     Skipped,
     Then,
     Verdict,
+    in_language,
 )
-from bai_scenario.components.domain import WrittenByThisRun
+from bai_scenario.components.domain import Mentions, WrittenByThisRun
 from bai_scenario.components.system import KEPT, Kept, lay_a_caller, role_named
-from bai_scenario.seeds.retention_policy.retention_policy import SeedRetentionPolicy
+from bai_scenario.seeds.retention_policy.retention_policy import TestSeedRetentionPolicy
 
 KEPT_DAYS = 30
 """시드가 미리 만들어 두는 정책의 보존 일수."""
@@ -66,12 +71,16 @@ class APolicyAndSomeone(Given[Any, APolicyAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"보존 정책 하나와, {role_named(self.role)} 한 명"
+        named = role_named(self.role)
+        return Says(
+            f"보존 정책 하나와, {named} 한 명",
+            english=f"one retention policy and one {in_language(named, Language.ENGLISH)}",
+        )
 
     @override
     async def lay(self, seeding: Any) -> APolicyAndACaller:
         policy = await seeding.creating(
-            SeedRetentionPolicy(
+            TestSeedRetentionPolicy(
                 category=self.category, retention_days=KEPT_DAYS, enabled=self.enabled
             )
         )
@@ -87,12 +96,19 @@ class TwoPoliciesAndSomeone(Given[Any, ManyPoliciesAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"카테고리가 다른 보존 정책 둘과, {role_named(self.role)} 한 명"
+        named = role_named(self.role)
+        return Says(
+            f"카테고리가 다른 보존 정책 둘과, {named} 한 명",
+            english=(
+                "two retention policies of different categories and "
+                f"one {in_language(named, Language.ENGLISH)}"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> ManyPoliciesAndACaller:
-        wanted = await seeding.creating(SeedRetentionPolicy(category=RetentionCategory.LOGS))
-        other = await seeding.creating(SeedRetentionPolicy(category=RetentionCategory.LOGIN))
+        wanted = await seeding.creating(TestSeedRetentionPolicy(category=RetentionCategory.LOGS))
+        other = await seeding.creating(TestSeedRetentionPolicy(category=RetentionCategory.LOGIN))
         caller = await lay_a_caller(seeding, self.role)
         return ManyPoliciesAndACaller(
             laid=(seeding.made(wanted), seeding.made(other)),
@@ -109,12 +125,21 @@ class AnActiveAndAnInactivePolicy(Given[Any, ManyPoliciesAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"활성 보존 정책 하나와 비활성 하나, 그리고 {role_named(self.role)} 한 명"
+        named = role_named(self.role)
+        return Says(
+            f"활성 보존 정책 하나와 비활성 하나, 그리고 {named} 한 명",
+            english=(
+                "one active retention policy, one inactive and "
+                f"one {in_language(named, Language.ENGLISH)}"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> ManyPoliciesAndACaller:
-        active = await seeding.creating(SeedRetentionPolicy(category=RetentionCategory.LOGS))
-        await seeding.creating(SeedRetentionPolicy(category=RetentionCategory.LOGIN, enabled=False))
+        active = await seeding.creating(TestSeedRetentionPolicy(category=RetentionCategory.LOGS))
+        await seeding.creating(
+            TestSeedRetentionPolicy(category=RetentionCategory.LOGIN, enabled=False)
+        )
         caller = await lay_a_caller(seeding, self.role)
         return ManyPoliciesAndACaller(
             laid=(seeding.made(active),),
@@ -133,7 +158,7 @@ def policy_verdicts(
 ) -> list[Verdict]:
     """Every place of one policy node."""
     return [
-        Skipped("id", "데이터베이스가 만든다"),
+        Skipped("id", Says("데이터베이스가 생성합니다", english="the database generates it")),
         Same("category", node.category, category),
         Same("retention_period_days", node.retention_period_days, days),
         Same("enabled", node.enabled, enabled),
@@ -154,7 +179,10 @@ class TheNewPolicyNode(Then[Any, RetentionPolicyNode]):
 
     @override
     def says(self) -> str:
-        return "생성한 정책 전체가 반환된다"
+        return Says(
+            "생성한 정책 전체가 반환됩니다",
+            english="the whole policy just created comes back",
+        )
 
     @override
     def look(self, laid: Any, answered: Answered[RetentionPolicyNode]) -> list[Verdict]:
@@ -180,7 +208,10 @@ class ThePolicyNode(Then[APolicyAndACaller, RetentionPolicyNode]):
 
     @override
     def says(self) -> str:
-        return "미리 만들어 둔 정책 전체가 반환된다"
+        return Says(
+            "미리 저장한 정책 전체가 반환됩니다",
+            english="the whole policy seeded in advance comes back",
+        )
 
     @override
     def look(
@@ -205,7 +236,10 @@ class TheLaidPoliciesAreLeft(Then[ManyPoliciesAndACaller, SearchRetentionPolicie
 
     @override
     def says(self) -> str:
-        return "응답에 나와야 하는 정책만 반환된다"
+        return Says(
+            "응답에 나와야 하는 정책만 반환됩니다",
+            english="only the policies that must appear in the response come back",
+        )
 
     @override
     def look(
@@ -232,7 +266,10 @@ class OnlyTheNamedPolicyIsLeft(Then[ManyPoliciesAndACaller, SearchRetentionPolic
 
     @override
     def says(self) -> str:
-        return "필터에 맞는 정책 하나만 반환된다"
+        return Says(
+            "필터에 맞는 정책 하나만 반환됩니다",
+            english="only the one policy the filter names comes back",
+        )
 
     @override
     def look(
@@ -251,15 +288,67 @@ class OnlyTheNamedPolicyIsLeft(Then[ManyPoliciesAndACaller, SearchRetentionPolic
 
 @dataclass(frozen=True)
 class TheDeletedPolicyId(Then[APolicyAndACaller, Any]):
-    """삭제한 정책의 id를 담은 응답. 삭제와 완전 삭제가 같은 형태로 응답한다."""
+    """삭제한 정책의 id를 담은 응답."""
 
     @override
     def says(self) -> str:
-        return "삭제한 정책의 id가 반환된다"
+        return Says(
+            "삭제한 정책의 id 가 반환됩니다",
+            english="the id of the deleted policy comes back",
+        )
 
     @override
     def look(self, laid: APolicyAndACaller, answered: Answered[Any]) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [Refused(EntityNotFoundError, answered.raised)]
-        return [Held[UUID]("id", payload.id, SameAs[UUID](laid.policy.id, "미리 만들어 둔 정책"))]
+        return [
+            Held[UUID](
+                "id",
+                payload.id,
+                SameAs[UUID](
+                    laid.policy.id,
+                    Says("미리 저장한 정책", english="the policy seeded in advance"),
+                ),
+            )
+        ]
+
+
+@dataclass(frozen=True)
+class NothingIsProcessed(Then[ManyPoliciesAndACaller, PartialBulkPayload[RetentionPolicyNode]]):
+    """처리된 정책 없이, 대상이 모두 같은 이유로 실패 목록에 온다."""
+
+    reason: str
+
+    @override
+    def says(self) -> str:
+        return Says(
+            "처리된 정책 없이 대상이 모두 실패 목록에 옵니다",
+            english="no policy is processed and every target comes back in the failed list",
+        )
+
+    @override
+    def look(
+        self,
+        laid: ManyPoliciesAndACaller,
+        answered: Answered[PartialBulkPayload[RetentionPolicyNode]],
+    ) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        verdicts: list[Verdict] = [
+            Same("successes", payload.successes, []),
+            Same("failed count", len(payload.failed), len(laid.laid)),
+        ]
+        for i, (failure, policy) in enumerate(zip(payload.failed, laid.laid, strict=False)):
+            verdicts += [
+                Held[UUID](
+                    f"failed[{i}].id",
+                    failure.id,
+                    SameAs(
+                        policy.id, Says("대상 정책의 id", english="the id of the target policy")
+                    ),
+                ),
+                Held(f"failed[{i}].message", failure.message, Mentions(self.reason)),
+            ]
+        return verdicts

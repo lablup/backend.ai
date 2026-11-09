@@ -20,6 +20,7 @@ from ai.backend.common.dto.manager.query import (
     ToManyFilter,
     UUIDFilter,
 )
+from ai.backend.common.dto.manager.v2.entity_label.request import EntityLabelNestedFilter
 from ai.backend.common.dto.manager.v2.keypair.request import KeypairFilter
 from ai.backend.common.dto.manager.v2.user.types import (
     OrderDirection,
@@ -32,6 +33,7 @@ from ai.backend.common.dto.manager.v2.user.types import (
     UserStatus,
     UserStatusFilter,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.tristate.unset import UNSET, Unset
 
 __all__ = (
@@ -139,7 +141,11 @@ class UpdateUserInput(BaseRequestModel):
     )
     status: UserStatus | None | Unset = Field(
         default=UNSET,
-        description="New account status. Omit to leave unchanged.",
+        description=(
+            "New account status, ACTIVE or INACTIVE. Omit to leave unchanged. "
+            f"DELETED is deprecated since {NEXT_RELEASE_VERSION}: it is handled as a user "
+            "delete, and ACTIVE on a deleted user as a user restore."
+        ),
     )
     role: UserRole | None | Unset = Field(
         default=UNSET,
@@ -322,7 +328,15 @@ class KeypairNestedFilter(ToManyFilter[KeypairFilter]):
 class UserFilter(BaseRequestModel):
     """Filter criteria for searching users."""
 
-    uuid: UUIDFilter | None = Field(default=None, description="Filter by user UUID.")
+    uuid: UUIDFilter | None = Field(
+        default=None,
+        description=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `entity_id`.",
+        deprecated=True,
+    )
+    entity_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by user ID.",
+    )
     username: StringFilter | None = Field(default=None, description="Filter by username.")
     email: StringFilter | None = Field(default=None, description="Filter by email.")
     full_name: StringFilter | None = Field(default=None, description="Filter by full name.")
@@ -373,6 +387,10 @@ class UserFilter(BaseRequestModel):
     )
     project: UserProjectFilter | None = Field(
         default=None, description="Nested filter for projects a user belongs to."
+    )
+    labels: EntityLabelNestedFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by the labels on the entity.",
     )
     AND: list[UserFilter] | None = Field(
         default=None, description="Combine multiple filters with AND logic."

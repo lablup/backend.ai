@@ -16,6 +16,9 @@ from ai.backend.manager.repositories.resource_usage_history.repository import (
     ResourceUsageHistoryRepository,
 )
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
+from ai.backend.manager.repositories.system_session_environ.repository import (
+    SystemSessionEnvironRepository,
+)
 from ai.backend.manager.sokovan.scheduler.types import ScheduleType
 
 if TYPE_CHECKING:
@@ -99,8 +102,9 @@ from ai.backend.manager.views.sokovan.result import PromotionSpec
 
 
 def create_default_scheduler_components(
-    repository: SchedulerRepository,
+    scheduler_repository: SchedulerRepository,
     fair_share_repository: FairShareRepository,
+    system_session_environ_repository: SystemSessionEnvironRepository,
     config_provider: ManagerConfigProvider,
     agent_client_pool: AgentClientPool,
     network_plugin_ctx: NetworkPluginContext,
@@ -111,8 +115,9 @@ def create_default_scheduler_components(
     Create scheduler components with default configuration.
 
     Args:
-        repository: The repository for accessing system data
+        scheduler_repository: The repository for accessing system data
         fair_share_repository: The fair share repository for sequencing
+        system_session_environ_repository: The repository for the environ rows the launcher injects
         config_provider: The manager configuration provider
         agent_client_pool: Pool for managing agent clients
         network_plugin_ctx: Network plugin context for network management
@@ -136,7 +141,7 @@ def create_default_scheduler_components(
             validator=validator,
             default_sequencer=sequencer,
             agent_selector=agent_selector,
-            repository=repository,
+            repository=scheduler_repository,
             fair_share_repository=fair_share_repository,
             config_provider=config_provider,
             valkey_schedule=valkey_schedule,
@@ -146,7 +151,8 @@ def create_default_scheduler_components(
     # Create launcher
     launcher = SessionLauncher(
         SessionLauncherArgs(
-            repository=repository,
+            scheduler_repository=scheduler_repository,
+            system_session_environ_repository=system_session_environ_repository,
             agent_client_pool=agent_client_pool,
             network_plugin_ctx=network_plugin_ctx,
             config_provider=config_provider,
@@ -157,7 +163,7 @@ def create_default_scheduler_components(
     # Create terminator
     terminator = SessionTerminator(
         SessionTerminatorArgs(
-            repository=repository,
+            repository=scheduler_repository,
             agent_client_pool=agent_client_pool,
             valkey_schedule=valkey_schedule,
         )
@@ -167,7 +173,7 @@ def create_default_scheduler_components(
         provisioner=provisioner,
         launcher=launcher,
         terminator=terminator,
-        repository=repository,
+        repository=scheduler_repository,
         config_provider=config_provider,
         agent_client_pool=agent_client_pool,
         network_plugin_ctx=network_plugin_ctx,
@@ -201,7 +207,7 @@ class CoordinatorHandlersArgs:
     provisioner: SessionProvisioner
     launcher: SessionLauncher
     terminator: SessionTerminator
-    repository: SchedulerRepository
+    scheduler_repository: SchedulerRepository
     valkey_schedule: ValkeyScheduleClient
     scheduling_controller: SchedulingController
     fair_share_aggregator: FairShareAggregator
@@ -238,38 +244,38 @@ def _create_lifecycle_handlers(
     return {
         ScheduleType.SCHEDULE: ScheduleSessionsLifecycleHandler(
             args.provisioner,
-            args.repository,
+            args.scheduler_repository,
             args.scheduling_controller,
         ),
         ScheduleType.DEPRIORITIZE: DeprioritizeSessionsLifecycleHandler(
-            args.repository,
+            args.scheduler_repository,
         ),
         ScheduleType.CHECK_PRECONDITION: CheckPreconditionLifecycleHandler(
             args.launcher,
-            args.repository,
+            args.scheduler_repository,
         ),
         ScheduleType.START: StartSessionsLifecycleHandler(
             args.launcher,
-            args.repository,
+            args.scheduler_repository,
         ),
         ScheduleType.TERMINATE: TerminateSessionsLifecycleHandler(
             args.terminator,
-            args.repository,
+            args.scheduler_repository,
         ),
         ScheduleType.RELEASE_RESERVED: ReleaseReservedSessionsLifecycleHandler(
-            args.repository,
+            args.scheduler_repository,
         ),
         ScheduleType.PREEMPTED: PreemptSessionsLifecycleHandler(
-            args.repository,
+            args.scheduler_repository,
             args.scheduling_controller,
         ),
         ScheduleType.RESCHEDULING: RescheduleSessionsLifecycleHandler(
             args.terminator,
-            args.repository,
+            args.scheduler_repository,
             args.scheduling_controller,
         ),
         ScheduleType.SWEEP: SweepSessionsLifecycleHandler(
-            args.repository,
+            args.scheduler_repository,
         ),
     }
 
@@ -374,7 +380,7 @@ def _create_kernel_observers(
             calculator=args.fair_share_calculator,
             resource_usage_repository=args.resource_usage_repository,
             fair_share_repository=args.fair_share_repository,
-            scheduler_repository=args.repository,
+            scheduler_repository=args.scheduler_repository,
         ),
     }
 
@@ -390,7 +396,7 @@ def _create_cleanup_handlers(
     return {
         ScheduleType.CLEANUP_FORCE_TERMINATED: CleanupForceTerminatedHandler(
             terminator=args.terminator,
-            repository=args.repository,
+            repository=args.scheduler_repository,
             valkey_schedule=args.valkey_schedule,
         ),
     }

@@ -10,6 +10,7 @@ from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.image_alias import ImageAliasID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.image.types import ImageAliasData, ImageData, ImageStatus, ImageType
@@ -25,11 +26,10 @@ class ImageCreator(EntityCreator[ImageRow, ImageData]):
     """Creator for an image.
 
     The image joins the registry it was scanned from, and `public` as well when that
-    registry is global. A customized one joins no scope of its own: it belongs to the
-    registry like every other image, and who may see it is a read's question.
-    ``customized`` records that a session commit made it and ``creator_id`` the user it
-    was made for. Both come from the customized-owner label, which the caller reads at
-    write time and no read goes back to.
+    registry is global; a customized image additionally joins the project it is
+    created in. ``customized`` records that a session commit made it and
+    ``creator_id`` the user it was made for. All three come from the customized-owner
+    label, which the caller reads at write time and no read goes back to.
     """
 
     name: str
@@ -48,6 +48,7 @@ class ImageCreator(EntityCreator[ImageRow, ImageData]):
     status: ImageStatus = ImageStatus.ALIVE
     customized: bool = False
     creator_id: UserID | None = None
+    created_in_project_id: ProjectID | None = None
     registry_is_global: bool = False
 
     @override
@@ -59,6 +60,8 @@ class ImageCreator(EntityCreator[ImageRow, ImageData]):
         scopes: list[EntityIdentifier] = [self.registry_id]
         if self.registry_is_global:
             scopes.append(global_entity_id(GlobalEntityName.PUBLIC))
+        if self.created_in_project_id is not None:
+            scopes.append(self.created_in_project_id)
         return scopes
 
     @override

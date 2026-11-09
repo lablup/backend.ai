@@ -8,7 +8,7 @@ Prints them as ``KEY=value`` lines for a job output:
 Version suffix          ``RELEASE_AUDIENCE`` ``IS_PRERELEASE``
 ======================= ==================== ================
 ``aN``                  ``internal``         ``true``
-``rcN``                 ``public``           ``true``
+``rcN``                 ``internal``         ``true``
 none, or ``.postN``     ``public``           ``false``
 anything else           exit code 1
 ======================= ==================== ================
@@ -23,10 +23,8 @@ FINAL = re.compile(r"\d+(\.\d+)*(\.post\d+)?$")
 
 
 def classify(version: str) -> tuple[str, str]:
-    if ALPHA.search(version):
+    if ALPHA.search(version) or RELEASE_CANDIDATE.search(version):
         return "internal", "true"
-    if RELEASE_CANDIDATE.search(version):
-        return "public", "true"
     if FINAL.fullmatch(version):
         return "public", "false"
     raise ValueError(

@@ -12,7 +12,10 @@ from uuid import UUID
 import click
 
 from ai.backend.client.cli.v2.helpers import (
+    EntityLabelTerm,
     create_v2_registry,
+    entity_label_filter_options,
+    entity_label_relations,
     load_v2_config,
     parse_order_options,
     print_result,
@@ -67,6 +70,7 @@ def role() -> None:
     default=None,
     help="Filter roles assigned to this user id.",
 )
+@entity_label_filter_options
 def search(
     limit: int | None,
     offset: int | None,
@@ -77,6 +81,7 @@ def search(
     scope_type: str | None,
     scope_id: str | None,
     assigned_user_id: str | None,
+    label: tuple[EntityLabelTerm, ...],
 ) -> None:
     """Search roles."""
     from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
@@ -107,8 +112,9 @@ def search(
         assigned_user_dto = UserNestedFilter(user_id=UUIDFilter(equals=UUID(assigned_user_id)))
 
     # Build filter only if any filter option is provided
+    relations = entity_label_relations(label)
     filter_dto: RoleFilter | None = None
-    if any([
+    if relations or any([
         name_contains is not None,
         source is not None,
         status is not None,
@@ -121,6 +127,7 @@ def search(
             status=RoleStatusFilter(equals=status) if status is not None else None,
             mapped_scope=mapped_scope_dto,
             assigned_user=assigned_user_dto,
+            AND=[RoleFilter(labels=rel) for rel in relations] or None,
         )
 
     # Build order only if --order-by is provided
@@ -320,14 +327,11 @@ def update(
 @click.argument("role_id", type=str)
 def delete(role_id: str) -> None:
     """Soft-delete a role."""
-    from ai.backend.common.dto.manager.v2.rbac.request import DeleteRoleInput
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.rbac.delete_role(
-                DeleteRoleInput(id=UUID(role_id)),
-            )
+            result = await registry.rbac.delete_role(UUID(role_id))
             print_result(result)
         finally:
             await registry.close()

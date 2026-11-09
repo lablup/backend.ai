@@ -97,6 +97,7 @@ class StorageDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
             MessagingComposerInput(
                 local_config=local_config,
                 redis_config=infrastructure.redis_config,
+                sentinel_monitors=infrastructure.sentinel_monitors,
                 metric_registry=bootstrap.metric_registry,
             ),
         )
@@ -120,6 +121,7 @@ class StorageDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 local_config=local_config,
                 etcd=infrastructure.etcd,
                 redis_config=infrastructure.redis_config,
+                sentinel_monitors=infrastructure.sentinel_monitors,
                 valkey=infrastructure.valkey,
                 event_producer=messaging.event_producer,
             ),

@@ -19,6 +19,7 @@ from ai.backend.testutils.scenario_steps import (
     Given,
     Refused,
     Same,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -27,11 +28,11 @@ from ai.backend.testutils.scenario_steps import (
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.deployment import ADeploymentAndACaller, ADeploymentInThatPlace
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type SyncingStep = Scenario[
-    SeedingSession, ADeploymentAndACaller, DeploymentAdapter, SyncReplicaPayload
+    TestSeedingSession, ADeploymentAndACaller, DeploymentAdapter, SyncReplicaPayload
 ]
 
 
@@ -45,7 +46,12 @@ class Syncing(When[ADeploymentAndACaller, DeploymentAdapter, SyncReplicaPayload]
 
     @override
     def describe(self, laid: ADeploymentAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.deployment.metadata.name}의 복제 맞추기를 요청"
+        return Says(
+            f"{laid.caller.username} 이 {laid.deployment.metadata.name}의 복제 맞추기를 요청합니다",
+            english=(
+                f"{laid.caller.username} asks {laid.deployment.metadata.name} to sync its replicas"
+            ),
+        )
 
     @override
     async def call(
@@ -63,7 +69,10 @@ class SyncingHasStarted(Then[ADeploymentAndACaller, SyncReplicaPayload]):
 
     @override
     def says(self) -> str:
-        return "맞추기를 시작했다고 답한다"
+        return Says(
+            "복제 맞추기를 시작했다고 응답합니다",
+            english="the response says syncing the replicas has started",
+        )
 
     @override
     def look(
@@ -77,7 +86,7 @@ class SyncingHasStarted(Then[ADeploymentAndACaller, SyncReplicaPayload]):
 
 @dataclass(frozen=True)
 class TheGrantedUserStartsSyncing(
-    Scenario[SeedingSession, ADeploymentAndACaller, DeploymentAdapter, SyncReplicaPayload]
+    Scenario[TestSeedingSession, ADeploymentAndACaller, DeploymentAdapter, SyncReplicaPayload]
 ):
     @override
     def summary(self) -> str:
@@ -85,10 +94,16 @@ class TheGrantedUserStartsSyncing(
 
     @override
     def describe(self) -> str:
-        return "수정 권한을 받은 사용자가 복제 맞추기를 요청하면, 맞추기를 시작했다고 답한다"
+        return Says(
+            "수정 권한을 받은 사용자가 복제 맞추기를 요청하면, 맞추기를 시작했다고 응답합니다",
+            english=(
+                "when a user granted update asks to sync the replicas, the response says syncing "
+                "has started"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ADeploymentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:
         return ADeploymentInThatPlace(granted=(Permission.UPDATE,), replica_count=2)
 
     @override
@@ -102,7 +117,7 @@ class TheGrantedUserStartsSyncing(
 
 @dataclass(frozen=True)
 class ReadingIsNotEnoughToSync(
-    Scenario[SeedingSession, ADeploymentAndACaller, DeploymentAdapter, SyncReplicaPayload]
+    Scenario[TestSeedingSession, ADeploymentAndACaller, DeploymentAdapter, SyncReplicaPayload]
 ):
     @override
     def summary(self) -> str:
@@ -110,10 +125,16 @@ class ReadingIsNotEnoughToSync(
 
     @override
     def describe(self) -> str:
-        return "읽기 권한만 받은 사용자가 복제 맞추기를 요청하면, 권한 부족으로 거부된다"
+        return Says(
+            "읽기 권한만 받은 사용자가 복제 맞추기를 요청하면, 권한 부족으로 거부됩니다",
+            english=(
+                "when a user granted only read asks to sync the replicas, the call is rejected for "
+                "lack of permission"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ADeploymentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:
         return ADeploymentInThatPlace(granted=(Permission.READ,))
 
     @override

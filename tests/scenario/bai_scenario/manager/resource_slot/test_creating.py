@@ -17,7 +17,7 @@ from ai.backend.manager.api.adapters.resource_slot.adapter import ResourceSlotAd
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.resource_slot import ResourceSlotTypeAlreadyExists
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Configured, Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.resource_slot import (
     ASlotTypeAndACaller,
@@ -26,13 +26,13 @@ from bai_scenario.components.resource_slot import (
 )
 from bai_scenario.components.system import ENFORCEMENT, ACaller, SomeoneAlone
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 MADE = "cuda.shares"
 BINARY_ROUNDED = NumberFormatInfo(binary=True, round_length=2)
 
-type CreatingStep = Scenario[SeedingSession, Any, ResourceSlotAdapter, ResourceSlotTypeNode]
+type CreatingStep = Scenario[TestSeedingSession, Any, ResourceSlotAdapter, ResourceSlotTypeNode]
 
 
 @dataclass(frozen=True)
@@ -49,8 +49,15 @@ class Creating(When[ACaller, ResourceSlotAdapter, ResourceSlotTypeNode]):
 
     @override
     def describe(self, laid: ACaller) -> str:
-        how = "표시 항목까지 지정해" if self.shown else "이름과 종류만 지정해"
-        return f"{laid.caller.username}이 {self.slot_type.value} 종류 슬롯 {self.named}(을)를 {how} 생성"
+        how_ko = "표시 항목까지 지정해" if self.shown else "이름과 종류만 지정해"
+        how_en = "giving every display value" if self.shown else "giving only a name and a kind"
+        return Says(
+            f"{laid.caller.username} 이 {self.slot_type.value} 종류 슬롯 {self.named}을 {how_ko} 생성합니다",
+            english=(
+                f"{laid.caller.username} creates the {self.slot_type.value} slot "
+                f"{self.named} {how_en}"
+            ),
+        )
 
     @override
     async def call(self, adapter: ResourceSlotAdapter, laid: ACaller) -> ResourceSlotTypeNode:
@@ -84,7 +91,13 @@ class CreatingWithTheLaidName(When[ASlotTypeAndACaller, ResourceSlotAdapter, Res
 
     @override
     def describe(self, laid: ASlotTypeAndACaller) -> str:
-        return f"{laid.caller.username}이 이미 있는 이름 {laid.slot_type.slot_name}(으)로 다시 생성"
+        return Says(
+            f"{laid.caller.username} 이 이미 있는 이름 {laid.slot_type.slot_name}으로 다시 생성합니다",
+            english=(
+                f"{laid.caller.username} creates it again with the name "
+                f"{laid.slot_type.slot_name} that already exists"
+            ),
+        )
 
     @override
     async def call(
@@ -101,7 +114,7 @@ class CreatingWithTheLaidName(When[ASlotTypeAndACaller, ResourceSlotAdapter, Res
 
 @dataclass(frozen=True)
 class TheSuperadminMakesOneWithANameAndAKind(
-    Scenario[SeedingSession, ACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
+    Scenario[TestSeedingSession, ACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
 ):
     @override
     def summary(self) -> str:
@@ -109,13 +122,19 @@ class TheSuperadminMakesOneWithANameAndAKind(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 슬롯 이름과 종류만 지정해 생성하면, 표시용 문자열은 모두 비고 필수 여부는 거짓, "
-            "사용 여부는 참, 순위는 0, 숫자 서식은 십진에 반올림 없음인 노드가 반환된다"
+        return Says(
+            "superadmin 이 슬롯 이름과 종류만 지정해 생성하면, 표시용 문자열은 모두 비고 "
+            "필수 여부는 거짓, 사용 여부는 참, 순위는 0, 숫자 서식은 십진에 반올림 없음인 "
+            "노드가 반환됩니다",
+            english=(
+                "when the superadmin creates a slot type with only a name and a kind, the node "
+                "comes back with every display string empty, required false, enabled true, "
+                "rank 0, and a decimal number format without rounding"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ACaller]:
+    def given(self) -> Given[TestSeedingSession, ACaller]:
         return SomeoneAlone(role=UserRole.SUPERADMIN)
 
     @override
@@ -129,7 +148,7 @@ class TheSuperadminMakesOneWithANameAndAKind(
 
 @dataclass(frozen=True)
 class EveryDisplayValueComesBackAsGiven(
-    Scenario[SeedingSession, ACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
+    Scenario[TestSeedingSession, ACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
 ):
     @override
     def summary(self) -> str:
@@ -137,10 +156,18 @@ class EveryDisplayValueComesBackAsGiven(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 표시 이름·설명·단위·아이콘·서식·순위까지 지정해 생성하면, 지정한 값이 그대로 담긴 노드가 반환된다"
+        return Says(
+            "superadmin 이 표시 이름, 설명, 단위, 아이콘, 서식, 순위까지 지정해 생성하면, "
+            "지정한 값이 그대로 담긴 노드가 반환됩니다",
+            english=(
+                "when the superadmin creates a slot type with the display name, description, "
+                "unit, icon, number format and rank given, the node comes back with those "
+                "values as given"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ACaller]:
+    def given(self) -> Given[TestSeedingSession, ACaller]:
         return SomeoneAlone(role=UserRole.SUPERADMIN)
 
     @override
@@ -165,7 +192,7 @@ class EveryDisplayValueComesBackAsGiven(
 
 @dataclass(frozen=True)
 class EachKindIsAccepted(
-    Scenario[SeedingSession, ACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
+    Scenario[TestSeedingSession, ACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
 ):
     slot_type: SlotTypes
 
@@ -175,10 +202,16 @@ class EachKindIsAccepted(
 
     @override
     def describe(self) -> str:
-        return f"슈퍼관리자가 {self.slot_type.value} 종류로 생성하면 그 종류가 담긴 노드가 반환된다"
+        return Says(
+            f"superadmin 이 {self.slot_type.value} 종류로 생성하면 그 종류가 담긴 노드가 반환됩니다",
+            english=(
+                f"when the superadmin creates a slot type of the {self.slot_type.value} kind, "
+                "the node comes back with that kind"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ACaller]:
+    def given(self) -> Given[TestSeedingSession, ACaller]:
         return SomeoneAlone(role=UserRole.SUPERADMIN)
 
     @override
@@ -192,7 +225,7 @@ class EachKindIsAccepted(
 
 @dataclass(frozen=True)
 class ANameAlreadyTakenIsRefused(
-    Scenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
+    Scenario[TestSeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
 ):
     @override
     def summary(self) -> str:
@@ -200,14 +233,20 @@ class ANameAlreadyTakenIsRefused(
 
     @override
     def describe(self) -> str:
-        return (
-            "같은 이름의 슬롯 종류가 있을 때 그 이름으로 다시 생성하면, 이름 중복으로 거부된다. "
-            "이 행은 에이전트 자원·커널 할당·모델 카드 자원 요구·배포 preset 자원 슬롯·배포 리비전 자원 슬롯 "
-            "테이블이 참조하므로 덮어쓰지 않는다"
+        return Says(
+            "같은 이름의 자원 슬롯 유형이 있을 때 그 이름으로 다시 생성하면, 이름 중복으로 "
+            "거부됩니다. 이 시나리오는 에이전트 자원, 커널 할당, 모델 카드 자원 요구, "
+            "배포 preset 자원 슬롯, 배포 리비전 자원 슬롯 테이블이 참조하므로 덮어쓰지 않습니다",
+            english=(
+                "when a slot type of the same name exists, creating it again with that name is "
+                "rejected as a duplicate. This scenario is not overwritten because the agent "
+                "resource, kernel allocation, model card resource request, deployment preset "
+                "resource slot and deployment revision resource slot tables refer to it"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ASlotTypeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ASlotTypeAndACaller]:
         return ASlotTypeAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -221,7 +260,7 @@ class ANameAlreadyTakenIsRefused(
 
 @dataclass(frozen=True)
 class AUserWhoIsNotTheSuperadminMayNotCreate(
-    Scenario[SeedingSession, ACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
+    Scenario[TestSeedingSession, ACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
 ):
     @override
     def summary(self) -> str:
@@ -229,10 +268,15 @@ class AUserWhoIsNotTheSuperadminMayNotCreate(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 슬롯 종류를 생성하면 역할 부족으로 거부된다"
+        return Says(
+            "superadmin 이 아닌 사용자가 자원 슬롯 유형을 생성하면 역할 부족으로 거부됩니다",
+            english=(
+                "a user who is not the superadmin creating a slot type is rejected for lack of role"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ACaller]:
+    def given(self) -> Given[TestSeedingSession, ACaller]:
         return SomeoneAlone()
 
     @override
@@ -246,7 +290,7 @@ class AUserWhoIsNotTheSuperadminMayNotCreate(
 
 @dataclass(frozen=True)
 class EnforcementOffStillNeedsTheSuperadmin(
-    Scenario[SeedingSession, ACaller, ResourceSlotAdapter, ResourceSlotTypeNode], Configured
+    Scenario[TestSeedingSession, ACaller, ResourceSlotAdapter, ResourceSlotTypeNode], Configured
 ):
     @override
     def summary(self) -> str:
@@ -254,14 +298,20 @@ class EnforcementOffStillNeedsTheSuperadmin(
 
     @override
     def describe(self) -> str:
-        return "권한 검사를 꺼도 슈퍼관리자가 아니면 슬롯 종류를 생성하지 못한다"
+        return Says(
+            "권한 검사를 꺼도 superadmin 이 아니면 자원 슬롯 유형을 생성하지 못합니다",
+            english=(
+                "turning permission checks off still does not let a user who is not the "
+                "superadmin create a slot type"
+            ),
+        )
 
     @override
     def config(self) -> Mapping[str, Any]:
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, ACaller]:
+    def given(self) -> Given[TestSeedingSession, ACaller]:
         return SomeoneAlone()
 
     @override

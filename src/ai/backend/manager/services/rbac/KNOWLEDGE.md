@@ -14,10 +14,12 @@ generated:
 status: stable
 ---
 
-# RBAC graph writes — Knowledge
+# RBAC graph writes: Knowledge
 
 > Rules: `../AGENTS.md`. Design: `proposals/BEP-1075-entity-relation-operations.md`,
 > `proposals/BEP-1076-project-membership.md`, `proposals/BEP-1077-project-scoped-ownership.md`.
+
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
 The operations that build the permission graph are wired here rather than in the domains
 they are about. A registry's allowed projects and a resource group's domains are the
@@ -55,8 +57,11 @@ entity type, shape, operation, gate and backing.
   entity is asked once however many pairs name it, and the answer is per pair.
 - A pair already linked is skipped in ops and answered `False`. Naming one twice is not
   something a caller has to avoid, so no call site catches a duplicate.
-- The audit row records the direction — `create_relation`, `purge_relation`,
-  `delete_relation`, `restore_relation` — and the scopes it named. The pair is what
+- A pair already linked still has its graph reads (govern and share) registered again.
+  The registration is idempotent, so a pair whose row survived without its graph rows is
+  filled in when it is created again.
+- The audit row records the direction (`create_relation`, `purge_relation`,
+  `delete_relation`, `restore_relation`) and the scopes it named. The pair is what
   tells one relation from another, not the name.
 - What a run of several pairs *means* is still the caller's: the registry's "removing
   where nothing was linked raises" counts what came back.
@@ -67,11 +72,13 @@ entity type, shape, operation, gate and backing.
   `entity_type` is `user` (BEP-1076). It is a scope action, not a relation.
 - Enrolling and the role grant land in one ops primitive. A user on a roster without the
   role the caller named is not a state the operation may leave behind.
-- `join_members` narrows to the project's own domain and to users not already on the
-  roster; `join_member` does neither, because the caller that uses it — a
-  project-scoped role grant — has already decided.
+- `join_member` and `join_members` pick the users they take by the same check: only
+  users of the project's domain, and a user already on the roster is left as it stands
+  (its membership row and caps are not written again).
+- A user not taken is left out of the result by `join_members` and rejected by
+  `join_member` with `ProjectMemberNotJoinableError`.
 
-## The personal-project refusal is an ops invariant
+## The personal-project rejection is an ops invariant
 
 - A personal project takes no member beyond the user it was created with. The refusal is
   in `V2RosterWriteOps`, so no path reaches around it.
@@ -79,12 +86,12 @@ entity type, shape, operation, gate and backing.
   owner is the one member such a project ever takes.
 - The projects a user is enrolled in are narrowed by several callers, and a filter each
   of them applies is a filter each of them can forget.
-- A roster write onto a project that is not there is refused for the same reason: an
+- A roster write onto a project that is not there is rejected for the same reason: an
   edge to nothing is not a state any caller asked for.
 
 ## The roster is the graph and nothing else
 
-- A roster place is the graph edge and its caps. The graph is where a roster read
+- A roster entry is the graph edge and its caps. The graph is where a roster read
   answers from, and since BA-7796 there is nothing else it could answer from.
 
 ## A role grant is a roster place as well
@@ -92,6 +99,8 @@ entity type, shape, operation, gate and backing.
 - Granting a project-scoped role puts the user on that project's list, and taking the
   last role there back takes them off it. The two writes are one operation, so they sit
   here beside the roster rather than with the role catalog.
+- A bulk role grant fails per user. A user who cannot join the roster and a user the
+  grant fails for are reported in failures; the other users go through.
 - What stays with the role catalog is the role itself and its permissions: creating a
   role, editing it, and reading it are not graph writes.
 - These four are still on the legacy action base. The role domain's move to the v2

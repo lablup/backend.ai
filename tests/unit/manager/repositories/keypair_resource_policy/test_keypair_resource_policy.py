@@ -430,9 +430,7 @@ class TestKeypairResourcePolicyOps:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> None:
         """Test removing a keypair resource policy"""
-        result = await ops.purge_entity(
-            KeyPairResourcePolicyPurger(name=sample_policy.name, policy_id=sample_policy.uuid)
-        )
+        result = await ops.purge_entity(KeyPairResourcePolicyPurger(policy_id=sample_policy.uuid))
 
         assert result.name == sample_policy.name
 
@@ -451,9 +449,7 @@ class TestKeypairResourcePolicyOps:
         """Test that removing a non-existent policy raises EntityNotFoundError"""
         with pytest.raises(EntityNotFoundError):
             await ops.purge_entity(
-                KeyPairResourcePolicyPurger(
-                    name="nonexistent-policy", policy_id=KeyPairResourcePolicyUUID(uuid4())
-                )
+                KeyPairResourcePolicyPurger(policy_id=KeyPairResourcePolicyUUID(uuid4()))
             )
 
     @pytest.fixture

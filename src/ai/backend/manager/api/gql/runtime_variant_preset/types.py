@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Annotated, Self
+from typing import TYPE_CHECKING, Annotated, Self, override
 from uuid import UUID
 
 import strawberry
@@ -10,8 +11,16 @@ from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
+from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetID
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.request import (
     CreateRuntimeVariantPresetInput as CreateInputDTO,
+)
+from ai.backend.common.dto.manager.v2.runtime_variant_preset.request import (
+    PartialBulkPurgeRuntimeVariantPresetsInput as PartialBulkPurgeInputDTO,
+)
+from ai.backend.common.dto.manager.v2.runtime_variant_preset.request import (
+    PartialBulkUpdateRuntimeVariantPresetsInput as PartialBulkUpdateInputDTO,
 )
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.request import (
     RuntimeVariantPresetFilter as FilterDTO,
@@ -58,6 +67,7 @@ from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import StringFilter as StringFilterGQL
 from ai.backend.manager.api.gql.base import UUIDFilter as UUIDFilterGQL
+from ai.backend.manager.api.gql.common_types import PartialBulkFailureGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -105,7 +115,7 @@ class PresetValueTypeGQL(StrEnum):
 
 @gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="UI control type for a runtime variant preset.",
     ),
     name="RuntimeVariantPresetUIType",
@@ -196,7 +206,7 @@ class UIOptionGQL(PydanticOutputMixin[UIOptionDTO]):
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Slider UI config input."),
+    BackendAIGQLMeta(added_version="26.9.0", description="Slider UI config input."),
     name="RuntimeVariantPresetSliderOptionInput",
 )
 class SliderOptionInputGQL(PydanticInputMixin[SliderOptionDTO]):
@@ -207,7 +217,7 @@ class SliderOptionInputGQL(PydanticInputMixin[SliderOptionDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="Number input UI config input.",
     ),
     name="RuntimeVariantPresetNumberOptionInput",
@@ -218,7 +228,7 @@ class NumberOptionInputGQL(PydanticInputMixin[NumberOptionDTO]):
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Choice item input."),
+    BackendAIGQLMeta(added_version="26.9.0", description="Choice item input."),
     name="RuntimeVariantPresetChoiceItemInput",
 )
 class ChoiceItemInputGQL(PydanticInputMixin[ChoiceItemDTO]):
@@ -228,7 +238,7 @@ class ChoiceItemInputGQL(PydanticInputMixin[ChoiceItemDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="Select UI config input.",
     ),
     name="RuntimeVariantPresetChoiceOptionInput",
@@ -239,7 +249,7 @@ class ChoiceOptionInputGQL(PydanticInputMixin[ChoiceOptionDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="Text input UI config input.",
     ),
     name="RuntimeVariantPresetTextOptionInput",
@@ -250,7 +260,7 @@ class TextOptionInputGQL(PydanticInputMixin[TextOptionDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="UI rendering options input.",
     ),
     name="RuntimeVariantPresetUIOptionInput",
@@ -299,7 +309,7 @@ class RuntimeVariantPresetGQL(PydanticNodeMixin[NodeDTO]):
     id: NodeID[str] = gql_field(description="Relay-style global node identifier.")
     entity_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the runtime variant preset.",
         ),
     )
@@ -324,13 +334,13 @@ class RuntimeVariantPresetGQL(PydanticNodeMixin[NodeDTO]):
     )
     added_version: str | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="Runtime version this preset became available in; null means it always was.",
         )
     )
     deprecated_version: str | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="Runtime version this preset was removed in, exclusive; null means it is still offered.",
         )
     )
@@ -362,6 +372,19 @@ class RuntimeVariantPresetGQL(PydanticNodeMixin[NodeDTO]):
             RuntimeVariantID(self.runtime_variant_id)
         )
 
+    @classmethod
+    @override
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[RuntimeVariantPresetGQL | None]:
+        return await info.context.data_loaders.runtime_variant_preset_loader.load_many([
+            RuntimeVariantPresetID(UUID(nid)) for nid in node_ids
+        ])
+
 
 RuntimeVariantPresetEdge = Edge[RuntimeVariantPresetGQL]
 
@@ -391,12 +414,16 @@ class RuntimeVariantPresetFilterGQL(PydanticInputMixin[FilterDTO]):
     )
     runtime_version: str | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description=(
                 "Keep only presets valid at this runtime version, that is "
                 "added_version <= version < deprecated_version. Dot-separated numbers."
             ),
         ),
+        default=None,
+    )
+    entity_id: UUIDFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter by preset ID."),
         default=None,
     )
     AND: list[Self] | None = gql_added_field(
@@ -456,31 +483,31 @@ class CreateRuntimeVariantPresetInputGQL(PydanticInputMixin[CreateInputDTO]):
     )
     added_version: str | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="Runtime version this preset becomes available in. Dot-separated numbers.",
         )
     )
     deprecated_version: str | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="Runtime version this preset is removed in, exclusive. Dot-separated numbers.",
         )
     )
     category: str | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UI category group for organizing parameters.",
         )
     )
     display_name: str | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="Human-readable display label for the UI.",
         )
     )
     ui_option: UIOptionInputGQL | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UI rendering options.",
         )
     )
@@ -509,31 +536,31 @@ class UpdateRuntimeVariantPresetInputGQL(PydanticInputMixin[UpdateInputDTO]):
     )
     added_version: str | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="New version this preset becomes available in.",
         )
     )
     deprecated_version: str | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="New version this preset is removed in, exclusive.",
         )
     )
     category: str | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="New UI category group.",
         )
     )
     display_name: str | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="New human-readable display label.",
         )
     )
     ui_option: UIOptionInputGQL | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="New UI rendering options.",
         )
     )
@@ -564,3 +591,68 @@ class UpdateRuntimeVariantPresetPayloadGQL(PydanticOutputMixin[UpdatePayloadDTO]
 )
 class DeleteRuntimeVariantPresetPayloadGQL(PydanticOutputMixin[DeletePayloadDTO]):
     id: UUID = gql_field(description="ID of the deleted preset.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for runtime variant preset purge.",
+    ),
+    model=DeletePayloadDTO,
+    name="PurgeRuntimeVariantPresetPayload",
+)
+class PurgeRuntimeVariantPresetPayloadGQL(PydanticOutputMixin[DeletePayloadDTO]):
+    purged_id: strawberry.ID = gql_field(
+        description="Global ID of the purged runtime variant preset."
+    )
+    entity_id: UUID = gql_field(description="UUID of the purged runtime variant preset.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Input for updating several runtime variant presets, each answered for separately."
+        ),
+    ),
+    name="PartialBulkUpdateRuntimeVariantPresetsInput",
+)
+class PartialBulkUpdateRuntimeVariantPresetsInputGQL(PydanticInputMixin[PartialBulkUpdateInputDTO]):
+    items: list[UpdateRuntimeVariantPresetInputGQL] = gql_field(
+        description="The presets to update, each with its fields."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Input for purging several runtime variant presets, each answered for separately."
+        ),
+    ),
+    name="PartialBulkPurgeRuntimeVariantPresetsInput",
+)
+class PartialBulkPurgeRuntimeVariantPresetsInputGQL(PydanticInputMixin[PartialBulkPurgeInputDTO]):
+    ids: list[UUID] = gql_field(description="IDs of the presets to purge.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Result of a partial bulk runtime variant preset operation: the presets processed "
+            "and the ones that failed."
+        ),
+    ),
+    model=PartialBulkPayload[NodeDTO],
+    name="PartialBulkRuntimeVariantPresetsPayload",
+)
+class PartialBulkRuntimeVariantPresetsPayloadGQL(PydanticOutputMixin[PartialBulkPayload[NodeDTO]]):
+    """Payload for partial bulk runtime variant preset mutations."""
+
+    successes: list[RuntimeVariantPresetGQL] = gql_field(
+        description="The presets processed, as they stood when processed."
+    )
+    failed: list[PartialBulkFailureGQL] = gql_field(
+        description="The presets not processed, each with the reason."
+    )

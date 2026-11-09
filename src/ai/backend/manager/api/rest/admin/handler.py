@@ -108,6 +108,7 @@ class AdminHandler:
             valkey_image=gql_deps.valkey_image,
             valkey_live=gql_deps.valkey_live,
             valkey_schedule=gql_deps.valkey_schedule,
+            sentinel_monitors=gql_deps.sentinel_monitors,
             network_plugin_ctx=gql_deps.network_plugin_ctx,
             manager_status=manager_status,
             known_slot_types=known_slot_types,

@@ -13,23 +13,32 @@ from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.data.vfolder.types import VFolderData
 from ai.backend.manager.models.entity_share.creators import EntityShareCreator
 from ai.backend.manager.models.entity_share.updaters import EntityShareAcceptUpdater
-from bai_scenario.seeds.seeder import Naming, SeedRowFromThree, SeedShareAcceptance
+from ai.backend.testutils.scenario_steps import Says
+from bai_scenario.seeds.seeder import Naming, TestSeedRowFromThree, TestSeedShareAcceptance
 
 
 @dataclass(frozen=True)
-class SeedVFolderShare(SeedRowFromThree[UserData, VFolderData, UserData, EntityShareData]):
+class TestSeedVFolderShare(TestSeedRowFromThree[UserData, VFolderData, UserData, EntityShareData]):
     """The first person offers the folder to the second, under ``cap``."""
 
-    cap: Permission
+    cap: Permission | None = None
     name_hint: str = "share"
 
     @override
     def kind(self) -> str:
-        return "폴더 공유 제안"
+        return Says("vfolder 공유 제안", english="vfolder share offer")
 
     @override
     def detail(self) -> str:
-        return f"{self.cap.name} 권한으로 제안되고, 아직 답하지 않았다"
+        if self.cap is None:
+            return Says(
+                "권한 상한 없이 제안되었고, 아직 응답하지 않았습니다",
+                english="offered with no ceiling on the permissions, not answered yet",
+            )
+        return Says(
+            f"{self.cap.name} 권한으로 제안되었고, 아직 응답하지 않았습니다",
+            english=f"offered under the {self.cap.name} permission, not answered yet",
+        )
 
     @override
     def name(self, naming: Naming) -> str:
@@ -48,12 +57,12 @@ class SeedVFolderShare(SeedRowFromThree[UserData, VFolderData, UserData, EntityS
 
 
 @dataclass(frozen=True)
-class SeedShareTaken(SeedShareAcceptance[EntityShareData]):
+class TestSeedShareTaken(TestSeedShareAcceptance[EntityShareData]):
     """The recipient the offer names takes it."""
 
     @override
     def kind(self) -> str:
-        return "받는 사람이 받아들임"
+        return Says("받는 사람이 받아들임", english="the recipient accepts it")
 
     @override
     def seed(self, offer: EntityShareData) -> EntityShareAcceptUpdater:

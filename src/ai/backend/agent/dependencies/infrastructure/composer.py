@@ -8,12 +8,15 @@ from typing import override
 from aiodocker import Docker
 
 from ai.backend.agent.config.unified import AgentUnifiedConfig
+from ai.backend.common.clients.valkey_client.sentinel_monitor.dependency import (
+    SentinelMonitorDependency,
+)
 from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.dependencies import DependencyComposer, DependencyStack
 from ai.backend.common.etcd import AsyncEtcd
 
 from .docker import DockerDependency
-from .redis import AgentValkeyClients, AgentValkeyDependency
+from .redis import AgentValkeyClients, AgentValkeyDependency, AgentValkeyInput
 
 
 @dataclass
@@ -47,7 +50,7 @@ class AgentInfrastructureComposer(
 ):
     """Composes all agent infrastructure dependencies as a single unit.
 
-    Composes valkey and docker dependencies in order.
+    Composes Sentinel monitor, valkey and docker dependencies in order.
     Etcd is passed from the bootstrap stage and not managed here.
     """
 
@@ -73,9 +76,15 @@ class AgentInfrastructureComposer(
             AgentInfrastructureResources containing all initialized resources
         """
         # Enter dependencies using the stack
+        sentinel_monitors = await stack.enter_dependency(
+            SentinelMonitorDependency(),
+            setup_input.redis_config.to_valkey_profile_target().targets(),
+        )
         valkey = await stack.enter_dependency(
             AgentValkeyDependency(),
-            setup_input.redis_config,
+            AgentValkeyInput(
+                redis_config=setup_input.redis_config, sentinel_monitors=sentinel_monitors
+            ),
         )
         docker = await stack.enter_dependency(
             DockerDependency(),

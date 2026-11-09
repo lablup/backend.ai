@@ -63,11 +63,12 @@ from ai.backend.agent.health.docker import DockerHealthChecker
 from ai.backend.agent.metrics.metric import RPCMetricObserver
 from ai.backend.agent.monitor import AgentErrorPluginContext, AgentStatsPluginContext
 from ai.backend.agent.resources import collect_device_capacities, scan_gpu_alloc_map
-from ai.backend.agent.rpc.context import with_rpc_context
+from ai.backend.agent.rpc.context import with_rpc_context, with_rpc_trace
 from ai.backend.agent.rpc.health.registry import register_health_domain
 from ai.backend.agent.rpc.hwinfo.registry import register_hwinfo_domain
 from ai.backend.agent.rpc.kernel.registry import register_kernel_domain
 from ai.backend.agent.rpc.middlewares.metric import build_metric_middleware
+from ai.backend.agent.rpc.middlewares.tracing import build_tracing_middleware
 from ai.backend.agent.rpc.routing import AgentRPCRegistry
 from ai.backend.agent.runtime import AgentRuntime
 from ai.backend.agent.types import AgentBackend
@@ -75,6 +76,7 @@ from ai.backend.common import config, identity, msgpack, utils
 from ai.backend.common.asyncio import current_loop
 from ai.backend.common.auth import AgentAuthHandler, PublicKey, SecretKey
 from ai.backend.common.bgtask.reporter import ProgressReporter
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.defs import RedisRole
 from ai.backend.common.docker import ImageRef
@@ -109,6 +111,7 @@ from ai.backend.common.metrics.http import (
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.networking import force_threaded_dns_resolver
+from ai.backend.common.plugin import load_configured_wheelhouse
 from ai.backend.common.process.child_exit import ChildExitMonitor, ChildStatus
 from ai.backend.common.process.crashdump import enable_crash_dump
 from ai.backend.common.service_discovery.etcd_discovery.service_discovery import (
@@ -145,7 +148,12 @@ from ai.backend.common.types import (
     safe_print_redis_config,
 )
 from ai.backend.logging import Logger, LogLevel
-from ai.backend.logging.otel import LegacyOtelLogging, OpenTelemetrySpec, apply_otel_tracer
+from ai.backend.logging.otel import (
+    LegacyOtelLogging,
+    OpenTelemetrySpec,
+    apply_otel_tracer,
+    build_otel_server_middleware,
+)
 from ai.backend.logging.structured import StructuredLogger, with_log_context
 from ai.backend.logging.structured_otel import StructuredOtelLogging
 
@@ -205,6 +213,7 @@ class _RPCRegistryBase:
         signature = inspect.signature(meth)
 
         @functools.wraps(meth)
+        @_trace_rpc(meth.__name__)
         @_collect_metrics(self._metric_observer, meth.__name__)
         async def _inner(self_: AgentRPCServer, request: RPCMessage) -> Any:
             scoped = False
@@ -264,6 +273,18 @@ class RPCFunctionRegistryV2(_RPCRegistryBase):
         return self._register(meth, lambda result: result.as_dict(), log_failure=True)
 
 
+def _trace_rpc(method_name: str) -> Callable[..., Any]:
+    def decorator(meth: Callable[..., Any]) -> Callable[[AgentRPCServer, RPCMessage], Any]:
+        @functools.wraps(meth)
+        async def _inner(self: AgentRPCServer, request: RPCMessage) -> Any:
+            with with_rpc_trace(request, method_name):
+                return await meth(self, request)
+
+        return _inner
+
+    return decorator
+
+
 def _collect_metrics(observer: RPCMetricObserver, method_name: str) -> Callable[..., Any]:
     def decorator(meth: Callable[..., Any]) -> Callable[[AgentRPCServer, RPCMessage], Any]:
         @functools.wraps(meth)
@@ -295,9 +316,9 @@ class AgentRPCServer(aobject):
     rpc_function: ClassVar[RPCFunctionRegistry] = RPCFunctionRegistry()
     rpc_function_v2: ClassVar[RPCFunctionRegistryV2] = RPCFunctionRegistryV2()
 
-    rpc_auth_manager_public_key: PublicKey | None
-    rpc_auth_agent_public_key: PublicKey | None
-    rpc_auth_agent_secret_key: SecretKey | None
+    rpc_auth_manager_public_key: PublicKey
+    rpc_auth_agent_public_key: PublicKey
+    rpc_auth_agent_secret_key: SecretKey
 
     loop: asyncio.AbstractEventLoop
     etcd: AsyncEtcd
@@ -310,6 +331,7 @@ class AgentRPCServer(aobject):
     stats_monitor: AgentStatsPluginContext
     error_monitor: AgentErrorPluginContext
     health_probe: HealthProbe
+    sentinel_monitors: SentinelMonitorSet
 
     def __init__(
         self,
@@ -330,6 +352,12 @@ class AgentRPCServer(aobject):
 
         await self.read_agent_config()
         await self.read_agent_config_container()
+        if not self.local_config.redis:
+            raise ConfigurationError({"AgentRPCServer": "Redis runtime configuration is missing."})
+        self.sentinel_monitors = SentinelMonitorSet(
+            self.local_config.redis.to_redis_profile_target().valkey_targets()
+        )
+        await self.sentinel_monitors.start()
 
         self.stats_monitor = AgentStatsPluginContext(
             self.etcd, self.local_config.model_dump(by_alias=True)
@@ -340,36 +368,30 @@ class AgentRPCServer(aobject):
         await self.stats_monitor.init()
         await self.error_monitor.init()
 
-        if self.local_config.agent_common.rpc_auth_agent_keypair is not None:
-            manager_pkey, _ = load_certificate(
-                str(self.local_config.agent_common.rpc_auth_manager_public_key)
+        manager_pkey, _ = load_certificate(
+            str(self.local_config.agent_common.rpc_auth_manager_public_key)
+        )
+        self.rpc_auth_manager_public_key = PublicKey(manager_pkey)
+        agent_pkey, agent_skey = load_certificate(
+            str(self.local_config.agent_common.rpc_auth_agent_keypair)
+        )
+        if agent_skey is None:
+            raise AgentInitializationError(
+                "Agent secret key is not available from the keypair file."
             )
-            self.rpc_auth_manager_public_key = PublicKey(manager_pkey)
-            agent_pkey, agent_skey = load_certificate(
-                str(self.local_config.agent_common.rpc_auth_agent_keypair)
-            )
-            if agent_skey is None:
-                raise AgentInitializationError(
-                    "Agent secret key is not available from the keypair file."
-                )
-            self.rpc_auth_agent_public_key = PublicKey(agent_pkey)
-            self.rpc_auth_agent_secret_key = SecretKey(agent_skey)
-            log.info(
-                "rpc encryption and authentication enabled",
-                agent_public_key=self.rpc_auth_agent_public_key.decode("ascii"),
-                manager_public_key=self.rpc_auth_manager_public_key.decode("ascii"),
-            )
-            auth_handler = AgentAuthHandler(
-                "local",
-                self.rpc_auth_manager_public_key,
-                self.rpc_auth_agent_public_key,
-                self.rpc_auth_agent_secret_key,
-            )
-        else:
-            self.rpc_auth_manager_public_key = None
-            self.rpc_auth_agent_public_key = None
-            self.rpc_auth_agent_secret_key = None
-            auth_handler = None
+        self.rpc_auth_agent_public_key = PublicKey(agent_pkey)
+        self.rpc_auth_agent_secret_key = SecretKey(agent_skey)
+        log.info(
+            "rpc encryption and authentication enabled",
+            agent_public_key=self.rpc_auth_agent_public_key.decode("ascii"),
+            manager_public_key=self.rpc_auth_manager_public_key.decode("ascii"),
+        )
+        auth_handler = AgentAuthHandler(
+            "local",
+            self.rpc_auth_manager_public_key,
+            self.rpc_auth_agent_public_key,
+            self.rpc_auth_agent_secret_key,
+        )
 
         self.runtime = await AgentRuntime.create_runtime(
             self.local_config,
@@ -377,6 +399,7 @@ class AgentRPCServer(aobject):
             self.stats_monitor,
             self.error_monitor,
             self.rpc_auth_agent_public_key,
+            self.sentinel_monitors,
         )
 
         # Start serving requests.
@@ -477,7 +500,10 @@ class AgentRPCServer(aobject):
         # hard-coded.
         self._rpc_registry = AgentRPCRegistry(
             runtime=self.runtime,
-            middlewares=[build_metric_middleware(RPCMetricObserver.instance())],
+            middlewares=[
+                build_tracing_middleware(),
+                build_metric_middleware(RPCMetricObserver.instance()),
+            ],
         )
         register_kernel_domain(self._rpc_registry)
         register_health_domain(self._rpc_registry, health_probe=self.health_probe)
@@ -633,6 +659,7 @@ class AgentRPCServer(aobject):
         if not self.debug_server_task.done():
             await self.debug_server_task
         await self.runtime.__aexit__(*exc_info)
+        await self.sentinel_monitors.close()
         await self.stats_monitor.cleanup()
         await self.error_monitor.cleanup()
         await self.health_probe.stop()
@@ -831,7 +858,8 @@ class AgentRPCServer(aobject):
         # Failures raised by `_create_kernel` are logged in their kernel scope; this logs the rest.
         try:
             agent = self.runtime.get_agent(agent_id)
-            throttle_sema = asyncio.Semaphore(agent.local_config.agent.kernel_creation_concurrency)
+            # The agent's own: `kernel-creation-concurrency` bounds the agent, not one request.
+            throttle_sema = agent.kernel_creation_sema
             session_id = SessionId(UUID(raw_session_id))
             coros = []
             for raw_kernel_id, raw_config in zip(raw_kernel_ids, raw_configs, strict=True):
@@ -1435,23 +1463,13 @@ async def aiomonitor_ctx(
 
 @asynccontextmanager
 async def etcd_ctx(local_config: AgentUnifiedConfig) -> AsyncGenerator[AsyncEtcd]:
-    etcd_credentials = None
-    if local_config.etcd.user and local_config.etcd.password:
-        etcd_credentials = {
-            "user": local_config.etcd.user,
-            "password": local_config.etcd.password,
-        }
     scope_prefix_map = {
         ConfigScopes.GLOBAL: "",
         ConfigScopes.SGROUP: f"sgroup/{local_config.agent.legacy_sgroup_name()}",
         ConfigScopes.NODE: f"nodes/agents/{local_config.agent.defaulted_id}",
     }
-    etcd_config_data = local_config.etcd.to_dataclass()
-    async with AsyncEtcd(
-        [addr.to_legacy() for addr in etcd_config_data.addrs],
-        local_config.etcd.namespace,
-        scope_prefix_map,
-        credentials=etcd_credentials,
+    async with AsyncEtcd.create_from_config(
+        local_config.etcd.to_dataclass(), scope_prefix_map
     ) as etcd:
         yield etcd
 
@@ -1530,6 +1548,8 @@ async def agent_server_ctx(
     )
     app = build_root_server()
     app["health_probe"] = agent_server.health_probe
+    if local_config.otel.enabled:
+        app.middlewares.insert(0, build_otel_server_middleware())
     runner = web.AppRunner(app)
     await runner.setup()
     internal_addr = local_config.agent_common.internal_addr.to_legacy()
@@ -1574,7 +1594,10 @@ async def service_discovery_ctx(
             valkey_profile_target = local_config.redis.to_valkey_profile_target()
             live_valkey_target = valkey_profile_target.profile_target(RedisRole.LIVE)
             service_discovery = await RedisServiceDiscovery.create(
-                args=RedisServiceDiscoveryArgs(valkey_target=live_valkey_target)
+                args=RedisServiceDiscoveryArgs(
+                    valkey_target=live_valkey_target,
+                    sentinel_monitor=agent_server.sentinel_monitors.monitor_for(live_valkey_target),
+                )
             )
     sd_loop = ServiceDiscoveryLoop(
         sd_type,
@@ -1790,6 +1813,7 @@ def main(
                     "supervisor",
                 )
                 log.info("agent starting", version=VERSION, runtime=utils.env_info())
+                load_configured_wheelhouse(server_config.wheelhouse)
 
                 # Built here rather than at module scope: these allocate shared memory
                 # and a semaphore, which no other `ag` subcommand has any use for.

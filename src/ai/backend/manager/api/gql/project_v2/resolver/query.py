@@ -96,7 +96,7 @@ async def admin_projects_v2(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description=(
             "Page through the projects the named scopes reach, combined with OR. "
             "Every scope is authorized before the read runs."

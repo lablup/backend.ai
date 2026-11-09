@@ -306,7 +306,7 @@ class TestMonitoringValkeyClientContextManager:
 
         This is the core scenario where the monitor loop alone cannot detect the problem:
         the monitor client pings successfully, but the operation client is broken.
-        The client() failure tracking sets _reconnect_event, and the monitor loop
+        The client() failure tracking requests a reconnect, and the monitor loop
         performs the actual reconnection.
         """
         threshold = monitoring_client._operation_failure_threshold
@@ -328,12 +328,12 @@ class TestMonitoringValkeyClientContextManager:
                 async with monitoring_client.client() as conn:
                     await conn.ping()
 
-        # 5. Counter should be reset and reconnect event should be set
+        # 5. Counter should be reset and a reconnect should be requested
         assert monitoring_client._operation_failure_count == 0
-        assert monitoring_client._reconnect_event.is_set()
+        assert monitoring_client._reconnect_requested
 
         # 6. Simulate monitor loop picking up the reconnect request
-        monitoring_client._reconnect_event.clear()
+        monitoring_client._reconnect_requested = False
         await monitoring_client._reconnect()
 
         # 7. Operation client should be restored

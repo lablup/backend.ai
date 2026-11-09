@@ -14,7 +14,6 @@ from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.pagination import PaginationInfo
 from ai.backend.common.dto.manager.v2.group.types import ProjectType
 from ai.backend.common.dto.manager.v2.user.response import UserNode
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import BackendAISchema
 
 __all__ = (
@@ -119,7 +118,7 @@ class ProjectNode(BaseResponseModel):
         description="Unique identifier for the project (UUID).",
     )
     entity_id: UUID = Field(
-        description=f"UUID of the project. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the project. Added in 26.9.0.",
     )
     basic_info: ProjectBasicInfo = Field(
         description="Basic project information including name, type, and description.",
@@ -160,6 +159,7 @@ class DeleteProjectPayload(BaseResponseModel):
     deleted: bool = Field(
         description="Whether the deletion was successful.",
     )
+    project: ProjectNode = Field(description="The soft-deleted project. Added in 26.10.0.")
 
 
 class RestoreProjectPayload(BaseResponseModel):
@@ -168,6 +168,7 @@ class RestoreProjectPayload(BaseResponseModel):
     restored: bool = Field(
         description="Whether the restore was successful.",
     )
+    project: ProjectNode = Field(description="The restored project. Added in 26.10.0.")
 
 
 class PurgeProjectPayload(BaseResponseModel):

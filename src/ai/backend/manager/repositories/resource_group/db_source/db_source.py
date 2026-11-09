@@ -15,13 +15,13 @@ from ai.backend.common.data.entity.resource_group import (
 )
 from ai.backend.common.types import SlotQuantity
 from ai.backend.manager.data.agent.types import AgentStatus
-from ai.backend.manager.data.deployment.types import DeploymentOptions
+from ai.backend.manager.data.deployment.types import DeploymentHandlerOptions, DeploymentOptions
 from ai.backend.manager.data.resource_group.types import (
     ResourceGroupData,
     ResourceGroupListResult,
     ResourceInfo,
 )
-from ai.backend.manager.data.session.options import DefaultSessionOptions
+from ai.backend.manager.data.session.options import AgentSelectionPolicy, DefaultSessionOptions
 from ai.backend.manager.errors.resource import ResourceGroupNotFound
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.domain.row import DomainRow
@@ -108,23 +108,38 @@ class ResourceGroupDBSource:
     async def replace_default_deployment_options(
         self,
         name: ResourceGroupName,
-        options: DeploymentOptions,
+        handler_options: DeploymentHandlerOptions,
+        agent_selection_policy: AgentSelectionPolicy | None,
     ) -> DeploymentOptions:
         """Fully replace the ``default_deployment_options`` JSONB column
-        and return the stored value in a single ``UPDATE ... RETURNING``
-        round-trip.
+        and return the stored value (``UPDATE ... RETURNING``).
 
         The column is typed as ``PydanticColumn(DeploymentOptions)`` so
-        the domain model is persisted verbatim.
+        the domain model is persisted verbatim. The agent selection policy
+        is replaced only when given; ``None`` keeps the stored one.
 
         Raises:
             ScalingGroupNotFound: If the resource group does not exist.
         """
         async with self._db.begin_session() as session:
+            if agent_selection_policy is None:
+                stored_options = await session.scalar(
+                    sa.select(ResourceGroupRow.default_deployment_options)
+                    .where(ResourceGroupRow.name == name)
+                    .with_for_update()
+                )
+                if stored_options is None:
+                    raise ResourceGroupNotFound(f"Resource group not found (name:{name})")
+                agent_selection_policy = stored_options.agent_selection_policy
             stmt = (
                 sa.update(ResourceGroupRow)
                 .where(ResourceGroupRow.name == name)
-                .values(default_deployment_options=options)
+                .values(
+                    default_deployment_options=DeploymentOptions(
+                        handler_options=handler_options,
+                        agent_selection_policy=agent_selection_policy,
+                    )
+                )
                 .returning(ResourceGroupRow.default_deployment_options)
             )
             result = await session.execute(stmt)

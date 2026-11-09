@@ -16,12 +16,12 @@ from ai.backend.common.resilience import (
     RetryPolicy,
 )
 from ai.backend.common.resilience.policies.retry import BackoffStrategy
-from ai.backend.manager.data.deployment.types import DeploymentOptions
+from ai.backend.manager.data.deployment.types import DeploymentHandlerOptions, DeploymentOptions
 from ai.backend.manager.data.resource_group.types import (
     ResourceGroupData,
     ResourceInfo,
 )
-from ai.backend.manager.data.session.options import DefaultSessionOptions
+from ai.backend.manager.data.session.options import AgentSelectionPolicy, DefaultSessionOptions
 from ai.backend.manager.errors.resource import ResourceGroupNotFound
 from ai.backend.manager.models.resource_group.creators import ResourceGroupCreator
 from ai.backend.manager.models.resource_group.purgers import ResourceGroupPurger
@@ -152,18 +152,22 @@ class ResourceGroupRepository:
     async def replace_default_deployment_options(
         self,
         name: ResourceGroupName,
-        options: DeploymentOptions,
+        handler_options: DeploymentHandlerOptions,
+        agent_selection_policy: AgentSelectionPolicy | None,
     ) -> DeploymentOptions:
         """Fully replace a resource group's ``default_deployment_options``.
 
-        Returns the persisted :class:`DeploymentOptions` value via
-        ``UPDATE ... RETURNING`` so this path does a single round-trip and
-        does not re-materialise the surrounding resource group node.
+        ``agent_selection_policy`` replaces the policy; ``None`` keeps the stored one.
+
+        Returns the persisted :class:`DeploymentOptions` value without
+        re-materialising the surrounding resource group node.
 
         Raises:
             ScalingGroupNotFound: If the resource group does not exist.
         """
-        return await self._db_source.replace_default_deployment_options(name, options)
+        return await self._db_source.replace_default_deployment_options(
+            name, handler_options, agent_selection_policy
+        )
 
     @resource_group_repository_resilience.apply()
     async def replace_default_session_options(

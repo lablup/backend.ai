@@ -53,11 +53,13 @@ from ai.backend.manager.data.resource.types import UserEnqueuePolicy
 from ai.backend.manager.data.resource_group.types import ResourceGroupData
 from ai.backend.manager.data.session.creation import ContainerUserInfo
 from ai.backend.manager.data.session.types import SessionInfo, SessionStatus
+from ai.backend.manager.data.session_group.types import SessionGroupData
 from ai.backend.manager.exceptions import ErrorStatusInfo
 from ai.backend.manager.models.kernel.searchers import KernelSearcher
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
 from ai.backend.manager.models.session.searchers import SessionInfoSearcher, SessionSearcher
 from ai.backend.manager.models.session.updaters import SessionStatusBatchUpdater
+from ai.backend.manager.models.session_group.searchers import SessionGroupSearcher
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.rbac.permission_check_repository import (
@@ -224,6 +226,7 @@ class SchedulerRepository:
                     policy=None,
                     container_user=ContainerUserInfo(),
                     dotfiles=DotfileBundle(),
+                    default_bootstrap_script=None,
                     pending_session_count=0,
                     pending_session_resource_slots={},
                     vfolder_mounts_by_role={},
@@ -508,6 +511,10 @@ class SchedulerRepository:
         return await self._db_source.get_resource_group_name_by_id(resource_group_id)
 
     @scheduler_repository_resilience.apply()
+    async def search_session_groups(self, searcher: SessionGroupSearcher) -> list[SessionGroupData]:
+        return await self._db_source.search_session_groups(searcher)
+
+    @scheduler_repository_resilience.apply()
     async def get_domain_id_by_name(self, name: DomainName) -> DomainID:
         return await self._db_source.get_domain_id_by_name(name)
 
@@ -718,19 +725,9 @@ class SchedulerRepository:
         await self._db_source.update_session_error_info(session_id, error_info)
 
     @scheduler_repository_resilience.apply()
-    async def get_keypair_concurrency(self, access_key: AccessKey, is_sftp: bool = False) -> int:
-        """
-        Count the keypair's active sessions straight from the database.
-
-        The database is the single source of truth for concurrency; the
-        former Valkey counter cache has been removed.
-
-        :param access_key: The access key to query
-        :param is_sftp: Whether to get SFTP concurrency (True) or regular concurrency (False)
-        :return: Current concurrency count
-        """
-        concurrency_data = await self._db_source.get_keypair_concurrencies_from_db(access_key)
-        return concurrency_data.sftp_count if is_sftp else concurrency_data.regular_count
+    async def get_user_concurrency(self, user_id: UserID) -> int:
+        """The user's active session count that the scheduler checks against the concurrency limit."""
+        return await self._db_source.count_user_active_sessions(user_id)
 
     @scheduler_repository_resilience.apply()
     async def invalidate_kernel_related_cache(self, access_keys: list[AccessKey]) -> None:

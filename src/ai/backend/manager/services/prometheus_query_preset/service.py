@@ -1,9 +1,16 @@
 import logging
 
-from ai.backend.common.exception import PrometheusQueryPresetInvalidLabel
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.exception import (
+    InvalidMetricPresetTemplate,
+    PrometheusQueryPresetInvalidLabel,
+)
+from ai.backend.common.metrics.types import CONTAINER_UTILIZATION_METRIC_LABEL_NAME
 from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, PartialBulkResult
 from ai.backend.manager.actions.v2.ops.result import CreatedEntityOpsResult
 from ai.backend.manager.clients.prometheus.client import PrometheusClient
+from ai.backend.manager.clients.prometheus.metric_types import ensure_container_metric_name
 from ai.backend.manager.clients.prometheus.preset import (
     LabelMatcher,
     MetricPreset,
@@ -13,6 +20,9 @@ from ai.backend.manager.data.prometheus_query_preset.types import (
     ExecutePresetOptions,
     PrometheusQueryPresetData,
 )
+from ai.backend.manager.models.prometheus_query_preset.updaters import (
+    PrometheusQueryPresetUpdater,
+)
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.prometheus_query_preset.repository import (
     PrometheusQueryPresetRepository,
@@ -21,6 +31,9 @@ from ai.backend.manager.services.prometheus_query_preset.actions.create import C
 from ai.backend.manager.services.prometheus_query_preset.actions.execute_preset import (
     ExecutePresetAction,
     ExecutePresetActionResult,
+)
+from ai.backend.manager.services.prometheus_query_preset.actions.partial_bulk_update import (
+    PartialBulkUpdatePresetsAction,
 )
 from ai.backend.manager.services.prometheus_query_preset.actions.preview import (
     PreviewPresetAction,
@@ -70,6 +83,35 @@ class PrometheusQueryPresetService:
         preset_data = await self._ops_repository.update(action.updater)
         return UpdatePresetActionResult(preset=preset_data)
 
+    async def partial_bulk_update_presets(
+        self, action: PartialBulkUpdatePresetsAction
+    ) -> PartialBulkResult[PrometheusQueryPresetData]:
+        rejected: list[PartialBulkEntityResult[PrometheusQueryPresetData]] = []
+        updaters: dict[EntityIdentifier, PrometheusQueryPresetUpdater] = {}
+        for updater in action.updaters:
+            template = updater.query_template.optional_value()
+            try:
+                if template is not None:
+                    self._template_renderer.validate(template)
+            except InvalidMetricPresetTemplate as e:
+                rejected.append(PartialBulkEntityResult.failed(updater.preset_id, e))
+                continue
+            updaters[updater.preset_id] = updater
+        result = await self._ops_repository.partial_bulk_update(updaters)
+        return PartialBulkResult(
+            items=[
+                *rejected,
+                *(
+                    PartialBulkEntityResult.succeeded(entity_id, data)
+                    for entity_id, data in result.successes.items()
+                ),
+                *(
+                    PartialBulkEntityResult.failed(entity_id, error)
+                    for entity_id, error in result.errors.items()
+                ),
+            ]
+        )
+
     def _validate_labels(
         self,
         options: ExecutePresetOptions,
@@ -101,6 +143,9 @@ class PrometheusQueryPresetService:
     async def execute_preset(self, action: ExecutePresetAction) -> ExecutePresetActionResult:
         preset_data = await self._repository.get_by_id(action.preset_id)
         self._validate_labels(action.options, preset_data)
+        metric_name = action.options.filter_labels.get(CONTAINER_UTILIZATION_METRIC_LABEL_NAME)
+        if metric_name is not None:
+            ensure_container_metric_name(metric_name)
         # Window fallback: request → preset → server default
         time_window = action.time_window or preset_data.time_window or self._default_timewindow
 

@@ -8,6 +8,7 @@ from typing import Any, override
 import pytest
 
 from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.image.request import (
@@ -44,11 +45,15 @@ from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
     Held,
+    Language,
     Same,
+    SameAs,
+    Says,
     Scenario,
     Then,
     Verdict,
     When,
+    in_language,
 )
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.image import (
@@ -61,7 +66,9 @@ from bai_scenario.components.image import (
     ByCursor,
     ByOffset,
     ByTwoModesAtOnce,
+    CustomizedAndUncustomizedImages,
     Filled,
+    ImagesCommittedForTwoUsers,
     ImagesInTwoRegistriesAndAPlainUser,
     ImagesWithTwoStatuses,
     ManyImagesAndACaller,
@@ -69,7 +76,7 @@ from bai_scenario.components.image import (
     Paging,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 DEFAULT_PAGE = 50
@@ -83,6 +90,8 @@ class Searching(When[ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayloa
     paging: Paging = field(default_factory=ByOffset)
     named_only: bool = False
     status: ImageStatusType | None = None
+    customized: bool | None = None
+    committed_for_caller: bool = False
     descending: bool = False
 
     @override
@@ -91,28 +100,56 @@ class Searching(When[ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayloa
 
     @override
     def describe(self, laid: ManyImagesAndACaller) -> str:
-        conditions: list[str] = []
+        korean: list[str] = []
+        english: list[str] = []
         if self.named_only:
-            conditions.append(f"{laid.named.name} 이름으로")
+            korean.append(f"{laid.named.name} 이름으로")
+            english.append(f"by the name {laid.named.name}")
         if self.status is not None:
-            conditions.append(f"{self.status.value} 상태로")
+            korean.append(f"{self.status.value} 상태로")
+            english.append(f"with status {self.status.value}")
+        if self.customized is not None:
+            if self.customized:
+                korean.append("커스텀 이미지로")
+                english.append("customized")
+            else:
+                korean.append("커스텀 이미지가 아닌 것으로")
+                english.append("not customized")
+        if self.committed_for_caller:
+            korean.append("자신이 커밋한 이미지로")
+            english.append("committed by the caller")
         if self.descending:
-            conditions.append("이름 내림차순으로 정렬해")
-        conditions.append(self.paging.says())
-        return f"{laid.caller.username}이 {' '.join(conditions)} 검색함"
+            korean.append("이름 내림차순으로 정렬해")
+            english.append("ordered by name descending")
+        paging = self.paging.says()
+        korean.append(in_language(paging, Language.KOREAN))
+        english.append(in_language(paging, Language.ENGLISH))
+        return Says(
+            f"{laid.caller.username}이 {' '.join(korean)} 검색합니다",
+            english=f"{laid.caller.username} searches {' '.join(english)}",
+        )
 
     @override
     async def call(
         self, adapter: ImageAdapter, laid: ManyImagesAndACaller
     ) -> AdminSearchImagesPayload:
         filter_input = None
-        if self.named_only or self.status is not None:
+        if (
+            self.named_only
+            or self.status is not None
+            or self.customized is not None
+            or self.committed_for_caller
+        ):
             filter_input = ImageFilterInputDTO(
                 name=StringFilter(equals=str(laid.named.name)) if self.named_only else None,
                 status=(
                     ImageStatusFilterInputDTO(equals=self.status)
                     if self.status is not None
                     else None
+                ),
+                customized=self.customized,
+                creator_id=(
+                    UUIDFilter(equals=laid.caller.id) if self.committed_for_caller else None
                 ),
             )
         order = (
@@ -147,7 +184,11 @@ class SearchingWithACursor(When[ManyImagesAndACaller, ImageAdapter, AdminSearchI
 
     @override
     def describe(self, laid: ManyImagesAndACaller) -> str:
-        return f"{laid.caller.username}이 {self.paging.says()} 검색함"
+        paging = self.paging.says()
+        return Says(
+            f"{laid.caller.username}이 {in_language(paging, Language.KOREAN)} 검색합니다",
+            english=(f"{laid.caller.username} searches {in_language(paging, Language.ENGLISH)}"),
+        )
 
     @override
     async def call(
@@ -169,7 +210,10 @@ class SearchingWithinARegistry(When[ManyImagesAndACaller, ImageAdapter, ScopedSe
 
     @override
     def describe(self, laid: ManyImagesAndACaller) -> str:
-        return f"{laid.caller.username}이 한 레지스트리를 스코프로 이미지를 검색함"
+        return Says(
+            f"{laid.caller.username}이 한 레지스트리를 스코프로 이미지를 검색합니다",
+            english=f"{laid.caller.username} searches images scoped to one registry",
+        )
 
     @override
     async def call(
@@ -196,7 +240,10 @@ class SearchingAliases(When[ManyImagesAndACaller, ImageAdapter, AdminSearchImage
 
     @override
     def describe(self, laid: ManyImagesAndACaller) -> str:
-        return f"{laid.caller.username}이 별칭을 검색함"
+        return Says(
+            f"{laid.caller.username}이 별칭을 검색합니다",
+            english=f"{laid.caller.username} searches aliases",
+        )
 
     @override
     async def call(
@@ -218,7 +265,10 @@ class SearchingTheAliasesOf(When[AnAliasAndACaller, ImageAdapter, AdminSearchIma
 
     @override
     def describe(self, laid: AnAliasAndACaller) -> str:
-        return f"{laid.caller.username}이 별칭을 검색함"
+        return Says(
+            f"{laid.caller.username}이 별칭을 검색합니다",
+            english=f"{laid.caller.username} searches aliases",
+        )
 
     @override
     async def call(
@@ -242,7 +292,10 @@ class SearchingTheAliasesOfTheImage(
 
     @override
     def describe(self, laid: AnAliasAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.image.name}의 별칭을 검색함"
+        return Says(
+            f"{laid.caller.username}이 {laid.image.name}의 별칭을 검색합니다",
+            english=f"{laid.caller.username} searches the aliases of {laid.image.name}",
+        )
 
     @override
     async def call(
@@ -266,7 +319,13 @@ class SearchingAliasesForOneImage(
 
     @override
     def describe(self, laid: AliasesAndACaller) -> str:
-        return f"{laid.caller.username}이 한 이미지의 별칭을 이름 내림차순으로 검색함"
+        return Says(
+            f"{laid.caller.username}이 한 이미지의 별칭을 이름 내림차순으로 검색합니다",
+            english=(
+                f"{laid.caller.username} searches the aliases of one image ordered by name "
+                "descending"
+            ),
+        )
 
     @override
     async def call(
@@ -297,13 +356,16 @@ class TheAttachedAliasIsFound[
 
     @override
     def says(self) -> str:
-        return "등록해 둔 별칭이 반환된다"
+        return Says(
+            "등록해 둔 별칭이 반환됩니다",
+            english="the alias that was attached comes back",
+        )
 
     @override
     def look(self, laid: AnAliasAndACaller, answered: Answered[TPayload]) -> list[Verdict]:
         payload = answered.response
         if payload is None:
-            return [Held("응답", answered.response, Filled())]
+            return [Held("response", answered.response, Filled())]
         return [
             Same("items", [one.alias for one in payload.items], [laid.alias.alias]),
             Same("total_count", payload.total_count, 1),
@@ -320,13 +382,16 @@ class EveryLaidImageIsCounted[TPayload: (AdminSearchImagesPayload, ScopedSearchI
 
     @override
     def says(self) -> str:
-        return "미리 만들어 둔 이미지가 모두 집계된다"
+        return Says(
+            "미리 저장한 이미지가 모두 집계됩니다",
+            english="every image created in advance is counted",
+        )
 
     @override
     def look(self, laid: ManyImagesAndACaller, answered: Answered[TPayload]) -> list[Verdict]:
         payload = answered.response
         if payload is None:
-            return [Held("응답", answered.response, Filled())]
+            return [Held("response", answered.response, Filled())]
         return [
             Same(
                 "items",
@@ -345,7 +410,10 @@ class OnlyTheNamedImageIsReturned(Then[ManyImagesAndACaller, AdminSearchImagesPa
 
     @override
     def says(self) -> str:
-        return "이름이 일치하는 이미지만 반환된다"
+        return Says(
+            "이름이 일치하는 이미지만 반환됩니다",
+            english="only the image whose name matches comes back",
+        )
 
     @override
     def look(
@@ -353,7 +421,7 @@ class OnlyTheNamedImageIsReturned(Then[ManyImagesAndACaller, AdminSearchImagesPa
     ) -> list[Verdict]:
         payload = answered.response
         if payload is None:
-            return [Held("응답", answered.response, Filled())]
+            return [Held("response", answered.response, Filled())]
         return [
             Same("items", [one.name for one in payload.items], [str(laid.named.name)]),
             Same("total_count", payload.total_count, 1),
@@ -368,7 +436,10 @@ class OnlyTheAliveImageIsReturned(Then[ManyImagesAndACaller, AdminSearchImagesPa
 
     @override
     def says(self) -> str:
-        return "살아 있는 이미지만 반환된다"
+        return Says(
+            "살아 있는 이미지만 반환됩니다",
+            english="only alive images come back",
+        )
 
     @override
     def look(
@@ -376,9 +447,106 @@ class OnlyTheAliveImageIsReturned(Then[ManyImagesAndACaller, AdminSearchImagesPa
     ) -> list[Verdict]:
         payload = answered.response
         if payload is None:
-            return [Held("응답", answered.response, Filled())]
+            return [Held("response", answered.response, Filled())]
         return [
             Same("items", [one.name for one in payload.items], [str(laid.named.name)]),
+            Same("total_count", payload.total_count, 1),
+            Same("has_next_page", payload.has_next_page, False),
+            Same("has_previous_page", payload.has_previous_page, False),
+        ]
+
+
+@dataclass(frozen=True)
+class OnlyImagesOfTheCustomizationAreReturned(Then[ManyImagesAndACaller, AdminSearchImagesPayload]):
+    """커스텀 여부가 일치하는 이미지만, 커스텀 여부와 커밋한 사용자를 담아 반환된다."""
+
+    customized: bool
+
+    @override
+    def says(self) -> str:
+        if self.customized:
+            return Says(
+                "커스텀 이미지만 반환되고, 커밋한 사용자로 호출자가 담깁니다",
+                english=(
+                    "only customized images come back, carrying the caller as the user "
+                    "who committed them"
+                ),
+            )
+        return Says(
+            "커스텀 이미지가 아닌 이미지만 반환되고, 커밋한 사용자는 비어 있습니다",
+            english=(
+                "only images that are not customized come back, "
+                "and the user who committed them is empty"
+            ),
+        )
+
+    @override
+    def look(
+        self, laid: ManyImagesAndACaller, answered: Answered[AdminSearchImagesPayload]
+    ) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Held("response", answered.response, Filled())]
+        expected = [one for one in laid.laid if one.customized is self.customized]
+        got_creators = [one.creator_id for one in payload.items]
+        committed_for: list[UserID | None] = [UserID(laid.caller.id)]
+        creator: Verdict = (
+            Held(
+                "creator_id",
+                got_creators,
+                SameAs(
+                    committed_for,
+                    Says("호출자의 id", english="the id of the caller"),
+                ),
+            )
+            if self.customized
+            else Same("creator_id", got_creators, [one.creator_id for one in expected])
+        )
+        return [
+            Same("items", [one.name for one in payload.items], [str(one.name) for one in expected]),
+            Same(
+                "customized",
+                [one.customized for one in payload.items],
+                [one.customized for one in expected],
+            ),
+            creator,
+            Same("total_count", payload.total_count, len(expected)),
+            Same("has_next_page", payload.has_next_page, False),
+            Same("has_previous_page", payload.has_previous_page, False),
+        ]
+
+
+@dataclass(frozen=True)
+class OnlyTheImageCommittedForTheCallerIsReturned(
+    Then[ManyImagesAndACaller, AdminSearchImagesPayload]
+):
+    """호출자가 커밋한 이미지만 반환된다."""
+
+    @override
+    def says(self) -> str:
+        return Says(
+            "호출자가 커밋한 이미지만 반환됩니다",
+            english="only images the caller committed come back",
+        )
+
+    @override
+    def look(
+        self, laid: ManyImagesAndACaller, answered: Answered[AdminSearchImagesPayload]
+    ) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Held("response", answered.response, Filled())]
+        committed_for: list[UserID | None] = [UserID(laid.caller.id)]
+        return [
+            Same("items", [one.name for one in payload.items], [str(laid.named.name)]),
+            Held(
+                "creator_id",
+                [one.creator_id for one in payload.items],
+                SameAs(
+                    committed_for,
+                    Says("호출자의 id", english="the id of the caller"),
+                ),
+            ),
             Same("total_count", payload.total_count, 1),
             Same("has_next_page", payload.has_next_page, False),
             Same("has_previous_page", payload.has_previous_page, False),
@@ -391,7 +559,10 @@ class TheMiddleOfTheDescendingOrderIsReturned(Then[ManyImagesAndACaller, AdminSe
 
     @override
     def says(self) -> str:
-        return "정렬된 결과의 가운데 2개와 앞뒤 페이지 표시가 반환된다"
+        return Says(
+            "정렬된 결과의 가운데 2개와 앞뒤 페이지 표시가 반환됩니다",
+            english="the middle two of the ordered result come back with both page flags",
+        )
 
     @override
     def look(
@@ -399,7 +570,7 @@ class TheMiddleOfTheDescendingOrderIsReturned(Then[ManyImagesAndACaller, AdminSe
     ) -> list[Verdict]:
         payload = answered.response
         if payload is None:
-            return [Held("응답", answered.response, Filled())]
+            return [Held("response", answered.response, Filled())]
         ordered = sorted((str(one.name) for one in laid.laid), reverse=True)
         return [
             Same("items", [one.name for one in payload.items], ordered[1:3]),
@@ -417,7 +588,10 @@ class OnlyTheAliasesOfTheNamedImageAreReturned(
 
     @override
     def says(self) -> str:
-        return "해당 이미지의 별칭만 이름 내림차순으로 반환된다"
+        return Says(
+            "해당 이미지의 별칭만 이름 내림차순으로 반환됩니다",
+            english="only the aliases of that image come back, ordered by name descending",
+        )
 
     @override
     def look(
@@ -425,7 +599,7 @@ class OnlyTheAliasesOfTheNamedImageAreReturned(
     ) -> list[Verdict]:
         payload = answered.response
         if payload is None:
-            return [Held("응답", answered.response, Filled())]
+            return [Held("response", answered.response, Filled())]
         expected = sorted((one.alias for one in laid.aliases), reverse=True)
         return [
             Same("items", [one.alias for one in payload.items], expected),
@@ -443,7 +617,12 @@ class OnePageComesBack(Then[ManyImagesAndACaller, AdminSearchImagesPayload]):
 
     @override
     def says(self) -> str:
-        return "지정한 개수만 반환되고 다음 페이지가 있다고 알린다"
+        return Says(
+            "지정한 개수만 반환되고 다음 페이지가 있다고 알립니다",
+            english=(
+                "only the requested count comes back and the answer says there is a next page"
+            ),
+        )
 
     @override
     def look(
@@ -451,7 +630,7 @@ class OnePageComesBack(Then[ManyImagesAndACaller, AdminSearchImagesPayload]):
     ) -> list[Verdict]:
         payload = answered.response
         if payload is None:
-            return [Held("응답", answered.response, Filled())]
+            return [Held("response", answered.response, Filled())]
         return [
             Same("length", len(payload.items), self.size),
             Same("total_count", payload.total_count, len(laid.laid)),
@@ -466,7 +645,7 @@ class NoAliasIsFound(Then[ManyImagesAndACaller, AdminSearchImageAliasesPayload])
 
     @override
     def says(self) -> str:
-        return "별칭이 하나도 없다"
+        return Says("별칭이 하나도 없습니다", english="there is no alias at all")
 
     @override
     def look(
@@ -474,7 +653,7 @@ class NoAliasIsFound(Then[ManyImagesAndACaller, AdminSearchImageAliasesPayload])
     ) -> list[Verdict]:
         payload = answered.response
         if payload is None:
-            return [Held("응답", answered.response, Filled())]
+            return [Held("response", answered.response, Filled())]
         return [
             Same("items", list(payload.items), []),
             Same("total_count", payload.total_count, 0),
@@ -485,7 +664,7 @@ class NoAliasIsFound(Then[ManyImagesAndACaller, AdminSearchImageAliasesPayload])
 
 @dataclass(frozen=True)
 class SearchingWithoutAFilterCountsEvery(
-    Scenario[SeedingSession, ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]
+    Scenario[TestSeedingSession, ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]
 ):
     @override
     def summary(self) -> str:
@@ -493,10 +672,16 @@ class SearchingWithoutAFilterCountsEvery(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 조건 없이 검색하면 미리 만들어 둔 이미지가 모두 반환된다"
+        return Says(
+            "superadmin 이 조건 없이 검색하면 미리 저장한 이미지가 모두 반환됩니다",
+            english=(
+                "when the superadmin searches without a filter, "
+                "every image seeded in advance comes back"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyImagesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyImagesAndACaller]:
         return ManyImagesAndSomeone()
 
     @override
@@ -510,7 +695,7 @@ class SearchingWithoutAFilterCountsEvery(
 
 @dataclass(frozen=True)
 class SearchingByNameReturnsOnlyTheMatch(
-    Scenario[SeedingSession, ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]
+    Scenario[TestSeedingSession, ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]
 ):
     @override
     def summary(self) -> str:
@@ -518,10 +703,15 @@ class SearchingByNameReturnsOnlyTheMatch(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 한 이미지의 이름으로 검색하면 그 이미지만 반환된다"
+        return Says(
+            "superadmin 이 한 이미지의 이름으로 검색하면 그 이미지만 반환됩니다",
+            english=(
+                "when the superadmin searches by the name of one image, only that image comes back"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyImagesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyImagesAndACaller]:
         return ManyImagesAndSomeone(count=3)
 
     @override
@@ -535,7 +725,7 @@ class SearchingByNameReturnsOnlyTheMatch(
 
 @dataclass(frozen=True)
 class SearchingByStatusReturnsOnlyAliveImages(
-    Scenario[SeedingSession, ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]
+    Scenario[TestSeedingSession, ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]
 ):
     @override
     def summary(self) -> str:
@@ -543,12 +733,17 @@ class SearchingByStatusReturnsOnlyAliveImages(
 
     @override
     def describe(self) -> str:
-        return (
-            "살아 있는 이미지와 삭제된 이미지 중 살아 있는 상태로 검색하면 해당 이미지만 반환된다"
+        return Says(
+            "살아 있는 이미지와 삭제된 이미지 중 살아 있는 상태로 검색하면 해당 이미지만 "
+            "반환됩니다",
+            english=(
+                "searching a mix of alive and deleted images for the alive status "
+                "brings back only those images"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyImagesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyImagesAndACaller]:
         return ImagesWithTwoStatuses()
 
     @override
@@ -564,8 +759,86 @@ class SearchingByStatusReturnsOnlyAliveImages(
 
 
 @dataclass(frozen=True)
+class SearchingByCustomizationReturnsOnlyTheMatch(
+    Scenario[TestSeedingSession, ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]
+):
+    customized: bool
+
+    @override
+    def summary(self) -> str:
+        if self.customized:
+            return "filtering-images-by-customized-returns-only-customized-images"
+        return "filtering-images-by-not-customized-returns-only-uncustomized-images"
+
+    @override
+    def describe(self) -> str:
+        if self.customized:
+            return Says(
+                "커스텀 이미지와 커스텀 이미지가 아닌 이미지 중 커스텀 이미지로 검색하면 "
+                "커스텀 이미지만 커밋한 사용자와 함께 반환됩니다",
+                english=(
+                    "searching a mix of customized and uncustomized images for customized "
+                    "images brings back only the customized images together with the user "
+                    "who committed them"
+                ),
+            )
+        return Says(
+            "커스텀 이미지와 커스텀 이미지가 아닌 이미지 중 커스텀 이미지가 아닌 것으로 검색하면 "
+            "커스텀 이미지가 아닌 이미지만 반환됩니다",
+            english=(
+                "searching a mix of customized and uncustomized images for images that are "
+                "not customized brings back only the uncustomized images"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ManyImagesAndACaller]:
+        return CustomizedAndUncustomizedImages()
+
+    @override
+    def when(self) -> When[ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]:
+        return Searching(paging=ByOffset(limit=DEFAULT_PAGE), customized=self.customized)
+
+    @override
+    def then(self) -> Then[ManyImagesAndACaller, AdminSearchImagesPayload]:
+        return OnlyImagesOfTheCustomizationAreReturned(customized=self.customized)
+
+
+@dataclass(frozen=True)
+class SearchingByCreatorReturnsOnlyTheirImages(
+    Scenario[TestSeedingSession, ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]
+):
+    @override
+    def summary(self) -> str:
+        return "filtering-images-by-creator-returns-only-images-they-committed"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "호출자와 다른 사용자가 각각 커밋한 커스텀 이미지 중 호출자가 커밋한 것으로 "
+            "검색하면 호출자가 커밋한 이미지만 반환됩니다",
+            english=(
+                "among custom images committed by the caller and by another user, searching "
+                "for the ones the caller committed brings back only the caller's images"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ManyImagesAndACaller]:
+        return ImagesCommittedForTwoUsers()
+
+    @override
+    def when(self) -> When[ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]:
+        return Searching(paging=ByOffset(limit=DEFAULT_PAGE), committed_for_caller=True)
+
+    @override
+    def then(self) -> Then[ManyImagesAndACaller, AdminSearchImagesPayload]:
+        return OnlyTheImageCommittedForTheCallerIsReturned()
+
+
+@dataclass(frozen=True)
 class OrderingAndOffsetChooseTheMiddlePage(
-    Scenario[SeedingSession, ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]
+    Scenario[TestSeedingSession, ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]
 ):
     @override
     def summary(self) -> str:
@@ -573,10 +846,16 @@ class OrderingAndOffsetChooseTheMiddlePage(
 
     @override
     def describe(self) -> str:
-        return "이름 내림차순으로 정렬하고 첫 항목을 제외하면 두 번째와 세 번째 이미지가 반환된다"
+        return Says(
+            "이름 내림차순으로 정렬하고 첫 항목을 제외하면 두 번째와 세 번째 이미지가 반환됩니다",
+            english=(
+                "ordering by name descending and skipping the first item "
+                "brings back the second and third images"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyImagesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyImagesAndACaller]:
         return ManyImagesAndSomeone(count=4)
 
     @override
@@ -593,7 +872,7 @@ class OrderingAndOffsetChooseTheMiddlePage(
 
 @dataclass(frozen=True)
 class ThePageSizeDefaultsToFifty(
-    Scenario[SeedingSession, ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]
+    Scenario[TestSeedingSession, ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]
 ):
     @override
     def summary(self) -> str:
@@ -601,10 +880,17 @@ class ThePageSizeDefaultsToFifty(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 페이지 크기를 생략하고 검색하면, 50개까지만 반환되고 다음 페이지가 있다고 알린다"
+        return Says(
+            "superadmin 이 페이지 크기를 생략하고 검색하면 50개까지만 반환되고 다음 페이지가 "
+            "있다고 알립니다",
+            english=(
+                "when the superadmin searches with the page size omitted, only 50 come back "
+                "and the answer says there is a next page"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyImagesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyImagesAndACaller]:
         return ManyImagesAndSomeone(count=DEFAULT_PAGE + 1)
 
     @override
@@ -618,7 +904,7 @@ class ThePageSizeDefaultsToFifty(
 
 @dataclass(frozen=True)
 class APlainUserMayNotSearch(
-    Scenario[SeedingSession, ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]
+    Scenario[TestSeedingSession, ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]
 ):
     @override
     def summary(self) -> str:
@@ -626,10 +912,17 @@ class APlainUserMayNotSearch(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 이미지를 검색하려 하면 슈퍼관리자 권한 부족으로 거부된다"
+        return Says(
+            "superadmin 이 아닌 사용자가 이미지를 검색하려 하면 superadmin 권한 부족으로 "
+            "거부됩니다",
+            english=(
+                "when a user who is not the superadmin tries to search images, "
+                "the call is rejected for lack of superadmin privilege"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyImagesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyImagesAndACaller]:
         return ManyImagesAndSomeone(role=UserRole.USER)
 
     @override
@@ -643,7 +936,7 @@ class APlainUserMayNotSearch(
 
 @dataclass(frozen=True)
 class ACursorAloneReadsFromTheFront(
-    Scenario[SeedingSession, ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]
+    Scenario[TestSeedingSession, ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]
 ):
     @override
     def summary(self) -> str:
@@ -651,10 +944,17 @@ class ACursorAloneReadsFromTheFront(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 크기와 오프셋 없이 커서만 지정해 검색하면 지정한 개수만 반환되고 다음 페이지가 있다고 알린다"
+        return Says(
+            "superadmin 이 크기와 오프셋 없이 커서만 지정해 검색하면 지정한 개수만 반환되고 "
+            "다음 페이지가 있다고 알립니다",
+            english=(
+                "when the superadmin searches with only a cursor and no size or offset, only "
+                "the requested count comes back and the answer says there is a next page"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyImagesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyImagesAndACaller]:
         return ManyImagesAndSomeone(count=3)
 
     @override
@@ -668,7 +968,7 @@ class ACursorAloneReadsFromTheFront(
 
 @dataclass(frozen=True)
 class ASizeBesideACursorIsRefused(
-    Scenario[SeedingSession, ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]
+    Scenario[TestSeedingSession, ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]
 ):
     @override
     def summary(self) -> str:
@@ -676,10 +976,13 @@ class ASizeBesideACursorIsRefused(
 
     @override
     def describe(self) -> str:
-        return "크기와 커서를 함께 지정하면 입력이 잘못되어 거부된다"
+        return Says(
+            "크기와 커서를 함께 지정하면 입력이 잘못되어 거부됩니다",
+            english="naming both a size and a cursor is rejected as invalid input",
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyImagesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyImagesAndACaller]:
         return ManyImagesAndSomeone()
 
     @override
@@ -693,7 +996,7 @@ class ASizeBesideACursorIsRefused(
 
 @dataclass(frozen=True)
 class ACursorReadsFromTheFront(
-    Scenario[SeedingSession, ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]
+    Scenario[TestSeedingSession, ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]
 ):
     @override
     def summary(self) -> str:
@@ -701,10 +1004,17 @@ class ACursorReadsFromTheFront(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 커서로 앞에서부터 조회하면 지정한 개수만 반환되고 다음 페이지가 있다고 알린다"
+        return Says(
+            "superadmin 이 커서로 앞에서부터 조회하면 지정한 개수만 반환되고 다음 페이지가 "
+            "있다고 알립니다",
+            english=(
+                "when the superadmin reads from the front by cursor, only the requested count "
+                "comes back and the answer says there is a next page"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyImagesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyImagesAndACaller]:
         return ManyImagesAndSomeone(count=3)
 
     @override
@@ -718,7 +1028,7 @@ class ACursorReadsFromTheFront(
 
 @dataclass(frozen=True)
 class AReaderOfTheRegistrySearchesItsImages(
-    Scenario[SeedingSession, ManyImagesAndACaller, ImageAdapter, ScopedSearchImagesPayload]
+    Scenario[TestSeedingSession, ManyImagesAndACaller, ImageAdapter, ScopedSearchImagesPayload]
 ):
     @override
     def summary(self) -> str:
@@ -726,14 +1036,19 @@ class AReaderOfTheRegistrySearchesItsImages(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "이미지가 레지스트리 2개에 나뉘어 있을 때 한쪽 레지스트리에 권한을 받은 사용자가 "
             "그 레지스트리를 스코프로 조회하면, 그 레지스트리의 이미지만 반환되고 다른 쪽은 "
-            "집계되지 않는다"
+            "집계되지 않습니다",
+            english=(
+                "when images are split across two registries, a user granted permission on one "
+                "registry searching scoped to that registry gets back only its images, and "
+                "the other registry is not counted"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyImagesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyImagesAndACaller]:
         return ImagesInTwoRegistriesAndAPlainUser()
 
     @override
@@ -747,7 +1062,7 @@ class AReaderOfTheRegistrySearchesItsImages(
 
 @dataclass(frozen=True)
 class AUserWithNoPermissionMayNotSearchTheRegistryImages(
-    Scenario[SeedingSession, ManyImagesAndACaller, ImageAdapter, ScopedSearchImagesPayload]
+    Scenario[TestSeedingSession, ManyImagesAndACaller, ImageAdapter, ScopedSearchImagesPayload]
 ):
     @override
     def summary(self) -> str:
@@ -755,13 +1070,17 @@ class AUserWithNoPermissionMayNotSearchTheRegistryImages(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "아무 권한도 받지 않은 사용자가 한 레지스트리를 스코프로 이미지를 조회하려 하면 "
-            "권한 부족으로 거부된다"
+            "권한 부족으로 거부됩니다",
+            english=(
+                "when a user granted nothing tries to search images scoped to one registry, "
+                "the call is rejected for lack of permission"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyImagesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyImagesAndACaller]:
         return ImagesInTwoRegistriesAndAPlainUser(granted=False)
 
     @override
@@ -775,7 +1094,7 @@ class AUserWithNoPermissionMayNotSearchTheRegistryImages(
 
 @dataclass(frozen=True)
 class TwoPaginationModesAreRefused(
-    Scenario[SeedingSession, ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]
+    Scenario[TestSeedingSession, ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]
 ):
     @override
     def summary(self) -> str:
@@ -783,13 +1102,17 @@ class TwoPaginationModesAreRefused(
 
     @override
     def describe(self) -> str:
-        return (
-            "크기와 커서를 함께 지정하면 입력이 잘못되어 거부된다. "
-            "요청 타입이 아니라 어댑터가 페이지 방식을 고르는 과정에서 발생한다"
+        return Says(
+            "크기와 커서를 함께 지정하면 입력이 잘못되어 거부됩니다. 요청 타입이 아니라 "
+            "어댑터가 페이지 방식을 고르는 과정에서 발생합니다",
+            english=(
+                "naming both a size and a cursor is rejected as invalid input. It happens "
+                "while the adapter picks the page mode, not in the request type"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyImagesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyImagesAndACaller]:
         return ManyImagesAndSomeone()
 
     @override
@@ -803,7 +1126,7 @@ class TwoPaginationModesAreRefused(
 
 @dataclass(frozen=True)
 class ABrokenCursorIsRefused(
-    Scenario[SeedingSession, ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]
+    Scenario[TestSeedingSession, ManyImagesAndACaller, ImageAdapter, AdminSearchImagesPayload]
 ):
     @override
     def summary(self) -> str:
@@ -811,10 +1134,13 @@ class ABrokenCursorIsRefused(
 
     @override
     def describe(self) -> str:
-        return "해석할 수 없는 커서 값을 지정하면 커서가 잘못되어 거부된다"
+        return Says(
+            "해석할 수 없는 커서 값을 지정하면 커서가 잘못되어 거부됩니다",
+            english="naming a cursor value that cannot be read is rejected as an invalid cursor",
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyImagesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyImagesAndACaller]:
         return ManyImagesAndSomeone()
 
     @override
@@ -828,7 +1154,7 @@ class ABrokenCursorIsRefused(
 
 @dataclass(frozen=True)
 class SearchingAliasesWithNoneAttached(
-    Scenario[SeedingSession, ManyImagesAndACaller, ImageAdapter, AdminSearchImageAliasesPayload]
+    Scenario[TestSeedingSession, ManyImagesAndACaller, ImageAdapter, AdminSearchImageAliasesPayload]
 ):
     @override
     def summary(self) -> str:
@@ -836,10 +1162,14 @@ class SearchingAliasesWithNoneAttached(
 
     @override
     def describe(self) -> str:
-        return "별칭을 하나도 등록하지 않은 상태에서 슈퍼관리자가 별칭을 검색하면 응답이 비어 있다"
+        return Says(
+            "별칭을 하나도 등록하지 않은 상태에서 superadmin 이 별칭을 검색하면 응답이 비어 "
+            "있습니다",
+            english="with no alias attached, a superadmin searching aliases gets an empty answer",
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyImagesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyImagesAndACaller]:
         return ManyImagesAndSomeone()
 
     @override
@@ -853,7 +1183,7 @@ class SearchingAliasesWithNoneAttached(
 
 @dataclass(frozen=True)
 class SearchingAliasesFindsTheAttachedOne(
-    Scenario[SeedingSession, AnAliasAndACaller, ImageAdapter, AdminSearchImageAliasesPayload]
+    Scenario[TestSeedingSession, AnAliasAndACaller, ImageAdapter, AdminSearchImageAliasesPayload]
 ):
     @override
     def summary(self) -> str:
@@ -861,10 +1191,13 @@ class SearchingAliasesFindsTheAttachedOne(
 
     @override
     def describe(self) -> str:
-        return "별칭이 등록되어 있을 때 슈퍼관리자가 별칭을 검색하면 그 별칭이 반환된다"
+        return Says(
+            "별칭이 등록되어 있을 때 superadmin 이 별칭을 검색하면 그 별칭이 반환됩니다",
+            english=("with an alias attached, a superadmin searching aliases gets that alias back"),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AnAliasAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnAliasAndACaller]:
         return AnAliasAndSomeone()
 
     @override
@@ -878,7 +1211,7 @@ class SearchingAliasesFindsTheAttachedOne(
 
 @dataclass(frozen=True)
 class FilteringAndOrderingAliases(
-    Scenario[SeedingSession, AliasesAndACaller, ImageAdapter, AdminSearchImageAliasesPayload]
+    Scenario[TestSeedingSession, AliasesAndACaller, ImageAdapter, AdminSearchImageAliasesPayload]
 ):
     @override
     def summary(self) -> str:
@@ -886,10 +1219,17 @@ class FilteringAndOrderingAliases(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 한 이미지의 별칭만 이름 내림차순으로 검색하면 해당 별칭만 정렬되어 반환된다"
+        return Says(
+            "superadmin 이 한 이미지의 별칭만 이름 내림차순으로 검색하면 해당 별칭만 정렬되어 "
+            "반환됩니다",
+            english=(
+                "when the superadmin searches only the aliases of one image ordered by name "
+                "descending, only those aliases come back ordered"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AliasesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AliasesAndACaller]:
         return AliasesOnTwoImagesAndSomeone()
 
     @override
@@ -903,7 +1243,7 @@ class FilteringAndOrderingAliases(
 
 @dataclass(frozen=True)
 class APlainUserMayNotSearchAliases(
-    Scenario[SeedingSession, ManyImagesAndACaller, ImageAdapter, AdminSearchImageAliasesPayload]
+    Scenario[TestSeedingSession, ManyImagesAndACaller, ImageAdapter, AdminSearchImageAliasesPayload]
 ):
     @override
     def summary(self) -> str:
@@ -911,10 +1251,16 @@ class APlainUserMayNotSearchAliases(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 별칭을 검색하려 하면 슈퍼관리자 권한 부족으로 거부된다"
+        return Says(
+            "superadmin 이 아닌 사용자가 별칭을 검색하려 하면 superadmin 권한 부족으로 거부됩니다",
+            english=(
+                "when a user who is not the superadmin tries to search aliases, "
+                "the call is rejected for lack of superadmin privilege"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyImagesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyImagesAndACaller]:
         return ManyImagesAndSomeone(role=UserRole.USER)
 
     @override
@@ -928,7 +1274,7 @@ class APlainUserMayNotSearchAliases(
 
 @dataclass(frozen=True)
 class AReaderOfTheImageSearchesItsAliases(
-    Scenario[SeedingSession, AnAliasAndACaller, ImageAdapter, SearchImageAliasesPayload]
+    Scenario[TestSeedingSession, AnAliasAndACaller, ImageAdapter, SearchImageAliasesPayload]
 ):
     @override
     def summary(self) -> str:
@@ -936,12 +1282,17 @@ class AReaderOfTheImageSearchesItsAliases(
 
     @override
     def describe(self) -> str:
-        return (
-            "그 이미지에 권한을 받은 사용자가 그 이미지의 별칭을 검색하면 등록해 둔 별칭이 반환된다"
+        return Says(
+            "그 이미지에 권한을 받은 사용자가 그 이미지의 별칭을 검색하면 등록해 둔 별칭이 "
+            "반환됩니다",
+            english=(
+                "a user granted permission on the image searching its aliases gets the "
+                "attached alias back"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AnAliasAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnAliasAndACaller]:
         return AnAliasAndAPlainUser(granted=True)
 
     @override
@@ -955,7 +1306,7 @@ class AReaderOfTheImageSearchesItsAliases(
 
 @dataclass(frozen=True)
 class AUserWithNoPermissionMayNotSearchTheImageAliases(
-    Scenario[SeedingSession, AnAliasAndACaller, ImageAdapter, SearchImageAliasesPayload]
+    Scenario[TestSeedingSession, AnAliasAndACaller, ImageAdapter, SearchImageAliasesPayload]
 ):
     @override
     def summary(self) -> str:
@@ -963,12 +1314,17 @@ class AUserWithNoPermissionMayNotSearchTheImageAliases(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 받지 않은 사용자가 그 이미지의 별칭을 검색하려 하면 권한 부족으로 거부된다"
+        return Says(
+            "아무 권한도 받지 않은 사용자가 그 이미지의 별칭을 검색하려 하면 권한 부족으로 "
+            "거부됩니다",
+            english=(
+                "when a user granted nothing tries to search the aliases of that image, "
+                "the call is rejected for lack of permission"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AnAliasAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnAliasAndACaller]:
         return AnAliasAndAPlainUser(granted=False)
 
     @override
@@ -984,6 +1340,9 @@ SCENARIOS: list[Any] = [
     SearchingWithoutAFilterCountsEvery(),
     SearchingByNameReturnsOnlyTheMatch(),
     SearchingByStatusReturnsOnlyAliveImages(),
+    SearchingByCustomizationReturnsOnlyTheMatch(customized=True),
+    SearchingByCustomizationReturnsOnlyTheMatch(customized=False),
+    SearchingByCreatorReturnsOnlyTheirImages(),
     OrderingAndOffsetChooseTheMiddlePage(),
     ThePageSizeDefaultsToFifty(),
     ACursorAloneReadsFromTheFront(),

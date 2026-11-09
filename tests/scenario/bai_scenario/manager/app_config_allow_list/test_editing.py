@@ -27,7 +27,7 @@ from ai.backend.manager.api.adapters.app_config_allow_list.adapter import (
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.app_config_allow_list import (
     AnEntryAndACaller,
@@ -35,11 +35,11 @@ from bai_scenario.components.app_config_allow_list import (
     TheEntryNode,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type EditingStep = Scenario[
-    SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode
+    TestSeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode
 ]
 
 
@@ -52,13 +52,23 @@ class ChangingTheRank(When[AnEntryAndACaller, AppConfigAllowListAdapter, AppConf
 
     @override
     def operation(self) -> str:
-        return "admin_update"
+        return "update"
 
     @override
     def describe(self, laid: AnEntryAndACaller) -> str:
-        called = "존재하지 않는 ID" if self.other is not None else f"{laid.name}의 allow_list"
-        how = f"순위 {self.rank}(으)로 변경" if self.rank is not None else "빈 요청"
-        return f"{laid.caller.username}이 {called} 수정 ({how})"
+        if self.other is not None:
+            called_ko, called_en = "존재하지 않는 ID", "a missing ID"
+        else:
+            called_ko = f"{laid.name}의 allow_list"
+            called_en = f"the allow_list of {laid.name}"
+        if self.rank is not None:
+            how_ko, how_en = f"순위 {self.rank}(으)로 변경", f"rank to {self.rank}"
+        else:
+            how_ko, how_en = "빈 요청", "an empty request"
+        return Says(
+            f"{laid.caller.username}이 {called_ko} 수정합니다 ({how_ko})",
+            english=f"{laid.caller.username} edits {called_en} ({how_en})",
+        )
 
     @override
     async def call(
@@ -71,15 +81,15 @@ class ChangingTheRank(When[AnEntryAndACaller, AppConfigAllowListAdapter, AppConf
         else:
             raise LookupError("this row lays no entry to edit")
         with ActingAs(laid.caller):
-            payload = await adapter.admin_update(
-                UpdateAppConfigAllowListInput(id=wanted, rank=self.rank)
-            )
+            payload = await adapter.update(UpdateAppConfigAllowListInput(id=wanted, rank=self.rank))
         return payload.app_config_allow_list
 
 
 @dataclass(frozen=True)
 class TheSuperadminChangesTheRank(
-    Scenario[SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]
+    Scenario[
+        TestSeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode
+    ]
 ):
     started: datetime
 
@@ -89,10 +99,17 @@ class TheSuperadminChangesTheRank(
 
     @override
     def describe(self) -> str:
-        return "allow_list 하나가 있고 슈퍼관리자가 순위를 바꾸면, 순위만 변경되고 설정 이름과 스코프 유형은 그대로다"
+        return Says(
+            "allow_list 하나가 있고 superadmin 이 순위를 변경하면, 순위만 변경되고 설정 이름과 "
+            "스코프 유형은 그대로입니다",
+            english=(
+                "with one allow_list laid, when the superadmin changes the rank, only the "
+                "rank changes and the config name and scope kind stay the same"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnEntryAndACaller]:
         return AnEntryAndSomeone(opened=AppConfigScopeType.USER, role=UserRole.SUPERADMIN)
 
     @override
@@ -106,7 +123,9 @@ class TheSuperadminChangesTheRank(
 
 @dataclass(frozen=True)
 class AnEmptyEditChangesNothing(
-    Scenario[SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]
+    Scenario[
+        TestSeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode
+    ]
 ):
     started: datetime
 
@@ -116,10 +135,17 @@ class AnEmptyEditChangesNothing(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아무 값도 지정하지 않고 수정하면, 아무것도 바뀌지 않은 노드가 반환된다"
+        return Says(
+            "superadmin 이 아무 값도 지정하지 않고 수정하면, 아무것도 변경되지 않은 노드가 "
+            "반환됩니다",
+            english=(
+                "when the superadmin edits without naming any value, "
+                "the node comes back with nothing changed"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnEntryAndACaller]:
         return AnEntryAndSomeone(opened=AppConfigScopeType.USER, role=UserRole.SUPERADMIN)
 
     @override
@@ -133,7 +159,9 @@ class AnEmptyEditChangesNothing(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotEdit(
-    Scenario[SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]
+    Scenario[
+        TestSeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode
+    ]
 ):
     @override
     def summary(self) -> str:
@@ -141,12 +169,17 @@ class AUserGrantedNothingMayNotEdit(
 
     @override
     def describe(self) -> str:
-        return (
-            "같은 allow_list를 권한이 없는 일반 사용자가 수정하면, 엔티티 수정 권한이 없어 거부된다"
+        return Says(
+            "같은 allow_list 를 권한이 없는 일반 사용자가 수정하면, "
+            "엔티티 수정 권한이 없어 거부됩니다",
+            english=(
+                "when a plain user without permission edits the same allow_list, "
+                "the call is rejected because the user has no entity update permission"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnEntryAndACaller]:
         return AnEntryAndSomeone(opened=AppConfigScopeType.USER)
 
     @override
@@ -160,7 +193,9 @@ class AUserGrantedNothingMayNotEdit(
 
 @dataclass(frozen=True)
 class AnUnknownIdIsNotFoundForASuperadmin(
-    Scenario[SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]
+    Scenario[
+        TestSeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode
+    ]
 ):
     @override
     def summary(self) -> str:
@@ -168,12 +203,17 @@ class AnUnknownIdIsNotFoundForASuperadmin(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 존재하지 않는 ID의 순위를 수정하면, 대상을 찾을 수 없다는 이유로 거부된다"
+        return Says(
+            "superadmin 이 존재하지 않는 ID 의 순위를 수정하면, "
+            "대상을 찾을 수 없다는 이유로 거부됩니다",
+            english=(
+                "when the superadmin edits the rank of a missing ID, "
+                "the call is rejected because there is no such target"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnEntryAndACaller]:
         return AnEntryAndSomeone(role=UserRole.SUPERADMIN)
 
     @override

@@ -10,6 +10,7 @@ from ai.backend.common.bgtask.task.base import (
     BaseBackgroundTaskHandler,
     BaseBackgroundTaskManifest,
 )
+from ai.backend.common.data.entity.storage_volume import StorageVolumeName
 from ai.backend.common.type_adapters import VFolderIDField
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage.bgtask.types import StorageBgtaskName
@@ -44,7 +45,7 @@ class FileDeleteTaskHandler(BaseBackgroundTaskHandler[FileDeleteManifest, None])
 
     @override
     async def execute(self, manifest: FileDeleteManifest) -> None:
-        volume = self._volume_pool.get_volume_by_name(manifest.volume)
+        volume = self._volume_pool.get_volume_by_name(StorageVolumeName(manifest.volume))
         await volume.delete_files(
             manifest.vfolder_id,
             manifest.relpaths,

@@ -117,7 +117,9 @@ class TestAdminPurge:
         definition_id = uuid4()
         mock_resp = AsyncMock()
         mock_resp.status = 200
-        mock_resp.json = AsyncMock(return_value={"id": str(definition_id)})
+        mock_resp.json = AsyncMock(
+            return_value={"id": str(definition_id), "entity_id": str(definition_id)}
+        )
         mock_session = _make_request_session(mock_resp)
         client = _make_client(mock_session)
 

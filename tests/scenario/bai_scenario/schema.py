@@ -69,6 +69,14 @@ import ai.backend.manager.models.image
 import ai.backend.manager.models.image.row
 import ai.backend.manager.models.kernel
 import ai.backend.manager.models.kernel.row
+import ai.backend.manager.models.kernel_group
+import ai.backend.manager.models.kernel_group.row
+import ai.backend.manager.models.kernel_group_environ
+import ai.backend.manager.models.kernel_group_environ.row
+import ai.backend.manager.models.kernel_group_resource_slot
+import ai.backend.manager.models.kernel_group_resource_slot.row
+import ai.backend.manager.models.kernel_group_vfolder_mount
+import ai.backend.manager.models.kernel_group_vfolder_mount.row
 import ai.backend.manager.models.keypair
 import ai.backend.manager.models.keypair.row
 import ai.backend.manager.models.login_client_type
@@ -137,8 +145,12 @@ import ai.backend.manager.models.session_template
 import ai.backend.manager.models.session_template.row
 import ai.backend.manager.models.specs
 import ai.backend.manager.models.storage
+import ai.backend.manager.models.storage_backend
+import ai.backend.manager.models.storage_backend.row
 import ai.backend.manager.models.storage_namespace
 import ai.backend.manager.models.storage_namespace.row
+import ai.backend.manager.models.storage_volume
+import ai.backend.manager.models.storage_volume.row
 import ai.backend.manager.models.types
 import ai.backend.manager.models.user
 import ai.backend.manager.models.user.row
@@ -158,4 +170,4 @@ import ai.backend.manager.models.virtual_entity.virtual_entity
 
 def registered() -> int:
     """How many model modules this file names; a smoke check for the generator."""
-    return 146
+    return 150

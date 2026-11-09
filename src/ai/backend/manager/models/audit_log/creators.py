@@ -80,8 +80,8 @@ class BaseAuditLogFields:
     def _build_row(
         self,
         *,
-        entity_type: str | None,
-        entity_id: uuid.UUID | str | None = None,
+        entity_type: EntityType | None,
+        entity_id: uuid.UUID | None = None,
         lookup_kind: str | None = None,
         lookup_key: str | None = None,
     ) -> AuditLogRow:
@@ -94,7 +94,7 @@ class BaseAuditLogFields:
             created_at=self.created_at,
             description=self.description,
             status=self.status,
-            entity_id=None if entity_id is None else str(entity_id),
+            entity_id=entity_id,
             lookup_kind=lookup_kind,
             lookup_key=lookup_key,
             request_id=self.request_id,
@@ -256,7 +256,7 @@ class GlobalAuditLogCreator(DanglingAuditLogCreator):
 class AuditLogScopeCreator(NestedFieldCreator[AuditLogID, AuditLogScopeRow, AuditLogScopeData]):
     """A scope the audited run covered, owned by the audit row it is written under."""
 
-    scope_type: str
+    scope_type: EntityType
     scope_id: uuid.UUID
 
     @override

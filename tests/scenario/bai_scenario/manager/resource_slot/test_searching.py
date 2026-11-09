@@ -15,10 +15,12 @@ from ai.backend.common.dto.manager.v2.resource_slot.request import (
 from ai.backend.common.dto.manager.v2.resource_slot.response import (
     AdminSearchResourceSlotTypesPayload,
 )
+from ai.backend.common.exception import UnreachableError
 from ai.backend.common.types import SlotTypes
 from ai.backend.manager.api.adapters.resource_slot.adapter import ResourceSlotAdapter
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
+from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.resource_slot import (
     EveryLaidSlotTypeIsCounted,
     ManySlotTypesAndACaller,
@@ -27,17 +29,17 @@ from bai_scenario.components.resource_slot import (
     TheFirstPageOfSlotTypes,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 DEFAULT_PAGE = 10
 
-DISTINCT_DISPLAY = "눈에 띄는 슬롯"
+DISTINCT_DISPLAY = Says("눈에 띄는 슬롯", english="a conspicuous slot")
 """표시 이름 필터로 골라낼 슬롯 종류에만 붙이는 표시 이름."""
 
 type Searched = AdminSearchResourceSlotTypesPayload
 type SearchingStep = Scenario[
-    SeedingSession, ManySlotTypesAndACaller, ResourceSlotAdapter, Searched
+    TestSeedingSession, ManySlotTypesAndACaller, ResourceSlotAdapter, Searched
 ]
 
 
@@ -51,7 +53,10 @@ class SearchingEverySlotType(When[ManySlotTypesAndACaller, ResourceSlotAdapter, 
 
     @override
     def describe(self, laid: ManySlotTypesAndACaller) -> str:
-        return f"{laid.caller.username}이 필터 없이 전체 조회"
+        return Says(
+            f"{laid.caller.username} 이 필터 없이 전체를 조회합니다",
+            english=f"{laid.caller.username} reads everything without a filter",
+        )
 
     @override
     async def call(self, adapter: ResourceSlotAdapter, laid: ManySlotTypesAndACaller) -> Searched:
@@ -69,7 +74,10 @@ class SearchingByName(When[ManySlotTypesAndACaller, ResourceSlotAdapter, Searche
 
     @override
     def describe(self, laid: ManySlotTypesAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.named.slot_name} 이름 필터로 조회"
+        return Says(
+            f"{laid.caller.username} 이 {laid.named.slot_name} 이름 필터로 조회합니다",
+            english=(f"{laid.caller.username} reads with the name filter {laid.named.slot_name}"),
+        )
 
     @override
     async def call(self, adapter: ResourceSlotAdapter, laid: ManySlotTypesAndACaller) -> Searched:
@@ -93,7 +101,10 @@ class SearchingByKind(When[ManySlotTypesAndACaller, ResourceSlotAdapter, Searche
 
     @override
     def describe(self, laid: ManySlotTypesAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.named.slot_type} 종류 필터로 조회"
+        return Says(
+            f"{laid.caller.username} 이 {laid.named.slot_type} 종류 필터로 조회합니다",
+            english=(f"{laid.caller.username} reads with the kind filter {laid.named.slot_type}"),
+        )
 
     @override
     async def call(self, adapter: ResourceSlotAdapter, laid: ManySlotTypesAndACaller) -> Searched:
@@ -117,7 +128,13 @@ class SearchingByDisplayName(When[ManySlotTypesAndACaller, ResourceSlotAdapter, 
 
     @override
     def describe(self, laid: ManySlotTypesAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.named.display_name} 표시 이름 필터로 조회"
+        return Says(
+            f"{laid.caller.username} 이 {laid.named.display_name} 표시 이름 필터로 조회합니다",
+            english=(
+                f"{laid.caller.username} reads with the display name filter "
+                f"{laid.named.display_name}"
+            ),
+        )
 
     @override
     async def call(self, adapter: ResourceSlotAdapter, laid: ManySlotTypesAndACaller) -> Searched:
@@ -143,7 +160,10 @@ class SearchingTheFirst(When[ManySlotTypesAndACaller, ResourceSlotAdapter, Searc
 
     @override
     def describe(self, laid: ManySlotTypesAndACaller) -> str:
-        return f"{laid.caller.username}이 앞에서 {self.first}건만 청해 조회"
+        return Says(
+            f"{laid.caller.username} 이 앞에서 {self.first}건만 요청해 조회합니다",
+            english=f"{laid.caller.username} reads asking for only the first {self.first}",
+        )
 
     @override
     async def call(self, adapter: ResourceSlotAdapter, laid: ManySlotTypesAndACaller) -> Searched:
@@ -155,7 +175,7 @@ class SearchingTheFirst(When[ManySlotTypesAndACaller, ResourceSlotAdapter, Searc
 
 @dataclass(frozen=True)
 class AUserGrantedNothingCountsEverySlotType(
-    Scenario[SeedingSession, ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]
+    Scenario[TestSeedingSession, ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -163,10 +183,17 @@ class AUserGrantedNothingCountsEverySlotType(
 
     @override
     def describe(self) -> str:
-        return "슬롯 종류 둘이 있을 때 아무 권한도 없는 사용자가 필터 없이 조회하면 둘 다 집계된다"
+        return Says(
+            "자원 슬롯 유형 둘이 있을 때 아무 권한도 없는 사용자가 필터 없이 조회하면 둘 다 "
+            "집계됩니다",
+            english=(
+                "when two slot types exist and a user granted nothing reads without a filter, "
+                "both are counted"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ManySlotTypesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManySlotTypesAndACaller]:
         return ManySlotTypesAndSomeone(besides=1)
 
     @override
@@ -180,7 +207,7 @@ class AUserGrantedNothingCountsEverySlotType(
 
 @dataclass(frozen=True)
 class ANameFilterNarrows(
-    Scenario[SeedingSession, ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]
+    Scenario[TestSeedingSession, ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -188,12 +215,17 @@ class ANameFilterNarrows(
 
     @override
     def describe(self) -> str:
-        return (
-            "슬롯 종류 여럿 중 하나의 이름을 필터로 조회하면, 응답에는 그 이름의 슬롯 종류만 남는다"
+        return Says(
+            "자원 슬롯 유형 여럿 중 하나의 이름을 필터로 조회하면, 응답에는 그 이름의 자원 슬롯 "
+            "유형만 남습니다",
+            english=(
+                "when the call reads with the name of one of several slot types as a filter, "
+                "only the slot type of that name stays in the answer"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManySlotTypesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManySlotTypesAndACaller]:
         return ManySlotTypesAndSomeone(besides=2)
 
     @override
@@ -207,7 +239,7 @@ class ANameFilterNarrows(
 
 @dataclass(frozen=True)
 class OmittingThePageSizeGivesTen(
-    Scenario[SeedingSession, ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]
+    Scenario[TestSeedingSession, ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -215,10 +247,17 @@ class OmittingThePageSizeGivesTen(
 
     @override
     def describe(self) -> str:
-        return "슬롯 종류 11개가 있을 때 크기 없이 조회하면 10건까지 반환되고 다음 페이지가 있다고 응답한다"
+        return Says(
+            "자원 슬롯 유형 11개가 있을 때 크기 없이 조회하면 10건까지 반환되고 다음 페이지가 "
+            "있다고 응답합니다",
+            english=(
+                "when 11 slot types exist and the call reads without a size, 10 come back and "
+                "the answer says a next page exists"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ManySlotTypesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManySlotTypesAndACaller]:
         return ManySlotTypesAndSomeone(besides=DEFAULT_PAGE)
 
     @override
@@ -232,7 +271,7 @@ class OmittingThePageSizeGivesTen(
 
 @dataclass(frozen=True)
 class AKindFilterNarrows(
-    Scenario[SeedingSession, ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]
+    Scenario[TestSeedingSession, ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -240,13 +279,18 @@ class AKindFilterNarrows(
 
     @override
     def describe(self) -> str:
-        return (
-            "종류가 다른 슬롯 종류 하나와 같은 종류 여럿이 있을 때 그 종류를 필터로 조회하면, "
-            "응답에는 그 종류의 슬롯 종류만 남는다"
+        return Says(
+            "종류가 다른 자원 슬롯 유형 하나와 같은 종류 여럿이 있을 때 그 종류를 필터로 조회하면, "
+            "응답에는 그 종류의 자원 슬롯 유형만 남습니다",
+            english=(
+                "when one slot type of another kind and several of the same kind exist and the "
+                "call reads with that kind as a filter, only the slot types of that kind stay "
+                "in the answer"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManySlotTypesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManySlotTypesAndACaller]:
         return ManySlotTypesAndSomeone(besides=2, named_kind=SlotTypes.BYTES)
 
     @override
@@ -260,7 +304,7 @@ class AKindFilterNarrows(
 
 @dataclass(frozen=True)
 class ADisplayNameFilterNarrows(
-    Scenario[SeedingSession, ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]
+    Scenario[TestSeedingSession, ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -268,13 +312,18 @@ class ADisplayNameFilterNarrows(
 
     @override
     def describe(self) -> str:
-        return (
-            "표시 이름이 다른 슬롯 종류 하나와 같은 표시 이름 여럿이 있을 때 그 표시 이름을 필터로 조회하면, "
-            "응답에는 그 표시 이름의 슬롯 종류만 남는다"
+        return Says(
+            "표시 이름이 다른 자원 슬롯 유형 하나와 같은 표시 이름 여럿이 있을 때 그 표시 이름을 "
+            "필터로 조회하면, 응답에는 그 표시 이름의 자원 슬롯 유형만 남습니다",
+            english=(
+                "when one slot type with another display name and several with the same display "
+                "name exist and the call reads with that display name as a filter, only the "
+                "slot types with that display name stay in the answer"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManySlotTypesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManySlotTypesAndACaller]:
         return ManySlotTypesAndSomeone(besides=2, named_display_name=DISTINCT_DISPLAY)
 
     @override
@@ -288,7 +337,7 @@ class ADisplayNameFilterNarrows(
 
 @dataclass(frozen=True)
 class AskingForTheFirstOneGivesOne(
-    Scenario[SeedingSession, ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]
+    Scenario[TestSeedingSession, ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -296,10 +345,17 @@ class AskingForTheFirstOneGivesOne(
 
     @override
     def describe(self) -> str:
-        return "슬롯 종류 셋이 있을 때 앞에서 한 건만 청해 조회하면 한 건이 반환되고 다음 페이지가 있다고 응답한다"
+        return Says(
+            "자원 슬롯 유형 셋이 있을 때 앞에서 한 건만 요청해 조회하면 한 건이 반환되고 다음 "
+            "페이지가 있다고 응답합니다",
+            english=(
+                "when three slot types exist and the call asks for only the first one, one comes "
+                "back and the answer says a next page exists"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ManySlotTypesAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManySlotTypesAndACaller]:
         return ManySlotTypesAndSomeone(besides=2)
 
     @override
@@ -311,10 +367,62 @@ class AskingForTheFirstOneGivesOne(
         return TheFirstPageOfSlotTypes(size=1)
 
 
+@dataclass(frozen=True)
+class SearchingWithoutLogin(When[ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]):
+    """로그인 문맥 없이 전체를 검색한다."""
+
+    @override
+    def operation(self) -> str:
+        return "search_slot_types"
+
+    @override
+    def describe(self, laid: ManySlotTypesAndACaller) -> str:
+        return Says(
+            "로그인 문맥 없이 전체를 조회합니다",
+            english="without a login context, reads everything",
+        )
+
+    @override
+    async def call(self, adapter: ResourceSlotAdapter, laid: ManySlotTypesAndACaller) -> Searched:
+        return await adapter.search_slot_types(AdminSearchResourceSlotTypesInput())
+
+
+@dataclass(frozen=True)
+class ACallWithoutLoginIsRefused(
+    Scenario[TestSeedingSession, ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]
+):
+    @override
+    def summary(self) -> str:
+        return "searching-slot-types-without-login-is-refused"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "로그인 문맥 없이 자원 슬롯 유형을 조회하면 거부됩니다",
+            english=(
+                "reading slot types without a login context is rejected because there is no "
+                "caller to authorize against"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ManySlotTypesAndACaller]:
+        return ManySlotTypesAndSomeone(besides=1)
+
+    @override
+    def when(self) -> When[ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]:
+        return SearchingWithoutLogin()
+
+    @override
+    def then(self) -> Then[ManySlotTypesAndACaller, Searched]:
+        return TheCallIsRefused(UnreachableError)
+
+
 SCENARIOS: list[SearchingStep] = [
     AUserGrantedNothingCountsEverySlotType(),
     ANameFilterNarrows(),
     OmittingThePageSizeGivesTen(),
+    ACallWithoutLoginIsRefused(),
     # TODO(BA-7928): the adapter reads neither the kind and display name filters nor
     # `first`, so these three rows fail until it does.
     # AKindFilterNarrows(),

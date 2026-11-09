@@ -40,13 +40,13 @@ from ai.backend.manager.models.resource_group.row import (
     ResourceGroupForDomainRow,
     ResourceGroupForKeypairsRow,
     ResourceGroupForProjectRow,
-    ResourceGroupOpts,
     ResourceGroupRow,
     resource_groups,
     sgroups_for_domains,
     sgroups_for_groups,
     sgroups_for_keypairs,
 )
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.models.resource_group.updaters import ResourceGroupUpdater
 from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
@@ -270,7 +270,6 @@ class ScalingGroupNode(graphene.ObjectType):  # type: ignore[misc]
     is_public = graphene.Boolean()
     created_at = GQLDateTime()
     wsproxy_addr = graphene.String()
-    wsproxy_api_token = graphene.String()
     driver = graphene.String()
     driver_opts = graphene.JSONString()
     scheduler = graphene.String()
@@ -290,7 +289,6 @@ class ScalingGroupNode(graphene.ObjectType):  # type: ignore[misc]
             is_public=row.is_public,
             created_at=row.created_at,
             wsproxy_addr=row.wsproxy_addr,
-            wsproxy_api_token=row.wsproxy_api_token,
             driver=row.driver,
             driver_opts=row.driver_opts,
             scheduler=row.scheduler,

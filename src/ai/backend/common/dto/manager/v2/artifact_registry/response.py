@@ -17,7 +17,6 @@ from ai.backend.common.dto.manager.v2.artifact.response import (
     ArtifactRevisionNode,
 )
 from ai.backend.common.dto.manager.v2.artifact.types import VerificationStepResult
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 from .types import (
     ArtifactRegistryType,
@@ -53,7 +52,7 @@ class ArtifactRegistryGQLNode(BaseResponseModel):
 
     id: UUID = Field(description="Internal identifier of the artifact registry metadata record.")
     entity_id: UUID = Field(
-        description=f"UUID of the artifact registry. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the artifact registry. Added in 26.9.0.",
     )
     registry_id: UUID = Field(description="Identifier of the actual registry implementation.")
     name: str = Field(description="Name of the artifact registry.")

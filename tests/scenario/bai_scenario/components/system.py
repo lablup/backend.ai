@@ -18,12 +18,12 @@ from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.user.types import UserData
-from ai.backend.testutils.scenario_steps import Given
+from ai.backend.testutils.scenario_steps import Given, Language, Says, in_language
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf
-from bai_scenario.seeds.domain.domain import SeedDomain
-from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
-from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
-from bai_scenario.seeds.user.user import SeedUserOf
+from bai_scenario.seeds.domain.domain import TestSeedDomain
+from bai_scenario.seeds.rbac.role import TestSeedPermission, TestSeedRole
+from bai_scenario.seeds.seeder import Laid, TestSeeder, TestSeedNest
+from bai_scenario.seeds.user.user import TestSeedUserOf
 
 ENFORCEMENT = "manager.rbac.enforcement_enabled"
 """The switch the entity gate reads. A row that turns it off passes it as its config."""
@@ -36,9 +36,10 @@ class Kept:
 KEPT = Kept()
 
 
-def role_named(role: UserRole) -> str:
+def role_named(role: UserRole) -> Says:
     """What the report calls a user of this role, the same way the seed does."""
-    return SeedUserOf(role=role).kind()
+    named = TestSeedUserOf(role=role).kind()
+    return named if isinstance(named, Says) else Says(named)
 
 
 @dataclass(frozen=True)
@@ -50,14 +51,14 @@ class ACaller:
 
 async def lay_a_caller(seeding: Any, role: UserRole = UserRole.USER) -> Laid[UserData]:
     """A user of the given role, in a domain of their own."""
-    home = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+    home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
     caller: Laid[UserData] = await seeding.within(SomeoneOf(home, role=role))
     return caller
 
 
 @dataclass(frozen=True)
-class SomeoneReadingInPublic(SeedNest[Laid[UserData]]):
-    """그 사용자에게 public 에서 한 엔티티 타입을 읽을 권한을 준다.
+class SomeoneReadingInPublic(TestSeedNest[Laid[UserData]]):
+    """그 사용자에게 public 에서 한 엔티티 타입에 한 권한을 준다.
 
     설치본은 모든 계정에 public_member 를 자동으로 붙이지만 시나리오 스키마는 시드 역할을
     만들지 않는다. 그래서 같은 범위를 시나리오가 직접 역할로 준다.
@@ -66,34 +67,49 @@ class SomeoneReadingInPublic(SeedNest[Laid[UserData]]):
     domain: Laid[Any]
     entity_type: EntityType
     role: UserRole = UserRole.USER
+    permission: Permission = Permission.READ
 
     @override
     def kind(self) -> str:
-        return f"public 에서 {self.entity_type} 조회 권한을 받은 사용자 준비"
+        if self.permission is Permission.READ:
+            return Says(
+                f"public 에서 {self.entity_type} 조회 권한을 받은 사용자 준비",
+                english=f"Prepare a user granted read permission on {self.entity_type} in public",
+            )
+        return Says(
+            f"public 에서 {self.entity_type} {self.permission.name} 권한을 받은 사용자 준비",
+            english=(
+                f"Prepare a user granted the {self.permission.name} permission "
+                f"on {self.entity_type} in public"
+            ),
+        )
 
     @override
-    def lay(self, seed: Seeder) -> Laid[UserData]:
+    def lay(self, seed: TestSeeder) -> Laid[UserData]:
         someone = seed.within(SomeoneOf(self.domain, role=self.role))
         granted = seed.creating_from(
-            SeedRole(
+            TestSeedRole(
                 lambda _: global_entity_id(GlobalEntityName.PUBLIC), name_hint="public-reader"
             ),
             someone,
         )
         seed.adding(
-            SeedPermission(entity_type=self.entity_type, permission=Permission.READ), granted
+            TestSeedPermission(entity_type=self.entity_type, permission=self.permission), granted
         )
         seed.granting(granted, someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id))
         return someone
 
 
 async def lay_a_public_reader(
-    seeding: Any, entity_type: EntityType, role: UserRole = UserRole.USER
+    seeding: Any,
+    entity_type: EntityType,
+    role: UserRole = UserRole.USER,
+    permission: Permission = Permission.READ,
 ) -> Laid[UserData]:
-    """A user of the given role who reads one entity type in public."""
-    home = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+    """A user of the given role who holds one permission on one entity type in public."""
+    home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
     caller: Laid[UserData] = await seeding.within(
-        SomeoneReadingInPublic(home, entity_type, role=role)
+        SomeoneReadingInPublic(home, entity_type, role=role, permission=permission)
     )
     return caller
 
@@ -106,7 +122,11 @@ class SomeoneAlone(Given[Any, ACaller]):
 
     @override
     def describe(self) -> str:
-        return f"{role_named(self.role)} 한 명"
+        who = role_named(self.role)
+        return Says(
+            f"{who} 한 명",
+            english=f"one {in_language(who, Language.ENGLISH)}",
+        )
 
     @override
     async def lay(self, seeding: Any) -> ACaller:

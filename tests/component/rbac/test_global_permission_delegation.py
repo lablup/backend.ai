@@ -18,7 +18,7 @@ from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.role import RoleEntityType, RoleID
 from ai.backend.common.data.entity.types import EntityType
-from ai.backend.common.data.entity.user import UserEntityType
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.manager.actions.monitors import ActionMonitors
@@ -160,7 +160,9 @@ async def grant_global_role(
             await rbac_processors.assign_role.run(
                 AssignRoleAction(
                     input=UserRoleAssignmentInput(
-                        user_id=regular_user_fixture.user_uuid, role_id=role_id
+                        user_id=UserID(regular_user_fixture.user_uuid),
+                        role_id=role_id,
+                        granted_by=UserID(superadmin.user_id),
                     )
                 )
             )

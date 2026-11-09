@@ -54,6 +54,7 @@ class TestSokovanOrchestratorDependency:
             metric_repository=MagicMock(),
             fair_share_repository=MagicMock(),
             resource_usage_repository=MagicMock(),
+            system_session_environ_repository=MagicMock(),
             config_provider=MagicMock(),
             agent_client_pool=MagicMock(),
             appproxy_client_pool=MagicMock(),
@@ -114,6 +115,7 @@ class TestSokovanOrchestratorDependency:
         valkey_schedule = MagicMock()
         route_controller = MagicMock()
         agent_selector = MagicMock()
+        system_session_environ_repository = MagicMock()
 
         dependency = SokovanOrchestratorDependency()
         sokovan_input = SokovanOrchestratorInput(
@@ -124,6 +126,7 @@ class TestSokovanOrchestratorDependency:
             metric_repository=MagicMock(),
             fair_share_repository=fair_share_repo,
             resource_usage_repository=MagicMock(),
+            system_session_environ_repository=system_session_environ_repository,
             config_provider=config_provider,
             agent_client_pool=agent_client_pool,
             appproxy_client_pool=MagicMock(),
@@ -147,6 +150,7 @@ class TestSokovanOrchestratorDependency:
             mock_create_components.assert_called_once_with(
                 scheduler_repo,
                 fair_share_repo,
+                system_session_environ_repository,
                 config_provider,
                 agent_client_pool,
                 network_plugin_ctx,

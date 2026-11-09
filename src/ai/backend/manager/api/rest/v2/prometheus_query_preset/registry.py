@@ -19,10 +19,8 @@ def register_v2_prometheus_query_preset_routes(
 ) -> RouteRegistry:
     """Register all v2 prometheus query preset routes.
 
-    Read endpoints (search, get, execute) are available to any authenticated
-    user because prometheus query presets are a shared catalog of metric
-    query templates. Write endpoints (create, update, delete) remain
-    restricted to superadmins.
+    Create and preview are restricted to superadmins; the rest check the caller's
+    permission on each preset.
     """
     reg = RouteRegistry.create("prometheus-query-presets", route_deps.cors_options)
 
@@ -30,8 +28,14 @@ def register_v2_prometheus_query_preset_routes(
     reg.add("POST", "/search", handler.search, middlewares=[auth_required])
     reg.add("POST", "/preview", handler.admin_preview, middlewares=[superadmin_required])
     reg.add("GET", "/{preset_id}", handler.get, middlewares=[auth_required])
-    reg.add("PATCH", "/{preset_id}", handler.update, middlewares=[superadmin_required])
+    reg.add("PATCH", "/{preset_id}", handler.update, middlewares=[auth_required])
     reg.add("POST", "/{preset_id}/execute", handler.execute, middlewares=[auth_required])
+    reg.add("DELETE", "/{preset_id}", handler.purge, middlewares=[auth_required])
+    reg.add(
+        "POST", "/partial-bulk-update", handler.partial_bulk_update, middlewares=[auth_required]
+    )
+    reg.add("POST", "/partial-bulk-purge", handler.partial_bulk_purge, middlewares=[auth_required])
+    # Deprecated since NEXT_RELEASE_VERSION.
     reg.add("POST", "/delete", handler.delete, middlewares=[superadmin_required])
 
     return reg

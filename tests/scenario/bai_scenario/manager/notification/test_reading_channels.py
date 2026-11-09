@@ -17,7 +17,7 @@ from ai.backend.manager.api.adapters.notification.adapter import NotificationAda
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.notification import (
     AChannelAndACaller,
@@ -31,10 +31,10 @@ from bai_scenario.components.notification import (
     TwoChannelsAndSomeone,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type ReadingStep = Scenario[SeedingSession, Any, NotificationAdapter, Any]
+type ReadingStep = Scenario[TestSeedingSession, Any, NotificationAdapter, Any]
 
 
 @dataclass(frozen=True)
@@ -49,8 +49,16 @@ class ReadingById(When[AChannelAndACaller, NotificationAdapter, NotificationChan
 
     @override
     def describe(self, laid: AChannelAndACaller) -> str:
-        target = "존재하지 않는 id" if self.unknown else f"채널 {laid.channel.name}"
-        return f"{laid.caller.username}이 {target} 조회"
+        if self.unknown:
+            target_ko = "존재하지 않는 id"
+            target_en = "an unknown id"
+        else:
+            target_ko = f"채널 {laid.channel.name}"
+            target_en = f"the channel {laid.channel.name}"
+        return Says(
+            f"{laid.caller.username}이 {target_ko} 조회합니다",
+            english=f"{laid.caller.username} gets {target_en}",
+        )
 
     @override
     async def call(
@@ -71,7 +79,14 @@ class ReadingManyByIds(When[ManyChannelsAndACaller, NotificationAdapter, LoadedC
 
     @override
     def describe(self, laid: ManyChannelsAndACaller) -> str:
-        return f"{laid.caller.username}이 미리 만들어 둔 {len(laid.laid)}개와 없는 id 하나를 한 번에 조회"
+        return Says(
+            f"{laid.caller.username}이 미리 저장한 {len(laid.laid)}개와 없는 id 하나를 "
+            "한 번에 조회합니다",
+            english=(
+                f"{laid.caller.username} batch-loads the {len(laid.laid)} channels created "
+                "in advance and one unknown id"
+            ),
+        )
 
     @override
     async def call(
@@ -95,7 +110,13 @@ class ReadingTheLaidByIds(When[ManyChannelsAndACaller, NotificationAdapter, Load
 
     @override
     def describe(self, laid: ManyChannelsAndACaller) -> str:
-        return f"{laid.caller.username}이 미리 만들어 둔 {len(laid.laid)}개를 한 번에 조회"
+        return Says(
+            f"{laid.caller.username}이 미리 저장한 {len(laid.laid)}개를 한 번에 조회합니다",
+            english=(
+                f"{laid.caller.username} batch-loads the {len(laid.laid)} channels "
+                "created in advance"
+            ),
+        )
 
     @override
     async def call(
@@ -115,7 +136,10 @@ class ReadingNoIds(When[ManyChannelsAndACaller, NotificationAdapter, LoadedChann
 
     @override
     def describe(self, laid: ManyChannelsAndACaller) -> str:
-        return f"{laid.caller.username}이 빈 id 목록으로 조회"
+        return Says(
+            f"{laid.caller.username}이 빈 id 목록으로 조회합니다",
+            english=f"{laid.caller.username} batch-loads with an empty id list",
+        )
 
     @override
     async def call(
@@ -127,7 +151,7 @@ class ReadingNoIds(When[ManyChannelsAndACaller, NotificationAdapter, LoadedChann
 
 @dataclass(frozen=True)
 class TheSuperadminReadsAChannel(
-    Scenario[SeedingSession, AChannelAndACaller, NotificationAdapter, NotificationChannelNode]
+    Scenario[TestSeedingSession, AChannelAndACaller, NotificationAdapter, NotificationChannelNode]
 ):
     started: datetime
 
@@ -137,10 +161,15 @@ class TheSuperadminReadsAChannel(
 
     @override
     def describe(self) -> str:
-        return "채널 하나가 있고 슈퍼관리자가 id로 조회하면, 그 채널 전체가 반환된다"
+        return Says(
+            "채널 하나가 있고 superadmin 이 id 로 조회하면, 그 채널 전체가 응답으로 옵니다",
+            english=(
+                "with one channel, when the superadmin gets it by id, the whole channel comes back"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AChannelAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AChannelAndACaller]:
         return AChannelAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -154,7 +183,7 @@ class TheSuperadminReadsAChannel(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotRead(
-    Scenario[SeedingSession, AChannelAndACaller, NotificationAdapter, NotificationChannelNode]
+    Scenario[TestSeedingSession, AChannelAndACaller, NotificationAdapter, NotificationChannelNode]
 ):
     @override
     def summary(self) -> str:
@@ -162,13 +191,18 @@ class AUserGrantedNothingMayNotRead(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 없는 사용자가 id로 조회하면 권한 부족으로 거부된다. "
-            "만든 사람으로 기록되어 있어도 같다"
+        return Says(
+            "아무 권한도 없는 사용자가 id 로 조회하면 권한 부족으로 거부됩니다. "
+            "채널의 만든 사람이 그 사용자여도 같습니다",
+            english=(
+                "when a user granted nothing gets a channel by id, it is rejected for "
+                "not enough permission, even when the channel records that user as "
+                "its creator"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AChannelAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AChannelAndACaller]:
         return AChannelAndSomeone()
 
     @override
@@ -182,7 +216,7 @@ class AUserGrantedNothingMayNotRead(
 
 @dataclass(frozen=True)
 class TheMonitorMayNotRead(
-    Scenario[SeedingSession, AChannelAndACaller, NotificationAdapter, NotificationChannelNode]
+    Scenario[TestSeedingSession, AChannelAndACaller, NotificationAdapter, NotificationChannelNode]
 ):
     @override
     def summary(self) -> str:
@@ -190,13 +224,18 @@ class TheMonitorMayNotRead(
 
     @override
     def describe(self) -> str:
-        return (
-            "모니터가 id로 조회하면 권한 부족으로 거부된다. "
-            "검색은 통과하지만 id 조회는 권한 검사이고 모니터에게도 부여된 권한이 없다"
+        return Says(
+            "모니터가 id 로 조회하면 권한 부족으로 거부됩니다. "
+            "검색은 통과하지만 id 조회는 권한 검사이고 모니터에게도 부여된 권한이 없습니다",
+            english=(
+                "when the monitor gets a channel by id, it is rejected for not enough "
+                "permission. Search passes, but a get by id is a permission check and "
+                "the monitor holds no permission for it either"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AChannelAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AChannelAndACaller]:
         return AChannelAndSomeone(role=UserRole.MONITOR)
 
     @override
@@ -210,7 +249,7 @@ class TheMonitorMayNotRead(
 
 @dataclass(frozen=True)
 class TheSuperadminReadingAnUnknownIdIsNotFound(
-    Scenario[SeedingSession, AChannelAndACaller, NotificationAdapter, NotificationChannelNode]
+    Scenario[TestSeedingSession, AChannelAndACaller, NotificationAdapter, NotificationChannelNode]
 ):
     @override
     def summary(self) -> str:
@@ -218,10 +257,16 @@ class TheSuperadminReadingAnUnknownIdIsNotFound(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 존재하지 않는 id로 조회하면 대상을 찾을 수 없다는 이유로 거부된다"
+        return Says(
+            "superadmin 이 존재하지 않는 id 로 조회하면 대상을 찾을 수 없다는 이유로 거부됩니다",
+            english=(
+                "when the superadmin gets an id nothing answers to, "
+                "it is rejected because no target is found"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AChannelAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AChannelAndACaller]:
         return AChannelAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -235,7 +280,7 @@ class TheSuperadminReadingAnUnknownIdIsNotFound(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingReadingAnUnknownIdIsRefusedForPermission(
-    Scenario[SeedingSession, AChannelAndACaller, NotificationAdapter, NotificationChannelNode]
+    Scenario[TestSeedingSession, AChannelAndACaller, NotificationAdapter, NotificationChannelNode]
 ):
     @override
     def summary(self) -> str:
@@ -243,13 +288,19 @@ class AUserGrantedNothingReadingAnUnknownIdIsRefusedForPermission(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 없는 사용자가 존재하지 않는 id로 조회하면 대상 없음이 아니라 권한 부족으로 "
-            "거부된다. 권한 검사가 먼저 실행되고 없는 행에는 부여된 권한도 없기 때문이다"
+        return Says(
+            "아무 권한도 없는 사용자가 존재하지 않는 id 로 조회하면 대상 없음이 아니라 "
+            "권한 부족으로 거부됩니다. 권한 검사가 먼저 실행되고 없는 행에는 부여된 "
+            "권한도 없기 때문입니다",
+            english=(
+                "when a user granted nothing gets an unknown id, it is rejected for not "
+                "enough permission rather than for a missing target, because the "
+                "permission check runs first and a missing row holds no grant either"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AChannelAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AChannelAndACaller]:
         return AChannelAndSomeone()
 
     @override
@@ -263,7 +314,7 @@ class AUserGrantedNothingReadingAnUnknownIdIsRefusedForPermission(
 
 @dataclass(frozen=True)
 class TheSuperadminLoadsLaidAndMissing(
-    Scenario[SeedingSession, ManyChannelsAndACaller, NotificationAdapter, LoadedChannels]
+    Scenario[TestSeedingSession, ManyChannelsAndACaller, NotificationAdapter, LoadedChannels]
 ):
     started: datetime
 
@@ -273,13 +324,18 @@ class TheSuperadminLoadsLaidAndMissing(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 미리 만들어 둔 채널 둘과 없는 id 하나를 한 번에 조회하면, "
-            "요청한 순서대로 반환되고 없는 id에 해당하는 항목은 비어 있다"
+        return Says(
+            "superadmin 이 미리 저장한 채널 둘과 없는 id 하나를 한 번에 조회하면, "
+            "요청한 순서대로 반환되고 없는 id 에 해당하는 항목은 비어 있습니다",
+            english=(
+                "when the superadmin batch-loads two channels created in advance and one "
+                "unknown id, they come back in the order asked and the item for the "
+                "unknown id is empty"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyChannelsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyChannelsAndACaller]:
         return TwoChannelsAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -293,7 +349,7 @@ class TheSuperadminLoadsLaidAndMissing(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingIsRefusedPerItem(
-    Scenario[SeedingSession, ManyChannelsAndACaller, NotificationAdapter, LoadedChannels]
+    Scenario[TestSeedingSession, ManyChannelsAndACaller, NotificationAdapter, LoadedChannels]
 ):
     @override
     def summary(self) -> str:
@@ -301,13 +357,17 @@ class AUserGrantedNothingIsRefusedPerItem(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "아무 권한도 없는 사용자가 채널 둘을 한 번에 조회하면, "
-            "호출은 거부되지 않고 항목마다 권한 부족 거부가 담긴다"
+            "호출은 거부되지 않고 항목마다 권한 부족 거부가 담깁니다",
+            english=(
+                "when a user granted nothing batch-loads two channels, the call is not "
+                "rejected and each item carries a rejection for not enough permission"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyChannelsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyChannelsAndACaller]:
         return TwoChannelsAndSomeone()
 
     @override
@@ -321,7 +381,7 @@ class AUserGrantedNothingIsRefusedPerItem(
 
 @dataclass(frozen=True)
 class ABatchLoadOfNothingAnswersNothing(
-    Scenario[SeedingSession, ManyChannelsAndACaller, NotificationAdapter, LoadedChannels]
+    Scenario[TestSeedingSession, ManyChannelsAndACaller, NotificationAdapter, LoadedChannels]
 ):
     @override
     def summary(self) -> str:
@@ -329,10 +389,16 @@ class ABatchLoadOfNothingAnswersNothing(
 
     @override
     def describe(self) -> str:
-        return "빈 id 목록으로 조회하면 하위 계층을 부르지 않고 빈 응답이 반환된다"
+        return Says(
+            "빈 id 목록으로 조회하면 하위 계층을 호출하지 않고 빈 응답이 반환됩니다",
+            english=(
+                "a batch load with an empty id list brings an empty response without "
+                "calling the lower layer"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyChannelsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyChannelsAndACaller]:
         return TwoChannelsAndSomeone()
 
     @override

@@ -11,6 +11,7 @@ from unittest.mock import AsyncMock, Mock
 
 import aiodocker
 import pytest
+from zmq.auth.certs import create_certificates
 
 from ai.backend.agent.config.unified import AgentUnifiedConfig
 from ai.backend.agent.resources import ResourceAllocator
@@ -19,11 +20,15 @@ from ai.backend.common import config
 from ai.backend.common import config as common_config
 from ai.backend.common import validators as tx
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
+from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.types import HostPortPair
 from ai.backend.logging import LocalLogger
 from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat, LogLevel
 from ai.backend.testutils.bootstrap import (  # noqa: F401
+    ETCD_PASSWORD,
+    ETCD_USER,
     etcd_container,
     redis_container,
     sync_file_lock,
@@ -98,8 +103,21 @@ def patch_dummy_agent_config() -> Generator[None, None, None]:
 
 
 @pytest.fixture(scope="session")
+def rpc_auth_key_config(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Path]:
+    """Agent config entries pointing at freshly generated RPC auth key files."""
+    key_dir = tmp_path_factory.mktemp("rpc-auth-keys")
+    manager_public_key, _ = create_certificates(key_dir, "manager")
+    _, agent_keypair = create_certificates(key_dir, "agent")
+    return {
+        "rpc-auth-manager-public-key": Path(manager_public_key),
+        "rpc-auth-agent-keypair": Path(agent_keypair),
+    }
+
+
+@pytest.fixture(scope="session")
 def local_config(
     test_id: str,
+    rpc_auth_key_config: dict[str, Path],
     logging_config: LoggingConfig,
     etcd_container: Any,  # noqa: F811
     redis_container: Any,  # noqa: F811
@@ -128,6 +146,7 @@ def local_config(
             "mount-path": mount_path,
             "backend": "dummy",
             "rpc-listen-addr": HostPortPair("", 18100 + get_parallel_slot()),
+            **rpc_auth_key_config,
             "agent-sock-port": 18200 + get_parallel_slot(),
             "metadata-server-bind-host": "0.0.0.0",
             "metadata-server-port": 18300 + get_parallel_slot(),
@@ -159,6 +178,8 @@ def local_config(
         "etcd": {
             "addr": etcd_addr,
             "namespace": f"ns-{test_id}",
+            "user": ETCD_USER,
+            "password": ETCD_PASSWORD,
         },
         "redis": {
             "addr": redis_addr,
@@ -179,7 +200,7 @@ def local_config(
     try:
         # Override external database config with the current environment's config.
         fs_local_config, cfg_src_path = config.read_from_file(None, "agent")
-        server_config.etcd.addr = fs_local_config["etcd"]["addr"]
+        server_config.etcd.addrs = EtcdConfig.model_validate(fs_local_config["etcd"]).addrs
         _override_if_exists(fs_local_config["etcd"], server_config.etcd.model_dump(), "user")
         _override_if_exists(fs_local_config["etcd"], server_config.etcd.model_dump(), "password")
     except config.ConfigurationError:
@@ -347,6 +368,7 @@ async def agent_runtime(
         mock_stats_monitor,
         mock_error_monitor,
         None,
+        SentinelMonitorSet([]),
     )
 
     try:

@@ -11,6 +11,8 @@ from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.dto.manager.v2.resource_preset.request import (
     AdminSearchResourcePresetsInput,
     CreateResourcePresetInput,
+    PartialBulkPurgeResourcePresetsInput,
+    PartialBulkUpdateResourcePresetsInput,
     UpdateResourcePresetInput,
 )
 from ai.backend.common.dto.manager.v2.resource_preset.response import (
@@ -84,10 +86,26 @@ class V2ResourcePresetHandler:
         result = await self._adapter.update(merged_input)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
-    async def delete(
+    async def purge(
         self,
         path: PathParam[PresetIdPathParam],
     ) -> APIResponse:
-        """Delete a resource preset by ID."""
-        result = await self._adapter.delete(path.parsed.preset_id)
+        """Permanently delete a resource preset by ID."""
+        result = await self._adapter.purge(path.parsed.preset_id)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_update(
+        self,
+        body: BodyParam[PartialBulkUpdateResourcePresetsInput],
+    ) -> APIResponse:
+        """Update several resource presets, answering for each one."""
+        result = await self._adapter.partial_bulk_update(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_purge(
+        self,
+        body: BodyParam[PartialBulkPurgeResourcePresetsInput],
+    ) -> APIResponse:
+        """Permanently delete several resource presets, answering for each one."""
+        result = await self._adapter.partial_bulk_purge(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)

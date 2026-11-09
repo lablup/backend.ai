@@ -3,6 +3,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from ai.backend.client.v2.base_domain import BaseDomainClient
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
     SearchDeploymentRevisionPresetsInput,
 )
@@ -13,6 +14,8 @@ from ai.backend.common.dto.manager.v2.model_card.request import (
     BulkDeleteModelCardsInput,
     CreateModelCardInput,
     DeployModelCardInput,
+    PartialBulkPurgeModelCardsInput,
+    PartialBulkUpdateModelCardsInput,
     SearchModelCardsInput,
     UpdateModelCardInput,
 )
@@ -80,16 +83,44 @@ class V2ModelCardClient(BaseDomainClient):
             response_model=UpdateModelCardPayload,
         )
 
-    async def delete(self, card_id: UUID) -> DeleteModelCardPayload:
+    async def purge(self, card_id: UUID) -> DeleteModelCardPayload:
+        """Purge a model card."""
         return await self._client.typed_request(
             "DELETE",
             f"{_PATH}/{card_id}",
             response_model=DeleteModelCardPayload,
         )
 
+    async def partial_bulk_update(
+        self, request: PartialBulkUpdateModelCardsInput
+    ) -> PartialBulkPayload[ModelCardNode]:
+        """Update several model cards, answering for each one."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/partial-bulk-update",
+            request=request,
+            response_model=PartialBulkPayload[ModelCardNode],
+        )
+
+    async def partial_bulk_purge(
+        self, request: PartialBulkPurgeModelCardsInput
+    ) -> PartialBulkPayload[ModelCardNode]:
+        """Purge several model cards, answering for each one."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/partial-bulk-purge",
+            request=request,
+            response_model=PartialBulkPayload[ModelCardNode],
+        )
+
+    async def delete(self, card_id: UUID) -> DeleteModelCardPayload:
+        """Deprecated. Use :meth:`purge`."""
+        return await self.purge(card_id)
+
     async def admin_bulk_delete(
         self, request: BulkDeleteModelCardsInput
     ) -> BulkDeleteModelCardsPayload:
+        """Deprecated. Use :meth:`partial_bulk_purge`."""
         return await self._client.typed_request(
             "POST",
             f"{_PATH}/bulk-delete",

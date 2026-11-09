@@ -1,7 +1,4 @@
-"""The service catalog adapter, assembled for one row.
-
-The one call runs straight against ops, so there is no service to build.
-"""
+"""The service catalog adapter, assembled for one row."""
 
 from __future__ import annotations
 
@@ -17,7 +14,9 @@ from ai.backend.manager.actions.v2.validators import ActionValidators as V2Actio
 from ai.backend.manager.api.adapters.service_catalog.adapter import ServiceCatalogAdapter
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.service_catalog.repository import ServiceCatalogRepository
 from ai.backend.manager.services.service_catalog.processors import ServiceCatalogProcessors
+from ai.backend.manager.services.service_catalog.service import ServiceCatalogService
 
 
 @pytest.fixture
@@ -35,5 +34,8 @@ async def adapter(
         )
     )
     return ServiceCatalogAdapter(
-        ServiceCatalogProcessors(registry.group(GroupMeta(ServiceCatalogEntityType())))
+        ServiceCatalogProcessors(
+            registry.group(GroupMeta(ServiceCatalogEntityType())),
+            ServiceCatalogService(ServiceCatalogRepository(provider)),
+        )
     )

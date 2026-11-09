@@ -4,6 +4,7 @@ python_sources(
     dependencies=[
         "src/ai/backend/runner:src",
         "src/ai/backend/helpers:src",
+        "//:reqs#backend.ai-krunner-alpine",  # not auto-inferred
         "//:reqs#backend.ai-krunner-static-gnu",  # not auto-inferred
         ":resources",
     ],
@@ -15,6 +16,7 @@ python_sources(
     dependencies=[
         "src/ai/backend/runner:src",
         "src/ai/backend/helpers:src",
+        "//:reqs#backend.ai-krunner-alpine",  # not auto-inferred
         "//:reqs#backend.ai-krunner-static-gnu",  # not auto-inferred
         ":resources",
     ],

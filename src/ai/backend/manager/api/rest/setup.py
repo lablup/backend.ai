@@ -40,6 +40,9 @@ def setup_api(
         key_provider_pool=r.bootstrap.key_provider_pool,
         deployment_coordinator=r.orchestration.sokovan_orchestrator.deployment_coordinator,
         schedule_coordinator=r.orchestration.sokovan_orchestrator.coordinator,
+        session_lifecycle_handlers=(
+            r.orchestration.sokovan_orchestrator.coordinator.registered_lifecycle_handlers()
+        ),
         config_provider=r.bootstrap.config_provider,
     )
     gql_context_deps = GQLContextDeps(
@@ -51,6 +54,7 @@ def setup_api(
         valkey_image=r.infrastructure.valkey.image,
         valkey_live=r.infrastructure.valkey.live,
         valkey_schedule=r.infrastructure.valkey.schedule,
+        sentinel_monitors=r.infrastructure.sentinel_monitors,
         network_plugin_ctx=r.plugins.network_plugin_ctx,
         background_task_manager=r.system.background_task_manager,
         storage_manager=r.components.storage_manager,

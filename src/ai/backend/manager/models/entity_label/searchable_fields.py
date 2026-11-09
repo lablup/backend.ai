@@ -20,6 +20,9 @@ from ai.backend.manager.models.specs.search.field import SearchableField
 class _EntityLabelOwnFields:
     """The label's own columns."""
 
+    field_id = SearchableField(
+        EntityLabelRow.id, UUIDConditions(EntityLabelRow.id), ColumnOrder(EntityLabelRow.id)
+    )
     key = SearchableField(
         EntityLabelRow.key, StringConditions(EntityLabelRow.key), ColumnOrder(EntityLabelRow.key)
     )

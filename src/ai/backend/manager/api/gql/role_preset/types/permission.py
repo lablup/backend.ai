@@ -7,19 +7,26 @@ permission mutations.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
 from enum import Enum
-from typing import Any, Self
+from typing import Any, Self, cast, override
 from uuid import UUID
 
 import strawberry
+from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.role_permission_preset import RolePermissionPresetID
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.role_permission_preset.request import (
     RolePermissionPresetFilter as RolePermissionPresetFilterDTO,
 )
 from ai.backend.common.dto.manager.v2.role_permission_preset.request import (
     RolePermissionPresetOrder as RolePermissionPresetOrderDTO,
+)
+from ai.backend.common.dto.manager.v2.role_permission_preset.response import (
+    AtomicBulkAddRolePresetPermissionsPayload as AtomicBulkAddRolePresetPermissionsPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.role_permission_preset.response import (
     BulkAddRolePermissionPresetFailureInfo as BulkAddRolePermissionPresetFailureInfoDTO,
@@ -43,6 +50,7 @@ from ai.backend.manager.api.gql.base import (
     StringFilter,
     UUIDFilter,
 )
+from ai.backend.manager.api.gql.common_types import PartialBulkFailureGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -64,10 +72,9 @@ from ai.backend.manager.api.gql.rbac.types.permission import (
     PermissionBitFilterGQL,
 )
 from ai.backend.manager.api.gql.rbac.types.scope import PermissionBitGQL
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
-_REMOVED_OPERATION_REASON = (
-    f"Deprecated since {NEXT_RELEASE_VERSION}. Use `permission`; this field is always null."
-)
+_REMOVED_OPERATION_REASON = "Deprecated since 26.9.0. Use `permission`; this field is always null."
 
 # --- Node / Connection types ---
 
@@ -83,7 +90,7 @@ class RolePermissionPresetGQL(PydanticNodeMixin[RolePermissionPresetNode]):
     id: NodeID[str] = gql_field(description="Permission entry UUID.")
     field_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the role permission preset.",
         ),
     )
@@ -98,6 +105,20 @@ class RolePermissionPresetGQL(PydanticNodeMixin[RolePermissionPresetNode]):
     )  # type: ignore[misc]
     def operation(self) -> OperationTypeGQL | None:
         return None
+
+    @classmethod
+    @override
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[Self | None]:
+        results = await info.context.data_loaders.role_permission_preset_loader.load_many([
+            RolePermissionPresetID(UUID(nid)) for nid in node_ids
+        ])
+        return cast(list[Self | None], results)
 
 
 RolePermissionPresetEdge = Edge[RolePermissionPresetGQL]
@@ -146,12 +167,17 @@ class RolePermissionPresetFilterGQL(PydanticInputMixin[RolePermissionPresetFilte
     operation: OperationTypeFilterGQL | None = gql_field(
         description="Filter by granted operation.",
         default=None,
-        deprecation_reason=(
-            f"Deprecated since {NEXT_RELEASE_VERSION}. Use `permission`; the value is ignored."
-        ),
+        deprecation_reason=("Deprecated since 26.9.0. Use `permission`; the value is ignored."),
     )
     created_at: DateTimeFilter | None = gql_field(
         description="Filter by creation timestamp.", default=None
+    )
+    field_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by role permission preset ID.",
+        ),
+        default=None,
     )
     AND: list[Self] | None = gql_field(
         description="Combine multiple filters with AND logic. All conditions must match.",
@@ -181,7 +207,7 @@ class RolePermissionPresetOrderFieldGQL(Enum):
     OPERATION = strawberry.enum_value(
         "operation",
         deprecation_reason=(
-            f"Deprecated since {NEXT_RELEASE_VERSION}. Use `PERMISSION`; ordering by it is ignored."
+            "Deprecated since 26.9.0. Use `PERMISSION`; ordering by it is ignored."
         ),
     )
 
@@ -278,4 +304,42 @@ class BulkRemoveRolePermissionPresetsPayloadGQL(
     )
     failed: list[BulkRolePermissionPresetFailureInfoGQL] = gql_field(
         description="Permission entry IDs that failed to delete."
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload returned after adding permission entries to a role preset, all or none.",
+    ),
+    model=AtomicBulkAddRolePresetPermissionsPayloadDTO,
+    name="AtomicBulkAddRolePresetPermissionsPayload",
+)
+class AtomicBulkAddRolePresetPermissionsPayloadGQL(
+    PydanticOutputMixin[AtomicBulkAddRolePresetPermissionsPayloadDTO]
+):
+    items: list[RolePermissionPresetGQL] = gql_field(
+        description="Permission entries that were added."
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Result of a partial bulk role preset permission operation: the entries processed "
+            "and the ones that failed."
+        ),
+    ),
+    model=PartialBulkPayload[RolePermissionPresetNode],
+    name="PartialBulkRolePresetPermissionsPayload",
+)
+class PartialBulkRolePresetPermissionsPayloadGQL(
+    PydanticOutputMixin[PartialBulkPayload[RolePermissionPresetNode]]
+):
+    successes: list[RolePermissionPresetGQL] = gql_field(
+        description="The permission entries processed, as they stood."
+    )
+    failed: list[PartialBulkFailureGQL] = gql_field(
+        description="The permission entries not processed, each with the reason."
     )

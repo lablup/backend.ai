@@ -1,32 +1,32 @@
-# Backend.AI App Proxy Coordinator
+# Backend.AI app proxy coordinator
 
 ## Purpose
 
-The App Proxy Coordinator manages routing information for App Proxy Workers, coordinates worker instances, and handles service port mappings for compute session services (Jupyter, SSH, TensorBoard, etc.).
+The app proxy coordinator manages routing information for app proxy workers, coordinates worker instances, and handles service port mappings for session services (Jupyter, SSH, TensorBoard, and so on).
 
 ## Key Responsibilities
 
 ### 1. Worker Management
-- Register and track App Proxy Worker instances
+- Register and track app proxy worker instances
 - Monitor worker health and availability
-- Distribute routing information to workers
+- Distribute routing information to app proxy workers
 - Handle worker failover
 
 ### 2. Route Management
 - Manage service port mappings (session → service → port)
 - Update routing tables dynamically
-- Propagate route changes to workers
-- Handle route conflicts and resolution
+- Propagate route changes to app proxy workers
+- Handle route conflicts and resolve them
 
 ### 3. Service Discovery
-- Maintain service registry
-- Provide route lookup for workers
+- Maintain the service registry
+- Provide route lookup for app proxy workers
 - Update routes when sessions change
 - Clean up routes for terminated sessions
 
 ## Entry Points
 
-App Proxy Coordinator has 1 entry point to receive and process requests.
+The app proxy coordinator has one entry point to receive and process requests.
 
 ### 1. REST API
 

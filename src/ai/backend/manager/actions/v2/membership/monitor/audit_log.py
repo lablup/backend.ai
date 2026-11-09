@@ -74,7 +74,7 @@ class MembershipActionAuditLogMonitor(MembershipActionMonitor):
         await self._repository.atomic_create_fields_with_nested(
             [FieldToCreate(owner_id=meta.entity, creator=creator)],
             [
-                AuditLogScopeCreator(scope_type=str(scope.entity_type()), scope_id=scope)
+                AuditLogScopeCreator(scope_type=scope.entity_type(), scope_id=scope)
                 for scope in meta.scopes
             ],
         )

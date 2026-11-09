@@ -7,7 +7,9 @@ from dataclasses import dataclass
 from typing import Any
 
 from ai.backend.common import msgpack
+from ai.backend.common.dotfile import DotfilePath
 from ai.backend.common.dto.manager.config.types import MAXIMUM_DOTFILE_SIZE
+from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.manager.errors.storage import (
     DotfileAlreadyExists,
     DotfileCreationFailed,
@@ -48,12 +50,7 @@ class DotfileQueryResult:
 
 @dataclass(frozen=True)
 class DotfileEntries:
-    """The dotfile entries packed into one row's column.
-
-    Every edit is a read of the whole set followed by a write of the whole set, so
-    the limits the set has to hold — one entry per path, a count, a packed size —
-    are decided here rather than at each of the three tables that store one.
-    """
+    """Dotfiles with shared path, count and serialized-size constraints."""
 
     entries: tuple[DotfileEntry, ...] = ()
 
@@ -65,6 +62,19 @@ class DotfileEntries:
                 DotfileEntry(path=row["path"], perm=row["perm"], data=row["data"]) for row in rows
             )
         )
+
+    @classmethod
+    def verify_packed(cls, packed: bytes) -> None:
+        try:
+            cls.unpack(packed).verify_paths()
+        except (ValueError, TypeError, KeyError) as e:
+            raise InvalidAPIParameters(
+                "dotfiles must be a msgpack list of path, perm and data entries."
+            ) from e
+
+    def verify_paths(self) -> None:
+        for entry in self.entries:
+            DotfilePath(entry.path)
 
     def get(self, path: str) -> DotfileEntry:
         for entry in self.entries:

@@ -6,6 +6,7 @@ from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.session_group import SessionGroupID
+from ai.backend.common.schema.deployment import IntOrPercent, ReplicaGroupRolloutSpec
 from ai.backend.manager.data.deployment.types import (
     ReplicaGroupLifecycle,
     ReplicaGroupScalingStatus,
@@ -58,6 +59,10 @@ def _make_row() -> ReplicaGroupRow:
         traffic_weight=70,
         lifecycle=ReplicaGroupLifecycle.ROLLING,
         scaling_status=ReplicaGroupScalingStatus.SCALING,
+        rollout=ReplicaGroupRolloutSpec(
+            max_surge=IntOrPercent(count=1),
+            max_unavailable=IntOrPercent(count=0),
+        ),
     )
 
 

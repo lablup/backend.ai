@@ -13,6 +13,7 @@ from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import EnumFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "ClusterModeEnum",
@@ -22,6 +23,7 @@ __all__ = (
     "SessionOrderField",
     "SessionResultEnum",
     "SessionStatusEnum",
+    "SessionTerminationStatusEnum",
     "SessionResultFilter",
     "SessionStatusFilter",
     "SessionTypeEnum",
@@ -52,6 +54,15 @@ class SessionStatusEnum(StrEnum):
     TERMINATED = "TERMINATED"
     ERROR = "ERROR"
     CANCELLED = "CANCELLED"
+
+
+class SessionTerminationStatusEnum(StrEnum):
+    """What a termination request did to one session."""
+
+    CANCELLED = "cancelled"
+    TERMINATING = "terminating"
+    FORCE_TERMINATED = "force-terminated"
+    SKIPPED = "skipped"
 
 
 class SessionTypeEnum(StrEnum):
@@ -100,6 +111,8 @@ class SessionOrderField(StrEnum):
     NETWORK_TYPE = "network_type"
     NETWORK_ID = "network_id"
     REPLICA_ID = "replica_id"
+    SESSION_GROUP_ID = "session_group_id"
+    REQUESTED_STARTS_AT = "requested_starts_at"
 
 
 class CreateSessionTypeEnum(StrEnum):
@@ -157,6 +170,10 @@ class SessionUses(BaseRequestModel):
     )
     resource_group: list[UUID] | None = Field(
         default=None, description="Resource groups the session runs in"
+    )
+    vfolder: list[UUID] | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Vfolders the session's kernel groups mount",
     )
 
 

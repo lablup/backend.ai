@@ -13,7 +13,7 @@ from typing import Any, override
 import pytest
 
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.audit_log.request import (
     AdminSearchAuditLogsInput,
     AuditLogFilter,
@@ -28,6 +28,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Configured,
     Given,
+    Says,
     Scenario,
     Then,
     When,
@@ -36,6 +37,7 @@ from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.audit_log import (
     ManyRecordsGlobally,
     MixedStatusGlobally,
+    OneRunGlobally,
     RecordsAndACaller,
     ThePageIsCapped,
     TheRecordsAnswered,
@@ -43,11 +45,11 @@ from bai_scenario.components.audit_log import (
     TwoRecordsGlobally,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Searched = SearchAuditLogsPayload
-type SearchingStep = Scenario[SeedingSession, RecordsAndACaller, AuditLogAdapter, Searched]
+type SearchingStep = Scenario[TestSeedingSession, RecordsAndACaller, AuditLogAdapter, Searched]
 ENFORCEMENT = "manager.rbac.enforcement_enabled"
 
 
@@ -61,7 +63,10 @@ class SearchingEverything(When[RecordsAndACaller, AuditLogAdapter, Searched]):
 
     @override
     def describe(self, laid: RecordsAndACaller) -> str:
-        return f"{laid.caller.username}이 필터 없이 전체 검색"
+        return Says(
+            f"{laid.caller.username}이 필터 없이 전체 검색합니다",
+            english=f"{laid.caller.username} searches everything without a filter",
+        )
 
     @override
     async def call(self, adapter: AuditLogAdapter, laid: RecordsAndACaller) -> Searched:
@@ -79,7 +84,10 @@ class SearchingBySuccess(When[RecordsAndACaller, AuditLogAdapter, Searched]):
 
     @override
     def describe(self, laid: RecordsAndACaller) -> str:
-        return f"{laid.caller.username}이 성공 상태 필터로 검색"
+        return Says(
+            f"{laid.caller.username}이 성공 상태 필터로 검색합니다",
+            english=f"{laid.caller.username} searches with a success status filter",
+        )
 
     @override
     async def call(self, adapter: AuditLogAdapter, laid: RecordsAndACaller) -> Searched:
@@ -103,7 +111,10 @@ class SearchingByTriggeredUser(When[RecordsAndACaller, AuditLogAdapter, Searched
 
     @override
     def describe(self, laid: RecordsAndACaller) -> str:
-        return f"{laid.caller.username}이 실행한 사용자 필터로 검색"
+        return Says(
+            f"{laid.caller.username}이 실행한 사용자 필터로 검색합니다",
+            english=f"{laid.caller.username} searches with a triggered-user filter",
+        )
 
     @override
     async def call(self, adapter: AuditLogAdapter, laid: RecordsAndACaller) -> Searched:
@@ -118,6 +129,31 @@ class SearchingByTriggeredUser(When[RecordsAndACaller, AuditLogAdapter, Searched
 
 
 @dataclass(frozen=True)
+class SearchingByRun(When[RecordsAndACaller, AuditLogAdapter, Searched]):
+    """한 실행의 기록을 필터로 검색한다."""
+
+    @override
+    def operation(self) -> str:
+        return "admin_search"
+
+    @override
+    def describe(self, laid: RecordsAndACaller) -> str:
+        return Says(
+            f"{laid.caller.username}이 실행 필터로 검색합니다",
+            english=f"{laid.caller.username} searches with a run filter",
+        )
+
+    @override
+    async def call(self, adapter: AuditLogAdapter, laid: RecordsAndACaller) -> Searched:
+        with ActingAs(laid.caller):
+            return await adapter.admin_search(
+                AdminSearchAuditLogsInput(
+                    filter=AuditLogFilter(action_id=UUIDFilter(equals=laid.filter_action))
+                )
+            )
+
+
+@dataclass(frozen=True)
 class SearchingWithoutPageSize(When[RecordsAndACaller, AuditLogAdapter, Searched]):
     """페이지 크기를 지정하지 않고 검색한다."""
 
@@ -127,7 +163,10 @@ class SearchingWithoutPageSize(When[RecordsAndACaller, AuditLogAdapter, Searched
 
     @override
     def describe(self, laid: RecordsAndACaller) -> str:
-        return f"{laid.caller.username}이 크기 없이 검색"
+        return Says(
+            f"{laid.caller.username}이 크기 없이 검색합니다",
+            english=f"{laid.caller.username} searches without a page size",
+        )
 
     @override
     async def call(self, adapter: AuditLogAdapter, laid: RecordsAndACaller) -> Searched:
@@ -145,7 +184,10 @@ class SearchingWithMixedPagination(When[RecordsAndACaller, AuditLogAdapter, Sear
 
     @override
     def describe(self, laid: RecordsAndACaller) -> str:
-        return f"{laid.caller.username}이 두 페이지 방식을 함께 지정해 검색"
+        return Says(
+            f"{laid.caller.username}이 두 페이지 방식을 함께 지정해 검색합니다",
+            english=f"{laid.caller.username} searches naming both pagination modes at once",
+        )
 
     @override
     async def call(self, adapter: AuditLogAdapter, laid: RecordsAndACaller) -> Searched:
@@ -163,7 +205,10 @@ class SearchingWithBadCursor(When[RecordsAndACaller, AuditLogAdapter, Searched])
 
     @override
     def describe(self, laid: RecordsAndACaller) -> str:
-        return f"{laid.caller.username}이 손상된 커서로 검색"
+        return Says(
+            f"{laid.caller.username}이 손상된 커서로 검색합니다",
+            english=f"{laid.caller.username} searches with a broken cursor",
+        )
 
     @override
     async def call(self, adapter: AuditLogAdapter, laid: RecordsAndACaller) -> Searched:
@@ -175,7 +220,7 @@ class SearchingWithBadCursor(When[RecordsAndACaller, AuditLogAdapter, Searched])
 
 @dataclass(frozen=True)
 class TheSuperadminSeesEveryRecord(
-    Scenario[SeedingSession, RecordsAndACaller, AuditLogAdapter, Searched]
+    Scenario[TestSeedingSession, RecordsAndACaller, AuditLogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -183,10 +228,16 @@ class TheSuperadminSeesEveryRecord(
 
     @override
     def describe(self) -> str:
-        return "기록 둘이 있고 슈퍼관리자가 필터 없이 검색하면, 둘 다 반환되고 최근 것이 먼저다"
+        return Says(
+            "기록 둘이 있고 superadmin 이 필터 없이 검색하면, 둘 다 반환되고 최근 것이 먼저입니다",
+            english=(
+                "when there are two records and the superadmin searches without a filter, "
+                "both come back with the newest first"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, RecordsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RecordsAndACaller]:
         return TwoRecordsGlobally(role=UserRole.SUPERADMIN)
 
     @override
@@ -200,7 +251,7 @@ class TheSuperadminSeesEveryRecord(
 
 @dataclass(frozen=True)
 class TheMonitorRoleSeesEveryRecord(
-    Scenario[SeedingSession, RecordsAndACaller, AuditLogAdapter, Searched]
+    Scenario[TestSeedingSession, RecordsAndACaller, AuditLogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -208,10 +259,17 @@ class TheMonitorRoleSeesEveryRecord(
 
     @override
     def describe(self) -> str:
-        return "검색은 읽기 연산이므로 모니터 역할 사용자도 슈퍼관리자 검사를 통과해 슈퍼관리자와 같은 응답을 받는다"
+        return Says(
+            "검색은 읽기 연산이므로 모니터 역할 사용자도 superadmin 검사를 통과해 superadmin 과 "
+            "같은 응답을 받습니다",
+            english=(
+                "because searching is a read operation, a monitor-role user also passes the "
+                "superadmin check and gets the same response as the superadmin"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, RecordsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RecordsAndACaller]:
         return TwoRecordsGlobally(role=UserRole.MONITOR)
 
     @override
@@ -225,7 +283,7 @@ class TheMonitorRoleSeesEveryRecord(
 
 @dataclass(frozen=True)
 class APlainUserMayNotSearch(
-    Scenario[SeedingSession, RecordsAndACaller, AuditLogAdapter, Searched]
+    Scenario[TestSeedingSession, RecordsAndACaller, AuditLogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -233,10 +291,16 @@ class APlainUserMayNotSearch(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자도 모니터도 아닌 사용자가 전체를 검색하면, 역할 부족으로 거부된다"
+        return Says(
+            "superadmin 도 모니터도 아닌 사용자가 전체를 검색하면, 역할 부족으로 거부됩니다",
+            english=(
+                "when a user who is neither the superadmin nor a monitor searches everything, "
+                "it is rejected for lack of role"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, RecordsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RecordsAndACaller]:
         return TwoRecordsGlobally(role=UserRole.USER)
 
     @override
@@ -250,7 +314,7 @@ class APlainUserMayNotSearch(
 
 @dataclass(frozen=True)
 class EnforcementOffStillNeedsTheRole(
-    Scenario[SeedingSession, RecordsAndACaller, AuditLogAdapter, Searched], Configured
+    Scenario[TestSeedingSession, RecordsAndACaller, AuditLogAdapter, Searched], Configured
 ):
     @override
     def summary(self) -> str:
@@ -258,14 +322,20 @@ class EnforcementOffStillNeedsTheRole(
 
     @override
     def describe(self) -> str:
-        return "권한 검사를 꺼도 슈퍼관리자가 아닌 사용자는 전체를 검색할 수 없다"
+        return Says(
+            "권한 검사를 꺼도 superadmin 이 아닌 사용자는 전체를 검색할 수 없습니다",
+            english=(
+                "turning the permission check off still does not let a user who is not the "
+                "superadmin search everything"
+            ),
+        )
 
     @override
     def config(self) -> Mapping[str, Any]:
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, RecordsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RecordsAndACaller]:
         return TwoRecordsGlobally(role=UserRole.USER)
 
     @override
@@ -279,7 +349,7 @@ class EnforcementOffStillNeedsTheRole(
 
 @dataclass(frozen=True)
 class OmittingThePageSizeCapsThePage(
-    Scenario[SeedingSession, RecordsAndACaller, AuditLogAdapter, Searched]
+    Scenario[TestSeedingSession, RecordsAndACaller, AuditLogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -287,12 +357,17 @@ class OmittingThePageSizeCapsThePage(
 
     @override
     def describe(self) -> str:
-        return (
-            "페이지 크기를 지정하지 않고 검색하면, 10건까지 반환되고 다음 페이지가 있다고 응답한다"
+        return Says(
+            "페이지 크기를 지정하지 않고 검색하면, 10건까지 반환되고 다음 페이지가 있다고 "
+            "응답합니다",
+            english=(
+                "when a search gives no page size, ten items come back and it answers that "
+                "there is a next page"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, RecordsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RecordsAndACaller]:
         return ManyRecordsGlobally(total=11)
 
     @override
@@ -306,7 +381,7 @@ class OmittingThePageSizeCapsThePage(
 
 @dataclass(frozen=True)
 class AStatusFilterNarrowsToSuccess(
-    Scenario[SeedingSession, RecordsAndACaller, AuditLogAdapter, Searched]
+    Scenario[TestSeedingSession, RecordsAndACaller, AuditLogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -314,12 +389,17 @@ class AStatusFilterNarrowsToSuccess(
 
     @override
     def describe(self) -> str:
-        return (
-            "성공 기록과 거부 기록이 섞여 있을 때 성공 상태 필터로 검색하면, 성공한 기록만 반환된다"
+        return Says(
+            "성공 기록과 거부 기록이 섞여 있을 때 성공 상태 필터로 검색하면, 성공한 기록만 "
+            "반환됩니다",
+            english=(
+                "when success records and rejected records are mixed and a success status "
+                "filter is used, only the successful records come back"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, RecordsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RecordsAndACaller]:
         return MixedStatusGlobally()
 
     @override
@@ -333,7 +413,7 @@ class AStatusFilterNarrowsToSuccess(
 
 @dataclass(frozen=True)
 class AnActorFilterNarrowsToOneUser(
-    Scenario[SeedingSession, RecordsAndACaller, AuditLogAdapter, Searched]
+    Scenario[TestSeedingSession, RecordsAndACaller, AuditLogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -341,10 +421,17 @@ class AnActorFilterNarrowsToOneUser(
 
     @override
     def describe(self) -> str:
-        return "두 사용자가 각각 기록을 남겼을 때 한 사용자 필터로 검색하면, 그 사용자가 실행한 기록만 반환된다"
+        return Says(
+            "두 사용자가 각각 기록을 남겼을 때 한 사용자 필터로 검색하면, 그 사용자가 실행한 "
+            "기록만 반환됩니다",
+            english=(
+                "when two users each left records and one user filter is used, only the "
+                "records that user triggered come back"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, RecordsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RecordsAndACaller]:
         return TwoActorsGlobally()
 
     @override
@@ -357,8 +444,40 @@ class AnActorFilterNarrowsToOneUser(
 
 
 @dataclass(frozen=True)
+class ARunFilterNarrowsToOneRun(
+    Scenario[TestSeedingSession, RecordsAndACaller, AuditLogAdapter, Searched]
+):
+    @override
+    def summary(self) -> str:
+        return "a-run-filter-answers-every-record-the-run-left-and-only-those"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "한 실행이 여러 엔티티에 기록을 남겼을 때 그 실행 필터로 검색하면, 그 실행이 남긴 "
+            "기록이 모두, 그리고 그것만 반환됩니다",
+            english=(
+                "when one run left records on several entities and its run filter is used, "
+                "every record that run left comes back, and only those"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, RecordsAndACaller]:
+        return OneRunGlobally()
+
+    @override
+    def when(self) -> When[RecordsAndACaller, AuditLogAdapter, Searched]:
+        return SearchingByRun()
+
+    @override
+    def then(self) -> Then[RecordsAndACaller, Searched]:
+        return TheRecordsAnswered()
+
+
+@dataclass(frozen=True)
 class TwoPaginationModesAreRefused(
-    Scenario[SeedingSession, RecordsAndACaller, AuditLogAdapter, Searched]
+    Scenario[TestSeedingSession, RecordsAndACaller, AuditLogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -366,10 +485,16 @@ class TwoPaginationModesAreRefused(
 
     @override
     def describe(self) -> str:
-        return "오프셋 방식과 커서 방식을 함께 지정해 검색하면, 잘못된 입력으로 거부된다"
+        return Says(
+            "오프셋 방식과 커서 방식을 함께 지정해 검색하면, 잘못된 입력으로 거부됩니다",
+            english=(
+                "when a search names both the offset and cursor pagination modes at once, it "
+                "is rejected as invalid input"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, RecordsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RecordsAndACaller]:
         return TwoRecordsGlobally(role=UserRole.SUPERADMIN)
 
     @override
@@ -383,7 +508,7 @@ class TwoPaginationModesAreRefused(
 
 @dataclass(frozen=True)
 class ABrokenCursorIsRefused(
-    Scenario[SeedingSession, RecordsAndACaller, AuditLogAdapter, Searched]
+    Scenario[TestSeedingSession, RecordsAndACaller, AuditLogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -391,10 +516,16 @@ class ABrokenCursorIsRefused(
 
     @override
     def describe(self) -> str:
-        return "해석할 수 없는 커서로 검색하면, 잘못된 커서로 거부된다"
+        return Says(
+            "해석할 수 없는 커서로 검색하면, 잘못된 커서로 거부됩니다",
+            english=(
+                "when a search uses a cursor that cannot be decoded, it is rejected as a "
+                "broken cursor"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, RecordsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RecordsAndACaller]:
         return TwoRecordsGlobally(role=UserRole.SUPERADMIN)
 
     @override
@@ -414,6 +545,7 @@ SCENARIOS: list[SearchingStep] = [
     OmittingThePageSizeCapsThePage(),
     AStatusFilterNarrowsToSuccess(),
     AnActorFilterNarrowsToOneUser(),
+    ARunFilterNarrowsToOneRun(),
     TwoPaginationModesAreRefused(),
     ABrokenCursorIsRefused(),
 ]

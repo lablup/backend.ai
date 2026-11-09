@@ -14,11 +14,12 @@ from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.types import ClusterMode, MountPermission, ResourceSlot
 from ai.backend.manager.data.deployment.types import DeploymentInfo, ModelRevisionData
 from ai.backend.manager.models.deployment_revision.creators import DeploymentRevisionCreator
-from bai_scenario.seeds.seeder import SeedField
+from ai.backend.testutils.scenario_steps import Says
+from bai_scenario.seeds.seeder import TestSeedFieldCreator
 
 
 @dataclass(frozen=True)
-class SeedRevisionOf(SeedField[DeploymentInfo, ModelRevisionData]):
+class TestSeedRevisionOf(TestSeedFieldCreator[DeploymentInfo, ModelRevisionData]):
     """One revision of the deployment, numbered one past its last.
 
     The image, folder, runtime and group are values earlier rows answered; this seed
@@ -35,7 +36,7 @@ class SeedRevisionOf(SeedField[DeploymentInfo, ModelRevisionData]):
 
     @override
     def kind(self) -> str:
-        return "리비전 하나를 갖는다"
+        return Says("리비전 하나를 갖는다", english="has one revision")
 
     @override
     def owner_id(self, owner: DeploymentInfo) -> DeploymentID:

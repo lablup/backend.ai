@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Self, override
 
+from ai.backend.common.clients.valkey_client.sentinel_monitor.base import AbstractSentinelMonitor
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.message_queue.abc import AbstractAnycaster
 from ai.backend.common.message_queue.payload import AnycastMessagePayload
@@ -40,7 +41,13 @@ class RedisAnycaster(AbstractAnycaster):
         self._closed = False
 
     @classmethod
-    async def create(cls, redis_target: RedisTarget, stream_key: str, db: int = 0) -> Self:
+    async def create(
+        cls,
+        redis_target: RedisTarget,
+        stream_key: str,
+        db: int = 0,
+        sentinel_monitor: AbstractSentinelMonitor | None = None,
+    ) -> Self:
         """
         Create a new RedisAnycaster instance.
 
@@ -56,6 +63,7 @@ class RedisAnycaster(AbstractAnycaster):
             redis_target.to_valkey_target(),
             human_readable_name="redis_anycaster",
             db_id=db,
+            sentinel_monitor=sentinel_monitor,
         )
         return cls(client, stream_key)
 

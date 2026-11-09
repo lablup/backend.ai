@@ -4,13 +4,19 @@ from ai.backend.common.dto.manager.v2.entity_label.request import (
     EntityLabelFilter,
     EntityLabelNestedFilter,
     EntityLabelOrder,
+    PartialBulkPurgeEntityLabelInput,
+    PartialBulkUpsertEntityLabelInput,
     SearchEntityLabelsInput,
     UpsertEntityLabelInput,
 )
 from ai.backend.common.dto.manager.v2.entity_label.response import (
     EntityLabelNode,
+    PartialBulkPurgeEntityLabelPayload,
+    PartialBulkUpsertEntityLabelPayload,
+    PurgeEntityLabelError,
     PurgeEntityLabelPayload,
     SearchEntityLabelsPayload,
+    UpsertEntityLabelError,
     UpsertEntityLabelPayload,
 )
 from ai.backend.common.dto.manager.v2.entity_label.types import (
@@ -21,6 +27,9 @@ from ai.backend.common.dto.manager.v2.entity_label.types import (
 __all__ = (
     "UpsertEntityLabelInput",
     "UpsertEntityLabelPayload",
+    "UpsertEntityLabelError",
+    "PartialBulkUpsertEntityLabelInput",
+    "PartialBulkUpsertEntityLabelPayload",
     "EntityLabelFilter",
     "EntityLabelNestedFilter",
     "EntityLabelNode",
@@ -28,6 +37,9 @@ __all__ = (
     "EntityLabelOrderField",
     "OrderDirection",
     "PurgeEntityLabelPayload",
+    "PurgeEntityLabelError",
+    "PartialBulkPurgeEntityLabelInput",
+    "PartialBulkPurgeEntityLabelPayload",
     "SearchEntityLabelsInput",
     "SearchEntityLabelsPayload",
 )

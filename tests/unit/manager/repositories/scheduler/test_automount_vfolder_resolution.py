@@ -32,6 +32,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.entity.domain import DomainID, DomainName
@@ -39,7 +40,6 @@ from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.types import BinarySize, QuotaScopeID, ResourceSlot
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.data.session.draft import (
     KernelGroupDraft,
@@ -60,7 +60,6 @@ from ai.backend.manager.models.deployment_revision.row import DeploymentRevision
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.endpoint.row import EndpointRow
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.keypair.row import KeyPairRow

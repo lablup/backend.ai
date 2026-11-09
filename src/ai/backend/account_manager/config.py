@@ -228,8 +228,24 @@ class EtcdConfig(BaseSchema):
             examples=[HostPortPair(host="127.0.0.1", port=8121)],
         ),
     ]
-    user: Annotated[str, Field(description="etcd user.")]
-    password: Annotated[str, Field(description="etcd password.")]
+    user: Annotated[str, Field(min_length=1, description="etcd user.")]
+    password: Annotated[str, Field(min_length=1, description="etcd password.")]
+    keep_alive_interval: Annotated[
+        float,
+        Field(
+            default=5.0,
+            gt=0,
+            description="Seconds without a frame before a keep-alive ping is sent.",
+        ),
+    ]
+    keep_alive_timeout: Annotated[
+        float,
+        Field(
+            default=3.0,
+            gt=0,
+            description="Seconds to wait for a keep-alive ping reply.",
+        ),
+    ]
 
 
 class DBConfig(BaseSchema):

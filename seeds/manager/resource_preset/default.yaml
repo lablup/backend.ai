@@ -1,0 +1,43 @@
+kind: resource_preset
+version: 1
+items:
+- id: 0fdd1492-dd77-43a4-a0ec-8df48b57a56a
+  name: cpu01-small
+  resource_slots:
+    cpu: '1'
+    mem: '1073741824'
+- id: e2d9fdc4-c970-4cc9-a4a4-557af14d9cc6
+  name: cpu02-medium
+  resource_slots:
+    cpu: '4'
+    mem: '8589934592'
+  shared_memory: '1073741824'
+- id: e5a27471-b7df-4f91-96ea-ba5b14de62fa
+  name: cpu03-large
+  resource_slots:
+    cpu: '8'
+    mem: '17179869184'
+  shared_memory: '2147483648'
+- id: a0d393b6-7427-4b9f-b550-8a616692ad1d
+  name: cuda01-small
+  resource_slots:
+    cpu: '1'
+    mem: '4294967296'
+    cuda.device: '1'
+    cuda.shares: '0.5'
+- id: bddd6bfd-7095-479f-b6e8-a95224468508
+  name: cuda02-medium
+  resource_slots:
+    cpu: '4'
+    mem: '17179869184'
+    cuda.device: '2'
+    cuda.shares: '2.0'
+  shared_memory: '1073741824'
+- id: 054a98be-80d5-47bc-aef1-c447bfaa35b0
+  name: cuda03-large
+  resource_slots:
+    cpu: '8'
+    mem: '34359738368'
+    cuda.device: '4'
+    cuda.shares: '4.0'
+  shared_memory: '2147483648'

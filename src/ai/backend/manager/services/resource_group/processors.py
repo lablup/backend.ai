@@ -53,6 +53,12 @@ from ai.backend.manager.services.resource_group.actions.list_resource_groups imp
     SearchResourceGroupsAction,
 )
 from ai.backend.manager.services.resource_group.actions.lookup import LookupResourceGroupAction
+from ai.backend.manager.services.resource_group.actions.partial_bulk_purge_resource_groups import (
+    PartialBulkPurgeResourceGroupsAction,
+)
+from ai.backend.manager.services.resource_group.actions.partial_bulk_update_resource_groups import (
+    PartialBulkUpdateResourceGroupsAction,
+)
 from ai.backend.manager.services.resource_group.actions.purge_resource_group import (
     PurgeResourceGroupAction,
     PurgeResourceGroupActionResult,
@@ -98,6 +104,12 @@ class ResourceGroupProcessors:
     ]
     update_resource_group: SingleEntityActionProcessor[
         UpdateResourceGroupAction, UpdateResourceGroupActionResult
+    ]
+    partial_bulk_update: PartialBulkActionProcessor[
+        PartialBulkUpdateResourceGroupsAction, ResourceGroupData
+    ]
+    partial_bulk_purge: PartialBulkActionProcessor[
+        PartialBulkPurgeResourceGroupsAction, ResourceGroupData
     ]
     search_resource_groups: GlobalActionProcessor[
         SearchResourceGroupsAction, BatchOpsResult[ResourceGroupData]
@@ -157,6 +169,12 @@ class ResourceGroupProcessors:
         )
         self.update_resource_group = group.single_entity(
             UpdateResourceGroupAction, service.update_resource_group
+        )
+        self.partial_bulk_update = group.partial_bulk_update_ops(
+            PartialBulkUpdateResourceGroupsAction
+        )
+        self.partial_bulk_purge = group.entity_partial_bulk_purge_ops(
+            PartialBulkPurgeResourceGroupsAction
         )
         self.search_resource_groups = group.global_searcher_ops(SearchResourceGroupsAction)
         self.scoped_search_resource_groups = group.scoped_search_ops(

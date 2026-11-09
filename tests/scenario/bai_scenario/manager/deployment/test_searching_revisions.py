@@ -30,7 +30,7 @@ from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.deployment_revision import (
     ADeploymentToRevise,
@@ -40,13 +40,13 @@ from bai_scenario.components.deployment_revision import (
     RevisionsInTwoProjects,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Searched = AdminSearchRevisionsPayload
 type Slots = SearchAllocatedResourceSlotsPayload
-type SearchingStep = Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, Searched]
-type SlotStep = Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, Slots]
+type SearchingStep = Scenario[TestSeedingSession, RevisionsAndACaller, DeploymentAdapter, Searched]
+type SlotStep = Scenario[TestSeedingSession, RevisionsAndACaller, DeploymentAdapter, Slots]
 
 
 @dataclass(frozen=True)
@@ -61,8 +61,21 @@ class SearchingTheDeployment(When[RevisionsAndACaller, DeploymentAdapter, Search
 
     @override
     def describe(self, laid: RevisionsAndACaller) -> str:
-        filtered = f" 번호 {self.number}로 걸러" if self.number is not None else ""
-        return f"{laid.caller.username}이 {laid.deployment.metadata.name}의 리비전을{filtered} 조회"
+        if self.number is not None:
+            return Says(
+                f"{laid.caller.username} 이 {laid.deployment.metadata.name}의 리비전을 "
+                f"번호 {self.number} 필터로 조회합니다",
+                english=(
+                    f"{laid.caller.username} searches the revisions of "
+                    f"{laid.deployment.metadata.name} filtered by number {self.number}"
+                ),
+            )
+        return Says(
+            f"{laid.caller.username} 이 {laid.deployment.metadata.name}의 리비전을 조회합니다",
+            english=(
+                f"{laid.caller.username} searches the revisions of {laid.deployment.metadata.name}"
+            ),
+        )
 
     @override
     async def call(self, adapter: DeploymentAdapter, laid: RevisionsAndACaller) -> Searched:
@@ -88,7 +101,10 @@ class SearchingEveryRevision(When[RevisionsAndACaller, DeploymentAdapter, Search
 
     @override
     def describe(self, laid: RevisionsAndACaller) -> str:
-        return f"{laid.caller.username}이 필터 없이 모든 리비전을 조회"
+        return Says(
+            f"{laid.caller.username} 이 필터 없이 모든 리비전을 조회합니다",
+            english=f"{laid.caller.username} searches every revision without a filter",
+        )
 
     @override
     async def call(self, adapter: DeploymentAdapter, laid: RevisionsAndACaller) -> Searched:
@@ -106,7 +122,13 @@ class SearchingTheSlots(When[RevisionsAndACaller, DeploymentAdapter, Slots]):
 
     @override
     def describe(self, laid: RevisionsAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.deployment.metadata.name}의 첫 리비전의 슬롯을 조회"
+        return Says(
+            f"{laid.caller.username} 이 {laid.deployment.metadata.name}의 첫 리비전의 슬롯을 조회합니다",
+            english=(
+                f"{laid.caller.username} searches the slots allocated by the first revision of "
+                f"{laid.deployment.metadata.name}"
+            ),
+        )
 
     @override
     async def call(self, adapter: DeploymentAdapter, laid: RevisionsAndACaller) -> Slots:
@@ -119,7 +141,7 @@ class SearchingTheSlots(When[RevisionsAndACaller, DeploymentAdapter, Slots]):
 
 @dataclass(frozen=True)
 class TheGrantedUserCountsTheDeploymentsRevisions(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, Searched]
+    Scenario[TestSeedingSession, RevisionsAndACaller, DeploymentAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -127,13 +149,17 @@ class TheGrantedUserCountsTheDeploymentsRevisions(
 
     @override
     def describe(self) -> str:
-        return (
-            "리비전 셋이 딸린 배포에 읽기 권한을 받은 사용자가 그 배포의 리비전을 훑으면, "
-            "셋을 모두 센다"
+        return Says(
+            "리비전 셋이 딸린 배포에 읽기 권한을 받은 사용자가 그 배포의 리비전을 조회하면, "
+            "셋을 모두 셉니다",
+            english=(
+                "when a user granted read on a deployment holding three revisions searches that "
+                "deployment's revisions, all three are counted"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RevisionsAndACaller]:
         return ADeploymentToRevise(granted=(Permission.READ,), revisions=3)
 
     @override
@@ -147,7 +173,7 @@ class TheGrantedUserCountsTheDeploymentsRevisions(
 
 @dataclass(frozen=True)
 class FilteringByNumberLeavesThatOne(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, Searched]
+    Scenario[TestSeedingSession, RevisionsAndACaller, DeploymentAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -155,10 +181,16 @@ class FilteringByNumberLeavesThatOne(
 
     @override
     def describe(self) -> str:
-        return "리비전 셋이 딸린 배포의 리비전을 번호로 걸러 훑으면, 그 번호의 것만 남는다"
+        return Says(
+            "리비전 셋이 딸린 배포의 리비전을 번호 필터로 조회하면, 그 번호의 것만 남습니다",
+            english=(
+                "searching the revisions of a deployment holding three revisions filtered by "
+                "number leaves only the one with that number"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RevisionsAndACaller]:
         return ADeploymentToRevise(granted=(Permission.READ,), revisions=3)
 
     @override
@@ -172,7 +204,7 @@ class FilteringByNumberLeavesThatOne(
 
 @dataclass(frozen=True)
 class AnotherDeploymentsRevisionsStayOut(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, Searched]
+    Scenario[TestSeedingSession, RevisionsAndACaller, DeploymentAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -180,13 +212,18 @@ class AnotherDeploymentsRevisionsStayOut(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "두 프로젝트의 배포에 리비전이 나뉘어 있고 한쪽에만 읽기 권한을 받은 사용자가 "
-            "그쪽 배포의 리비전을 훑으면, 그쪽 것만 나온다"
+            "그쪽 배포의 리비전을 조회하면, 그쪽 것만 나옵니다",
+            english=(
+                "when revisions are split across deployments in two projects and a user granted "
+                "read on only one side searches that side's deployment revisions, only that side "
+                "comes back"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RevisionsAndACaller]:
         return RevisionsInTwoProjects(granted=(Permission.READ,), named=2, elsewhere=1)
 
     @override
@@ -200,7 +237,7 @@ class AnotherDeploymentsRevisionsStayOut(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotSearchIt(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, Searched]
+    Scenario[TestSeedingSession, RevisionsAndACaller, DeploymentAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -208,10 +245,16 @@ class AUserGrantedNothingMayNotSearchIt(
 
     @override
     def describe(self) -> str:
-        return "아무 배포 권한도 받지 않은 사용자가 배포의 리비전을 훑으면, 권한 부족으로 거부된다"
+        return Says(
+            "아무 배포 권한도 받지 않은 사용자가 배포의 리비전을 조회하면, 권한 부족으로 거부됩니다",
+            english=(
+                "when a user with no deployment grant searches a deployment's revisions, the call "
+                "is rejected for lack of permission"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RevisionsAndACaller]:
         return ADeploymentToRevise(revisions=1)
 
     @override
@@ -225,7 +268,7 @@ class AUserGrantedNothingMayNotSearchIt(
 
 @dataclass(frozen=True)
 class TheSuperadminCountsEveryRevision(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, Searched]
+    Scenario[TestSeedingSession, RevisionsAndACaller, DeploymentAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -233,13 +276,18 @@ class TheSuperadminCountsEveryRevision(
 
     @override
     def describe(self) -> str:
-        return (
-            "두 프로젝트의 배포에 리비전이 나뉘어 있고 슈퍼관리자가 필터 없이 전체를 훑으면, "
-            "둘의 것을 모두 센다. 이 문은 역할이 지킨다"
+        return Says(
+            "두 프로젝트의 배포에 리비전이 나뉘어 있고 superadmin 이 필터 없이 전체를 조회하면, "
+            "둘의 것을 모두 셉니다. 이 동작은 역할이 검사합니다",
+            english=(
+                "when revisions are split across deployments in two projects and a superadmin "
+                "searches everything without a filter, the revisions of both are counted; the role "
+                "checks this operation"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RevisionsAndACaller]:
         return RevisionsInTwoProjects(role=UserRole.SUPERADMIN, named=2, elsewhere=1)
 
     @override
@@ -253,7 +301,7 @@ class TheSuperadminCountsEveryRevision(
 
 @dataclass(frozen=True)
 class AReadGrantDoesNotOpenTheGlobalDoor(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, Searched]
+    Scenario[TestSeedingSession, RevisionsAndACaller, DeploymentAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -261,13 +309,17 @@ class AReadGrantDoesNotOpenTheGlobalDoor(
 
     @override
     def describe(self) -> str:
-        return (
-            "모든 배포에 읽기 권한을 받았지만 슈퍼관리자가 아닌 사용자가 전체 리비전을 훑으면, "
-            "역할로 거부된다"
+        return Says(
+            "모든 배포에 읽기 권한을 받았지만 superadmin 이 아닌 사용자가 전체 리비전을 조회하면, "
+            "역할로 거부됩니다",
+            english=(
+                "when a user granted read on every deployment but not a superadmin searches every "
+                "revision, the role rejects it"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RevisionsAndACaller]:
         return ADeploymentToRevise(granted=(Permission.READ,), revisions=1)
 
     @override
@@ -281,7 +333,7 @@ class AReadGrantDoesNotOpenTheGlobalDoor(
 
 @dataclass(frozen=True)
 class TheGrantedUserCountsARevisionsSlots(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, Slots]
+    Scenario[TestSeedingSession, RevisionsAndACaller, DeploymentAdapter, Slots]
 ):
     @override
     def summary(self) -> str:
@@ -289,13 +341,17 @@ class TheGrantedUserCountsARevisionsSlots(
 
     @override
     def describe(self) -> str:
-        return (
-            "슬롯 둘을 잡은 리비전이 딸린 배포에 읽기 권한을 받은 사용자가 그 리비전의 슬롯을 "
-            "훑으면, 둘을 모두 센다"
+        return Says(
+            "슬롯 둘을 할당한 리비전이 딸린 배포에 읽기 권한을 받은 사용자가 그 리비전의 슬롯을 "
+            "조회하면, 둘을 모두 셉니다",
+            english=(
+                "when a user granted read on a deployment holding a revision that allocates two "
+                "slots searches that revision's slots, both are counted"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RevisionsAndACaller]:
         return ADeploymentToRevise(granted=(Permission.READ,), revisions=1)
 
     @override
@@ -309,7 +365,7 @@ class TheGrantedUserCountsARevisionsSlots(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotSearchTheSlots(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, Slots]
+    Scenario[TestSeedingSession, RevisionsAndACaller, DeploymentAdapter, Slots]
 ):
     @override
     def summary(self) -> str:
@@ -317,13 +373,17 @@ class AUserGrantedNothingMayNotSearchTheSlots(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 배포 권한도 받지 않은 사용자가 배포의 리비전의 슬롯을 훑으면, "
-            "리비전을 찾을 수 없다는 답으로 거부된다"
+        return Says(
+            "아무 배포 권한도 받지 않은 사용자가 배포의 리비전의 슬롯을 조회하면, "
+            "리비전을 찾을 수 없다는 응답으로 거부됩니다",
+            english=(
+                "when a user with no deployment grant searches a deployment revision's slots, the "
+                "call is rejected with a response that the revision is not found"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RevisionsAndACaller]:
         return ADeploymentToRevise(revisions=1)
 
     @override

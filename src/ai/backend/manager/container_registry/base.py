@@ -24,6 +24,7 @@ import yarl
 
 from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.docker import (
     ImageRef,
@@ -53,6 +54,7 @@ from ai.backend.manager.exceptions import ScanImageError, ScanTagError
 from ai.backend.manager.models.image.creators import ImageCreator
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.image.searchable_fields import ImageSearchableFields
+from ai.backend.manager.models.user.queriers import BulkUserQuerier
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
@@ -74,6 +76,29 @@ rescan_counts: ContextVar[RescanCounts] = ContextVar("rescan_counts")
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+
+
+@dataclass(frozen=True)
+class _ScannedOwners:
+    """The users the scanned owner labels name that exist here, and the personal
+    project of each one that has it."""
+
+    known_users: frozenset[UserID]
+    personal_projects: Mapping[UserID, ProjectID]
+
+    def creator_of(self, labels: Mapping[str, Any]) -> UserID | None:
+        """The user the owner label names, or none where that user does not exist here."""
+        user_id = _customized_owner_user_id(labels)
+        if user_id not in self.known_users:
+            return None
+        return user_id
+
+    def created_in_project(self, labels: Mapping[str, Any]) -> ProjectID | None:
+        """The personal project of the image's creator, or none where it has none."""
+        user_id = self.creator_of(labels)
+        if user_id is None:
+            return None
+        return self.personal_projects.get(user_id)
 
 
 def _is_customized(labels: Mapping[str, Any]) -> bool:
@@ -226,6 +251,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             log.trace("registry has no images", registry_url=str(self.registry_url))
         else:
             image_identifiers = [(k.canonical, k.architecture) for k in _all_updates.keys()]
+            scanned_owners = await self._scanned_owners(_all_updates)
             async with self.db.begin_session_read_committed() as session:
                 existing_images = await session.scalars(
                     sa.select(ImageRow).where(
@@ -243,7 +269,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         image_row.accelerators = update.get("accels")
                         image_row.labels = update["labels"]
                         image_row.customized = _is_customized(update["labels"])
-                        image_row.creator_id = _customized_owner_user_id(update["labels"])
+                        image_row.creator_id = scanned_owners.creator_of(update["labels"])
                         image_row.is_local = is_local
                         scanned_images.append(ImageSearchableFields.own.to_data(image_row))
 
@@ -301,7 +327,10 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                             labels=update["labels"],
                             status=ImageStatus.ALIVE,
                             customized=_is_customized(update["labels"]),
-                            creator_id=_customized_owner_user_id(update["labels"]),
+                            creator_id=scanned_owners.creator_of(update["labels"]),
+                            created_in_project_id=scanned_owners.created_in_project(
+                                update["labels"]
+                            ),
                             registry_is_global=self.registry_info.is_global,
                         ),
                     )
@@ -311,9 +340,27 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             scanned_images.extend(await self._create_scanned_images(creators))
         return scanned_images
 
+    async def _scanned_owners(self, updates: Mapping[ImageIdentifier, Any]) -> _ScannedOwners:
+        """Resolve every scanned customized-owner label against the users here, so a
+        label naming a user this installation does not have writes no creator."""
+        user_ids = list({
+            user_id
+            for update in updates.values()
+            if (user_id := _customized_owner_user_id(update["labels"])) is not None
+        })
+        if not user_ids:
+            return _ScannedOwners(known_users=frozenset(), personal_projects={})
+        async with self._ops_provider.read_ops() as r:
+            known_users = await r.query_bulk_data(BulkUserQuerier(), user_ids)
+            personal_projects = await r.personal_projects(user_ids)
+        return _ScannedOwners(
+            known_users=frozenset(UserID(user_id) for user_id in known_users),
+            personal_projects=personal_projects,
+        )
+
     async def _create_scanned_images(self, creators: list[ImageCreator]) -> list[ImageData]:
-        """Insert the images the scan found, each joining the registry it came from and
-        `public` as well where that registry is global."""
+        """Insert the images the scan found, each joining the registry it came from,
+        `public` as well where that registry is global, and the project that owns it."""
         if not creators:
             return []
         async with self._ops_provider.write_ops() as w:

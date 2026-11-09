@@ -10,7 +10,6 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 from .types import ContainerRegistryType
 
@@ -18,6 +17,7 @@ __all__ = (
     "ContainerRegistryNode",
     "CreateContainerRegistryPayload",
     "DeleteContainerRegistryPayload",
+    "PurgeContainerRegistryPayload",
     "AdminSearchContainerRegistriesPayload",
     "UpdateContainerRegistryPayload",
 )
@@ -28,7 +28,7 @@ class ContainerRegistryNode(BaseResponseModel):
 
     id: UUID = Field(description="Unique identifier of the container registry.")
     entity_id: UUID = Field(
-        description=f"UUID of the container registry. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the container registry. Added in 26.9.0.",
     )
     url: str = Field(description="URL of the container registry.")
     registry_name: str = Field(description="Unique name identifying the container registry.")
@@ -66,6 +66,14 @@ class DeleteContainerRegistryPayload(BaseResponseModel):
     """Payload for container registry deletion mutation result."""
 
     id: UUID = Field(description="ID of the deleted container registry.")
+    entity_id: UUID = Field(description="UUID of the deleted container registry. Added in 26.10.0.")
+
+
+class PurgeContainerRegistryPayload(BaseResponseModel):
+    """Payload for container registry purge mutation result."""
+
+    id: UUID = Field(description="ID of the purged container registry.")
+    entity_id: UUID = Field(description="UUID of the purged container registry. Added in 26.10.0.")
 
 
 class AdminSearchContainerRegistriesPayload(BaseResponseModel):

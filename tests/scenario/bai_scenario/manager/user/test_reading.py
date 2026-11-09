@@ -1,4 +1,4 @@
-"""사용자 읽기 — 하나를 읽을 때와 여럿을 한 번에 읽을 때."""
+"""사용자 읽기 — 하나를 읽을 때, 여럿을 한 번에 읽을 때, email 로 찾을 때."""
 
 from __future__ import annotations
 
@@ -15,13 +15,17 @@ from ai.backend.common.dto.manager.v2.user.response import UserNode
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.user.types import UserData
+from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
+    Held,
     Refused,
     Same,
+    SameAs,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -31,12 +35,13 @@ from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf
 from bai_scenario.components.user import AGrant, UserNodeLook
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
-from bai_scenario.seeds.domain.domain import SeedDomain
+from bai_scenario.seeds.domain.domain import TestSeedDomain
 
 type Loaded = list[UserNode | Exception | None]
-type Answer = UserNode | Loaded
+type LookedUp = list[UserID | Exception]
+type Answer = UserNode | Loaded | LookedUp
 
 
 @dataclass(frozen=True)
@@ -58,7 +63,7 @@ class AReaderAndTwoUsers:
 
 @dataclass(frozen=True)
 class SomeoneAndAnother(Given[Any, AReaderAndATarget]):
-    """한 도메인의 사용자 둘. `granted`면 부르는 사람이 상대 사용자에 READ를 받는다."""
+    """한 도메인의 사용자 둘. `granted`면 호출자가 상대 사용자에 READ를 받는다."""
 
     granted: bool
     role: UserRole = UserRole.USER
@@ -66,12 +71,21 @@ class SomeoneAndAnother(Given[Any, AReaderAndATarget]):
     @override
     def describe(self) -> str:
         if self.granted:
-            return "도메인 하나와 사용자 둘, 한 사람은 다른 사람에 대한 사용자 읽기 권한을 받았다"
-        return "도메인 하나와 사용자 둘, 아무도 권한을 받지 않았다"
+            return Says(
+                "도메인 하나와 사용자 둘, 한 사람은 다른 사람에 대한 사용자 읽기 권한을 받았습니다",
+                english=(
+                    "one domain and two users, and one of them holds the user read permission "
+                    "on the other"
+                ),
+            )
+        return Says(
+            "도메인 하나와 사용자 둘, 아무도 권한을 받지 않았습니다",
+            english="one domain and two users, and neither holds a permission",
+        )
 
     @override
     async def lay(self, seeding: Any) -> AReaderAndATarget:
-        domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         target = await seeding.within(SomeoneOf(domain))
         caller = await seeding.within(SomeoneOf(domain, role=self.role))
         if self.granted:
@@ -81,15 +95,21 @@ class SomeoneAndAnother(Given[Any, AReaderAndATarget]):
 
 @dataclass(frozen=True)
 class SomeoneReadingOneOfTwo(Given[Any, AReaderAndTwoUsers]):
-    """한 도메인의 사용자 셋. 부르는 사람은 둘 중 한 사람에게만 READ를 받았다."""
+    """한 도메인의 사용자 셋. 호출자는 둘 중 한 사람에게만 READ를 받았다."""
 
     @override
     def describe(self) -> str:
-        return "도메인 하나와 사용자 셋, 부르는 사람은 한 사람에 대한 사용자 읽기 권한만 받았다"
+        return Says(
+            "도메인 하나와 사용자 셋, 호출자는 한 사람에 대한 사용자 읽기 권한만 받았습니다",
+            english=(
+                "one domain and three users, and the caller holds the user read permission on "
+                "only one of them"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> AReaderAndTwoUsers:
-        domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         readable = await seeding.within(SomeoneOf(domain))
         unreadable = await seeding.within(SomeoneOf(domain))
         caller = await seeding.within(SomeoneOf(domain))
@@ -109,7 +129,10 @@ class ReadingTheTarget(When[AReaderAndATarget, UserAdapter, Answer]):
 
     @override
     def describe(self, laid: AReaderAndATarget) -> str:
-        return f"{laid.caller.username}이 {laid.target.username}을 읽음"
+        return Says(
+            f"{laid.caller.username}이 {laid.target.username}을 id 로 읽습니다",
+            english=f"{laid.caller.username} reads {laid.target.username} by id",
+        )
 
     @override
     async def call(self, adapter: UserAdapter, laid: AReaderAndATarget) -> Answer:
@@ -128,9 +151,13 @@ class LoadingReadableUnreadableAndMissing(When[AReaderAndTwoUsers, UserAdapter, 
 
     @override
     def describe(self, laid: AReaderAndTwoUsers) -> str:
-        return (
+        return Says(
             f"{laid.caller.username}이 {laid.readable.username}, "
-            f"{laid.unreadable.username}, 없는 id 순으로 일괄 읽음"
+            f"{laid.unreadable.username}, 없는 id 순으로 일괄 읽습니다",
+            english=(
+                f"{laid.caller.username} batch reads {laid.readable.username}, "
+                f"{laid.unreadable.username}, and a missing id in that order"
+            ),
         )
 
     @override
@@ -153,7 +180,10 @@ class LoadingTheTargetAndMissing(When[AReaderAndATarget, UserAdapter, Answer]):
 
     @override
     def describe(self, laid: AReaderAndATarget) -> str:
-        return f"{laid.caller.username}이 {laid.target.username}과 없는 id를 일괄 읽음"
+        return Says(
+            f"{laid.caller.username}이 {laid.target.username}과 없는 id 를 일괄 읽습니다",
+            english=(f"{laid.caller.username} batch reads {laid.target.username} and a missing id"),
+        )
 
     @override
     async def call(self, adapter: UserAdapter, laid: AReaderAndATarget) -> Answer:
@@ -171,12 +201,86 @@ class LoadingNothing(When[AReaderAndATarget, UserAdapter, Answer]):
 
     @override
     def describe(self, laid: AReaderAndATarget) -> str:
-        return f"{laid.caller.username}이 빈 목록으로 일괄 읽음"
+        return Says(
+            f"{laid.caller.username}이 빈 목록으로 일괄 읽습니다",
+            english=f"{laid.caller.username} batch reads an empty list",
+        )
 
     @override
     async def call(self, adapter: UserAdapter, laid: AReaderAndATarget) -> Answer:
         with ActingAs(laid.caller):
             return await adapter.batch_load_by_ids([])
+
+
+@dataclass(frozen=True)
+class LookingUpTheTarget(When[AReaderAndATarget, UserAdapter, Answer]):
+    """상대 사용자를 email 로 찾는다."""
+
+    @override
+    def operation(self) -> str:
+        return "batch_lookup_by_emails"
+
+    @override
+    def describe(self, laid: AReaderAndATarget) -> str:
+        return Says(
+            f"{laid.caller.username}이 {laid.target.username}의 email 로 찾습니다",
+            english=f"{laid.caller.username} looks up the email of {laid.target.username}",
+        )
+
+    @override
+    async def call(self, adapter: UserAdapter, laid: AReaderAndATarget) -> Answer:
+        with ActingAs(laid.caller):
+            return await adapter.batch_lookup_by_emails([laid.target.email])
+
+
+@dataclass(frozen=True)
+class LookingUpReadableUnreadableAndMissing(When[AReaderAndTwoUsers, UserAdapter, Answer]):
+    """읽을 수 있는 사람, 읽을 수 없는 사람, 없는 email 순으로 한 번에 찾는다."""
+
+    @override
+    def operation(self) -> str:
+        return "batch_lookup_by_emails"
+
+    @override
+    def describe(self, laid: AReaderAndTwoUsers) -> str:
+        return Says(
+            f"{laid.caller.username}이 {laid.readable.username}, "
+            f"{laid.unreadable.username}, 없는 email 순으로 email 을 찾습니다",
+            english=(
+                f"{laid.caller.username} looks up the emails of {laid.readable.username}, "
+                f"{laid.unreadable.username}, and a missing email in that order"
+            ),
+        )
+
+    @override
+    async def call(self, adapter: UserAdapter, laid: AReaderAndTwoUsers) -> Answer:
+        with ActingAs(laid.caller):
+            return await adapter.batch_lookup_by_emails([
+                laid.readable.email,
+                laid.unreadable.email,
+                f"{uuid4()}@nowhere.invalid",
+            ])
+
+
+@dataclass(frozen=True)
+class LookingUpNothing(When[AReaderAndATarget, UserAdapter, Answer]):
+    """빈 email 목록으로 찾는다."""
+
+    @override
+    def operation(self) -> str:
+        return "batch_lookup_by_emails"
+
+    @override
+    def describe(self, laid: AReaderAndATarget) -> str:
+        return Says(
+            f"{laid.caller.username}이 빈 목록으로 email 을 찾습니다",
+            english=f"{laid.caller.username} looks up emails from an empty list",
+        )
+
+    @override
+    async def call(self, adapter: UserAdapter, laid: AReaderAndATarget) -> Answer:
+        with ActingAs(laid.caller):
+            return await adapter.batch_lookup_by_emails([])
 
 
 @dataclass(frozen=True)
@@ -187,7 +291,10 @@ class TheTargetNode(Then[AReaderAndATarget, Answer]):
 
     @override
     def says(self) -> str:
-        return "읽힌 사용자 전체가 온다"
+        return Says(
+            "읽은 사용자 전체가 응답으로 옵니다",
+            english="the whole user read comes back",
+        )
 
     @override
     def look(self, laid: AReaderAndATarget, answered: Answered[Answer]) -> list[Verdict]:
@@ -205,7 +312,10 @@ class EachElementInOrder(Then[AReaderAndTwoUsers, Answer]):
 
     @override
     def says(self) -> str:
-        return "원소마다 결과가 입력 순서대로 온다"
+        return Says(
+            "원소마다 결과가 입력 순서대로 옵니다",
+            english="a result comes back for each element in input order",
+        )
 
     @override
     def look(self, laid: AReaderAndTwoUsers, answered: Answered[Answer]) -> list[Verdict]:
@@ -231,7 +341,10 @@ class TheNodeThenNothing(Then[AReaderAndATarget, Answer]):
 
     @override
     def says(self) -> str:
-        return "있는 사람은 노드, 없는 id 자리는 비어서 온다"
+        return Says(
+            "있는 사람은 노드, 없는 id 자리는 비어서 옵니다",
+            english="the existing user comes back as a node and the missing id comes back empty",
+        )
 
     @override
     def look(self, laid: AReaderAndATarget, answered: Answered[Answer]) -> list[Verdict]:
@@ -254,7 +367,10 @@ class AnEmptyList(Then[AReaderAndATarget, Answer]):
 
     @override
     def says(self) -> str:
-        return "빈 목록이 온다"
+        return Says(
+            "빈 목록이 응답으로 옵니다",
+            english="an empty list comes back",
+        )
 
     @override
     def look(self, laid: AReaderAndATarget, answered: Answered[Answer]) -> list[Verdict]:
@@ -264,7 +380,73 @@ class AnEmptyList(Then[AReaderAndATarget, Answer]):
 
 
 @dataclass(frozen=True)
-class AGrantedUserReadsAnother(Scenario[SeedingSession, AReaderAndATarget, UserAdapter, Answer]):
+class TheTargetId(Then[AReaderAndATarget, Answer]):
+    """찾은 사용자의 id 하나가 온다."""
+
+    @override
+    def says(self) -> str:
+        return Says(
+            "찾은 사용자의 id 가 응답으로 옵니다",
+            english="the id of the user found comes back",
+        )
+
+    @override
+    def look(self, laid: AReaderAndATarget, answered: Answered[Answer]) -> list[Verdict]:
+        found = answered.response
+        if not isinstance(found, list):
+            return [Same("raised", type(answered.raised).__name__, None)]
+        return [
+            Same("length", len(found), 1),
+            Held[object](
+                "[0]",
+                found[0],
+                SameAs[object](
+                    UserID(laid.target.id),
+                    Says("대상 사용자의 id", english="the id of the target user"),
+                ),
+            ),
+        ]
+
+
+@dataclass(frozen=True)
+class TheReadableIdThenTwoRefusals(Then[AReaderAndTwoUsers, Answer]):
+    """읽을 수 있는 사람은 id, 읽을 수 없는 사람과 없는 email 은 같은 거부가 온다."""
+
+    @override
+    def says(self) -> str:
+        return Says(
+            "읽을 수 있는 사람은 id, 나머지 둘은 같은 거부가 입력 순서대로 옵니다",
+            english=(
+                "the readable user comes back as an id and the other two come back with the "
+                "same rejection in input order"
+            ),
+        )
+
+    @override
+    def look(self, laid: AReaderAndTwoUsers, answered: Answered[Answer]) -> list[Verdict]:
+        found = answered.response
+        if not isinstance(found, list):
+            return [Same("raised", type(answered.raised).__name__, None)]
+        first, second, third = found
+        return [
+            Same("length", len(found), 3),
+            Held[object](
+                "[0]",
+                first,
+                SameAs[object](
+                    UserID(laid.readable.id),
+                    Says("읽을 수 있는 사용자의 id", english="the id of the readable user"),
+                ),
+            ),
+            Refused(GenericBadRequest, second if isinstance(second, Exception) else None),
+            Refused(GenericBadRequest, third if isinstance(third, Exception) else None),
+        ]
+
+
+@dataclass(frozen=True)
+class AGrantedUserReadsAnother(
+    Scenario[TestSeedingSession, AReaderAndATarget, UserAdapter, Answer]
+):
     started: datetime
 
     @override
@@ -273,13 +455,17 @@ class AGrantedUserReadsAnother(Scenario[SeedingSession, AReaderAndATarget, UserA
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "대상 사용자 스코프에서 사용자 읽기 권한을 받은 사용자가 읽으면, "
-            "기본 키까지 채운 노드 전체가 답으로 온다"
+            "기본 키까지 채운 노드 전체가 응답으로 옵니다",
+            english=(
+                "when a user granted the user read permission in the target user scope reads "
+                "the user, the whole node with the default key filled comes back"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AReaderAndATarget]:
+    def given(self) -> Given[TestSeedingSession, AReaderAndATarget]:
         return SomeoneAndAnother(granted=True)
 
     @override
@@ -293,7 +479,7 @@ class AGrantedUserReadsAnother(Scenario[SeedingSession, AReaderAndATarget, UserA
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotReadAnother(
-    Scenario[SeedingSession, AReaderAndATarget, UserAdapter, Answer]
+    Scenario[TestSeedingSession, AReaderAndATarget, UserAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -301,10 +487,16 @@ class AUserGrantedNothingMayNotReadAnother(
 
     @override
     def describe(self) -> str:
-        return "아무 역할도 받지 않은 사용자가 다른 사용자를 읽으려 하면, 엔티티 권한 문이 막는다"
+        return Says(
+            "아무 역할도 받지 않은 사용자가 다른 사용자를 읽으려 하면, 엔티티 권한 문이 막습니다",
+            english=(
+                "a user holding no role who tries to read another user is rejected by the "
+                "entity permission gate"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AReaderAndATarget]:
+    def given(self) -> Given[TestSeedingSession, AReaderAndATarget]:
         return SomeoneAndAnother(granted=False)
 
     @override
@@ -318,23 +510,28 @@ class AUserGrantedNothingMayNotReadAnother(
 
 @dataclass(frozen=True)
 class ABatchLoadAnswersEachElementInOrder(
-    Scenario[SeedingSession, AReaderAndTwoUsers, UserAdapter, Answer]
+    Scenario[TestSeedingSession, AReaderAndTwoUsers, UserAdapter, Answer]
 ):
     started: datetime
 
     @override
     def summary(self) -> str:
-        return "a-batch-load-answers-a-node-or-a-refusal-for-each-id-in-order"
+        return "a-batch-load-answers-a-node-or-a-rejection-for-each-id-in-order"
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "한 사용자에게만 읽기 권한을 받은 사용자가 읽을 수 있는 사용자, 읽을 수 없는 사용자, "
-            "없는 id를 한 번에 요청하면, 입력 순서대로 원소별 결과가 온다"
+            "없는 id 를 한 번에 요청하면, 입력 순서대로 원소별 결과가 옵니다",
+            english=(
+                "when a user granted read on only one user requests a readable user, an "
+                "unreadable user, and a missing id at once, a result comes back for each "
+                "element in input order"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AReaderAndTwoUsers]:
+    def given(self) -> Given[TestSeedingSession, AReaderAndTwoUsers]:
         return SomeoneReadingOneOfTwo()
 
     @override
@@ -348,7 +545,7 @@ class ABatchLoadAnswersEachElementInOrder(
 
 @dataclass(frozen=True)
 class TheSuperadminBatchLoadLeavesAMissingIdEmpty(
-    Scenario[SeedingSession, AReaderAndATarget, UserAdapter, Answer]
+    Scenario[TestSeedingSession, AReaderAndATarget, UserAdapter, Answer]
 ):
     started: datetime
 
@@ -358,13 +555,17 @@ class TheSuperadminBatchLoadLeavesAMissingIdEmpty(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 있는 id와 없는 id를 함께 요청하면, "
-            "권한 문을 지나 없는 원소 자리에 빈 값이 온다"
+        return Says(
+            "superadmin 이 있는 id 와 없는 id 를 함께 요청하면, "
+            "권한 문을 지나 없는 원소 자리에 빈 값이 옵니다",
+            english=(
+                "when the superadmin requests an existing id and a missing id together, it "
+                "passes the permission gate and the missing element comes back empty"
+            ),
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AReaderAndATarget]:
+    def given(self) -> Given[TestSeedingSession, AReaderAndATarget]:
         return SomeoneAndAnother(granted=False, role=UserRole.SUPERADMIN)
 
     @override
@@ -378,7 +579,7 @@ class TheSuperadminBatchLoadLeavesAMissingIdEmpty(
 
 @dataclass(frozen=True)
 class ABatchLoadOfNothingAnswersNothing(
-    Scenario[SeedingSession, AReaderAndATarget, UserAdapter, Answer]
+    Scenario[TestSeedingSession, AReaderAndATarget, UserAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -386,10 +587,17 @@ class ABatchLoadOfNothingAnswersNothing(
 
     @override
     def describe(self) -> str:
-        return "권한 없는 사용자가 빈 id 목록을 주면, 어떤 액션도 부르지 않고 빈 목록이 답으로 온다"
+        return Says(
+            "권한 없는 사용자가 빈 id 목록을 주면, 어떤 액션도 호출하지 않고 빈 목록이 응답으로 "
+            "옵니다",
+            english=(
+                "when a user holding no permission gives an empty id list, no action is called "
+                "and an empty list comes back"
+            ),
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, AReaderAndATarget]:
+    def given(self) -> Given[TestSeedingSession, AReaderAndATarget]:
         return SomeoneAndAnother(granted=False)
 
     @override
@@ -401,18 +609,118 @@ class ABatchLoadOfNothingAnswersNothing(
         return AnEmptyList()
 
 
-SCENARIOS: list[Scenario[SeedingSession, Any, UserAdapter, Answer]] = [
+@dataclass(frozen=True)
+class AGrantedUserLooksUpAnotherByEmail(
+    Scenario[TestSeedingSession, AReaderAndATarget, UserAdapter, Answer]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-granted-read-on-another-user-looks-up-their-id-by-email"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "대상 사용자 스코프에서 사용자 읽기 권한을 받은 사용자가 그 사용자의 email 을 찾으면, "
+            "그 사용자의 id 가 응답으로 옵니다",
+            english=(
+                "when a user granted the user read permission in the target user scope looks "
+                "up that user's email, the id of that user comes back"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, AReaderAndATarget]:
+        return SomeoneAndAnother(granted=True)
+
+    @override
+    def when(self) -> When[AReaderAndATarget, UserAdapter, Answer]:
+        return LookingUpTheTarget()
+
+    @override
+    def then(self) -> Then[AReaderAndATarget, Answer]:
+        return TheTargetId()
+
+
+@dataclass(frozen=True)
+class AnUnreadableUserAndAMissingEmailAreRefusedAlike(
+    Scenario[TestSeedingSession, AReaderAndTwoUsers, UserAdapter, Answer]
+):
+    @override
+    def summary(self) -> str:
+        return "an-unreadable-user-and-a-missing-email-are-refused-alike"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "한 사용자에게만 읽기 권한을 받은 사용자가 읽을 수 있는 사용자, 읽을 수 없는 사용자, "
+            "없는 email 을 한 번에 찾으면, 첫째는 id, 나머지 둘은 같은 거부가 입력 순서대로 옵니다",
+            english=(
+                "when a user granted read on only one user looks up a readable user, an "
+                "unreadable user, and a missing email at once, the first comes back as an id "
+                "and the other two come back with the same rejection in input order"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, AReaderAndTwoUsers]:
+        return SomeoneReadingOneOfTwo()
+
+    @override
+    def when(self) -> When[AReaderAndTwoUsers, UserAdapter, Answer]:
+        return LookingUpReadableUnreadableAndMissing()
+
+    @override
+    def then(self) -> Then[AReaderAndTwoUsers, Answer]:
+        return TheReadableIdThenTwoRefusals()
+
+
+@dataclass(frozen=True)
+class AnEmailLookupOfNothingAnswersNothing(
+    Scenario[TestSeedingSession, AReaderAndATarget, UserAdapter, Answer]
+):
+    @override
+    def summary(self) -> str:
+        return "an-email-lookup-of-no-emails-answers-an-empty-list"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "권한 없는 사용자가 빈 email 목록을 주면, 어떤 액션도 호출하지 않고 빈 목록이 응답으로 "
+            "옵니다",
+            english=(
+                "when a user holding no permission gives an empty email list, no action is "
+                "called and an empty list comes back"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, AReaderAndATarget]:
+        return SomeoneAndAnother(granted=False)
+
+    @override
+    def when(self) -> When[AReaderAndATarget, UserAdapter, Answer]:
+        return LookingUpNothing()
+
+    @override
+    def then(self) -> Then[AReaderAndATarget, Answer]:
+        return AnEmptyList()
+
+
+SCENARIOS: list[Scenario[TestSeedingSession, Any, UserAdapter, Answer]] = [
     AGrantedUserReadsAnother(started=datetime.now(UTC)),
     AUserGrantedNothingMayNotReadAnother(),
     ABatchLoadAnswersEachElementInOrder(started=datetime.now(UTC)),
     TheSuperadminBatchLoadLeavesAMissingIdEmpty(started=datetime.now(UTC)),
     ABatchLoadOfNothingAnswersNothing(),
+    AGrantedUserLooksUpAnotherByEmail(),
+    AnUnreadableUserAndAMissingEmailAreRefusedAlike(),
+    AnEmailLookupOfNothingAnswersNothing(),
 ]
 
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
 async def test_reading(
-    scenario: Scenario[SeedingSession, Any, UserAdapter, Answer],
+    scenario: Scenario[TestSeedingSession, Any, UserAdapter, Answer],
     adapter: UserAdapter,
     engine: ExtendedAsyncSAEngine,
 ) -> None:

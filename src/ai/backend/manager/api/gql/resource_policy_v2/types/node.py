@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any, override
 from uuid import UUID
 
 import strawberry
@@ -15,7 +16,6 @@ from ai.backend.common.dto.manager.v2.resource_policy.response import (
     ProjectResourcePolicyNode,
     UserResourcePolicyNode,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.common_types import (
     BinarySizeInfoGQL,
     ResourceLimitEntryGQL,
@@ -52,7 +52,7 @@ class KeypairResourcePolicyV2GQL(PydanticNodeMixin[KeypairResourcePolicyNode]):
     id: NodeID[str] = gql_field(description="Policy name (primary key).")
     entity_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the policy.",
         ),
     )
@@ -171,6 +171,27 @@ class KeypairResourcePolicyV2GQL(PydanticNodeMixin[KeypairResourcePolicyNode]):
             count=result.total_count,
         )
 
+    @classmethod
+    @override
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[KeypairResourcePolicyV2GQL | None]:
+        loaders = info.context.data_loaders
+        ids = await loaders.keypair_resource_policy_id_by_name_loader.load_many(list(node_ids))
+        found = [node_id for node_id in ids if node_id is not None]
+        by_id = dict(
+            zip(
+                found,
+                await loaders.keypair_resource_policy_by_id_loader.load_many(found),
+                strict=True,
+            )
+        )
+        return [by_id[node_id] if node_id is not None else None for node_id in ids]
+
 
 KeypairResourcePolicyV2Edge = Edge[KeypairResourcePolicyV2GQL]
 
@@ -203,7 +224,7 @@ class UserResourcePolicyV2GQL(PydanticNodeMixin[UserResourcePolicyNode]):
     id: NodeID[str] = gql_field(description="Policy name (primary key).")
     entity_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the policy.",
         ),
     )
@@ -228,6 +249,27 @@ class UserResourcePolicyV2GQL(PydanticNodeMixin[UserResourcePolicyNode]):
     max_customized_image_count: int = gql_field(
         description="Maximum customized images a user can create."
     )
+
+    @classmethod
+    @override
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[UserResourcePolicyV2GQL | None]:
+        loaders = info.context.data_loaders
+        ids = await loaders.user_resource_policy_id_by_name_loader.load_many(list(node_ids))
+        found = [node_id for node_id in ids if node_id is not None]
+        by_id = dict(
+            zip(
+                found,
+                await loaders.user_resource_policy_by_id_loader.load_many(found),
+                strict=True,
+            )
+        )
+        return [by_id[node_id] if node_id is not None else None for node_id in ids]
 
 
 UserResourcePolicyV2Edge = Edge[UserResourcePolicyV2GQL]
@@ -261,7 +303,7 @@ class ProjectResourcePolicyV2GQL(PydanticNodeMixin[ProjectResourcePolicyNode]):
     id: NodeID[str] = gql_field(description="Policy name (primary key).")
     entity_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the policy.",
         ),
     )
@@ -272,6 +314,27 @@ class ProjectResourcePolicyV2GQL(PydanticNodeMixin[ProjectResourcePolicyNode]):
     max_network_count: int = gql_field(
         description="Maximum networks a project can create. -1 means unlimited."
     )
+
+    @classmethod
+    @override
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[ProjectResourcePolicyV2GQL | None]:
+        loaders = info.context.data_loaders
+        ids = await loaders.project_resource_policy_id_by_name_loader.load_many(list(node_ids))
+        found = [node_id for node_id in ids if node_id is not None]
+        by_id = dict(
+            zip(
+                found,
+                await loaders.project_resource_policy_by_id_loader.load_many(found),
+                strict=True,
+            )
+        )
+        return [by_id[node_id] if node_id is not None else None for node_id in ids]
 
 
 ProjectResourcePolicyV2Edge = Edge[ProjectResourcePolicyV2GQL]

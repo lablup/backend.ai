@@ -162,6 +162,9 @@ def _aggregate_kernel_records(
     (roughly entities * days * slots rows) instead of re-scanning the raw records.
     ``_daily_kernel_usage`` holds the finest grain that carries every level's key columns.
     """
+    # The same table name is used by this migration's duplicate on the other release
+    # line, and both can run in one upgrade transaction.
+    conn.execute(sa.text("DROP TABLE IF EXISTS _daily_kernel_usage"))
     conn.execute(
         sa.text(
             """
