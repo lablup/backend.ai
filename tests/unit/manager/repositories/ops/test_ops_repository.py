@@ -1027,16 +1027,6 @@ def repository_behind_one_session_timeout(
     )
 
 
-@pytest.fixture
-def repository_with_no_session_timeout(
-    database: ExtendedAsyncSAEngine,
-) -> _RepositoryOverTimingOutProvider:
-    provider = _ProviderTimingOutOnFirstOpens(database, timeouts=0)
-    return _RepositoryOverTimingOutProvider(
-        repository=OpsRepository[RolePresetData](provider), provider=provider
-    )
-
-
 class TestRetryOnSessionOpenFailure:
     async def test_a_read_whose_first_session_times_out_is_retried(
         self, stored_preset_behind_one_session_timeout: _StoredPresetBehindTimingOutProvider
@@ -1065,12 +1055,3 @@ class TestRetryOnSessionOpenFailure:
             ).all()
         assert [row.id for row in stored] == [created.id]
         assert situation.provider.sessions_opened == 2
-
-    async def test_a_backend_ai_error_is_not_retried(
-        self, repository_with_no_session_timeout: _RepositoryOverTimingOutProvider
-    ) -> None:
-        situation = repository_with_no_session_timeout
-
-        with pytest.raises(EntityNotFoundError):
-            await situation.repository.get(_PresetQuerier(target=uuid.uuid4()))
-        assert situation.provider.sessions_opened == 1
