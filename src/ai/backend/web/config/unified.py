@@ -1839,8 +1839,8 @@ class SessionConfig(BaseConfigSchema):
         ),
         BackendAIConfigMeta(
             description=(
-                "Maximum number of failed login attempts before blocking. After this many "
-                "failures, the IP or account is blocked for login_block_time seconds. "
+                "Maximum number of failed login attempts per username before blocking. After "
+                "this many failures, login for that username is blocked for login_block_time seconds. "
                 "Lower values are more secure but may frustrate legitimate users."
             ),
             added_version="25.12.0",
