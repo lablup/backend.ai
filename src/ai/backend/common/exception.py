@@ -497,21 +497,6 @@ class InvalidAPIParameters(BackendAIError, web.HTTPBadRequest):
         )
 
 
-class PasswordTooLong(BackendAIError, web.HTTPBadRequest):
-    """Raised when a password is longer than its hash algorithm hashes in full."""
-
-    error_type = "https://api.backend.ai/probs/password-too-long"
-    error_title = "The password is too long for the password hash algorithm."
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.AUTH,
-            operation=ErrorOperation.PARSING,
-            error_detail=ErrorDetail.INVALID_PARAMETERS,
-        )
-
-
 class BackendAISchemaValidationFailed(BackendAIError, web.HTTPBadRequest):
     """Default 400 raised by :class:`BackendAISchema.build_validation_error`.
 

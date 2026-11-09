@@ -8,8 +8,6 @@ import enum
 from dataclasses import dataclass
 from typing import Final
 
-from ai.backend.common.exception import PasswordTooLong
-
 
 class PasswordHashAlgorithm(enum.StrEnum):
     """Supported password hash algorithms."""
@@ -19,15 +17,6 @@ class PasswordHashAlgorithm(enum.StrEnum):
     SHA3_256 = "sha3_256"
     PBKDF2_SHA256 = "pbkdf2_sha256"
     PBKDF2_SHA3_256 = "pbkdf2_sha3_256"
-
-    def max_password_bytes(self) -> int | None:
-        """The longest password, in UTF-8 bytes, the algorithm hashes in full; None when
-        it has no limit."""
-        match self:
-            case PasswordHashAlgorithm.BCRYPT:
-                return BCRYPT_MAX_PASSWORD_BYTES
-            case _:
-                return None
 
 
 HASH_DELIMITER: Final[str] = "$"
@@ -119,13 +108,6 @@ class PasswordInfo:
     algorithm: PasswordHashAlgorithm
     rounds: int
     salt_size: int
-
-    def __post_init__(self) -> None:
-        max_bytes = self.algorithm.max_password_bytes()
-        if max_bytes is not None and len(self.password.encode("utf8")) > max_bytes:
-            raise PasswordTooLong(
-                f"The password is longer than the {max_bytes} bytes {self.algorithm} hashes."
-            )
 
     def need_migration(self, hash_info: HashInfo) -> bool:
         """

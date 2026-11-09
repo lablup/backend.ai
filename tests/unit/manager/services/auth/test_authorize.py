@@ -11,7 +11,7 @@ from ai.backend.common.data.entity.resource_policy import (
     UserResourcePolicyUUID,
 )
 from ai.backend.common.dto.manager.auth.types import AuthTokenType
-from ai.backend.common.exception import InvalidAPIParameters, PasswordTooLong
+from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.plugin.hook import HookPluginContext, HookResult, HookResults
 from ai.backend.manager.config.unified import AuthConfig
 from ai.backend.manager.data.auth.login_session_types import LoginAttemptResult
@@ -237,39 +237,6 @@ async def test_authorize_invalid_credentials(
 
     with pytest.raises(AuthorizationFailed):
         await auth_service.authorize(action)
-
-
-async def test_authorize_refuses_a_password_bcrypt_cannot_hash_in_full_before_the_lookup(
-    auth_service: AuthService,
-    mock_hook_plugin_ctx: MagicMock,
-    mock_auth_repository: AsyncMock,
-    mock_config_provider: MagicMock,
-) -> None:
-    mock_hook_plugin_ctx.dispatch.return_value = HookResult(
-        status=HookResults.PASSED, result=None, reason=None
-    )
-    mock_config_provider.config.auth = AuthConfig(
-        max_password_age=timedelta(days=90),
-        password_hash_algorithm=PasswordHashAlgorithm.BCRYPT,
-        password_hash_rounds=12,
-        password_hash_salt_size=32,
-        login_session_max_age=604800,
-    )
-    action = AuthorizeAction(
-        type=AuthTokenType.KEYPAIR,
-        domain_name="default",
-        email="test@example.com",
-        password="a" * 73,
-        request=MagicMock(),
-        stoken=None,
-        client_type_id=uuid4(),
-        otp=None,
-    )
-
-    with pytest.raises(PasswordTooLong):
-        await auth_service.authorize(action)
-
-    mock_auth_repository.verify_credential.assert_not_awaited()
 
 
 @pytest.mark.parametrize(
