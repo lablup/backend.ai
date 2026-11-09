@@ -3,7 +3,7 @@
 # Runs the same upstream script, retrying it because the launcher download returns 504 intermittently.
 set -euo pipefail
 
-# The setup-commit that init-pants v11 pins.
+# Same as the setup-commit default of pantsbuild/actions/init-pants@0aaef864 (v11); update both together.
 commit=6f136713a46e555946a22ffb3ed49c372eea58df
 script=$(mktemp)
 curl --proto '=https' --tlsv1.2 -fsSL --retry 5 --retry-all-errors --retry-delay 5 -o "$script" \
