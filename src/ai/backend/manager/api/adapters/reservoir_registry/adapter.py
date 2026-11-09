@@ -284,14 +284,15 @@ class ReservoirRegistryAdapter(BaseAdapter):
             if item.error is not None
         ]
 
-    def _reservoir_registry_data_to_dto(self, data: ReservoirRegistryData) -> ReservoirRegistryNode:
+    @staticmethod
+    def _reservoir_registry_data_to_dto(data: ReservoirRegistryData) -> ReservoirRegistryNode:
         return ReservoirRegistryNode(
             id=data.id,
             entity_id=data.id,
             name=data.name,
             endpoint=data.endpoint,
             access_key=data.access_key,
-            secret_key=self._secret_key_for_caller(data.secret_key),
+            secret_key=ReservoirRegistryAdapter._secret_key_for_caller(data.secret_key),
             api_version=data.api_version,
         )
 

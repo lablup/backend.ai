@@ -271,8 +271,8 @@ class HuggingFaceRegistryAdapter(BaseAdapter):
             if item.error is not None
         ]
 
+    @staticmethod
     def _huggingface_registry_data_to_dto(
-        self,
         data: HuggingFaceRegistryData,
     ) -> HuggingFaceRegistryNode:
         return HuggingFaceRegistryNode(
@@ -280,7 +280,7 @@ class HuggingFaceRegistryAdapter(BaseAdapter):
             entity_id=data.id,
             name=data.name,
             url=data.url,
-            token=self._token_for_caller(data.token),
+            token=HuggingFaceRegistryAdapter._token_for_caller(data.token),
         )
 
     @staticmethod
