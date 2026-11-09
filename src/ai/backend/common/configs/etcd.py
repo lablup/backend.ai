@@ -21,7 +21,7 @@ class EtcdTLSConfig(BaseConfigSchema):
         bool,
         Field(default=False),
         BackendAIConfigMeta(
-            description="Connect to etcd over TLS. Requires ca-cert.",
+            description="Connect to etcd over TLS.",
             added_version=NEXT_RELEASE_VERSION,
             example=ConfigExample(local="false", prod="false"),
         ),
@@ -30,7 +30,10 @@ class EtcdTLSConfig(BaseConfigSchema):
         FilePath | None,
         Field(default=None),
         BackendAIConfigMeta(
-            description="PEM file of the CA certificate that signed the etcd server certificate.",
+            description=(
+                "PEM file of the CA certificate that signed the etcd server certificate. "
+                "Required if TLS is enabled."
+            ),
             added_version=NEXT_RELEASE_VERSION,
             example=ConfigExample(local="", prod="/etc/backend.ai/etcd/ca.pem"),
         ),

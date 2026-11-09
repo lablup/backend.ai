@@ -508,11 +508,12 @@
   # TLS settings for the connection to etcd.
   # Added in 26.10.0
   [etcd.tls]
-    # Connect to etcd over TLS. Requires ca-cert.
+    # Connect to etcd over TLS.
     # Added in 26.10.0
     enabled = false
 
     # PEM file of the CA certificate that signed the etcd server certificate.
+    # Required if TLS is enabled.
     # Added in 26.10.0
     ## ca-cert = "/etc/backend.ai/etcd/ca.pem"
 

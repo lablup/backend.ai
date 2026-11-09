@@ -5,10 +5,11 @@ user = "manager"                            # env: BACKEND_ETCD_USER
 password = "ETCD_PASSWORD"                  # env: BACKEND_ETCD_PASSWORD
 
 [etcd.tls]
-# Connect to etcd over TLS. Requires ca-cert.
+# Connect to etcd over TLS.
 enabled = false
 
 # PEM file of the CA certificate that signed the etcd server certificate.
+# Required if TLS is enabled.
 # ca-cert = "/etc/backend.ai/etcd/ca.pem"
 
 # PEM files of the client certificate and key, for an etcd started with --client-cert-auth.
