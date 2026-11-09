@@ -262,6 +262,28 @@ class TestSessionLauncherKernelCreation:
         mock_client = mock_agent_client_pool._mock_client
         assert mock_client.create_kernels.await_count == 2
 
+    async def test_failure_before_any_rpc_releases_the_claim(
+        self,
+        launcher: SessionLauncher,
+        mock_repository: AsyncMock,
+        mock_agent_client_pool: MagicMock,
+        mock_system_session_environ_repository: AsyncMock,
+        session_for_start_single_kernel: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        """A failure before the first create_kernels RPC hands the claimed sessions back to START."""
+        mock_system_session_environ_repository.resolve.side_effect = RuntimeError("resolve failed")
+        session = session_for_start_single_kernel
+
+        with (
+            RecorderContext.scope("test", entity_ids=[session.session_id]),
+            pytest.raises(RuntimeError),
+        ):
+            await launcher.start_sessions_for_handler([session], image_config_default)
+
+        mock_repository.release_sessions_for_start.assert_awaited_once_with([session.session_id])
+        mock_agent_client_pool._mock_client.create_kernels.assert_not_awaited()
+
     @pytest.mark.parametrize("auto_pull", list(AutoPullBehavior))
     async def test_kernel_creation_follows_auto_pull_config(
         self,

@@ -220,13 +220,24 @@ class SessionLauncher:
         """
         if not sessions:
             return
-        system_session_environ_by_session = await self._system_session_environ_repository.resolve(
-            sessions,
-            SystemSessionEnvironSearcher(
-                pagination=NoPagination(),
-                conditions=[SystemSessionEnvironSearchableFields.own.deleted_at.filter.is_null()],
-            ),
-        )
+        try:
+            system_session_environ_by_session = (
+                await self._system_session_environ_repository.resolve(
+                    sessions,
+                    SystemSessionEnvironSearcher(
+                        pagination=NoPagination(),
+                        conditions=[
+                            SystemSessionEnvironSearchableFields.own.deleted_at.filter.is_null()
+                        ],
+                    ),
+                )
+            )
+        except BaseException:
+            # No kernel was requested yet: hand the claimed sessions back to START.
+            await self._scheduler_repository.release_sessions_for_start([
+                session.session_id for session in sessions
+            ])
+            raise
 
         async def start_with_timeout(session: SessionDataForStart) -> None:
             with with_log_context(session_id=session.session_id):
