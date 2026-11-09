@@ -3,6 +3,9 @@ from __future__ import annotations
 import os
 import sys
 from pathlib import Path
+from pprint import pformat
+
+from pydantic import ValidationError
 
 from ai.backend.common.config import ConfigurationError as BaseConfigError
 from ai.backend.common.config import override_key, override_with_env, read_from_file
@@ -34,9 +37,11 @@ def load_local_config(
 
     try:
         return StorageProxyUnifiedConfig.model_validate(raw_cfg)
-    except Exception as e:
+    except ValidationError as e:
         print(
-            f"ConfigurationError: Validation of storage-proxy local config has failed, {e}",
+            "ConfigurationError: Validation of storage-proxy local config has failed:",
+            pformat(e.errors(include_input=False, include_url=False)),
+            sep="\n",
             file=sys.stderr,
         )
         raise BaseConfigError(raw_cfg) from e

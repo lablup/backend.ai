@@ -310,7 +310,7 @@ async def update_password_no_auth(request: web.Request) -> web.Response:
         raise ManagerConnectionUnavailable(extra_msg=e.extra_msg) from e
     except BackendClientError as e:
         # This is error, not failed login, so we should not update login history.
-        raise ProxyTargetUnreachableError(str(e)) from e
+        raise ProxyTargetUnreachableError() from e
     except BackendAPIError as e:
         log.trace(
             "password update failed (email: {}, ip: {}): {}",
@@ -534,7 +534,7 @@ async def login_handler(request: web.Request) -> web.Response:
         raise ManagerConnectionUnavailable(extra_msg=e.extra_msg) from e
     except BackendClientError as e:
         # This is error, not failed login, so we should not update login history.
-        raise ProxyTargetUnreachableError(str(e)) from e
+        raise ProxyTargetUnreachableError() from e
     except BackendAPIError as e:
         log.trace(
             "login failed (email: {}, ip: {}): {}",
@@ -753,7 +753,7 @@ async def token_login_handler(request: web.Request) -> web.Response:
     except NoHealthyEndpointError as e:
         raise ManagerConnectionUnavailable(extra_msg=e.extra_msg) from e
     except BackendClientError as e:
-        raise ProxyTargetUnreachableError(str(e)) from e
+        raise ProxyTargetUnreachableError() from e
     except BackendAPIError as e:
         log.trace(
             "token login failed", status=e.status, claimed_user_id=_claimed_user_id(auth_token)

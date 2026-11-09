@@ -15,7 +15,6 @@ from collections.abc import AsyncGenerator, AsyncIterator, Callable, Sequence
 from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from pprint import pformat, pprint
 from typing import Any
 
 import aiohttp_cors
@@ -463,7 +462,6 @@ def main(
             "ConfigurationError: Could not read or validate the storage-proxy local config:",
             file=sys.stderr,
         )
-        print(pformat(e.invalid_data), file=sys.stderr)
         raise click.Abort() from e
     # Note: logging configuration is handled separately in Logger class
     # Debug mode is already set during config loading if needed
@@ -497,9 +495,6 @@ def main(
                 log_config = logging.getLogger("ai.backend.agent.config")
                 if local_config.debug.enabled:
                     log_config.debug("debug mode enabled.")
-                if local_config.debug.enabled:
-                    print("== Storage proxy configuration ==")
-                    pprint(local_config.model_dump())
                 runner: Callable[..., Any]
                 match local_config.storage_proxy.event_loop:
                     case EventLoopType.UVLOOP:
