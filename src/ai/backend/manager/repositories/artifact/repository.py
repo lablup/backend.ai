@@ -355,14 +355,11 @@ class ArtifactRepository:
         return await self._db_source.update_artifact_revision_status(artifact_revision_id, status)
 
     @artifact_repository_resilience.apply()
-    async def mark_artifact_revision_pulling_if_unchanged(
-        self, artifact_revision_id: ArtifactRevisionID, status_read_before: ArtifactStatus
-    ) -> bool:
-        """Set the status to PULLING only if it is still `status_read_before`.
-        Returns False when another import changed the status first."""
-        return await self._db_source.mark_artifact_revision_pulling_if_unchanged(
-            artifact_revision_id, status_read_before
-        )
+    async def mark_artifact_revision_pulling(
+        self, artifact_revision_id: ArtifactRevisionID
+    ) -> None:
+        """Raises ArtifactRevisionImportInProgressError if the revision is already being imported."""
+        await self._db_source.mark_artifact_revision_pulling(artifact_revision_id)
 
     @artifact_repository_resilience.apply()
     async def update_artifact_revision_remote_status(
