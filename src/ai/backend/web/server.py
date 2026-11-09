@@ -179,7 +179,11 @@ async def static_handler(request: web.Request) -> web.StreamResponse:
         relative_path = file_path.relative_to(static_path)
     except (ValueError, FileNotFoundError) as e:
         raise StaticFileNotFoundError() from e
-    if relative_path.as_posix() in {"stats", "config.ini"} or file_path.name.endswith((
+    if relative_path.as_posix() in {
+        "stats",
+        "config.ini",
+        "version.json",
+    } or file_path.name.endswith((
         ".js.map",
         ".css.map",
     )):
@@ -238,7 +242,11 @@ async def console_handler(request: web.Request) -> web.StreamResponse:
             }),
             content_type="application/problem+json",
         ) from e
-    if relative_path.as_posix() in {"stats", "config.ini"} or file_path.name.endswith((
+    if relative_path.as_posix() in {
+        "stats",
+        "config.ini",
+        "version.json",
+    } or file_path.name.endswith((
         ".js.map",
         ".css.map",
     )):
