@@ -59,14 +59,8 @@ from etcd_client import (
     Txn as EtcdTransactionAction,
 )
 
-<<<<<<< HEAD
-from ai.backend.common.data.config.types import EtcdConfigData
-from ai.backend.logging import BraceStyleAdapter
-=======
 from ai.backend.common.data.config.types import EtcdConfigData, EtcdTLSConfigData
-from ai.backend.common.exception import InvalidConfigError
-from ai.backend.logging.structured import StructuredLogger
->>>>>>> a31d4c3f0 (feat(BA-8980): connect to etcd over TLS (#16649))
+from ai.backend.logging import BraceStyleAdapter
 
 from .types import HostPortPair, QueueSentinel
 
@@ -403,18 +397,11 @@ class AsyncEtcd(AbstractKVStore):
         }
 
         return cls(
-<<<<<<< HEAD
             etcd_addrs,
             namespace,
             scope_prefix_map,
             credentials=credentials,
-=======
-            [addr.to_legacy() for addr in etcd_config.addrs],
-            etcd_config.namespace,
-            scope_prefix_map or {ConfigScopes.GLOBAL: ""},
-            credentials={"user": etcd_config.user, "password": etcd_config.password},
             tls=etcd_config.tls,
->>>>>>> a31d4c3f0 (feat(BA-8980): connect to etcd over TLS (#16649))
             keep_alive_interval=etcd_config.keep_alive_interval,
             keep_alive_timeout=etcd_config.keep_alive_timeout,
         )
