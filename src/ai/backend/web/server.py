@@ -160,8 +160,6 @@ cache_patterns = {
 }
 _cache_patterns = {re.compile(k): v for k, v in cache_patterns.items()}
 
-_FILES_SERVED_ONLY_AFTER_LOGIN = frozenset({"version.json"})
-
 
 def apply_cache_headers(response: web.StreamResponse, path: str) -> web.StreamResponse:
     for regex, headers in _cache_patterns.items():
@@ -170,19 +168,6 @@ def apply_cache_headers(response: web.StreamResponse, path: str) -> web.StreamRe
             response.headers.update(headers)
             break
     return response
-
-
-def _is_login_only_file(relative_path: Path) -> bool:
-    return relative_path.as_posix() in _FILES_SERVED_ONLY_AFTER_LOGIN
-
-
-async def _file_response_only_after_login(
-    request: web.Request, file_path: Path, request_path: str
-) -> web.StreamResponse:
-    session = await get_session(request)
-    if not session.get("authenticated", False):
-        raise StaticFileNotFoundError()
-    return apply_cache_headers(web.FileResponse(file_path), request_path)
 
 
 async def static_handler(request: web.Request) -> web.StreamResponse:
@@ -199,8 +184,6 @@ async def static_handler(request: web.Request) -> web.StreamResponse:
         ".css.map",
     )):
         raise StaticFileNotFoundError()
-    if _is_login_only_file(relative_path):
-        return await _file_response_only_after_login(request, file_path, request_path)
     if file_path.is_file():
         return apply_cache_headers(web.FileResponse(file_path), request_path)
     raise StaticFileNotFoundError()
@@ -229,6 +212,16 @@ async def config_toml_handler(request: web.Request) -> web.Response:
     return response
 
 
+async def version_json_handler(request: web.Request) -> web.StreamResponse:
+    session = await get_session(request)
+    if not session.get("authenticated", False):
+        raise StaticFileNotFoundError()
+    config = cast(WebServerUnifiedConfig, request.app["config"])
+    return apply_cache_headers(
+        web.FileResponse(config.service.static_path / "version.json"), "version.json"
+    )
+
+
 async def console_handler(request: web.Request) -> web.StreamResponse:
     request_path = request.match_info["path"]
     config = cast(WebServerUnifiedConfig, request.app["config"])
@@ -250,8 +243,6 @@ async def console_handler(request: web.Request) -> web.StreamResponse:
         ".css.map",
     )):
         raise StaticFileNotFoundError()
-    if _is_login_only_file(relative_path):
-        return await _file_response_only_after_login(request, file_path, request_path)
     index_path = (static_path / "index.html").resolve()
     if file_path.is_file() and file_path != index_path:
         return apply_cache_headers(web.FileResponse(file_path), request_path)
@@ -1164,6 +1155,7 @@ async def webapp_ctx(
     cors.add(app.router.add_route("POST", "/pipeline/{path:.*$}", pipeline_handler))
     cors.add(app.router.add_route("PATCH", "/pipeline/{path:.*$}", pipeline_handler))
     cors.add(app.router.add_route("DELETE", "/pipeline/{path:.*$}", pipeline_handler))
+    cors.add(app.router.add_route("GET", "/version.json", version_json_handler))
     if config.service.mode == ServiceMode.WEBUI:
         cors.add(app.router.add_route("GET", "/config.toml", config_toml_handler))
         app["webui_index_template"] = (config.service.static_path / "index.html").read_text()
