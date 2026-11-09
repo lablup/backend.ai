@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import uuid
 from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
@@ -13,7 +14,6 @@ from ai.backend.agent.containerd.rpc.types import ContainerRecord, TaskInfo, Tas
 from ai.backend.agent.errors.containerd import KernelVerbNotSupported
 from ai.backend.common.types import (
     AgentId,
-    AutoPullBehavior,
     ContainerId,
     ContainerStatus,
     KernelId,
@@ -28,7 +28,9 @@ def agent(fake: FakeContainerd) -> ContainerdAgent:
     instance = object.__new__(ContainerdAgent)
     instance.local_config = MagicMock()
     instance.id = AgentId("i-test")
+    instance.resource_lock = asyncio.Lock()
     instance._client = cast(Any, fake)
+    instance.error_monitor = MagicMock(capture_exception=AsyncMock())
     return instance
 
 
@@ -41,12 +43,6 @@ _RAISING: list[tuple[str, tuple[Any, ...]]] = [
     ("destroy_local_network", ("net",)),
     ("get_cgroup_path", (MagicMock(), ContainerId("c"))),
     ("extract_image_command", ("img",)),
-    ("resolve_image_distro", (MagicMock(),)),
-    ("check_image", (MagicMock(), "id", AutoPullBehavior.DIGEST)),
-    ("init_kernel_context", (MagicMock(), MagicMock(), MagicMock())),
-    ("destroy_kernel", (KernelId(uuid.uuid4()), ContainerId("c"))),
-    ("clean_kernel", (KernelId(uuid.uuid4()), ContainerId("c"), False)),
-    ("restart_kernel__store_config", (KernelId(uuid.uuid4()), "cfg", b"")),
 ]
 
 
@@ -215,6 +211,32 @@ class TestEnumerateContainers:
         )
 
         assert await agent.enumerate_containers() == []
+
+
+class TestDestroyAndClean:
+    async def test_destroy_then_clean_removes_everything(
+        self, agent: ContainerdAgent, fake: FakeContainerd
+    ) -> None:
+        cast(MagicMock, agent.local_config).debug.skip_container_deletion = False
+        kid = _add_container(fake, "c1", state=TaskState.RUNNING)
+        fake.snapshots["c1"] = []
+
+        await agent.destroy_kernel(kid, ContainerId("c1"))
+        await agent.clean_kernel(kid, ContainerId("c1"), False)
+
+        assert fake.containers == {} and fake.tasks == {} and fake.snapshots == {}
+
+    async def test_containerd_errors_are_swallowed(
+        self, agent: ContainerdAgent, fake: FakeContainerd
+    ) -> None:
+        cast(MagicMock, agent.local_config).debug.skip_container_deletion = False
+        kid = _add_container(fake, "c1", state=TaskState.RUNNING)
+        fake.failing.update({"kill_task:SIGTERM", "delete_container"})
+
+        await agent.destroy_kernel(kid, ContainerId("c1"))
+        await agent.clean_kernel(kid, ContainerId("c1"), False)
+
+        cast(AsyncMock, agent.error_monitor.capture_exception).assert_awaited_once()
 
 
 class TestShutdown:

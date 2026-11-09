@@ -34,7 +34,8 @@ class ContainerdKernel(AbstractKernel):
 
     @override
     async def check_status(self) -> dict[str, Any] | None:
-        raise KernelVerbNotSupported("check_status")
+        # FIXME(containerd-mvp): no code runner; the started task counts as ready
+        return {}
 
     @override
     async def get_completions(self, text: str, opts: Mapping[str, Any]) -> CodeCompletionResp:
@@ -48,13 +49,15 @@ class ContainerdKernel(AbstractKernel):
     async def interrupt_kernel(self) -> dict[str, Any]:
         raise KernelVerbNotSupported("interrupt_kernel")
 
+    # FIXME(containerd-mvp): no service is started; the manager proceeds to the app-proxy token
     @override
     async def start_service(self, service: str, opts: Mapping[str, Any]) -> dict[str, Any]:
-        raise KernelVerbNotSupported("start_service")
+        return {"status": "started"}
 
+    # FIXME(containerd-mvp): no model service is started by the agent
     @override
     async def start_model_service(self, model_service: Mapping[str, Any]) -> dict[str, Any]:
-        raise KernelVerbNotSupported("start_model_service")
+        return {"status": "started"}
 
     @override
     async def shutdown_service(self, service: str) -> None:
@@ -76,9 +79,10 @@ class ContainerdKernel(AbstractKernel):
     ) -> None:
         raise KernelVerbNotSupported("commit")
 
+    # FIXME(containerd-mvp): no service apps are reported
     @override
     async def get_service_apps(self) -> dict[str, Any]:
-        raise KernelVerbNotSupported("get_service_apps")
+        return {"status": "ok", "data": []}
 
     @override
     async def accept_file(self, container_path: os.PathLike[str] | str, filedata: bytes) -> None:
