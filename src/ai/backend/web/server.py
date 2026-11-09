@@ -176,11 +176,9 @@ async def _file_response_only_after_login(
     request: web.Request, file_path: Path, request_path: str
 ) -> web.StreamResponse:
     session = await get_session(request)
-    match bool(session.get("authenticated", False)):
-        case True:
-            return apply_cache_headers(web.FileResponse(file_path), request_path)
-        case False:
-            raise StaticFileNotFoundError()
+    if not session.get("authenticated", False):
+        raise StaticFileNotFoundError()
+    return apply_cache_headers(web.FileResponse(file_path), request_path)
 
 
 async def static_handler(request: web.Request) -> web.StreamResponse:
