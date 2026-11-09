@@ -167,7 +167,11 @@ class ManyStoragesAndSomeone(Given[Any, ManyStoragesAndACaller]):
 
 
 def storage_verdicts(
-    at: str, node: ObjectStorageNode, storage: ObjectStorageData, host: str | Kept
+    at: str,
+    node: ObjectStorageNode,
+    storage: ObjectStorageData,
+    host: str | Kept,
+    secret_key: str | Kept,
 ) -> list[Verdict]:
     """Every place of one object storage node, prefixed for a node inside a list."""
     seeded = Says(
@@ -180,7 +184,11 @@ def storage_verdicts(
         Same(f"{at}name", node.name, storage.name),
         Same(f"{at}host", node.host, storage.host if isinstance(host, Kept) else host),
         Same(f"{at}access_key", node.access_key, storage.access_key),
-        Same(f"{at}secret_key", node.secret_key, storage.secret_key),
+        Same(
+            f"{at}secret_key",
+            node.secret_key,
+            storage.secret_key if isinstance(secret_key, Kept) else secret_key,
+        ),
         Same(f"{at}endpoint", node.endpoint, storage.endpoint),
         Same(f"{at}region", node.region, storage.region),
     ]
@@ -191,12 +199,22 @@ class TheStorageNode(Then[AStorageAndACaller, ObjectStorageNode]):
     """미리 만들어 둔 object storage 가 통째로 반환된다. 수정 요청은 바뀌어야 하는 필드만 인자로 준다."""
 
     host: str | Kept = KEPT
+    secret_key: str | Kept = KEPT
 
     @override
     def says(self) -> str:
+        if isinstance(self.secret_key, Kept):
+            return Says(
+                "미리 저장한 object storage 전체가 반환됩니다",
+                english="the whole object storage created in advance comes back",
+            )
         return Says(
-            "미리 저장한 object storage 전체가 반환됩니다",
-            english="the whole object storage created in advance comes back",
+            f"미리 저장한 object storage 가 반환되고, secret key 는 {self.secret_key!r} 로 "
+            "반환됩니다",
+            english=(
+                f"the object storage created in advance comes back with {self.secret_key!r} as "
+                "its secret key"
+            ),
         )
 
     @override
@@ -206,7 +224,7 @@ class TheStorageNode(Then[AStorageAndACaller, ObjectStorageNode]):
         node = answered.response
         if node is None:
             return [Refused(EntityNotFoundError, answered.raised)]
-        return storage_verdicts("", node, laid.storage, self.host)
+        return storage_verdicts("", node, laid.storage, self.host, self.secret_key)
 
 
 @dataclass(frozen=True)
@@ -290,7 +308,7 @@ class EveryStorageIsProcessed(Then[ManyStoragesAndACaller, PartialBulkPayload[Ob
             return [Refused(NotEnoughPermission, answered.raised)]
         verdicts: list[Verdict] = [Same("successes count", len(payload.successes), len(laid.laid))]
         for i, (node, storage) in enumerate(zip(payload.successes, laid.laid, strict=False)):
-            verdicts += storage_verdicts(f"successes[{i}].", node, storage, self.host)
+            verdicts += storage_verdicts(f"successes[{i}].", node, storage, self.host, KEPT)
         if self.missing is None:
             return [*verdicts, Same("failed", payload.failed, [])]
         verdicts.append(Same("failed count", len(payload.failed), 1))

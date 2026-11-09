@@ -28,7 +28,7 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [object storage 조회 권한을 받은 사용자가 미리 저장한 object storage 둘을 한 번에 조회하면, 둘은 요청한 순서대로 반환됩니다](#reading-a-user-granted-read-reads-several-object-storages-in-the-requested-order) | 성공 |
+| [object storage 조회 권한을 받은 사용자가 미리 저장한 object storage 둘을 한 번에 조회하면, 둘은 요청한 순서대로 반환되고 저장된 secret key 는 반환되지 않습니다](#reading-a-user-granted-read-reads-several-object-storages-in-the-requested-order) | 성공 |
 | [아무 권한도 받지 않은 사용자가 object storage id 여럿을 한 번에 조회하면, 요청 전체가 거부되는 대신 항목마다 권한 부족 거부가 담겨 반환됩니다](#reading-a-user-granted-nothing-reading-many-object-storage-ids-is-refused-on-every-id) | 거부 |
 
 **create**
@@ -42,7 +42,7 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [object storage 조회 권한을 받은 사용자가 하나를 조회하면 미리 저장한 object storage 전체가 반환됩니다](#reading-a-user-granted-read-gets-an-object-storage) | 성공 |
+| [object storage 조회 권한을 받은 사용자가 하나를 조회하면 미리 저장한 object storage 가 반환되고, 저장된 secret key 는 반환되지 않습니다](#reading-a-user-granted-read-gets-an-object-storage) | 성공 |
 | [아무 권한도 받지 않은 사용자가 object storage 하나를 조회하면 권한 부족으로 거부됩니다](#reading-a-user-granted-nothing-may-not-get-an-object-storage) | 거부 |
 
 **partial_bulk_purge**
@@ -156,7 +156,7 @@ Then
 
 #### [a-user-granted-read-reads-several-object-storages-in-the-requested-order](/tests/scenario/bai_scenario/manager/object_storage/test_reading.py): pass
 
-object storage 조회 권한을 받은 사용자가 미리 저장한 object storage 둘을 한 번에 조회하면, 둘은 요청한 순서대로 반환됩니다
+object storage 조회 권한을 받은 사용자가 미리 저장한 object storage 둘을 한 번에 조회하면, 둘은 요청한 순서대로 반환되고 저장된 secret key 는 반환되지 않습니다
 
 Given
 
@@ -180,14 +180,14 @@ When
 
 Then
 
-- 미리 저장한 object storage 는 요청한 순서대로 반환됩니다
+- 미리 저장한 object storage 는 요청한 순서대로 반환되고, secret key 는 '*****' 로 반환됩니다
   - length = 2
   - [0].id: 미리 저장한 object storage 와 같다
   - [0].entity_id: 미리 저장한 object storage 와 같다
   - [0].name = 'object-storage-1'
   - [0].host = 'seeded.object-storage.test'
   - [0].access_key = 'seeded-access-key'
-  - [0].secret_key = 'seeded-secret-key'
+  - [0].secret_key = '*****'
   - [0].endpoint = 'http://seeded.object-storage.test'
   - [0].region = 'seeded-region'
   - [1].id: 미리 저장한 object storage 와 같다
@@ -195,7 +195,7 @@ Then
   - [1].name = 'object-storage-2'
   - [1].host = 'seeded.object-storage.test'
   - [1].access_key = 'seeded-access-key'
-  - [1].secret_key = 'seeded-secret-key'
+  - [1].secret_key = '*****'
   - [1].endpoint = 'http://seeded.object-storage.test'
   - [1].region = 'seeded-region'
 
@@ -293,7 +293,7 @@ Then
 
 #### [a-user-granted-read-gets-an-object-storage](/tests/scenario/bai_scenario/manager/object_storage/test_reading.py): pass
 
-object storage 조회 권한을 받은 사용자가 하나를 조회하면 미리 저장한 object storage 전체가 반환됩니다
+object storage 조회 권한을 받은 사용자가 하나를 조회하면 미리 저장한 object storage 가 반환되고, 저장된 secret key 는 반환되지 않습니다
 
 Given
 
@@ -316,13 +316,13 @@ When
 
 Then
 
-- 미리 저장한 object storage 전체가 반환됩니다
+- 미리 저장한 object storage 가 반환되고, secret key 는 '*****' 로 반환됩니다
   - id: 미리 저장한 object storage 와 같다
   - entity_id: 미리 저장한 object storage 와 같다
   - name = 'object-storage-1'
   - host = 'seeded.object-storage.test'
   - access_key = 'seeded-access-key'
-  - secret_key = 'seeded-secret-key'
+  - secret_key = '*****'
   - endpoint = 'http://seeded.object-storage.test'
   - region = 'seeded-region'
 
