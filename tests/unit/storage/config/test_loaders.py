@@ -33,10 +33,30 @@ class TestLoadLocalConfig:
     def test_validation_error_is_reported_without_input_values(
         self, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        with pytest.raises(ConfigurationError):
+        with pytest.raises(ConfigurationError) as raised:
             load_local_config(None)
 
         assert "s3cr3t-value" not in capsys.readouterr().err
+        assert "s3cr3t-value" not in str(raised.value)
+        assert raised.value.__cause__ is None
+        assert raised.value.__suppress_context__
+
+    @pytest.mark.usefixtures("config_source")
+    def test_unexpected_error_is_reported_by_its_class_name(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        monkeypatch.setattr(
+            StorageProxyUnifiedConfig,
+            "model_validate",
+            MagicMock(side_effect=TypeError("s3cr3t-value")),
+        )
+
+        with pytest.raises(ConfigurationError):
+            load_local_config(None)
+
+        err = capsys.readouterr().err
+        assert "TypeError" in err
+        assert "s3cr3t-value" not in err
 
     @pytest.mark.usefixtures("config_source")
     def test_backend_ai_error_from_a_validator_becomes_configuration_error(
