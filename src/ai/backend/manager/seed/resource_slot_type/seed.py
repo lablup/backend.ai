@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from decimal import Decimal
 from typing import override
 
 from pydantic import Field
@@ -29,6 +30,8 @@ class ResourceSlotTypeSeed(SeedItem):
     number_format: NumberFormat = NumberFormat()
     rank: int = Field(default=0, ge=-(2**31), le=2**31 - 1)
     sealed_launch: bool = False
+    max_per_session: Decimal | None = Field(default=None, ge=0)
+    single_node_only: bool = False
 
     @override
     def key(self) -> str:
@@ -50,6 +53,8 @@ class ResourceSlotTypeSeed(SeedItem):
                 number_format=self.number_format,
                 rank=self.rank,
                 sealed_launch=self.sealed_launch,
+                max_per_session=self.max_per_session,
+                single_node_only=self.single_node_only,
             ),
             field_upserters=[],
             field_purgers=[],

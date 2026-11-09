@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
+from typing import Annotated
 from uuid import UUID
 
 from pydantic import Field, model_validator
@@ -136,6 +138,17 @@ class CreateResourceSlotTypeInput(BaseRequestModel):
         default=False,
         description="Whether a kernel holding this slot must be launched sealed or fail.",
     )
+    max_per_session: Decimal | None = Field(
+        default=None,
+        ge=0,
+        max_digits=24,
+        decimal_places=6,
+        description="Maximum total amount of this slot one session may request. Null means no limit.",
+    )
+    single_node_only: bool = Field(
+        default=False,
+        description="Whether a session requesting this slot must run on a single node.",
+    )
 
 
 class UpdateResourceSlotTypeInput(BaseRequestModel):
@@ -170,6 +183,19 @@ class UpdateResourceSlotTypeInput(BaseRequestModel):
     sealed_launch: bool | None | Unset = Field(
         default=UNSET,
         description="Whether a kernel holding this slot must be launched sealed or fail.",
+    )
+    max_per_session: (
+        Annotated[Decimal, Field(ge=0, max_digits=24, decimal_places=6)] | None | Unset
+    ) = Field(
+        default=UNSET,
+        description=(
+            "Maximum total amount of this slot one session may request. "
+            "Omit to leave unchanged; null removes the limit."
+        ),
+    )
+    single_node_only: bool | None | Unset = Field(
+        default=UNSET,
+        description="Whether a session requesting this slot must run on a single node.",
     )
 
 

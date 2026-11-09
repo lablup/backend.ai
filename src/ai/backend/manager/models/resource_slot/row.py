@@ -123,6 +123,16 @@ class ResourceSlotTypeRow(LifecycleTimestampsMixin, Base):
         default=False,
         server_default=sa.false(),
     )
+    max_per_session: Mapped[Decimal | None] = mapped_column(
+        "max_per_session", sa.Numeric(precision=24, scale=6), nullable=True
+    )
+    single_node_only: Mapped[bool] = mapped_column(
+        "single_node_only",
+        sa.Boolean,
+        nullable=False,
+        default=False,
+        server_default=sa.false(),
+    )
 
 
 class AgentResourceRow(LifecycleTimestampsMixin, Base):

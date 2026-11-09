@@ -71,6 +71,12 @@ class ResourceSlotTypeNode(BaseResponseModel):
     sealed_launch: bool = Field(
         description="Whether a kernel holding this slot must be launched sealed or fail."
     )
+    max_per_session: Decimal | None = Field(
+        description="Maximum total amount of this slot one session may request. Null means no limit."
+    )
+    single_node_only: bool = Field(
+        description="Whether a session requesting this slot must run on a single node."
+    )
 
 
 class AdminSearchResourceSlotTypesPayload(BaseResponseModel):

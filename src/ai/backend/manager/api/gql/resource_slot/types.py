@@ -219,6 +219,20 @@ class ResourceSlotTypeGQL(PydanticNodeMixin[ResourceSlotTypeNodeDTO]):
             description="Whether a kernel holding this slot must be launched sealed or fail.",
         ),
     )
+    max_per_session: Decimal | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Maximum total amount of this slot one session may request. Null means no limit."
+            ),
+        ),
+    )
+    single_node_only: bool = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Whether a session requesting this slot must run on a single node.",
+        ),
+    )
 
     @classmethod
     @override
@@ -367,6 +381,22 @@ class CreateResourceSlotTypeInputGQL(PydanticInputMixin[CreateResourceSlotTypeIn
         ),
         default=False,
     )
+    max_per_session: Decimal | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Maximum total amount of this slot one session may request. Null means no limit."
+            ),
+        ),
+        default=None,
+    )
+    single_node_only: bool = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Whether a session requesting this slot must run on a single node.",
+        ),
+        default=False,
+    )
 
 
 @gql_pydantic_type(
@@ -415,6 +445,26 @@ class UpdateResourceSlotTypeInputGQL(PydanticInputMixin[UpdateResourceSlotTypeIn
             added_version=NEXT_RELEASE_VERSION,
             description=(
                 "Whether a kernel holding this slot must be launched sealed or fail. "
+                "Omit to leave unchanged."
+            ),
+        ),
+        default=UNSET,
+    )
+    max_per_session: Decimal | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Maximum total amount of this slot one session may request. "
+                "Omit to leave unchanged; null removes the limit."
+            ),
+        ),
+        default=UNSET,
+    )
+    single_node_only: bool | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Whether a session requesting this slot must run on a single node. "
                 "Omit to leave unchanged."
             ),
         ),
