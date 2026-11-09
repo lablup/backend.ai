@@ -757,16 +757,23 @@ class ModelCard(graphene.ObjectType):  # type: ignore[misc]
         vfolder_id = resolve_entity_id(id, VFolderUUID)
         user = graph_ctx.user
         client_ctx = ClientContext(graph_ctx.db, user["domain_name"], user["uuid"], user["role"])
+        # Every user of a domain reads its model store projects, as `get_connection` lists them.
+        readable: sa.ColumnElement[bool] = VFolderRow.group.in_(
+            sa.select(ProjectRow.id).where(
+                (ProjectRow.type == ProjectType.MODEL_STORE)
+                & (ProjectRow.domain_name == user["domain_name"])
+            )
+        )
         async with graph_ctx.db.connect() as db_conn:
             permission_ctx = await get_permission_ctx(
                 db_conn, client_ctx, SystemScope(), VFolderRBACPermission.READ_ATTRIBUTE
             )
             cond = permission_ctx.query_condition
-            if cond is None:
-                return None
+            if cond is not None:
+                readable = sa.or_(readable, cond)
             query = (
                 sa.select(VFolderRow)
-                .where(sa.and_(cond, VFolderRow.id == vfolder_id))
+                .where(sa.and_(readable, VFolderRow.id == vfolder_id))
                 .options(selectinload(VFolderRow.user_row), selectinload(VFolderRow.group_row))
             )
             async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:

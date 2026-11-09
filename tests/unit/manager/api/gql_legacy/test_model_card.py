@@ -107,7 +107,8 @@ class TestModelCardParseModelModifiedAt:
 
 
 class TestModelCardGetNode:
-    """modelCard(id:) reads a vfolder only within the requester's vfolder permissions."""
+    """modelCard(id:) reads a vfolder within the requester's vfolder permissions or the
+    model store projects of their domain."""
 
     @pytest.fixture
     def db_session(self) -> MagicMock:
@@ -139,7 +140,7 @@ class TestModelCardGetNode:
     def model_card_id(self) -> str:
         return to_global_id("ModelCard", str(uuid.uuid4()))
 
-    async def test_a_requester_reaching_no_vfolder_gets_null_without_a_read(
+    async def test_a_requester_without_vfolder_permissions_reads_only_the_model_store(
         self, info: graphene.ResolveInfo, db_session: MagicMock, model_card_id: str
     ) -> None:
         permission_ctx = MagicMock(query_condition=None)
@@ -148,9 +149,14 @@ class TestModelCardGetNode:
             AsyncMock(return_value=permission_ctx),
         ):
             assert await ModelCard.get_node(info, model_card_id) is None
-        db_session.scalar.assert_not_called()
+        stmt: sa.Select[tuple[object]] = db_session.scalar.await_args.args[0]
+        where = str(stmt.whereclause)
+        assert "groups.type" in where
+        assert "groups.domain_name" in where
+        assert "vfolders.id" in where
+        assert "vfolders.domain_name" not in where
 
-    async def test_the_read_is_bounded_by_the_permission_condition(
+    async def test_the_read_is_bounded_by_the_permission_condition_or_the_model_store(
         self, info: graphene.ResolveInfo, db_session: MagicMock, model_card_id: str
     ) -> None:
         permission_ctx = MagicMock(query_condition=VFolderRow.domain_name == "default")
@@ -162,4 +168,5 @@ class TestModelCardGetNode:
         stmt: sa.Select[tuple[object]] = db_session.scalar.await_args.args[0]
         where = str(stmt.whereclause)
         assert "vfolders.domain_name" in where
+        assert "groups.type" in where
         assert "vfolders.id" in where
