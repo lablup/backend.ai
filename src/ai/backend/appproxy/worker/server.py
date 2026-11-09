@@ -95,7 +95,7 @@ from ai.backend.common.defs import (
     REDIS_STREAM_DB,
     RedisRole,
 )
-from ai.backend.common.dto.appproxy.v2.ingress.types import IngressAuthority
+from ai.backend.common.dto.appproxy.v2.ingress.types import Ingress, IngressAuthority
 from ai.backend.common.dto.internal.health import (
     ConnectivityCheckResponse,
     HealthResponse,
@@ -533,13 +533,15 @@ async def worker_registration_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
     circuits = await list_worker_circuits(root_ctx, str(uuid.uuid4()))
     ingress_authority = IngressAuthority(root_ctx.local_config.proxy_worker.authority)
-    ingresses = [circuit.to_ingress(ingress_authority) for circuit in circuits]
-    for ingress, circuit in zip(ingresses, circuits, strict=True):
-        await root_ctx.proxy_frontend.register_ingress(ingress, circuit)
+    registered_ingresses: list[Ingress] = []
+    for circuit in circuits:
+        ingress = circuit.to_ingress(ingress_authority)
+        if await root_ctx.proxy_frontend.register_ingress(ingress, circuit):
+            registered_ingresses.append(ingress)
     # Applied rather than replaced, so circuits from events handled meanwhile are kept.
     ingress_writer = root_ctx.ingress_state.writer
     if ingress_writer is not None:
-        await ingress_writer.apply(ingresses)
+        await ingress_writer.apply(registered_ingresses)
 
     cron = LocalCron([WorkerHeartbeatTask(root_ctx)])
     await cron.start()
@@ -758,15 +760,13 @@ async def handle_proxy_route_event(
         case AppProxyCircuitCreatedEvent():
             log.debug("circuits created: {}", [str(c.id) for c in event.circuits])
             created_circuits = [Circuit.from_serialized_circuit(c) for c in event.circuits]
-            created_ingresses = [
-                circuit.to_ingress(ingress_authority) for circuit in created_circuits
-            ]
-            for created_ingress, created_circuit in zip(
-                created_ingresses, created_circuits, strict=True
-            ):
-                await context.proxy_frontend.register_ingress(created_ingress, created_circuit)
+            registered_ingresses: list[Ingress] = []
+            for created_circuit in created_circuits:
+                created_ingress = created_circuit.to_ingress(ingress_authority)
+                if await context.proxy_frontend.register_ingress(created_ingress, created_circuit):
+                    registered_ingresses.append(created_ingress)
             if ingress_writer is not None:
-                await ingress_writer.apply(created_ingresses)
+                await ingress_writer.apply(registered_ingresses)
             await context.event_producer.broadcast_event(
                 AppProxyWorkerCircuitAddedEvent(
                     target_worker_authority=context.local_config.proxy_worker.authority,

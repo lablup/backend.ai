@@ -33,6 +33,7 @@ from ai.backend.manager.errors.resource import (
     ProjectNotFound,
     ResourceGroupNotFound,
 )
+from ai.backend.manager.errors.user import KeyPairNotFound
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.domain.row import domains
 from ai.backend.manager.models.kernel.row import KernelRow
@@ -94,7 +95,7 @@ class ResourceAllocationDBSource:
             result = await session.execute(query)
             row = result.first()
             if row is None:
-                raise PermissionError(f"No default keypair found for user (id: {user_id})")
+                raise KeyPairNotFound(f"No default keypair found for user (id: {user_id})")
             return KeypairContextData(
                 access_key=AccessKey(row.access_key),
                 resource_policy={

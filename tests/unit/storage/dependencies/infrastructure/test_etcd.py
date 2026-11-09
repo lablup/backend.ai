@@ -10,6 +10,7 @@ from ai.backend.common.typed_validators import HostPortPair
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.storage.config.unified import StorageProxyUnifiedConfig
 from ai.backend.storage.dependencies.infrastructure.etcd import EtcdProvider
+from ai.backend.testutils.bootstrap import ETCD_PASSWORD, ETCD_USER
 
 
 class TestEtcdProvider:
@@ -29,8 +30,8 @@ class TestEtcdProvider:
         config.etcd = EtcdConfig.model_validate({
             "addrs": [HostPortPair(host=etcd_addr.host, port=etcd_addr.port)],
             "namespace": test_ns,
-            "user": None,
-            "password": None,
+            "user": ETCD_USER,
+            "password": ETCD_PASSWORD,
         })
         return config
 

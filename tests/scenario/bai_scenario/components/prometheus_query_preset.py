@@ -17,6 +17,7 @@ from uuid import UUID
 from ai.backend.common.data.entity.prometheus_query_preset import (
     PrometheusQueryPresetEntityType,
 )
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
@@ -239,6 +240,8 @@ class ManyPresetsAndSomeone(Given[Any, ManyPresetsAndACaller]):
 
     role: UserRole = UserRole.USER
     besides: int = 1
+    reading_in_public: bool = True
+    """호출자가 public 에서 프리셋을 읽을 수 있는지. 읽기가 없는 쪽을 세우는 행이 끝난다."""
 
     @override
     def describe(self) -> str:
@@ -253,7 +256,46 @@ class ManyPresetsAndSomeone(Given[Any, ManyPresetsAndACaller]):
         others = [
             await seeding.creating(TestSeedPreset(name_hint="other")) for _ in range(self.besides)
         ]
-        caller = await lay_someone(seeding, self.role)
+        caller = (
+            await lay_someone(seeding, self.role)
+            if self.reading_in_public
+            else await lay_a_caller(seeding, self.role)
+        )
+        return ManyPresetsAndACaller(
+            laid=tuple(seeding.made(one) for one in [wanted, *others]),
+            named=seeding.made(wanted),
+            caller=seeding.made(caller),
+        )
+
+
+@dataclass(frozen=True)
+class ManyPresetsAndSomeoneGranted(Given[Any, ManyPresetsAndACaller]):
+    """프리셋 여럿과, 프리셋에 주어진 권한 하나만 받은 호출자 한 명."""
+
+    permission: Permission
+    role: UserRole = UserRole.USER
+    besides: int = 1
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            f"프리셋 {self.besides + 1}개와, 프리셋에 {self.permission.name} 권한을 받은 "
+            f"{self.role.value} 한 명",
+            english=(
+                f"{self.besides + 1} presets and one {self.role.value} granted "
+                f"{self.permission.name} on presets"
+            ),
+        )
+
+    @override
+    async def lay(self, seeding: Any) -> ManyPresetsAndACaller:
+        wanted = await seeding.creating(TestSeedPreset(name_hint="wanted"))
+        others = [
+            await seeding.creating(TestSeedPreset(name_hint="other")) for _ in range(self.besides)
+        ]
+        caller = await lay_a_public_reader(
+            seeding, PrometheusQueryPresetEntityType(), role=self.role, permission=self.permission
+        )
         return ManyPresetsAndACaller(
             laid=tuple(seeding.made(one) for one in [wanted, *others]),
             named=seeding.made(wanted),

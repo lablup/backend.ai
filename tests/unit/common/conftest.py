@@ -30,6 +30,8 @@ if TYPE_CHECKING:
     from ai.backend.testutils.bootstrap import EtcdContainerFixture, RedisContainerFixture
 
 from ai.backend.testutils.bootstrap import (  # noqa: F401
+    ETCD_PASSWORD,
+    ETCD_USER,
     etcd_container,
     redis_container,
     sync_file_lock,
@@ -199,6 +201,7 @@ async def gateway_etcd(
         scope_prefix_map={
             ConfigScopes.GLOBAL: "",
         },
+        credentials={"user": ETCD_USER, "password": ETCD_PASSWORD},
     ) as etcd:
         await etcd.delete_prefix("", scope=ConfigScopes.GLOBAL)
         yield etcd

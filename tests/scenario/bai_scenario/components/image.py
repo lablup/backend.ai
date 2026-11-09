@@ -31,13 +31,11 @@ from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.defs import INTRINSIC_SLOTS_MIN
-from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Condition,
     Given,
     Held,
-    Refused,
     Same,
     SameAs,
     Says,
@@ -45,6 +43,7 @@ from ai.backend.testutils.scenario_steps import (
     Then,
     Verdict,
 )
+from bai_scenario.components.answers import MissingResponse
 from bai_scenario.components.domain import Mentions, SomeoneOf, WrittenByThisRun
 from bai_scenario.seeds.domain.domain import TestSeedDomain
 from bai_scenario.seeds.image.image import TestSeedAlias, TestSeedCommittedImage, TestSeedImage
@@ -299,27 +298,46 @@ class AnImageSomeoneElseMade(Given[Any, AnImageAndACaller]):
 
 @dataclass(frozen=True)
 class ManyImagesAndSomeone(Given[Any, ManyImagesAndACaller]):
-    """레지스트리 1개 안의 이미지 여러 개와 호출자 1명."""
+    """레지스트리 1개 안의 이미지 여러 개와 호출자 1명.
+
+    `statuses`를 주면 그 상태의 이미지를 그 순서로 만든다. `granted`를 주면 호출자가
+    레지스트리에서 그 권한들을 받는다.
+    """
 
     role: UserRole = UserRole.SUPERADMIN
     count: int = 2
+    statuses: tuple[ImageStatus, ...] | None = None
+    granted: tuple[Permission, ...] | None = None
 
     @override
     def describe(self) -> str:
+        statuses = self.statuses or (ImageStatus.ALIVE,) * self.count
+        status = ", ".join(one.value for one in statuses)
+        holds = "" if self.granted is None else ", 그 레지스트리에서 이미지 권한을 받은"
+        holds_en = "" if self.granted is None else ", granted image permission on the registry"
         return Says(
-            f"레지스트리 1개와 그 안의 이미지 {self.count}개, {self.role.value} 1명",
-            english=f"one registry and {self.count} images in it, one {self.role.value}",
+            f"레지스트리 1개와 그 안의 이미지 {len(statuses)}개(상태는 {status}), "
+            f"{self.role.value} 1명{holds}",
+            english=(
+                f"one registry and {len(statuses)} images in it (statuses {status}), "
+                f"one {self.role.value}{holds_en}"
+            ),
         )
 
     @override
     async def lay(self, seeding: Any) -> ManyImagesAndACaller:
+        statuses = self.statuses or (ImageStatus.ALIVE,) * self.count
         domain = await seeding.creating(TestSeedDomain(name_hint="home"))
         registry = await seeding.creating(TestSeedContainerRegistry(name_hint="host"))
         images = [
-            await seeding.creating_from(TestSeedImage(name_hint=f"image-{index}"), registry)
-            for index in range(self.count)
+            await seeding.creating_from(
+                TestSeedImage(name_hint=f"image-{index}", status=status), registry
+            )
+            for index, status in enumerate(statuses)
         ]
         caller = await seeding.within(SomeoneOf(domain, role=self.role))
+        if self.granted is not None:
+            await seeding.within(SomeoneReachingImages(registry, caller, permissions=self.granted))
         return ManyImagesAndACaller(
             laid=tuple(seeding.made(one) for one in images),
             named=seeding.made(images[0]),
@@ -438,6 +456,67 @@ class ImagesCommittedForTwoUsers(Given[Any, ManyImagesAndACaller]):
         return ManyImagesAndACaller(
             laid=(made_mine, seeding.made(theirs)),
             named=made_mine,
+            registry=seeding.made(registry),
+            caller=made_caller,
+        )
+
+
+@dataclass(frozen=True)
+class CustomImagesOfTwoMakers(Given[Any, ManyImagesAndACaller]):
+    """호출자가 커밋한 커스텀 이미지와 다른 사용자가 커밋한 커스텀 이미지.
+
+    호출자는 자기 개인 프로젝트에서만 `granted` 권한을 받는다. `laid`의 첫째는 호출자의
+    이미지, 둘째는 다른 사용자의 이미지다.
+    """
+
+    own_status: ImageStatus = ImageStatus.ALIVE
+    other_status: ImageStatus = ImageStatus.ALIVE
+    granted: Permission = Permission.SOFT_DELETE
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "호출자가 커밋한 커스텀 이미지 1개"
+            f"(상태는 {self.own_status.value})와 다른 사용자가 커밋한 커스텀 이미지 1개"
+            f"(상태는 {self.other_status.value}), 호출자 개인 프로젝트에서만 이미지 권한 있음",
+            english=(
+                "one custom image the caller committed "
+                f"(status {self.own_status.value}) and one custom image another user committed "
+                f"(status {self.other_status.value}), with image permission only in the "
+                "caller's personal project"
+            ),
+        )
+
+    @override
+    async def lay(self, seeding: Any) -> ManyImagesAndACaller:
+        domain = await seeding.creating(TestSeedDomain(name_hint="home"))
+        registry = await seeding.creating(TestSeedContainerRegistry(name_hint="host"))
+        caller = await seeding.within(SomeoneOf(domain))
+        other = await seeding.within(SomeoneOf(domain))
+        made_caller = seeding.made(caller)
+        own_project = await seeding.personal_project_of(caller)
+        own = await seeding.creating_from_two(
+            TestSeedCommittedImage(
+                creator_id=UserID(made_caller.id), name_hint="mine", status=self.own_status
+            ),
+            registry,
+            own_project,
+        )
+        theirs = await seeding.creating_from_two(
+            TestSeedCommittedImage(
+                creator_id=UserID(seeding.made(other).id),
+                name_hint="theirs",
+                status=self.other_status,
+            ),
+            registry,
+            await seeding.personal_project_of(other),
+        )
+        await seeding.within(
+            SomeoneReachingImagesOfProject(own_project, caller, permissions=(self.granted,))
+        )
+        return ManyImagesAndACaller(
+            laid=(seeding.made(own), seeding.made(theirs)),
+            named=seeding.made(own),
             registry=seeding.made(registry),
             caller=made_caller,
         )
@@ -585,6 +664,7 @@ class SomeoneReachingImages(TestSeedNest[Laid[None]]):
 
     registry: Laid[ContainerRegistryData]
     someone: Laid[UserData]
+    permissions: tuple[Permission, ...] = REACHING
 
     @override
     def kind(self) -> str:
@@ -599,7 +679,7 @@ class SomeoneReachingImages(TestSeedNest[Laid[None]]):
             TestSeedRole(lambda one: ContainerRegistryID(one.id), name_hint="image-keeper"),
             self.registry,
         )
-        for allowed in REACHING:
+        for allowed in self.permissions:
             seed.adding(TestSeedPermission(entity_type=ImageEntityType(), permission=allowed), role)
         return seed.granting(
             role, self.someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id)
@@ -612,6 +692,7 @@ class SomeoneReachingImagesOfProject(TestSeedNest[Laid[None]]):
 
     project: Laid[ProjectData]
     someone: Laid[UserData]
+    permissions: tuple[Permission, ...] = REACHING
 
     @override
     def kind(self) -> str:
@@ -626,7 +707,7 @@ class SomeoneReachingImagesOfProject(TestSeedNest[Laid[None]]):
             TestSeedRole(lambda one: ProjectID(one.id), name_hint="image-keeper"),
             self.project,
         )
-        for allowed in REACHING:
+        for allowed in self.permissions:
             seed.adding(TestSeedPermission(entity_type=ImageEntityType(), permission=allowed), role)
         return seed.granting(
             role, self.someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id)
@@ -816,28 +897,17 @@ class TheImageNode(Then[Any, ImageNode]):
 
 @dataclass(frozen=True)
 class EveryImageComesBack(Then[ManyImagesAndACaller, PartialBulkPayload[ImageNode]]):
-    """대상 이미지가 모두 처리된 목록에 온다. `missing`이 있으면 그 id 만 실패 목록에 온다."""
+    """대상 이미지가 모두 처리된 목록에 온다."""
 
     status: ImageStatus = ImageStatus.ALIVE
     tag: str | None = None
-    missing: uuid.UUID | None = None
 
     @override
     def says(self) -> str:
-        if self.missing is None:
-            return Says(
-                f"대상 이미지가 모두 {self.status.value} 상태로 오고, 실패한 것은 없습니다",
-                english=(
-                    f"every target image comes back with status {self.status.value} "
-                    "and nothing failed"
-                ),
-            )
         return Says(
-            f"대상 이미지가 모두 {self.status.value} 상태로 오고, "
-            "없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다",
+            f"대상 이미지가 모두 {self.status.value} 상태로 오고, 실패한 것은 없습니다",
             english=(
-                f"every target image comes back with status {self.status.value} and an unknown "
-                "id comes back in the failed list because no target answers to it"
+                f"every target image comes back with status {self.status.value} and nothing failed"
             ),
         )
 
@@ -849,42 +919,29 @@ class EveryImageComesBack(Then[ManyImagesAndACaller, PartialBulkPayload[ImageNod
     ) -> list[Verdict]:
         payload = answered.response
         if payload is None:
-            return [Refused(NotEnoughPermission, answered.raised)]
+            return [MissingResponse(answered.raised)]
         node_look = TheImageNode(status=self.status, tag=self.tag)
         verdicts: list[Verdict] = [Same("successes count", len(payload.successes), len(laid.laid))]
         for node, image in zip(payload.successes, laid.laid, strict=False):
             verdicts += node_look.look(
                 AnImageAndACaller(image, laid.caller), Answered(response=node)
             )
-        if self.missing is None:
-            return [*verdicts, Same("failed", payload.failed, [])]
-        verdicts.append(Same("failed count", len(payload.failed), 1))
-        for failure in payload.failed:
-            verdicts += [
-                Held[uuid.UUID](
-                    "failed[0].id",
-                    failure.id,
-                    SameAs(
-                        self.missing,
-                        Says("요청에 넣은 없는 id", english="the unknown id put in the request"),
-                    ),
-                ),
-                Held("failed[0].message", failure.message, Mentions("not found")),
-            ]
-        return verdicts
+        return [*verdicts, Same("failed", payload.failed, [])]
 
 
 @dataclass(frozen=True)
-class NoImageIsProcessed(Then[ManyImagesAndACaller, PartialBulkPayload[ImageNode]]):
-    """처리된 이미지 없이, 대상이 모두 같은 이유로 실패 목록에 온다."""
+class OneImageIsNotProcessed(Then[ManyImagesAndACaller, PartialBulkPayload[ImageNode]]):
+    """`laid`의 첫째만 처리되고, 둘째는 같은 이유로 실패 목록에 온다."""
 
-    reason: str
+    status: ImageStatus = ImageStatus.ALIVE
+    tag: str | None = None
+    reason: str = "not found"
 
     @override
     def says(self) -> str:
         return Says(
-            "처리된 이미지 없이 대상이 모두 실패 목록에 옵니다",
-            english="no image is processed and every target comes back in the failed list",
+            "대상 이미지 하나만 처리된 목록에 오고, 나머지 하나는 실패 목록에 옵니다",
+            english="only one target comes back processed and the other one in the failed list",
         )
 
     @override
@@ -895,22 +952,29 @@ class NoImageIsProcessed(Then[ManyImagesAndACaller, PartialBulkPayload[ImageNode
     ) -> list[Verdict]:
         payload = answered.response
         if payload is None:
-            return [Refused(NotEnoughPermission, answered.raised)]
-        verdicts: list[Verdict] = [
-            Same("successes", payload.successes, []),
-            Same("failed count", len(payload.failed), len(laid.laid)),
-        ]
-        for i, (failure, image) in enumerate(zip(payload.failed, laid.laid, strict=False)):
+            return [MissingResponse(answered.raised)]
+        processed, unprocessed = laid.laid
+        verdicts: list[Verdict] = [Same("successes count", len(payload.successes), 1)]
+        if payload.successes:
+            verdicts += TheImageNode(status=self.status, tag=self.tag).look(
+                AnImageAndACaller(processed, laid.caller), Answered(response=payload.successes[0])
+            )
+        verdicts.append(Same("failed count", len(payload.failed), 1))
+        if payload.failed:
+            failure = payload.failed[0]
             verdicts += [
                 Held[uuid.UUID](
-                    f"failed[{i}].id",
+                    "failed[0].id",
                     failure.id,
                     SameAs(
-                        image.id,
-                        Says("대상 이미지의 id", english="the id of the target image"),
+                        unprocessed.id,
+                        Says(
+                            "처리되지 않은 대상 이미지의 id",
+                            english="the id of the target image left unprocessed",
+                        ),
                     ),
                 ),
-                Held(f"failed[{i}].message", failure.message, Mentions(self.reason)),
+                Held("failed[0].message", failure.message, Mentions(self.reason)),
             ]
         return verdicts
 

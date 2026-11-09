@@ -7,6 +7,7 @@ from ai.backend.common.exception import UnreachableError
 from ai.backend.common.types import VFolderMountPolicy
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
+from ai.backend.manager.errors.common import Forbidden
 from ai.backend.manager.errors.storage import VFolderNotFound
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
@@ -144,10 +145,13 @@ class VFolderSharingService:
     async def update_sharing_status(
         self, action: UpdateVFolderSharingStatusAction
     ) -> UpdateVFolderSharingStatusActionResult:
+        requester_id = self._requester().user_id
+        if any(user_id == requester_id for user_id, _ in action.to_update):
+            raise Forbidden("Cannot change your own mount permission")
         await self._vfolder_repository.update_vfolder_sharing_status(
             action.vfolder_uuid,
             action.to_delete,
             action.to_update,
-            sharer_id=UserID(self._requester().user_id),
+            sharer_id=UserID(requester_id),
         )
         return UpdateVFolderSharingStatusActionResult()

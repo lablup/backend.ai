@@ -14,6 +14,7 @@ from tenacity.stop import stop_after_attempt
 from ai.backend.appproxy.common.defs import PERMIT_COOKIE_NAME
 from ai.backend.appproxy.common.errors import (
     InvalidAPIParameters,
+    InvalidCredentials,
     ServerMisconfiguredError,
 )
 from ai.backend.appproxy.common.types import (
@@ -103,9 +104,15 @@ async def setup(
     request: web.Request, params: ProxySetupRequestModel
 ) -> web.StreamResponse | PydanticResponse[ProxySetupResponseModel]:
     root_ctx: RootContext = request.app["_root.context"]
-    jwt_body = jwt.decode(
-        params.token, root_ctx.local_config.secrets.jwt_secret, algorithms=["HS256"]
-    )
+    try:
+        jwt_body = jwt.decode(
+            params.token,
+            root_ctx.local_config.secrets.jwt_secret,
+            algorithms=["HS256"],
+            options={"require": ["exp", "jti", "circuit"]},
+        )
+    except jwt.PyJWTError as e:
+        raise InvalidCredentials(f"E20008: Invalid authorization token ({e})") from e
     requested_circuit_id = UUID(jwt_body["circuit"])
 
     config = root_ctx.local_config.proxy_worker

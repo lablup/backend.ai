@@ -2,18 +2,18 @@
 
 [배경](/src/ai/backend/manager/api/adapters/notification/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/notification/adapter.py)
 
-시나리오: 미완성 6 / 18
+시나리오: 미완성 3 / 18
 
 - ops 구성 (16)
-  - batch_load_channels_by_ids: 대표 성공 ✓ · 대표 거부 ✗: SCENARIO-GAP
-  - batch_load_rules_by_ids: 대표 성공 ✓ · 대표 거부 ✗: SCENARIO-GAP
+  - batch_load_channels_by_ids: 대표 성공 ✓ · 대표 거부 ✓
+  - batch_load_rules_by_ids: 대표 성공 ✓ · 대표 거부 ✓
   - create_channel: 대표 성공 ✓ · 대표 거부 ✓
   - create_rule: 대표 성공 ✓ · 대표 거부 ✓
   - get_channel: 대표 성공 ✓ · 대표 거부 ✓
   - get_rule: 대표 성공 ✓ · 대표 거부 ✓
   - partial_bulk_purge_channels: 대표 성공 ✓ · 대표 거부 ✗: SCENARIO-GAP
   - partial_bulk_purge_rules: 대표 성공 ✓ · 대표 거부 ✗: SCENARIO-GAP
-  - partial_bulk_update_channels: 대표 성공 ✓ · 대표 거부 ✗: SCENARIO-GAP
+  - partial_bulk_update_channels: 대표 성공 ✓ · 대표 거부 ✓
   - partial_bulk_update_rules: 대표 성공 ✓ · 대표 거부 ✗: SCENARIO-GAP
   - purge_channel: 대표 성공 ✓ · 대표 거부 ✓
   - purge_rule: 대표 성공 ✓ · 대표 거부 ✓
@@ -30,16 +30,16 @@
 | 시나리오 | 판정 |
 |---|---|
 | [빈 id 목록으로 조회하면 하위 계층을 호출하지 않고 빈 응답이 반환됩니다](#reading_channels-a-batch-load-of-no-channel-ids-answers-an-empty-list) | 성공 |
-| [아무 권한도 없는 사용자가 채널 둘을 한 번에 조회하면, 호출은 거부되지 않고 항목마다 권한 부족 거부가 담깁니다](#reading_channels-a-user-granted-nothing-batch-loading-channels-is-refused-per-item) | 성공 |
 | [superadmin 이 미리 저장한 채널 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id 에 해당하는 항목은 비어 있습니다](#reading_channels-the-superadmin-batch-load-leaves-a-missing-id-empty) | 성공 |
+| [아무 권한도 없는 사용자가 채널 둘을 한 번에 조회하면, 호출은 거부되지 않고 항목마다 권한 부족 거부가 담깁니다](#reading_channels-a-user-granted-nothing-batch-loading-channels-is-refused-per-item) | 거부 |
 
 **batch_load_rules_by_ids**
 
 | 시나리오 | 판정 |
 |---|---|
 | [빈 id 목록으로 조회하면 하위 계층을 호출하지 않고 빈 응답이 반환됩니다](#reading_rules-a-batch-load-of-no-rule-ids-answers-an-empty-list) | 성공 |
-| [아무 권한도 없는 사용자가 규칙 둘을 한 번에 조회하면, 호출은 거부되지 않고 항목마다 권한 부족 거부가 담깁니다](#reading_rules-a-user-granted-nothing-batch-loading-rules-is-refused-per-item) | 성공 |
 | [superadmin 이 미리 저장한 규칙 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id 에 해당하는 항목은 비어 있습니다](#reading_rules-the-superadmin-batch-load-leaves-a-missing-rule-id-empty) | 성공 |
+| [아무 권한도 없는 사용자가 규칙 둘을 한 번에 조회하면, 호출은 거부되지 않고 항목마다 권한 부족 거부가 담깁니다](#reading_rules-a-user-granted-nothing-batch-loading-rules-is-refused-per-item) | 거부 |
 
 **create_channel**
 
@@ -101,6 +101,7 @@
 |---|---|
 | [아무 권한도 없는 사용자가 채널 여럿을 한 번에 수정하려 하면, 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_editing_channels-a-user-granted-nothing-edits-none-of-several-channels) | 성공 |
 | [superadmin 이 채널 둘의 설명을 한 번에 변경하면, 둘 다 새 설명으로 오고 실패한 것은 없습니다](#partial_bulk_editing_channels-the-superadmin-describes-several-channels-at-once) | 성공 |
+| [superadmin 이 채널 둘을 한 번에 수정하며 하나에 웹훅도 이메일도 아닌 설정을 담으면, 호출이 거부됩니다](#partial_bulk_editing_channels-a-spec-naming-neither-webhook-nor-email-refuses-the-bulk-edit) | 거부 |
 
 **partial_bulk_update_rules**
 
@@ -220,35 +221,6 @@ Then
 - 빈 응답이 반환됩니다
   - items = []
 
-<a id="reading_channels-a-user-granted-nothing-batch-loading-channels-is-refused-per-item"></a>
-
-#### [a-user-granted-nothing-batch-loading-channels-is-refused-per-item](/tests/scenario/bai_scenario/manager/notification/test_reading_channels.py): pass
-
-아무 권한도 없는 사용자가 채널 둘을 한 번에 조회하면, 호출은 거부되지 않고 항목마다 권한 부족 거부가 담깁니다
-
-Given
-
-- webhook 채널 둘과, 일반 사용자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - webhook 채널 wanted-1: https://hooks.example.test/notify 주소로 보냅니다
-  - webhook 채널 other-1: https://hooks.example.test/notify 주소로 보냅니다
-
-When
-
-- NotificationAdapter.batch_load_channels_by_ids: user-1이 미리 저장한 2개를 한 번에 조회합니다
-
-Then
-
-- 항목마다 권한 부족 거부가 담깁니다
-  - len(items) = 2
-  - items[0] = 'NotEnoughPermission'
-  - items[1] = 'NotEnoughPermission'
-
 <a id="reading_channels-the-superadmin-batch-load-leaves-a-missing-id-empty"></a>
 
 #### [the-superadmin-batch-load-leaves-a-missing-id-empty](/tests/scenario/bai_scenario/manager/notification/test_reading_channels.py): pass
@@ -276,6 +248,7 @@ Then
 - 요청한 순서대로 반환되고, 없는 id 에 해당하는 항목은 비어 있습니다
   - len(items) = 3
   - items[0].id: 건너뜀: 데이터베이스가 생성합니다
+  - items[0].entity_id: 미리 저장한 채널의 id 와 같다
   - items[0].name = 'wanted-1'
   - items[0].description = None
   - items[0].channel_type = 'webhook'
@@ -286,6 +259,7 @@ Then
   - items[0].created_at: 이 실행이 쓴 시각
   - items[0].updated_at: 이 실행이 쓴 시각
   - items[1].id: 건너뜀: 데이터베이스가 생성합니다
+  - items[1].entity_id: 미리 저장한 채널의 id 와 같다
   - items[1].name = 'other-1'
   - items[1].description = None
   - items[1].channel_type = 'webhook'
@@ -296,6 +270,35 @@ Then
   - items[1].created_at: 이 실행이 쓴 시각
   - items[1].updated_at: 이 실행이 쓴 시각
   - items[2] = None
+
+<a id="reading_channels-a-user-granted-nothing-batch-loading-channels-is-refused-per-item"></a>
+
+#### [a-user-granted-nothing-batch-loading-channels-is-refused-per-item](/tests/scenario/bai_scenario/manager/notification/test_reading_channels.py): pass
+
+아무 권한도 없는 사용자가 채널 둘을 한 번에 조회하면, 호출은 거부되지 않고 항목마다 권한 부족 거부가 담깁니다
+
+Given
+
+- webhook 채널 둘과, 일반 사용자 한 명
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - webhook 채널 wanted-1: https://hooks.example.test/notify 주소로 보냅니다
+  - webhook 채널 other-1: https://hooks.example.test/notify 주소로 보냅니다
+
+When
+
+- NotificationAdapter.batch_load_channels_by_ids: user-1이 미리 저장한 2개를 한 번에 조회합니다
+
+Then
+
+- 항목마다 권한 부족 거부가 담깁니다
+  - len(items) = 2
+  - 거부: NotEnoughPermission
+  - 거부: NotEnoughPermission
 
 ### batch_load_rules_by_ids
 
@@ -327,36 +330,6 @@ Then
 - 빈 응답이 반환됩니다
   - items = []
 
-<a id="reading_rules-a-user-granted-nothing-batch-loading-rules-is-refused-per-item"></a>
-
-#### [a-user-granted-nothing-batch-loading-rules-is-refused-per-item](/tests/scenario/bai_scenario/manager/notification/test_reading_rules.py): pass
-
-아무 권한도 없는 사용자가 규칙 둘을 한 번에 조회하면, 호출은 거부되지 않고 항목마다 권한 부족 거부가 담깁니다
-
-Given
-
-- 같은 webhook 채널을 가리키는 규칙 둘과, 일반 사용자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - webhook 채널 channel-1: https://hooks.example.test/notify 주소로 보냅니다
-  - 규칙 wanted-1: session.started 이벤트를 알립니다
-  - 규칙 other-1: session.started 이벤트를 알립니다
-
-When
-
-- NotificationAdapter.batch_load_rules_by_ids: user-1이 미리 저장한 2개를 한 번에 조회합니다
-
-Then
-
-- 항목마다 권한 부족 거부가 담깁니다
-  - len(items) = 2
-  - items[0] = 'NotEnoughPermission'
-  - items[1] = 'NotEnoughPermission'
-
 <a id="reading_rules-the-superadmin-batch-load-leaves-a-missing-rule-id-empty"></a>
 
 #### [the-superadmin-batch-load-leaves-a-missing-rule-id-empty](/tests/scenario/bai_scenario/manager/notification/test_reading_rules.py): pass
@@ -385,6 +358,7 @@ Then
 - 요청한 순서대로 반환되고, 없는 id 에 해당하는 항목은 비어 있습니다
   - len(items) = 3
   - items[0].id: 건너뜀: 데이터베이스가 생성합니다
+  - items[0].entity_id: 미리 저장한 규칙의 id 와 같다
   - items[0].name = 'wanted-1'
   - items[0].description = None
   - items[0].rule_type = 'session.started'
@@ -395,6 +369,7 @@ Then
   - items[0].created_at: 이 실행이 쓴 시각
   - items[0].updated_at: 이 실행이 쓴 시각
   - items[1].id: 건너뜀: 데이터베이스가 생성합니다
+  - items[1].entity_id: 미리 저장한 규칙의 id 와 같다
   - items[1].name = 'other-1'
   - items[1].description = None
   - items[1].rule_type = 'session.started'
@@ -405,6 +380,36 @@ Then
   - items[1].created_at: 이 실행이 쓴 시각
   - items[1].updated_at: 이 실행이 쓴 시각
   - items[2] = None
+
+<a id="reading_rules-a-user-granted-nothing-batch-loading-rules-is-refused-per-item"></a>
+
+#### [a-user-granted-nothing-batch-loading-rules-is-refused-per-item](/tests/scenario/bai_scenario/manager/notification/test_reading_rules.py): pass
+
+아무 권한도 없는 사용자가 규칙 둘을 한 번에 조회하면, 호출은 거부되지 않고 항목마다 권한 부족 거부가 담깁니다
+
+Given
+
+- 같은 webhook 채널을 가리키는 규칙 둘과, 일반 사용자 한 명
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - webhook 채널 channel-1: https://hooks.example.test/notify 주소로 보냅니다
+  - 규칙 wanted-1: session.started 이벤트를 알립니다
+  - 규칙 other-1: session.started 이벤트를 알립니다
+
+When
+
+- NotificationAdapter.batch_load_rules_by_ids: user-1이 미리 저장한 2개를 한 번에 조회합니다
+
+Then
+
+- 항목마다 권한 부족 거부가 담깁니다
+  - len(items) = 2
+  - 거부: NotEnoughPermission
+  - 거부: NotEnoughPermission
 
 ### create_channel
 
@@ -432,6 +437,7 @@ Then
 
 - 생성한 채널 전체가 반환됩니다
   - id: 건너뜀: 데이터베이스가 생성합니다
+  - entity_id: 노드의 id 와 같다
   - name = 'muted'
   - description = None
   - channel_type = 'webhook'
@@ -466,6 +472,7 @@ Then
 
 - 생성한 채널 전체가 반환됩니다
   - id: 건너뜀: 데이터베이스가 생성합니다
+  - entity_id: 노드의 id 와 같다
   - name = 'alerts'
   - description = None
   - channel_type = 'webhook'
@@ -500,6 +507,7 @@ Then
 
 - 생성한 채널 전체가 반환됩니다
   - id: 건너뜀: 데이터베이스가 생성합니다
+  - entity_id: 노드의 id 와 같다
   - name = 'mail'
   - description = None
   - channel_type = 'email'
@@ -645,6 +653,7 @@ Then
 
 - 생성한 규칙 전체가 반환됩니다
   - id: 건너뜀: 데이터베이스가 생성합니다
+  - entity_id: 노드의 id 와 같다
   - name = 'muted'
   - description = None
   - rule_type = 'session.started'
@@ -680,6 +689,7 @@ Then
 
 - 생성한 규칙 전체가 반환됩니다
   - id: 건너뜀: 데이터베이스가 생성합니다
+  - entity_id: 노드의 id 와 같다
   - name = 'orphan'
   - description = None
   - rule_type = 'session.started'
@@ -715,6 +725,7 @@ Then
 
 - 생성한 규칙 전체가 반환됩니다
   - id: 건너뜀: 데이터베이스가 생성합니다
+  - entity_id: 노드의 id 와 같다
   - name = 'on-start'
   - description = None
   - rule_type = 'session.started'
@@ -804,6 +815,7 @@ Then
 
 - 미리 저장한 채널 전체가 반환됩니다
   - id: 건너뜀: 데이터베이스가 생성합니다
+  - entity_id: 미리 저장한 채널의 id 와 같다
   - name = 'channel-1'
   - description = None
   - channel_type = 'webhook'
@@ -946,6 +958,7 @@ Then
 
 - 미리 저장한 규칙 전체가 반환됩니다
   - id: 건너뜀: 데이터베이스가 생성합니다
+  - entity_id: 미리 저장한 규칙의 id 와 같다
   - name = 'rule-1'
   - description = None
   - rule_type = 'session.started'
@@ -1071,6 +1084,7 @@ Then
 - 미리 저장한 채널이 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다
   - successes count = 2
   - successes[0].id: 건너뜀: 데이터베이스가 생성합니다
+  - successes[0].entity_id: 미리 저장한 채널의 id 와 같다
   - successes[0].name = 'wanted-1'
   - successes[0].description = None
   - successes[0].channel_type = 'webhook'
@@ -1081,6 +1095,7 @@ Then
   - successes[0].created_at: 이 실행이 쓴 시각
   - successes[0].updated_at: 이 실행이 쓴 시각
   - successes[1].id: 건너뜀: 데이터베이스가 생성합니다
+  - successes[1].entity_id: 미리 저장한 채널의 id 와 같다
   - successes[1].name = 'other-1'
   - successes[1].description = None
   - successes[1].channel_type = 'webhook'
@@ -1157,6 +1172,7 @@ Then
 - 미리 저장한 규칙이 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다
   - successes count = 2
   - successes[0].id: 건너뜀: 데이터베이스가 생성합니다
+  - successes[0].entity_id: 미리 저장한 규칙의 id 와 같다
   - successes[0].name = 'wanted-1'
   - successes[0].description = None
   - successes[0].rule_type = 'session.started'
@@ -1167,6 +1183,7 @@ Then
   - successes[0].created_at: 이 실행이 쓴 시각
   - successes[0].updated_at: 이 실행이 쓴 시각
   - successes[1].id: 건너뜀: 데이터베이스가 생성합니다
+  - successes[1].entity_id: 미리 저장한 규칙의 id 와 같다
   - successes[1].name = 'other-1'
   - successes[1].description = None
   - successes[1].rule_type = 'session.started'
@@ -1241,6 +1258,7 @@ Then
 - 미리 저장한 채널이 모두 처리된 목록에 오고, 실패한 것은 없습니다
   - successes count = 2
   - successes[0].id: 건너뜀: 데이터베이스가 생성합니다
+  - successes[0].entity_id: 미리 저장한 채널의 id 와 같다
   - successes[0].name = 'wanted-1'
   - successes[0].description = '한 번에 변경한 설명'
   - successes[0].channel_type = 'webhook'
@@ -1251,6 +1269,7 @@ Then
   - successes[0].created_at: 이 실행이 쓴 시각
   - successes[0].updated_at: 이 실행이 쓴 시각
   - successes[1].id: 건너뜀: 데이터베이스가 생성합니다
+  - successes[1].entity_id: 미리 저장한 채널의 id 와 같다
   - successes[1].name = 'other-1'
   - successes[1].description = '한 번에 변경한 설명'
   - successes[1].channel_type = 'webhook'
@@ -1261,6 +1280,33 @@ Then
   - successes[1].created_at: 이 실행이 쓴 시각
   - successes[1].updated_at: 이 실행이 쓴 시각
   - failed = []
+
+<a id="partial_bulk_editing_channels-a-spec-naming-neither-webhook-nor-email-refuses-the-bulk-edit"></a>
+
+#### [a-spec-naming-neither-webhook-nor-email-refuses-the-bulk-edit](/tests/scenario/bai_scenario/manager/notification/test_partial_bulk_editing_channels.py): pass
+
+superadmin 이 채널 둘을 한 번에 수정하며 하나에 웹훅도 이메일도 아닌 설정을 담으면, 호출이 거부됩니다
+
+Given
+
+- webhook 채널 둘과, superadmin 한 명
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - webhook 채널 wanted-1: https://hooks.example.test/notify 주소로 보냅니다
+  - webhook 채널 other-1: https://hooks.example.test/notify 주소로 보냅니다
+
+When
+
+- NotificationAdapter.partial_bulk_update_channels: user-1이 채널 2개를 한 번에 수정하며 둘째에 웹훅도 이메일도 아닌 설정을 담습니다
+
+Then
+
+- 거부됩니다
+  - 거부: InvalidNotificationSpec
 
 ### partial_bulk_update_rules
 
@@ -1325,6 +1371,7 @@ Then
 - 미리 저장한 규칙이 모두 처리된 목록에 오고, 실패한 것은 없습니다
   - successes count = 2
   - successes[0].id: 건너뜀: 데이터베이스가 생성합니다
+  - successes[0].entity_id: 미리 저장한 규칙의 id 와 같다
   - successes[0].name = 'wanted-1'
   - successes[0].description = '한 번에 변경한 설명'
   - successes[0].rule_type = 'session.started'
@@ -1335,6 +1382,7 @@ Then
   - successes[0].created_at: 이 실행이 쓴 시각
   - successes[0].updated_at: 이 실행이 쓴 시각
   - successes[1].id: 건너뜀: 데이터베이스가 생성합니다
+  - successes[1].entity_id: 미리 저장한 규칙의 id 와 같다
   - successes[1].name = 'other-1'
   - successes[1].description = '한 번에 변경한 설명'
   - successes[1].rule_type = 'session.started'
@@ -1374,6 +1422,7 @@ Then
 
 - 삭제한 채널의 id 가 반환됩니다
   - id: 미리 저장한 채널와 같다
+  - entity_id: 미리 저장한 채널와 같다
 
 <a id="retiring_channels-the-superadmin-deletes-a-channel"></a>
 
@@ -1400,6 +1449,7 @@ Then
 
 - 삭제한 채널의 id 가 반환됩니다
   - id: 미리 저장한 채널와 같다
+  - entity_id: 미리 저장한 채널와 같다
 
 <a id="retiring_channels-a-user-granted-nothing-may-not-delete-a-channel"></a>
 
@@ -1481,6 +1531,7 @@ Then
 
 - 삭제한 규칙의 id 가 반환됩니다
   - id: 미리 저장한 규칙와 같다
+  - entity_id: 미리 저장한 규칙와 같다
 
 <a id="retiring_rules-a-user-granted-nothing-may-not-delete-a-rule"></a>
 
@@ -1957,6 +2008,7 @@ Then
 
 - 미리 저장한 채널 전체가 반환됩니다
   - id: 건너뜀: 데이터베이스가 생성합니다
+  - entity_id: 미리 저장한 채널의 id 와 같다
   - name = 'channel-1'
   - description = None
   - channel_type = 'webhook'
@@ -1992,6 +2044,7 @@ Then
 
 - 미리 저장한 채널 전체가 반환됩니다
   - id: 건너뜀: 데이터베이스가 생성합니다
+  - entity_id: 미리 저장한 채널의 id 와 같다
   - name = 'channel-1'
   - description = None
   - channel_type = 'webhook'
@@ -2027,6 +2080,7 @@ Then
 
 - 미리 저장한 채널 전체가 반환됩니다
   - id: 건너뜀: 데이터베이스가 생성합니다
+  - entity_id: 미리 저장한 채널의 id 와 같다
   - name = 'channel-1'
   - description = None
   - channel_type = 'webhook'
@@ -2062,6 +2116,7 @@ Then
 
 - 미리 저장한 채널 전체가 반환됩니다
   - id: 건너뜀: 데이터베이스가 생성합니다
+  - entity_id: 미리 저장한 채널의 id 와 같다
   - name = 'channel-1'
   - description = None
   - channel_type = 'webhook'
@@ -2097,6 +2152,7 @@ Then
 
 - 미리 저장한 채널 전체가 반환됩니다
   - id: 건너뜀: 데이터베이스가 생성합니다
+  - entity_id: 미리 저장한 채널의 id 와 같다
   - name = 'renamed'
   - description = None
   - channel_type = 'webhook'
@@ -2213,6 +2269,7 @@ Then
 
 - 미리 저장한 규칙 전체가 반환됩니다
   - id: 건너뜀: 데이터베이스가 생성합니다
+  - entity_id: 미리 저장한 규칙의 id 와 같다
   - name = 'rule-1'
   - description = None
   - rule_type = 'session.started'
@@ -2249,6 +2306,7 @@ Then
 
 - 미리 저장한 규칙 전체가 반환됩니다
   - id: 건너뜀: 데이터베이스가 생성합니다
+  - entity_id: 미리 저장한 규칙의 id 와 같다
   - name = 'rule-1'
   - description = None
   - rule_type = 'session.started'
@@ -2285,6 +2343,7 @@ Then
 
 - 미리 저장한 규칙 전체가 반환됩니다
   - id: 건너뜀: 데이터베이스가 생성합니다
+  - entity_id: 미리 저장한 규칙의 id 와 같다
   - name = 'rule-1'
   - description = None
   - rule_type = 'session.started'
@@ -2321,6 +2380,7 @@ Then
 
 - 미리 저장한 규칙 전체가 반환됩니다
   - id: 건너뜀: 데이터베이스가 생성합니다
+  - entity_id: 미리 저장한 규칙의 id 와 같다
   - name = 'rule-1'
   - description = None
   - rule_type = 'session.started'
@@ -2357,6 +2417,7 @@ Then
 
 - 미리 저장한 규칙 전체가 반환됩니다
   - id: 건너뜀: 데이터베이스가 생성합니다
+  - entity_id: 미리 저장한 규칙의 id 와 같다
   - name = 'renamed'
   - description = None
   - rule_type = 'session.started'

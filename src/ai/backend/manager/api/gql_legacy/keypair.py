@@ -141,11 +141,13 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
     )
 
     async def resolve_secret_key(self, info: graphene.ResolveInfo) -> str | None:
-        """The stored secret key as plaintext; the column holds it encrypted once a
-        write provider is named."""
+        """The stored secret key as plaintext, only to its owner and superadmins;
+        the column holds it encrypted once a write provider is named."""
         if self.secret_key is None:
             return None
         ctx: GraphQueryContext = info.context
+        if ctx.user["role"] != UserRole.SUPERADMIN and self.user != ctx.user["uuid"]:
+            return None
         return await ctx.key_provider_pool.decrypt(self.secret_key, KEYPAIR_SECRET_KEY_CONTEXT)
 
     async def resolve_user_info(

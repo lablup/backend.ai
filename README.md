@@ -369,23 +369,8 @@ Packages are placed in the `dist/` directory.
 
 ### Code Quality Hooks
 
-Backend.AI uses Git pre-commit hooks to maintain code quality:
-
-```bash
-# Automatically runs on every commit:
-# - Auto-formatting (pants fmt)
-# - Linting (pants lint)
-
-# Bypass hooks if needed (use sparingly)
-git commit --no-verify
-```
-
-The pre-commit hook validates:
-- Code style and formatting
-
-Type checking and tests run in CI for comprehensive coverage.
-
-See [AGENTS.md](AGENTS.md#hooks-and-code-quality) for the hook system documentation.
+The git hooks (pre-commit, pre-push) run the low-cost checks, and CI runs the pants-based checks (lint, typecheck, test).
+See [BUILDING.md](BUILDING.md#automated-quality-checks) for what each hook runs.
 
 ### Development Guide
 

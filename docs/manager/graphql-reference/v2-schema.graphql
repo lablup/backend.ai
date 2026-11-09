@@ -12075,6 +12075,10 @@ type ObjectStorage implements Node {
   name: String!
   host: String!
   accessKey: String!
+
+  """
+  Secret key for authentication. Masked unless the caller is a superadmin.
+  """
   secretKey: String!
   endpoint: String!
   region: String!
@@ -18082,6 +18086,7 @@ enum RetentionCategory {
   SESSIONS
   USAGE_RECORDS
   USAGE_BUCKETS
+  PROJECTS
 }
 
 """

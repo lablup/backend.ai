@@ -12,6 +12,7 @@ from etcd_client import CondVar, GRPCStatusCode, GRPCStatusError, WatchEventType
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes, Event
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import HostPortPair, QueueSentinel
+from ai.backend.testutils.bootstrap import ETCD_PASSWORD, ETCD_USER
 
 
 async def test_basic_crud(etcd: AsyncEtcd) -> None:
@@ -715,6 +716,7 @@ async def test_etcd_not_opened_connects_per_request(
         addrs=[etcd_container[1].to_legacy()],
         namespace=test_ns,
         scope_prefix_map={ConfigScopes.GLOBAL: "global"},
+        credentials={"user": ETCD_USER, "password": ETCD_PASSWORD},
     )
     await etcd.put("not-opened", "1")
     assert await etcd.get("not-opened") == "1"

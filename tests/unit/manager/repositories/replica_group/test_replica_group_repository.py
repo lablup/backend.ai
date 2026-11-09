@@ -36,6 +36,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteSubStatus,
     RouteTrafficStatus,
 )
+from ai.backend.manager.data.session.types import SchedulingResult
 from ai.backend.manager.data.session_group.types import (
     SessionGroupPlacementDirection,
     SessionGroupPlacementEnforcement,
@@ -54,7 +55,11 @@ from ai.backend.manager.models.replica_group.searchable_fields import (
 )
 from ai.backend.manager.models.replica_group.updaters import (
     ReplicaGroupDeployUpdater,
+    ReplicaGroupLifecycleUpdater,
     ReplicaGroupScalingUpdater,
+)
+from ai.backend.manager.models.replica_group_history.creators import (
+    ReplicaGroupHistoryCreator,
 )
 from ai.backend.manager.models.replica_group_history.row import ReplicaGroupHistoryRow
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
@@ -85,6 +90,8 @@ from ai.backend.manager.repositories.replica_group.repository import ReplicaGrou
 from ai.backend.manager.repositories.replica_group.types import (
     GroupRolloutSetup,
     GroupRouteDrainInstruction,
+    ReplicaGroupLifecycleReconcileApply,
+    ReplicaGroupReconcileTransition,
     ReplicaGroupScalingReconcileApply,
 )
 from ai.backend.manager.types import OptionalState
@@ -171,146 +178,153 @@ def _password_info(password: str) -> PasswordInfo:
     )
 
 
+@pytest.fixture
+async def db_with_cleanup(
+    database_connection: ExtendedAsyncSAEngine,
+) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    async with with_tables(
+        database_connection,
+        [
+            VirtualEntityRow,
+            EntityMembershipRow,
+            EntityMembershipCapRow,
+            EntityMembershipFieldRow,
+            ScopeBindingRow,
+            EntityLabelRow,
+            PermissionRow,
+            DomainRow,
+            ResourceGroupRow,
+            ResourcePresetRow,
+            UserResourcePolicyRow,
+            ProjectResourcePolicyRow,
+            KeyPairResourcePolicyRow,
+            RoleRow,
+            UserRoleRow,
+            UserRow,
+            KeyPairRow,
+            ProjectRow,
+            EndpointRow,
+            SessionGroupRow,
+            ReplicaGroupRow,
+            ReplicaGroupHistoryRow,
+            SessionRow,
+            RoutingRow,
+        ],
+    ):
+        yield database_connection
+
+
+@pytest.fixture
+async def test_endpoint_id(
+    db_with_cleanup: ExtendedAsyncSAEngine,
+) -> DeploymentID:
+    domain_id = DomainID(uuid.uuid4())
+    domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+    sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
+    user_policy_name = f"test-user-policy-{uuid.uuid4().hex[:8]}"
+    project_policy_name = f"test-proj-policy-{uuid.uuid4().hex[:8]}"
+    user_uuid = uuid.uuid4()
+    group_id = uuid.uuid4()
+    endpoint_id = DeploymentID(uuid.uuid4())
+
+    async with db_with_cleanup.begin_session() as db_sess:
+        db_sess.add(
+            DomainRow(
+                id=domain_id,
+                name=domain_name,
+                description="Test domain",
+                is_active=True,
+                total_resource_slots=ResourceSlot(),
+                allowed_vfolder_hosts={},
+                allowed_docker_registries=[],
+            )
+        )
+        db_sess.add(
+            ResourceGroupRow(
+                name=sgroup_name,
+                description="Test scaling group",
+                is_active=True,
+                driver="static",
+                driver_opts={},
+                scheduler="fifo",
+                scheduler_opts=ResourceGroupOpts(),
+            )
+        )
+        db_sess.add(
+            UserResourcePolicyRow(
+                name=user_policy_name,
+                max_vfolder_count=10,
+                max_quota_scope_size=BinarySize.finite_from_str("10GiB"),
+                max_session_count_per_model_session=5,
+                max_customized_image_count=3,
+            )
+        )
+        db_sess.add(
+            ProjectResourcePolicyRow(
+                name=project_policy_name,
+                max_vfolder_count=10,
+                max_quota_scope_size=int(BinarySize.from_str("100GiB")),
+                max_network_count=5,
+            )
+        )
+        await db_sess.flush()
+        db_sess.add(
+            UserRow(
+                uuid=user_uuid,
+                username=f"testuser-{user_uuid.hex[:8]}",
+                email=f"test-{user_uuid.hex[:8]}@example.com",
+                password=_password_info("test_password"),
+                need_password_change=False,
+                status=UserStatus.ACTIVE,
+                status_info="active",
+                domain_name=domain_name,
+                role=UserRole.USER,
+                resource_policy=user_policy_name,
+                domain_id=domain_id,
+            )
+        )
+        db_sess.add(
+            ProjectRow(
+                id=group_id,
+                name=f"test-group-{uuid.uuid4().hex[:8]}",
+                domain_name=domain_name,
+                resource_policy=project_policy_name,
+            )
+        )
+        await db_sess.flush()
+        # A session group joins its project and its owner, which must be in the
+        # graph first.
+        db_sess.add(VirtualEntityRow(entity_type=ProjectEntityType(), entity_id=group_id))
+        db_sess.add(VirtualEntityRow(entity_type=UserEntityType(), entity_id=user_uuid))
+        await db_sess.flush()
+        db_sess.add(
+            EndpointRow(
+                id=endpoint_id,
+                name=f"test-endpoint-{uuid.uuid4().hex[:8]}",
+                created_user=user_uuid,
+                session_owner=user_uuid,
+                domain=domain_name,
+                project=group_id,
+                resource_group=sgroup_name,
+                desired_replicas=1,
+                url=f"http://test-{uuid.uuid4().hex[:8]}.example.com",
+                open_to_public=False,
+                lifecycle_stage=EndpointLifecycle.DESTROYED,
+            )
+        )
+        await db_sess.commit()
+
+    return endpoint_id
+
+
+@pytest.fixture
+def replica_group_repository(
+    db_with_cleanup: ExtendedAsyncSAEngine,
+) -> ReplicaGroupRepository:
+    return ReplicaGroupRepository(ReplicaGroupOpsProvider(db_with_cleanup))
+
+
 class TestReplicaGroupRepository:
-    @pytest.fixture
-    async def db_with_cleanup(
-        self,
-        database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-        async with with_tables(
-            database_connection,
-            [
-                VirtualEntityRow,
-                EntityMembershipRow,
-                EntityMembershipCapRow,
-                EntityMembershipFieldRow,
-                ScopeBindingRow,
-                EntityLabelRow,
-                PermissionRow,
-                DomainRow,
-                ResourceGroupRow,
-                ResourcePresetRow,
-                UserResourcePolicyRow,
-                ProjectResourcePolicyRow,
-                KeyPairResourcePolicyRow,
-                RoleRow,
-                UserRoleRow,
-                UserRow,
-                KeyPairRow,
-                ProjectRow,
-                EndpointRow,
-                SessionGroupRow,
-                ReplicaGroupRow,
-                ReplicaGroupHistoryRow,
-                SessionRow,
-                RoutingRow,
-            ],
-        ):
-            yield database_connection
-
-    @pytest.fixture
-    async def test_endpoint_id(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> DeploymentID:
-        domain_id = DomainID(uuid.uuid4())
-        domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
-        sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
-        user_policy_name = f"test-user-policy-{uuid.uuid4().hex[:8]}"
-        project_policy_name = f"test-proj-policy-{uuid.uuid4().hex[:8]}"
-        user_uuid = uuid.uuid4()
-        group_id = uuid.uuid4()
-        endpoint_id = DeploymentID(uuid.uuid4())
-
-        async with db_with_cleanup.begin_session() as db_sess:
-            db_sess.add(
-                DomainRow(
-                    id=domain_id,
-                    name=domain_name,
-                    description="Test domain",
-                    is_active=True,
-                    total_resource_slots=ResourceSlot(),
-                    allowed_vfolder_hosts={},
-                    allowed_docker_registries=[],
-                )
-            )
-            db_sess.add(
-                ResourceGroupRow(
-                    name=sgroup_name,
-                    description="Test scaling group",
-                    is_active=True,
-                    driver="static",
-                    driver_opts={},
-                    scheduler="fifo",
-                    scheduler_opts=ResourceGroupOpts(),
-                )
-            )
-            db_sess.add(
-                UserResourcePolicyRow(
-                    name=user_policy_name,
-                    max_vfolder_count=10,
-                    max_quota_scope_size=BinarySize.finite_from_str("10GiB"),
-                    max_session_count_per_model_session=5,
-                    max_customized_image_count=3,
-                )
-            )
-            db_sess.add(
-                ProjectResourcePolicyRow(
-                    name=project_policy_name,
-                    max_vfolder_count=10,
-                    max_quota_scope_size=int(BinarySize.from_str("100GiB")),
-                    max_network_count=5,
-                )
-            )
-            await db_sess.flush()
-            db_sess.add(
-                UserRow(
-                    uuid=user_uuid,
-                    username=f"testuser-{user_uuid.hex[:8]}",
-                    email=f"test-{user_uuid.hex[:8]}@example.com",
-                    password=_password_info("test_password"),
-                    need_password_change=False,
-                    status=UserStatus.ACTIVE,
-                    status_info="active",
-                    domain_name=domain_name,
-                    role=UserRole.USER,
-                    resource_policy=user_policy_name,
-                    domain_id=domain_id,
-                )
-            )
-            db_sess.add(
-                ProjectRow(
-                    id=group_id,
-                    name=f"test-group-{uuid.uuid4().hex[:8]}",
-                    domain_name=domain_name,
-                    resource_policy=project_policy_name,
-                )
-            )
-            await db_sess.flush()
-            # A session group joins its project and its owner, which must be in the
-            # graph first.
-            db_sess.add(VirtualEntityRow(entity_type=ProjectEntityType(), entity_id=group_id))
-            db_sess.add(VirtualEntityRow(entity_type=UserEntityType(), entity_id=user_uuid))
-            await db_sess.flush()
-            db_sess.add(
-                EndpointRow(
-                    id=endpoint_id,
-                    name=f"test-endpoint-{uuid.uuid4().hex[:8]}",
-                    created_user=user_uuid,
-                    session_owner=user_uuid,
-                    domain=domain_name,
-                    project=group_id,
-                    resource_group=sgroup_name,
-                    desired_replicas=1,
-                    url=f"http://test-{uuid.uuid4().hex[:8]}.example.com",
-                    open_to_public=False,
-                    lifecycle_stage=EndpointLifecycle.DESTROYED,
-                )
-            )
-            await db_sess.commit()
-
-        return endpoint_id
-
     @pytest.fixture
     async def two_group_ids(
         self,
@@ -352,13 +366,6 @@ class TestReplicaGroupRepository:
             )
             await db_sess.commit()
         return first, second
-
-    @pytest.fixture
-    def replica_group_repository(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> ReplicaGroupRepository:
-        return ReplicaGroupRepository(ReplicaGroupOpsProvider(db_with_cleanup))
 
     async def test_setup_target_groups_gives_a_fresh_group_its_placement_group(
         self,
@@ -861,3 +868,183 @@ class TestReplicaGroupRepository:
         assert status_by_id[provisioning_new_id] is RouteStatus.TERMINATING
         assert status_by_id[running_healthy_id] is RouteStatus.RUNNING
         assert status_by_id[running_unhealthy_id] is RouteStatus.RUNNING
+
+
+class TestApplyLifecycleReconcileSessionGroupBoundary:
+    """A replica group reaching DRAINED fixes its session group's retention boundary
+    in the same transaction; the first stamp stands."""
+
+    async def _add_draining_group(
+        self,
+        db: ExtendedAsyncSAEngine,
+        endpoint_id: DeploymentID,
+        *,
+        deleted_at: datetime | None = None,
+    ) -> tuple[ReplicaGroupID, SessionGroupID]:
+        group_id = ReplicaGroupID(uuid.uuid4())
+        async with db.begin_session() as db_sess:
+            session_group_id = await _create_session_group(db_sess, endpoint_id)
+            if deleted_at is not None:
+                await db_sess.execute(
+                    sa.update(SessionGroupRow)
+                    .where(SessionGroupRow.id == session_group_id)
+                    .values(deleted_at=deleted_at)
+                )
+            db_sess.add(
+                ReplicaGroupRow(
+                    id=group_id,
+                    deployment_id=endpoint_id,
+                    session_group_id=session_group_id,
+                    lifecycle=ReplicaGroupLifecycle.DRAINING,
+                    scaling_status=ReplicaGroupScalingStatus.SCALING,
+                    rollout=ReplicaGroupRolloutSpec(
+                        max_surge=IntOrPercent(count=1),
+                        max_unavailable=IntOrPercent(count=0),
+                    ),
+                )
+            )
+            await db_sess.commit()
+        return group_id, session_group_id
+
+    async def _add_live_group(
+        self,
+        db: ExtendedAsyncSAEngine,
+        endpoint_id: DeploymentID,
+        session_group_id: SessionGroupID,
+    ) -> ReplicaGroupID:
+        group_id = ReplicaGroupID(uuid.uuid4())
+        async with db.begin_session() as db_sess:
+            db_sess.add(
+                ReplicaGroupRow(
+                    id=group_id,
+                    deployment_id=endpoint_id,
+                    session_group_id=session_group_id,
+                    lifecycle=ReplicaGroupLifecycle.STABLE,
+                    scaling_status=ReplicaGroupScalingStatus.STABLE,
+                    rollout=ReplicaGroupRolloutSpec(
+                        max_surge=IntOrPercent(count=1),
+                        max_unavailable=IntOrPercent(count=0),
+                    ),
+                )
+            )
+            await db_sess.commit()
+        return group_id
+
+    def _drained_apply(
+        self,
+        endpoint_id: DeploymentID,
+        group_id: ReplicaGroupID,
+    ) -> ReplicaGroupLifecycleReconcileApply:
+        return ReplicaGroupLifecycleReconcileApply(
+            transitions=[
+                ReplicaGroupReconcileTransition(
+                    deployment_id=endpoint_id,
+                    history_creator=ReplicaGroupHistoryCreator(
+                        replica_group_id=group_id,
+                        category=ReplicaGroupHandlerCategory.LIFECYCLE,
+                        phase="draining",
+                        result=SchedulingResult.SUCCESS,
+                        message="",
+                        from_status=ReplicaGroupLifecycle.DRAINING.value,
+                        to_status=ReplicaGroupLifecycle.DRAINED.value,
+                    ),
+                    status_updater=ReplicaGroupLifecycleUpdater(
+                        replica_group_id=group_id,
+                        lifecycle=OptionalState.update(ReplicaGroupLifecycle.DRAINED),
+                    ),
+                )
+            ],
+            terminal_group_ids=[group_id],
+        )
+
+    async def _deleted_at(
+        self, db: ExtendedAsyncSAEngine, session_group_id: SessionGroupID
+    ) -> datetime | None:
+        async with db.begin_readonly_session() as db_sess:
+            return await db_sess.scalar(
+                sa.select(SessionGroupRow.deleted_at).where(SessionGroupRow.id == session_group_id)
+            )
+
+    async def test_drained_group_stamps_its_session_group(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        replica_group_repository: ReplicaGroupRepository,
+        test_endpoint_id: DeploymentID,
+    ) -> None:
+        group_id, session_group_id = await self._add_draining_group(
+            db_with_cleanup, test_endpoint_id
+        )
+
+        await replica_group_repository.apply_lifecycle_reconcile(
+            self._drained_apply(test_endpoint_id, group_id)
+        )
+
+        assert await self._deleted_at(db_with_cleanup, session_group_id) is not None
+
+    async def test_live_replica_group_holding_the_same_session_group_keeps_no_boundary(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        replica_group_repository: ReplicaGroupRepository,
+        test_endpoint_id: DeploymentID,
+    ) -> None:
+        group_id, session_group_id = await self._add_draining_group(
+            db_with_cleanup, test_endpoint_id
+        )
+        await self._add_live_group(db_with_cleanup, test_endpoint_id, session_group_id)
+
+        await replica_group_repository.apply_lifecycle_reconcile(
+            self._drained_apply(test_endpoint_id, group_id)
+        )
+
+        assert await self._deleted_at(db_with_cleanup, session_group_id) is None
+
+    async def test_existing_boundary_is_kept(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        replica_group_repository: ReplicaGroupRepository,
+        test_endpoint_id: DeploymentID,
+    ) -> None:
+        first_stamp = datetime(2026, 1, 1, tzinfo=UTC)
+        group_id, session_group_id = await self._add_draining_group(
+            db_with_cleanup, test_endpoint_id, deleted_at=first_stamp
+        )
+
+        await replica_group_repository.apply_lifecycle_reconcile(
+            self._drained_apply(test_endpoint_id, group_id)
+        )
+
+        assert await self._deleted_at(db_with_cleanup, session_group_id) == first_stamp
+
+    async def test_group_not_drained_keeps_no_boundary(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        replica_group_repository: ReplicaGroupRepository,
+        test_endpoint_id: DeploymentID,
+    ) -> None:
+        group_id, session_group_id = await self._add_draining_group(
+            db_with_cleanup, test_endpoint_id
+        )
+
+        await replica_group_repository.apply_lifecycle_reconcile(
+            ReplicaGroupLifecycleReconcileApply(
+                transitions=[
+                    ReplicaGroupReconcileTransition(
+                        deployment_id=test_endpoint_id,
+                        history_creator=ReplicaGroupHistoryCreator(
+                            replica_group_id=group_id,
+                            category=ReplicaGroupHandlerCategory.LIFECYCLE,
+                            phase="draining",
+                            result=SchedulingResult.NEED_RETRY,
+                            message="",
+                            from_status=ReplicaGroupLifecycle.DRAINING.value,
+                        ),
+                        status_updater=ReplicaGroupLifecycleUpdater(
+                            replica_group_id=group_id,
+                            lifecycle=OptionalState.update(ReplicaGroupLifecycle.DRAINING),
+                        ),
+                    )
+                ],
+            )
+        )
+
+        assert await self._deleted_at(db_with_cleanup, session_group_id) is None

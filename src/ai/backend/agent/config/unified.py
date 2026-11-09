@@ -47,6 +47,7 @@ from ai.backend.common.configs import (
 from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.configs.storage_status_report import StorageStatusReportConfig
 from ai.backend.common.configs.volume_status_check import VolumeStatusCheckConfig
+from ai.backend.common.configs.wheelhouse import WheelhouseConfig
 from ai.backend.common.meta import (
     NEXT_RELEASE_VERSION,
     BackendAIConfigMeta,
@@ -924,9 +925,8 @@ class CommonAgentConfig(BaseConfigSchema):
         ),
     ]
     rpc_auth_manager_public_key: Annotated[
-        FilePath | None,
+        FilePath,
         Field(
-            default=None,
             validation_alias=AliasChoices(
                 "rpc-auth-manager-public-key", "rpc_auth_manager_public_key"
             ),
@@ -936,7 +936,8 @@ class CommonAgentConfig(BaseConfigSchema):
             description=(
                 "Path to the manager's public key file for authenticating RPC messages. "
                 "Used with ZeroMQ CURVE authentication to verify messages from the manager. "
-                "Part of the RPC security mechanism for preventing unauthorized access."
+                "Part of the RPC security mechanism for preventing unauthorized access. "
+                f"Required since {NEXT_RELEASE_VERSION}."
             ),
             added_version="25.12.0",
             secret=True,
@@ -946,9 +947,8 @@ class CommonAgentConfig(BaseConfigSchema):
         ),
     ]
     rpc_auth_agent_keypair: Annotated[
-        FilePath | None,
+        FilePath,
         Field(
-            default=None,
             validation_alias=AliasChoices("rpc-auth-agent-keypair", "rpc_auth_agent_keypair"),
             serialization_alias="rpc-auth-agent-keypair",
         ),
@@ -956,7 +956,8 @@ class CommonAgentConfig(BaseConfigSchema):
             description=(
                 "Path to the agent's keypair file for RPC authentication. "
                 "Contains both public and private keys used for ZeroMQ CURVE authentication. "
-                "The private key must be kept secure as it proves the agent's identity."
+                "The private key must be kept secure as it proves the agent's identity. "
+                f"Required since {NEXT_RELEASE_VERSION}."
             ),
             added_version="25.12.0",
             secret=True,
@@ -2389,6 +2390,18 @@ class AgentGlobalConfig(BaseConfigSchema):
                 "and memory issues in the agent process."
             ),
             added_version="25.12.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
+    wheelhouse: Annotated[
+        WheelhouseConfig,
+        Field(default_factory=WheelhouseConfig),
+        BackendAIConfigMeta(
+            description=(
+                "Plugin wheels loaded when the agent starts. Wheels run without "
+                "verification, so keep the path writable only by trusted operators."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
             composite=CompositeType.FIELD,
         ),
     ]

@@ -115,6 +115,7 @@ from ai.backend.common.docker import (
     DEFAULT_KERNEL_FEATURE,
     MAX_KERNELSPEC,
     MIN_KERNELSPEC,
+    RUNNER_RESERVED_ENVIRON_KEYS,
     ImageRef,
     KernelFeatures,
     LabelName,
@@ -178,6 +179,7 @@ from ai.backend.common.events.types import (
 )
 from ai.backend.common.exception import (
     ConfigurationError,
+    InvalidVFolderMountSourceError,
     VolumeMountFailed,
 )
 from ai.backend.common.json import (
@@ -196,6 +198,7 @@ from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.runner.types import Runner
 from ai.backend.common.service_ports import parse_service_ports
+from ai.backend.common.storage.vfolder.subpath import VFolderSubpath, resolve_vfolder_subpath
 from ai.backend.common.typed_validators import HostPortPair
 from ai.backend.common.types import (
     AbuseReportValue,
@@ -556,6 +559,21 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
         arch = get_arch_name()
         return arch, matched_distro, matched_libc_style, krunner_volume, krunner_pyver
 
+    async def _resolve_vfolder_mount_source(self, vfolder: VFolderMount) -> Path:
+        host_path = Path(vfolder.host_path)
+        subpath_parts = vfolder.vfsubpath.parts
+        if not subpath_parts:
+            return host_path
+        if host_path.parts[-len(subpath_parts) :] != subpath_parts:
+            raise InvalidVFolderMountSourceError(
+                f"The host path {host_path} does not end with the subpath {vfolder.vfsubpath}"
+            )
+        target = VFolderSubpath(
+            base_path=Path(*host_path.parts[: -len(subpath_parts)]),
+            subpath=vfolder.vfsubpath,
+        )
+        return await run_in_executor_with_context(None, resolve_vfolder_subpath, target)
+
     async def mount_vfolders(
         self,
         vfolders: Sequence[VFolderMount],
@@ -565,9 +583,10 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
             if self.internal_data.get("prevent_vfolder_mounts", False):
                 if vfolder.name != ".logs":
                     continue
+            source = await self._resolve_vfolder_mount_source(vfolder)
             mount = Mount(
                 MountTypes.BIND,
-                Path(vfolder.host_path),
+                source,
                 Path(vfolder.kernel_path),
                 vfolder.mount_perm,
             )
@@ -2621,7 +2640,12 @@ class AbstractAgent[
                     cluster_ssh_port_mapping=cluster_info.get("cluster_ssh_port_mapping"),
                 )
                 log.debug("kernel creation context initialized")
-                environ: dict[str, str] = {**kernel_config["environ"]}
+                # Drop the runner-reserved keys the caller sent; the agent sets them below.
+                environ: dict[str, str] = {
+                    k: v
+                    for k, v in kernel_config["environ"].items()
+                    if k not in RUNNER_RESERVED_ENVIRON_KEYS
+                }
 
                 # Inject Backend.AI-intrinsic env-variables for gosu
                 if (ouid := ctx.get_overriding_uid()) is not None:

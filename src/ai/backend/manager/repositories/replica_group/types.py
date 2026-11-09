@@ -118,6 +118,11 @@ class ReplicaGroupScalingReconcileApply:
 @dataclass
 class ReplicaGroupLifecycleReconcileApply:
     """One lifecycle-reconcile tick's writes: each group's next desired counts + lifecycle
-    transition + history (no route create/drain — the scaling reconcile fills routes)."""
+    transition + history (no route create/drain — the scaling reconcile fills routes).
+
+    ``terminal_group_ids`` names the groups this tick transitions to a terminal
+    lifecycle; their session groups take that moment as the retention boundary.
+    """
 
     transitions: Sequence[ReplicaGroupReconcileTransition] = field(default_factory=list)
+    terminal_group_ids: Sequence[ReplicaGroupID] = field(default_factory=list)

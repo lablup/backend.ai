@@ -32,7 +32,7 @@ class BaseFrontend[TBackend: BaseBackend](metaclass=ABCMeta):
         self.backends = {}
 
     # TODO: Drop the circuit once an ingress carries the values the backends read from it.
-    async def register_ingress(self, ingress: Ingress, circuit: Circuit | None = None) -> None:
+    async def register_ingress(self, ingress: Ingress, circuit: Circuit | None = None) -> bool:
         metrics = self.root_context.metrics
         frontend_key = ingress.frontend.key()
         backend = await self.initialize_backend(ingress, circuit)
@@ -41,6 +41,7 @@ class BaseFrontend[TBackend: BaseBackend](metaclass=ABCMeta):
         with with_log_context(circuit_id=backend.circuit_id):
             log.debug("registered the ingress of frontend {}", frontend_key)
         metrics.circuit.observe_circuit_creation(protocol=ingress.frontend.protocol.name)
+        return True
 
     async def update_ingress(self, ingress: Ingress) -> None:
         frontend_key = ingress.frontend.key()

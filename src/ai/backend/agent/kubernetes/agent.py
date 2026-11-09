@@ -472,9 +472,10 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                 # in image importer kernels.
                 if vfolder.name != ".logs":
                     continue
+            source = await self._resolve_vfolder_mount_source(vfolder)
             mount = Mount(
                 MountTypes.K8S_HOSTPATH,
-                Path(vfolder.host_path),
+                source,
                 Path(vfolder.kernel_path),
                 vfolder.mount_perm,
                 opts={
@@ -485,7 +486,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                 KubernetesHostPathVolume(
                     name=f"kernel-{self.kernel_id}-hostPath-{idx}",
                     hostPath={
-                        "path": vfolder.host_path.as_posix(),
+                        "path": source.as_posix(),
                         "type": "Directory",
                     },
                 ),
@@ -543,11 +544,17 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                                 "env": [{"name": k, "value": v} for k, v in environ.items()],
                                 "volumeMounts": [cattr.unstructure(v) for v in self.volume_mounts],
                                 "ports": [{"containerPort": x} for x in ports],
-                                "securityContext": {"privileged": True},
+                                "securityContext": {
+                                    "capabilities": {
+                                        "add": [
+                                            "IPC_LOCK",  # for hugepages and RDMA
+                                            "SYS_NICE",  # for NFS based GPUDirect Storage
+                                        ],
+                                    },
+                                },
                             }
                         ],
                         "volumes": [cattr.unstructure(v) for v in self.volumes],
-                        "securityContext": {"privileged": True},
                     },
                 },
             },

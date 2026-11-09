@@ -16678,6 +16678,10 @@ type ObjectStorage implements Node
   name: String!
   host: String!
   accessKey: String!
+
+  """
+  Secret key for authentication. Masked unless the caller is a superadmin.
+  """
   secretKey: String!
   endpoint: String!
   region: String!
@@ -23983,6 +23987,7 @@ enum RetentionCategory
   SESSIONS @join__enumValue(graph: STRAWBERRY)
   USAGE_RECORDS @join__enumValue(graph: STRAWBERRY)
   USAGE_BUCKETS @join__enumValue(graph: STRAWBERRY)
+  PROJECTS @join__enumValue(graph: STRAWBERRY)
 }
 
 """
@@ -25919,7 +25924,6 @@ type ScalingGroupNode implements Node
   is_public: Boolean @join__field(graph: GRAPHENE)
   created_at: DateTime @join__field(graph: GRAPHENE)
   wsproxy_addr: String @join__field(graph: GRAPHENE)
-  wsproxy_api_token: String @join__field(graph: GRAPHENE)
   driver: String @join__field(graph: GRAPHENE)
   driver_opts: JSONString @join__field(graph: GRAPHENE)
   scheduler: String @join__field(graph: GRAPHENE)

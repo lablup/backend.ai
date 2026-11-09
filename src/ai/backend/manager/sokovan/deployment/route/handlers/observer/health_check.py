@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from typing import override
 
 import aiohttp
+import yarl
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import (
     ReplicaHealthResult,
@@ -145,12 +146,22 @@ class RouteHealthObserver(RouteObserver):
         expected_status_code: int,
     ) -> bool:
         """Perform HTTP GET health check."""
-        url = f"http://{host}:{port}{path}"
         with with_log_context(route_id=route_id):
+            # Build from parts so the path cannot replace the host (e.g. ``@other.host/``).
+            path_part, _, query = path.partition("?")
+            try:
+                url = yarl.URL.build(
+                    scheme="http", host=host, port=port, path=path_part, query_string=query
+                )
+            except ValueError as e:
+                log.trace("route health check path is invalid: {}", path, reason=repr(e))
+                return False
             try:
                 async with aiohttp.ClientSession() as session:
                     async with session.get(
-                        url, timeout=aiohttp.ClientTimeout(total=max_wait_time)
+                        url,
+                        timeout=aiohttp.ClientTimeout(total=max_wait_time),
+                        allow_redirects=False,
                     ) as resp:
                         if resp.status != expected_status_code:
                             log.trace(

@@ -9,7 +9,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from aiohttp import web
 
-from ai.backend.agent.errors.watcher import InvalidWatcherTokenError
+from ai.backend.agent.errors.watcher import (
+    InvalidWatcherTokenError,
+    WatcherTokenNotConfiguredError,
+)
 from ai.backend.agent.watcher import auth_middleware, watcher_server
 
 _TOKEN_HEADER = "X-BackendAI-Watcher-Token"
@@ -64,36 +67,65 @@ class TestAuthMiddleware:
         handler.assert_not_called()
 
 
-class TestStartupTokenLog:
-    @pytest.mark.parametrize(
-        ("stored_token", "token_configured"),
-        [("watcher-secret-value", True), (None, False)],
-        ids=["configured", "not-configured"],
-    )
-    async def test_logs_whether_token_is_configured_without_its_value(
-        self,
-        caplog: pytest.LogCaptureFixture,
-        stored_token: str | None,
-        token_configured: bool,
+def _watcher_cfg() -> dict[str, Any]:
+    return {
+        "logging": MagicMock(),
+        "etcd": {
+            "user": "test",
+            "password": "test",
+            "addrs": [],
+            "namespace": "test",
+            "keep-alive-interval": 5.0,
+            "keep-alive-timeout": 3.0,
+        },
+        "watcher": {"ssl-enabled": False, "service-addr": MagicMock()},
+    }
+
+
+def _mock_etcd(stored_token: str | None) -> AsyncMock:
+    etcd = AsyncMock()
+    etcd.get.return_value = stored_token
+    etcd.__aenter__.return_value = etcd
+    return etcd
+
+
+class TestStartupToken:
+    async def test_starts_without_logging_token_value(
+        self, caplog: pytest.LogCaptureFixture
     ) -> None:
-        etcd = AsyncMock()
-        etcd.get.return_value = stored_token
-        etcd.__aenter__.return_value = etcd
-        cfg: dict[str, Any] = {
-            "logging": MagicMock(),
-            "etcd": {"user": None, "addrs": [], "namespace": "test"},
-            "watcher": {"ssl-enabled": False, "service-addr": MagicMock()},
-        }
         with (
-            patch("ai.backend.agent.watcher.AsyncEtcd", return_value=etcd),
+            patch(
+                "ai.backend.agent.watcher.AsyncEtcd.create_from_config",
+                return_value=_mock_etcd("watcher-secret"),
+            ),
             patch("ai.backend.agent.watcher.Logger"),
             patch("ai.backend.agent.watcher.web.AppRunner", return_value=AsyncMock()),
-            patch("ai.backend.agent.watcher.web.TCPSite", return_value=AsyncMock()),
+            patch("ai.backend.agent.watcher.web.TCPSite", return_value=AsyncMock()) as tcp_site,
             caplog.at_level(logging.DEBUG, logger="ai.backend.agent.watcher"),
         ):
-            async with watcher_server(asyncio.get_running_loop(), 0, (cfg, "ipc://test")):
+            async with watcher_server(
+                asyncio.get_running_loop(), 0, (_watcher_cfg(), "ipc://test")
+            ):
                 pass
 
-        records = [vars(record) for record in caplog.records]
-        assert all("watcher-secret-value" not in str(record) for record in records)
-        assert any(record.get("log_tag_token_configured") is token_configured for record in records)
+        tcp_site.return_value.start.assert_awaited_once()
+        assert all("watcher-secret" not in str(vars(record)) for record in caplog.records)
+
+    @pytest.mark.parametrize("stored_token", [None, ""], ids=["missing", "empty"])
+    async def test_refuses_to_start_without_token(self, stored_token: str | None) -> None:
+        with (
+            patch(
+                "ai.backend.agent.watcher.AsyncEtcd.create_from_config",
+                return_value=_mock_etcd(stored_token),
+            ),
+            patch("ai.backend.agent.watcher.Logger"),
+            patch("ai.backend.agent.watcher.web.AppRunner", return_value=AsyncMock()),
+            patch("ai.backend.agent.watcher.web.TCPSite", return_value=AsyncMock()) as tcp_site,
+            pytest.raises(WatcherTokenNotConfiguredError),
+        ):
+            async with watcher_server(
+                asyncio.get_running_loop(), 0, (_watcher_cfg(), "ipc://test")
+            ):
+                pass
+
+        tcp_site.return_value.start.assert_not_awaited()

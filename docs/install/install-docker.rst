@@ -136,16 +136,12 @@ Create ``webserver.conf`` with the following content:
    mode = "webui"
    enable_signup = false
    allow_anonymous_change_password = false
-   allow_project_resource_monitor = false
    allow_change_signin_mode = false
    allow_manual_image_name_for_session = false
    allow_signup_without_confirmation = false
-   always_enqueue_compute_session = false
    webui_debug = true
    mask_user_info = false
    enable_2FA = false
-   force_2FA = false
-   directory_based_usage = false
    enable_reservoir = false
 
    [resources]
@@ -179,7 +175,6 @@ Create ``webserver.conf`` with the following content:
    domain = "default"
    # Multiple endpoints: first for container-to-container communication, second for browser access
    endpoint = "http://backend-ai-manager:8091,http://127.0.0.1:8091"
-   text = "Backend.AI Cloud"
    ssl_verify = false
    auth_token_name = 'sToken'
 

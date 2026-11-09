@@ -8,6 +8,7 @@ from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.typed_validators import HostPortPair
 
 _ETCD_MEMBERS = ["etcd1:2379", "etcd2:2379", "etcd3:2379"]
+_CREDENTIALS = {"user": "test", "password": "test"}
 
 
 class TestEtcdConfigAddrs:
@@ -35,10 +36,10 @@ class TestEtcdConfigAddrs:
         ],
     )
     def test_to_dataclass_addrs(self, raw: dict[str, Any], expected: list[HostPortPair]) -> None:
-        assert EtcdConfig.model_validate(raw).to_dataclass().addrs == expected
+        assert EtcdConfig.model_validate({**_CREDENTIALS, **raw}).to_dataclass().addrs == expected
 
     def test_addr_config_survives_dump_and_reload(self) -> None:
-        etcd_config = EtcdConfig.model_validate({"addr": "etcd1:2379"})
+        etcd_config = EtcdConfig.model_validate({**_CREDENTIALS, "addr": "etcd1:2379"})
 
         reloaded = EtcdConfig.model_validate(etcd_config.model_dump())
 
@@ -46,7 +47,7 @@ class TestEtcdConfigAddrs:
 
     def test_empty_addrs_rejected(self) -> None:
         with pytest.raises(BackendAISchemaValidationFailed):
-            EtcdConfig.model_validate({"addrs": []})
+            EtcdConfig.model_validate({**_CREDENTIALS, "addrs": []})
 
 
 class TestEtcdConfigIvAddrs:

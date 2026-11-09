@@ -5,6 +5,7 @@ import csv
 import logging
 import os
 import shlex
+import ssl
 import subprocess
 import time
 import urllib.parse
@@ -96,6 +97,7 @@ class NetAppClientArgs:
     endpoint: str
     user: str
     password: str
+    ssl_context: ssl.SSLContext | bool = False
 
 
 class NetAppClient:
@@ -112,7 +114,7 @@ class NetAppClient:
         self._password = args.password
         self._session = aiohttp.ClientSession(
             self._endpoint,
-            connector=aiohttp.TCPConnector(ssl=False),
+            connector=aiohttp.TCPConnector(ssl=args.ssl_context),
             auth=aiohttp.BasicAuth(self._user, self._password),
         )
 

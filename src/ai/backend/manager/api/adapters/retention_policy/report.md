@@ -5,7 +5,7 @@
 Scenario: incomplete 3 / 8
 
 - built from ops (8)
-  - batch_load_by_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - batch_load_by_ids: representative success ✓ · representative rejection ✗: SCENARIO-GAP
   - create: representative success ✓ · representative rejection ✓
   - get: representative success ✓ · representative rejection ✓
   - partial_bulk_purge: representative success ✓ · representative rejection ✗: SCENARIO-GAP
@@ -14,6 +14,12 @@ Scenario: incomplete 3 / 8
   - search: representative success ✓ · representative rejection ✓
   - update: representative success ✓ · representative rejection ✓
 
+**batch_load_by_ids**
+
+| scenario | verdict |
+|---|---|
+| [when one policy exists and the superadmin batch-loads it and one unknown id, they come back in the order asked and the item for the unknown id is empty](#reading-the-superadmin-batch-load-leaves-a-missing-id-empty) | answered |
+
 **create**
 
 | scenario | verdict |
@@ -21,6 +27,7 @@ Scenario: incomplete 3 / 8
 | [when the superadmin creates a policy of the deployments category, the node comes back with that category](#creating-a-policy-for-the-deployments-category-is-made) | answered |
 | [when the superadmin creates a policy of the login category, the node comes back with that category](#creating-a-policy-for-the-login-category-is-made) | answered |
 | [when the superadmin creates a policy of the logs category, the node comes back with that category](#creating-a-policy-for-the-logs-category-is-made) | answered |
+| [when the superadmin creates a policy of the projects category, the node comes back with that category](#creating-a-policy-for-the-projects-category-is-made) | answered |
 | [when the superadmin creates a policy of the reconcile_history category, the node comes back with that category](#creating-a-policy-for-the-reconcile-history-category-is-made) | answered |
 | [when the superadmin creates a policy of the roles_invitations category, the node comes back with that category](#creating-a-policy-for-the-roles-invitations-category-is-made) | answered |
 | [when the superadmin creates a policy of the sessions category, the node comes back with that category](#creating-a-policy-for-the-sessions-category-is-made) | answered |
@@ -87,6 +94,54 @@ Scenario: incomplete 3 / 8
 | [when a user granted nothing edits a policy, the call is rejected for lack of permission](#editing-a-user-granted-nothing-may-not-edit-a-policy) | rejected |
 | [when the category of one of two policies is changed to the category of the other, the call is rejected as a duplicate. Unlike at creation, the constraint violation from the repository propagates as it is](#editing-moving-a-policy-to-a-category-already-taken-is-refused) | rejected |
 | [when the superadmin edits an id nothing answers to, the call is rejected as not found](#editing-the-superadmin-editing-a-policy-id-nothing-answers-to-is-not-found) | rejected |
+
+### batch_load_by_ids
+
+<a id="reading-the-superadmin-batch-load-leaves-a-missing-id-empty"></a>
+
+#### [the-superadmin-batch-load-leaves-a-missing-id-empty](/tests/scenario/bai_scenario/manager/retention_policy/test_reading.py): pass
+
+when one policy exists and the superadmin batch-loads it and one unknown id, they come back in the order asked and the item for the unknown id is empty
+
+Given
+
+- two retention policies of different categories and one superadmin
+  - Retention policy logs: kept for 30 days
+  - Retention policy login: kept for 30 days
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- RetentionPolicyAdapter.batch_load_by_ids: user-1 batch-loads the policy created in advance and one unknown id
+
+Then
+
+- they come back in the order asked and the item for an unknown id is empty
+  - len(items) = 3
+  - items[0].id: same as the id of the policy laid
+  - items[0].entity_id: same as the id of the policy laid
+  - id: skipped: the database generates it
+  - category = <RetentionCategory.LOGS: 'logs'>
+  - retention_period_days = 30
+  - enabled = True
+  - last_swept_at = None
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
+  - items[1].id: same as the id of the policy laid
+  - items[1].entity_id: same as the id of the policy laid
+  - id: skipped: the database generates it
+  - category = <RetentionCategory.LOGIN: 'login'>
+  - retention_period_days = 30
+  - enabled = True
+  - last_swept_at = None
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
+  - items[2] = None
 
 ### create
 
@@ -177,6 +232,37 @@ Then
 - the whole policy just created comes back
   - id: skipped: the database generates it
   - category = <RetentionCategory.LOGS: 'logs'>
+  - retention_period_days = 90
+  - enabled = True
+  - last_swept_at = None
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
+
+<a id="creating-a-policy-for-the-projects-category-is-made"></a>
+
+#### [a-policy-for-the-projects-category-is-made](/tests/scenario/bai_scenario/manager/retention_policy/test_creating.py): pass
+
+when the superadmin creates a policy of the projects category, the node comes back with that category
+
+Given
+
+- one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- RetentionPolicyAdapter.create: user-1 creates a policy for the projects category
+
+Then
+
+- the whole policy just created comes back
+  - id: skipped: the database generates it
+  - category = <RetentionCategory.PROJECTS: 'projects'>
   - retention_period_days = 90
   - enabled = True
   - last_swept_at = None

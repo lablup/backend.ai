@@ -14,7 +14,14 @@ class TestWatcherSSL:
         key_path = tmp_path / "watcher.key"
         config = {
             "logging": MagicMock(),
-            "etcd": {"user": None, "password": None, "addrs": [], "namespace": "test"},
+            "etcd": {
+                "user": "test",
+                "password": "test",
+                "addrs": [],
+                "namespace": "test",
+                "keep-alive-interval": 5.0,
+                "keep-alive-timeout": 3.0,
+            },
             "watcher": {
                 "service-addr": HostPortPair("127.0.0.1", 6009),
                 "ssl-enabled": True,
@@ -26,14 +33,16 @@ class TestWatcherSSL:
         }
         etcd_context = MagicMock()
         etcd_context.__aenter__ = AsyncMock(
-            return_value=AsyncMock(get=AsyncMock(return_value=None))
+            return_value=AsyncMock(get=AsyncMock(return_value="watcher-token"))
         )
         etcd_context.__aexit__ = AsyncMock(return_value=None)
         ssl_context = MagicMock()
 
         with (
             patch("ai.backend.agent.watcher.Logger"),
-            patch("ai.backend.agent.watcher.AsyncEtcd", return_value=etcd_context),
+            patch(
+                "ai.backend.agent.watcher.AsyncEtcd.create_from_config", return_value=etcd_context
+            ),
             patch("ai.backend.agent.watcher.web.AppRunner", return_value=AsyncMock()),
             patch("ai.backend.agent.watcher.web.TCPSite", return_value=AsyncMock()) as tcp_site,
             patch("ai.backend.agent.watcher.ssl.create_default_context", return_value=ssl_context),

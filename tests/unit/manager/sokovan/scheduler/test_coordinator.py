@@ -1265,6 +1265,7 @@ class TestScheduleCoordinatorPostProcessors:
             successes=[
                 KernelTransitionInfo(
                     kernel_id=KernelId(uuid4()),
+                    session_id=SessionId(uuid4()),
                     from_status=KernelStatus.RUNNING,
                 )
             ],

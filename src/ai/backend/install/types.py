@@ -177,8 +177,10 @@ class HalfstackConfig:
     redis_sentinel_addrs: list[HostPortPair] | None
     redis_password: str | None
     etcd_addr: list[ServerAddr]  # multiple if HA
-    etcd_user: str | None
-    etcd_password: str | None
+    etcd_user: str
+    etcd_password: str
+    etcd_keep_alive_interval: float = 5.0
+    etcd_keep_alive_timeout: float = 3.0
 
 
 @dataclasses.dataclass(frozen=True)
