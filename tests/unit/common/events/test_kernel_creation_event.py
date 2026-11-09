@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import uuid
 from decimal import Decimal
 
@@ -101,6 +102,42 @@ class TestKernelCreationEventPayload:
         cuda = restored.creation_info.used_devices.units[DeviceName("cuda")][DeviceId("0")]
         assert cuda.used[ResourceSlotName("cuda.shares")] == Decimal("0.5")
         assert cuda.memory_size == 21474836480
+
+    def test_attestation_roundtrip(
+        self,
+        kernel_id: KernelId,
+        session_id: SessionId,
+        creation_info: KernelCreationInfo,
+    ) -> None:
+        with_attestation = creation_info.model_copy(
+            update={"attestation": {"attested": True, "claims": {"a": 1}}}
+        )
+        event = KernelStartedAnycastEvent(
+            kernel_id=kernel_id, session_id=session_id, creation_info=with_attestation
+        )
+
+        restored = KernelStartedAnycastEvent.from_message(event.to_message())
+
+        assert restored.creation_info.attestation == with_attestation.attestation
+
+    def test_event_from_an_older_agent_has_no_attestation(
+        self,
+        kernel_id: KernelId,
+        session_id: SessionId,
+        creation_info: KernelCreationInfo,
+    ) -> None:
+        event = KernelStartedAnycastEvent(
+            kernel_id=kernel_id, session_id=session_id, creation_info=creation_info
+        )
+        message = event.to_message()
+        payload = json.loads(message.payload)
+        del payload["creation_info"]["attestation"]
+
+        restored = KernelStartedAnycastEvent.from_message(
+            message.model_copy(update={"payload": json.dumps(payload)})
+        )
+
+        assert restored.creation_info.attestation is None
 
     def test_earlier_creation_events_carry_no_creation_info(
         self, kernel_id: KernelId, session_id: SessionId
