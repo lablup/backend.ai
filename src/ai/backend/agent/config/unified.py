@@ -2458,6 +2458,39 @@ class ContainerdConfig(BaseConfigSchema):
             example=ConfigExample(local="{}", prod="{}"),
         ),
     ]
+    trusted_storage_profiles: Annotated[
+        list[str],
+        Field(
+            default_factory=list,
+            validation_alias=AliasChoices("trusted-storage-profiles", "trusted_storage_profiles"),
+            serialization_alias="trusted-storage-profiles",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Names of runtime profiles whose kernels get a trusted storage: "
+                "a sparse backing file attached as a loop device, whose path the profile receives "
+                "as trusted_storage_path. Kernels of other profiles get none."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="[]", prod='["coco-tdx"]'),
+        ),
+    ]
+    trusted_storage_size: Annotated[
+        BinarySizeField,
+        Field(
+            default=BinarySize.finite_from_str("64G"),
+            validation_alias=AliasChoices("trusted-storage-size", "trusted_storage_size"),
+            serialization_alias="trusted-storage-size",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Apparent size of each kernel's trusted storage backing file. "
+                "The file is sparse, so host disk is used only as the kernel writes to it."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="64G", prod="64G"),
+        ),
+    ]
     bridge_name: Annotated[
         str,
         Field(
@@ -2501,6 +2534,13 @@ class ContainerdConfig(BaseConfigSchema):
     def _check_bridge_subnet(cls, v: ipaddress.IPv4Network) -> ipaddress.IPv4Network:
         if v.prefixlen > 30:
             raise ValueError("bridge-subnet must have a prefix length of 30 or less")
+        return v
+
+    @field_validator("trusted_storage_size", mode="after")
+    @classmethod
+    def _check_trusted_storage_size(cls, v: BinarySize) -> BinarySize:
+        if v < BinarySize(2**20) or int(v) % 512 != 0:
+            raise ValueError("trusted-storage-size must be a multiple of 512 bytes, at least 1 MiB")
         return v
 
 

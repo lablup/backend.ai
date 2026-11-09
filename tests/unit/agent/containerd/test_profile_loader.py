@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
+from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -23,7 +24,9 @@ class _Profile:
     def name(self) -> str:
         return self._name
 
-    def plan(self, kernel_config: KernelCreationConfig) -> LaunchPlan:
+    def plan(
+        self, kernel_config: KernelCreationConfig, *, trusted_storage_path: Path | None = None
+    ) -> LaunchPlan:
         return LaunchPlan("io.example.v1")
 
 

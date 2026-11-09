@@ -19,6 +19,7 @@ from ai.backend.agent.errors.containerd import (
     ContainerdImageNotFound,
     ContainerdOperationFailed,
     KernelNetworkSetupFailed,
+    TrustedStorageUnavailable,
 )
 
 
@@ -186,3 +187,27 @@ class FakeCommandRunner:
 
     def matching(self, *prefix: str) -> list[tuple[str, ...]]:
         return [c for c in self.calls if c[: len(prefix)] == prefix]
+
+
+class FakeLosetup:
+    """Stands in for trusted_storage._losetup: backing files and their loop devices."""
+
+    calls: list[tuple[str, ...]]
+    loops: dict[str, str]
+    failing: set[str]
+
+    def __init__(self) -> None:
+        self.calls = []
+        self.loops = {}
+        self.failing = set()
+
+    async def __call__(self, *args: str) -> str:
+        self.calls.append(args)
+        if args[0] in self.failing:
+            raise TrustedStorageUnavailable(f"losetup {args[0]}: injected failure")
+        if args[0] == "--find":
+            self.loops[args[-1]] = f"/dev/loop{len(self.loops)}"
+        elif args[0] == "--detach":
+            self.loops = {k: v for k, v in self.loops.items() if v != args[1]}
+            return ""
+        return self.loops.get(args[-1], "")

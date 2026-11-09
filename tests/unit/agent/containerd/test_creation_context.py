@@ -31,6 +31,7 @@ from ai.backend.agent.port_pool import PortPool
 from ai.backend.agent.resources import ComputerContext, KernelResourceSpec
 from ai.backend.agent.types import KernelOwnershipData, MountInfo
 from ai.backend.common.types import (
+    BinarySize,
     DeviceId,
     DeviceName,
     KernelCreationConfig,
@@ -41,7 +42,7 @@ from ai.backend.common.types import (
     SlotName,
 )
 
-from .fakes import FakeCommandRunner, FakeContainerd
+from .fakes import FakeCommandRunner, FakeContainerd, FakeLosetup
 
 IMAGE = "cr.example.com/stable/python:3.11"
 
@@ -189,7 +190,9 @@ class _PatchingProfile(RuntimeProfile):
         return "patching"
 
     @override
-    def plan(self, kernel_config: KernelCreationConfig) -> LaunchPlan:
+    def plan(
+        self, kernel_config: KernelCreationConfig, *, trusted_storage_path: Path | None = None
+    ) -> LaunchPlan:
         options = RuntimeOptions(type_url="t/1", value=b"v")
         return LaunchPlan("io.example.v1", {"annotations": {"k": "v"}}, options)
 
@@ -203,7 +206,9 @@ class _TlsProfile(RuntimeProfile):
         return "tls"
 
     @override
-    def plan(self, kernel_config: KernelCreationConfig) -> LaunchPlan:
+    def plan(
+        self, kernel_config: KernelCreationConfig, *, trusted_storage_path: Path | None = None
+    ) -> LaunchPlan:
         return self.PLAN
 
 
@@ -214,7 +219,9 @@ class _FailingProfile(RuntimeProfile):
         return "failing"
 
     @override
-    def plan(self, kernel_config: KernelCreationConfig) -> LaunchPlan:
+    def plan(
+        self, kernel_config: KernelCreationConfig, *, trusted_storage_path: Path | None = None
+    ) -> LaunchPlan:
         raise RuntimeError("plan failed")
 
 
@@ -246,7 +253,9 @@ class _MountPatchingProfile(RuntimeProfile):
         return "mount-patching"
 
     @override
-    def plan(self, kernel_config: KernelCreationConfig) -> LaunchPlan:
+    def plan(
+        self, kernel_config: KernelCreationConfig, *, trusted_storage_path: Path | None = None
+    ) -> LaunchPlan:
         return LaunchPlan("io.example.v1", {"mounts": []})
 
 
@@ -257,7 +266,9 @@ class _NamingProfile(RuntimeProfile):
         return "naming"
 
     @override
-    def plan(self, kernel_config: KernelCreationConfig) -> LaunchPlan:
+    def plan(
+        self, kernel_config: KernelCreationConfig, *, trusted_storage_path: Path | None = None
+    ) -> LaunchPlan:
         return LaunchPlan("io.containerd.runc.v2")
 
     @override
@@ -685,3 +696,102 @@ class TestAcceleratorPlugin:
             plugin = cast(MagicMock, ctx.computers[device].instance)
             plugin.generate_docker_args.assert_not_called()
             plugin.generate_mounts.assert_not_called()
+
+
+class _StoragePlanProfile(RuntimeProfile):
+    paths: list[Path | None]
+
+    def __init__(self) -> None:
+        self.paths = []
+
+    @property
+    @override
+    def name(self) -> str:
+        return "storage"
+
+    @override
+    def plan(
+        self, kernel_config: KernelCreationConfig, *, trusted_storage_path: Path | None = None
+    ) -> LaunchPlan:
+        self.paths.append(trusted_storage_path)
+        return LaunchPlan("io.example.v1")
+
+
+class TestTrustedStorage:
+    @staticmethod
+    def _enable(ctx: Ctx, profile: _StoragePlanProfile) -> None:
+        ctx._profile = profile
+        ctx.local_config.containerd.trusted_storage_profiles = ["storage"]
+        ctx.local_config.containerd.trusted_storage_size = BinarySize(2**20)
+
+    async def test_enabled_profile_plans_with_the_loop_device(
+        self,
+        ctx: Ctx,
+        resource_spec: KernelResourceSpec,
+        losetup: FakeLosetup,
+        tmp_path: Path,
+    ) -> None:
+        profile = _StoragePlanProfile()
+        self._enable(ctx, profile)
+        kernel = await _prepare(ctx, resource_spec)
+
+        await ctx.start_container(kernel, [], None, [], MagicMock())
+
+        assert profile.paths == [Path("/dev/loop0")]
+        assert (tmp_path / str(ctx.kernel_id) / "trusted-store.img").stat().st_size == 2**20
+
+    async def test_profile_that_is_not_enabled_plans_without_it(
+        self,
+        ctx: Ctx,
+        resource_spec: KernelResourceSpec,
+        losetup: FakeLosetup,
+    ) -> None:
+        profile = _StoragePlanProfile()
+        self._enable(ctx, profile)
+        ctx.local_config.containerd.trusted_storage_profiles = []
+        kernel = await _prepare(ctx, resource_spec)
+
+        await ctx.start_container(kernel, [], None, [], MagicMock())
+
+        assert profile.paths == [None]
+        assert losetup.calls == []
+
+    async def test_failed_launch_detaches_and_removes_the_scratch(
+        self,
+        ctx: Ctx,
+        resource_spec: KernelResourceSpec,
+        losetup: FakeLosetup,
+        fake: FakeContainerd,
+        tmp_path: Path,
+    ) -> None:
+        self._enable(ctx, _StoragePlanProfile())
+        kernel = await _prepare(ctx, resource_spec)
+        fake.failing.add("create_task")
+
+        with pytest.raises(ContainerdOperationFailed):
+            await ctx.start_container(kernel, [], None, [], MagicMock())
+
+        assert losetup.loops == {}
+        assert not (tmp_path / str(ctx.kernel_id)).exists()
+
+    async def test_failed_network_setup_detaches_and_removes_the_scratch(
+        self,
+        ctx: Ctx,
+        resource_spec: KernelResourceSpec,
+        losetup: FakeLosetup,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        self._enable(ctx, _StoragePlanProfile())
+
+        async def failing(kernel_id: KernelId) -> IPv4Address:
+            assert losetup.loops
+            raise KernelNetworkSetupFailed("boom")
+
+        monkeypatch.setattr(ctx._network, "setup", failing)
+
+        with pytest.raises(KernelNetworkSetupFailed):
+            await _prepare(ctx, resource_spec)
+
+        assert losetup.loops == {}
+        assert not (tmp_path / str(ctx.kernel_id)).exists()
