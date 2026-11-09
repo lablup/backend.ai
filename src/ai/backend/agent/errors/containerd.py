@@ -31,6 +31,21 @@ class KernelVerbNotSupported(BackendAIError, web.HTTPNotImplemented):
         )
 
 
+class HostConfigNotTranslatable(BackendAIError, web.HTTPNotImplemented):
+    """Raised when a compute plugin's Docker container fragment has no OCI translation."""
+
+    error_type = "https://api.backend.ai/probs/agent/host-config-not-translatable"
+    error_title = "The plugin's Docker host config cannot be applied under containerd."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.KERNEL,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.NOT_IMPLEMENTED,
+        )
+
+
 class RuntimeProfileLoadError(BackendAIError, web.HTTPInternalServerError):
     """Raised when the configured runtime profile is unknown or cannot be loaded."""
 

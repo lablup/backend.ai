@@ -8,7 +8,9 @@ from collections.abc import Mapping, MutableMapping, Sequence
 from decimal import Decimal
 from ipaddress import IPv4Address, ip_address
 from pathlib import Path
-from typing import Any, Final, override
+from typing import Any, Final, cast, override
+
+from aiodocker.docker import Docker
 
 from ai.backend.agent.agent import (
     ACTIVE_STATUS_SET,
@@ -17,6 +19,12 @@ from ai.backend.agent.agent import (
     ScanImagesResult,
 )
 from ai.backend.agent.config.unified import AgentUnifiedConfig, ContainerSandboxType
+from ai.backend.agent.containerd.hostconfig import (
+    HostConfigTranslation,
+    apply_to_spec,
+    merge_translations,
+    translate_fragment,
+)
 from ai.backend.agent.containerd.image import resolve_image
 from ai.backend.agent.containerd.intrinsic import CPUSET_LABEL, MEMORY_LABEL
 from ai.backend.agent.containerd.kernel import ContainerdKernel
@@ -107,6 +115,9 @@ _CONTAINER_STATUS: Final[Mapping[TaskState, ContainerStatus]] = {
 HOST_PORTS_LABEL: Final = "ai.backend.containerd.host-ports"
 KERNEL_IP_LABEL: Final = "ai.backend.containerd.kernel-ip"
 _INTRINSIC_DEVICES: Final = frozenset({DeviceName("cpu"), DeviceName("mem")})
+# A plugin's generate_docker_args must not use its docker argument; one that does
+# fails with AttributeError.
+_NO_DOCKER: Final = cast(Docker, None)
 
 
 def _allocated(resource_spec: KernelResourceSpec) -> tuple[list[int], int]:
@@ -114,6 +125,17 @@ def _allocated(resource_spec: KernelResourceSpec) -> tuple[list[int], int]:
     cpus = resource_spec.allocations.get(DeviceName("cpu"), {}).get(SlotName("cpu"), {})
     mems = resource_spec.allocations.get(DeviceName("mem"), {}).get(SlotName("mem"), {})
     return sorted(int(core) for core in cpus), int(sum(mems.values()))
+
+
+def _bind_mount(info: MountInfo) -> dict[str, Any]:
+    if info.mode != MountTypes.BIND:
+        raise KernelVerbNotSupported(f"accelerator mount type {info.mode} ({info.dst_path})")
+    return {
+        "destination": str(info.dst_path),
+        "type": "bind",
+        "source": str(info.src_path),
+        "options": ["rbind", "ro", "rprivate"],
+    }
 
 
 def _kernel_id_of(record: ContainerRecord) -> KernelId | None:
@@ -171,6 +193,10 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
     _base_spec: dict[str, Any]
     _spec_signature: str | None
     _spec_mount: dict[str, Any] | None
+    _host_configs: list[tuple[str, HostConfigTranslation]]
+    _accelerator_allocs: list[
+        tuple[AbstractComputePlugin, Mapping[SlotName, Mapping[DeviceId, Decimal]]]
+    ]
 
     def __init__(
         self,
@@ -209,6 +235,8 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         # Read first: a sealed kernel without a signature fails before anything is created.
         self._spec_signature = spec_signature(kernel_config)
         self._spec_mount = None
+        self._host_configs = []
+        self._accelerator_allocs = []
 
     @override
     async def get_extra_envs(self) -> Mapping[str, str]:
@@ -278,24 +306,39 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         if mounts:
             raise KernelVerbNotSupported(f"mounts ({', '.join(str(m.target) for m in mounts)})")
 
-    # cpu and mem are applied through the spec resources; any other plugin is refused.
+    # cpu and mem are applied through the spec resources; another plugin's device nodes and
+    # env are translated from its Docker container fragment.
     @override
     async def apply_accelerator_allocation(
         self,
         computer: AbstractComputePlugin,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
     ) -> None:
-        if computer.key not in _INTRINSIC_DEVICES:
-            raise KernelVerbNotSupported(f"accelerator {computer.key}")
+        if computer.key in _INTRINSIC_DEVICES:
+            return
+        fragment = await computer.generate_docker_args(_NO_DOCKER, device_alloc)
+        name = str(computer.key)
+        translation = await asyncio.to_thread(translate_fragment, name, fragment)
+        self._host_configs = [*self._host_configs, (name, translation)]
+        merge_translations(self._host_configs)
 
-    # No kernel runner: the image's own command runs, so no runner or plugin files are mounted.
+    # No kernel runner: the image's own command runs, so no runner files are mounted. The
+    # accelerators' allocations are still applied, and their env goes into the kernel environ.
     @override
     async def mount_krunner(
         self,
         resource_spec: KernelResourceSpec,
         environ: MutableMapping[str, str],
     ) -> None:
-        return None
+        # The plugin mounts are generated in prepare_container, where a failure removes the dir.
+        for view in resource_spec.device_list:
+            if view.device in _INTRINSIC_DEVICES:
+                continue
+            computer = self.computers[view.device].instance
+            alloc = {view.slot: view.device_alloc}
+            await self.apply_accelerator_allocation(computer, alloc)
+            self._accelerator_allocs.append((computer, alloc))
+        environ.update(merge_translations(self._host_configs).env)
 
     @override
     async def generate_accelerator_mounts(
@@ -303,7 +346,13 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         computer: AbstractComputePlugin,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
     ) -> list[MountInfo]:
-        raise KernelVerbNotSupported("generate_accelerator_mounts")
+        if computer.key in _INTRINSIC_DEVICES:
+            return []
+        src_path = (
+            self.local_config.container.scratch_root / str(self.kernel_id) / str(computer.key)
+        )
+        await asyncio.to_thread(src_path.mkdir, parents=True, exist_ok=True)
+        return await computer.generate_mounts(src_path, device_alloc)
 
     @override
     def resolve_krunner_filepath(self, filename: str) -> Path:
@@ -345,8 +394,12 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
                 extra_caps=extra_caps,
             )
         )
-        # A failed setup tears down what it created.
+        self._base_spec = apply_to_spec(self._base_spec, merge_translations(self._host_configs))
+        # A failed setup tears down what it created, including the plugins' scratch dirs.
         try:
+            for computer, alloc in self._accelerator_allocs:
+                for info in await self.generate_accelerator_mounts(computer, alloc):
+                    self._base_spec["mounts"].append(_bind_mount(info))
             if self._spec_signature is not None:
                 await self._add_spec_jws(self._spec_signature)
             self._address = await self._network.setup(self.kernel_id)
@@ -374,6 +427,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         await asyncio.to_thread(write_spec_jws, path, signature)
         self._spec_mount = spec_jws_mount(path)
 
+    # Removes the kernel's whole scratch dir: the spec JWS and the plugins' mount dirs.
     async def _remove_spec_dir(self) -> None:
         root = self.local_config.container.scratch_root
         await asyncio.to_thread(remove_spec_dir, root, str(self.kernel_id))
