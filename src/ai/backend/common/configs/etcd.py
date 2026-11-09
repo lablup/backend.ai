@@ -1,24 +1,12 @@
 from __future__ import annotations
 
-<<<<<<< HEAD
-from typing import Annotated
-
-from pydantic import Field
-
-from ai.backend.common.config import BaseConfigSchema
-from ai.backend.common.data.config.types import EtcdConfigData
-from ai.backend.common.meta import BackendAIConfigMeta, ConfigExample
-=======
-from collections.abc import Mapping
-from typing import Annotated, Any, Self
+from typing import Annotated, Self
 
 from pydantic import Field, FilePath, model_validator
 
 from ai.backend.common.config import BaseConfigSchema
 from ai.backend.common.data.config.types import EtcdConfigData, EtcdTLSConfigData
 from ai.backend.common.meta import BackendAIConfigMeta, CompositeType, ConfigExample
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
->>>>>>> a31d4c3f (feat(BA-8980): connect to etcd over TLS (#16649))
 from ai.backend.common.typed_validators import HostPortPair
 
 __all__ = ("EtcdConfig", "EtcdTLSConfig")
@@ -32,7 +20,7 @@ class EtcdTLSConfig(BaseConfigSchema):
         Field(default=False),
         BackendAIConfigMeta(
             description="Connect to etcd over TLS.",
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.8",
             example=ConfigExample(local="false", prod="false"),
         ),
     ]
@@ -44,7 +32,7 @@ class EtcdTLSConfig(BaseConfigSchema):
                 "PEM file of the CA certificate that signed the etcd server certificate. "
                 "Required if TLS is enabled."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.8",
             example=ConfigExample(local="", prod="/etc/backend.ai/etcd/ca.pem"),
         ),
     ]
@@ -56,7 +44,7 @@ class EtcdTLSConfig(BaseConfigSchema):
                 "PEM file of the client certificate, for an etcd started with --client-cert-auth. "
                 "Set together with client-key."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.8",
             example=ConfigExample(local="", prod="/etc/backend.ai/etcd/client.pem"),
         ),
     ]
@@ -65,7 +53,7 @@ class EtcdTLSConfig(BaseConfigSchema):
         Field(default=None),
         BackendAIConfigMeta(
             description="PEM file of the client private key. Set together with client-cert.",
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.8",
             example=ConfigExample(local="", prod="/etc/backend.ai/etcd/client-key.pem"),
         ),
     ]
@@ -77,7 +65,7 @@ class EtcdTLSConfig(BaseConfigSchema):
                 "Seconds to wait for the TLS handshake with an etcd member. "
                 "When not set, the handshake has no limit: request timeouts do not end it."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.8",
             example=ConfigExample(local="", prod="10.0"),
         ),
     ]
@@ -183,12 +171,13 @@ class EtcdConfig(BaseConfigSchema):
             example=ConfigExample(local="3.0", prod="3.0"),
         ),
     ]
+
     tls: Annotated[
         EtcdTLSConfig,
         Field(default_factory=EtcdTLSConfig),
         BackendAIConfigMeta(
             description="TLS settings for the connection to etcd.",
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.8",
             composite=CompositeType.FIELD,
         ),
     ]

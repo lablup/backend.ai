@@ -220,22 +220,6 @@ class GroupID:
         )
 
 
-<<<<<<< HEAD
-class EtcdConfig(BaseSchema):
-    namespace: Annotated[str, Field(description="etcd namespace.")]
-    addr: Annotated[
-        HostPortPair,
-        Field(
-            description="Address to access the etcd.",
-            examples=[HostPortPair(host="127.0.0.1", port=8121)],
-        ),
-    ]
-    user: Annotated[str, Field(description="etcd user.")]
-    password: Annotated[str, Field(description="etcd password.")]
-
-
-=======
->>>>>>> a31d4c3f (feat(BA-8980): connect to etcd over TLS (#16649))
 class DBConfig(BaseSchema):
     type: Annotated[
         DBType,

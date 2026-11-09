@@ -33,11 +33,7 @@ from textual.app import App
 from textual.containers import Vertical
 from textual.widgets import ProgressBar
 
-<<<<<<< HEAD
 from ai.backend.common.data.permission.types import Permission
-=======
-from ai.backend.common.data.config.types import EtcdConfigData, EtcdTLSConfigData
->>>>>>> a31d4c3f (feat(BA-8980): connect to etcd over TLS (#16649))
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.types import HostPortPair
 
@@ -404,7 +400,6 @@ class Context(metaclass=ABCMeta):
     @actxmgr
     async def etcd_ctx(self) -> AsyncIterator[AsyncEtcd]:
         halfstack = self.install_info.halfstack_config
-<<<<<<< HEAD
         scope_prefix_map = {
             ConfigScopes.GLOBAL: "",
         }
@@ -422,27 +417,6 @@ class Context(metaclass=ABCMeta):
             scope_prefix_map,
             credentials=creds,
         ) as etcd:
-=======
-        etcd_config = EtcdConfigData(
-            namespace="local",
-            addrs=[
-                HostPortPairModel(host=addr.face.host, port=addr.face.port)
-                for addr in halfstack.etcd_addr
-            ],
-            user=halfstack.etcd_user,
-            password=halfstack.etcd_password,
-            keep_alive_interval=halfstack.etcd_keep_alive_interval,
-            keep_alive_timeout=halfstack.etcd_keep_alive_timeout,
-            tls=EtcdTLSConfigData(
-                enabled=False,
-                ca_cert=None,
-                client_cert=None,
-                client_key=None,
-                handshake_timeout=None,
-            ),
-        )
-        async with AsyncEtcd.create_from_config(etcd_config) as etcd:
->>>>>>> a31d4c3f (feat(BA-8980): connect to etcd over TLS (#16649))
             yield etcd
 
     async def etcd_put_json(
