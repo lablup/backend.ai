@@ -15,3 +15,4 @@ def test_runc_plan_is_the_plain_runc_runtime() -> None:
     assert plan.runtime_handler == RUNC_RUNTIME_HANDLER == "io.containerd.runc.v2"
     assert plan.spec_patch == {}
     assert plan.runtime_options is None
+    assert plan.readiness is None

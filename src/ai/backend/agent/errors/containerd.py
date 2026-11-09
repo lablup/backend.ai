@@ -148,3 +148,33 @@ class KernelBridgeInvalid(BackendAIError, web.HTTPInternalServerError):
             operation=ErrorOperation.SETUP,
             error_detail=ErrorDetail.INVALID_PARAMETERS,
         )
+
+
+class ReadinessTimeout(BackendAIError, web.HTTPGatewayTimeout):
+    """Raised when a kernel is not ready within the readiness timeout of its launch plan."""
+
+    error_type = "https://api.backend.ai/probs/agent/kernel-readiness-timeout"
+    error_title = "The kernel did not become ready within the readiness timeout."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.KERNEL,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.TIMEOUT,
+        )
+
+
+class KernelTaskExited(BackendAIError, web.HTTPInternalServerError):
+    """Raised when the task of a kernel exits or disappears before the kernel is ready."""
+
+    error_type = "https://api.backend.ai/probs/agent/kernel-task-exited"
+    error_title = "The kernel task exited before it became ready."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.KERNEL,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )

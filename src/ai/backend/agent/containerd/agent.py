@@ -345,6 +345,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             service_ports=service_ports,
             environ=environ,
             data={},
+            client=self._client,
         )
 
     def _acquire_host_ports(self, count: int) -> list[int]:
@@ -385,6 +386,8 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         host_ports: list[int] = []
         try:
             launch_plan = self._profile.plan(self.kernel_config)
+            if isinstance(kernel_obj, ContainerdKernel):
+                kernel_obj.launch_plan = launch_plan
             address = self._address
             if address is None:
                 raise KernelNetworkSetupFailed("start_container ran before prepare_container")
@@ -441,6 +444,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             "stdout_port": 0,
             "host_ports": host_ports,
             "kernel_ip": str(address),
+            "published_host": self._network.published_host,
         }
 
     def _container_labels(

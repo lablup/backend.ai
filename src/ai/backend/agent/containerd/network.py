@@ -102,6 +102,11 @@ class KernelNetwork:
         self._addresses = {}
         self._run = run
 
+    @property
+    def published_host(self) -> str:
+        """The local address whose DNAT rules reach a kernel (the gateway without a bind host)."""
+        return self._bind_address or str(self._gateway)
+
     def netns_path(self, kernel_id: KernelId) -> str:
         return f"{_NETNS_DIR}/{self._netns(kernel_id)}"
 
