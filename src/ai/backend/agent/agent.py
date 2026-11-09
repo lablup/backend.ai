@@ -2444,18 +2444,12 @@ class AbstractAgent[
                             flush_timeout=1.0,
                             api_version=3,
                         )
-                    except KeyError:
-                        await self.anycast_and_broadcast_event(
-                            KernelTerminatedAnycastEvent(
-                                kernel_id=kernel_id,
-                                session_id=session_id,
-                                reason=KernelLifecycleEventReason.SELF_TERMINATED,
-                            ),
-                            KernelTerminatedBroadcastEvent(
-                                kernel_id=kernel_id,
-                                session_id=session_id,
-                                reason=KernelLifecycleEventReason.SELF_TERMINATED,
-                            ),
+                    except KernelNotFoundError:
+                        # `_handle_clean_event` removes the kernel and then sends its termination
+                        # events with the real reason; sending them here too could reach the
+                        # manager first and replace that reason.
+                        log.debug(
+                            "execute_batch(k:{}): kernel removed, batch execution ended", kernel_id
                         )
                         break
 
@@ -3629,9 +3623,8 @@ class AbstractAgent[
             raise
         except KeyError:
             # This situation is handled in the lifecycle management subsystem.
-            raise RuntimeError(
-                f"The container for kernel {kernel_id} is not found! "
-                "(might be terminated--try it again)"
+            raise KernelNotFoundError(
+                f"The container for kernel {kernel_id} is not found (it might be terminated)."
             ) from None
 
         if result["status"] in ("finished", "exec-timeout"):
