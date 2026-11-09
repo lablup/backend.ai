@@ -5,12 +5,13 @@ from decimal import Decimal
 from ipaddress import IPv4Address
 from pathlib import Path
 from typing import Any, cast, override
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from ai.backend.agent.containerd.agent import KERNEL_IP_LABEL
 from ai.backend.agent.containerd.agent import ContainerdKernelCreationContext as Ctx
+from ai.backend.agent.containerd.hostconfig import DeviceNode, HostConfigTranslation
 from ai.backend.agent.containerd.intrinsic import CPUSET_LABEL, MEMORY_LABEL
 from ai.backend.agent.containerd.kernel import ContainerdKernel
 from ai.backend.agent.containerd.network import KernelNetwork
@@ -20,18 +21,21 @@ from ai.backend.agent.containerd.rpc.types import RuntimeOptions
 from ai.backend.agent.errors.agent import ContainerCreationFailedError
 from ai.backend.agent.errors.containerd import (
     ContainerdOperationFailed,
+    HostConfigNotTranslatable,
     KernelNetworkSetupFailed,
+    KernelVerbNotSupported,
     SealedSpecMissing,
 )
 from ai.backend.agent.errors.resources import PortPoolExhaustedError
 from ai.backend.agent.port_pool import PortPool
 from ai.backend.agent.resources import ComputerContext, KernelResourceSpec
-from ai.backend.agent.types import KernelOwnershipData
+from ai.backend.agent.types import KernelOwnershipData, MountInfo
 from ai.backend.common.types import (
     DeviceId,
     DeviceName,
     KernelCreationConfig,
     KernelId,
+    MountTypes,
     ResourceSlot,
     ServicePort,
     SlotName,
@@ -571,3 +575,113 @@ class TestStartContainer:
             await ctx.start_container(kernel, [], None, [], MagicMock())
 
         assert len(port_pool) == before
+
+
+def _with_accelerator(
+    ctx: Ctx,
+    base: KernelResourceSpec,
+    fragment: dict[str, Any],
+    mounts: list[MountInfo] | None = None,
+) -> KernelResourceSpec:
+    plugin = MagicMock(key=DeviceName("acc"))
+    plugin.generate_docker_args = AsyncMock(return_value=fragment)
+    plugin.generate_mounts = AsyncMock(return_value=mounts or [])
+    ctx.computers = {
+        **ctx.computers,
+        DeviceName("acc"): ComputerContext(plugin, [], MagicMock()),
+    }
+    alloc = {SlotName("acc.device"): {DeviceId("0"): Decimal(1)}}
+    return KernelResourceSpec(
+        slots=base.slots,
+        allocations={**base.allocations, DeviceName("acc"): alloc},
+        scratch_disk_size=0,
+    )
+
+
+class TestAcceleratorPlugin:
+    async def test_device_node_and_mount_reach_the_spec_and_env_the_environ(
+        self,
+        ctx: Ctx,
+        resource_spec: KernelResourceSpec,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+    ) -> None:
+        node = DeviceNode("/dev/accel0", "c", 195, 0, "rw", 0o660, 0, 44)
+        monkeypatch.setattr(
+            "ai.backend.agent.containerd.agent.translate_fragment",
+            lambda name, fragment: HostConfigTranslation(devices=(node,), env=(("ACC", "1"),)),
+        )
+        lib = MountInfo(MountTypes.BIND, tmp_path / "lib", Path("/opt/acc"))
+        spec = _with_accelerator(ctx, resource_spec, {}, [lib])
+        environ: dict[str, str] = {"LANG": "C"}
+
+        await ctx.mount_krunner(spec, environ)
+        await _prepare(ctx, spec)
+
+        assert environ == {"LANG": "C", "ACC": "1"}
+        linux = ctx._base_spec["linux"]
+        assert linux["devices"][0]["path"] == "/dev/accel0"
+        assert linux["resources"]["devices"][-1]["major"] == 195
+        assert ctx._base_spec["mounts"][-1]["destination"] == "/opt/acc"
+
+    async def test_untranslatable_fragment_raises_and_leaves_no_scratch_dir(
+        self,
+        ctx: Ctx,
+        resource_spec: KernelResourceSpec,
+        tmp_path: Path,
+    ) -> None:
+        spec = _with_accelerator(ctx, resource_spec, {"HostConfig": {"Privileged": True}})
+
+        with pytest.raises(HostConfigNotTranslatable):
+            await ctx.mount_krunner(spec, {})
+
+        assert not (tmp_path / str(ctx.kernel_id)).exists()
+
+    async def test_non_bind_accelerator_mount_is_not_supported(
+        self,
+        ctx: Ctx,
+        resource_spec: KernelResourceSpec,
+        tmp_path: Path,
+    ) -> None:
+        mount = MountInfo(MountTypes.VOLUME, Path("vol"), Path("/opt/acc"))
+        spec = _with_accelerator(ctx, resource_spec, {}, [mount])
+        await ctx.mount_krunner(spec, {})
+
+        with pytest.raises(KernelVerbNotSupported, match="/opt/acc"):
+            await _prepare(ctx, spec)
+
+        assert not (tmp_path / str(ctx.kernel_id)).exists()
+
+    async def test_scratch_dir_is_created_in_prepare_and_removed_when_it_fails(
+        self,
+        ctx: Ctx,
+        resource_spec: KernelResourceSpec,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        spec = _with_accelerator(ctx, resource_spec, {})
+        scratch = tmp_path / str(ctx.kernel_id)
+        await ctx.mount_krunner(spec, {})
+        assert not scratch.exists()
+
+        async def failing(kernel_id: KernelId) -> IPv4Address:
+            assert scratch.is_dir()
+            raise KernelNetworkSetupFailed("boom")
+
+        monkeypatch.setattr(ctx._network, "setup", failing)
+
+        with pytest.raises(KernelNetworkSetupFailed):
+            await _prepare(ctx, spec)
+
+        assert not scratch.exists()
+
+    async def test_intrinsic_devices_never_reach_the_plugin_hooks(
+        self, ctx: Ctx, resource_spec: KernelResourceSpec
+    ) -> None:
+        await ctx.mount_krunner(resource_spec, {})
+        await _prepare(ctx, resource_spec)
+
+        for device in (DeviceName("cpu"), DeviceName("mem")):
+            plugin = cast(MagicMock, ctx.computers[device].instance)
+            plugin.generate_docker_args.assert_not_called()
+            plugin.generate_mounts.assert_not_called()
