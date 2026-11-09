@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Protocol
 
 from ai.backend.agent.containerd.rpc.types import RuntimeOptions
@@ -41,7 +42,11 @@ class RuntimeProfile(Protocol):
     @property
     def name(self) -> str: ...
 
-    def plan(self, kernel_config: KernelCreationConfig) -> LaunchPlan: ...
+    def plan(
+        self, kernel_config: KernelCreationConfig, *, trusted_storage_path: Path | None = None
+    ) -> LaunchPlan:
+        """Plan the launch; trusted_storage_path is the loop device, passed only when enabled."""
+        ...
 
     def describe_failure(self, exit_status: int | None, error_text: str) -> str | None:
         """Name why a kernel failed (exit_status is None when no task ran); None keeps the message."""

@@ -5,11 +5,12 @@ from ipaddress import IPv4Network
 
 import pytest
 
+from ai.backend.agent.containerd import trusted_storage
 from ai.backend.agent.containerd.network import KernelNetwork
 from ai.backend.agent.types import KernelOwnershipData
 from ai.backend.common.types import AgentId, KernelId, SessionId
 
-from .fakes import FakeCommandRunner, FakeContainerd
+from .fakes import FakeCommandRunner, FakeContainerd, FakeLosetup
 
 
 @pytest.fixture
@@ -36,3 +37,10 @@ def network(runner: FakeCommandRunner) -> KernelNetwork:
     return KernelNetwork(
         "bai0", IPv4Network("172.30.0.0/24"), "10.0.0.5", (30000, 30999), run=runner
     )
+
+
+@pytest.fixture
+def losetup(monkeypatch: pytest.MonkeyPatch) -> FakeLosetup:
+    fake = FakeLosetup()
+    monkeypatch.setattr(trusted_storage, "_losetup", fake)
+    return fake

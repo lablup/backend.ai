@@ -43,7 +43,6 @@ from ai.backend.agent.containerd.rpc.types import (
     TaskState,
 )
 from ai.backend.agent.containerd.sealed import (
-    remove_spec_dir,
     spec_jws_mount,
     spec_jws_path,
     spec_signature,
@@ -54,6 +53,11 @@ from ai.backend.agent.containerd.spec import (
     build_base_spec,
     build_launch_spec,
     merge_env,
+)
+from ai.backend.agent.containerd.trusted_storage import (
+    attach_trusted_storage,
+    release_scratch,
+    trusted_store_path,
 )
 from ai.backend.agent.errors import UnsupportedResource
 from ai.backend.agent.errors.agent import (
@@ -189,6 +193,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
     _port_pool: PortPool
     _network: KernelNetwork
     _address: IPv4Address | None
+    _trusted_storage: Path | None
     _resource_lock: asyncio.Lock
     _base_spec: dict[str, Any]
     _spec_signature: str | None
@@ -230,6 +235,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         self._port_pool = port_pool
         self._network = network
         self._address = None
+        self._trusted_storage = None
         self._resource_lock = resource_lock
         self._base_spec = {}
         # Read first: a sealed kernel without a signature fails before anything is created.
@@ -402,10 +408,12 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
                     self._base_spec["mounts"].append(_bind_mount(info))
             if self._spec_signature is not None:
                 await self._add_spec_jws(self._spec_signature)
+            if self._profile.name in self.local_config.containerd.trusted_storage_profiles:
+                await self._add_trusted_storage()
             self._address = await self._network.setup(self.kernel_id)
         except BaseException:
             await self._teardown_network()
-            await self._remove_spec_dir()
+            await self._release_scratch()
             raise
         return ContainerdKernel(
             self.ownership_data,
@@ -427,10 +435,19 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         await asyncio.to_thread(write_spec_jws, path, signature)
         self._spec_mount = spec_jws_mount(path)
 
-    # Removes the kernel's whole scratch dir: the spec JWS and the plugins' mount dirs.
-    async def _remove_spec_dir(self) -> None:
+    async def _add_trusted_storage(self) -> None:
+        config = self.local_config.containerd
         root = self.local_config.container.scratch_root
-        await asyncio.to_thread(remove_spec_dir, root, str(self.kernel_id))
+        backing = trusted_store_path(root, str(self.kernel_id))
+        self._trusted_storage = await attach_trusted_storage(
+            backing, int(config.trusted_storage_size)
+        )
+
+    # Removes the kernel's whole scratch dir (spec JWS, plugin mount dirs, trusted storage file).
+    async def _release_scratch(self) -> None:
+        # The loop device is detached before the scratch dir holding its file goes.
+        await release_scratch(self.local_config.container.scratch_root, str(self.kernel_id))
+        self._trusted_storage = None
 
     def _acquire_host_ports(self, count: int) -> list[int]:
         acquired: list[int] = []
@@ -469,7 +486,12 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         service_ports = kernel_obj.service_ports
         host_ports: list[int] = []
         try:
-            launch_plan = self._profile.plan(self.kernel_config)
+            if self._trusted_storage is None:
+                launch_plan = self._profile.plan(self.kernel_config)
+            else:
+                launch_plan = self._profile.plan(
+                    self.kernel_config, trusted_storage_path=self._trusted_storage
+                )
             if isinstance(kernel_obj, ContainerdKernel):
                 kernel_obj.launch_plan = launch_plan
             address = self._address
@@ -520,7 +542,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             self._port_pool.release_many(host_ports)
             await self._teardown_network()
             await self._free_allocations(kernel_obj.resource_spec)
-            await self._remove_spec_dir()
+            await self._release_scratch()
             if not isinstance(e, Exception):
                 raise
             reason = describe_profile_failure(self._profile, None, str(e))
@@ -811,9 +833,7 @@ class ContainerdAgent(
             await self._network.teardown(kernel_id)
         except BackendAIError:
             log.exception("kernel network teardown failed", kernel_id=kernel_id)
-        await asyncio.to_thread(
-            remove_spec_dir, self.local_config.container.scratch_root, str(kernel_id)
-        )
+        await release_scratch(self.local_config.container.scratch_root, str(kernel_id))
 
     @override
     async def create_local_network(self, network_name: str) -> None:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Final, override
 
 from ai.backend.agent.containerd.profile.base import LaunchPlan, RuntimeProfile
@@ -18,5 +19,7 @@ class RuncProfile(RuntimeProfile):
         return RUNC_PROFILE_NAME
 
     @override
-    def plan(self, kernel_config: KernelCreationConfig) -> LaunchPlan:
+    def plan(
+        self, kernel_config: KernelCreationConfig, *, trusted_storage_path: Path | None = None
+    ) -> LaunchPlan:
         return LaunchPlan(runtime_handler=RUNC_RUNTIME_HANDLER)
