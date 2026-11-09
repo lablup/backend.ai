@@ -91,7 +91,7 @@ class ContainerdImageInvalid(BackendAIError, web.HTTPInternalServerError):
 
 
 class KernelNetworkSetupFailed(BackendAIError, web.HTTPInternalServerError):
-    """Raised when a host network command for a kernel (ip) fails."""
+    """Raised when a host network command for a kernel (ip, iptables, sysctl) fails."""
 
     error_type = "https://api.backend.ai/probs/agent/kernel-network-setup-failed"
     error_title = "The kernel network cannot be set up."

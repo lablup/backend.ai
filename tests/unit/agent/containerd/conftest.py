@@ -33,4 +33,6 @@ def runner() -> FakeCommandRunner:
 
 @pytest.fixture
 def network(runner: FakeCommandRunner) -> KernelNetwork:
-    return KernelNetwork("bai0", IPv4Network("172.30.0.0/24"), run=runner)
+    return KernelNetwork(
+        "bai0", IPv4Network("172.30.0.0/24"), "10.0.0.5", (30000, 30999), run=runner
+    )
