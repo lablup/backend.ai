@@ -914,13 +914,12 @@ class TestVfolderRepositoryAllowedVfolderHosts:
 
         assert isinstance(result, VFolderHostPermissionMap)
 
-    async def test_get_allowed_vfolder_hosts_answers_a_general_project_with_its_own_hosts(
+    async def test_get_allowed_vfolder_hosts_unions_a_general_project_with_the_keypair_policy(
         self,
         vfolder_repository: VfolderRepository,
         user_with_default_keypair: uuid.UUID,
         test_group: uuid.UUID,
     ) -> None:
-        """The user's keypair policy does not answer for a general project."""
         result = await vfolder_repository.get_allowed_vfolder_hosts(
             user_uuid=user_with_default_keypair,
             group_uuid=test_group,
@@ -931,7 +930,59 @@ class TestVfolderRepositoryAllowedVfolderHosts:
                 VFolderHostPermission.CREATE,
                 VFolderHostPermission.MOUNT_IN_SESSION,
             },
+            "local:volume1": {
+                VFolderHostPermission.CREATE,
+                VFolderHostPermission.MODIFY,
+            },
         })
+
+    @pytest.fixture
+    async def project_without_hosts_in_a_domain_granting_create(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_project_resource_policy_name: str,
+    ) -> uuid.UUID:
+        domain_name = f"granting-domain-{uuid.uuid4().hex[:8]}"
+        project_uuid = uuid.uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                DomainRow(
+                    id=DomainID(uuid.uuid4()),
+                    name=domain_name,
+                    is_active=True,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts={"nfs": ["create-vfolder"]},
+                    allowed_docker_registries=[],
+                )
+            )
+            await db_sess.flush()
+            db_sess.add(
+                ProjectRow(
+                    id=project_uuid,
+                    name=f"model-store-{project_uuid.hex[:8]}",
+                    domain_name=domain_name,
+                    is_active=True,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts={},
+                    resource_policy=test_project_resource_policy_name,
+                    type=ProjectType.MODEL_STORE,
+                )
+            )
+            await db_sess.flush()
+        return project_uuid
+
+    async def test_get_allowed_vfolder_hosts_unions_a_general_project_with_its_domain(
+        self,
+        vfolder_repository: VfolderRepository,
+        test_user: uuid.UUID,
+        project_without_hosts_in_a_domain_granting_create: uuid.UUID,
+    ) -> None:
+        result = await vfolder_repository.get_allowed_vfolder_hosts(
+            user_uuid=test_user,
+            group_uuid=project_without_hosts_in_a_domain_granting_create,
+        )
+
+        assert result == VFolderHostPermissionMap({"nfs": {VFolderHostPermission.CREATE}})
 
     @pytest.fixture
     async def test_personal_project(

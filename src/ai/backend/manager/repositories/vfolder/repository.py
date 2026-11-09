@@ -268,7 +268,8 @@ class VfolderRepository:
         """
         Get the allowed VFolder hosts for a user.
 
-        A personal project carries no hosts of its own; the user's keypair policy answers.
+        A non-personal project unions its domain's, its own and the user's keypair policy
+        hosts. A personal project carries no hosts of its own; the keypair policy answers.
         """
         async with self._db.begin_readonly_session_read_committed() as db_session:
             if group_uuid:
@@ -278,7 +279,15 @@ class VfolderRepository:
                 if group_row is None:
                     raise ProjectNotFound(f"Project with {group_uuid} not found.")
                 if group_row.type != ProjectType.PERSONAL:
-                    return group_row.allowed_vfolder_hosts
+                    keypair_hosts = await self._fetch_default_keypair_vfolder_hosts(
+                        db_session, user_uuid
+                    )
+                    return await get_allowed_vfolder_hosts_by_group(
+                        await db_session.connection(),
+                        {"allowed_vfolder_hosts": keypair_hosts or VFolderHostPermissionMap()},
+                        group_row.domain_name,
+                        group_uuid,
+                    )
 
             allowed_hosts = await self._fetch_default_keypair_vfolder_hosts(db_session, user_uuid)
             if allowed_hosts is None:
