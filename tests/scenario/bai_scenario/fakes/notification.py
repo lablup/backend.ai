@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import override
 
 import jinja2
+import jinja2.sandbox
 
 from ai.backend.manager.data.notification import NotificationChannelData
 from ai.backend.manager.notification.channels.base import AbstractNotificationChannel
@@ -41,7 +42,9 @@ class FakeNotificationCenter(NotificationCenter):
     _sent: list[str]
 
     def __init__(self) -> None:
-        self._template_env = jinja2.Environment(loader=jinja2.BaseLoader(), autoescape=False)
+        self._template_env = jinja2.sandbox.ImmutableSandboxedEnvironment(
+            loader=jinja2.BaseLoader(), autoescape=False
+        )
         self._sent = []
 
     @override
