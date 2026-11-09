@@ -27,7 +27,12 @@ from ai.backend.agent.errors.watcher import (
 )
 from ai.backend.common import config, utils
 from ai.backend.common import validators as tx
+<<<<<<< HEAD
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+=======
+from ai.backend.common.configs.etcd import EtcdConfig
+from ai.backend.common.etcd import AsyncEtcd
+>>>>>>> a31d4c3f0 (feat(BA-8980): connect to etcd over TLS (#16649))
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.utils import Fstab
@@ -312,6 +317,7 @@ async def watcher_server(
         },
     )
     with logger:
+<<<<<<< HEAD
         etcd_credentials = None
         if app["config"]["etcd"]["user"]:
             etcd_credentials = {
@@ -327,6 +333,9 @@ async def watcher_server(
             scope_prefix_map=scope_prefix_map,
             credentials=etcd_credentials,
         ) as etcd:
+=======
+        async with AsyncEtcd.create_from_config(app["config"]["etcd"].to_dataclass()) as etcd:
+>>>>>>> a31d4c3f0 (feat(BA-8980): connect to etcd over TLS (#16649))
             app["config_server"] = etcd
 
             token = await etcd.get(WATCHER_TOKEN_ETCD_KEY)
@@ -410,25 +419,22 @@ def main(
     log_level: LogLevel,
     debug: bool,
 ) -> None:
-    watcher_config_iv = (
-        t.Dict({
-            t.Key("watcher"): t.Dict({
-                t.Key("service-addr", default=("0.0.0.0", 6009)): tx.HostPortPair,
-                t.Key("ssl-enabled", default=False): t.Bool,
-                t.Key("ssl-cert", default=None): t.Null | tx.Path(type="file"),
-                t.Key("ssl-key", default=None): t.Null | tx.Path(type="file"),
-                t.Key("target-service", default="backendai-agent.service"): t.String,
-                t.Key("soft-reset-available", default=False): t.Bool,
-                t.Key("fstab-path", default="/etc/fstab"): t.String,
-            }).allow_extra("*"),
-            t.Key("logging"): t.Any,  # checked in ai.backend.logging
-            t.Key("debug"): t.Dict({
-                t.Key("enabled", default=False): t.Bool,
-            }).allow_extra("*"),
-        })
-        .merge(config.etcd_config_iv)
-        .allow_extra("*")
-    )
+    watcher_config_iv = t.Dict({
+        t.Key("watcher"): t.Dict({
+            t.Key("service-addr", default=("0.0.0.0", 6009)): tx.HostPortPair,
+            t.Key("ssl-enabled", default=False): t.Bool,
+            t.Key("ssl-cert", default=None): t.Null | tx.Path(type="file"),
+            t.Key("ssl-key", default=None): t.Null | tx.Path(type="file"),
+            t.Key("target-service", default="backendai-agent.service"): t.String,
+            t.Key("soft-reset-available", default=False): t.Bool,
+            t.Key("fstab-path", default="/etc/fstab"): t.String,
+        }).allow_extra("*"),
+        t.Key("logging"): t.Any,  # checked in ai.backend.logging
+        t.Key("etcd"): t.Any,  # checked by EtcdConfig
+        t.Key("debug"): t.Dict({
+            t.Key("enabled", default=False): t.Bool,
+        }).allow_extra("*"),
+    }).allow_extra("*")
 
     raw_cfg, cfg_src_path = config.read_from_file(config_path, "agent")
 
@@ -457,6 +463,7 @@ def main(
             pprint(_mask_secrets(cfg))
         cfg["_src"] = cfg_src_path
         cfg["logging"] = logging_config
+        cfg["etcd"] = EtcdConfig.model_validate(cfg["etcd"])
     except config.ConfigurationError as e:
         print("Validation of watcher configuration has failed:", file=sys.stderr)
         print(pformat(e.invalid_data), file=sys.stderr)
@@ -483,7 +490,7 @@ def main(
         fn = Path(logging_config.file.filename)
         logging_config.file.filename = f"{fn.stem}-watcher{fn.suffix}"
 
-    setproctitle(f"backend.ai: watcher {cfg['etcd']['namespace']}")
+    setproctitle(f"backend.ai: watcher {cfg['etcd'].namespace}")
     with logger:
         log.info("Backend.AI Agent Watcher {0}", __version__)
         log.info("runtime: {0}", utils.env_info())
