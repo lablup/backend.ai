@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import logging
 from collections import defaultdict
 from collections.abc import Awaitable, Mapping
@@ -17,6 +18,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.data.entity.network import NetworkID
 from ai.backend.common.docker import ImageRef
+from ai.backend.common.plugin.hook import FIRST_COMPLETED, PASSED, HookPluginContext, HookResult
 from ai.backend.common.types import (
     AgentId,
     AutoPullBehavior,
@@ -24,16 +26,20 @@ from ai.backend.common.types import (
     ClusterMode,
     ClusterSSHKeyPair,
     ClusterSSHPortMapping,
+    ConfidentialSpec,
     ImageConfig,
     KernelCreationConfig,
     KernelId,
+    SealedPayload,
     SessionId,
+    SlotName,
 )
 from ai.backend.logging.structured import StructuredLogger, with_log_context
 from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.dotfile.types import normalize_newlines
 from ai.backend.manager.defs import START_SESSION_TIMEOUT_SEC
+from ai.backend.manager.errors.common import RejectedByHook
 from ai.backend.manager.exceptions import convert_to_status_data
 from ai.backend.manager.metrics.scheduler import (
     SchedulerPhaseMetricObserver,
@@ -64,6 +70,81 @@ from ai.backend.manager.views.sokovan.lifecycle import (
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
+_ENV_PREFIX_BACKENDAI = "BACKENDAI_"
+_SEALED_PAYLOAD_SCHEMA_VERSION = 1
+_CONFIDENTIAL_HOOK_PLUGIN = "confidential"
+# Per hook call; a slow hook rejects the session like a failing one
+_PRE_CREATE_KERNEL_HOOK_TIMEOUT_SEC = 60.0
+
+
+def _strip_kernel_config(kernel_config: KernelCreationConfig) -> KernelCreationConfig:
+    """Copy a config keeping only BACKENDAI_* environ and blanking the SSH private key."""
+    stripped = copy.copy(kernel_config)
+    stripped["environ"] = {
+        key: value
+        for key, value in kernel_config["environ"].items()
+        if key.startswith(_ENV_PREFIX_BACKENDAI)
+    }
+    internal_data = kernel_config["internal_data"]
+    if internal_data is not None:
+        internal_data = dict(internal_data)
+        ssh_keypair = internal_data.get("ssh_keypair")
+        if ssh_keypair is not None:
+            internal_data["ssh_keypair"] = {**ssh_keypair, "private_key": ""}
+    stripped["internal_data"] = internal_data
+    return stripped
+
+
+def _strip_cluster_info(cluster_info: ClusterInfo) -> ClusterInfo:
+    """Copy a cluster info with the SSH private key blanked; the keypair is shared."""
+    stripped = copy.copy(cluster_info)
+    ssh_keypair = cluster_info["ssh_keypair"]
+    if ssh_keypair is not None:
+        stripped["ssh_keypair"] = {**ssh_keypair, "private_key": ""}
+    return stripped
+
+
+def _build_sealed_payload(kernel_config: KernelCreationConfig) -> SealedPayload:
+    return SealedPayload(
+        schema_version=_SEALED_PAYLOAD_SCHEMA_VERSION,
+        environ={
+            key: value
+            for key, value in kernel_config["environ"].items()
+            if not key.startswith(_ENV_PREFIX_BACKENDAI)
+        },
+    )
+
+
+def _parse_confidential_spec(hook_result: HookResult) -> ConfidentialSpec:
+    """Validate the hook result strictly; anything else rejects the kernel."""
+    if hook_result.status != PASSED:
+        log.warning(
+            "PRE_CREATE_KERNEL hook did not pass",
+            hook_status=str(hook_result.status),
+            reason=hook_result.reason,
+        )
+        raise RejectedByHook(
+            extra_msg="PRE_CREATE_KERNEL hook did not approve the confidential kernel",
+            extra_data={"plugins": hook_result.src_plugin},
+        )
+    value = hook_result.result
+    if (
+        hook_result.src_plugin != _CONFIDENTIAL_HOOK_PLUGIN
+        or not isinstance(value, Mapping)
+        or type(value.get("schema_version")) is not int
+        or not all(type(value.get(key)) is str for key in ("initdata", "sealed", "signature"))
+    ):
+        raise RejectedByHook(
+            extra_msg="PRE_CREATE_KERNEL hook returned no valid confidential spec",
+            extra_data={"plugins": hook_result.src_plugin},
+        )
+    return ConfidentialSpec(
+        schema_version=value["schema_version"],
+        initdata=value["initdata"],
+        sealed=value["sealed"],
+        signature=value["signature"],
+    )
+
 
 @dataclass
 class _AgentCreateRequest:
@@ -79,6 +160,7 @@ class SessionLauncherArgs:
     system_session_environ_repository: SystemSessionEnvironRepository
     agent_client_pool: AgentClientPool
     network_plugin_ctx: NetworkPluginContext
+    hook_plugin_ctx: HookPluginContext
     config_provider: ManagerConfigProvider
     valkey_schedule: ValkeyScheduleClient
 
@@ -97,6 +179,7 @@ class SessionLauncher:
     _system_session_environ_repository: SystemSessionEnvironRepository
     _agent_client_pool: AgentClientPool
     _network_plugin_ctx: NetworkPluginContext
+    _hook_plugin_ctx: HookPluginContext
     _config_provider: ManagerConfigProvider
     _valkey_schedule: ValkeyScheduleClient
     _phase_metrics: SchedulerPhaseMetricObserver
@@ -106,6 +189,7 @@ class SessionLauncher:
         self._system_session_environ_repository = args.system_session_environ_repository
         self._agent_client_pool = args.agent_client_pool
         self._network_plugin_ctx = args.network_plugin_ctx
+        self._hook_plugin_ctx = args.hook_plugin_ctx
         self._config_provider = args.config_provider
         self._valkey_schedule = args.valkey_schedule
         self._phase_metrics = SchedulerPhaseMetricObserver.instance()
@@ -192,7 +276,7 @@ class SessionLauncher:
         self,
         sessions: list[SessionDataForStart],
         image_configs: dict[UUID, ImageConfigData],
-    ) -> None:
+    ) -> dict[SessionId, RejectedByHook]:
         """
         Start sessions on agents for the given sessions.
 
@@ -204,6 +288,7 @@ class SessionLauncher:
 
         :param sessions: List of sessions with full data for starting
         :param image_configs: Image configurations indexed by image ID
+        :return: Sessions rejected by a PRE_CREATE_KERNEL hook, with the rejection
         """
         with RecorderContext[SessionId].shared_phase(
             "trigger_kernel_creation",
@@ -213,21 +298,22 @@ class SessionLauncher:
                 "create_kernels",
                 success_detail="Kernel creation requested",
             ):
-                await self._start_sessions_concurrently(sessions, image_configs)
+                return await self._start_sessions_concurrently(sessions, image_configs)
 
     async def _start_sessions_concurrently(
         self,
         sessions: list[SessionDataForStart],
         image_configs: dict[UUID, ImageConfigData],
-    ) -> None:
+    ) -> dict[SessionId, RejectedByHook]:
         """
         Start multiple sessions concurrently with individual timeouts.
 
         :param sessions: List of sessions to start
         :param image_configs: Image configurations indexed by image ID
+        :return: Sessions rejected by a PRE_CREATE_KERNEL hook, with the rejection
         """
         if not sessions:
-            return
+            return {}
         system_session_environ_by_session = await self._system_session_environ_repository.resolve(
             sessions,
             SystemSessionEnvironSearcher(
@@ -249,13 +335,17 @@ class SessionLauncher:
             *[start_with_timeout(session) for session in sessions],
             return_exceptions=True,
         )
+        rejected: dict[SessionId, RejectedByHook] = {}
         for session, result in zip(sessions, results, strict=True):
-            if isinstance(result, BaseException):
+            if isinstance(result, RejectedByHook):
+                rejected[session.session_id] = result
+            elif isinstance(result, BaseException):
                 log.warning(
                     "session start failed with unhandled exception",
                     session_id=session.session_id,
                     exc_info=result,
                 )
+        return rejected
 
     async def _start_single_session(
         self,
@@ -318,6 +408,8 @@ class SessionLauncher:
             image_configs_by_id: dict[UUID, ImageConfig] = {}
             for img_id, img_cfg in image_configs.items():
                 image_configs_by_id[img_id] = img_cfg.to_image_config(auto_pull)
+
+            sealed_slot_names = await self._scheduler_repository.get_sealed_launch_slot_names()
 
             # Build the kernel creation request of each agent (no RPC is sent here)
             async def build_agent_request(
@@ -426,6 +518,20 @@ class SessionLauncher:
                     "cluster_ssh_port_mapping": network_setup.cluster_ssh_port_mapping,
                 }
 
+                sealed_kernel_ids = {
+                    str(k.kernel_id)
+                    for k in agent_kernels
+                    if any(
+                        amount > 0 and SlotName(name) in sealed_slot_names
+                        for name, amount in k.requested_slots.items()
+                    )
+                }
+                if sealed_kernel_ids:
+                    # Plain kernels on this agent also get the cluster info without the SSH key
+                    kernel_configs, cluster_info = await self._seal_kernel_configs(
+                        session, sealed_kernel_ids, kernel_configs, cluster_info
+                    )
+
                 return _AgentCreateRequest(
                     kernel_ids, kernel_configs, cluster_info, kernel_image_refs
                 )
@@ -450,6 +556,10 @@ class SessionLauncher:
                     *[build_agent_request(kernels_by_agent[aid]) for aid in agent_ids_ordered],
                     return_exceptions=True,
                 )
+                # Reject before any RPC so a retry cannot duplicate kernels
+                for build_result in build_results:
+                    if isinstance(build_result, RejectedByHook):
+                        raise build_result
                 create_tasks: list[Awaitable[None]] = []
                 sending_agent_ids: list[AgentId] = []
                 for aid, build_result in zip(agent_ids_ordered, build_results, strict=True):
@@ -483,12 +593,59 @@ class SessionLauncher:
         except Exception as e:
             # Convert exception to error status info
             error_info = convert_to_status_data(e, self._config_provider.config.debug.enabled)
-            log.warning("session start failed", exc_info=True)
+            if isinstance(e, RejectedByHook):
+                log.warning("session start rejected by hook", reason=e.extra_msg)
+            else:
+                log.warning("session start failed", exc_info=True)
             # Update error info in status_data without changing status
             # Session will be handled by timeout detection in Coordinator
             await self._scheduler_repository.update_session_error_info(
                 session.session_id, error_info
             )
+            if isinstance(e, RejectedByHook):
+                raise
+
+    async def _seal_kernel_configs(
+        self,
+        session: SessionDataForStart,
+        sealed_kernel_ids: set[str],
+        kernel_configs: list[KernelCreationConfig],
+        cluster_info: ClusterInfo,
+    ) -> tuple[list[KernelCreationConfig], ClusterInfo]:
+        """Run PRE_CREATE_KERNEL for each sealed kernel; fail closed on any problem.
+
+        Returns the configs to send and the SSH-key-stripped cluster info.
+        """
+        stripped_cluster_info = _strip_cluster_info(cluster_info)
+        sent_configs: list[KernelCreationConfig] = []
+        for kernel_config in kernel_configs:
+            if kernel_config["kernel_id"] not in sealed_kernel_ids:
+                sent_configs.append(kernel_config)
+                continue
+            log.debug(
+                "dispatching PRE_CREATE_KERNEL",
+                session_id=session.session_id,
+                kernel_id=kernel_config["kernel_id"],
+            )
+            stripped_config = _strip_kernel_config(kernel_config)
+            try:
+                async with async_timeout.timeout(_PRE_CREATE_KERNEL_HOOK_TIMEOUT_SEC):
+                    hook_result = await self._hook_plugin_ctx.dispatch(
+                        "PRE_CREATE_KERNEL",
+                        (
+                            stripped_config,
+                            stripped_cluster_info,
+                            _build_sealed_payload(kernel_config),
+                            {"domain_id": str(session.domain_id)},
+                        ),
+                        return_when=FIRST_COMPLETED,
+                        success_if_no_hook=False,
+                    )
+            except TimeoutError as e:
+                raise RejectedByHook(extra_msg="PRE_CREATE_KERNEL hook timed out") from e
+            stripped_config["confidential"] = _parse_confidential_spec(hook_result)
+            sent_configs.append(stripped_config)
+        return sent_configs, stripped_cluster_info
 
     async def _setup_network_configuration(
         self,
