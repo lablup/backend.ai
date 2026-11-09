@@ -6,6 +6,7 @@ import signal
 import uuid
 from collections.abc import Mapping, MutableMapping, Sequence
 from decimal import Decimal
+from ipaddress import IPv4Address
 from pathlib import Path
 from typing import Any, Final, override
 
@@ -24,6 +25,7 @@ from ai.backend.agent.containerd.lifecycle import (
     destroy_container,
     launch_container,
 )
+from ai.backend.agent.containerd.network import KernelNetwork
 from ai.backend.agent.containerd.rpc.client import ContainerdAPI, ContainerdClient
 from ai.backend.agent.containerd.rpc.types import (
     ContainerdClientConfig,
@@ -88,6 +90,7 @@ _CONTAINER_STATUS: Final[Mapping[TaskState, ContainerStatus]] = {
     TaskState.PAUSING: ContainerStatus.PAUSED,
     TaskState.STOPPED: ContainerStatus.EXITED,
 }
+KERNEL_IP_LABEL: Final = "ai.backend.containerd.kernel-ip"
 _RUNC_RUNTIME: Final = "io.containerd.runc.v2"
 _INTRINSIC_DEVICES: Final = frozenset({DeviceName("cpu"), DeviceName("mem")})
 
@@ -120,6 +123,8 @@ def _to_container(record: ContainerRecord, status: ContainerStatus) -> Container
 
 class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKernel]):
     _client: ContainerdAPI
+    _network: KernelNetwork
+    _address: IPv4Address | None
     _resource_lock: asyncio.Lock
     _base_spec: dict[str, Any]
 
@@ -135,6 +140,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         restarting: bool = False,
         *,
         client: ContainerdAPI,
+        network: KernelNetwork,
         resource_lock: asyncio.Lock,
     ) -> None:
         super().__init__(
@@ -148,6 +154,8 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             restarting=restarting,
         )
         self._client = client
+        self._network = network
+        self._address = None
         self._resource_lock = resource_lock
         self._base_spec = {}
 
@@ -282,9 +290,16 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
                 cpu_cores=cores,
                 memory_bytes=memory_bytes,
                 shm_bytes=int(resource_opts.get("shmem") or 0),
+                netns_path=self._network.netns_path(self.kernel_id),
                 extra_caps=extra_caps,
             )
         )
+        # A failed setup tears down what it created.
+        try:
+            self._address = await self._network.setup(self.kernel_id)
+        except BaseException:
+            await self._teardown_network()
+            raise
         return ContainerdKernel(
             self.ownership_data,
             self.kernel_config["network_id"],
@@ -296,6 +311,12 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             environ=environ,
             data={},
         )
+
+    async def _teardown_network(self) -> None:
+        try:
+            await self._network.teardown(self.kernel_id)
+        except BackendAIError:
+            log.exception("kernel network teardown failed", kernel_id=self.kernel_id)
 
     async def _free_allocations(self, resource_spec: KernelResourceSpec) -> None:
         async with self._resource_lock:
@@ -340,6 +361,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
                 spec=spec,
             )
         except BaseException:
+            await self._teardown_network()
             await self._free_allocations(kernel_obj.resource_spec)
             raise
         container = self.local_config.container
@@ -355,6 +377,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
     def _container_labels(self, resource_spec: KernelResourceSpec) -> dict[str, str]:
         cores, memory_bytes = _allocated(resource_spec)
         return {
+            KERNEL_IP_LABEL: str(self._address or ""),
             CPUSET_LABEL: ",".join(map(str, cores)),
             MEMORY_LABEL: str(memory_bytes),
             LabelName.AGENT_ID: str(self.agent_id),
@@ -373,6 +396,7 @@ class ContainerdAgent(
     AbstractAgent[ContainerdKernel, ContainerdKernelCreationContext],
 ):
     _client: ContainerdAPI
+    _network: KernelNetwork
 
     def __init__(
         self,
@@ -382,6 +406,9 @@ class ContainerdAgent(
     ) -> None:
         super().__init__(etcd, local_config, **kwargs)
         containerd_config = local_config.containerd
+        self._network = KernelNetwork(
+            containerd_config.bridge_name, containerd_config.bridge_subnet
+        )
         # The base class starts a registry cleanup loop in its __init__, which needs the client.
         self._client = ContainerdClient(
             ContainerdClientConfig(
@@ -399,10 +426,23 @@ class ContainerdAgent(
         await self._client.connect()
         log.info("containerd connected", address=config.address, namespace=config.namespace)
         try:
+            await self._network.init()
+            await self._sweep_network()
             await super().__ainit__()
         except BaseException:
             await self._client.close()
             raise
+
+    async def _sweep_network(self) -> None:
+        """Keep the addresses of the containers found at startup and remove other netns."""
+        found = await self.enumerate_containers(frozenset(ContainerStatus))
+        for kernel_id, container in found:
+            if address := container.labels.get(KERNEL_IP_LABEL):
+                try:
+                    self._network.restore(kernel_id, IPv4Address(address))
+                except ValueError:
+                    log.warning("kernel address label is malformed", kernel_id=kernel_id)
+        await self._network.sweep([kernel_id for kernel_id, _ in found])
 
     @override
     async def shutdown(self, stop_signal: signal.Signals) -> None:
@@ -548,6 +588,7 @@ class ContainerdAgent(
             self.computers,
             restarting=restarting,
             client=self._client,
+            network=self._network,
             resource_lock=self.resource_lock,
         )
 
@@ -581,6 +622,10 @@ class ContainerdAgent(
                 await clean_container(self._client, str(container_id))
             except BackendAIError:
                 log.exception("container delete failed", container_id=container_id)
+        try:
+            await self._network.teardown(kernel_id)
+        except BackendAIError:
+            log.exception("kernel network teardown failed", kernel_id=kernel_id)
 
     @override
     async def create_local_network(self, network_name: str) -> None:

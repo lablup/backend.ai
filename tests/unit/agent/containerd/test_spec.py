@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from dataclasses import replace
 from typing import Any
 from unittest.mock import patch
 
@@ -46,6 +47,11 @@ class TestBaseSpec:
         ]
         network = next(n for n in spec["linux"]["namespaces"] if n["type"] == "network")
         assert "path" not in network
+
+    def test_netns_path_is_joined(self) -> None:
+        spec = build_base_spec(replace(_input(), netns_path="/run/netns/bai0-x"))
+
+        assert {"type": "network", "path": "/run/netns/bai0-x"} in spec["linux"]["namespaces"]
 
     def test_cpu_and_memory_limits(self) -> None:
         resources = build_base_spec(_input())["linux"]["resources"]

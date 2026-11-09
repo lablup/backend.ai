@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from collections.abc import Mapping
+from ipaddress import IPv4Address
 from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
@@ -9,7 +11,8 @@ import pytest
 from pytest_mock import MockerFixture
 
 from ai.backend.agent.config.unified import ContainerdConfig
-from ai.backend.agent.containerd.agent import ContainerdAgent
+from ai.backend.agent.containerd.agent import KERNEL_IP_LABEL, ContainerdAgent
+from ai.backend.agent.containerd.network import KernelNetwork
 from ai.backend.agent.containerd.rpc.types import ContainerRecord, TaskInfo, TaskState
 from ai.backend.agent.errors.containerd import KernelVerbNotSupported
 from ai.backend.common.types import (
@@ -19,19 +22,26 @@ from ai.backend.common.types import (
     KernelId,
 )
 
-from .fakes import FakeContainerd
+from .fakes import FakeCommandRunner, FakeContainerd
 
 
 @pytest.fixture
-def agent(fake: FakeContainerd, monkeypatch: pytest.MonkeyPatch) -> ContainerdAgent:
+def agent(
+    fake: FakeContainerd,
+    network: KernelNetwork,
+    runner: FakeCommandRunner,
+    monkeypatch: pytest.MonkeyPatch,
+) -> ContainerdAgent:
     """A bare agent carrying only the attributes the tested methods touch."""
     instance = object.__new__(ContainerdAgent)
     instance.local_config = MagicMock()
     instance.id = AgentId("i-test")
     instance.resource_lock = asyncio.Lock()
     instance._client = cast(Any, fake)
+    instance._network = network
     instance.error_monitor = MagicMock(capture_exception=AsyncMock())
     monkeypatch.setattr(instance, "reconstruct_resource_usage", AsyncMock())
+    runner.script(["ip", "-d", "link", "show"], "3: bai0: <UP>\n    bridge forward_delay 1\n")
     return instance
 
 
@@ -83,11 +93,13 @@ def _add_container(
     owner: str = OWNER,
     kernel_id: uuid.UUID | None = None,
     session_id: str | None = SESSION_ID,
+    extra_labels: Mapping[str, str] | None = None,
 ) -> KernelId:
     kid = kernel_id or uuid.uuid4()
     labels = {
         "ai.backend.owner": owner,
         "ai.backend.kernel-id": str(kid),
+        **(extra_labels or {}),
     }
     if session_id is not None:
         labels["ai.backend.session-id"] = session_id
@@ -246,6 +258,35 @@ class TestDestroyAndClean:
         await agent.clean_kernel(kid, ContainerId("c1"), False)
 
         cast(AsyncMock, agent.error_monitor.capture_exception).assert_awaited_once()
+
+
+class TestKernelNetwork:
+    async def test_clean_kernel_tears_the_network_down(
+        self, agent: ContainerdAgent, runner: FakeCommandRunner
+    ) -> None:
+        kid = KernelId(uuid.uuid4())
+        runner.script(["ip", "netns", "list"], f"bai0-{kid}\n")
+
+        await agent.clean_kernel(kid, None, False)
+
+        assert runner.matching("ip", "netns", "del") == [("ip", "netns", "del", f"bai0-{kid}")]
+
+    async def test_sweep_keeps_live_kernels_and_their_addresses(
+        self, agent: ContainerdAgent, fake: FakeContainerd, runner: FakeCommandRunner
+    ) -> None:
+        live = _add_container(
+            fake, "c1", state=TaskState.RUNNING, extra_labels={KERNEL_IP_LABEL: "172.30.0.2"}
+        )
+        _add_container(
+            fake, "c2", state=TaskState.RUNNING, extra_labels={KERNEL_IP_LABEL: "not-an-ip"}
+        )
+        stale = KernelId(uuid.uuid4())
+        runner.script(["ip", "netns", "list"], f"bai0-{live}\nbai0-{stale}\nother\n")
+
+        await agent._sweep_network()
+
+        assert runner.matching("ip", "netns", "del") == [("ip", "netns", "del", f"bai0-{stale}")]
+        assert await agent._network.setup(KernelId(uuid.uuid4())) == IPv4Address("172.30.0.3")
 
 
 class TestShutdown:

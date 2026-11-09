@@ -102,6 +102,7 @@ class SpecInput:
     cpu_cores: Sequence[int]  # the cpuset; its length is the CPU quota
     memory_bytes: int
     shm_bytes: int  # 0 or less means DEFAULT_SHM_BYTES
+    netns_path: str | None = None  # join this network namespace instead of a new one
     extra_caps: Sequence[str] = ()
 
 
@@ -151,6 +152,9 @@ def build_base_spec(inp: SpecInput) -> dict[str, Any]:
             "options": ["nosuid", "noexec", "nodev", "mode=1777", f"size={shm_bytes}"],
         },
     )
+    network: dict[str, Any] = {"type": "network"}
+    if inp.netns_path:
+        network["path"] = inp.netns_path
     return {
         "ociVersion": OCI_VERSION,
         "process": {
@@ -176,7 +180,7 @@ def build_base_spec(inp: SpecInput) -> dict[str, Any]:
                 {"type": "ipc"},
                 {"type": "uts"},
                 {"type": "mount"},
-                {"type": "network"},
+                network,
                 {"type": "cgroup"},
             ],
             "resources": _resources(inp),

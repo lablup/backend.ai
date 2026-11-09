@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from typing import Any, cast
 from unittest.mock import MagicMock
 
@@ -10,6 +11,7 @@ from ai.backend.agent.agent import AbstractAgent
 from ai.backend.agent.config.unified import AgentUnifiedConfig, ContainerdConfig
 from ai.backend.agent.containerd.agent import ContainerdAgent
 from ai.backend.agent.containerd.rpc.client import ContainerdClient
+from ai.backend.common.types import KernelId
 
 
 @pytest.fixture
@@ -35,6 +37,11 @@ class TestContainerdAgentInit:
 
         assert isinstance(agent._client, ContainerdClient)
         assert agent._client._config.create_task_timeout == 120.0
+
+    def test_bridge_settings_reach_the_network(self, base_init: MagicMock) -> None:
+        agent = _new_agent(_local_config({"bridge-name": "bai1", "bridge-subnet": "10.9.0.0/24"}))
+
+        assert agent._network.netns_path(KernelId(uuid.UUID(int=1))).startswith("/run/netns/bai1-")
 
     def test_base_init_receives_the_remaining_arguments(self, base_init: MagicMock) -> None:
         config = _local_config({})

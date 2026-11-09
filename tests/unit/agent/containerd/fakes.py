@@ -5,6 +5,7 @@ import signal
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from ai.backend.agent.containerd.network import CommandResult
 from ai.backend.agent.containerd.rpc.types import (
     ContainerRecord,
     ImageTarget,
@@ -16,6 +17,7 @@ from ai.backend.agent.errors.containerd import (
     ContainerdImageInvalid,
     ContainerdImageNotFound,
     ContainerdOperationFailed,
+    KernelNetworkSetupFailed,
 )
 
 
@@ -151,3 +153,28 @@ class FakeContainerd:
         self.images[image_ref] = ImageTarget(
             "sha256:manifest", "application/vnd.oci.image.manifest.v1+json"
         )
+
+
+class FakeCommandRunner:
+    """Records host commands; the longest scripted argv prefix answers, else success."""
+
+    calls: list[tuple[str, ...]]
+    results: dict[tuple[str, ...], CommandResult]
+
+    def __init__(self) -> None:
+        self.calls = []
+        self.results = {}
+
+    def script(self, prefix: Sequence[str], stdout: str = "", returncode: int = 0) -> None:
+        self.results[tuple(prefix)] = CommandResult(returncode, stdout, "")
+
+    async def __call__(self, *argv: str, check: bool = True) -> CommandResult:
+        self.calls.append(argv)
+        matches = [p for p in self.results if argv[: len(p)] == p]
+        result = self.results[max(matches, key=len)] if matches else CommandResult(0, "", "")
+        if check and result.returncode != 0:
+            raise KernelNetworkSetupFailed(f"{argv}: exit {result.returncode}")
+        return result
+
+    def matching(self, *prefix: str) -> list[tuple[str, ...]]:
+        return [c for c in self.calls if c[: len(prefix)] == prefix]

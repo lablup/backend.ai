@@ -2,26 +2,30 @@ from __future__ import annotations
 
 import asyncio
 from decimal import Decimal
+from ipaddress import IPv4Address
 from typing import Any, cast
 from unittest.mock import MagicMock
 
 import pytest
 
+from ai.backend.agent.containerd.agent import KERNEL_IP_LABEL
 from ai.backend.agent.containerd.agent import ContainerdKernelCreationContext as Ctx
 from ai.backend.agent.containerd.intrinsic import CPUSET_LABEL, MEMORY_LABEL
 from ai.backend.agent.containerd.kernel import ContainerdKernel
-from ai.backend.agent.errors.containerd import ContainerdOperationFailed
+from ai.backend.agent.containerd.network import KernelNetwork
+from ai.backend.agent.errors.containerd import ContainerdOperationFailed, KernelNetworkSetupFailed
 from ai.backend.agent.resources import ComputerContext, KernelResourceSpec
 from ai.backend.agent.types import KernelOwnershipData
 from ai.backend.common.types import (
     DeviceId,
     DeviceName,
     KernelCreationConfig,
+    KernelId,
     ResourceSlot,
     SlotName,
 )
 
-from .fakes import FakeContainerd
+from .fakes import FakeCommandRunner, FakeContainerd
 
 IMAGE = "cr.example.com/stable/python:3.11"
 
@@ -62,6 +66,7 @@ def ctx(
     ownership_data: KernelOwnershipData,
     fake: FakeContainerd,
     alloc_map: MagicMock,
+    network: KernelNetwork,
 ) -> Ctx:
     local_config = MagicMock()
     local_config.container.sandbox_type = "docker"
@@ -96,6 +101,7 @@ def ctx(
         local_config,
         computers,
         client=fake,
+        network=network,
         resource_lock=asyncio.Lock(),
     )
 
@@ -104,6 +110,43 @@ async def _prepare(ctx: Ctx, resource_spec: KernelResourceSpec) -> ContainerdKer
     return await ctx.prepare_container(
         resource_spec, {"LANG": "en_US.UTF-8", "LOCAL_USER_ID": "1000"}, [], MagicMock()
     )
+
+
+class TestPrepareContainer:
+    async def test_network_is_set_up_and_joined_by_the_spec(
+        self, ctx: Ctx, resource_spec: KernelResourceSpec, runner: FakeCommandRunner
+    ) -> None:
+        await _prepare(ctx, resource_spec)
+
+        ns = f"bai0-{ctx.kernel_id}"
+        assert runner.matching("ip", "netns", "add") == [("ip", "netns", "add", ns)]
+        assert ctx._base_spec["linux"]["namespaces"][4] == {
+            "type": "network",
+            "path": f"/run/netns/{ns}",
+        }
+        assert ctx._container_labels(resource_spec)[KERNEL_IP_LABEL] == "172.30.0.2"
+
+    @pytest.mark.parametrize("error", [KernelNetworkSetupFailed("x"), asyncio.CancelledError()])
+    async def test_interrupted_network_setup_is_torn_down(
+        self,
+        ctx: Ctx,
+        resource_spec: KernelResourceSpec,
+        runner: FakeCommandRunner,
+        monkeypatch: pytest.MonkeyPatch,
+        error: BaseException,
+    ) -> None:
+        ns = f"bai0-{ctx.kernel_id}"
+        runner.script(["ip", "netns", "list"], f"{ns}\n")
+
+        async def interrupted(kernel_id: KernelId) -> IPv4Address:
+            raise error
+
+        monkeypatch.setattr(ctx._network, "setup", interrupted)
+
+        with pytest.raises(type(error)):
+            await _prepare(ctx, resource_spec)
+
+        assert runner.matching("ip", "netns", "del") == [("ip", "netns", "del", ns)]
 
 
 class TestStartContainer:
@@ -148,14 +191,18 @@ class TestStartContainer:
         resource_spec: KernelResourceSpec,
         fake: FakeContainerd,
         alloc_map: MagicMock,
+        runner: FakeCommandRunner,
     ) -> None:
+        ns = f"bai0-{ctx.kernel_id}"
         kernel = await _prepare(ctx, resource_spec)
+        runner.script(["ip", "netns", "list"], f"{ns}\n")
         fake.failing.add("create_task")
 
         with pytest.raises(ContainerdOperationFailed, match="create_task"):
             await ctx.start_container(kernel, [], None, [], MagicMock())
 
         cast(MagicMock, alloc_map.free).assert_called_once()
+        assert runner.matching("ip", "netns", "del") == [("ip", "netns", "del", ns)]
         assert fake.containers == {} and fake.snapshots == {} and fake.tasks == {}
 
     async def test_cancelled_launch_frees_the_allocations_and_leaves_nothing(
