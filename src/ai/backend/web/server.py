@@ -172,8 +172,8 @@ def apply_cache_headers(response: web.StreamResponse, path: str) -> web.StreamRe
     return response
 
 
-def _is_existing_login_only_file(relative_path: Path, file_path: Path) -> bool:
-    return relative_path.as_posix() in _FILES_SERVED_ONLY_AFTER_LOGIN and file_path.is_file()
+def _is_login_only_file(relative_path: Path) -> bool:
+    return relative_path.as_posix() in _FILES_SERVED_ONLY_AFTER_LOGIN
 
 
 async def _file_response_only_after_login(
@@ -199,7 +199,7 @@ async def static_handler(request: web.Request) -> web.StreamResponse:
         ".css.map",
     )):
         raise StaticFileNotFoundError()
-    if _is_existing_login_only_file(relative_path, file_path):
+    if _is_login_only_file(relative_path):
         return await _file_response_only_after_login(request, file_path, request_path)
     if file_path.is_file():
         return apply_cache_headers(web.FileResponse(file_path), request_path)
@@ -250,7 +250,7 @@ async def console_handler(request: web.Request) -> web.StreamResponse:
         ".css.map",
     )):
         raise StaticFileNotFoundError()
-    if _is_existing_login_only_file(relative_path, file_path):
+    if _is_login_only_file(relative_path):
         return await _file_response_only_after_login(request, file_path, request_path)
     index_path = (static_path / "index.html").resolve()
     if file_path.is_file() and file_path != index_path:
