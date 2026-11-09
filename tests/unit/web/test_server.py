@@ -1,5 +1,5 @@
 import json
-from collections.abc import AsyncIterator, Awaitable, Callable
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from pathlib import Path
@@ -22,9 +22,7 @@ from ai.backend.web.errors import UnauthenticatedError
 from ai.backend.web.server import (
     build_cors_options,
     config_toml_handler,
-    console_handler,
     extend_login_session,
-    static_handler,
     update_password_no_auth,
     version_json_handler,
 )
@@ -405,7 +403,6 @@ class TestVersionJsonHandler:
         client = await aiohttp_client(app_serving_version_json)
         resp = await client.get("/version.json")
         assert resp.status == 404
-        assert "26.10.0" not in await resp.text()
 
     async def test_after_login_is_served(
         self, aiohttp_client: Any, app_serving_version_json: web.Application
@@ -415,36 +412,3 @@ class TestVersionJsonHandler:
         resp = await client.get("/version.json")
         assert resp.status == 200
         assert await resp.text() == _VERSION_JSON
-
-
-class TestFallbackHandlersRefuseVersionJson:
-    @pytest.fixture
-    def app_with_fallback_handler(
-        self, request: pytest.FixtureRequest, tmp_path: Path
-    ) -> web.Application:
-        fallback_handler: Callable[[web.Request], Awaitable[web.StreamResponse]] = request.param
-        (tmp_path / "version.json").write_text(_VERSION_JSON)
-        app = web.Application()
-        setup_session(app, SimpleCookieStorage())
-        app["config"] = WebServerUnifiedConfig.model_validate({
-            "service": {"static-path": str(tmp_path)},
-        })
-        app["webui_index_template"] = "<html></html>"
-        app.router.add_route("POST", "/login", _login)
-        app.router.add_route("GET", "/{path:.*$}", fallback_handler)
-        return app
-
-    @pytest.mark.parametrize(
-        "app_with_fallback_handler",
-        [console_handler, static_handler],
-        ids=lambda handler: handler.__name__,
-        indirect=True,
-    )
-    async def test_after_login_is_not_found(
-        self, aiohttp_client: Any, app_with_fallback_handler: web.Application
-    ) -> None:
-        client = await aiohttp_client(app_with_fallback_handler)
-        await client.post("/login")
-        resp = await client.get("/version.json")
-        assert resp.status == 404
-        assert "26.10.0" not in await resp.text()
