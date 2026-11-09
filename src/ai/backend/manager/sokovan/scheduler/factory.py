@@ -257,6 +257,7 @@ def _create_lifecycle_handlers(
         ScheduleType.START: StartSessionsLifecycleHandler(
             args.launcher,
             args.scheduler_repository,
+            args.scheduling_controller,
         ),
         ScheduleType.TERMINATE: TerminateSessionsLifecycleHandler(
             args.terminator,
