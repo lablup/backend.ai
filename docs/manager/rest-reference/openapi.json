@@ -28640,6 +28640,12 @@
             "description": "Display ordering rank. Lower values appear first.",
             "title": "Rank",
             "type": "integer"
+          },
+          "sealed_launch": {
+            "default": false,
+            "description": "Whether a kernel holding this slot must be launched sealed or fail.",
+            "title": "Sealed Launch",
+            "type": "boolean"
           }
         },
         "required": [
@@ -28763,6 +28769,18 @@
             "default": null,
             "description": "Display ordering rank.",
             "title": "Rank"
+          },
+          "sealed_launch": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether a kernel holding this slot must be launched sealed or fail.",
+            "title": "Sealed Launch"
           }
         },
         "required": [
