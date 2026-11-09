@@ -10,6 +10,7 @@ from ai.backend.agent.containerd.rpc.types import (
     ContainerRecord,
     ImageTarget,
     MountSpec,
+    RuntimeOptions,
     TaskInfo,
     TaskState,
 )
@@ -29,6 +30,7 @@ class FakeContainerd:
     containers: dict[str, ContainerRecord]
     snapshots: dict[str, Sequence[MountSpec]]
     specs: dict[str, tuple[str, Mapping[str, Any]]]
+    runtime_options: dict[str, RuntimeOptions | None]
     tasks: dict[str, TaskInfo]
     calls: list[str]
     closed: bool
@@ -46,6 +48,7 @@ class FakeContainerd:
         self.containers = {}
         self.snapshots = {}
         self.specs = {}
+        self.runtime_options = {}
         self.tasks = {}
         self.calls = []
         self.closed = False
@@ -104,11 +107,16 @@ class FakeContainerd:
         self.snapshots.pop(key, None)
 
     async def create_container(
-        self, record: ContainerRecord, runtime: str, spec: Mapping[str, Any], *_: Any
+        self,
+        record: ContainerRecord,
+        runtime: str,
+        spec: Mapping[str, Any],
+        runtime_options: RuntimeOptions | None = None,
     ) -> None:
         self._call("create_container")
         self.containers[record.id] = record
         self.specs[record.id] = (runtime, spec)
+        self.runtime_options[record.id] = runtime_options
 
     async def get_container(self, container_id: str) -> ContainerRecord | None:
         return self.containers.get(container_id)

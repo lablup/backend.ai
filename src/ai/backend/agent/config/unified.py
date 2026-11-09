@@ -2429,6 +2429,35 @@ class ContainerdConfig(BaseConfigSchema):
             example=ConfigExample(local="30.0", prod="120.0"),
         ),
     ]
+    runtime_profile: Annotated[
+        str,
+        Field(
+            default="runc",
+            min_length=1,
+            validation_alias=AliasChoices("runtime-profile", "runtime_profile"),
+            serialization_alias="runtime-profile",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Runtime profile that runs the kernels: the built-in 'runc', or the name of "
+                "a backendai_runtime_profile_v1 entry point."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="runc", prod="runc"),
+        ),
+    ]
+    profiles: Annotated[
+        dict[str, dict[str, Any]],
+        Field(default_factory=dict),
+        BackendAIConfigMeta(
+            description=(
+                "Per-profile options, keyed by profile name; "
+                "each table is passed to that profile's entry point."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="{}", prod="{}"),
+        ),
+    ]
     bridge_name: Annotated[
         str,
         Field(

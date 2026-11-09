@@ -10,8 +10,10 @@ from pytest_mock import MockerFixture
 from ai.backend.agent.agent import AbstractAgent
 from ai.backend.agent.config.unified import AgentUnifiedConfig, ContainerdConfig
 from ai.backend.agent.containerd.agent import ContainerdAgent
+from ai.backend.agent.containerd.profile.runc import RuncProfile
 from ai.backend.agent.containerd.rpc.client import ContainerdClient
 from ai.backend.agent.errors.agent import InvalidAgentConfigError
+from ai.backend.agent.errors.containerd import RuntimeProfileLoadError
 from ai.backend.common.types import KernelId
 
 
@@ -48,6 +50,19 @@ class TestContainerdAgentInit:
         agent = _new_agent(_local_config({"bridge-name": "bai1", "bridge-subnet": "10.9.0.0/24"}))
 
         assert agent._network.netns_path(KernelId(uuid.UUID(int=1))).startswith("/run/netns/bai1-")
+
+    def test_default_config_selects_the_runc_profile(self, base_init: MagicMock) -> None:
+        agent = _new_agent(_local_config({}))
+
+        assert isinstance(agent._profile, RuncProfile)
+
+    def test_unknown_profile_stops_the_agent_before_the_base_init(
+        self, base_init: MagicMock
+    ) -> None:
+        with pytest.raises(RuntimeProfileLoadError, match="not-installed"):
+            _new_agent(_local_config({"runtime-profile": "not-installed"}))
+
+        base_init.assert_not_called()
 
     def test_base_init_receives_the_remaining_arguments(self, base_init: MagicMock) -> None:
         config = _local_config({})

@@ -13,6 +13,7 @@ from pytest_mock import MockerFixture
 from ai.backend.agent.config.unified import ContainerdConfig
 from ai.backend.agent.containerd.agent import KERNEL_IP_LABEL, ContainerdAgent
 from ai.backend.agent.containerd.network import KernelNetwork
+from ai.backend.agent.containerd.profile.runc import RuncProfile
 from ai.backend.agent.containerd.rpc.types import ContainerRecord, TaskInfo, TaskState
 from ai.backend.agent.errors.containerd import KernelVerbNotSupported
 from ai.backend.agent.port_pool import PortPool
@@ -40,6 +41,7 @@ def agent(
     instance.resource_lock = asyncio.Lock()
     instance._client = cast(Any, fake)
     instance._network = network
+    instance._profile = RuncProfile()
     instance.port_pool = PortPool((30000, 30009), cooldown_sec=0)
     instance.error_monitor = MagicMock(capture_exception=AsyncMock())
     monkeypatch.setattr(instance, "reconstruct_resource_usage", AsyncMock())

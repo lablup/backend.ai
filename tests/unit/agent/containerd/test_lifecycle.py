@@ -13,7 +13,7 @@ from ai.backend.agent.containerd.lifecycle import (
     destroy_container,
     launch_container,
 )
-from ai.backend.agent.containerd.rpc.types import ContainerRecord
+from ai.backend.agent.containerd.rpc.types import ContainerRecord, RuntimeOptions
 from ai.backend.agent.errors.containerd import ContainerdOperationFailed
 
 from .fakes import FakeContainerd
@@ -21,7 +21,7 @@ from .fakes import FakeContainerd
 CID = "kernel-1-abcd1234"
 
 
-async def _launch(fake: FakeContainerd) -> int:
+async def _launch(fake: FakeContainerd, options: RuntimeOptions | None = None) -> int:
     record = ContainerRecord(CID, "img:1", "overlayfs", CID, {"k": "v"})
     return await launch_container(
         fake,
@@ -29,6 +29,7 @@ async def _launch(fake: FakeContainerd) -> int:
         runtime="io.containerd.runc.v2",
         chain_id="sha256:aa",
         spec={"ociVersion": "1.1.0"},
+        runtime_options=options,
     )
 
 
@@ -42,6 +43,13 @@ class TestLaunch:
             "create_task",
             "start_task",
         ]
+
+    async def test_runtime_options_reach_container_creation(self, fake: FakeContainerd) -> None:
+        options = RuntimeOptions(type_url="t/1", value=b"v")
+
+        await _launch(fake, options)
+
+        assert fake.runtime_options[CID] == options
 
     async def test_failure_removes_everything_created(self, fake: FakeContainerd) -> None:
         fake.failing.add("start_task")

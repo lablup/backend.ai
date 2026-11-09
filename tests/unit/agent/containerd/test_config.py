@@ -35,6 +35,10 @@ class TestContainerdConfig:
         with pytest.raises(BackendAISchemaValidationFailed):
             ContainerdConfig.model_validate({"create-task-timeout": value})
 
+    def test_empty_runtime_profile_is_refused(self) -> None:
+        with pytest.raises(BackendAISchemaValidationFailed):
+            ContainerdConfig.model_validate({"runtime-profile": ""})
+
     def test_bridge_defaults_and_subnet_aliases(self) -> None:
         config = ContainerdConfig.model_validate({})
         assert (config.bridge_name, str(config.bridge_subnet)) == ("bai0", "172.30.0.0/24")

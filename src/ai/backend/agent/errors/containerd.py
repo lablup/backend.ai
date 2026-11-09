@@ -1,4 +1,4 @@
-"""Errors raised by the containerd backend."""
+"""Errors raised by the containerd backend and its runtime profiles."""
 
 from __future__ import annotations
 
@@ -27,6 +27,21 @@ class KernelVerbNotSupported(BackendAIError, web.HTTPNotImplemented):
             domain=ErrorDomain.KERNEL,
             operation=ErrorOperation.EXECUTE,
             error_detail=ErrorDetail.NOT_IMPLEMENTED,
+        )
+
+
+class RuntimeProfileLoadError(BackendAIError, web.HTTPInternalServerError):
+    """Raised when the configured runtime profile is unknown or cannot be loaded."""
+
+    error_type = "https://api.backend.ai/probs/agent/runtime-profile-load-failed"
+    error_title = "The runtime profile cannot be loaded."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.PLUGIN,
+            operation=ErrorOperation.SETUP,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
         )
 
 
