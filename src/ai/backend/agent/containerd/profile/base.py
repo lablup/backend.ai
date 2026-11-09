@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 from ai.backend.agent.containerd.rpc.types import RuntimeOptions
 from ai.backend.common.types import KernelCreationConfig
+from ai.backend.logging.structured import StructuredLogger
+
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @dataclass(frozen=True)
@@ -38,3 +42,22 @@ class RuntimeProfile(Protocol):
     def name(self) -> str: ...
 
     def plan(self, kernel_config: KernelCreationConfig) -> LaunchPlan: ...
+
+    def describe_failure(self, exit_status: int | None, error_text: str) -> str | None:
+        """Name why a kernel failed (exit_status is None when no task ran); None keeps the message."""
+        return None
+
+
+def describe_profile_failure(
+    profile: RuntimeProfile, exit_status: int | None, error_text: str
+) -> str | None:
+    """Call profile.describe_failure(); a missing or failing hook describes nothing."""
+    describe = getattr(profile, "describe_failure", None)
+    if describe is None:
+        return None
+    try:
+        reason: str | None = describe(exit_status, error_text)
+    except Exception:
+        log.exception("runtime profile describe_failure failed", profile=profile.name)
+        return None
+    return reason

@@ -4,6 +4,7 @@ import asyncio
 import uuid
 from collections.abc import Mapping
 from ipaddress import IPv4Address
+from pathlib import Path
 from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
@@ -33,10 +34,12 @@ def agent(
     network: KernelNetwork,
     runner: FakeCommandRunner,
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> ContainerdAgent:
     """A bare agent carrying only the attributes the tested methods touch."""
     instance = object.__new__(ContainerdAgent)
     instance.local_config = MagicMock()
+    instance.local_config.container.scratch_root = tmp_path
     instance.id = AgentId("i-test")
     instance.resource_lock = asyncio.Lock()
     instance._client = cast(Any, fake)
@@ -250,6 +253,17 @@ class TestDestroyAndClean:
 
         assert fake.containers == {} and fake.tasks == {} and fake.snapshots == {}
         cast(AsyncMock, agent.reconstruct_resource_usage).assert_not_awaited()
+
+    async def test_signature_directory_is_removed(
+        self, agent: ContainerdAgent, fake: FakeContainerd, tmp_path: Path
+    ) -> None:
+        kid = _add_container(fake, "c1", state=TaskState.STOPPED)
+        (tmp_path / str(kid)).mkdir()
+        (tmp_path / str(kid) / "spec.jws").write_bytes(b"a.b.c")
+
+        await agent.clean_kernel(kid, ContainerId("c1"), False)
+
+        assert not (tmp_path / str(kid)).exists()
 
     async def test_containerd_errors_are_swallowed(
         self, agent: ContainerdAgent, fake: FakeContainerd

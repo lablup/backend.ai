@@ -6,6 +6,7 @@ from typing import override
 
 from aiohttp import web
 
+from ai.backend.agent.errors.agent import KernelExitedBeforeReadyError
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -165,16 +166,23 @@ class ReadinessTimeout(BackendAIError, web.HTTPGatewayTimeout):
         )
 
 
-class KernelTaskExited(BackendAIError, web.HTTPInternalServerError):
+class KernelTaskExited(KernelExitedBeforeReadyError):
     """Raised when the task of a kernel exits or disappears before the kernel is ready."""
 
     error_type = "https://api.backend.ai/probs/agent/kernel-task-exited"
     error_title = "The kernel task exited before it became ready."
+
+
+class SealedSpecMissing(BackendAIError, web.HTTPBadRequest):
+    """Raised when a sealed kernel is created without the signature of its launch spec."""
+
+    error_type = "https://api.backend.ai/probs/agent/sealed-spec-missing"
+    error_title = "A sealed kernel has no spec signature."
 
     @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.KERNEL,
             operation=ErrorOperation.CREATE,
-            error_detail=ErrorDetail.INTERNAL_ERROR,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
         )

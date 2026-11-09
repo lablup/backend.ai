@@ -26,13 +26,20 @@ from ai.backend.agent.containerd.lifecycle import (
     launch_container,
 )
 from ai.backend.agent.containerd.network import KernelNetwork, PortForward
-from ai.backend.agent.containerd.profile.base import RuntimeProfile
+from ai.backend.agent.containerd.profile.base import RuntimeProfile, describe_profile_failure
 from ai.backend.agent.containerd.profile.loader import load_runtime_profile
 from ai.backend.agent.containerd.rpc.client import ContainerdAPI, ContainerdClient
 from ai.backend.agent.containerd.rpc.types import (
     ContainerdClientConfig,
     ContainerRecord,
     TaskState,
+)
+from ai.backend.agent.containerd.sealed import (
+    remove_spec_dir,
+    spec_jws_mount,
+    spec_jws_path,
+    spec_signature,
+    write_spec_jws,
 )
 from ai.backend.agent.containerd.spec import (
     SpecInput,
@@ -41,7 +48,11 @@ from ai.backend.agent.containerd.spec import (
     merge_env,
 )
 from ai.backend.agent.errors import UnsupportedResource
-from ai.backend.agent.errors.agent import InvalidAgentConfigError, UnsupportedBaseDistroError
+from ai.backend.agent.errors.agent import (
+    ContainerCreationFailedError,
+    InvalidAgentConfigError,
+    UnsupportedBaseDistroError,
+)
 from ai.backend.agent.errors.containerd import KernelNetworkSetupFailed, KernelVerbNotSupported
 from ai.backend.agent.etcd import AgentEtcdClientView
 from ai.backend.agent.kernel import AbstractKernel
@@ -158,6 +169,8 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
     _address: IPv4Address | None
     _resource_lock: asyncio.Lock
     _base_spec: dict[str, Any]
+    _spec_signature: str | None
+    _spec_mount: dict[str, Any] | None
 
     def __init__(
         self,
@@ -193,6 +206,9 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         self._address = None
         self._resource_lock = resource_lock
         self._base_spec = {}
+        # Read first: a sealed kernel without a signature fails before anything is created.
+        self._spec_signature = spec_signature(kernel_config)
+        self._spec_mount = None
 
     @override
     async def get_extra_envs(self) -> Mapping[str, str]:
@@ -331,9 +347,12 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         )
         # A failed setup tears down what it created.
         try:
+            if self._spec_signature is not None:
+                await self._add_spec_jws(self._spec_signature)
             self._address = await self._network.setup(self.kernel_id)
         except BaseException:
             await self._teardown_network()
+            await self._remove_spec_dir()
             raise
         return ContainerdKernel(
             self.ownership_data,
@@ -346,7 +365,18 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             environ=environ,
             data={},
             client=self._client,
+            profile=self._profile,
         )
+
+    async def _add_spec_jws(self, signature: str) -> None:
+        root = self.local_config.container.scratch_root
+        path = spec_jws_path(root, str(self.kernel_id))
+        await asyncio.to_thread(write_spec_jws, path, signature)
+        self._spec_mount = spec_jws_mount(path)
+
+    async def _remove_spec_dir(self) -> None:
+        root = self.local_config.container.scratch_root
+        await asyncio.to_thread(remove_spec_dir, root, str(self.kernel_id))
 
     def _acquire_host_ports(self, count: int) -> list[int]:
         acquired: list[int] = []
@@ -414,6 +444,9 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
                 cgroups_path=f"/{self._client.namespace}/{container_id}",
                 spec_patch=launch_plan.spec_patch,
             )
+            if self._spec_mount is not None:
+                # After the patch: a profile's spec_patch["mounts"] replaces the base list.
+                spec.setdefault("mounts", []).append(self._spec_mount)
             record = ContainerRecord(
                 id=container_id,
                 image=image_name,
@@ -429,11 +462,20 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
                 spec=spec,
                 runtime_options=launch_plan.runtime_options,
             )
-        except BaseException:
+        except BaseException as e:
             self._port_pool.release_many(host_ports)
             await self._teardown_network()
             await self._free_allocations(kernel_obj.resource_spec)
-            raise
+            await self._remove_spec_dir()
+            if not isinstance(e, Exception):
+                raise
+            reason = describe_profile_failure(self._profile, None, str(e))
+            if reason is None:
+                raise
+            raise ContainerCreationFailedError(
+                f"Kernel failed to create container (k:{self.kernel_id!s}, detail: {e!s})",
+                failure_reason=reason,
+            ) from e
         container = self.local_config.container
         return {
             "container_id": container_id,
@@ -715,6 +757,9 @@ class ContainerdAgent(
             await self._network.teardown(kernel_id)
         except BackendAIError:
             log.exception("kernel network teardown failed", kernel_id=kernel_id)
+        await asyncio.to_thread(
+            remove_spec_dir, self.local_config.container.scratch_root, str(kernel_id)
+        )
 
     @override
     async def create_local_network(self, network_name: str) -> None:

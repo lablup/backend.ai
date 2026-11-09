@@ -3,7 +3,8 @@ from __future__ import annotations
 import asyncio
 from decimal import Decimal
 from ipaddress import IPv4Address
-from typing import Any, cast
+from pathlib import Path
+from typing import Any, cast, override
 from unittest.mock import MagicMock
 
 import pytest
@@ -13,10 +14,15 @@ from ai.backend.agent.containerd.agent import ContainerdKernelCreationContext as
 from ai.backend.agent.containerd.intrinsic import CPUSET_LABEL, MEMORY_LABEL
 from ai.backend.agent.containerd.kernel import ContainerdKernel
 from ai.backend.agent.containerd.network import KernelNetwork
-from ai.backend.agent.containerd.profile.base import LaunchPlan, TlsConnectReadiness
+from ai.backend.agent.containerd.profile.base import LaunchPlan, RuntimeProfile, TlsConnectReadiness
 from ai.backend.agent.containerd.profile.runc import RuncProfile
 from ai.backend.agent.containerd.rpc.types import RuntimeOptions
-from ai.backend.agent.errors.containerd import ContainerdOperationFailed, KernelNetworkSetupFailed
+from ai.backend.agent.errors.agent import ContainerCreationFailedError
+from ai.backend.agent.errors.containerd import (
+    ContainerdOperationFailed,
+    KernelNetworkSetupFailed,
+    SealedSpecMissing,
+)
 from ai.backend.agent.errors.resources import PortPoolExhaustedError
 from ai.backend.agent.port_pool import PortPool
 from ai.backend.agent.resources import ComputerContext, KernelResourceSpec
@@ -79,8 +85,10 @@ def ctx(
     alloc_map: MagicMock,
     network: KernelNetwork,
     port_pool: PortPool,
+    tmp_path: Path,
 ) -> Ctx:
     local_config = MagicMock()
+    local_config.container.scratch_root = tmp_path
     local_config.container.sandbox_type = "docker"
     local_config.container.advertised_host = None
     local_config.container.bind_host = "10.0.0.5"
@@ -170,34 +178,176 @@ class TestPrepareContainer:
         assert runner.matching("ip", "netns", "del") == [("ip", "netns", "del", ns)]
 
 
-class _PatchingProfile:
+class _PatchingProfile(RuntimeProfile):
     @property
+    @override
     def name(self) -> str:
         return "patching"
 
+    @override
     def plan(self, kernel_config: KernelCreationConfig) -> LaunchPlan:
         options = RuntimeOptions(type_url="t/1", value=b"v")
         return LaunchPlan("io.example.v1", {"annotations": {"k": "v"}}, options)
 
 
-class _TlsProfile:
+class _TlsProfile(RuntimeProfile):
     PLAN = LaunchPlan("io.example.v1", readiness=TlsConnectReadiness("8080", 60.0))
 
     @property
+    @override
     def name(self) -> str:
         return "tls"
 
+    @override
     def plan(self, kernel_config: KernelCreationConfig) -> LaunchPlan:
         return self.PLAN
 
 
-class _FailingProfile:
+class _FailingProfile(RuntimeProfile):
     @property
+    @override
     def name(self) -> str:
         return "failing"
 
+    @override
     def plan(self, kernel_config: KernelCreationConfig) -> LaunchPlan:
         raise RuntimeError("plan failed")
+
+
+def _sealed(config: KernelCreationConfig, signature: str) -> KernelCreationConfig:
+    return cast(KernelCreationConfig, {**config, "confidential": {"signature": signature}})
+
+
+def _rebuilt(ctx: Ctx, config: KernelCreationConfig, profile: RuntimeProfile | None = None) -> Ctx:
+    return Ctx(
+        ctx.ownership_data,
+        MagicMock(),
+        MagicMock(),
+        config,
+        "ubuntu22.04",
+        ctx.local_config,
+        ctx.computers,
+        profile=profile or RuncProfile(),
+        client=ctx._client,
+        network=ctx._network,
+        port_pool=ctx._port_pool,
+        resource_lock=asyncio.Lock(),
+    )
+
+
+class _MountPatchingProfile(RuntimeProfile):
+    @property
+    @override
+    def name(self) -> str:
+        return "mount-patching"
+
+    @override
+    def plan(self, kernel_config: KernelCreationConfig) -> LaunchPlan:
+        return LaunchPlan("io.example.v1", {"mounts": []})
+
+
+class _NamingProfile(RuntimeProfile):
+    @property
+    @override
+    def name(self) -> str:
+        return "naming"
+
+    @override
+    def plan(self, kernel_config: KernelCreationConfig) -> LaunchPlan:
+        return LaunchPlan("io.containerd.runc.v2")
+
+    @override
+    def describe_failure(self, exit_status: int | None, error_text: str) -> str | None:
+        return "named reason"
+
+
+class TestSealedSpec:
+    async def test_unsealed_kernel_has_no_spec_mount(
+        self, ctx: Ctx, resource_spec: KernelResourceSpec, fake: FakeContainerd
+    ) -> None:
+        kernel = await _prepare(ctx, resource_spec)
+
+        data = await ctx.start_container(kernel, [], None, [], MagicMock())
+
+        mounts = dict(fake.specs[data["container_id"]][1])["mounts"]
+        assert all(m["destination"] != "/run/bai/spec.jws" for m in mounts)
+
+    async def test_sealed_kernel_gets_the_signature_file_and_mount(
+        self, ctx: Ctx, resource_spec: KernelResourceSpec, fake: FakeContainerd, tmp_path: Path
+    ) -> None:
+        sealed = _rebuilt(ctx, _sealed(ctx.kernel_config, "aaa.bbb.ccc"))
+        kernel = await _prepare(sealed, resource_spec)
+
+        data = await sealed.start_container(kernel, [], None, [], MagicMock())
+
+        path = tmp_path / str(sealed.kernel_id) / "spec.jws"
+        assert path.read_bytes() == b"aaa.bbb.ccc"
+        assert dict(fake.specs[data["container_id"]][1])["mounts"][-1] == {
+            "destination": "/run/bai/spec.jws",
+            "type": "bind",
+            "source": str(path),
+            "options": ["rbind", "ro", "rprivate"],
+        }
+
+    async def test_profile_patching_mounts_keeps_the_spec_mount(
+        self, ctx: Ctx, resource_spec: KernelResourceSpec, fake: FakeContainerd
+    ) -> None:
+        sealed = _rebuilt(ctx, _sealed(ctx.kernel_config, "aaa.bbb.ccc"), _MountPatchingProfile())
+        kernel = await _prepare(sealed, resource_spec)
+
+        data = await sealed.start_container(kernel, [], None, [], MagicMock())
+
+        mounts = dict(fake.specs[data["container_id"]][1])["mounts"]
+        assert [m["destination"] for m in mounts] == ["/run/bai/spec.jws"]
+
+    async def test_sealed_kernel_without_a_signature_is_refused_at_construction(
+        self, ctx: Ctx
+    ) -> None:
+        config = cast(KernelCreationConfig, {**ctx.kernel_config, "confidential": {}})
+
+        with pytest.raises(SealedSpecMissing):
+            _rebuilt(ctx, config)
+
+    async def test_failed_network_setup_removes_the_signature_file(
+        self,
+        ctx: Ctx,
+        resource_spec: KernelResourceSpec,
+        runner: FakeCommandRunner,
+        tmp_path: Path,
+    ) -> None:
+        sealed = _rebuilt(ctx, _sealed(ctx.kernel_config, "aaa.bbb.ccc"))
+        runner.script(["ip", "netns", "add"], returncode=1)
+
+        with pytest.raises(KernelNetworkSetupFailed):
+            await _prepare(sealed, resource_spec)
+
+        assert not (tmp_path / str(sealed.kernel_id)).exists()
+
+    async def test_failed_launch_removes_the_signature_file(
+        self, ctx: Ctx, resource_spec: KernelResourceSpec, fake: FakeContainerd, tmp_path: Path
+    ) -> None:
+        sealed = _rebuilt(ctx, _sealed(ctx.kernel_config, "aaa.bbb.ccc"))
+        kernel = await _prepare(sealed, resource_spec)
+        fake.failing.add("create_task")
+
+        with pytest.raises(ContainerdOperationFailed):
+            await sealed.start_container(kernel, [], None, [], MagicMock())
+
+        assert not (tmp_path / str(sealed.kernel_id)).exists()
+
+
+class TestCreateFailureReason:
+    async def test_profile_reason_is_added_to_the_creation_error(
+        self, ctx: Ctx, resource_spec: KernelResourceSpec, fake: FakeContainerd
+    ) -> None:
+        ctx._profile = _NamingProfile()
+        kernel = await _prepare(ctx, resource_spec)
+        fake.failing.add("create_task")
+
+        with pytest.raises(ContainerCreationFailedError, match="named reason: ") as exc_info:
+            await ctx.start_container(kernel, [], None, [], MagicMock())
+
+        assert isinstance(exc_info.value.__cause__, ContainerdOperationFailed)
 
 
 class TestStartContainer:

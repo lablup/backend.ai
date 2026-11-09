@@ -9,7 +9,12 @@ from typing import Any, Final, override
 
 from tenacity import TryAgain
 
-from ai.backend.agent.containerd.profile.base import LaunchPlan, TlsConnectReadiness
+from ai.backend.agent.containerd.profile.base import (
+    LaunchPlan,
+    RuntimeProfile,
+    TlsConnectReadiness,
+    describe_profile_failure,
+)
 from ai.backend.agent.containerd.rpc.client import ContainerdAPI
 from ai.backend.agent.containerd.rpc.types import TaskState
 from ai.backend.agent.errors.containerd import (
@@ -38,6 +43,7 @@ _TLS_RETRY_INTERVAL_SEC: Final = 1.0
 
 class ContainerdKernel(AbstractKernel):
     launch_plan: LaunchPlan | None
+    _profile: RuntimeProfile | None
     _client: ContainerdAPI
     _readiness_deadline: float | None
 
@@ -54,6 +60,7 @@ class ContainerdKernel(AbstractKernel):
         data: dict[Any, Any],
         environ: Mapping[str, Any],
         client: ContainerdAPI,
+        profile: RuntimeProfile | None = None,
     ) -> None:
         super().__init__(
             ownership_data,
@@ -69,6 +76,7 @@ class ContainerdKernel(AbstractKernel):
         # Set by start_container, where the profile plans the launch.
         self.launch_plan = None
         self._client = client
+        self._profile = profile
         self._readiness_deadline = None
 
     @override
@@ -124,11 +132,22 @@ class ContainerdKernel(AbstractKernel):
             log.debug("kernel task lookup failed", kernel_id=str(self.kernel_id), error=repr(e))
             return
         if task is None:
-            raise KernelTaskExited(f"the kernel task is gone (container {container_id})")
+            message = f"the kernel task is gone (container {container_id})"
+            raise KernelTaskExited(message, failure_reason=self._describe(None, message))
         if task.state is TaskState.STOPPED:
-            raise KernelTaskExited(
+            message = (
                 f"the kernel task exited with status {task.exit_status} (container {container_id})"
             )
+            raise KernelTaskExited(
+                message,
+                exit_status=task.exit_status,
+                failure_reason=self._describe(task.exit_status, message),
+            )
+
+    def _describe(self, exit_status: int | None, message: str) -> str | None:
+        if self._profile is None:
+            return None
+        return describe_profile_failure(self._profile, exit_status, message)
 
     async def _check_tls_status(self, readiness: TlsConnectReadiness) -> dict[str, Any]:
         loop = asyncio.get_running_loop()

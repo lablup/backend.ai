@@ -62,11 +62,20 @@ class ImagePullFailedError(BackendAIError, web.HTTPBadGateway):
         )
 
 
+def _prefix_failure_reason(extra_msg: str | None, failure_reason: str | None) -> str | None:
+    if failure_reason is None:
+        return extra_msg
+    return f"{failure_reason}: {extra_msg}" if extra_msg else failure_reason
+
+
 class ContainerCreationFailedError(BackendAIError, web.HTTPInternalServerError):
     """Raised when container creation fails (final error to return to client)."""
 
     error_type = "https://api.backend.ai/probs/agent/container-creation-failed"
     error_title = "Container creation failed."
+
+    def __init__(self, extra_msg: str | None = None, *, failure_reason: str | None = None) -> None:
+        super().__init__(_prefix_failure_reason(extra_msg, failure_reason))
 
     @override
     def error_code(self) -> ErrorCode:
@@ -119,6 +128,33 @@ class ContainerStartupFailedError(BackendAIError, web.HTTPInternalServerError):
             domain=ErrorDomain.KERNEL,
             operation=ErrorOperation.START,
             error_detail=ErrorDetail.NOT_READY,
+        )
+
+
+class KernelExitedBeforeReadyError(BackendAIError, web.HTTPInternalServerError):
+    """Raised when the kernel's process exits or disappears before the kernel is ready."""
+
+    error_type = "https://api.backend.ai/probs/agent/kernel-exited-before-ready"
+    error_title = "The kernel exited before it became ready."
+
+    exit_status: int | None
+
+    def __init__(
+        self,
+        extra_msg: str | None = None,
+        *,
+        exit_status: int | None = None,
+        failure_reason: str | None = None,
+    ) -> None:
+        super().__init__(_prefix_failure_reason(extra_msg, failure_reason))
+        self.exit_status = exit_status
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.KERNEL,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
         )
 
 

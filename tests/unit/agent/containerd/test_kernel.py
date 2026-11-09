@@ -7,7 +7,7 @@ import ssl
 import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 from unittest.mock import MagicMock
 
 import pytest
@@ -21,6 +21,7 @@ from tenacity import AsyncRetrying, TryAgain, retry_if_exception_type, stop_afte
 from ai.backend.agent.containerd import kernel as kernel_module
 from ai.backend.agent.containerd.kernel import ContainerdKernel
 from ai.backend.agent.containerd.profile.base import LaunchPlan, TlsConnectReadiness
+from ai.backend.agent.containerd.profile.runc import RuncProfile
 from ai.backend.agent.containerd.rpc.types import TaskInfo, TaskState
 from ai.backend.agent.errors.containerd import (
     ContainerdOperationFailed,
@@ -48,6 +49,12 @@ def kernel(ownership_data: KernelOwnershipData, fake: FakeContainerd) -> Contain
         data={},
         client=fake,
     )
+
+
+class _NamingProfile(RuncProfile):
+    @override
+    def describe_failure(self, exit_status: int | None, error_text: str) -> str | None:
+        return f"named {exit_status}"
 
 
 class TestContainerdKernelInit:
@@ -345,11 +352,13 @@ class TestCheckStatusTlsTaskExit:
         fast_probe: None,
         refused: RefusingConnect,
     ) -> None:
+        tls_kernel._profile = _NamingProfile()
         fake.tasks[CONTAINER_ID] = TaskInfo(pid=1000, state=TaskState.STOPPED, exit_status=137)
 
-        with pytest.raises(KernelTaskExited, match="status 137") as exc_info:
+        with pytest.raises(KernelTaskExited, match=r"named 137: .*status 137") as exc_info:
             await tls_kernel.check_status()
 
+        assert exc_info.value.exit_status == 137
         assert not isinstance(exc_info.value, TryAgain)
         assert refused.calls == 1
 

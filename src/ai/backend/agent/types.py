@@ -177,6 +177,8 @@ class ContainerLifecycleEvent:
     done_future: asyncio.Future[Any] | None = None
     exit_code: int | None = None
     suppress_events: bool = False
+    # Not exit_code: Docker passes a raw string there and the events must keep -1 for it.
+    task_exit_status: int | None = None
 
     @override
     def __str__(self) -> str:
