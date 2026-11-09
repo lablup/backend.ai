@@ -358,7 +358,8 @@ class ArtifactRepository:
     async def mark_artifact_revision_pulling(
         self, artifact_revision_id: ArtifactRevisionID
     ) -> None:
-        """Raises ArtifactRevisionImportInProgressError if the revision is already being imported."""
+        """Raises ArtifactRevisionNotFoundError if the revision does not exist and
+        ArtifactRevisionImportInProgressError if it is already being imported."""
         await self._db_source.mark_artifact_revision_pulling(artifact_revision_id)
 
     @artifact_repository_resilience.apply()

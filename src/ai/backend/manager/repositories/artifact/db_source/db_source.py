@@ -252,20 +252,24 @@ class ArtifactDBSource:
         self, artifact_revision_id: ArtifactRevisionID
     ) -> None:
         async with self._db.begin_session() as db_sess:
-            stmt = (
-                sa.update(ArtifactRevisionRow)
-                .where(
-                    ArtifactRevisionRow.id == artifact_revision_id,
-                    ArtifactRevisionRow.status.not_in(ARTIFACT_IMPORT_IN_PROGRESS_STATUSES),
-                )
-                .values(status=ArtifactStatus.PULLING)
-                .returning(ArtifactRevisionRow.id)
+            status = await db_sess.scalar(
+                sa.select(ArtifactRevisionRow.status)
+                .where(ArtifactRevisionRow.id == artifact_revision_id)
+                .with_for_update()
             )
-            result = await db_sess.execute(stmt)
-            if result.scalar_one_or_none() is None:
+            if status is None:
+                raise ArtifactRevisionNotFoundError(
+                    f"Artifact revision {artifact_revision_id} not found"
+                )
+            if status in ARTIFACT_IMPORT_IN_PROGRESS_STATUSES:
                 raise ArtifactRevisionImportInProgressError(
                     f"Artifact revision {artifact_revision_id} is already being imported"
                 )
+            await db_sess.execute(
+                sa.update(ArtifactRevisionRow)
+                .where(ArtifactRevisionRow.id == artifact_revision_id)
+                .values(status=ArtifactStatus.PULLING)
+            )
 
     async def update_artifact_revision_remote_status(
         self, artifact_revision_id: uuid.UUID, remote_status: ArtifactRemoteStatus
