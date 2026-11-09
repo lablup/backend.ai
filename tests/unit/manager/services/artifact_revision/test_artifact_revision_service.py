@@ -44,6 +44,7 @@ from ai.backend.manager.data.association.types import AssociationArtifactsStorag
 from ai.backend.manager.errors.artifact import (
     ArtifactImportBadRequestError,
     ArtifactRevisionDeletionBadRequestError,
+    ArtifactRevisionImportInProgressError,
 )
 from ai.backend.manager.errors.artifact_registry import InvalidArtifactRegistryTypeError
 from ai.backend.manager.errors.common import ServerMisconfiguredError
@@ -565,6 +566,12 @@ class _ImportStartedFirstByAnotherRequest:
     storage_proxy_client: MagicMock
 
 
+@dataclass(frozen=True)
+class _VFolderImportOfRevisionAlreadyImporting:
+    revision: ArtifactRevisionData
+    vfolder_uuid: VFolderUUID
+
+
 class TestImportArtifactRevisionAction:
     """Test cases for ImportArtifactRevisionAction"""
 
@@ -831,35 +838,78 @@ class TestImportArtifactRevisionAction:
             sample_revision.id, ArtifactStatus.AVAILABLE
         )
 
-    @pytest.fixture
-    def revision_already_pulling(
+    @pytest.fixture(
+        params=[ArtifactStatus.PULLING, ArtifactStatus.VERIFYING], ids=["pulling", "verifying"]
+    )
+    def revision_already_importing(
         self,
+        request: pytest.FixtureRequest,
         mock_revision_ops: MagicMock,
         mock_artifact_repository: MagicMock,
         sample_revision: ArtifactRevisionData,
     ) -> ArtifactRevisionData:
-        revision = replace(sample_revision, status=ArtifactStatus.PULLING)
+        revision = replace(sample_revision, status=request.param)
         mock_revision_ops.get_field = AsyncMock(return_value=revision)
         mock_artifact_repository.get_artifact_by_id = AsyncMock()
         mock_artifact_repository.update_artifact_revision_status = AsyncMock()
         return revision
 
-    async def test_revision_already_pulling_starts_no_import(
+    async def test_revision_already_importing_starts_no_import(
         self,
         service: ArtifactRevisionService,
         mock_artifact_repository: MagicMock,
         mock_storage_manager: MagicMock,
         mock_background_task_manager: MagicMock,
-        revision_already_pulling: ArtifactRevisionData,
+        revision_already_importing: ArtifactRevisionData,
     ) -> None:
         action = ImportArtifactRevisionAction(
-            artifact_revision_id=revision_already_pulling.id, force=True
+            artifact_revision_id=revision_already_importing.id, force=True
         )
         result = await service.import_revision(action)
 
-        assert result.result == revision_already_pulling
+        assert result.result == revision_already_importing
         assert result.task_id is None
         mock_storage_manager.get_manager_facing_client.assert_not_called()
+        mock_background_task_manager.start.assert_not_called()
+        mock_artifact_repository.update_artifact_revision_status.assert_not_called()
+
+    @pytest.fixture
+    def vfolder_import_of_revision_already_importing(
+        self,
+        mock_vfolder_repository: MagicMock,
+        mock_permission_check: MagicMock,
+        mock_storage_manager: MagicMock,
+        caller: UserData,
+        revision_already_importing: ArtifactRevisionData,
+    ) -> _VFolderImportOfRevisionAlreadyImporting:
+        vfolder_uuid = VFolderUUID(uuid.uuid4())
+        mock_permission_check.held_permissions = AsyncMock(
+            return_value={vfolder_uuid: Permission.READ | Permission.UPDATE}
+        )
+        vfolder_data = MagicMock()
+        vfolder_data.id = vfolder_uuid
+        vfolder_data.quota_scope_id = "user:" + str(caller.user_id)
+        vfolder_data.host = "local:volume1"
+        mock_vfolder_repository.get_by_id = AsyncMock(return_value=vfolder_data)
+        mock_storage_manager.get_proxy_and_volume.return_value = ("local", "volume1")
+        return _VFolderImportOfRevisionAlreadyImporting(
+            revision=revision_already_importing, vfolder_uuid=vfolder_uuid
+        )
+
+    async def test_vfolder_import_of_revision_already_importing_is_rejected(
+        self,
+        service: ArtifactRevisionService,
+        mock_artifact_repository: MagicMock,
+        mock_background_task_manager: MagicMock,
+        vfolder_import_of_revision_already_importing: _VFolderImportOfRevisionAlreadyImporting,
+    ) -> None:
+        situation = vfolder_import_of_revision_already_importing
+        action = ImportArtifactRevisionAction(
+            artifact_revision_id=situation.revision.id, vfolder_id=situation.vfolder_uuid
+        )
+        with pytest.raises(ArtifactRevisionImportInProgressError):
+            await service.import_revision(action)
+
         mock_background_task_manager.start.assert_not_called()
         mock_artifact_repository.update_artifact_revision_status.assert_not_called()
 

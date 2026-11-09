@@ -2,6 +2,7 @@ import uuid
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType, VerificationStepResult
 from ai.backend.common.data.entity.artifact import ArtifactID
+from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
 from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec
 from ai.backend.common.data.storage.registries.types import ModelData
 from ai.backend.common.data.storage.types import ArtifactStorageType
@@ -355,7 +356,7 @@ class ArtifactRepository:
 
     @artifact_repository_resilience.apply()
     async def mark_artifact_revision_pulling_if_unchanged(
-        self, artifact_revision_id: uuid.UUID, status_read_before: ArtifactStatus
+        self, artifact_revision_id: ArtifactRevisionID, status_read_before: ArtifactStatus
     ) -> bool:
         """Set the status to PULLING only if it is still `status_read_before`.
         Returns False when another import changed the status first."""

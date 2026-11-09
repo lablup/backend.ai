@@ -667,7 +667,7 @@ class TestArtifactRevisionRepository:
         case: _MarkPullingCase,
     ) -> None:
         marked = await artifact_repository.mark_artifact_revision_pulling_if_unchanged(
-            sample_revision_id, case.status_read_before
+            ArtifactRevisionID(sample_revision_id), case.status_read_before
         )
 
         revision = await revision_ops.get_field(
