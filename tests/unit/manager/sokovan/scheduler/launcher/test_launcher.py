@@ -11,12 +11,13 @@ Test Scenarios:
 from __future__ import annotations
 
 import logging
+from dataclasses import replace
 from unittest.mock import AsyncMock, MagicMock
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 
-from ai.backend.common.types import AutoPullBehavior
+from ai.backend.common.types import AgentId, AutoPullBehavior
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
 from ai.backend.manager.sokovan.scheduler.launcher.launcher import SessionLauncher
 from ai.backend.manager.views.sokovan.image import ImageConfigData
@@ -347,6 +348,43 @@ class TestSessionLauncherKernelCreation:
         environ = kernel_configs[0]["environ"]
         assert environ["A"] == "test-session"
         assert environ["U"] == "mine"
+
+    async def test_unbuildable_agent_does_not_block_other_agents(
+        self,
+        launcher: SessionLauncher,
+        mock_agent_client_pool: MagicMock,
+        mock_repository: AsyncMock,
+        mock_valkey_schedule: AsyncMock,
+        session_for_start_multi_kernel: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        """A kernel config that cannot be built fails only its own agent.
+
+        Given: Two agents, one kernel referencing an unknown image
+        When: Session is started
+        Then: create_kernels is awaited once (other agent), the bad agent is recorded
+              as failed, and no session error info is written
+        """
+        # Arrange
+        main, sub = session_for_start_multi_kernel.kernels
+        session = replace(
+            session_for_start_multi_kernel,
+            kernels=[
+                replace(main, agent_id=AgentId("agent-1")),
+                replace(sub, agent_id=AgentId("agent-2"), image_id=uuid4()),
+            ],
+        )
+
+        # Act
+        with RecorderContext.scope("test", entity_ids=[session.session_id]):
+            await launcher.start_sessions_for_handler([session], image_config_default)
+
+        # Assert
+        mock_agent_client_pool._mock_client.create_kernels.assert_awaited_once()
+        mock_valkey_schedule.record_session_failed_agents.assert_awaited_once_with(
+            session.session_id, [AgentId("agent-2")]
+        )
+        mock_repository.update_session_error_info.assert_not_awaited()
 
 
 # =============================================================================

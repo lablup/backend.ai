@@ -66,6 +66,14 @@ log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @dataclass
+class _AgentCreateRequest:
+    kernel_ids: list[KernelId]
+    kernel_configs: list[KernelCreationConfig]
+    cluster_info: ClusterInfo
+    kernel_image_refs: dict[KernelId, ImageRef]
+
+
+@dataclass
 class SessionLauncherArgs:
     scheduler_repository: SchedulerRepository
     system_session_environ_repository: SystemSessionEnvironRepository
@@ -311,11 +319,10 @@ class SessionLauncher:
             for img_id, img_cfg in image_configs.items():
                 image_configs_by_id[img_id] = img_cfg.to_image_config(auto_pull)
 
-            # Create kernels on each agent
-            async def create_kernels_on_agent(
-                agent_id: AgentId,
+            # Build the kernel creation request of each agent (no RPC is sent here)
+            async def build_agent_request(
                 agent_kernels: list[KernelBindingData],
-            ) -> None:
+            ) -> _AgentCreateRequest:
                 # Prepare kernel creation configs
                 kernel_ids = [k.kernel_id for k in agent_kernels]
                 kernel_configs: list[KernelCreationConfig] = []
@@ -419,26 +426,43 @@ class SessionLauncher:
                     "cluster_ssh_port_mapping": network_setup.cluster_ssh_port_mapping,
                 }
 
-                # Create the kernels using connection pool
+                return _AgentCreateRequest(
+                    kernel_ids, kernel_configs, cluster_info, kernel_image_refs
+                )
+
+            # Create kernels on an agent using connection pool
+            async def create_kernels_on_agent(
+                agent_id: AgentId, request: _AgentCreateRequest
+            ) -> None:
                 async with self._agent_client_pool.acquire(agent_id) as client:
                     await client.create_kernels(
                         session.session_id,
-                        kernel_ids,
-                        kernel_configs,
-                        cluster_info,
-                        kernel_image_refs,
+                        request.kernel_ids,
+                        request.kernel_configs,
+                        request.cluster_info,
+                        request.kernel_image_refs,
                     )
 
-            agent_ids_ordered: list[AgentId] = []
-            create_tasks: list[Awaitable[None]] = []
-            for agent_id, agent_kernels in kernels_by_agent.items():
-                agent_ids_ordered.append(agent_id)
-                create_tasks.append(create_kernels_on_agent(agent_id, agent_kernels))
-
-            if create_tasks:
+            agent_ids_ordered = list(kernels_by_agent)
+            failed_agent_ids: list[AgentId] = []
+            if agent_ids_ordered:
+                build_results = await asyncio.gather(
+                    *[build_agent_request(kernels_by_agent[aid]) for aid in agent_ids_ordered],
+                    return_exceptions=True,
+                )
+                create_tasks: list[Awaitable[None]] = []
+                sending_agent_ids: list[AgentId] = []
+                for aid, build_result in zip(agent_ids_ordered, build_results, strict=True):
+                    if isinstance(build_result, BaseException):
+                        log.error(
+                            "kernel creation failed on agent", agent_id=aid, exc_info=build_result
+                        )
+                        failed_agent_ids.append(aid)
+                    else:
+                        sending_agent_ids.append(aid)
+                        create_tasks.append(create_kernels_on_agent(aid, build_result))
                 results = await asyncio.gather(*create_tasks, return_exceptions=True)
-                failed_agent_ids: list[AgentId] = []
-                for aid, result in zip(agent_ids_ordered, results, strict=True):
+                for aid, result in zip(sending_agent_ids, results, strict=True):
                     if isinstance(result, BaseException):
                         log.error("kernel creation failed on agent", agent_id=aid, exc_info=result)
                         failed_agent_ids.append(aid)
