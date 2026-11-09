@@ -338,7 +338,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
                 chain_id=image.chain_id,
                 spec=spec,
             )
-        except Exception:
+        except BaseException:
             await self._free_allocations(kernel_obj.resource_spec)
             raise
         container = self.local_config.container
@@ -384,6 +384,7 @@ class ContainerdAgent(
                 address=containerd_config.address,
                 namespace=containerd_config.namespace,
                 snapshotter=containerd_config.snapshotter,
+                create_task_timeout=containerd_config.create_task_timeout,
             )
         )
 

@@ -9,6 +9,7 @@ from pytest_mock import MockerFixture
 from ai.backend.agent.agent import AbstractAgent
 from ai.backend.agent.config.unified import AgentUnifiedConfig, ContainerdConfig
 from ai.backend.agent.containerd.agent import ContainerdAgent
+from ai.backend.agent.containerd.rpc.client import ContainerdClient
 
 
 @pytest.fixture
@@ -29,6 +30,12 @@ def _new_agent(local_config: AgentUnifiedConfig) -> ContainerdAgent:
 
 
 class TestContainerdAgentInit:
+    def test_create_task_timeout_reaches_the_client(self, base_init: MagicMock) -> None:
+        agent = _new_agent(_local_config({"create-task-timeout": 120}))
+
+        assert isinstance(agent._client, ContainerdClient)
+        assert agent._client._config.create_task_timeout == 120.0
+
     def test_base_init_receives_the_remaining_arguments(self, base_init: MagicMock) -> None:
         config = _local_config({})
 

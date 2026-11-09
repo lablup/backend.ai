@@ -2412,6 +2412,23 @@ class ContainerdConfig(BaseConfigSchema):
             example=ConfigExample(local="overlayfs", prod="overlayfs"),
         ),
     ]
+    create_task_timeout: Annotated[
+        float,
+        Field(
+            default=30.0,
+            gt=0,
+            allow_inf_nan=False,
+            validation_alias=AliasChoices("create-task-timeout", "create_task_timeout"),
+            serialization_alias="create-task-timeout",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Timeout in seconds of the containerd CreateTask call; other calls keep 30 seconds."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="30.0", prod="120.0"),
+        ),
+    ]
 
 
 class AgentGlobalConfig(BaseConfigSchema):

@@ -149,3 +149,26 @@ class TestStartContainer:
 
         cast(MagicMock, alloc_map.free).assert_called_once()
         assert fake.containers == {} and fake.snapshots == {} and fake.tasks == {}
+
+    async def test_cancelled_launch_frees_the_allocations_and_leaves_nothing(
+        self,
+        ctx: Ctx,
+        resource_spec: KernelResourceSpec,
+        fake: FakeContainerd,
+        alloc_map: MagicMock,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        kernel = await _prepare(ctx, resource_spec)
+        create_task = fake.create_task
+
+        async def created_then_cancelled(*args: Any, **kwargs: Any) -> Any:
+            await create_task(*args, **kwargs)
+            raise asyncio.CancelledError
+
+        monkeypatch.setattr(fake, "create_task", created_then_cancelled)
+
+        with pytest.raises(asyncio.CancelledError):
+            await ctx.start_container(kernel, [], None, [], MagicMock())
+
+        alloc_map.free.assert_called_once()
+        assert fake.containers == {} and fake.snapshots == {} and fake.tasks == {}
