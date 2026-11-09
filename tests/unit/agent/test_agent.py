@@ -19,7 +19,7 @@ from ai.backend.agent.config.unified import (
 )
 from ai.backend.agent.server import AgentRPCServer
 from ai.backend.agent.types import AgentBackend
-from ai.backend.common.configs.etcd import EtcdConfig
+from ai.backend.common.configs.etcd import EtcdConfig, EtcdTLSConfig
 from ai.backend.common.typed_validators import HostPortPair
 
 
@@ -45,6 +45,13 @@ def base_agent_config() -> AgentUnifiedConfig:
             password=None,
             keep_alive_interval=5.0,
             keep_alive_timeout=3.0,
+            tls=EtcdTLSConfig(
+                enabled=False,
+                ca_cert=None,
+                client_cert=None,
+                client_key=None,
+                handshake_timeout=None,
+            ),
         ),
     )
 
