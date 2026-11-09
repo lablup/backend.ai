@@ -2733,9 +2733,12 @@ class AbstractAgent[
 
                 # Initialize the creation context
                 if self.local_config.debug.log_kernel_config:
-                    log.debug(
-                        "kernel creation config dumped", kernel_config=str(pretty(kernel_config))
-                    )
+                    # environ can carry user secrets, so only its keys are logged.
+                    dumped = {
+                        **kernel_config,
+                        "environ": dict.fromkeys(kernel_config["environ"], "***"),
+                    }
+                    log.debug("kernel creation config dumped", kernel_config=str(pretty(dumped)))
                 ctx = await self.init_kernel_context(
                     ownership_data,
                     kernel_image,
