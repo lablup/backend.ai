@@ -37,6 +37,7 @@ from ai.backend.common.exception import (
     BackendAIError,
     InvalidAPIParameters,
     UnknownImageReference,
+    UnreachableError,
 )
 from ai.backend.common.json import load_json
 from ai.backend.common.plugin.monitor import ErrorPluginContext
@@ -965,7 +966,7 @@ class SessionService:
                 code = action.params.code
                 opts = action.params.options
             else:
-                raise RuntimeError("should not reach here")
+                raise UnreachableError("should not reach here")
             # handle cases when some params are deliberately set to None
             if code is None:
                 code = ""

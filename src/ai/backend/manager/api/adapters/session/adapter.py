@@ -159,6 +159,7 @@ from ai.backend.manager.data.session.types import (
     SessionStatus,
     SessionTerminationStatus,
 )
+from ai.backend.manager.errors.auth import AuthenticationRequired
 from ai.backend.manager.errors.base.not_found import NotFoundError
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import (
@@ -339,11 +340,11 @@ class SessionAdapter(BaseAdapter):
     def _require_user_id() -> UUID:
         """Return the current user's UUID from request context.
 
-        Raises RuntimeError if called outside a request context.
+        Raises AuthenticationRequired if called outside a request context.
         """
         user = current_user()
         if user is None:
-            raise RuntimeError("SessionAdapter requires an authenticated user in context")
+            raise AuthenticationRequired()
         return user.user_id
 
     # -------------------------------------------------------------------------
