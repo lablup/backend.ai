@@ -48,6 +48,7 @@ class TestResourceSlotTypeSeed:
         assert (seed.display_name, seed.description) == ("", "")
         assert (seed.display_unit, seed.display_icon) == ("", "")
         assert seed.number_format == NumberFormat()
+        assert seed.sealed_launch is False
 
     @pytest.mark.parametrize(
         "item",
