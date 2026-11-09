@@ -707,7 +707,7 @@ class AuthService:
             )
         auth_config = self._config_provider.config.auth
         try:
-            await self._auth_repository.check_credential_without_migration(
+            credential = await self._auth_repository.check_credential_without_migration(
                 domain_name,
                 email,
                 PasswordInfo(
@@ -725,7 +725,7 @@ class AuthService:
             (
                 VerifyPasswordFormatHookArgs(
                     email=email,
-                    username=None,
+                    username=credential.username,
                     password=action.new_password,
                 ),
             ),
@@ -776,7 +776,7 @@ class AuthService:
             (
                 VerifyPasswordFormatHookArgs(
                     email=action.email,
-                    username=None,
+                    username=checked_user.username,
                     password=new_password,
                 ),
             ),

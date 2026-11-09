@@ -94,6 +94,7 @@ async def test_update_password_no_auth_successful(
     mock_auth_repository.check_credential_without_migration.return_value = UserCredential(
         user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         hashed_password="hashed_current_pass",
+        username="test-user",
     )
 
     new_timestamp = datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC)  # Fixed timestamp for comparison
@@ -196,6 +197,7 @@ async def test_update_password_no_auth_fails_when_new_password_same_as_current(
     mock_auth_repository.check_credential_without_migration.return_value = UserCredential(
         user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         hashed_password="hashed_same_password",
+        username="test-user",
     )
 
     mocker.patch(
@@ -222,6 +224,7 @@ async def test_update_password_no_auth_with_retry(
     mock_auth_repository.check_credential_without_migration.return_value = UserCredential(
         user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         hashed_password="hashed_current",
+        username="test-user",
     )
 
     changed_at = datetime.now(tz=UTC)
@@ -260,6 +263,7 @@ async def test_update_password_no_auth_hook_rejection(
     mock_auth_repository.check_credential_without_migration.return_value = UserCredential(
         user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         hashed_password="hashed_current",
+        username="test-user",
     )
 
     # Hook rejects the password
