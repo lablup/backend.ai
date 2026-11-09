@@ -22,6 +22,7 @@ from ai.backend.common.config import (
     _merge_service_config,
     merge,
     override_key,
+    redis_config_iv,
 )
 
 
@@ -749,3 +750,23 @@ class TestModelDefinitionWithArgsAppended:
         assert first is not None and second is not None
         assert first.start_command == "a --shared true"
         assert second.start_command == "b --shared true"
+
+
+class TestRedisConfigUsername:
+    def test_username_is_accepted_at_top_level_and_in_overrides(self) -> None:
+        checked = redis_config_iv.check({
+            "addr": "127.0.0.1:6379",
+            "username": "agent",
+            "password": "pw",
+            "override_configs": {"stream": {"addr": "127.0.0.1:6380", "username": "stream-agent"}},
+        })
+        assert checked["username"] == "agent"
+        assert checked["override_configs"]["stream"]["username"] == "stream-agent"
+
+    def test_username_defaults_to_none(self) -> None:
+        checked = redis_config_iv.check({
+            "addr": "127.0.0.1:6379",
+            "override_configs": {"stream": {"addr": "127.0.0.1:6380"}},
+        })
+        assert checked["username"] is None
+        assert checked["override_configs"]["stream"]["username"] is None
