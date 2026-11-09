@@ -617,11 +617,10 @@ def _build_web_health_response(connectivity: ConnectivityCheckResponse) -> web.R
     DEGRADED in the body but not surfaced via HTTP status."""
     response = HealthResponse(
         status=HealthStatus.OK if connectivity.overall_healthy else HealthStatus.DEGRADED,
-        version=__version__,
         component="webserver",
         connectivity=connectivity,
     )
-    return web.json_response(response.model_dump(mode="json", exclude={"version"}))
+    return web.json_response(response.model_dump(mode="json"))
 
 
 def _build_web_probe_response(connectivity: ConnectivityCheckResponse) -> web.Response:
@@ -629,12 +628,11 @@ def _build_web_probe_response(connectivity: ConnectivityCheckResponse) -> web.Re
     is_healthy = connectivity.overall_healthy
     response = HealthResponse(
         status=HealthStatus.OK if is_healthy else HealthStatus.ERROR,
-        version=__version__,
         component="webserver",
         connectivity=connectivity,
     )
     return web.json_response(
-        response.model_dump(mode="json", exclude={"version"}),
+        response.model_dump(mode="json"),
         status=HTTPStatus.OK if is_healthy else HTTPStatus.SERVICE_UNAVAILABLE,
     )
 
