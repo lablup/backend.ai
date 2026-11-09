@@ -14,7 +14,7 @@ from ai.backend.appproxy.coordinator.dependencies.infrastructure.etcd import (
     EtcdProvider,
 )
 from ai.backend.appproxy.coordinator.errors.config import InvalidTraefikEtcdCredentialsError
-from ai.backend.common.configs.etcd import EtcdConfig
+from ai.backend.common.configs.etcd import EtcdConfig, EtcdTLSConfig
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.typed_validators import HostPortPair
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
@@ -45,6 +45,13 @@ class TestEtcdProvider:
             password=None,
             keep_alive_interval=5.0,
             keep_alive_timeout=3.0,
+            tls=EtcdTLSConfig(
+                enabled=False,
+                ca_cert=None,
+                client_cert=None,
+                client_key=None,
+                handshake_timeout=None,
+            ),
         )
 
         # Create traefik config

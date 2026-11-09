@@ -1,15 +1,89 @@
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Self
 
-from pydantic import Field
+from pydantic import Field, FilePath, model_validator
 
 from ai.backend.common.config import BaseConfigSchema
-from ai.backend.common.data.config.types import EtcdConfigData
-from ai.backend.common.meta import BackendAIConfigMeta, ConfigExample
+from ai.backend.common.data.config.types import EtcdConfigData, EtcdTLSConfigData
+from ai.backend.common.meta import BackendAIConfigMeta, CompositeType, ConfigExample
 from ai.backend.common.typed_validators import HostPortPair
 
-__all__ = ("EtcdConfig",)
+__all__ = ("EtcdConfig", "EtcdTLSConfig")
+
+
+class EtcdTLSConfig(BaseConfigSchema):
+    """TLS settings for the connection to etcd."""
+
+    enabled: Annotated[
+        bool,
+        Field(default=False),
+        BackendAIConfigMeta(
+            description="Connect to etcd over TLS.",
+            added_version="26.4.19",
+            example=ConfigExample(local="false", prod="false"),
+        ),
+    ]
+    ca_cert: Annotated[
+        FilePath | None,
+        Field(default=None),
+        BackendAIConfigMeta(
+            description=(
+                "PEM file of the CA certificate that signed the etcd server certificate. "
+                "Required if TLS is enabled."
+            ),
+            added_version="26.4.19",
+            example=ConfigExample(local="", prod="/etc/backend.ai/etcd/ca.pem"),
+        ),
+    ]
+    client_cert: Annotated[
+        FilePath | None,
+        Field(default=None),
+        BackendAIConfigMeta(
+            description=(
+                "PEM file of the client certificate, for an etcd started with --client-cert-auth. "
+                "Set together with client-key."
+            ),
+            added_version="26.4.19",
+            example=ConfigExample(local="", prod="/etc/backend.ai/etcd/client.pem"),
+        ),
+    ]
+    client_key: Annotated[
+        FilePath | None,
+        Field(default=None),
+        BackendAIConfigMeta(
+            description="PEM file of the client private key. Set together with client-cert.",
+            added_version="26.4.19",
+            example=ConfigExample(local="", prod="/etc/backend.ai/etcd/client-key.pem"),
+        ),
+    ]
+    handshake_timeout: Annotated[
+        float | None,
+        Field(default=None, gt=0),
+        BackendAIConfigMeta(
+            description=(
+                "Seconds to wait for the TLS handshake with an etcd member. "
+                "When not set, the handshake has no limit: request timeouts do not end it."
+            ),
+            added_version="26.4.19",
+            example=ConfigExample(local="", prod="10.0"),
+        ),
+    ]
+
+    @model_validator(mode="after")
+    def _validate_certificate_combination(self) -> Self:
+        if (self.client_cert is None) != (self.client_key is None):
+            raise ValueError("etcd.tls.client-cert and etcd.tls.client-key must be set together")
+        return self
+
+    def to_dataclass(self) -> EtcdTLSConfigData:
+        return EtcdTLSConfigData(
+            enabled=self.enabled,
+            ca_cert=self.ca_cert,
+            client_cert=self.client_cert,
+            client_key=self.client_key,
+            handshake_timeout=self.handshake_timeout,
+        )
 
 
 class EtcdConfig(BaseConfigSchema):
@@ -98,6 +172,16 @@ class EtcdConfig(BaseConfigSchema):
         ),
     ]
 
+    tls: Annotated[
+        EtcdTLSConfig,
+        Field(default_factory=EtcdTLSConfig),
+        BackendAIConfigMeta(
+            description="TLS settings for the connection to etcd.",
+            added_version="26.4.19",
+            composite=CompositeType.FIELD,
+        ),
+    ]
+
     def to_dataclass(self) -> EtcdConfigData:
         """Convert to EtcdConfigData dataclass."""
         return EtcdConfigData(
@@ -107,4 +191,5 @@ class EtcdConfig(BaseConfigSchema):
             password=self.password,
             keep_alive_interval=self.keep_alive_interval,
             keep_alive_timeout=self.keep_alive_timeout,
+            tls=self.tls.to_dataclass(),
         )

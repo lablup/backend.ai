@@ -54,6 +54,7 @@ class EtcdProvider(DependencyProvider[ServerConfig, TraefikEtcd | None]):
                 traefik_config.etcd.namespace,
                 {ConfigScopes.GLOBAL: ""},
                 credentials=creds,
+                tls=traefik_config.etcd.tls.to_dataclass(),
             )
             yield traefik_etcd
         else:
