@@ -6,7 +6,6 @@ from collections.abc import Sequence
 from typing import Any
 from uuid import UUID
 
-from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
 from ai.backend.common.dto.manager.v2.common import PartialBulkFailure, PartialBulkPayload
 from ai.backend.common.dto.manager.v2.reservoir_registry.request import (
@@ -35,7 +34,6 @@ from ai.backend.manager.data.reservoir_registry.types import (
     ReservoirRegistryConnectionData,
     ReservoirRegistryData,
 )
-from ai.backend.manager.defs import SECRET_KEY_PLACEHOLDER
 from ai.backend.manager.models.reservoir_registry.creators import ReservoirRegistryCreator
 from ai.backend.manager.models.reservoir_registry.searchers import ReservoirRegistrySearcher
 from ai.backend.manager.models.reservoir_registry.updaters import ReservoirRegistryUpdater
@@ -246,7 +244,7 @@ class ReservoirRegistryAdapter(BaseAdapter):
             name=meta.name,
             endpoint=connection.endpoint,
             access_key=connection.access_key,
-            secret_key=self._secret_key_for_caller(connection.secret_key),
+            secret_key=connection.secret_key,
             api_version=connection.api_version,
         )
 
@@ -292,14 +290,6 @@ class ReservoirRegistryAdapter(BaseAdapter):
             name=data.name,
             endpoint=data.endpoint,
             access_key=data.access_key,
-            secret_key=ReservoirRegistryAdapter._secret_key_for_caller(data.secret_key),
+            secret_key=data.secret_key,
             api_version=data.api_version,
         )
-
-    @staticmethod
-    def _secret_key_for_caller(secret_key: str) -> str:
-        """Only a superadmin gets the stored secret key."""
-        user = current_user()
-        if user is not None and user.is_superadmin:
-            return secret_key
-        return SECRET_KEY_PLACEHOLDER

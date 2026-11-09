@@ -4,8 +4,8 @@
 
 Scenario: complete
 
-- built from ops (1)
-  - batch_load_by_ids: representative success ✓ · representative rejection ✓
+- ops + direct implementation (1)
+  - batch_load_by_ids: success present 1 · rejection present 1 (partial_bulk, partial_bulk_get_ops)
 - direct implementation (8)
   - create: success present 1 · rejection present 1 (global_scope)
   - get: success present 1 · rejection present 1 (single_entity)
