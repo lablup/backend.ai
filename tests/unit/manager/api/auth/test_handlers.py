@@ -437,6 +437,35 @@ class TestSignup:
         assert action.username == username
         assert action.full_name == full_name
 
+    @pytest.mark.parametrize(
+        ("headers", "expected_lang"),
+        [
+            ({}, "en-us"),
+            ({"Accept-Language": "ko-KR,ko;q=0.9,en;q=0.8"}, "ko-kr"),
+        ],
+    )
+    async def test_passes_first_accept_language_as_lang(
+        self,
+        handler: AuthHandler,
+        mock_processors: MagicMock,
+        signup_result: SignupActionResult,
+        headers: dict[str, str],
+        expected_lang: str,
+    ) -> None:
+        header = HeaderParam(SignupHeader).from_header(CIMultiDictProxy(CIMultiDict(headers)))
+        body: BodyParam[SignupRequest] = BodyParam(SignupRequest)
+        body.from_body({
+            "domain": "default",
+            "email": "newuser@example.com",
+            "password": "securepassword",
+        })
+        mock_processors.auth.signup.run = AsyncMock(return_value=signup_result)
+
+        await handler.signup(body, header)
+
+        action = mock_processors.auth.signup.run.call_args[0][0]
+        assert action.lang == expected_lang
+
 
 class TestSignout:
     """Tests for signout handler."""
