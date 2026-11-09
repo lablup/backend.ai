@@ -633,7 +633,6 @@ def _build_web_health_response(connectivity: ConnectivityCheckResponse) -> web.R
     DEGRADED in the body but not surfaced via HTTP status."""
     response = HealthResponse(
         status=HealthStatus.OK if connectivity.overall_healthy else HealthStatus.DEGRADED,
-        version=__version__,
         component="webserver",
         connectivity=connectivity,
     )
@@ -645,7 +644,6 @@ def _build_web_probe_response(connectivity: ConnectivityCheckResponse) -> web.Re
     is_healthy = connectivity.overall_healthy
     response = HealthResponse(
         status=HealthStatus.OK if is_healthy else HealthStatus.ERROR,
-        version=__version__,
         component="webserver",
         connectivity=connectivity,
     )
@@ -679,6 +677,7 @@ async def check_readyz(request: web.Request) -> web.Response:
     return _build_web_probe_response(connectivity)
 
 
+<<<<<<< HEAD
 async def webserver_healthcheck(request: web.Request) -> web.Response:
     stats: WebStats = request.app["stats"]
     stats.active_healthcheck_handlers.add(asyncio.current_task())
@@ -687,6 +686,10 @@ async def webserver_healthcheck(request: web.Request) -> web.Response:
         "details": "Success",
     }
     return web.json_response(result)
+=======
+async def webserver_healthcheck(_request: web.Request) -> web.Response:
+    return web.json_response({"details": "Success"})
+>>>>>>> a6e56ec91 (fix(BA-8974): stop returning the manager and webserver versions to unauthenticated clients (#16736))
 
 
 async def token_login_handler(request: web.Request) -> web.Response:
@@ -1128,7 +1131,7 @@ async def webapp_ctx(
         app.router.add_route("GET", "/func/{path:stream/session/[^/]+/apps$}", manager_web_handler)
     )
     cors.add(app.router.add_route("GET", "/func/{path:stream/.*$}", manager_websocket_handler))
-    cors.add(app.router.add_route("GET", "/func/", anon_web_handler))
+    cors.add(app.router.add_route("GET", "/func/health", anon_web_handler))
 
     # Feature flag for using Apollo Router(Graphql Federation)
     if config.apollo_router.enabled:
