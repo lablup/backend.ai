@@ -1,10 +1,15 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+from unittest.mock import AsyncMock
 
 import pytest
 
-from ai.backend.agent.dependencies.bootstrap.redis_config import RedisConfigDependency
+from ai.backend.agent.dependencies.bootstrap.redis_config import (
+    RedisConfigDependency,
+    RedisConfigInput,
+)
+from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 
 
@@ -25,7 +30,9 @@ class TestRedisConfigDependency:
         """Test that redis config is read from etcd successfully."""
         dependency = RedisConfigDependency()
 
-        async with dependency.provide(etcd_with_redis_config) as redis_config:
+        async with dependency.provide(
+            RedisConfigInput(etcd=etcd_with_redis_config)
+        ) as redis_config:
             assert redis_config is not None
             assert redis_config.addr is not None
 
@@ -43,7 +50,51 @@ class TestRedisConfigDependency:
 
         dependency = RedisConfigDependency()
 
-        async with dependency.provide(etcd) as redis_config:
+        async with dependency.provide(RedisConfigInput(etcd=etcd)) as redis_config:
             assert redis_config.addr is not None
             assert redis_config.addr.address == "192.168.1.100:6380"
             assert redis_config.password == "test-password"
+
+    @pytest.fixture
+    def local_redis_config(self) -> RedisConfig:
+        """Redis config as given by a ``[redis]`` section in the local config."""
+        return RedisConfig.model_validate({"addr": "10.0.0.5:6390"})
+
+    async def test_local_redis_config_wins_over_etcd(
+        self, etcd_with_redis_config: AsyncEtcd, local_redis_config: RedisConfig
+    ) -> None:
+        """Test that a local [redis] section is used as-is even when etcd has redis config."""
+        dependency = RedisConfigDependency()
+
+        async with dependency.provide(
+            RedisConfigInput(etcd=etcd_with_redis_config, local_redis_config=local_redis_config)
+        ) as redis_config:
+            assert redis_config is local_redis_config
+            assert redis_config.addr is not None
+            assert redis_config.addr.address == "10.0.0.5:6390"
+
+    async def test_local_redis_config_skips_etcd_read(
+        self, local_redis_config: RedisConfig
+    ) -> None:
+        """Test that etcd is not read when the local config has a redis section."""
+        etcd = AsyncMock(spec=AsyncEtcd)
+        dependency = RedisConfigDependency()
+
+        async with dependency.provide(
+            RedisConfigInput(etcd=etcd, local_redis_config=local_redis_config)
+        ):
+            pass
+
+        etcd.get_prefix.assert_not_called()
+
+    async def test_absent_local_redis_config_falls_back_to_etcd(
+        self, etcd_with_redis_config: AsyncEtcd
+    ) -> None:
+        """Test that etcd is read when the local config has no redis section."""
+        dependency = RedisConfigDependency()
+
+        async with dependency.provide(
+            RedisConfigInput(etcd=etcd_with_redis_config, local_redis_config=None)
+        ) as redis_config:
+            assert redis_config.addr is not None
+            assert redis_config.addr.address == "127.0.0.1:6379"
