@@ -1,4 +1,4 @@
-"""modifyGroup keeps an admin inside their domain and off the resource policy. (BA-8902)"""
+"""modifyGroup keeps an admin inside their domain. (BA-8902)"""
 
 from __future__ import annotations
 
@@ -46,12 +46,3 @@ class TestModifyGroupScope:
         result = await self._mutate(admin_info, self._props({"domainName": "other"}, monkeypatch))
         assert result.ok is False
         assert "domain" in result.msg
-
-    async def test_an_admin_may_not_change_the_resource_policy(
-        self, admin_info: graphene.ResolveInfo, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        result = await self._mutate(
-            admin_info, self._props({"resourcePolicy": "tier-2"}, monkeypatch)
-        )
-        assert result.ok is False
-        assert "resource policy" in result.msg

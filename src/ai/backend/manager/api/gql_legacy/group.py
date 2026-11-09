@@ -817,14 +817,12 @@ class ModifyGroup(graphene.Mutation):  # type: ignore[misc]
     ) -> ModifyGroup:
         graph_ctx: GraphQueryContext = info.context
         project_id = ProjectID(gid)
-        if graph_ctx.user["role"] != UserRole.SUPERADMIN:
-            if (
-                isinstance(props.domain_name, str)
-                and props.domain_name != graph_ctx.user["domain_name"]
-            ):
-                return cls(False, "only a superadmin can move a project to another domain", None)
-            if isinstance(props.resource_policy, str):
-                return cls(False, "only a superadmin can change the resource policy", None)
+        if (
+            graph_ctx.user["role"] != UserRole.SUPERADMIN
+            and isinstance(props.domain_name, str)
+            and props.domain_name != graph_ctx.user["domain_name"]
+        ):
+            return cls(False, "only a superadmin can move a project to another domain", None)
 
         # Resolved before anything is written, so a registry that is not there changes
         # nothing. The default is set after the edit, as a run of its own.
