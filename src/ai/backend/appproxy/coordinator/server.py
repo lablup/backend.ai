@@ -94,6 +94,7 @@ from ai.backend.common.defs import REDIS_STREAM_DB, REDIS_STREAM_LOCK, RedisRole
 from ai.backend.common.dependencies.stacks.builder import DependencyBuilderStack
 from ai.backend.common.dto.appproxy_coordinator.v2.status.types import AppProxyStatusResponse
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
+from ai.backend.common.events.event_types.session.broadcast import SchedulingBroadcastEvent
 from ai.backend.common.exception import BackendAIError, BackendAISchemaValidationFailed
 from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
 from ai.backend.common.health_checker.probe import HealthProbe, HealthProbeOptions
@@ -156,6 +157,18 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
+
+# `status_transition` of the manager's `SchedulingBroadcastEvent` when a session terminates.
+_SESSION_TERMINATED: Final = "TERMINATED"
+
+# Protocols whose workers refresh `circuit.{id}.last_access`. With Traefik only HTTP does.
+_IDLE_COLLECTED_PROTOCOLS: Final[frozenset[ProxyProtocol]] = frozenset({
+    ProxyProtocol.HTTP,
+    ProxyProtocol.TCP,
+})
+_IDLE_COLLECTED_PROTOCOLS_TRAEFIK: Final[frozenset[ProxyProtocol]] = frozenset({
+    ProxyProtocol.HTTP,
+})
 
 global_subapp_pkgs: Final[list[str]] = [
     ".circuit_v1",
@@ -474,6 +487,32 @@ async def on_worker_lost_event(
             await execute_with_txn_retry(_update, context.db.begin_session, db_conn)
 
 
+async def on_session_terminated_event(
+    context: RootContext,
+    _source: AgentId,
+    event: SchedulingBroadcastEvent,
+) -> None:
+    if event.status_transition != _SESSION_TERMINATED:
+        return
+
+    async def _update(sess: SASession) -> Sequence[Circuit]:
+        circuits = await Circuit.list_interactive_by_session(sess, event.session_id)
+        for circuit in circuits:
+            circuit.worker_row.occupied_slots -= 1
+            await sess.delete(circuit)
+        return circuits
+
+    with with_log_context(session_id=event.session_id):
+        async with context.db.connect() as db_conn:
+            circuits = await execute_with_txn_retry(_update, context.db.begin_session, db_conn)
+        if circuits:
+            await context.circuit_manager.unload_circuits(circuits)
+            log.debug(
+                "removed interactive circuits of the terminated session",
+                circuit_count=len(circuits),
+            )
+
+
 async def _reconcile_worker_occupied_slots(
     context: RootContext,
     circuits: Sequence[Circuit],
@@ -591,9 +630,16 @@ async def event_handler_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         on_reconcile_traefik_routes,
         name="proxy-coordinator",
     )
+    session_terminated_handler = root_ctx.core_event_dispatcher.subscribe(
+        SchedulingBroadcastEvent,
+        root_ctx,
+        on_session_terminated_event,
+        name="proxy-coordinator",
+    )
     try:
         yield
     finally:
+        root_ctx.core_event_dispatcher.unsubscribe(session_terminated_handler)
         root_ctx.event_dispatcher.unconsume(worker_lost_handler)
         root_ctx.event_dispatcher.unconsume(reconcile_traefik_routes_handler)
 
@@ -607,16 +653,22 @@ async def distributed_lock_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 @asynccontextmanager
 async def unused_port_collection_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     async def _collect(_context: None, _src: AgentId, _event: DoCheckUnusedPortEvent) -> None:
+        collected_protocols = (
+            _IDLE_COLLECTED_PROTOCOLS_TRAEFIK
+            if root_ctx.local_config.proxy_coordinator.enable_traefik
+            else _IDLE_COLLECTED_PROTOCOLS
+        )
+
         async def _update(sess: SASession) -> list[Circuit]:
-            non_inference_http_circuits = [
+            idle_collectable_circuits = [
                 c
                 for c in (await Circuit.list_circuits(sess))
-                if c.app_mode != AppMode.INFERENCE and c.protocol == ProxyProtocol.HTTP
+                if c.app_mode != AppMode.INFERENCE and c.protocol in collected_protocols
             ]
-            if len(non_inference_http_circuits) == 0:
+            if len(idle_collectable_circuits) == 0:
                 return []
             last_access = await root_ctx.valkey_live.get_multiple_live_data([
-                f"circuit.{c.id!s}.last_access" for c in non_inference_http_circuits
+                f"circuit.{c.id!s}.last_access" for c in idle_collectable_circuits
             ])
             unused_circuits: list[Circuit] = []
 
@@ -627,7 +679,7 @@ async def unused_port_collection_ctx(root_ctx: RootContext) -> AsyncIterator[Non
                 if access:
                     last_access_time = current_time - float(access.decode("utf-8"))
                 else:
-                    circuit_created_at = non_inference_http_circuits[idx].created_at
+                    circuit_created_at = idle_collectable_circuits[idx].created_at
                     last_access_time = (
                         current_time - circuit_created_at.timestamp() if circuit_created_at else 0.0
                     )
@@ -635,7 +687,7 @@ async def unused_port_collection_ctx(root_ctx: RootContext) -> AsyncIterator[Non
                     last_access_time
                     > root_ctx.local_config.proxy_coordinator.unused_circuit_collection_timeout
                 ):
-                    unused_circuits.append(non_inference_http_circuits[idx])
+                    unused_circuits.append(idle_collectable_circuits[idx])
             if len(unused_circuits) == 0:
                 return []
 
