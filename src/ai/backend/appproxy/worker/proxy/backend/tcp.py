@@ -42,7 +42,7 @@ class TCPBackend(BaseBackend):
     ) -> None:
         metrics = self.root_context.metrics
         total_bytes = 0
-        stop_event = asyncio.Event()
+        up_writer: asyncio.StreamWriter | None = None
 
         async def _pipe(
             reader: asyncio.StreamReader,
@@ -58,12 +58,22 @@ class TCPBackend(BaseBackend):
                         break
                     total_bytes += len(data)
                     metrics.proxy.observe_upstream_tcp_traffic_chunk(len(data))
-                    writer.write(data)
-                    await writer.drain()
-            except ConnectionResetError:
-                log.trace("{}: connection reset", tag)
-            finally:
-                stop_event.set()
+                    try:
+                        writer.write(data)
+                        await writer.drain()
+                    except RuntimeError as e:  # uvloop: the handle is already closed
+                        log.trace("{}: write to closed transport: {!r}", tag, e)
+                        break
+                # Propagate the half-close so the peer does not wait on keep-alive.
+                try:
+                    if writer.can_write_eof():
+                        writer.write_eof()
+                except RuntimeError:
+                    pass
+            except OSError as e:
+                log.trace("{}: connection ended: {!r}", tag, e)
+                # Closing the writer ends the opposite direction, which is blocked on read.
+                writer.close()
 
         target = await self._pool.select()
         log.trace(
@@ -77,8 +87,8 @@ class TCPBackend(BaseBackend):
         await marker_cron.start()
         await self.increase_request_counter()
 
+        sock = socket.socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
         try:
-            sock = socket.socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
             # unlike .frontend.tcp this has a chance of being a blocking call since kernel host can be a domain
             try:
@@ -95,8 +105,15 @@ class TCPBackend(BaseBackend):
                 group.create_task(_pipe(up_reader, down_writer, tag="up->down"))
                 group.create_task(_pipe(down_reader, up_writer, tag="down->up"))
         finally:
+            if up_writer is not None:
+                up_writer.close()
+            else:
+                sock.close()
             metrics.proxy.observe_upstream_tcp_traffic_chunk(total_bytes)
             await marker_cron.stop()
             down_writer.close()
-            await down_writer.wait_closed()
+            try:
+                await down_writer.wait_closed()
+            except OSError as e:  # the client is already gone: ENOTCONN / ECONNRESET
+                log.trace("downstream already closed: {!r}", e)
         log.trace("TCP connection closed")

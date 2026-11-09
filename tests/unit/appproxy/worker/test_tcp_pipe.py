@@ -1,0 +1,319 @@
+from __future__ import annotations
+
+import asyncio
+import errno
+import gc
+import sys
+import weakref
+from collections.abc import AsyncIterator, Callable
+from datetime import UTC, datetime
+from functools import partial
+from types import TracebackType
+from typing import Any
+from unittest.mock import AsyncMock, MagicMock
+from uuid import UUID
+
+import pytest
+
+from ai.backend.appproxy.common.types import AppMode, FrontendMode, ProxyProtocol, RouteInfo
+from ai.backend.appproxy.worker.proxy.backend.tcp import TCPBackend
+from ai.backend.appproxy.worker.proxy.frontend.tcp import TCPFrontend
+from ai.backend.appproxy.worker.types import Circuit, InteractiveAppInfo, PortFrontendInfo
+from ai.backend.common.dto.appproxy.v2.ingress.types import IngressAuthority
+
+PORT = 10201
+USER_ID = UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4")
+TIMEOUT = 5.0
+
+Handler = Callable[[asyncio.StreamReader, asyncio.StreamWriter], Any]
+
+
+def _create_circuit(kernel_port: int) -> Circuit:
+    return Circuit(
+        id=UUID("d0e6f60c-f375-4454-b4d3-e8ee202fa372"),
+        app="jupyter",
+        protocol=ProxyProtocol.TCP,
+        worker=UUID("00000000-0000-0000-0000-000000000000"),
+        app_mode=AppMode.INTERACTIVE,
+        frontend_mode=FrontendMode.PORT,
+        frontend=PortFrontendInfo(PORT),
+        port=PORT,
+        app_info=InteractiveAppInfo(user_id=USER_ID),
+        subdomain=None,
+        runtime_variant=None,
+        envs={},
+        arguments=None,
+        open_to_public=True,
+        allowed_client_ips=None,
+        user_id=USER_ID,
+        access_key="AKIAIOSFODNN7EXAMPLE",
+        endpoint_id=None,
+        route_info=[
+            RouteInfo(
+                route_id=UUID("4eeb260b-6cc5-4362-baf3-ea978388becd"),
+                session_id=UUID("f5cd34ba-ae53-4537-a813-09f38496443d"),
+                session_name=None,
+                kernel_host="127.0.0.1",
+                kernel_port=kernel_port,
+                protocol=ProxyProtocol.TCP,
+                traffic_ratio=1.0,
+            )
+        ],
+        session_ids=[UUID("f5cd34ba-ae53-4537-a813-09f38496443d")],
+        created_at=datetime(2024, 7, 16, 5, 45, 45, 982446, tzinfo=UTC),
+        updated_at=datetime(2024, 7, 16, 5, 45, 45, 982452, tzinfo=UTC),
+    )
+
+
+class _UnraisableCollector:
+    unraisable: list[Any]
+    _prev: Callable[[Any], object]
+
+    def __init__(self) -> None:
+        self.unraisable = []
+
+    def __enter__(self) -> _UnraisableCollector:
+        self._prev = sys.unraisablehook
+        sys.unraisablehook = self.unraisable.append
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: TracebackType | None,
+    ) -> None:
+        sys.unraisablehook = self._prev
+
+
+@pytest.fixture
+def root_context() -> MagicMock:
+    root_ctx = MagicMock()
+    root_ctx.last_used_time_marker_redis_queue = asyncio.Queue()
+    root_ctx.request_counter_redis_queue = asyncio.Queue()
+    return root_ctx
+
+
+@pytest.fixture
+async def servers() -> AsyncIterator[list[asyncio.Server]]:
+    started: list[asyncio.Server] = []
+    try:
+        yield started
+    finally:
+        for server in started:
+            server.close()
+            await server.wait_closed()
+
+
+async def _start_upstream(servers: list[asyncio.Server], handler: Handler) -> int:
+    server = await asyncio.start_server(handler, "127.0.0.1", 0)
+    servers.append(server)
+    port: int = server.sockets[0].getsockname()[1]
+    return port
+
+
+def _frontend(root_context: MagicMock, circuit: Circuit) -> TCPFrontend:
+    frontend = TCPFrontend(root_context)
+    frontend.backends[PORT] = TCPBackend(circuit.route_info, root_context, circuit)
+    root_context.ingress_state.reader.get = AsyncMock(
+        return_value=circuit.to_ingress(IngressAuthority("worker-1"))
+    )
+    return frontend
+
+
+class TestTCPPipe:
+    async def test_abandoned_half_closed_pipe_survives_gc(
+        self, root_context: MagicMock, servers: list[asyncio.Server]
+    ) -> None:
+        accepted = asyncio.Event()
+        upstream_writers: list[asyncio.StreamWriter] = []
+        conn_task_refs: list[weakref.ref[asyncio.Task[Any]]] = []
+
+        async def idle_upstream(r: asyncio.StreamReader, w: asyncio.StreamWriter) -> None:
+            upstream_writers.append(w)
+            accepted.set()
+            await r.read()
+
+        upstream_port = await _start_upstream(servers, idle_upstream)
+        frontend = _frontend(root_context, _create_circuit(upstream_port))
+
+        async def pipe_handler(r: asyncio.StreamReader, w: asyncio.StreamWriter) -> None:
+            task = asyncio.current_task()
+            assert task is not None
+            conn_task_refs.append(weakref.ref(task))
+            del task
+            await frontend.pipe(PORT, r, w)
+
+        proxy = await asyncio.start_server(pipe_handler, "127.0.0.1", 0)
+        servers.append(proxy)
+        try:
+            _, client_w = await asyncio.open_connection(
+                "127.0.0.1", proxy.sockets[0].getsockname()[1]
+            )
+            await asyncio.wait_for(accepted.wait(), TIMEOUT)
+            client_w.write_eof()
+            await asyncio.sleep(0.05)
+            loop_errors: list[str] = []
+            loop = asyncio.get_running_loop()
+            loop.set_exception_handler(lambda _loop, ctx: loop_errors.append(ctx["message"]))
+            try:
+                with _UnraisableCollector() as collector:
+                    for _ in range(3):
+                        gc.collect()
+                        await asyncio.sleep(0)
+            finally:
+                loop.set_exception_handler(None)
+
+            assert collector.unraisable == []
+            assert loop_errors == []
+            conn_task = conn_task_refs[0]()
+            assert conn_task is not None
+            assert not conn_task.done()
+            del conn_task
+            client_w.close()
+        finally:
+            for w in upstream_writers:
+                w.close()
+            await frontend.stop()
+            await frontend.backends[PORT].close()
+
+    async def test_half_close_propagates_and_reply_still_flows(
+        self, root_context: MagicMock, servers: list[asyncio.Server]
+    ) -> None:
+        upstream_saw: list[bytes] = []
+
+        async def reply_after_eof(r: asyncio.StreamReader, w: asyncio.StreamWriter) -> None:
+            upstream_saw.append(await r.read())  # returns only on EOF
+            w.write(b"reply-after-eof")
+            await w.drain()
+            w.close()
+
+        upstream_port = await _start_upstream(servers, reply_after_eof)
+        circuit = _create_circuit(upstream_port)
+        backend = TCPBackend(circuit.route_info, root_context, circuit)
+        proxy = await asyncio.start_server(backend.bind, "127.0.0.1", 0)
+        servers.append(proxy)
+        try:
+            client_r, client_w = await asyncio.open_connection(
+                "127.0.0.1", proxy.sockets[0].getsockname()[1]
+            )
+            client_w.write(b"request")
+            client_w.write_eof()
+            reply = await asyncio.wait_for(client_r.read(), TIMEOUT)
+            client_w.close()
+        finally:
+            await backend.close()
+
+        assert upstream_saw == [b"request"]
+        assert reply == b"reply-after-eof"
+
+    async def test_runtime_error_from_write_ends_direction_without_exception_group(
+        self, root_context: MagicMock, servers: list[asyncio.Server]
+    ) -> None:
+        async def send_then_wait(r: asyncio.StreamReader, w: asyncio.StreamWriter) -> None:
+            w.write(b"data")
+            await w.drain()
+            await r.read()
+            w.close()
+
+        upstream_port = await _start_upstream(servers, send_then_wait)
+        circuit = _create_circuit(upstream_port)
+        backend = TCPBackend(circuit.route_info, root_context, circuit)
+        down_writer = MagicMock()
+        down_writer.write.side_effect = RuntimeError("unable to perform operation on handle")
+        down_writer.can_write_eof.return_value = True
+        down_writer.drain = AsyncMock()
+        down_writer.wait_closed = AsyncMock()
+        down_reader = asyncio.StreamReader()
+        down_reader.feed_eof()
+
+        try:
+            await asyncio.wait_for(backend.bind(down_reader, down_writer), TIMEOUT)
+        finally:
+            await backend.close()
+
+        down_writer.write.assert_called_once_with(b"data")
+
+    @pytest.mark.parametrize(
+        "error",
+        [
+            OSError(errno.ENOTCONN, "Transport endpoint is not connected"),
+            ConnectionResetError(errno.ECONNRESET, "Connection reset by peer"),
+        ],
+    )
+    async def test_client_gone_before_close_is_a_normal_end(
+        self,
+        error: OSError,
+        root_context: MagicMock,
+        servers: list[asyncio.Server],
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        async def idle_upstream(r: asyncio.StreamReader, w: asyncio.StreamWriter) -> None:
+            await r.read()
+            w.close()
+
+        upstream_port = await _start_upstream(servers, idle_upstream)
+        frontend = _frontend(root_context, _create_circuit(upstream_port))
+        down_writer = MagicMock()
+        down_writer.get_extra_info.return_value = ("127.0.0.1", 54321)
+        down_writer.can_write_eof.return_value = True
+        down_writer.drain = AsyncMock()
+        down_writer.wait_closed = AsyncMock(side_effect=error)
+        down_reader = asyncio.StreamReader()
+        down_reader.feed_eof()
+
+        try:
+            await asyncio.wait_for(frontend.pipe(PORT, down_reader, down_writer), TIMEOUT)
+        finally:
+            await frontend.backends[PORT].close()
+
+        down_writer.wait_closed.assert_awaited_once()
+        assert [r for r in caplog.records if r.levelno >= 40] == []
+
+    async def test_client_writer_is_closed_when_bind_fails_before_its_cleanup(
+        self, root_context: MagicMock, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        frontend = _frontend(root_context, _create_circuit(1))
+        monkeypatch.setattr(
+            frontend.backends[PORT]._pool, "select", AsyncMock(side_effect=RuntimeError("boom"))
+        )
+        writer = MagicMock()
+        writer.get_extra_info.return_value = ("127.0.0.1", 54321)
+        writer.wait_closed = AsyncMock()
+
+        await asyncio.wait_for(frontend.pipe(PORT, asyncio.StreamReader(), writer), TIMEOUT)
+
+        writer.close.assert_called_once()
+        writer.wait_closed.assert_awaited_once()
+
+    async def test_stop_returns_with_open_half_closed_connection(
+        self, root_context: MagicMock, servers: list[asyncio.Server]
+    ) -> None:
+        accepted = asyncio.Event()
+        upstream_writers: list[asyncio.StreamWriter] = []
+
+        async def idle_upstream(r: asyncio.StreamReader, w: asyncio.StreamWriter) -> None:
+            upstream_writers.append(w)
+            accepted.set()
+            await r.read()
+
+        upstream_port = await _start_upstream(servers, idle_upstream)
+        frontend = _frontend(root_context, _create_circuit(upstream_port))
+        proxy = await asyncio.start_server(partial(frontend.pipe, PORT), "127.0.0.1", 0)
+        frontend.servers.append(proxy)
+        try:
+            _, client_w = await asyncio.open_connection(
+                "127.0.0.1", proxy.sockets[0].getsockname()[1]
+            )
+            await asyncio.wait_for(accepted.wait(), TIMEOUT)
+            client_w.write_eof()
+            await asyncio.sleep(0.05)
+            assert len(frontend._conn_tasks) == 1
+
+            await asyncio.wait_for(frontend.stop(), TIMEOUT)
+            client_w.close()
+        finally:
+            for w in upstream_writers:
+                w.close()
+            await frontend.backends[PORT].close()
+        assert frontend._conn_tasks == set()
