@@ -621,7 +621,7 @@ def _build_web_health_response(connectivity: ConnectivityCheckResponse) -> web.R
         component="webserver",
         connectivity=connectivity,
     )
-    return web.json_response(response.model_dump(mode="json"))
+    return web.json_response(response.model_dump(mode="json", exclude={"version"}))
 
 
 def _build_web_probe_response(connectivity: ConnectivityCheckResponse) -> web.Response:
@@ -634,7 +634,7 @@ def _build_web_probe_response(connectivity: ConnectivityCheckResponse) -> web.Re
         connectivity=connectivity,
     )
     return web.json_response(
-        response.model_dump(mode="json"),
+        response.model_dump(mode="json", exclude={"version"}),
         status=HTTPStatus.OK if is_healthy else HTTPStatus.SERVICE_UNAVAILABLE,
     )
 
@@ -664,11 +664,7 @@ async def check_readyz(request: web.Request) -> web.Response:
 
 
 async def webserver_healthcheck(_request: web.Request) -> web.Response:
-    result = {
-        "version": __version__,
-        "details": "Success",
-    }
-    return web.json_response(result)
+    return web.json_response({"details": "Success"})
 
 
 def _claimed_user_id(auth_token: str) -> uuid.UUID | None:
@@ -1123,7 +1119,7 @@ async def webapp_ctx(
         app.router.add_route("GET", "/func/{path:stream/session/[^/]+/apps$}", manager_web_handler)
     )
     cors.add(app.router.add_route("GET", "/func/{path:stream/.*$}", manager_websocket_handler))
-    cors.add(app.router.add_route("GET", "/func/", anon_web_handler))
+    cors.add(app.router.add_route("GET", "/func/health", anon_web_handler))
 
     # Feature flag for using Apollo Router(Graphql Federation)
     if config.apollo_router.enabled:
