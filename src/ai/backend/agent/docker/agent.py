@@ -108,6 +108,7 @@ from ai.backend.agent.types import (
     VolumeInfo,
 )
 from ai.backend.agent.utils import (
+    SECRET_MASK,
     ContainerSSHFileWriter,
     closing_async,
     container_pid_to_host_pid,
@@ -1455,7 +1456,10 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             # Env carries the session's environ, so only the variable names are logged.
             dumped = {
                 **container_config,
-                "Env": [f"{env.split('=', 1)[0]}=***" for env in container_config.get("Env", [])],
+                "Env": [
+                    f"{env.split('=', 1)[0]}={SECRET_MASK}"
+                    for env in container_config.get("Env", [])
+                ],
             }
             log.debug("full container config: {!r}", pretty(dumped))
 
