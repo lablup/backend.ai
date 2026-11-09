@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from ai.backend.agent.watcher import watcher_server
+from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.types import HostPortPair
 
 
@@ -14,7 +15,17 @@ class TestWatcherSSL:
         key_path = tmp_path / "watcher.key"
         config = {
             "logging": MagicMock(),
+<<<<<<< HEAD
             "etcd": {"user": None, "password": None, "addr": MagicMock(), "namespace": "test"},
+=======
+            "etcd": EtcdConfig.model_validate({
+                "user": "test",
+                "password": "test",
+                "namespace": "test",
+                "keep-alive-interval": 5.0,
+                "keep-alive-timeout": 3.0,
+            }),
+>>>>>>> a31d4c3f (feat(BA-8980): connect to etcd over TLS (#16649))
             "watcher": {
                 "service-addr": HostPortPair("127.0.0.1", 6009),
                 "ssl-enabled": True,

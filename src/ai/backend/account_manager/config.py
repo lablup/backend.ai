@@ -22,6 +22,7 @@ from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import PydanticUndefined, core_schema
 
 from ai.backend.common import config
+from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.types import BackendAISchema
 from ai.backend.logging import LogLevel
 
@@ -219,6 +220,7 @@ class GroupID:
         )
 
 
+<<<<<<< HEAD
 class EtcdConfig(BaseSchema):
     namespace: Annotated[str, Field(description="etcd namespace.")]
     addr: Annotated[
@@ -232,6 +234,8 @@ class EtcdConfig(BaseSchema):
     password: Annotated[str, Field(description="etcd password.")]
 
 
+=======
+>>>>>>> a31d4c3f (feat(BA-8980): connect to etcd over TLS (#16649))
 class DBConfig(BaseSchema):
     type: Annotated[
         DBType,

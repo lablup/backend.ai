@@ -14,6 +14,7 @@ from ai.backend.agent.errors.watcher import (
     WatcherTokenNotConfiguredError,
 )
 from ai.backend.agent.watcher import auth_middleware, watcher_server
+from ai.backend.common.configs.etcd import EtcdConfig
 
 _TOKEN_HEADER = "X-BackendAI-Watcher-Token"
 
@@ -70,7 +71,17 @@ class TestAuthMiddleware:
 def _watcher_cfg() -> dict[str, Any]:
     return {
         "logging": MagicMock(),
+<<<<<<< HEAD
         "etcd": {"user": None, "addr": MagicMock(), "namespace": "test"},
+=======
+        "etcd": EtcdConfig.model_validate({
+            "user": "test",
+            "password": "test",
+            "namespace": "test",
+            "keep-alive-interval": 5.0,
+            "keep-alive-timeout": 3.0,
+        }),
+>>>>>>> a31d4c3f (feat(BA-8980): connect to etcd over TLS (#16649))
         "watcher": {"ssl-enabled": False, "service-addr": MagicMock()},
     }
 

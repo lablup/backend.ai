@@ -30,7 +30,11 @@ from aiohttp import web
 from aiohttp.typedefs import Middleware
 from setproctitle import setproctitle
 
+<<<<<<< HEAD
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+=======
+from ai.backend.common.etcd import AsyncEtcd
+>>>>>>> a31d4c3f (feat(BA-8980): connect to etcd over TLS (#16649))
 from ai.backend.common.metrics.http import (
     SystemMetricUpdater,
     build_api_metric_middleware,
@@ -41,7 +45,10 @@ from ai.backend.common.metrics.multiprocess_setup import cleanup_prometheus_mult
 from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.networking import force_threaded_dns_resolver
+<<<<<<< HEAD
 from ai.backend.common.types import HostPortPair
+=======
+>>>>>>> a31d4c3f (feat(BA-8980): connect to etcd over TLS (#16649))
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 
@@ -201,6 +208,7 @@ def build_root_app(
         ]
     )
 
+<<<<<<< HEAD
     etcd_credentials = None
     if local_config.etcd.user:
         etcd_credentials = {
@@ -217,6 +225,9 @@ def build_root_app(
         scope_prefix_map,
         credentials=etcd_credentials,
     )
+=======
+    etcd = AsyncEtcd.create_from_config(local_config.etcd.to_dataclass())
+>>>>>>> a31d4c3f (feat(BA-8980): connect to etcd over TLS (#16649))
     root_ctx = RootContext()
     root_ctx.etcd = etcd
     root_ctx.local_config = local_config

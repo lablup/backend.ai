@@ -295,12 +295,86 @@
       # authentication. Should be set along with password for secure
       # deployments.
       # Added in 22.03.0
+<<<<<<< HEAD
       ## user = "backend"
       # Password for authenticating with etcd. Should be kept secret in
       # production environments. Set together with the user field for
       # authentication.
       # Added in 22.03.0
       ## password = "ETCD_PASSWORD"
+=======
+      password = "ETCD_PASSWORD"
+      # Seconds without a frame from an etcd member before a keep-alive ping is
+      # sent on a connection with requests in flight. Must not be below the
+      # server's --grpc-keepalive-min-time (5 seconds by default).
+      # Added in 26.10.0
+      keep-alive-interval = 5.0
+      # Seconds to wait for a keep-alive ping reply before the connection to
+      # that etcd member is closed and its requests go to the other members.
+      # Added in 26.10.0
+      keep-alive-timeout = 3.0
+
+      # TLS settings for the connection to etcd.
+      # Added in 26.10.0
+      [proxy_coordinator.traefik.etcd.tls]
+        # Connect to etcd over TLS.
+        # Added in 26.10.0
+        enabled = false
+
+        # PEM file of the CA certificate that signed the etcd server
+        # certificate. Required if TLS is enabled.
+        # Added in 26.10.0
+        ## ca-cert = "/etc/backend.ai/etcd/ca.pem"
+
+        # PEM file of the client certificate, for an etcd started with --client-
+        # cert-auth. Set together with client-key.
+        # Added in 26.10.0
+        ## client-cert = "/etc/backend.ai/etcd/client.pem"
+
+        # PEM file of the client private key. Set together with client-cert.
+        # Added in 26.10.0
+        ## client-key = "/etc/backend.ai/etcd/client-key.pem"
+
+        # Seconds to wait for the TLS handshake with an etcd member. When not
+        # set, the handshake has no limit: request timeouts do not end it.
+        # Added in 26.10.0
+        ## handshake-timeout = 10.0
+
+      # Addresses of the etcd cluster members. List every member of an etcd
+      # cluster, or a single address of a standalone server.
+      # Added in 26.10.0
+      [[proxy_coordinator.traefik.etcd.addrs]]
+      # Add multiple [[proxy_coordinator.traefik.etcd.addrs]] sections as needed
+        # Host address of the service. Can be a hostname, IP address, or special
+        # addresses like 0.0.0.0 to bind to all interfaces.
+        # Added in 22.03.0
+        host = "etcd1.example.com"
+        # Port number of the service. Must be between 1 and 65535. Ports below
+        # 1024 require root/admin privileges.
+        # Added in 22.03.0
+        port = 2379
+
+    # Strategy for resolving the real client IP behind a load balancer / reverse
+    # proxy when enforcing per-circuit client-IP allowlists via Traefik's
+    # ipAllowList middleware. Leave unset when Traefik is directly exposed to
+    # clients.
+    # Added in 26.4.5
+    [proxy_coordinator.traefik.client_ip_strategy]
+      # Number of trusted proxy hops in front of Traefik. Traefik selects the IP
+      # at this depth (counted from the rightmost, i.e. nearest-proxy, entry) of
+      # 'X-Forwarded-For' as the client IP. Mutually exclusive with
+      # 'excluded_ips'. Use this when a fixed number of proxies always front
+      # Traefik.
+      # Added in 26.4.5
+      ## depth = 1
+      # CIDR blocks (or bare IPs) of trusted proxies in front of Traefik.
+      # Traefik scans 'X-Forwarded-For' right-to-left, skipping these networks,
+      # and uses the first remaining address as the client IP. Mutually
+      # exclusive with 'depth'. Prefer this for environments where the proxy
+      # chain length varies.
+      # Added in 26.4.5
+      excluded_ips = ["10.0.0.0/8"]
+>>>>>>> a31d4c3f (feat(BA-8980): connect to etcd over TLS (#16649))
 
 # Performance profiling configuration for debugging and optimization. Includes
 # settings for cProfile and Pyroscope continuous profiling.

@@ -883,13 +883,13 @@ wheels = [
 
 [[package]]
 name = "etcd-client-py"
-version = "0.5.1"
+version = "0.6.0"
 source = { registry = "https://pypi.org/simple/" }
-sdist = { url = "https://files.pythonhosted.org/packages/bb/d2/c79d349cd668a24a3647b17db2396c59393ba6b368279abbe1169ba39bc7/etcd_client_py-0.5.1.tar.gz", hash = "sha256:7809b1adfa58c0e84cbaac166c7e76ce5987558426acaa8651075dd2315a9212", size = 143545, upload-time = "2026-01-09T14:58:45.192Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/71/00/01a2c5104da752f41e019cf359bc56164364767ffbcd46bc880cb34fee6f/etcd_client_py-0.6.0.tar.gz", hash = "sha256:8d07bf12b1c4ceffa5e206aca061cb8f8ee849b65db224ac386ef81f752e26a5", size = 183904, upload-time = "2026-11-06T08:00:36.674Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ab/92/2f21e778b884729d412613713d33eda98c644fbfb03bca4bb0ded94298ec/etcd_client_py-0.5.1-cp313-cp313-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl", hash = "sha256:dee52d29cd2d441ecebbc84b80c3c08370b0b5859dc5b165bf9133bd209e2565", size = 3566152, upload-time = "2026-01-09T14:58:30.231Z" },
-    { url = "https://files.pythonhosted.org/packages/a2/d1/6aad26b2f0581db64650f640c0d7968bbe25cc6a2fc35f7d66d4c0347f6b/etcd_client_py-0.5.1-cp313-cp313-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:c8bc311f225147e3260c6416d4c66146dd291e5af5c6b8120d0b410cce89a8d1", size = 1977332, upload-time = "2026-01-09T14:58:31.857Z" },
-    { url = "https://files.pythonhosted.org/packages/3f/6c/e6b2cf73127561e9c9bae8a41c017be346deeb54d0f8128109c2581beae6/etcd_client_py-0.5.1-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:63d245dcecdf845aa76b4da4f73d00919f07eb35788e683ee4f809e188c53375", size = 1916910, upload-time = "2026-01-09T14:58:33.747Z" },
+    { url = "https://files.pythonhosted.org/packages/e5/ee/a4660b5f25a82b4c00f101eab2bf1e371f5fac2b0468f0f3fa95338433d3/etcd_client_py-0.6.0-cp313-cp313-macosx_10_12_universal2.macosx_10_12_x86_64.macosx_11_0_arm64.whl", hash = "sha256:bbd2aef2931b037b6421a630364dbb2b6054a9b3b76399ea72d4253c5ba96610", size = 5056332, upload-time = "2026-11-06T08:00:20.385Z" },
+    { url = "https://files.pythonhosted.org/packages/85/d4/6c8fb6c9807d36c3f6fa29b78ad23f73a052ea6445fd53ea49ed6e5a26ca/etcd_client_py-0.6.0-cp313-cp313-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:6127fb590a0166ea1a0afe69d766bc6b6d436b09f44289599954a13e2940fc5e", size = 2921848, upload-time = "2026-11-06T08:00:22.468Z" },
+    { url = "https://files.pythonhosted.org/packages/5f/04/033d0ffd95f128b3d6512c0caa621ff7f1d1d6a9869cfcd42c4c674cf1c1/etcd_client_py-0.6.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:d7863a2839589441145bf0bbf773c66db834213c883b803b3a683acea30712bd", size = 2779971, upload-time = "2026-11-06T08:00:24.345Z" },
 ]
 
 [[package]]
@@ -2038,7 +2038,7 @@ requires-dist = [
     { name = "coloredlogs", specifier = "~=15.0" },
     { name = "cryptography", specifier = ">=44.0.2" },
     { name = "dataclasses-json", specifier = "~=0.6.7" },
-    { name = "etcd-client-py", specifier = "~=0.5.1" },
+    { name = "etcd-client-py", specifier = "~=0.6.0" },
     { name = "faker", specifier = "~=24.7.1" },
     { name = "graphene", specifier = "~=3.3.0" },
     { name = "graphene-federation", specifier = "~=3.2.0" },

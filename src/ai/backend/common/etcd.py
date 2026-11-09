@@ -52,6 +52,7 @@ from etcd_client import (
     ConnectOptions,
     GRPCStatusCode,
     GRPCStatusError,
+    TlsOptions,
     TxnOp,
     Watch,
 )
@@ -59,8 +60,14 @@ from etcd_client import (
     Txn as EtcdTransactionAction,
 )
 
+<<<<<<< HEAD
 from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.logging import BraceStyleAdapter
+=======
+from ai.backend.common.data.config.types import EtcdConfigData, EtcdTLSConfigData
+from ai.backend.common.exception import InvalidConfigError
+from ai.backend.logging.structured import StructuredLogger
+>>>>>>> a31d4c3f (feat(BA-8980): connect to etcd over TLS (#16649))
 
 from .types import HostPortPair, QueueSentinel
 
@@ -289,6 +296,7 @@ class AsyncEtcd(AbstractKVStore):
         scope_prefix_map: Mapping[ConfigScopes, str],
         *,
         credentials: dict[str, str] | None = None,
+        tls: EtcdTLSConfigData | None = None,
         encoding: str = "utf-8",
         watch_reconnect_intvl: float = 0.5,
         watch_reconnect_max_intvl: float = 30.0,
@@ -310,6 +318,12 @@ class AsyncEtcd(AbstractKVStore):
             )
         else:
             self._connect_options = None
+        scheme = "http"
+        if tls is not None and tls.enabled:
+            scheme = "https"
+            tls_options = self._tls_options_from_cert_files(tls)
+            connect_options = self._connect_options or ConnectOptions()
+            self._connect_options = connect_options.with_tls(tls_options)
         self._request_options = (
             (self._connect_options or ConnectOptions())
             .with_timeout(request_timeout)
@@ -334,9 +348,23 @@ class AsyncEtcd(AbstractKVStore):
         self.request_retries = request_retries
         self.request_retry_intvl = request_retry_intvl
         self.etcd = EtcdClient(
-            [f"http://{addr.host}:{addr.port}" for addr in addrs],
+            [f"{scheme}://{addr.host}:{addr.port}" for addr in addrs],
             connect_options=self._connect_options,
         )
+
+    @staticmethod
+    def _tls_options_from_cert_files(tls: EtcdTLSConfigData) -> TlsOptions:
+        tls_options = TlsOptions()
+        if tls.ca_cert is not None:
+            ca_cert_pem = tls.ca_cert.read_bytes()
+            tls_options = tls_options.with_ca_certificate(ca_cert_pem)
+        if tls.handshake_timeout is not None:
+            tls_options = tls_options.with_handshake_timeout(tls.handshake_timeout)
+        if tls.client_cert is None or tls.client_key is None:
+            return tls_options
+        client_cert_pem = tls.client_cert.read_bytes()
+        client_key_pem = tls.client_key.read_bytes()
+        return tls_options.with_identity(client_cert_pem, client_key_pem)
 
     def _should_rewatch(self, e: GRPCStatusError) -> bool:
         """A watch stream cut by a lost connection ends with ``UNAVAILABLE`` or ``UNKNOWN``."""
@@ -376,10 +404,18 @@ class AsyncEtcd(AbstractKVStore):
         }
 
         return cls(
+<<<<<<< HEAD
             etcd_addrs,
             namespace,
             scope_prefix_map,
             credentials=credentials,
+=======
+            [addr.to_legacy() for addr in etcd_config.addrs],
+            etcd_config.namespace,
+            scope_prefix_map or {ConfigScopes.GLOBAL: ""},
+            credentials={"user": etcd_config.user, "password": etcd_config.password},
+            tls=etcd_config.tls,
+>>>>>>> a31d4c3f (feat(BA-8980): connect to etcd over TLS (#16649))
             keep_alive_interval=etcd_config.keep_alive_interval,
             keep_alive_timeout=etcd_config.keep_alive_timeout,
         )
