@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator, Sequence
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any, override
 
@@ -86,6 +87,8 @@ from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingR
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.read import V2ReadOps
+from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
 from ai.backend.manager.services.ops.service import SearchService
 from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
@@ -952,3 +955,122 @@ class TestFullStack:
         # What the run reached reaches the audit trail; how much of it is recorded is
         # the audit policy's call.
         assert result.entity_ids() == (preset.id,)
+
+
+class _ProviderTimingOutOnFirstOpens(V2DBOpsProvider):
+    sessions_opened: int
+    _timeouts_left: int
+
+    def __init__(self, db: ExtendedAsyncSAEngine, timeouts: int) -> None:
+        super().__init__(db)
+        self.sessions_opened = 0
+        self._timeouts_left = timeouts
+
+    @override
+    @asynccontextmanager
+    async def read_ops(self) -> AsyncGenerator[V2ReadOps]:
+        self._time_out_while_timeouts_left()
+        async with super().read_ops() as r:
+            yield r
+
+    @override
+    @asynccontextmanager
+    async def write_ops(self) -> AsyncGenerator[V2WriteOps]:
+        self._time_out_while_timeouts_left()
+        async with super().write_ops() as w:
+            yield w
+
+    def _time_out_while_timeouts_left(self) -> None:
+        self.sessions_opened += 1
+        if self._timeouts_left > 0:
+            self._timeouts_left -= 1
+            raise TimeoutError
+
+
+@dataclass(frozen=True)
+class _RepositoryOverTimingOutProvider:
+    repository: OpsRepository[RolePresetData]
+    provider: _ProviderTimingOutOnFirstOpens
+
+
+@dataclass(frozen=True)
+class _StoredPresetBehindTimingOutProvider:
+    repository: OpsRepository[RolePresetData]
+    provider: _ProviderTimingOutOnFirstOpens
+    preset_id: uuid.UUID
+
+
+@pytest.fixture
+async def stored_preset_behind_one_session_timeout(
+    database: ExtendedAsyncSAEngine,
+) -> _StoredPresetBehindTimingOutProvider:
+    async with database.begin_session() as sess:
+        row = RolePresetRow(name="stored", scope_type=DomainEntityType())
+        sess.add(row)
+        await sess.flush()
+        preset_id = row.id
+    provider = _ProviderTimingOutOnFirstOpens(database, timeouts=1)
+    return _StoredPresetBehindTimingOutProvider(
+        repository=OpsRepository[RolePresetData](provider),
+        provider=provider,
+        preset_id=preset_id,
+    )
+
+
+@pytest.fixture
+def repository_behind_one_session_timeout(
+    database: ExtendedAsyncSAEngine,
+) -> _RepositoryOverTimingOutProvider:
+    provider = _ProviderTimingOutOnFirstOpens(database, timeouts=1)
+    return _RepositoryOverTimingOutProvider(
+        repository=OpsRepository[RolePresetData](provider), provider=provider
+    )
+
+
+@pytest.fixture
+def repository_with_no_session_timeout(
+    database: ExtendedAsyncSAEngine,
+) -> _RepositoryOverTimingOutProvider:
+    provider = _ProviderTimingOutOnFirstOpens(database, timeouts=0)
+    return _RepositoryOverTimingOutProvider(
+        repository=OpsRepository[RolePresetData](provider), provider=provider
+    )
+
+
+class TestRetryOnSessionOpenFailure:
+    async def test_a_read_whose_first_session_times_out_is_retried(
+        self, stored_preset_behind_one_session_timeout: _StoredPresetBehindTimingOutProvider
+    ) -> None:
+        situation = stored_preset_behind_one_session_timeout
+
+        read = await situation.repository.get(_PresetQuerier(target=situation.preset_id))
+
+        assert read.id == situation.preset_id
+        assert situation.provider.sessions_opened == 2
+
+    async def test_a_write_whose_first_session_times_out_is_retried_and_written_once(
+        self,
+        database: ExtendedAsyncSAEngine,
+        repository_behind_one_session_timeout: _RepositoryOverTimingOutProvider,
+    ) -> None:
+        situation = repository_behind_one_session_timeout
+
+        created = await situation.repository.create_global_entity(
+            _PresetCreator(name="retried", scope_type=DomainEntityType())
+        )
+
+        async with database.begin_readonly_session() as sess:
+            stored = (
+                await sess.scalars(sa.select(RolePresetRow).where(RolePresetRow.name == "retried"))
+            ).all()
+        assert [row.id for row in stored] == [created.id]
+        assert situation.provider.sessions_opened == 2
+
+    async def test_a_backend_ai_error_is_not_retried(
+        self, repository_with_no_session_timeout: _RepositoryOverTimingOutProvider
+    ) -> None:
+        situation = repository_with_no_session_timeout
+
+        with pytest.raises(EntityNotFoundError):
+            await situation.repository.get(_PresetQuerier(target=uuid.uuid4()))
+        assert situation.provider.sessions_opened == 1
