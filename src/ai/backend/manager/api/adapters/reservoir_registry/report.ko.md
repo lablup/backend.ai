@@ -20,7 +20,7 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [Reservoir 레지스트리 조회 권한을 받은 사용자가 미리 저장한 레지스트리 둘을 한 번에 조회하면, 둘은 요청한 순서대로 반환됩니다](#reading-a-user-granted-read-loads-several-reservoir-registries-in-the-requested-order) | 성공 |
+| [Reservoir 레지스트리 조회 권한을 받은 사용자가 미리 저장한 레지스트리 둘을 한 번에 조회하면, 둘은 요청한 순서대로 반환되고 저장된 secret key 는 반환되지 않습니다](#reading-a-user-granted-read-loads-several-reservoir-registries-in-the-requested-order) | 성공 |
 | [아무 권한도 받지 않은 사용자가 레지스트리 id 여럿을 한 번에 조회하면, 요청 전체가 거부되는 대신 항목마다 권한 부족 거부가 담겨 반환됩니다](#reading-a-user-granted-nothing-loading-many-registry-ids-is-refused-on-every-id) | 거부 |
 
 **create**
@@ -34,7 +34,7 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [Reservoir 레지스트리 조회 권한을 받은 사용자가 하나를 조회하면 미리 저장한 레지스트리 전체가 반환됩니다](#reading-a-user-granted-read-gets-a-registry) | 성공 |
+| [Reservoir 레지스트리 조회 권한을 받은 사용자가 하나를 조회하면 미리 저장한 레지스트리가 반환되고, 저장된 secret key 는 반환되지 않습니다](#reading-a-user-granted-read-gets-a-registry) | 성공 |
 | [아무 권한도 받지 않은 사용자가 레지스트리를 조회하려 하면 권한 부족으로 거부됩니다](#reading-a-user-granted-nothing-may-not-get-a-registry) | 거부 |
 
 **get_many**
@@ -86,7 +86,7 @@
 
 #### [a-user-granted-read-loads-several-reservoir-registries-in-the-requested-order](/tests/scenario/bai_scenario/manager/reservoir_registry/test_reading.py): pass
 
-Reservoir 레지스트리 조회 권한을 받은 사용자가 미리 저장한 레지스트리 둘을 한 번에 조회하면, 둘은 요청한 순서대로 반환됩니다
+Reservoir 레지스트리 조회 권한을 받은 사용자가 미리 저장한 레지스트리 둘을 한 번에 조회하면, 둘은 요청한 순서대로 반환되고 저장된 secret key 는 반환되지 않습니다
 
 Given
 
@@ -110,21 +110,21 @@ When
 
 Then
 
-- 미리 저장한 레지스트리는 요청한 순서대로 반환됩니다
+- 미리 저장한 레지스트리는 요청한 순서대로 반환되고, secret key 는 '*****' 로 반환됩니다
   - length = 2
   - [0].id: 미리 저장한 레지스트리의 id 와 같다
   - [0].entity_id: 미리 저장한 레지스트리의 id 와 같다
   - [0].name = 'registry-1'
   - [0].endpoint = 'https://reservoir.example.com'
   - [0].access_key = 'access-key'
-  - [0].secret_key = 'secret-key'
+  - [0].secret_key = '*****'
   - [0].api_version = 'v1'
   - [1].id: 미리 저장한 레지스트리의 id 와 같다
   - [1].entity_id: 미리 저장한 레지스트리의 id 와 같다
   - [1].name = 'registry-2'
   - [1].endpoint = 'https://reservoir.example.com'
   - [1].access_key = 'access-key'
-  - [1].secret_key = 'secret-key'
+  - [1].secret_key = '*****'
   - [1].api_version = 'v1'
 
 <a id="reading-a-user-granted-nothing-loading-many-registry-ids-is-refused-on-every-id"></a>
@@ -220,7 +220,7 @@ Then
 
 #### [a-user-granted-read-gets-a-registry](/tests/scenario/bai_scenario/manager/reservoir_registry/test_reading.py): pass
 
-Reservoir 레지스트리 조회 권한을 받은 사용자가 하나를 조회하면 미리 저장한 레지스트리 전체가 반환됩니다
+Reservoir 레지스트리 조회 권한을 받은 사용자가 하나를 조회하면 미리 저장한 레지스트리가 반환되고, 저장된 secret key 는 반환되지 않습니다
 
 Given
 
@@ -243,13 +243,13 @@ When
 
 Then
 
-- 미리 저장한 레지스트리 전체가 반환됩니다
+- 미리 저장한 레지스트리가 반환되고, secret key 는 '*****' 로 반환됩니다
   - id: 미리 저장한 레지스트리의 id 와 같다
   - entity_id: 미리 저장한 레지스트리의 id 와 같다
   - name = 'registry-1'
   - endpoint = 'https://reservoir.example.com'
   - access_key = 'access-key'
-  - secret_key = 'secret-key'
+  - secret_key = '*****'
   - api_version = 'v1'
 
 <a id="reading-a-user-granted-nothing-may-not-get-a-registry"></a>

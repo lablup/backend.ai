@@ -16,6 +16,7 @@ from ai.backend.manager.api.adapters.reservoir_registry.adapter import (
     ReservoirRegistryAdapter,
 )
 from ai.backend.manager.data.permission.types import Permission
+from ai.backend.manager.defs import SECRET_KEY_PLACEHOLDER
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -136,8 +137,11 @@ class TheRegistryNode(Then[ARegistryAndACaller, ReservoirRegistryNode]):
     @override
     def says(self) -> str:
         return Says(
-            "미리 저장한 레지스트리 전체가 반환됩니다",
-            english="the whole registry seeded in advance comes back",
+            f"미리 저장한 레지스트리가 반환되고, secret key 는 {SECRET_KEY_PLACEHOLDER!r} 로 반환됩니다",
+            english=(
+                f"the registry seeded in advance comes back with {SECRET_KEY_PLACEHOLDER!r} as its "
+                "secret key"
+            ),
         )
 
     @override
@@ -197,8 +201,12 @@ class TheOrderIsKept(Then[ManyRegistriesAndACaller, Loaded]):
     @override
     def says(self) -> str:
         return Says(
-            "미리 저장한 레지스트리는 요청한 순서대로 반환됩니다",
-            english="the registries seeded in advance come back in the requested order",
+            "미리 저장한 레지스트리는 요청한 순서대로 반환되고, secret key 는 "
+            f"{SECRET_KEY_PLACEHOLDER!r} 로 반환됩니다",
+            english=(
+                "the registries seeded in advance come back in the requested order with "
+                f"{SECRET_KEY_PLACEHOLDER!r} as their secret keys"
+            ),
         )
 
     @override
@@ -254,10 +262,10 @@ class AUserGrantedReadGets(
     def describe(self) -> str:
         return Says(
             "Reservoir 레지스트리 조회 권한을 받은 사용자가 하나를 조회하면 미리 저장한 "
-            "레지스트리 전체가 반환됩니다",
+            "레지스트리가 반환되고, 저장된 secret key 는 반환되지 않습니다",
             english=(
                 "when a user granted permission to read Reservoir registries reads one, the "
-                "whole registry seeded in advance comes back"
+                "registry seeded in advance comes back without its stored secret key"
             ),
         )
 
@@ -401,10 +409,11 @@ class AUserGrantedReadLoadsManyInOrder(
     def describe(self) -> str:
         return Says(
             "Reservoir 레지스트리 조회 권한을 받은 사용자가 미리 저장한 레지스트리 둘을 한 번에 "
-            "조회하면, 둘은 요청한 순서대로 반환됩니다",
+            "조회하면, 둘은 요청한 순서대로 반환되고 저장된 secret key 는 반환되지 않습니다",
             english=(
                 "when a user granted permission to read Reservoir registries loads two registries "
-                "seeded in advance at once, the two come back in the requested order"
+                "seeded in advance at once, the two come back in the requested order without "
+                "their stored secret keys"
             ),
         )
 
