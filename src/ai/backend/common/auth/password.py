@@ -22,15 +22,17 @@ class PasswordHashAlgorithm(enum.StrEnum):
 
     def max_password_bytes(self) -> int | None:
         """The longest password, in UTF-8 bytes, the algorithm hashes in full; None when
-        it has no limit. bcrypt reads only the first 72 bytes."""
+        it has no limit."""
         match self:
             case PasswordHashAlgorithm.BCRYPT:
-                return 72
+                return BCRYPT_MAX_PASSWORD_BYTES
             case _:
                 return None
 
 
 HASH_DELIMITER: Final[str] = "$"
+# bcrypt reads only this many bytes of a password.
+BCRYPT_MAX_PASSWORD_BYTES: Final[int] = 72
 
 
 @dataclass(frozen=True)
