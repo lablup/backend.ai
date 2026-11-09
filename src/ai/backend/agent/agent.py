@@ -2467,7 +2467,7 @@ class AbstractAgent[
                             flush_timeout=1.0,
                             api_version=3,
                         )
-                    except KeyError:
+                    except KernelNotFoundError:
                         await self.anycast_and_broadcast_event(
                             KernelTerminatedAnycastEvent(
                                 kernel_id=kernel_id,
