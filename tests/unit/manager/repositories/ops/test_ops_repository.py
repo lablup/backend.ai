@@ -1002,7 +1002,7 @@ def repository_timing_out_first_open(
 
 
 @pytest.fixture
-async def stored_preset_id(database: ExtendedAsyncSAEngine) -> uuid.UUID:
+async def stored_preset_id(database: ExtendedAsyncSAEngine) -> RolePresetID:
     async with database.begin_session() as sess:
         row = RolePresetRow(name="stored", scope_type=DomainEntityType())
         sess.add(row)
@@ -1015,7 +1015,7 @@ class TestRetryOnSessionOpenFailure:
         self,
         provider_timing_out_first_open: _ProviderTimingOutFirstOpen,
         repository_timing_out_first_open: OpsRepository[RolePresetData],
-        stored_preset_id: uuid.UUID,
+        stored_preset_id: RolePresetID,
     ) -> None:
         read_back = await repository_timing_out_first_open.get(
             _PresetQuerier(target=stored_preset_id)
