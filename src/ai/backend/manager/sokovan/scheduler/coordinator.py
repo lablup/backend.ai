@@ -4,7 +4,7 @@ from collections.abc import Awaitable, Mapping, Sequence
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Final, assert_never
+from typing import Final, assert_never
 from uuid import UUID
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
@@ -1244,12 +1244,12 @@ class ScheduleCoordinator:
     async def _apply_transition(
         self,
         handler_name: str,
-        session_infos: list[Any],
+        session_infos: list[SessionTransitionInfo],
         transition: TransitionStatus,
         scheduling_result: SchedulingResult,
         records: Mapping[SessionId, ExecutionRecord],
         status_changed_at: datetime,
-    ) -> list[Any]:
+    ) -> list[SessionTransitionInfo]:
         """Apply a single transition type to sessions (BEP-1030).
 
         Args:

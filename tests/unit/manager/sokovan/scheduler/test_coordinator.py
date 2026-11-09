@@ -7,7 +7,7 @@ Test Scenarios:
 - SC-CO-009 ~ SC-CO-013: HookExecution
 - SC-CO-014 ~ SC-CO-019: StatusTransition
 - SC-CO-019b: status_info cleared on RUNNING transition (BA-4841 regression)
-- SC-CO-019c: a session the transition guard leaves alone is neither broadcast nor reset
+- SC-CO-019c: a session the transition guard leaves alone is neither returned nor reset
 - SC-CO-020 ~ SC-CO-025: PostProcessors
 """
 
