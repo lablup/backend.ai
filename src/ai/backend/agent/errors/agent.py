@@ -77,6 +77,21 @@ class ContainerCreationFailedError(BackendAIError, web.HTTPInternalServerError):
         )
 
 
+class KernelCreationCancelledError(BackendAIError, web.HTTPInternalServerError):
+    """Raised when the kernel is destroyed while it is being created."""
+
+    error_type = "https://api.backend.ai/probs/agent/kernel-creation-cancelled"
+    error_title = "Kernel creation cancelled."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.KERNEL,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.CANCELED,
+        )
+
+
 class ContainerStartupTimeoutError(BackendAIError, web.HTTPGatewayTimeout):
     """Raised when container startup times out."""
 
