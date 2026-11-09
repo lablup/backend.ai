@@ -17,7 +17,7 @@ from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.data.manager_status.types import ManagerStatus
 from ai.backend.manager.defs import INTRINSIC_SLOTS
 from ai.backend.manager.errors.common import ServerMisconfiguredError
-from ai.backend.testutils.bootstrap import POSTGRES_PASSWORD, POSTGRES_USER
+from ai.backend.testutils.bootstrap import POSTGRES_PASSWORD, POSTGRES_USER, REDIS_PASSWORD
 
 VFOLDER_HOST = "local:volume1"
 
@@ -61,7 +61,10 @@ def base_config_dict(
     db_addr: HostPortPairModel, dbname: str, redis_addr: HostPortPairModel
 ) -> dict[str, Any]:
     raw: dict[str, Any] = {
-        "redis": {"addr": {"host": redis_addr.host, "port": redis_addr.port}},
+        "redis": {
+            "addr": {"host": redis_addr.host, "port": redis_addr.port},
+            "password": REDIS_PASSWORD,
+        },
         "etcd": {"user": "test", "password": "test"},
         "db": {
             "addr": {"host": db_addr.host, "port": db_addr.port},

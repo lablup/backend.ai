@@ -13,6 +13,7 @@ from ai.backend.common.types import (
     HostPortPair,
     RedisTarget,
 )
+from ai.backend.testutils.bootstrap import REDIS_PASSWORD
 
 
 @pytest.fixture
@@ -40,6 +41,7 @@ async def redis_queue(
     addr = redis_container[1]
     redis_target = RedisTarget(
         addr=addr,
+        password=REDIS_PASSWORD,
         redis_helper_config={
             "socket_timeout": 5.0,
             "socket_connect_timeout": 2.0,

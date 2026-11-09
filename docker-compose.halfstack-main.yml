@@ -58,8 +58,9 @@ services:
     command: >
       valkey-server
       --appendonly yes
+      --requirepass ${REDIS_PASSWORD:-develove}
     healthcheck:
-      test: ["CMD-SHELL", "valkey-cli ping | grep PONG"]
+      test: ["CMD-SHELL", "valkey-cli -a ${REDIS_PASSWORD:-develove} --no-auth-warning ping | grep PONG"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -71,7 +72,7 @@ services:
     networks:
       - half
     command: >
-      --redis.addr redis://backendai-half-redis:6379
+      --redis.addr redis://:${REDIS_PASSWORD:-develove}@backendai-half-redis:6379
       --include-system-metrics
       --include-config-metrics
       --include-modules-metrics

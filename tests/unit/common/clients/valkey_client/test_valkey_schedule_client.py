@@ -30,6 +30,7 @@ from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.defs import REDIS_LIVE_DB
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import AgentId, KernelId, SessionId, ValkeyTarget
+from ai.backend.testutils.bootstrap import REDIS_PASSWORD
 
 
 class TestValkeyScheduleClient:
@@ -45,6 +46,7 @@ class TestValkeyScheduleClient:
 
         valkey_target = ValkeyTarget(
             addr=hostport_pair.address,
+            password=REDIS_PASSWORD,
         )
 
         client = await ValkeyScheduleClient.create(
@@ -335,6 +337,7 @@ class TestKernelPresenceStatus:
 
         valkey_target = ValkeyTarget(
             addr=hostport_pair.address,
+            password=REDIS_PASSWORD,
         )
 
         client = await ValkeyScheduleClient.create(
@@ -644,6 +647,7 @@ class TestAgentLastCheck:
 
         valkey_target = ValkeyTarget(
             addr=hostport_pair.address,
+            password=REDIS_PASSWORD,
         )
 
         client = await ValkeyScheduleClient.create(
@@ -854,7 +858,7 @@ class TestForceTerminatedCleanupQueue:
         redis_container: tuple[str, HostPortPairModel],
     ) -> AsyncGenerator[ValkeyScheduleClient, None]:
         _, hostport_pair = redis_container
-        valkey_target = ValkeyTarget(addr=hostport_pair.address)
+        valkey_target = ValkeyTarget(addr=hostport_pair.address, password=REDIS_PASSWORD)
         client = await ValkeyScheduleClient.create(
             valkey_target=valkey_target,
             db_id=REDIS_LIVE_DB,
@@ -915,7 +919,7 @@ class TestReplicaProbeTargetClient:
     ) -> AsyncGenerator[ValkeyScheduleClient, None]:
         _, hostport_pair = redis_container
         client = await ValkeyScheduleClient.create(
-            valkey_target=ValkeyTarget(addr=hostport_pair.address),
+            valkey_target=ValkeyTarget(addr=hostport_pair.address, password=REDIS_PASSWORD),
             db_id=REDIS_LIVE_DB,
             human_readable_name="test-route-probe-target",
         )
@@ -1007,7 +1011,7 @@ class TestReplicaHealthStatusClient:
     ) -> AsyncGenerator[ValkeyScheduleClient, None]:
         _, hostport_pair = redis_container
         client = await ValkeyScheduleClient.create(
-            valkey_target=ValkeyTarget(addr=hostport_pair.address),
+            valkey_target=ValkeyTarget(addr=hostport_pair.address, password=REDIS_PASSWORD),
             db_id=REDIS_LIVE_DB,
             human_readable_name="test-route-health-status",
         )

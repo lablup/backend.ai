@@ -11,6 +11,7 @@ from ai.backend.agent.dependencies.infrastructure.redis import (
 from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.typed_validators import HostPortPair
+from ai.backend.testutils.bootstrap import REDIS_PASSWORD
 
 
 class TestValkeyDependency:
@@ -18,10 +19,10 @@ class TestValkeyDependency:
     async def redis_config(self, redis_container: Any) -> RedisConfig:
         """Redis config fixture using testcontainer."""
         redis_addr = redis_container[1]
-        return RedisConfig(  # type: ignore[call-arg]
-            addr=HostPortPair(host=redis_addr.host, port=redis_addr.port),
-            password=None,
-        )
+        return RedisConfig.model_validate({
+            "addr": HostPortPair(host=redis_addr.host, port=redis_addr.port),
+            "password": REDIS_PASSWORD,
+        })
 
     async def test_valkey_dependency_creates_all_clients(self, redis_config: RedisConfig) -> None:
         """Test that valkey dependency creates all 4 clients."""

@@ -17,6 +17,7 @@ from pydantic import (
 from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import PydanticUndefined, core_schema
 
+from ai.backend.common.defs import REDIS_PASSWORD_MIN_LENGTH
 from ai.backend.common.meta import (
     NEXT_RELEASE_VERSION,
     BackendAIConfigMeta,
@@ -172,13 +173,16 @@ class RedisConfig(BaseSchema):
         ),
     ]
     password: Annotated[
-        str | None,
-        Field(default=None),
+        str,
+        Field(min_length=REDIS_PASSWORD_MIN_LENGTH),
         BackendAIConfigMeta(
-            description="Redis password.",
+            description=(
+                f"Redis password, at least {REDIS_PASSWORD_MIN_LENGTH} characters. "
+                f"Required since {NEXT_RELEASE_VERSION}."
+            ),
             added_version="25.13.0",
             secret=True,
-            example=ConfigExample(local="", prod="REDIS_PASSWORD"),
+            example=ConfigExample(local="develove", prod="REDIS_PASSWORD"),
         ),
     ]
     redis_helper_config: Annotated[

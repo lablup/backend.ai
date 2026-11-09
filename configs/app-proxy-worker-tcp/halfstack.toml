@@ -1,5 +1,6 @@
 [redis]
 addr = { host = "127.0.0.1", port = 8110 }
+password = "develove"
 
 [proxy_worker]
 coordinator_endpoint = "http://127.0.0.1:10200"

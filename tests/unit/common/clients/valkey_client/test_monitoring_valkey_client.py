@@ -16,6 +16,7 @@ from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.exception import ClientNotConnectedError
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import ValkeyTarget
+from ai.backend.testutils.bootstrap import REDIS_PASSWORD
 
 
 @pytest.mark.redis
@@ -25,7 +26,7 @@ class TestMonitoringValkeyClient:
         self, redis_container: tuple[str, HostPortPairModel]
     ) -> AsyncIterator[MonitoringValkeyClient]:
         hostport_pair: HostPortPairModel = redis_container[1]
-        valkey_target = ValkeyTarget(addr=hostport_pair.address)
+        valkey_target = ValkeyTarget(addr=hostport_pair.address, password=REDIS_PASSWORD)
         client = cast(
             MonitoringValkeyClient,
             create_valkey_client(
@@ -116,7 +117,7 @@ class TestMonitoringValkeyClient:
     ) -> None:
         """Test that CancelledError during shutdown does not produce error logs (BA-3593)"""
         hostport_pair: HostPortPairModel = redis_container[1]
-        valkey_target = ValkeyTarget(addr=hostport_pair.address)
+        valkey_target = ValkeyTarget(addr=hostport_pair.address, password=REDIS_PASSWORD)
         client = cast(
             MonitoringValkeyClient,
             create_valkey_client(
@@ -161,7 +162,7 @@ class TestMonitoringValkeyClient:
     ) -> None:
         """Test that external task cancellation (simulating shutdown) does not produce error logs (BA-3593)"""
         hostport_pair: HostPortPairModel = redis_container[1]
-        valkey_target = ValkeyTarget(addr=hostport_pair.address)
+        valkey_target = ValkeyTarget(addr=hostport_pair.address, password=REDIS_PASSWORD)
         client = cast(
             MonitoringValkeyClient,
             create_valkey_client(
@@ -220,7 +221,7 @@ class TestMonitoringValkeyClientContextManager:
         self, redis_container: tuple[str, HostPortPairModel]
     ) -> AsyncIterator[MonitoringValkeyClient]:
         hostport_pair: HostPortPairModel = redis_container[1]
-        valkey_target = ValkeyTarget(addr=hostport_pair.address)
+        valkey_target = ValkeyTarget(addr=hostport_pair.address, password=REDIS_PASSWORD)
         client = cast(
             MonitoringValkeyClient,
             create_valkey_client(

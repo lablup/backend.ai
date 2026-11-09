@@ -11,6 +11,7 @@ from ai.backend.common.clients.valkey_client.client import (
 from ai.backend.common.health_checker import ComponentId
 from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
+from ai.backend.testutils.bootstrap import REDIS_PASSWORD
 
 
 class TestValkeyHealthChecker:
@@ -24,7 +25,7 @@ class TestValkeyHealthChecker:
         """Create a Valkey standalone client connected to the test container."""
         container_id, hostport_pair = redis_container
 
-        target = ValkeyStandaloneTarget(address=hostport_pair.address)
+        target = ValkeyStandaloneTarget(address=hostport_pair.address, password=REDIS_PASSWORD)
         client = ValkeyStandaloneClient(
             target,
             db_id=0,

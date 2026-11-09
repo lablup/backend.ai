@@ -13,6 +13,7 @@ from ai.backend.manager.dependencies.infrastructure.redis import (
     ValkeyDependency,
     ValkeyInput,
 )
+from ai.backend.testutils.bootstrap import REDIS_PASSWORD
 
 
 class TestValkeyDependency:
@@ -31,7 +32,7 @@ class TestValkeyDependency:
             "addr": HostPortPair(host=redis_addr.host, port=redis_addr.port),
             "sentinel": None,
             "service_name": None,
-            "password": None,
+            "password": REDIS_PASSWORD,
         }
         redis_config = redis_config_iv.check(redis_config_data)
 

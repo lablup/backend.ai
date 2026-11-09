@@ -35,6 +35,7 @@ from ai.backend.common.lock import (
 )
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.types import AgentId, HostPortPair, RedisTarget, ValkeyTarget
+from ai.backend.testutils.bootstrap import REDIS_PASSWORD
 
 
 @dataclass
@@ -96,7 +97,9 @@ async def run_timer(
     interval: int | float,
 ) -> None:
     redis_target = RedisTarget(
-        addr=redis_addr, redis_helper_config=config.redis_helper_default_config
+        addr=redis_addr,
+        password=REDIS_PASSWORD,
+        redis_helper_config=config.redis_helper_default_config,
     )
     node_id = f"{test_case_ns}-node-{threading.get_ident()}"
     redis_mq = await RedisQueue.create(
@@ -169,6 +172,7 @@ class TimerNode(threading.Thread):
         self.stop_event = asyncio.Event()
         redis_target = RedisTarget(
             addr=self.redis_container,
+            password=REDIS_PASSWORD,
             redis_helper_config={
                 "socket_timeout": 5.0,
                 "socket_connect_timeout": 2.0,
@@ -283,7 +287,7 @@ async def valkey_lock(
 ) -> AsyncIterator[ValkeyLockClient]:
     redis_addr = redis_container[1]
     client = await ValkeyLockClient.create(
-        ValkeyTarget(addr=f"{redis_addr.host}:{redis_addr.port}"),
+        ValkeyTarget(addr=f"{redis_addr.host}:{redis_addr.port}", password=REDIS_PASSWORD),
         db_id=REDIS_STREAM_LOCK,
         human_readable_name="test.lock",
     )

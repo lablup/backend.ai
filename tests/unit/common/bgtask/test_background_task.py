@@ -24,11 +24,12 @@ from ai.backend.common.events.event_types.bgtask.broadcast import (
 from ai.backend.common.message_queue.redis_queue.queue import RedisMQArgs, RedisQueue
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import AgentId, HostPortPair, RedisTarget, ValkeyTarget
+from ai.backend.testutils.bootstrap import REDIS_PASSWORD
 
 
 async def _flush_db(redis_addr: HostPortPairModel, db_id: int) -> None:
     client = create_valkey_client(
-        valkey_target=ValkeyTarget(addr=redis_addr.address),
+        valkey_target=ValkeyTarget(addr=redis_addr.address, password=REDIS_PASSWORD),
         db_id=db_id,
         human_readable_name=f"test_cleanup_{db_id}",
     )
@@ -50,7 +51,9 @@ async def message_queue(
 ) -> AsyncIterator[RedisQueue]:
     _, redis_addr = redis_container
     redis_target = RedisTarget(
-        addr=HostPortPair(host=redis_addr.host, port=redis_addr.port), redis_helper_config={}
+        addr=HostPortPair(host=redis_addr.host, port=redis_addr.port),
+        password=REDIS_PASSWORD,
+        redis_helper_config={},
     )
     message_queue = await RedisQueue.create(
         redis_target,
@@ -105,6 +108,7 @@ async def valkey_bgtask_client(
     _, redis_addr = redis_container
     valkey_target = ValkeyTarget(
         addr=redis_addr.address,
+        password=REDIS_PASSWORD,
     )
 
     valkey_client = await ValkeyBgtaskClient.create(

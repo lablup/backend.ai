@@ -16,11 +16,12 @@ from ai.backend.common.defs import REDIS_STREAM_LOCK
 from ai.backend.common.lock import RedisLock
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import ValkeyTarget
+from ai.backend.testutils.bootstrap import REDIS_PASSWORD
 
 
 @pytest.fixture
 def valkey_target(redis_container: tuple[str, HostPortPairModel]) -> ValkeyTarget:
-    return ValkeyTarget(addr=redis_container[1].address)
+    return ValkeyTarget(addr=redis_container[1].address, password=REDIS_PASSWORD)
 
 
 @pytest.fixture

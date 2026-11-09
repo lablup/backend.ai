@@ -7,6 +7,7 @@ from ai.backend.common.clients.valkey_client.valkey_session.client import Valkey
 from ai.backend.common.config import redis_config_iv
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import HostPortPair
+from ai.backend.testutils.bootstrap import REDIS_PASSWORD
 from ai.backend.web.config.unified import SessionConfig, WebServerUnifiedConfig
 from ai.backend.web.dependencies.infrastructure.redis import RedisProvider, RedisProviderInput
 
@@ -27,7 +28,7 @@ class TestRedisProvider:
             "addr": HostPortPair(host=redis_addr.host, port=redis_addr.port),
             "sentinel": None,
             "service_name": None,
-            "password": None,
+            "password": REDIS_PASSWORD,
         }
         redis_config = redis_config_iv.check(redis_config_data)
 

@@ -29,6 +29,7 @@ from ai.backend.logging.types import LogFormat, LogLevel
 from ai.backend.testutils.bootstrap import (  # noqa: F401
     ETCD_PASSWORD,
     ETCD_USER,
+    REDIS_PASSWORD,
     etcd_container,
     redis_container,
     sync_file_lock,
@@ -153,7 +154,7 @@ def local_config(
             "addr": redis_addr,
             "sentinel": None,
             "service_name": None,
-            "password": None,
+            "password": REDIS_PASSWORD,
             "redis_helper_config": config.redis_helper_default_config,
         },
         "plugins": {},

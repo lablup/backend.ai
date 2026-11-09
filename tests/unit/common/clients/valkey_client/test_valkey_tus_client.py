@@ -13,6 +13,7 @@ from ai.backend.common.clients.valkey_client.valkey_tus.client import (
 from ai.backend.common.defs import REDIS_TUS_DB
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import ValkeyTarget
+from ai.backend.testutils.bootstrap import REDIS_PASSWORD
 
 
 class TestValkeyTusClient:
@@ -23,6 +24,7 @@ class TestValkeyTusClient:
         hostport_pair: HostPortPairModel = redis_container[1]
         valkey_target = ValkeyTarget(
             addr=hostport_pair.address,
+            password=REDIS_PASSWORD,
         )
         client = await ValkeyTusClient.create(
             valkey_target,

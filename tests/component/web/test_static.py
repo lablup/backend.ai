@@ -30,7 +30,9 @@ class TestStaticExposure:
         static_path: Path,
         aiohttp_client: AiohttpClient,
     ) -> TestClient[web.Request, web.Application]:
-        config = WebServerUnifiedConfig.model_validate({})
+        config = WebServerUnifiedConfig.model_validate({
+            "session": {"redis": {"password": "test-password"}}
+        })
         config.service.static_path = static_path
         app = web.Application()
         app["config"] = config

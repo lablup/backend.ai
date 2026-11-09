@@ -81,6 +81,7 @@ from ai.backend.testutils.bootstrap import (
     POSTGRES_MAINTENANCE_DB,
     POSTGRES_PASSWORD,
     POSTGRES_USER,
+    REDIS_PASSWORD,
 )
 from ai.backend.testutils.pants import get_parallel_slot
 
@@ -327,6 +328,7 @@ def etcd_fixture(
                 "docker": {},
                 "redis": {
                     "addr": f"{redis_addr.host}:{redis_addr.port}",
+                    "password": REDIS_PASSWORD,
                 },
                 "plugins": {
                     "cloudia": {

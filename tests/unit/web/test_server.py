@@ -346,6 +346,7 @@ class TestConfigTomlHandler:
                 "hide-agents": False,
             },
             "ui": {"menu-blocklist": "agent"},
+            "session": {"redis": {"password": "test-password"}},
         })
         app["j2env"] = build_template_environment()
         app.router.add_route("GET", "/config.toml", config_toml_handler)

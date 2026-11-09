@@ -22,6 +22,7 @@ from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import (
     ValkeyTarget,
 )
+from ai.backend.testutils.bootstrap import REDIS_PASSWORD
 
 
 @pytest.fixture
@@ -45,6 +46,7 @@ async def redis_discovery(
     hostport_pair: HostPortPairModel = redis_container[1]
     valkey_target = ValkeyTarget(
         addr=hostport_pair.address,
+        password=REDIS_PASSWORD,
     )
     discovery = await RedisServiceDiscovery.create(
         args=RedisServiceDiscoveryArgs(

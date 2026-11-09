@@ -233,6 +233,7 @@ from ai.backend.testutils.bootstrap import (  # noqa: F401
     POSTGRES_MAINTENANCE_DB,
     POSTGRES_PASSWORD,
     POSTGRES_USER,
+    REDIS_PASSWORD,
     etcd_container,
     postgres_container,
     redis_container,
@@ -475,6 +476,7 @@ def etcd_fixture(
                 "docker": {},
                 "redis": {
                     "addr": f"{redis_addr.host}:{redis_addr.port}",
+                    "password": REDIS_PASSWORD,
                 },
                 "plugins": {
                     "cloudia": {
@@ -1543,7 +1545,10 @@ def config_provider(
         "logging": bootstrap_config.logging,
         "pyroscope": bootstrap_config.pyroscope,
         "debug": bootstrap_config.debug,
-        "redis": {"addr": {"host": redis_addr.host, "port": redis_addr.port}},
+        "redis": {
+            "addr": {"host": redis_addr.host, "port": redis_addr.port},
+            "password": REDIS_PASSWORD,
+        },
     })
     return _TestConfigProvider(unified_config)
 
@@ -1633,6 +1638,7 @@ async def event_producer(
     assert redis_config.addr is not None
     redis_target = RedisTarget(
         addr=HostPortPair(host=redis_config.addr.host, port=redis_config.addr.port),
+        password=redis_config.password,
         redis_helper_config={},
     )
     queue = await RedisQueue.create(

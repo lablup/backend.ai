@@ -50,6 +50,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
+from ai.backend.testutils.bootstrap import REDIS_PASSWORD
 from ai.backend.testutils.db import with_tables
 
 
@@ -84,6 +85,7 @@ class TestSyncInstalledImagesIntegration:
 
         valkey_target = ValkeyTarget(
             addr=f"{redis_addr[0]}:{redis_addr[1]}",
+            password=REDIS_PASSWORD,
         )
 
         client = await ValkeyImageClient.create(
@@ -109,6 +111,7 @@ class TestSyncInstalledImagesIntegration:
 
         valkey_target = ValkeyTarget(
             addr=f"{redis_addr[0]}:{redis_addr[1]}",
+            password=REDIS_PASSWORD,
         )
 
         client = await ValkeyLiveClient.create(
@@ -132,6 +135,7 @@ class TestSyncInstalledImagesIntegration:
 
         valkey_target = ValkeyTarget(
             addr=f"{redis_addr[0]}:{redis_addr[1]}",
+            password=REDIS_PASSWORD,
         )
 
         client = await ValkeyStatClient.create(

@@ -59,6 +59,14 @@ def sync_file_lock(path: Path, max_retries: int = 60, retry_interval: int = 2) -
         file.close()
 
 
+def _redis_auth(s: socket.socket) -> None:
+    password = REDIS_PASSWORD.encode()
+    s.send(b"*2\r\n$4\r\nAUTH\r\n$%d\r\n%s\r\n" % (len(password), password))
+    reply = s.recv(128, 0)
+    if not reply.startswith(b"+OK"):
+        raise RuntimeError(f"AUTH on redis failed: {reply!r}")
+
+
 def _wait_redis_health_check(host: str, port: int, timeout: float = 60.0) -> None:
     """Custom Redis health check using PING command (matches original implementation)."""
     deadline = time.monotonic() + timeout
@@ -69,6 +77,7 @@ def _wait_redis_health_check(host: str, port: int, timeout: float = 60.0) -> Non
         try:
             with contextlib.closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
                 s.connect((host, port))
+                _redis_auth(s)
                 s.send(b"*2\r\n$4\r\nPING\r\n$5\r\nhello\r\n")
                 reply = s.recv(128, 0)
                 if not reply.startswith(b"$5\r\nhello\r\n"):
@@ -83,6 +92,7 @@ def _wait_redis_health_check(host: str, port: int, timeout: float = 60.0) -> Non
 def flush_redis(host: str, port: int) -> None:
     with contextlib.closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
         s.connect((host, port))
+        _redis_auth(s)
         s.send(b"*1\r\n$8\r\nFLUSHALL\r\n")
         reply = s.recv(128, 0)
         if not reply.startswith(b"+OK"):
@@ -95,6 +105,7 @@ POSTGRES_USER: Final = "bai_testpool"
 POSTGRES_PASSWORD: Final = "bai_testpool_devpass"
 ETCD_USER: Final = "root"
 ETCD_PASSWORD: Final = "bai_testpool_devpass"
+REDIS_PASSWORD: Final = "bai_testpool_devpass"
 POSTGRES_MAINTENANCE_DB: Final = "bai_testpool"
 
 POOL_LABEL: Final = "ai.backend.test-pool"
@@ -303,6 +314,25 @@ def _redis_ready(container: Any) -> bool:
     return bool(container.exec_run(["redis-cli", "ping"]).exit_code == 0)
 
 
+def _redis_require_password(container: Any) -> None:
+    # redis-cli keeps going unauthenticated when AUTH fails on a server without a password,
+    # so the same command sets the password the first time and is a no-op afterwards.
+    result = container.exec_run([
+        "redis-cli",
+        "-a",
+        REDIS_PASSWORD,
+        "--no-auth-warning",
+        "config",
+        "set",
+        "requirepass",
+        REDIS_PASSWORD,
+    ])
+    if b"OK" not in result.output:
+        raise RuntimeError(
+            f"failed to set redis password: {result.output.decode(errors='replace')}"
+        )
+
+
 ETCD_SPEC: Final = PooledContainerSpec(
     role="etcd",
     image="quay.io/coreos/etcd:v3.5.4",
@@ -325,6 +355,7 @@ REDIS_SPEC: Final = PooledContainerSpec(
     ready=_redis_ready,
     command='redis-server --save "" --appendonly no',
     tmpfs={"/data": ""},
+    prepare=_redis_require_password,
 )
 
 # The image tracks the version halfstack runs, so a test exercises the same server the

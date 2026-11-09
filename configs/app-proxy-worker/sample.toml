@@ -21,9 +21,9 @@
   # Redis service name.
   # Added in 25.13.0
   ## service_name = "bai-service"
-  # Redis password.
+  # Redis password, at least 8 characters. Required since 26.10.0.
   # Added in 25.13.0
-  ## password = "REDIS_PASSWORD"
+  password = "REDIS_PASSWORD"
 
   # Configuration for Redis helper library.
   # Added in 25.13.0

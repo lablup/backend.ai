@@ -175,7 +175,7 @@ class HalfstackConfig:
     postgres_password: str
     redis_addr: ServerAddr | None
     redis_sentinel_addrs: list[HostPortPair] | None
-    redis_password: str | None
+    redis_password: str
     etcd_addr: list[ServerAddr]  # multiple if HA
     etcd_user: str
     etcd_password: str

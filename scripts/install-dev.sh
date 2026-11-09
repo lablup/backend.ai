@@ -1145,10 +1145,10 @@ configure_backendai() {
   if [ $CONFIGURE_HA -eq 1 ]; then
     ./backend.ai mgr etcd put config/redis/sentinel "127.0.0.1:${REDIS_SENTINEL1_PORT},127.0.0.1:${REDIS_SENTINEL2_PORT},127.0.0.1:${REDIS_SENTINEL3_PORT}"
     ./backend.ai mgr etcd put config/redis/service_name "mymaster"
-    ./backend.ai mgr etcd put config/redis/password "develove"
   else
     ./backend.ai mgr etcd put config/redis/addr "127.0.0.1:${REDIS_PORT}"
   fi
+  ./backend.ai mgr etcd put config/redis/password "develove"
 
   ./backend.ai mgr etcd put-json config/redis/redis_helper_config ./configs/manager/sample.etcd.redis-helper.json
 
@@ -1199,7 +1199,6 @@ configure_backendai() {
       sed_inplace "s/^addr = { host = \"127.0.0.1\", port = ${REDIS_PORT} }/# addr = { host = \"127.0.0.1\", port = ${REDIS_PORT} }/" "$f"
       sed_inplace "s/# sentinel = \[/sentinel = [/" "$f"
       sed_inplace "s/# service_name = \"mymaster\"/service_name = \"mymaster\"/" "$f"
-      sed_inplace "s/# password = \"develove\"/password = \"develove\"/" "$f"
     done
   fi
 
@@ -1271,7 +1270,6 @@ configure_backendai() {
 
   if [ $CONFIGURE_HA -eq 1 ]; then
     sed_inplace "s/addr = \"localhost:8111\"/# addr = \"localhost:8111\"/" ./webserver.conf
-    sed_inplace "s/# password = \"mysecret\"/password = \"develove\"/" ./webserver.conf
     sed_inplace "s/# service_name = \"mymaster\"/service_name = \"mymaster\"/" ./webserver.conf
     sed_inplace "s/# sentinel = \"127.0.0.1:9503,127.0.0.1:9504,127.0.0.1:9505\"/sentinel = \"127.0.0.1:9503,127.0.0.1:9504,127.0.0.1:9505\"/" ./webserver.conf
   else

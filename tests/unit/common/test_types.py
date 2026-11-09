@@ -650,13 +650,9 @@ class TestSafePrintRedisConfig:
         "case",
         [
             _RedisMaskingCase(
-                label="no-credentials",
-                raw_config={"addr": "127.0.0.1:6379"},
-            ),
-            _RedisMaskingCase(
                 label="password",
-                raw_config={"addr": "127.0.0.1:6379", "password": "s3cr3t"},
-                leaked_secrets=["s3cr3t"],
+                raw_config={"addr": "127.0.0.1:6379", "password": "s3cr3t-password"},
+                leaked_secrets=["s3cr3t-password"],
                 expected_mask_count=1,
             ),
             _RedisMaskingCase(
@@ -664,17 +660,17 @@ class TestSafePrintRedisConfig:
                 raw_config={
                     "sentinel": ["127.0.0.1:26379"],
                     "service_name": "mymaster",
-                    "password": "s3cr3t",
+                    "password": "s3cr3t-password",
                     "sentinel_password": "s3ntin3l",
                 },
-                leaked_secrets=["s3cr3t", "s3ntin3l"],
+                leaked_secrets=["s3cr3t-password", "s3ntin3l"],
                 expected_mask_count=2,
             ),
             _RedisMaskingCase(
                 label="override-configs",
                 raw_config={
                     "addr": "127.0.0.1:6379",
-                    "password": "s3cr3t",
+                    "password": "s3cr3t-password",
                     "override_configs": {
                         "stream": {
                             "addr": "127.0.0.1:6380",
@@ -683,7 +679,7 @@ class TestSafePrintRedisConfig:
                         },
                     },
                 },
-                leaked_secrets=["s3cr3t", "0verr1de", "0verr1de-s3ntin3l"],
+                leaked_secrets=["s3cr3t-password", "0verr1de", "0verr1de-s3ntin3l"],
                 expected_mask_count=3,
             ),
         ],

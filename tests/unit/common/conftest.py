@@ -32,6 +32,7 @@ if TYPE_CHECKING:
 from ai.backend.testutils.bootstrap import (  # noqa: F401
     ETCD_PASSWORD,
     ETCD_USER,
+    REDIS_PASSWORD,
     etcd_container,
     redis_container,
     sync_file_lock,
@@ -83,6 +84,7 @@ async def test_valkey_live(
     hostport_pair: HostPortPairModel = redis_container[1]
     valkey_target = ValkeyTarget(
         addr=hostport_pair.address,
+        password=REDIS_PASSWORD,
     )
     client = await ValkeyLiveClient.create(
         valkey_target,
@@ -102,6 +104,7 @@ async def test_valkey_stream(
     hostport_pair: HostPortPairModel = redis_container[1]
     valkey_target = ValkeyTarget(
         addr=hostport_pair.address,
+        password=REDIS_PASSWORD,
     )
     client = await ValkeyStreamClient.create(
         valkey_target,
@@ -122,6 +125,7 @@ async def test_valkey_rate_limit(
     hostport_pair: HostPortPairModel = redis_container[1]
     valkey_target = ValkeyTarget(
         addr=hostport_pair.address,
+        password=REDIS_PASSWORD,
     )
     client = await ValkeyRateLimitClient.create(
         valkey_target,
@@ -141,6 +145,7 @@ async def test_valkey_artifact(
     hostport_pair: HostPortPairModel = redis_container[1]
     valkey_target = ValkeyTarget(
         addr=hostport_pair.address,
+        password=REDIS_PASSWORD,
     )
     client = await ValkeyArtifactDownloadTrackingClient.create(
         valkey_target,
@@ -161,6 +166,7 @@ async def test_valkey_stream_mq(
     hostport_pair: HostPortPairModel = redis_container[1]
     redis_target = RedisTarget(
         addr=hostport_pair.to_legacy(),
+        password=REDIS_PASSWORD,
         redis_helper_config={
             "socket_timeout": 5.0,
             "socket_connect_timeout": 2.0,

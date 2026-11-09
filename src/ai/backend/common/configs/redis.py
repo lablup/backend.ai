@@ -4,7 +4,9 @@ from typing import Annotated, Any
 
 from pydantic import AliasChoices, Field, field_serializer, field_validator
 
+from ai.backend.common.defs import REDIS_PASSWORD_MIN_LENGTH
 from ai.backend.common.meta import (
+    NEXT_RELEASE_VERSION,
     BackendAIConfigMeta,
     CompositeType,
     ConfigExample,
@@ -148,17 +150,17 @@ class SingleRedisConfig(BackendAISchema):
         ),
     ]
     password: Annotated[
-        str | None,
-        Field(default=None),
+        str,
+        Field(min_length=REDIS_PASSWORD_MIN_LENGTH),
         BackendAIConfigMeta(
             description=(
-                "Password for authenticating with Redis master. "
-                "Set to None if Redis doesn't require authentication. "
-                "Should be kept secret in production environments."
+                "Password for authenticating with Redis master, "
+                f"at least {REDIS_PASSWORD_MIN_LENGTH} characters. "
+                f"Required since {NEXT_RELEASE_VERSION}."
             ),
             added_version="25.13.0",
             secret=True,
-            example=ConfigExample(local="", prod="REDIS_PASSWORD"),
+            example=ConfigExample(local="develove", prod="REDIS_PASSWORD"),
         ),
     ]
     sentinel_password: Annotated[

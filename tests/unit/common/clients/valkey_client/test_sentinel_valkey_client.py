@@ -781,19 +781,20 @@ class TestCreateValkeyClientFactory:
         return ValkeyTarget(
             sentinel=["127.0.0.1:26379", "127.0.0.1:26380"],
             service_name="mymaster",
-            password="secret",
+            password="test-password",
             request_timeout=2000,
         )
 
     @pytest.fixture
     def standalone_valkey_target(self) -> ValkeyTarget:
-        return ValkeyTarget(addr="127.0.0.1:6379")
+        return ValkeyTarget(addr="127.0.0.1:6379", password="test-password")
 
     @pytest.fixture
     def sentinel_valkey_target_with_custom_timeout(self) -> ValkeyTarget:
         return ValkeyTarget(
             sentinel=["127.0.0.1:26379"],
             service_name="mymaster",
+            password="test-password",
             request_timeout=30000,
         )
 

@@ -51,7 +51,7 @@ def agent_config(rpc_auth_key_config: dict[str, Path]) -> AgentUnifiedConfig:
             "addr": "127.0.0.1:6379",
             "sentinel": None,
             "service_name": None,
-            "password": None,
+            "password": "test-password",
             "redis_helper_config": config.redis_helper_default_config,
         },
     }

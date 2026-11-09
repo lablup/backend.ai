@@ -134,7 +134,7 @@ class Context(metaclass=ABCMeta):
             postgres_password="develove",
             redis_addr=ServerAddr(HostPortPair("127.0.0.1", 8110)),
             redis_sentinel_addrs=[],
-            redis_password=None,
+            redis_password="develove",
             etcd_addr=[ServerAddr(HostPortPair("127.0.0.1", 8120))],
             etcd_user="root",
             etcd_password="develove",
@@ -896,8 +896,7 @@ class Context(metaclass=ABCMeta):
                     "reconnect_poll_timeout": 0.3,
                 },
             }
-            if halfstack.redis_password:
-                data["redis"]["password"] = halfstack.redis_password
+            data["redis"]["password"] = halfstack.redis_password
         else:
             if not halfstack.redis_addr:
                 raise RuntimeError("redis_addr must be configured")
@@ -909,8 +908,7 @@ class Context(metaclass=ABCMeta):
                     "reconnect_poll_timeout": 0.3,
                 },
             }
-            if halfstack.redis_password:
-                data["redis"]["password"] = halfstack.redis_password
+            data["redis"]["password"] = halfstack.redis_password
         (base_path / "etcd.config.json").write_text(json.dumps(data))
         await self.etcd_put_json("config", data)
         public_addr = self.install_variable.public_facing_address
@@ -1238,16 +1236,14 @@ class Context(metaclass=ABCMeta):
                 )
                 redis_table["service_name"] = "mymaster"
                 redis_table["redis_helper_config"] = helper_table
-                if halfstack.redis_password:
-                    redis_table["password"] = halfstack.redis_password
+                redis_table["password"] = halfstack.redis_password
             else:
                 redis_table = tomlkit.table()
                 redis_table["addr"] = (
                     f"{halfstack.redis_addr.face.host}:{halfstack.redis_addr.face.port}"
                 )
                 redis_table["redis_helper_config"] = helper_table
-                if halfstack.redis_password:
-                    redis_table["password"] = halfstack.redis_password
+                redis_table["password"] = halfstack.redis_password
             data["session"]["redis"] = redis_table  # type: ignore
             data["ui"]["menu_blocklist"] = ",".join(service.webui_menu_blocklist)  # type: ignore
             data["ui"]["menu_inactivelist"] = ",".join(service.webui_menu_inactivelist)  # type: ignore
@@ -1369,6 +1365,7 @@ class Context(metaclass=ABCMeta):
             redis_addr_table["host"] = halfstack.redis_addr.face.host
             redis_addr_table["port"] = halfstack.redis_addr.face.port
             data["redis"]["addr"] = redis_addr_table  # type: ignore[index]
+            data["redis"]["password"] = halfstack.redis_password  # type: ignore[index]
             data["secrets"]["api_secret"] = service.appproxy_api_secret  # type: ignore[index]
             data["secrets"]["jwt_secret"] = service.appproxy_jwt_secret  # type: ignore[index]
             data["permit_hash"]["secret"] = service.appproxy_permit_hash_secret  # type: ignore[index]
@@ -1402,6 +1399,7 @@ class Context(metaclass=ABCMeta):
             redis_addr_table["host"] = halfstack.redis_addr.face.host
             redis_addr_table["port"] = halfstack.redis_addr.face.port
             data["redis"]["addr"] = redis_addr_table  # type: ignore[index]
+            data["redis"]["password"] = halfstack.redis_password  # type: ignore[index]
 
             data["proxy_worker"]["coordinator_endpoint"] = (  # type: ignore[index]
                 f"http://{service.appproxy_coordinator_addr.bind.host}:{service.appproxy_coordinator_addr.bind.port}"
@@ -1470,6 +1468,7 @@ class Context(metaclass=ABCMeta):
             redis_addr_table["host"] = halfstack.redis_addr.face.host
             redis_addr_table["port"] = halfstack.redis_addr.face.port
             data["redis"]["addr"] = redis_addr_table  # type: ignore[index]
+            data["redis"]["password"] = halfstack.redis_password  # type: ignore[index]
 
             data["proxy_worker"]["coordinator_endpoint"] = (  # type: ignore[index]
                 f"http://{service.appproxy_coordinator_addr.bind.host}:{service.appproxy_coordinator_addr.bind.port}"

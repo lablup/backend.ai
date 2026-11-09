@@ -81,6 +81,7 @@ from ai.backend.testutils.bootstrap import (  # noqa: F401
     POSTGRES_MAINTENANCE_DB,
     POSTGRES_PASSWORD,
     POSTGRES_USER,
+    REDIS_PASSWORD,
     postgres_container,
     redis_container,
 )
@@ -575,7 +576,7 @@ async def seed_data(
 async def valkey_client(redis_container: Any) -> AsyncIterator[ValkeyOpenIDClient]:  # noqa: F811
     """Real ValkeyOpenIDClient connected to the Docker Redis container."""
     _, addr = redis_container
-    target = ValkeyTarget(addr=f"{addr.host}:{addr.port}")
+    target = ValkeyTarget(addr=f"{addr.host}:{addr.port}", password=REDIS_PASSWORD)
     client = await ValkeyOpenIDClient.create(target, db_id=8)
     yield client
     await client.close()
@@ -600,6 +601,7 @@ def mock_config_provider(redis_container: Any) -> MagicMock:  # noqa: F811
     provider.config.auth.password_hash_salt_size = 16
     provider.config.redis.to_valkey_profile_target.return_value = ValkeyProfileTarget(
         addr=f"{addr.host}:{addr.port}",
+        password=REDIS_PASSWORD,
     )
     return provider
 

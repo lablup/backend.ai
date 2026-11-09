@@ -267,21 +267,21 @@ docker exec -e PGPASSWORD=develove $PGCONTAINER psql -U postgres -d appproxy -c 
 REDIS_CONTAINER=$(docker compose -f docker-compose.halfstack.current.yml ps -q backendai-half-redis)
 
 # Ping
-docker exec $REDIS_CONTAINER valkey-cli ping
+docker exec $REDIS_CONTAINER valkey-cli -a develove --no-auth-warning ping
 
 # Info
-docker exec $REDIS_CONTAINER valkey-cli info server
-docker exec $REDIS_CONTAINER valkey-cli dbsize
+docker exec $REDIS_CONTAINER valkey-cli -a develove --no-auth-warning info server
+docker exec $REDIS_CONTAINER valkey-cli -a develove --no-auth-warning dbsize
 
 # List keys (dev only)
-docker exec $REDIS_CONTAINER valkey-cli keys '*'
+docker exec $REDIS_CONTAINER valkey-cli -a develove --no-auth-warning keys '*'
 
 # Get or check specific key
-docker exec $REDIS_CONTAINER valkey-cli get <key>
-docker exec $REDIS_CONTAINER valkey-cli type <key>
+docker exec $REDIS_CONTAINER valkey-cli -a develove --no-auth-warning get <key>
+docker exec $REDIS_CONTAINER valkey-cli -a develove --no-auth-warning type <key>
 
 # Flush all (destructive)
-docker exec $REDIS_CONTAINER valkey-cli flushall
+docker exec $REDIS_CONTAINER valkey-cli -a develove --no-auth-warning flushall
 ```
 
 ### etcd

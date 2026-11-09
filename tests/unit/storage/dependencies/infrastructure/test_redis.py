@@ -18,7 +18,7 @@ from ai.backend.storage.dependencies.infrastructure.redis import (
     StorageProxyValkeyClients,
 )
 from ai.backend.storage.dependencies.infrastructure.redis_config import RedisConfigProvider
-from ai.backend.testutils.bootstrap import ETCD_PASSWORD, ETCD_USER
+from ai.backend.testutils.bootstrap import ETCD_PASSWORD, ETCD_USER, REDIS_PASSWORD
 
 
 class TestRedisProvider:
@@ -61,6 +61,7 @@ class TestRedisProvider:
                         "host": redis_addr.host,
                         "port": str(redis_addr.port),
                     },
+                    "password": REDIS_PASSWORD,
                 },
             )
             yield etcd

@@ -13,6 +13,8 @@ REDIS_CONTAINER_LOG: Final = 6
 REDIS_BGTASK_DB: Final = 7
 REDIS_TUS_DB: Final = 8
 
+REDIS_PASSWORD_MIN_LENGTH: Final = 8
+
 
 class RedisRole(StrEnum):
     STATISTICS = "statistics"
