@@ -52,6 +52,14 @@ class RuntimeProfile(Protocol):
         """Name why a kernel failed (exit_status is None when no task ran); None keeps the message."""
         return None
 
+    async def summarize_attestation(
+        self, host: str, port: int, timeout_s: float
+    ) -> Mapping[str, Any] | None:
+        """After readiness, describe the launch evidence as a small flat mapping, or None.
+        Core stores it as host-reported, unverified data. Users see it, and it reaches the owner's
+        callback URL and the legacy GraphQL `status_data`: hold no nonces, tokens or keys."""
+        return None
+
 
 def describe_profile_failure(
     profile: RuntimeProfile, exit_status: int | None, error_text: str
@@ -66,3 +74,20 @@ def describe_profile_failure(
         log.exception("runtime profile describe_failure failed", profile=profile.name)
         return None
     return reason
+
+
+async def summarize_profile_attestation(
+    profile: RuntimeProfile, host: str, port: int, timeout_s: float
+) -> Mapping[str, Any] | None:
+    """Call profile.summarize_attestation(); a missing or failing hook summarizes nothing."""
+    summarize = getattr(profile, "summarize_attestation", None)
+    if summarize is None:
+        return None
+    try:
+        summary: Mapping[str, Any] | None = await summarize(host, port, timeout_s)
+    except Exception as e:
+        log.warning(
+            "runtime profile summarize_attestation failed", profile=profile.name, error=repr(e)
+        )
+        return None
+    return summary

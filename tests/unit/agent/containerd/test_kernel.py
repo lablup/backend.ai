@@ -5,7 +5,7 @@ import datetime
 import ipaddress
 import ssl
 import uuid
-from collections.abc import AsyncIterator, Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from pathlib import Path
 from typing import Any, override
 from unittest.mock import MagicMock
@@ -400,3 +400,29 @@ class TestCheckStatusTlsTaskExit:
         _publish(tls_kernel, tls_server)
 
         assert await tls_kernel.check_status() == {}
+
+
+class _SummarizingProfile(RuncProfile):
+    @override
+    async def summarize_attestation(
+        self, host: str, port: int, timeout_s: float
+    ) -> Mapping[str, Any] | None:
+        return {"endpoint": f"{host}:{port}", "timeout": timeout_s}
+
+
+class TestSummarizeAttestation:
+    async def test_asks_the_profile_with_the_published_endpoint(
+        self, tls_kernel: ContainerdKernel
+    ) -> None:
+        tls_kernel._profile = _SummarizingProfile()
+        tls_kernel.data["published_host"] = "10.0.0.5"
+        _publish(tls_kernel, 30001)
+
+        summary = await tls_kernel.summarize_attestation(4.0)
+
+        assert summary == {"endpoint": "10.0.0.5:30001", "timeout": 4.0}
+
+    async def test_without_tls_readiness_summarizes_nothing(self, kernel: ContainerdKernel) -> None:
+        kernel._profile = _SummarizingProfile()
+
+        assert await kernel.summarize_attestation(4.0) is None

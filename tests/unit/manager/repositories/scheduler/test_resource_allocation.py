@@ -10,6 +10,7 @@ import uuid
 from collections.abc import AsyncGenerator
 from datetime import datetime, timedelta
 from decimal import Decimal
+from typing import Any
 
 import pytest
 import sqlalchemy as sa
@@ -85,6 +86,7 @@ async def _agent_uuid(db_sess: SASession, agent_id: str) -> AgentUUID:
 def _make_creation_info(
     cpu: str = "2",
     mem: str = "4096",
+    attestation: dict[str, Any] | None = None,
 ) -> KernelCreationInfo:
     """Build a KernelCreationInfo whose used devices aggregate to the given slots."""
     return KernelCreationInfo(
@@ -113,6 +115,7 @@ def _make_creation_info(
                 },
             }
         ),
+        attestation=attestation,
     )
 
 
@@ -876,3 +879,76 @@ class TestUpdateKernelStatusRunningResourceAllocation:
             for alloc in allocs:
                 assert alloc.used is None
                 assert alloc.used_at is None
+
+    @pytest.mark.parametrize(
+        ("role", "attestation", "kernel_has", "session_has"),
+        [
+            ("main", {"attested": True}, True, {"attested": True, "source": "host-reported"}),
+            ("main", None, False, None),
+            ("sub", {"attested": True}, True, {"stale": True}),
+        ],
+    )
+    async def test_attestation_reaches_kernel_and_main_session_status_data(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
+        test_domain: DomainFixtureData,
+        test_scaling_group_id: ResourceGroupID,
+        test_scaling_group_name: str,
+        test_group_id: uuid.UUID,
+        test_user_uuid: uuid.UUID,
+        test_access_key: AccessKey,
+        test_agent_id: str,
+        resource_slot_types: None,
+        role: str,
+        attestation: dict[str, Any] | None,
+        kernel_has: bool,
+        session_has: dict[str, Any] | None,
+    ) -> None:
+        """The summary is merged next to the other keys; none clears a stale session key."""
+        await self._seed_agent_resources(db_with_cleanup, test_agent_id)
+        session_id, kernel_id = await self._create_kernel_with_pending_allocations(
+            db_with_cleanup,
+            domain_id=test_domain_id,
+            domain_name=test_domain.domain_name,
+            resource_group_id=test_scaling_group_id,
+            resource_group_name=test_scaling_group_name,
+            group_id=test_group_id,
+            user_uuid=test_user_uuid,
+            access_key=test_access_key,
+            agent_id=test_agent_id,
+        )
+        base = {"scheduler": {"retries": 1}}
+        async with db_with_cleanup.begin_session() as db_sess:
+            await db_sess.execute(
+                sa.update(KernelRow)
+                .where(KernelRow.id == kernel_id)
+                .values(status_data=base, cluster_role=role)
+            )
+            await db_sess.execute(
+                sa.update(SessionRow)
+                .where(SessionRow.id == session_id)
+                .values(status_data={**base, "attestation": {"stale": True}})
+            )
+
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        result = await db_source.update_kernel_status_running(
+            kernel_id, "test-started", _make_creation_info(attestation=attestation)
+        )
+        assert result is True
+
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            kernel = (
+                await db_sess.execute(sa.select(KernelRow).where(KernelRow.id == kernel_id))
+            ).scalar_one()
+            session = (
+                await db_sess.execute(sa.select(SessionRow).where(SessionRow.id == session_id))
+            ).scalar_one()
+        kernel_expected = (
+            {**base, "attestation": {"attested": True, "source": "host-reported"}}
+            if kernel_has
+            else base
+        )
+        session_expected = base if session_has is None else {**base, "attestation": session_has}
+        assert kernel.status_data == kernel_expected
+        assert session.status_data == session_expected
