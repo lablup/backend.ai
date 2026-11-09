@@ -190,6 +190,21 @@ def build_base_spec(inp: SpecInput) -> dict[str, Any]:
     }
 
 
+def merge_patch(base: Mapping[str, Any], patch: Mapping[str, Any]) -> dict[str, Any]:
+    """RFC 7386 JSON merge patch: dicts merge, lists and scalars replace, null deletes."""
+    merged = copy.deepcopy(dict(base))
+    for key, value in patch.items():
+        if value is None:
+            merged.pop(key, None)
+        elif isinstance(value, Mapping) and isinstance(merged.get(key), dict):
+            merged[key] = merge_patch(merged[key], value)
+        else:
+            merged[key] = (
+                merge_patch({}, value) if isinstance(value, Mapping) else copy.deepcopy(value)
+            )
+    return merged
+
+
 def build_launch_spec(
     base_spec: Mapping[str, Any],
     *,
@@ -197,14 +212,15 @@ def build_launch_spec(
     env: Sequence[str],
     cwd: str,
     cgroups_path: str,
+    spec_patch: Mapping[str, Any],
 ) -> dict[str, Any]:
-    """Add the process args, env, working directory and cgroup path."""
+    """Add the process args, env, working directory and cgroup path, then the profile patch."""
     spec = copy.deepcopy(dict(base_spec))
     spec["linux"]["cgroupsPath"] = cgroups_path
     spec["process"]["args"] = list(args)
     spec["process"]["env"] = list(env)
     spec["process"]["cwd"] = cwd
-    return spec
+    return merge_patch(spec, spec_patch)
 
 
 def merge_env(image_env: Sequence[str], kernel_env: Mapping[str, str]) -> list[str]:

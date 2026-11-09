@@ -14,6 +14,7 @@ from ai.backend.agent.containerd.spec import (
     build_base_spec,
     build_launch_spec,
     merge_env,
+    merge_patch,
 )
 
 
@@ -174,6 +175,21 @@ class TestBaseSpec:
         ]
 
 
+class TestMergePatch:
+    def test_dicts_merge_lists_replace_and_null_deletes(self) -> None:
+        base = {"a": {"x": 1, "y": 2}, "l": [1, 2], "gone": 1}
+
+        merged = merge_patch(base, {"a": {"y": 3}, "l": [9], "gone": None})
+
+        assert merged == {"a": {"x": 1, "y": 3}, "l": [9]}
+        assert base["a"] == {"x": 1, "y": 2}
+
+    def test_nulls_inside_a_new_mapping_are_dropped(self) -> None:
+        merged = merge_patch({}, {"annotations": {"k": None}})
+
+        assert merged["annotations"] == {}
+
+
 class TestLaunchSpec:
     @pytest.fixture
     def base(self) -> dict[str, Any]:
@@ -186,6 +202,7 @@ class TestLaunchSpec:
             env=["A=1"],
             cwd="/srv",
             cgroups_path="/ns/c1",
+            spec_patch={},
         )
 
     def test_args_env_and_working_dir(self, base: dict[str, Any]) -> None:
@@ -197,6 +214,22 @@ class TestLaunchSpec:
 
     def test_cgroups_path_is_set(self, base: dict[str, Any]) -> None:
         assert self._build(base)["linux"]["cgroupsPath"] == "/ns/c1"
+
+    def test_non_empty_spec_patch_overrides_a_field_set_before_the_merge(
+        self, base: dict[str, Any]
+    ) -> None:
+        spec = build_launch_spec(
+            base,
+            args=["/bin/sh"],
+            env=[],
+            cwd="/srv",
+            cgroups_path="/ns/c1",
+            spec_patch={"process": {"cwd": "/patched"}, "linux": {"cgroupsPath": "/other"}},
+        )
+
+        assert spec["process"]["cwd"] == "/patched"
+        assert spec["linux"]["cgroupsPath"] == "/other"
+        assert spec["process"]["args"] == ["/bin/sh"]
 
     def test_base_spec_is_not_mutated(self, base: dict[str, Any]) -> None:
         self._build(base)

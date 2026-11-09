@@ -9,7 +9,13 @@ from collections.abc import Awaitable, Mapping, Sequence
 from typing import Any, Final
 
 from ai.backend.agent.containerd.rpc.client import ContainerdAPI
-from ai.backend.agent.containerd.rpc.types import ContainerRecord, MountSpec, TaskInfo, TaskState
+from ai.backend.agent.containerd.rpc.types import (
+    ContainerRecord,
+    MountSpec,
+    RuntimeOptions,
+    TaskInfo,
+    TaskState,
+)
 from ai.backend.agent.errors.containerd import ContainerdOperationFailed
 from ai.backend.common.exception import BackendAIError
 from ai.backend.logging.structured import StructuredLogger
@@ -45,6 +51,7 @@ async def launch_container(
     runtime: str,
     chain_id: str,
     spec: Mapping[str, Any],
+    runtime_options: RuntimeOptions | None = None,
 ) -> int:
     """Prepare the snapshot, create the container and start its task; returns the PID.
 
@@ -54,7 +61,7 @@ async def launch_container(
     try:
         # FIXME(containerd-mvp): no lease holds the snapshot, so containerd GC may collect it early
         rootfs: Sequence[MountSpec] = await client.prepare_snapshot(record.snapshot_key, chain_id)
-        await client.create_container(record, runtime, spec)
+        await client.create_container(record, runtime, spec, runtime_options)
         # FIXME(containerd-mvp): the task has no stdout/stderr, so a command that exits at once leaves no log
         pid = await client.create_task(record.id, rootfs, "", "")
         await client.start_task(record.id)

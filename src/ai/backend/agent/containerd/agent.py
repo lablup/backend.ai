@@ -26,6 +26,8 @@ from ai.backend.agent.containerd.lifecycle import (
     launch_container,
 )
 from ai.backend.agent.containerd.network import KernelNetwork, PortForward
+from ai.backend.agent.containerd.profile.base import RuntimeProfile
+from ai.backend.agent.containerd.profile.loader import load_runtime_profile
 from ai.backend.agent.containerd.rpc.client import ContainerdAPI, ContainerdClient
 from ai.backend.agent.containerd.rpc.types import (
     ContainerdClientConfig,
@@ -93,7 +95,6 @@ _CONTAINER_STATUS: Final[Mapping[TaskState, ContainerStatus]] = {
 }
 HOST_PORTS_LABEL: Final = "ai.backend.containerd.host-ports"
 KERNEL_IP_LABEL: Final = "ai.backend.containerd.kernel-ip"
-_RUNC_RUNTIME: Final = "io.containerd.runc.v2"
 _INTRINSIC_DEVICES: Final = frozenset({DeviceName("cpu"), DeviceName("mem")})
 
 
@@ -150,6 +151,7 @@ def _to_container(record: ContainerRecord, status: ContainerStatus) -> Container
 
 
 class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKernel]):
+    _profile: RuntimeProfile
     _client: ContainerdAPI
     _port_pool: PortPool
     _network: KernelNetwork
@@ -168,6 +170,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         computers: Mapping[DeviceName, ComputerContext],
         restarting: bool = False,
         *,
+        profile: RuntimeProfile,
         client: ContainerdAPI,
         port_pool: PortPool,
         network: KernelNetwork,
@@ -183,6 +186,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             computers,
             restarting=restarting,
         )
+        self._profile = profile
         self._client = client
         self._port_pool = port_pool
         self._network = network
@@ -380,6 +384,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         service_ports = kernel_obj.service_ports
         host_ports: list[int] = []
         try:
+            launch_plan = self._profile.plan(self.kernel_config)
             address = self._address
             if address is None:
                 raise KernelNetworkSetupFailed("start_container ran before prepare_container")
@@ -402,8 +407,9 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
                 args=[*image.entrypoint, *image.cmd],
                 env=merge_env(image.env, kernel_obj.environ),
                 cwd=image.working_dir or "/",
-                # cgroupfs form: the native API passes no runc options, so runc uses cgroupfs.
+                # cgroupfs path form; a runtime profile must not enable systemd cgroups.
                 cgroups_path=f"/{self._client.namespace}/{container_id}",
+                spec_patch=launch_plan.spec_patch,
             )
             record = ContainerRecord(
                 id=container_id,
@@ -415,9 +421,10 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             await launch_container(
                 self._client,
                 record,
-                runtime=_RUNC_RUNTIME,
+                runtime=launch_plan.runtime_handler,
                 chain_id=image.chain_id,
                 spec=spec,
+                runtime_options=launch_plan.runtime_options,
             )
         except BaseException:
             self._port_pool.release_many(host_ports)
@@ -460,6 +467,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
 class ContainerdAgent(
     AbstractAgent[ContainerdKernel, ContainerdKernelCreationContext],
 ):
+    _profile: RuntimeProfile
     _client: ContainerdAPI
     _network: KernelNetwork
 
@@ -469,10 +477,15 @@ class ContainerdAgent(
         local_config: AgentUnifiedConfig,
         **kwargs: Any,
     ) -> None:
+        # Load first: a bad profile must stop the agent before any background task starts.
+        containerd_config = local_config.containerd
+        profile = load_runtime_profile(
+            containerd_config.runtime_profile, containerd_config.profiles
+        )
         _check_bind_host(local_config.container.bind_host)
         _check_advertised_host(local_config.container.advertised_host or "0.0.0.0")
         super().__init__(etcd, local_config, **kwargs)
-        containerd_config = local_config.containerd
+        self._profile = profile
         self._network = KernelNetwork(
             containerd_config.bridge_name,
             containerd_config.bridge_subnet,
@@ -657,6 +670,7 @@ class ContainerdAgent(
             self.local_config,
             self.computers,
             restarting=restarting,
+            profile=self._profile,
             client=self._client,
             port_pool=self.port_pool,
             network=self._network,

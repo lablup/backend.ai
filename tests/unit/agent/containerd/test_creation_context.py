@@ -13,6 +13,9 @@ from ai.backend.agent.containerd.agent import ContainerdKernelCreationContext as
 from ai.backend.agent.containerd.intrinsic import CPUSET_LABEL, MEMORY_LABEL
 from ai.backend.agent.containerd.kernel import ContainerdKernel
 from ai.backend.agent.containerd.network import KernelNetwork
+from ai.backend.agent.containerd.profile.base import LaunchPlan
+from ai.backend.agent.containerd.profile.runc import RuncProfile
+from ai.backend.agent.containerd.rpc.types import RuntimeOptions
 from ai.backend.agent.errors.containerd import ContainerdOperationFailed, KernelNetworkSetupFailed
 from ai.backend.agent.errors.resources import PortPoolExhaustedError
 from ai.backend.agent.port_pool import PortPool
@@ -109,6 +112,7 @@ def ctx(
         "ubuntu22.04",
         local_config,
         computers,
+        profile=RuncProfile(),
         client=fake,
         port_pool=port_pool,
         network=network,
@@ -166,7 +170,67 @@ class TestPrepareContainer:
         assert runner.matching("ip", "netns", "del") == [("ip", "netns", "del", ns)]
 
 
+class _PatchingProfile:
+    @property
+    def name(self) -> str:
+        return "patching"
+
+    def plan(self, kernel_config: KernelCreationConfig) -> LaunchPlan:
+        options = RuntimeOptions(type_url="t/1", value=b"v")
+        return LaunchPlan("io.example.v1", {"annotations": {"k": "v"}}, options)
+
+
+class _FailingProfile:
+    @property
+    def name(self) -> str:
+        return "failing"
+
+    def plan(self, kernel_config: KernelCreationConfig) -> LaunchPlan:
+        raise RuntimeError("plan failed")
+
+
 class TestStartContainer:
+    async def test_failing_profile_plan_frees_the_allocations_and_tears_the_network_down(
+        self,
+        ctx: Ctx,
+        resource_spec: KernelResourceSpec,
+        fake: FakeContainerd,
+        alloc_map: MagicMock,
+        port_pool: PortPool,
+        runner: FakeCommandRunner,
+    ) -> None:
+        ns = f"bai0-{ctx.kernel_id}"
+        sports = [cast(ServicePort, {"name": "web", "container_ports": (8080,)})]
+        kernel = await _prepare(ctx, resource_spec, sports)
+        runner.script(["ip", "netns", "list"], f"{ns}\n")
+        ctx._profile = _FailingProfile()
+        before = len(port_pool)
+
+        with pytest.raises(RuntimeError, match="plan failed"):
+            await ctx.start_container(kernel, [], None, [], MagicMock())
+
+        assert len(port_pool) == before
+        cast(MagicMock, alloc_map.free).assert_called_once()
+        assert runner.matching("ip", "netns", "del") == [("ip", "netns", "del", ns)]
+        assert fake.containers == {} and fake.snapshots == {} and fake.tasks == {}
+
+    async def test_container_uses_the_runtime_of_the_profile_plan(
+        self,
+        ctx: Ctx,
+        resource_spec: KernelResourceSpec,
+        fake: FakeContainerd,
+    ) -> None:
+        ctx._profile = _PatchingProfile()
+        kernel = await _prepare(ctx, resource_spec)
+
+        data = await ctx.start_container(kernel, [], None, [], MagicMock())
+
+        cid = data["container_id"]
+        runtime, spec = fake.specs[cid]
+        assert runtime == "io.example.v1"
+        assert fake.runtime_options[cid] == RuntimeOptions(type_url="t/1", value=b"v")
+        assert dict(spec)["annotations"] == {"k": "v"}
+
     async def test_container_runs_the_image_command_on_runc(
         self,
         ctx: Ctx,
@@ -293,7 +357,7 @@ class TestStartContainer:
         with pytest.raises(asyncio.CancelledError):
             await ctx.start_container(kernel, [], None, [], MagicMock())
 
-        alloc_map.free.assert_called_once()
+        cast(MagicMock, alloc_map.free).assert_called_once()
         assert fake.containers == {} and fake.snapshots == {} and fake.tasks == {}
 
     async def test_pool_exhaustion_releases_the_ports_taken_and_frees_the_allocations(
@@ -311,7 +375,7 @@ class TestStartContainer:
             await ctx.start_container(kernel, [], None, [], MagicMock())
 
         assert len(port_pool) == before
-        alloc_map.free.assert_called_once()
+        cast(MagicMock, alloc_map.free).assert_called_once()
 
     async def test_cancelled_launch_returns_the_host_ports(
         self,
