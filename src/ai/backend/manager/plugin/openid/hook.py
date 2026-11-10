@@ -13,6 +13,7 @@ import jwt
 import jwt.exceptions
 from aiohttp import web
 
+from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.plugin.hook import HookHandler, HookPlugin, Reject
 from ai.backend.logging import BraceStyleAdapter
@@ -89,7 +90,9 @@ class OIDCHookPlugin(HookPlugin):
             raise Reject("user is inactivated")
 
         if payload.get("force", False):
-            await auth_repository.invalidate_active_login_sessions(user_id)
+            invalidated_tokens = await auth_repository.invalidate_active_login_sessions(user_id)
+            valkey_session = cast(ValkeySessionClient, root_app["_valkey_session"])
+            await valkey_session.delete_login_sessions(invalidated_tokens)
             log.info(
                 "AUTHORIZE_HOOK(openid): force-invalidated existing login sessions for {}",
                 email,

@@ -115,6 +115,7 @@ from .errors import (
     MissingRequestParameterError,
     ProxyTargetUnreachableError,
     StaticFileNotFoundError,
+    UnauthenticatedError,
     UnexpectedAuthResponseError,
 )
 from .proxy import (
@@ -127,7 +128,6 @@ from .proxy import (
 from .proxy import (
     pipeline_handler as pipeline_request_handler,
 )
-from .stats import WebStats, track_active_handlers, view_stats
 from .template import toml_scalar
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -165,18 +165,14 @@ def apply_cache_headers(response: web.StreamResponse, path: str) -> web.StreamRe
 
 
 async def static_handler(request: web.Request) -> web.StreamResponse:
-    stats: WebStats = request.app["stats"]
-    stats.active_static_handlers.add(asyncio.current_task())
     request_path = request.match_info["path"]
     config = cast(WebServerUnifiedConfig, request.app["config"])
     static_path = config.service.static_path
     file_path = (static_path / request_path).resolve()
     try:
-        file_path.relative_to(static_path)
+        relative_path = file_path.relative_to(static_path)
     except (ValueError, FileNotFoundError) as e:
         raise StaticFileNotFoundError() from e
-<<<<<<< HEAD
-=======
     if relative_path.as_posix() in {
         "stats",
         "config.ini",
@@ -186,33 +182,12 @@ async def static_handler(request: web.Request) -> web.StreamResponse:
         ".css.map",
     )):
         raise StaticFileNotFoundError()
->>>>>>> 581042d2 (fix(BA-8973): serve `version.json` only to clients with a login session (#16735))
     if file_path.is_file():
         return apply_cache_headers(web.FileResponse(file_path), request_path)
     raise StaticFileNotFoundError()
 
 
-async def config_ini_handler(request: web.Request) -> web.Response:
-    stats: WebStats = request.app["stats"]
-    stats.active_config_handlers.add(asyncio.current_task())
-    config = cast(WebServerUnifiedConfig, request.app["config"])
-    force_protocol = config.service.force_endpoint_protocol
-    if force_protocol is None:
-        scheme = request.scheme
-    else:
-        scheme = str(force_protocol)
-    j2env: jinja2.Environment = request.app["j2env"]
-    tpl = j2env.get_template("config_ini.toml.j2")
-    config_content = tpl.render({
-        "endpoint_url": f"{scheme}://{request.host}",  # must be absolute
-        "config": config.model_dump(by_alias=True),
-    })
-    return web.Response(text=config_content, content_type="text/plain")
-
-
 async def config_toml_handler(request: web.Request) -> web.Response:
-    stats: WebStats = request.app["stats"]
-    stats.active_config_handlers.add(asyncio.current_task())
     config = cast(WebServerUnifiedConfig, request.app["config"])
     force_protocol = config.service.force_endpoint_protocol
     if force_protocol is None:
@@ -239,15 +214,13 @@ async def version_json_handler(request: web.Request) -> web.StreamResponse:
 
 
 async def console_handler(request: web.Request) -> web.StreamResponse:
-    stats: WebStats = request.app["stats"]
-    stats.active_webui_handlers.add(asyncio.current_task())
     request_path = request.match_info["path"]
     config = cast(WebServerUnifiedConfig, request.app["config"])
     static_path = config.service.static_path
     file_path = (static_path / request_path).resolve()
     # SECURITY: only allow reading files under static_path
     try:
-        file_path.relative_to(static_path)
+        relative_path = file_path.relative_to(static_path)
     except (ValueError, FileNotFoundError) as e:
         raise web.HTTPNotFound(
             text=json.dumps({
@@ -256,8 +229,6 @@ async def console_handler(request: web.Request) -> web.StreamResponse:
             }),
             content_type="application/problem+json",
         ) from e
-<<<<<<< HEAD
-=======
     if relative_path.as_posix() in {
         "stats",
         "config.ini",
@@ -267,7 +238,6 @@ async def console_handler(request: web.Request) -> web.StreamResponse:
         ".css.map",
     )):
         raise StaticFileNotFoundError()
->>>>>>> 581042d2 (fix(BA-8973): serve `version.json` only to clients with a login session (#16735))
     index_path = (static_path / "index.html").resolve()
     if file_path.is_file() and file_path != index_path:
         return apply_cache_headers(web.FileResponse(file_path), request_path)
@@ -366,8 +336,6 @@ def build_cors_options(
 
 async def login_check_handler(request: web.Request) -> web.Response:
     session = await get_session(request)
-    stats: WebStats = request.app["stats"]
-    stats.active_login_check_handlers.add(asyncio.current_task())
     authenticated = bool(session.get("authenticated", False))
     public_data = None
     if authenticated:
@@ -420,8 +388,6 @@ async def _authorize_via_anonymous_session(
 
 async def login_handler(request: web.Request) -> web.Response:
     config = cast(WebServerUnifiedConfig, request.app["config"])
-    stats: WebStats = request.app["stats"]
-    stats.active_login_handlers.add(asyncio.current_task())
     session = await get_session(request)
     if session.get("authenticated", False):
         raise web.HTTPBadRequest(
@@ -608,8 +574,6 @@ async def login_handler(request: web.Request) -> web.Response:
 
 
 async def logout_handler(request: web.Request) -> web.Response:
-    stats: WebStats = request.app["stats"]
-    stats.active_logout_handlers.add(asyncio.current_task())
     session = await get_session(request)
     session_token = session.identity
 
@@ -641,6 +605,8 @@ async def extend_login_session(request: web.Request) -> web.Response:
 
     current = get_time()
     session = await get_session(request)
+    if not session.get("authenticated", False):
+        raise UnauthenticatedError()
 
     session.expiration_dt = current + login_session_extension_sec
     expires = datetime.fromtimestamp(session.expiration_dt, tz=UTC).isoformat()
@@ -698,16 +664,12 @@ async def check_readyz(request: web.Request) -> web.Response:
     return _build_web_probe_response(connectivity)
 
 
-async def webserver_healthcheck(request: web.Request) -> web.Response:
-    stats: WebStats = request.app["stats"]
-    stats.active_healthcheck_handlers.add(asyncio.current_task())
+async def webserver_healthcheck(_request: web.Request) -> web.Response:
     return web.json_response({"details": "Success"})
 
 
 async def token_login_handler(request: web.Request) -> web.Response:
     config = cast(WebServerUnifiedConfig, request.app["config"])
-    stats: WebStats = request.app["stats"]
-    stats.active_token_login_handlers.add(asyncio.current_task())
 
     # Check browser session exists.
     session = await get_session(request)
@@ -1114,7 +1076,6 @@ async def webapp_ctx(
         app.router.add_route("POST", "/server/update-password-no-auth", update_password_no_auth)
     )
     cors.add(app.router.add_route("POST", "/server/extend-login-session", extend_login_session))
-    cors.add(app.router.add_route("GET", "/stats", view_stats))
     cors.add(app.router.add_route("GET", "/health", check_health))
     cors.add(app.router.add_route("GET", "/livez", check_livez))
     cors.add(app.router.add_route("GET", "/readyz", check_readyz))
@@ -1167,7 +1128,6 @@ async def webapp_ctx(
     cors.add(app.router.add_route("DELETE", "/pipeline/{path:.*$}", pipeline_handler))
     cors.add(app.router.add_route("GET", "/version.json", version_json_handler))
     if config.service.mode == ServiceMode.WEBUI:
-        cors.add(app.router.add_route("GET", "/config.ini", config_ini_handler))
         cors.add(app.router.add_route("GET", "/config.toml", config_toml_handler))
         app["webui_index_template"] = (config.service.static_path / "index.html").read_text()
         fallback_handler = console_handler
@@ -1230,7 +1190,6 @@ async def server_main(
         app = web.Application(
             middlewares=[
                 decrypt_payload,
-                track_active_handlers,
                 security_policy_middleware,
                 general_exception_middleware,
             ],
@@ -1241,7 +1200,6 @@ async def server_main(
                 0, build_otel_server_middleware(untraced_handlers={console_handler, static_handler})
             )
         app["config"] = config
-        app["stats"] = WebStats()
         app["client_pool"] = await web_init_stack.enter_async_context(client_ctx(config, app))
         app["manager_pool"] = await web_init_stack.enter_async_context(
             manager_pool_ctx(config, app)

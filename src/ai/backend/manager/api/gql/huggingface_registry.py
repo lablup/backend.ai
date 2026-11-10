@@ -66,7 +66,9 @@ class HuggingFaceRegistry(PydanticNodeMixin[HuggingFaceRegistryNode]):
     )
     url: str
     name: str
-    token: str | None
+    token: str | None = gql_field(
+        description="Access token for the registry. Masked unless the caller is a superadmin."
+    )
 
     @classmethod
     @override
