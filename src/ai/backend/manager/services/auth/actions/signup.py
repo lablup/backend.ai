@@ -18,6 +18,7 @@ class SignupAction(AuthAction):
     username: str | None
     full_name: str | None
     description: str | None
+    token: str | None = None
 
     @override
     def entity_id(self) -> str | None:
