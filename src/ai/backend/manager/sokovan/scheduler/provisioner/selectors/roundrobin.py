@@ -1,8 +1,13 @@
 """
 Round-robin agent selector implementation for sokovan scheduler.
 
-This selector distributes workloads evenly across agents using
-a simple round-robin index.
+This selector distributes workloads evenly across agents by rotating an
+in-process index over the ID-ordered compatible candidates.
+
+The rotation is a best-effort approximation, not a strict turn order:
+the index resets on process restart / leader failover, and the candidate
+set varies per selection with compatibility filtering. That is
+sufficient for the goal of evening out placements.
 """
 
 from collections.abc import Sequence
@@ -10,29 +15,20 @@ from typing import override
 
 from .selector import (
     AbstractAgentSelector,
-    AgentSelectionConfig,
-    AgentSelectionCriteria,
-    AgentStateTracker,
 )
+from .tracker import AgentStateTracker
 from .types import ResourceRequirements
 
 
 class RoundRobinAgentSelector(AbstractAgentSelector):
     """
     Round-robin agent selector that distributes workloads evenly.
-
-    This selector uses a simple index-based approach for round-robin
-    selection. Some variance is acceptable.
     """
 
-    def __init__(self, next_index: int = 0) -> None:
-        """
-        Initialize with the next index to use.
+    _next_index: int
 
-        Args:
-            next_index: The index for the next selection
-        """
-        self.next_index = next_index
+    def __init__(self) -> None:
+        self._next_index = 0
 
     @override
     def name(self) -> str:
@@ -53,19 +49,15 @@ class RoundRobinAgentSelector(AbstractAgentSelector):
         self,
         trackers: Sequence[AgentStateTracker],
         _resource_req: ResourceRequirements,
-        _criteria: AgentSelectionCriteria,
-        _config: AgentSelectionConfig,
     ) -> AgentStateTracker:
         """
         Select an agent tracker using round-robin.
 
         Assumes trackers are already filtered for compatibility.
-        The caller should track and update the index after successful allocation.
         """
         # Sort trackers by agent ID for consistent ordering
         sorted_trackers = sorted(trackers, key=lambda tracker: tracker.original_agent.agent_id)
 
-        # Use modulo to wrap around
-        selected_index = self.next_index % len(sorted_trackers)
-
-        return sorted_trackers[selected_index]
+        selected = sorted_trackers[self._next_index % len(sorted_trackers)]
+        self._next_index += 1
+        return selected

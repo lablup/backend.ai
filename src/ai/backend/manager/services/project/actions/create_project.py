@@ -1,0 +1,37 @@
+from collections.abc import Sequence
+from dataclasses import dataclass
+from typing import override
+
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.manager.actions.v2.ops.base import CreateRoleManagedEntityOpsAction
+from ai.backend.manager.data.project.types import ProjectData
+from ai.backend.manager.models.project.creators import ProjectCreator
+from ai.backend.manager.models.project.row import ProjectRow
+
+
+@dataclass(frozen=True)
+class CreateProjectAction(CreateRoleManagedEntityOpsAction[ProjectRow, ProjectData]):
+    """Register a project under a domain."""
+
+    domain_id: DomainID
+    creator: ProjectCreator
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return ProjectEntityType()
+
+    @override
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return (self.domain_id,)
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "create_project"
+
+    @override
+    def to_creator(self) -> ProjectCreator:
+        return self.creator

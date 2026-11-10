@@ -1,0 +1,527 @@
+"""Entity writes of the v2 ops: every entity doubles as a scope.
+
+Creating always provisions the row's virtual entity node, which owns and governs
+itself, and writes the relations the spec declares — each ``created_in`` scope owns
+it and governs it;
+purging tears the same things down. The role-managed variants — typed against the combined spec — also
+provision the roles the scope type's active presets call for; the plain paths
+never touch roles at all.
+"""
+
+from __future__ import annotations
+
+import dataclasses
+import logging
+from collections import defaultdict
+from collections.abc import Collection, Mapping, Sequence
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, ClassVar
+
+import jinja2
+import jinja2.sandbox
+import sqlalchemy as sa
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+from ai.backend.common.data.entity.global_entity import GlobalEntityName
+from ai.backend.common.data.entity.role import RoleID
+from ai.backend.common.data.entity.role_preset import RolePresetID
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.data.permission.global_entity import global_entity_id
+from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
+from ai.backend.manager.data.permission.status import RoleStatus
+from ai.backend.manager.data.permission.types import (
+    Permission,
+    RoleSource,
+)
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.errors.role_preset import InvalidRoleNameTemplate
+from ai.backend.manager.models.base import Base
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
+    RolePermissionPresetRow,
+)
+from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
+from ai.backend.manager.models.specs.creator import (
+    EntityCreator,
+    GuardedEntityCreator,
+    RoleManagedEntityCreator,
+    RoleManagedGlobalEntityCreator,
+)
+from ai.backend.manager.models.specs.purger import GuardedEntityPurger
+from ai.backend.manager.models.specs.types import (
+    BulkResultWithFailures,
+    EntityInsertIfAbsentResult,
+)
+from ai.backend.manager.models.specs.upserter import EntityUpserter
+from ai.backend.manager.repositories.ops.v2.graph_write import V2GraphWriteOpsBase
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession as SASession
+
+log = StructuredLogger(logging.getLogger(__spec__.name))
+
+
+@dataclass(frozen=True)
+class _PresetRoleSpec:
+    """One role a preset calls for on one scope, as plain values ready to write."""
+
+    entity: EntityIdentifier
+    role_preset_id: RolePresetID
+    name: str
+    auto_assign: bool
+    entity_permissions: Mapping[EntityType, Sequence[Permission]]
+
+
+class V2EntityWriteOps(V2GraphWriteOpsBase):
+    """Entity writes, bound to a single session."""
+
+    # Rendered role names are stored in ``roles.name`` (sa.String(64)).
+    _MAX_ROLE_NAME_LENGTH: ClassVar[int] = 64
+
+    _template_env: jinja2.sandbox.ImmutableSandboxedEnvironment
+
+    def __init__(self, sess: SASession) -> None:
+        super().__init__(sess)
+        self._template_env = jinja2.sandbox.ImmutableSandboxedEnvironment(
+            undefined=jinja2.StrictUndefined,
+        )
+
+    async def create_entity[TRow: Base, TData](
+        self, creator: GuardedEntityCreator[TRow, TData]
+    ) -> TData:
+        """Insert one entity row: the row, its virtual entity node (self membership
+        which owns and governs itself), owned and governed by each ``created_in`` scope — one
+        transaction. No roles are involved on this path.
+
+        What the spec refuses runs first, each answering with its own error so a caller
+        learns which one stood in the way. A spec with nothing to refuse passes through.
+        """
+        await self._validate_precondition_checks(creator.precondition_checks())
+        row = creator.build_row()
+        await self._insert_row(row, creator.integrity_error_checks())
+        entity = creator.entity_id(row)
+        await self._provision([entity])
+        await self._created_in(creator.created_in(row), entity)
+        return creator.to_data(row)
+
+    async def create_role_managed_global_entity[TRow: Base, TData](
+        self, creator: RoleManagedGlobalEntityCreator[TRow, TData]
+    ) -> TData:
+        """Insert one role-managed entity row created in the `global` scope,
+        additionally provisioning the roles the scope type's active presets call for —
+        the spec's ``template_value`` feeds the presets' name templates."""
+        row = creator.build_row()
+        await self._insert_row(row, creator.integrity_error_checks())
+        entity = creator.entity_id(row)
+        await self._provision([entity])
+        await self._create_preset_roles({entity: creator.template_value(row)})
+        await self._created_in([global_entity_id(GlobalEntityName.GLOBAL)], entity)
+        return creator.to_data(row)
+
+    async def create_role_managed_entity[TRow: Base, TData](
+        self, creator: RoleManagedEntityCreator[TRow, TData]
+    ) -> TData:
+        """Insert one role-managed entity row: owned and governed by each
+        ``created_in`` scope as :meth:`create_entity` does, plus its preset roles."""
+        row = creator.build_row()
+        await self._insert_row(row, creator.integrity_error_checks())
+        entity = creator.entity_id(row)
+        await self._provision([entity])
+        await self._create_preset_roles({entity: creator.template_value(row)})
+        await self._created_in(creator.created_in(row), entity)
+        return creator.to_data(row)
+
+    async def atomic_create_entities[TRow: Base, TData](
+        self, creators: Sequence[EntityCreator[TRow, TData]]
+    ) -> list[TData]:
+        """Insert entity rows atomically in one flush, provisioning each row's
+        scope as :meth:`create_entity` does for one."""
+        if not creators:
+            return []
+        rows = [creator.build_row() for creator in creators]
+        await self._insert_rows(rows, creators[0].integrity_error_checks())
+        entities = [creator.entity_id(row) for creator, row in zip(creators, rows, strict=True)]
+        await self._provision(entities)
+        for creator, row, entity in zip(creators, rows, entities, strict=True):
+            await self._created_in(creator.created_in(row), entity)
+        return [creator.to_data(row) for creator, row in zip(creators, rows, strict=True)]
+
+    async def atomic_create_role_managed_global_entities[TRow: Base, TData](
+        self, creators: Sequence[RoleManagedGlobalEntityCreator[TRow, TData]]
+    ) -> list[TData]:
+        """Insert role-managed rows created in the `global` scope atomically, provisioning each
+        row's scope and preset roles as :meth:`create_role_managed_global_entity` does
+        for one."""
+        if not creators:
+            return []
+        rows = [creator.build_row() for creator in creators]
+        await self._insert_rows(rows, creators[0].integrity_error_checks())
+        entities = [creator.entity_id(row) for creator, row in zip(creators, rows, strict=True)]
+        await self._provision(entities)
+        await self._create_preset_roles({
+            entity: creator.template_value(row)
+            for creator, row, entity in zip(creators, rows, entities, strict=True)
+        })
+        for entity in entities:
+            await self._created_in([global_entity_id(GlobalEntityName.GLOBAL)], entity)
+        return [creator.to_data(row) for creator, row in zip(creators, rows, strict=True)]
+
+    async def atomic_create_role_managed_entities[TRow: Base, TData](
+        self, creators: Sequence[RoleManagedEntityCreator[TRow, TData]]
+    ) -> list[TData]:
+        """Insert role-managed entity rows atomically, provisioning each row's
+        scope, preset roles and relations as :meth:`create_role_managed_entity` does
+        for one."""
+        if not creators:
+            return []
+        rows = [creator.build_row() for creator in creators]
+        await self._insert_rows(rows, creators[0].integrity_error_checks())
+        entities = [creator.entity_id(row) for creator, row in zip(creators, rows, strict=True)]
+        await self._provision(entities)
+        await self._create_preset_roles({
+            entity: creator.template_value(row)
+            for creator, row, entity in zip(creators, rows, entities, strict=True)
+        })
+        for creator, row, entity in zip(creators, rows, entities, strict=True):
+            await self._created_in(creator.created_in(row), entity)
+        return [creator.to_data(row) for creator, row in zip(creators, rows, strict=True)]
+
+    async def purge_entity[TRow: Base, TData](
+        self, purger: GuardedEntityPurger[TRow, TData]
+    ) -> TData | None:
+        """Delete the entity row the id names while its guards hold, and the RBAC
+        graph it left; ``None`` if already gone, the failing guard's error if it
+        refused."""
+        await self._validate_conflict_checks(purger.conflict_checks())
+        row = await self._delete_row_returning(
+            purger.row_class(), purger.target_id_column(), purger.entity_id(), purger.guard_checks()
+        )
+        if row is None:
+            return None
+        await self._teardown([purger.entity_id()])
+        return purger.to_data(row)
+
+    async def partial_bulk_purge_entities[TRow: Base, TData](
+        self, purgers: Mapping[EntityIdentifier, GuardedEntityPurger[TRow, TData]]
+    ) -> BulkResultWithFailures[TData]:
+        """Delete each named entity independently, a row and its teardown sharing one
+        savepoint; a missing row raises :class:`EntityNotFoundError`."""
+        successes: dict[EntityIdentifier, TData] = {}
+        errors: dict[EntityIdentifier, Exception] = {}
+        for entity_id, purger in purgers.items():
+            try:
+                async with self._sess.begin_nested():
+                    data = await self.purge_entity(purger)
+                    if data is None:
+                        raise EntityNotFoundError(
+                            entity_type=entity_id.entity_type(),
+                            operation=ActionOperationType.PURGE,
+                            extra_msg=f"{purger.row_class().__name__} {entity_id} not found",
+                        )
+                    successes[entity_id] = data
+            except Exception as e:
+                errors[entity_id] = e
+        return BulkResultWithFailures(successes=successes, errors=errors)
+
+    async def upsert_entity[TRow: Base, TData](
+        self, upserter: EntityUpserter[TRow, TData]
+    ) -> TData:
+        """Insert or update an entity row on conflict; the scope stays provisioned
+        idempotently — the virtual entity node is get-or-create, and the declared
+        own and govern relations are registered idempotently."""
+        row = await self._upsert_row_returning(
+            upserter.row_class(),
+            upserter.index_elements(),
+            upserter.build_insert_values(),
+            upserter.build_update_values(),
+            upserter.integrity_error_checks(),
+        )
+        entity = upserter.entity_id(row)
+        await self._provision([entity])
+        await self._created_in(upserter.created_in(row), entity)
+        return upserter.to_data(row)
+
+    async def atomic_upsert_entities[TRow: Base, TData](
+        self, upserters: Sequence[EntityUpserter[TRow, TData]]
+    ) -> list[TData]:
+        """Insert-or-update every entity row atomically, provisioning each row's scope as
+        :meth:`upsert_entity` does for one.
+
+        One statement per row: each carries its own update values, so they cannot be
+        folded into a single insert the way :meth:`atomic_create_entities` folds its rows.
+        """
+        if not upserters:
+            return []
+        rows = [
+            await self._upsert_row_returning(
+                upserter.row_class(),
+                upserter.index_elements(),
+                upserter.build_insert_values(),
+                upserter.build_update_values(),
+                upserter.integrity_error_checks(),
+            )
+            for upserter in upserters
+        ]
+        entities = [upserter.entity_id(row) for upserter, row in zip(upserters, rows, strict=True)]
+        await self._provision(entities)
+        for upserter, row, entity in zip(upserters, rows, entities, strict=True):
+            await self._created_in(upserter.created_in(row), entity)
+        return [upserter.to_data(row) for upserter, row in zip(upserters, rows, strict=True)]
+
+    async def insert_entity_if_absent[TRow: Base, TData](
+        self, upserter: EntityUpserter[TRow, TData]
+    ) -> EntityInsertIfAbsentResult:
+        """Insert an entity row unless a row holds its conflict key, leaving that row as
+        it stands. The row is provisioned as :meth:`upsert_entity` provisions it,
+        inserted or not."""
+        [result] = await self.atomic_insert_entities_if_absent([upserter])
+        return result
+
+    async def atomic_insert_entities_if_absent[TRow: Base, TData](
+        self, upserters: Sequence[EntityUpserter[TRow, TData]]
+    ) -> list[EntityInsertIfAbsentResult]:
+        """:meth:`insert_entity_if_absent` for every upserter, all or nothing.
+
+        One statement per row: a row left out is read back by its own conflict key.
+        """
+        if not upserters:
+            return []
+        rows: list[tuple[TRow, bool]] = []
+        for upserter in upserters:
+            insert_values = upserter.build_insert_values()
+            inserted = await self._insert_row_if_absent(
+                upserter.row_class(),
+                upserter.index_elements(),
+                insert_values,
+                upserter.integrity_error_checks(),
+            )
+            if inserted is not None:
+                rows.append((inserted, True))
+            else:
+                rows.append((
+                    await self._row_holding_key(
+                        upserter.row_class(), upserter.index_elements(), insert_values
+                    ),
+                    False,
+                ))
+        entities = [
+            upserter.entity_id(row) for upserter, (row, _) in zip(upserters, rows, strict=True)
+        ]
+        await self._provision(entities)
+        for upserter, (row, _), entity in zip(upserters, rows, entities, strict=True):
+            await self._created_in(upserter.created_in(row), entity)
+        return [
+            EntityInsertIfAbsentResult(entity_id=entity, inserted=is_new)
+            for (_, is_new), entity in zip(rows, entities, strict=True)
+        ]
+
+    async def grant_roles(
+        self,
+        user_id: UserID,
+        role_ids: Sequence[RoleID],
+        granted_by: UserID | None = None,
+    ) -> list[bool]:
+        """Map the user to each role, answering per role, in the order given, whether
+        the grant was written. A role the user already holds is left as it stands and
+        answers False."""
+        if not role_ids:
+            return []
+        stmt = (
+            pg_insert(UserRoleRow)
+            .values([
+                {"user_id": user_id, "role_id": role_id, "granted_by": granted_by}
+                for role_id in role_ids
+            ])
+            .on_conflict_do_nothing()
+            .returning(UserRoleRow.role_id)
+        )
+        try:
+            granted = set((await self._sess.scalars(stmt)).all())
+        except sa.exc.IntegrityError as e:
+            raise self._parse_integrity_error(e) from e
+        return [role_id in granted for role_id in role_ids]
+
+    async def _grant_auto_assign_roles(
+        self, entities: Collection[EntityIdentifier], user_id: UserID
+    ) -> None:
+        """Map the user to every active auto_assign role of ``entities``; already-granted
+        pairs are skipped via the (user_id, role_id) unique key.
+
+        Not called by the generic entity paths: whether (and for which scopes — the
+        joined ones, the user's own) a creation grants roles is the user domain's
+        decision, wired explicitly during its migration."""
+        role_ids = (
+            await self._sess.scalars(
+                sa.select(RoleRow.id).where(
+                    sa.tuple_(RoleRow.scope_type, RoleRow.scope_id).in_([
+                        (e.entity_type(), e) for e in entities
+                    ]),
+                    RoleRow.auto_assign.is_(True),
+                    RoleRow.status == RoleStatus.ACTIVE,
+                )
+            )
+        ).all()
+        if role_ids:
+            await self._bulk_insert_ignore_conflicts(
+                [UserRoleRow(user_id=user_id, role_id=role_id) for role_id in role_ids],
+            )
+
+    # -- Preset-derived roles (role-managed paths only) ---------------------------
+
+    async def _create_preset_roles(
+        self, entity_values: Mapping[EntityIdentifier, ScopeTemplateValue]
+    ) -> None:
+        """Create the roles the active presets matching the scopes' types call for —
+        presets are the only source of a scope's roles. Each role carries its scope,
+        which owns and governs it as it does every other entity created there."""
+        await self._write_preset_roles(await self._preset_role_specs(entity_values))
+
+    async def _write_preset_roles(self, specs: Sequence[_PresetRoleSpec]) -> None:
+        """Write each spec's role, its place in the graph under its scope, and its
+        permissions."""
+        if not specs:
+            return
+        role_rows = [
+            RoleRow(
+                name=spec.name,
+                source=RoleSource.SYSTEM,
+                status=RoleStatus.ACTIVE,
+                auto_assign=spec.auto_assign,
+                role_preset_id=spec.role_preset_id,
+                scope_type=spec.entity.entity_type(),
+                scope_id=spec.entity,
+            )
+            for spec in specs
+        ]
+        self._sess.add_all(role_rows)
+        await self._sess.flush()
+        await self._provision([RoleID(row.id) for row in role_rows])
+        for spec, row in zip(specs, role_rows, strict=True):
+            await self._created_in([spec.entity], RoleID(row.id))
+        permission_rows = [
+            PermissionRow(
+                role_id=row.id,
+                entity_type=entity_type,
+                permission=permission,
+            )
+            for spec, row in zip(specs, role_rows, strict=True)
+            for entity_type, permissions in spec.entity_permissions.items()
+            for permission in permissions
+            if permission != Permission.NONE
+        ]
+        if permission_rows:
+            self._sess.add_all(permission_rows)
+            await self._sess.flush()
+
+    async def _preset_role_specs(
+        self, entity_values: Mapping[EntityIdentifier, ScopeTemplateValue]
+    ) -> list[_PresetRoleSpec]:
+        """The roles the active presets matching the scopes' types call for. A preset
+        with a scope id calls for a role in that scope alone."""
+        entities = list(entity_values)
+        if not entities:
+            return []
+        preset_rows = (
+            await self._sess.scalars(
+                sa.select(RolePresetRow).where(
+                    RolePresetRow.scope_type.in_({e.entity_type() for e in entities}),
+                    RolePresetRow.deleted_at.is_(None),
+                )
+            )
+        ).all()
+        if not preset_rows:
+            return []
+        permissions_by_preset: dict[RolePresetID, dict[EntityType, list[Permission]]] = defaultdict(
+            lambda: defaultdict(list)
+        )
+        preset_permission_rows = (
+            await self._sess.scalars(
+                sa.select(RolePermissionPresetRow).where(
+                    RolePermissionPresetRow.role_preset_id.in_([
+                        preset.id for preset in preset_rows
+                    ])
+                )
+            )
+        ).all()
+        for preset_permission in preset_permission_rows:
+            permissions_by_preset[preset_permission.role_preset_id][
+                preset_permission.entity_type
+            ].append(preset_permission.permission)
+        presets_by_scope_type: dict[EntityType, list[RolePresetRow]] = defaultdict(list)
+        for preset in preset_rows:
+            presets_by_scope_type[preset.scope_type].append(preset)
+        return [
+            _PresetRoleSpec(
+                entity=entity,
+                role_preset_id=preset.id,
+                name=self._preset_role_name(preset, entity, entity_values[entity]),
+                auto_assign=preset.auto_assign,
+                entity_permissions={
+                    entity_type: tuple(permissions)
+                    for entity_type, permissions in permissions_by_preset[preset.id].items()
+                },
+            )
+            for entity in entities
+            for preset in presets_by_scope_type[entity.entity_type()]
+            if preset.scope_id is None or preset.scope_id == entity
+        ]
+
+    def _preset_role_name(
+        self, preset: RolePresetRow, entity: EntityIdentifier, template_value: ScopeTemplateValue
+    ) -> str:
+        """The name of a role instantiated from the preset: a preset without a
+        template gets a generated per-scope name; a template that cannot be rendered
+        falls back to a deterministic name, so entity creation never fails on role
+        naming. The template sees the spec-declared values — no lookup."""
+        if preset.role_name_template is None:
+            return self._default_preset_role_name(preset, entity)
+        try:
+            return self._render_role_name(preset.role_name_template, template_value)
+        except InvalidRoleNameTemplate as e:
+            fallback = self._fallback_preset_role_name(entity)
+            log.warning(
+                "role name template not rendered, fallback name used",
+                role_preset_id=preset.id,
+                role_name_template=preset.role_name_template,
+                role_name=fallback,
+                exc_info=e,
+            )
+            return fallback
+
+    def _default_preset_role_name(self, preset: RolePresetRow, entity: EntityIdentifier) -> str:
+        """Generated per-entity name for a preset that declares no template: the preset
+        name suffixed with the entity id, so roles of different entities (and of
+        different presets on one entity) stay distinguishable."""
+        suffix = f"-{str(entity)[:8]}"
+        return f"{preset.name[: self._MAX_ROLE_NAME_LENGTH - len(suffix)]}{suffix}"
+
+    def _fallback_preset_role_name(self, entity: EntityIdentifier) -> str:
+        """Deterministic per-entity role name used when a preset's template cannot be
+        rendered. Built with plain string formatting — never via the template engine —
+        so entity creation cannot fail on role naming."""
+        return f"{entity.entity_type()}-{str(entity)[:8]}-role"
+
+    def _render_role_name(self, template: str, scope: ScopeTemplateValue) -> str:
+        """Render a role name from a preset's ``role_name_template``, raising
+        :class:`InvalidRoleNameTemplate` on syntax errors, undefined variables, or
+        an empty result.
+
+        An over-long render is truncated to the column limit rather than treated
+        as a failure — the template produced a usable name, and discarding it for
+        the generic fallback would lose the declared intent (the template-less
+        default name truncates the same way)."""
+        try:
+            rendered = self._template_env.from_string(template).render(
+                scope=dataclasses.asdict(scope),
+            )
+        except jinja2.TemplateError as e:
+            raise InvalidRoleNameTemplate(f"Failed to render role name template: {e}") from e
+        rendered = rendered.strip()
+        if not rendered:
+            raise InvalidRoleNameTemplate("Role name template rendered to an empty string.")
+        return rendered[: self._MAX_ROLE_NAME_LENGTH]

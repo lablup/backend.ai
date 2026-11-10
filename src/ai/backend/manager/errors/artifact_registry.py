@@ -2,6 +2,7 @@ from typing import override
 
 from aiohttp import web
 
+from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryEntityType
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -9,31 +10,29 @@ from ai.backend.common.exception import (
     ErrorDomain,
     ErrorOperation,
 )
+from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.errors.base.entity import EntityError, EntityErrorCode
 
 
-class ArtifactRegistryNotFoundError(BackendAIError, web.HTTPNotFound):
+class ArtifactRegistryNotFoundError(EntityError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/artifact-registry-not-found"
     error_title = "Artifact Registry Not Found"
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.ARTIFACT_REGISTRY,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            ArtifactRegistryEntityType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND
         )
 
 
-class ArtifactRegistryBadScanRequestError(BackendAIError, web.HTTPNotFound):
+class ArtifactRegistryBadScanRequestError(EntityError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/artifact-registry-bad-scan-request"
     error_title = "Artifact Registry Bad Scan Request"
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.ARTIFACT_REGISTRY,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.BAD_REQUEST,
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            ArtifactRegistryEntityType(), ActionOperationType.GET, ErrorDetail.BAD_REQUEST
         )
 
 

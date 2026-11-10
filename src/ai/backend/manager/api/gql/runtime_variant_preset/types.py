@@ -1,16 +1,26 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Annotated, Self
+from typing import TYPE_CHECKING, Annotated, Self, override
 from uuid import UUID
 
 import strawberry
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
+from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetID
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.request import (
     CreateRuntimeVariantPresetInput as CreateInputDTO,
+)
+from ai.backend.common.dto.manager.v2.runtime_variant_preset.request import (
+    PartialBulkPurgeRuntimeVariantPresetsInput as PartialBulkPurgeInputDTO,
+)
+from ai.backend.common.dto.manager.v2.runtime_variant_preset.request import (
+    PartialBulkUpdateRuntimeVariantPresetsInput as PartialBulkUpdateInputDTO,
 )
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.request import (
     RuntimeVariantPresetFilter as FilterDTO,
@@ -57,6 +67,7 @@ from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import StringFilter as StringFilterGQL
 from ai.backend.manager.api.gql.base import UUIDFilter as UUIDFilterGQL
+from ai.backend.manager.api.gql.common_types import PartialBulkFailureGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -104,6 +115,21 @@ class PresetValueTypeGQL(StrEnum):
 
 @gql_enum(
     BackendAIGQLMeta(
+        added_version="26.9.0",
+        description="UI control type for a runtime variant preset.",
+    ),
+    name="RuntimeVariantPresetUIType",
+)
+class UITypeGQL(StrEnum):
+    SLIDER = "slider"
+    NUMBER_INPUT = "number_input"
+    SELECT = "select"
+    CHECKBOX = "checkbox"
+    TEXT_INPUT = "text_input"
+
+
+@gql_enum(
+    BackendAIGQLMeta(
         added_version="26.4.2",
         description="Order fields for runtime variant presets.",
     ),
@@ -113,6 +139,8 @@ class RuntimeVariantPresetOrderFieldGQL(StrEnum):
     NAME = "name"
     RANK = "rank"
     CREATED_AT = "created_at"
+    ADDED_VERSION = "added_version"
+    DEPRECATED_VERSION = "deprecated_version"
 
 
 @gql_pydantic_type(
@@ -177,6 +205,76 @@ class UIOptionGQL(PydanticOutputMixin[UIOptionDTO]):
     text: TextOptionGQL | None = gql_field(description="Text input config.")
 
 
+@gql_pydantic_input(
+    BackendAIGQLMeta(added_version="26.9.0", description="Slider UI config input."),
+    name="RuntimeVariantPresetSliderOptionInput",
+)
+class SliderOptionInputGQL(PydanticInputMixin[SliderOptionDTO]):
+    min: float = gql_field(description="Minimum value.")
+    max: float = gql_field(description="Maximum value.")
+    step: float = gql_field(default=1, description="Increment step.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version="26.9.0",
+        description="Number input UI config input.",
+    ),
+    name="RuntimeVariantPresetNumberOptionInput",
+)
+class NumberOptionInputGQL(PydanticInputMixin[NumberOptionDTO]):
+    min: float | None = gql_field(default=None, description="Minimum value.")
+    max: float | None = gql_field(default=None, description="Maximum value.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(added_version="26.9.0", description="Choice item input."),
+    name="RuntimeVariantPresetChoiceItemInput",
+)
+class ChoiceItemInputGQL(PydanticInputMixin[ChoiceItemDTO]):
+    value: str = gql_field(description="Option value.")
+    label: str = gql_field(description="Display label.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version="26.9.0",
+        description="Select UI config input.",
+    ),
+    name="RuntimeVariantPresetChoiceOptionInput",
+)
+class ChoiceOptionInputGQL(PydanticInputMixin[ChoiceOptionDTO]):
+    items: list[ChoiceItemInputGQL] = gql_field(description="List of choices.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version="26.9.0",
+        description="Text input UI config input.",
+    ),
+    name="RuntimeVariantPresetTextOptionInput",
+)
+class TextOptionInputGQL(PydanticInputMixin[TextOptionDTO]):
+    placeholder: str | None = gql_field(default=None, description="Placeholder text.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version="26.9.0",
+        description="UI rendering options input.",
+    ),
+    name="RuntimeVariantPresetUIOptionInput",
+)
+class UIOptionInputGQL(PydanticInputMixin[UIOptionDTO]):
+    ui_type: UITypeGQL = gql_field(description="UI render type.")
+    slider: SliderOptionInputGQL | None = gql_field(default=None, description="Slider config.")
+    number: NumberOptionInputGQL | None = gql_field(
+        default=None, description="Number input config."
+    )
+    choices: ChoiceOptionInputGQL | None = gql_field(default=None, description="Select config.")
+    text: TextOptionInputGQL | None = gql_field(default=None, description="Text input config.")
+
+
 @gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.4.2",
@@ -209,6 +307,12 @@ class PresetTargetSpecGQL(PydanticOutputMixin[PresetTargetSpecDTO]):
 )
 class RuntimeVariantPresetGQL(PydanticNodeMixin[NodeDTO]):
     id: NodeID[str] = gql_field(description="Relay-style global node identifier.")
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="UUID of the runtime variant preset.",
+        ),
+    )
     runtime_variant_id: UUID = gql_field(description="The runtime variant this preset belongs to.")
     name: str = gql_field(
         description="Human-readable name of the configurable parameter (e.g., 'Tensor Parallel Size', 'Quantization')."
@@ -228,6 +332,18 @@ class RuntimeVariantPresetGQL(PydanticNodeMixin[NodeDTO]):
             description="Whether this preset parameter must be supplied when building a deployment revision.",
         )
     )
+    added_version: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="Runtime version this preset became available in; null means it always was.",
+        )
+    )
+    deprecated_version: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="Runtime version this preset was removed in, exclusive; null means it is still offered.",
+        )
+    )
     category: str | None = gql_field(description="UI category group for organizing parameters.")
     display_name: str | None = gql_field(description="Human-readable display label for the UI.")
     ui_option: UIOptionGQL | None = gql_field(description="UI rendering options.")
@@ -238,7 +354,7 @@ class RuntimeVariantPresetGQL(PydanticNodeMixin[NodeDTO]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.8.0",
             description="The runtime variant this preset belongs to. Fetch its name and other attributes in a single query alongside the preset list.",
         )
     )  # type: ignore[misc]
@@ -252,7 +368,22 @@ class RuntimeVariantPresetGQL(PydanticNodeMixin[NodeDTO]):
         ]
         | None
     ):
-        return await info.context.data_loaders.runtime_variant_loader.load(self.runtime_variant_id)
+        return await info.context.data_loaders.runtime_variant_loader.load(
+            RuntimeVariantID(self.runtime_variant_id)
+        )
+
+    @classmethod
+    @override
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[RuntimeVariantPresetGQL | None]:
+        return await info.context.data_loaders.runtime_variant_preset_loader.load_many([
+            RuntimeVariantPresetID(UUID(nid)) for nid in node_ids
+        ])
 
 
 RuntimeVariantPresetEdge = Edge[RuntimeVariantPresetGQL]
@@ -280,6 +411,20 @@ class RuntimeVariantPresetFilterGQL(PydanticInputMixin[FilterDTO]):
     name: StringFilterGQL | None = gql_field(default=None, description="Name filter.")
     runtime_variant_id: UUIDFilterGQL | None = gql_field(
         default=None, description="Variant ID filter."
+    )
+    runtime_version: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description=(
+                "Keep only presets valid at this runtime version, that is "
+                "added_version <= version < deprecated_version. Dot-separated numbers."
+            ),
+        ),
+        default=None,
+    )
+    entity_id: UUIDFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter by preset ID."),
+        default=None,
     )
     AND: list[Self] | None = gql_added_field(
         BackendAIGQLMeta(added_version="26.7.0", description="Match all of the given sub-filters."),
@@ -318,7 +463,10 @@ class CreateRuntimeVariantPresetInputGQL(PydanticInputMixin[CreateInputDTO]):
         description="How the value is applied: 'env' for environment variable, 'args' for command-line argument."
     )
     value_type: PresetValueTypeGQL = gql_field(
-        description="Data type for validation (e.g., 'str', 'int', 'float', 'bool', 'flag')."
+        description=(
+            "Data type for validation (e.g., 'str', 'int', 'float', 'bool', 'flag'). "
+            "'flag' is only valid when preset_target is 'args'."
+        )
     )
     default_value: str | None = gql_field(
         default=None, description="The default value shown to users when creating a deployment."
@@ -333,6 +481,36 @@ class CreateRuntimeVariantPresetInputGQL(PydanticInputMixin[CreateInputDTO]):
         ),
         default=False,
     )
+    added_version: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="Runtime version this preset becomes available in. Dot-separated numbers.",
+        )
+    )
+    deprecated_version: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="Runtime version this preset is removed in, exclusive. Dot-separated numbers.",
+        )
+    )
+    category: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="UI category group for organizing parameters.",
+        )
+    )
+    display_name: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="Human-readable display label for the UI.",
+        )
+    )
+    ui_option: UIOptionInputGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="UI rendering options.",
+        )
+    )
 
 
 @gql_pydantic_input(
@@ -341,16 +519,50 @@ class CreateRuntimeVariantPresetInputGQL(PydanticInputMixin[CreateInputDTO]):
 )
 class UpdateRuntimeVariantPresetInputGQL(PydanticInputMixin[UpdateInputDTO]):
     id: UUID = gql_field(description="Preset ID.")
-    name: str | None = gql_field(default=None, description="New name.")
-    description: str | None = gql_field(default=None, description="New description.")
-    rank: int | None = gql_field(default=None, description="New rank.")
-    preset_target: PresetTargetGQL | None = gql_field(default=None, description="New target.")
-    value_type: PresetValueTypeGQL | None = gql_field(default=None, description="New value type.")
-    default_value: str | None = gql_field(default=None, description="New default value.")
-    key: str | None = gql_field(default=None, description="New key.")
+    name: str | None = gql_field(description="New name.")
+    description: str | None = gql_field(description="New description.")
+    rank: int | None = gql_field(description="New rank.")
+    preset_target: PresetTargetGQL | None = gql_field(description="New target.")
+    value_type: PresetValueTypeGQL | None = gql_field(
+        description=(
+            "New value type. 'flag' is only valid when the effective preset_target is 'args' "
+            "(the stored target applies when preset_target is omitted)."
+        ),
+    )
+    default_value: str | None = gql_field(description="New default value.")
+    key: str | None = gql_field(description="New key.")
     required: bool | None = gql_added_field(
         BackendAIGQLMeta(added_version="26.4.4", description="New required flag."),
-        default=None,
+    )
+    added_version: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="New version this preset becomes available in.",
+        )
+    )
+    deprecated_version: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="New version this preset is removed in, exclusive.",
+        )
+    )
+    category: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="New UI category group.",
+        )
+    )
+    display_name: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="New human-readable display label.",
+        )
+    )
+    ui_option: UIOptionInputGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="New UI rendering options.",
+        )
     )
 
 
@@ -379,3 +591,68 @@ class UpdateRuntimeVariantPresetPayloadGQL(PydanticOutputMixin[UpdatePayloadDTO]
 )
 class DeleteRuntimeVariantPresetPayloadGQL(PydanticOutputMixin[DeletePayloadDTO]):
     id: UUID = gql_field(description="ID of the deleted preset.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for runtime variant preset purge.",
+    ),
+    model=DeletePayloadDTO,
+    name="PurgeRuntimeVariantPresetPayload",
+)
+class PurgeRuntimeVariantPresetPayloadGQL(PydanticOutputMixin[DeletePayloadDTO]):
+    purged_id: strawberry.ID = gql_field(
+        description="Global ID of the purged runtime variant preset."
+    )
+    entity_id: UUID = gql_field(description="UUID of the purged runtime variant preset.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Input for updating several runtime variant presets, each answered for separately."
+        ),
+    ),
+    name="PartialBulkUpdateRuntimeVariantPresetsInput",
+)
+class PartialBulkUpdateRuntimeVariantPresetsInputGQL(PydanticInputMixin[PartialBulkUpdateInputDTO]):
+    items: list[UpdateRuntimeVariantPresetInputGQL] = gql_field(
+        description="The presets to update, each with its fields."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Input for purging several runtime variant presets, each answered for separately."
+        ),
+    ),
+    name="PartialBulkPurgeRuntimeVariantPresetsInput",
+)
+class PartialBulkPurgeRuntimeVariantPresetsInputGQL(PydanticInputMixin[PartialBulkPurgeInputDTO]):
+    ids: list[UUID] = gql_field(description="IDs of the presets to purge.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Result of a partial bulk runtime variant preset operation: the presets processed "
+            "and the ones that failed."
+        ),
+    ),
+    model=PartialBulkPayload[NodeDTO],
+    name="PartialBulkRuntimeVariantPresetsPayload",
+)
+class PartialBulkRuntimeVariantPresetsPayloadGQL(PydanticOutputMixin[PartialBulkPayload[NodeDTO]]):
+    """Payload for partial bulk runtime variant preset mutations."""
+
+    successes: list[RuntimeVariantPresetGQL] = gql_field(
+        description="The presets processed, as they stood when processed."
+    )
+    failed: list[PartialBulkFailureGQL] = gql_field(
+        description="The presets not processed, each with the reason."
+    )

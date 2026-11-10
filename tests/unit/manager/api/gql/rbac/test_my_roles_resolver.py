@@ -7,9 +7,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.manager.api.gql.rbac.resolver import role as role_resolver
-from ai.backend.manager.api.gql.rbac.types import RoleAssignmentConnection
+from ai.backend.manager.api.gql.rbac.types.role import RoleAssignmentConnection
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 
@@ -26,13 +27,14 @@ class TestMyRoles:
             is_superadmin=False,
             role=UserRole.USER,
             domain_name="default",
+            domain_id=DomainID(uuid.uuid4()),
         )
 
-    async def test_calls_adapter_with_user_condition(
+    async def test_calls_my_role_assignment_search(
         self,
         user_data: UserData,
     ) -> None:
-        """Should call adapter with base_conditions filtering by user_id."""
+        """Should read the current user's assignments through the user-scoped search."""
         mock_search = AsyncMock(
             return_value=SearchResult(
                 items=[],
@@ -42,7 +44,7 @@ class TestMyRoles:
             )
         )
         info = MagicMock()
-        info.context.adapters.rbac.admin_search_role_assignments = mock_search
+        info.context.adapters.rbac.my_search_role_assignments = mock_search
 
         with patch(
             "ai.backend.manager.api.gql.rbac.resolver.role.current_user",
@@ -65,9 +67,6 @@ class TestMyRoles:
         mock_search.assert_called_once()
         call_args = mock_search.call_args
         assert call_args[0][0].first == 10
-
-        base_conditions = call_args.kwargs["base_conditions"]
-        assert len(base_conditions) == 1
 
     async def test_raises_insufficient_privilege_when_not_authenticated(self) -> None:
         """Should raise InsufficientPrivilege when no user is authenticated."""
@@ -105,7 +104,7 @@ class TestMyRoles:
             )
         )
         info = MagicMock()
-        info.context.adapters.rbac.admin_search_role_assignments = mock_search
+        info.context.adapters.rbac.my_search_role_assignments = mock_search
 
         with patch(
             "ai.backend.manager.api.gql.rbac.resolver.role.current_user",

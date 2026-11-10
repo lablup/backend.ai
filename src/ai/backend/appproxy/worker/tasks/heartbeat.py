@@ -11,12 +11,12 @@ from tenacity import AsyncRetrying, TryAgain, retry_if_exception_type, wait_expo
 from ai.backend.appproxy.common.errors import CoordinatorConnectionError
 from ai.backend.appproxy.worker.coordinator_client import ping_worker
 from ai.backend.common.cron import PeriodicTask
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 if TYPE_CHECKING:
     from ai.backend.appproxy.worker.types import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class WorkerHeartbeatTask(PeriodicTask):
@@ -54,8 +54,10 @@ class WorkerHeartbeatTask(PeriodicTask):
                         await ping_worker(self._root_ctx, str(uuid.uuid4()))
                     except CoordinatorConnectionError:
                         log.warning(
-                            "Failed to ping coordinator {}, retrying...",
-                            self._root_ctx.local_config.proxy_worker.coordinator_endpoint,
+                            "failed to ping the coordinator; retrying",
+                            coordinator_endpoint=str(
+                                self._root_ctx.local_config.proxy_worker.coordinator_endpoint
+                            ),
                         )
         except Exception as e:
-            log.warning("Failed to ping coordinator: {}", str(e))
+            log.warning("failed to ping the coordinator", exc_info=e)

@@ -1,18 +1,15 @@
-import uuid
 from dataclasses import dataclass
 from typing import override
 
 from aiohttp import web
 
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.services.auth.actions.base import AuthAction
+from ai.backend.manager.services.auth.actions.base import UserEntityAction
 
 
-@dataclass
-class UpdatePasswordAction(AuthAction):
+@dataclass(frozen=True)
+class UpdatePasswordAction(UserEntityAction):
     request: web.Request
-    user_id: uuid.UUID
     domain_name: str
     email: str
     old_password: str
@@ -20,13 +17,14 @@ class UpdatePasswordAction(AuthAction):
     new_password_confirm: str
 
     @override
-    def entity_id(self) -> str | None:
-        return None
-
-    @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.UPDATE
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "update_password"
 
     @property
     def hook_params(self) -> dict[str, str]:
@@ -37,11 +35,7 @@ class UpdatePasswordAction(AuthAction):
         }
 
 
-@dataclass
-class UpdatePasswordActionResult(BaseActionResult):
+@dataclass(frozen=True)
+class UpdatePasswordActionResult:
     success: bool
     message: str
-
-    @override
-    def entity_id(self) -> str | None:
-        return None

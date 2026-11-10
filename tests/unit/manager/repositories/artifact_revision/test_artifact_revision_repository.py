@@ -13,45 +13,52 @@ from datetime import UTC, datetime
 import pytest
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
+from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
+    ArtifactRevisionData,
     ArtifactStatus,
     ArtifactType,
 )
-from ai.backend.manager.errors.artifact import (
-    ArtifactRevisionNotFoundError,
+from ai.backend.manager.errors.base.field import FieldNotFoundError
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.artifact.row import ArtifactRow
+from ai.backend.manager.models.artifact_revision.queriers import ArtifactRevisionQuerier
+from ai.backend.manager.models.artifact_revision.row import ArtifactRevisionRow
+from ai.backend.manager.models.artifact_revision.searchers import ArtifactRevisionSearcher
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.deployment_auto_scaling_policy.row import (
+    DeploymentAutoScalingPolicyRow,
 )
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.artifact import ArtifactRow
-from ai.backend.manager.models.artifact_revision import ArtifactRevisionRow
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
-from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
-from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
-from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
-from ai.backend.manager.models.replica_group import ReplicaGroupRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
+from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.endpoint.row import EndpointRow
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
+from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.resource_preset import ResourcePresetRow
-from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
-from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
+from ai.backend.manager.models.routing.row import RoutingRow
+from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.testutils.db import with_tables
 
 
@@ -80,7 +87,7 @@ class TestArtifactRevisionRepository:
             [
                 # Base rows in FK dependency order (parents before children)
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -88,7 +95,7 @@ class TestArtifactRevisionRepository:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
@@ -353,8 +360,16 @@ class TestArtifactRevisionRepository:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ArtifactRepository, None]:
         """Create ArtifactRepository instance with database"""
-        repo = ArtifactRepository(db=db_with_cleanup)
+        repo = ArtifactRepository(db_with_cleanup, V2DBOpsProvider(db_with_cleanup))
         yield repo
+
+    @pytest.fixture
+    def revision_ops(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> OpsRepository[ArtifactRevisionData]:
+        """Ops-backed repository for artifact revision reads"""
+        return OpsRepository(V2DBOpsProvider(db_with_cleanup))
 
     # =========================================================================
     # Tests - Get
@@ -363,10 +378,13 @@ class TestArtifactRevisionRepository:
     async def test_get_artifact_revision_by_id(
         self,
         artifact_repository: ArtifactRepository,
+        revision_ops: OpsRepository[ArtifactRevisionData],
         sample_revision_id: uuid.UUID,
     ) -> None:
         """Test retrieving artifact revision by ID"""
-        revision = await artifact_repository.get_artifact_revision_by_id(sample_revision_id)
+        revision = await revision_ops.get_field(
+            ArtifactRevisionQuerier(revision_id=ArtifactRevisionID(sample_revision_id))
+        )
 
         assert revision is not None
         assert revision.id == sample_revision_id
@@ -375,10 +393,13 @@ class TestArtifactRevisionRepository:
     async def test_get_artifact_revision_by_id_not_found(
         self,
         artifact_repository: ArtifactRepository,
+        revision_ops: OpsRepository[ArtifactRevisionData],
     ) -> None:
         """Test retrieving non-existent artifact revision raises error"""
-        with pytest.raises(ArtifactRevisionNotFoundError):
-            await artifact_repository.get_artifact_revision_by_id(uuid.uuid4())
+        with pytest.raises(FieldNotFoundError):
+            await revision_ops.get_field(
+                ArtifactRevisionQuerier(revision_id=ArtifactRevisionID(uuid.uuid4()))
+            )
 
     async def test_get_artifact_revision(
         self,
@@ -395,22 +416,6 @@ class TestArtifactRevisionRepository:
         assert revision.version == "main"
 
     # =========================================================================
-    # Tests - List
-    # =========================================================================
-
-    async def test_list_artifact_revisions(
-        self,
-        artifact_repository: ArtifactRepository,
-        sample_artifact_id: uuid.UUID,
-        sample_revision_id: uuid.UUID,
-    ) -> None:
-        """Test listing artifact revisions"""
-        revisions = await artifact_repository.list_artifact_revisions(sample_artifact_id)
-
-        assert len(revisions) == 1
-        assert revisions[0].id == sample_revision_id
-
-    # =========================================================================
     # Tests - Search with filtering
     # =========================================================================
 
@@ -420,7 +425,7 @@ class TestArtifactRevisionRepository:
         sample_revisions_for_filtering: dict[ArtifactStatus, uuid.UUID],
     ) -> None:
         """Test searching artifact revisions filtered by status returns only matching revisions"""
-        querier = BatchQuerier(
+        searcher = ArtifactRevisionSearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
                 lambda: ArtifactRevisionRow.status == ArtifactStatus.AVAILABLE.value,
@@ -428,7 +433,7 @@ class TestArtifactRevisionRepository:
             orders=[],
         )
 
-        result = await artifact_repository.search_artifact_revisions(querier=querier)
+        result = await artifact_repository.search_artifact_revisions(searcher=searcher)
 
         result_revision_ids = [revision.id for revision in result.items]
         assert sample_revisions_for_filtering[ArtifactStatus.AVAILABLE] in result_revision_ids
@@ -443,7 +448,7 @@ class TestArtifactRevisionRepository:
         """Test artifact_id filter condition on search_artifact_revisions."""
         fixture = sample_revisions_for_artifact_id_filtering
 
-        querier = BatchQuerier(
+        searcher = ArtifactRevisionSearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
                 lambda: ArtifactRevisionRow.artifact_id == fixture.target_artifact_id,
@@ -451,7 +456,7 @@ class TestArtifactRevisionRepository:
             orders=[],
         )
 
-        result = await artifact_repository.search_artifact_revisions(querier=querier)
+        result = await artifact_repository.search_artifact_revisions(searcher=searcher)
 
         assert result.total_count == len(fixture.target_revision_ids)
         result_ids = {r.id for r in result.items}
@@ -468,13 +473,13 @@ class TestArtifactRevisionRepository:
         sample_revisions_for_ordering: list[uuid.UUID],
     ) -> None:
         """Test searching artifact revisions ordered by version ascending"""
-        querier = BatchQuerier(
+        searcher = ArtifactRevisionSearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[ArtifactRevisionRow.version.asc()],
         )
 
-        result = await artifact_repository.search_artifact_revisions(querier=querier)
+        result = await artifact_repository.search_artifact_revisions(searcher=searcher)
 
         result_versions = [revision.version for revision in result.items]
         assert result_versions == sorted(result_versions)
@@ -487,13 +492,13 @@ class TestArtifactRevisionRepository:
         sample_revisions_for_ordering: list[uuid.UUID],
     ) -> None:
         """Test searching artifact revisions ordered by version descending"""
-        querier = BatchQuerier(
+        searcher = ArtifactRevisionSearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[ArtifactRevisionRow.version.desc()],
         )
 
-        result = await artifact_repository.search_artifact_revisions(querier=querier)
+        result = await artifact_repository.search_artifact_revisions(searcher=searcher)
 
         result_versions = [revision.version for revision in result.items]
         assert result_versions == sorted(result_versions, reverse=True)
@@ -506,13 +511,13 @@ class TestArtifactRevisionRepository:
         sample_revisions_for_pagination: list[uuid.UUID],
     ) -> None:
         """Test searching artifact revisions ordered by size descending"""
-        querier = BatchQuerier(
+        searcher = ArtifactRevisionSearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[ArtifactRevisionRow.size.desc()],
         )
 
-        result = await artifact_repository.search_artifact_revisions(querier=querier)
+        result = await artifact_repository.search_artifact_revisions(searcher=searcher)
 
         result_sizes = [revision.size for revision in result.items if revision.size is not None]
         assert result_sizes == sorted(result_sizes, reverse=True)
@@ -527,13 +532,13 @@ class TestArtifactRevisionRepository:
         sample_revisions_for_pagination: list[uuid.UUID],
     ) -> None:
         """Test first page of offset-based pagination"""
-        querier = BatchQuerier(
+        searcher = ArtifactRevisionSearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[],
         )
 
-        result = await artifact_repository.search_artifact_revisions(querier=querier)
+        result = await artifact_repository.search_artifact_revisions(searcher=searcher)
 
         assert len(result.items) == 10
         assert result.total_count == 25
@@ -544,13 +549,13 @@ class TestArtifactRevisionRepository:
         sample_revisions_for_pagination: list[uuid.UUID],
     ) -> None:
         """Test second page of offset-based pagination"""
-        querier = BatchQuerier(
+        searcher = ArtifactRevisionSearcher(
             pagination=OffsetPagination(limit=10, offset=10),
             conditions=[],
             orders=[],
         )
 
-        result = await artifact_repository.search_artifact_revisions(querier=querier)
+        result = await artifact_repository.search_artifact_revisions(searcher=searcher)
 
         assert len(result.items) == 10
         assert result.total_count == 25
@@ -561,13 +566,13 @@ class TestArtifactRevisionRepository:
         sample_revisions_for_pagination: list[uuid.UUID],
     ) -> None:
         """Test last page of offset-based pagination with partial results"""
-        querier = BatchQuerier(
+        searcher = ArtifactRevisionSearcher(
             pagination=OffsetPagination(limit=10, offset=20),
             conditions=[],
             orders=[],
         )
 
-        result = await artifact_repository.search_artifact_revisions(querier=querier)
+        result = await artifact_repository.search_artifact_revisions(searcher=searcher)
 
         assert len(result.items) == 5
         assert result.total_count == 25
@@ -585,7 +590,7 @@ class TestArtifactRevisionRepository:
         # Filter: only AVAILABLE revisions
         # Order: by version descending
         # Pagination: limit 3, offset 2
-        querier = BatchQuerier(
+        searcher = ArtifactRevisionSearcher(
             pagination=OffsetPagination(limit=3, offset=2),
             conditions=[
                 lambda: ArtifactRevisionRow.status == ArtifactStatus.AVAILABLE.value,
@@ -593,7 +598,7 @@ class TestArtifactRevisionRepository:
             orders=[ArtifactRevisionRow.version.desc()],
         )
 
-        result = await artifact_repository.search_artifact_revisions(querier=querier)
+        result = await artifact_repository.search_artifact_revisions(searcher=searcher)
 
         # Total AVAILABLE revisions: 8, so total_count should be 8
         assert result.total_count == 8
@@ -615,6 +620,7 @@ class TestArtifactRevisionRepository:
     async def test_update_artifact_revision_status(
         self,
         artifact_repository: ArtifactRepository,
+        revision_ops: OpsRepository[ArtifactRevisionData],
         sample_revision_id: uuid.UUID,
     ) -> None:
         """Test updating artifact revision status"""
@@ -625,12 +631,15 @@ class TestArtifactRevisionRepository:
         assert updated_revision_id == sample_revision_id
 
         # Verify status was updated
-        revision = await artifact_repository.get_artifact_revision_by_id(sample_revision_id)
+        revision = await revision_ops.get_field(
+            ArtifactRevisionQuerier(revision_id=ArtifactRevisionID(sample_revision_id))
+        )
         assert revision.status == ArtifactStatus.VERIFYING
 
     async def test_update_artifact_revision_bytesize(
         self,
         artifact_repository: ArtifactRepository,
+        revision_ops: OpsRepository[ArtifactRevisionData],
         sample_revision_id: uuid.UUID,
     ) -> None:
         """Test updating artifact revision byte size"""
@@ -643,12 +652,15 @@ class TestArtifactRevisionRepository:
         assert updated_revision_id == sample_revision_id
 
         # Verify size was updated
-        revision = await artifact_repository.get_artifact_revision_by_id(sample_revision_id)
+        revision = await revision_ops.get_field(
+            ArtifactRevisionQuerier(revision_id=ArtifactRevisionID(sample_revision_id))
+        )
         assert revision.size == new_size
 
     async def test_update_artifact_revision_digest(
         self,
         artifact_repository: ArtifactRepository,
+        revision_ops: OpsRepository[ArtifactRevisionData],
         sample_revision_id: uuid.UUID,
     ) -> None:
         """Test updating artifact revision digest"""
@@ -661,7 +673,9 @@ class TestArtifactRevisionRepository:
         assert updated_revision_id == sample_revision_id
 
         # Verify digest was updated
-        revision = await artifact_repository.get_artifact_revision_by_id(sample_revision_id)
+        revision = await revision_ops.get_field(
+            ArtifactRevisionQuerier(revision_id=ArtifactRevisionID(sample_revision_id))
+        )
         assert revision.digest == new_digest
 
     async def test_update_artifact_revision_readme(
@@ -749,6 +763,7 @@ class TestArtifactRevisionRepository:
     async def test_reset_artifact_revision_status(
         self,
         artifact_repository: ArtifactRepository,
+        revision_ops: OpsRepository[ArtifactRevisionData],
         sample_revision_id: uuid.UUID,
     ) -> None:
         """Test resetting artifact revision status to SCANNED"""
@@ -765,7 +780,9 @@ class TestArtifactRevisionRepository:
         assert reset_revision_id == sample_revision_id
 
         # Verify status was reset to SCANNED
-        revision = await artifact_repository.get_artifact_revision_by_id(sample_revision_id)
+        revision = await revision_ops.get_field(
+            ArtifactRevisionQuerier(revision_id=ArtifactRevisionID(sample_revision_id))
+        )
         assert revision.status == ArtifactStatus.SCANNED
 
     async def test_get_artifact_revision_readme(

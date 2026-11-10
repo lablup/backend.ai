@@ -1,16 +1,19 @@
 import asyncio
 import logging
+from collections.abc import Iterator
+from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
 from typing import Any, override
 
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.common.contexts.request_id import with_request_context
+from ai.backend.logging.structured import StructuredLogger, with_log_context
 from ai.backend.manager.reporters.base import (
     AbstractReporter,
     FinishedActionMessage,
     StartedActionMessage,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @dataclass
@@ -49,21 +52,39 @@ class ReporterHub(AbstractReporter):
         while not self._closed:
             message = await self._start_queue.get()
             target_reporters = self._target_reporters(message.action_type)
-            for reporter in target_reporters:
-                try:
-                    await reporter.report_started(message)
-                except Exception as e:
-                    log.error("reporter.report_started failed: {}", e)
+            with self._action_scope(message):
+                for reporter in target_reporters:
+                    try:
+                        await reporter.report_started(message)
+                    except Exception:
+                        log.exception(
+                            "reporter report_started failed", reporter_type=type(reporter).__name__
+                        )
 
     async def _report_finished(self) -> None:
         while not self._closed:
             message = await self._finish_queue.get()
             target_reporters = self._target_reporters(message.action_type)
-            for reporter in target_reporters:
-                try:
-                    await reporter.report_finished(message)
-                except Exception as e:
-                    log.error("reporter.report_finished failed: {}", e)
+            with self._action_scope(message):
+                for reporter in target_reporters:
+                    try:
+                        await reporter.report_finished(message)
+                    except Exception:
+                        log.exception(
+                            "reporter report_finished failed", reporter_type=type(reporter).__name__
+                        )
+
+    @contextmanager
+    def _action_scope(
+        self, message: StartedActionMessage | FinishedActionMessage
+    ) -> Iterator[None]:
+        with ExitStack() as stack:
+            stack.enter_context(
+                with_log_context(action_id=message.action_id, action_name=message.action_type)
+            )
+            if message.request_id is not None:
+                stack.enter_context(with_request_context(message.request_id))
+            yield
 
     async def close(self) -> None:
         if self._closed:

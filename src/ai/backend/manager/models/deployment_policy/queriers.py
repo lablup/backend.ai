@@ -1,0 +1,50 @@
+"""Querier specs for the deployment_policies table."""
+
+from __future__ import annotations
+
+from typing import Any, override
+
+import sqlalchemy as sa
+from sqlalchemy.orm import InstrumentedAttribute
+
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.manager.data.deployment.types import DeploymentPolicyData
+from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_policy.searchable_fields import (
+    DeploymentPolicySearchableFields,
+)
+from ai.backend.manager.models.specs.querier import BulkFieldQuerier, OwnedFieldQuerier
+
+
+class DeploymentPolicyByDeploymentQuerier(
+    OwnedFieldQuerier[DeploymentID, DeploymentPolicyRow, DeploymentPolicyData]
+):
+    """The policy a deployment carries; ``uq_deployment_policies_endpoint`` caps it at one."""
+
+    @override
+    def build_select(self) -> sa.sql.Select[Any]:
+        return sa.select(DeploymentPolicyRow)
+
+    @override
+    def owner_id_column(self) -> InstrumentedAttribute[Any]:
+        return DeploymentPolicyRow.endpoint
+
+    @override
+    def to_data(self, row: DeploymentPolicyRow) -> DeploymentPolicyData:
+        return DeploymentPolicySearchableFields.own.to_data(row)
+
+
+class BulkDeploymentPolicyQuerier(BulkFieldQuerier[DeploymentPolicyRow, DeploymentPolicyData]):
+    """The deployment policy rows the caller named."""
+
+    @override
+    def row_class(self) -> type[DeploymentPolicyRow]:
+        return DeploymentPolicyRow
+
+    @override
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return DeploymentPolicyRow.id
+
+    @override
+    def to_data(self, row: DeploymentPolicyRow) -> DeploymentPolicyData:
+        return DeploymentPolicySearchableFields.own.to_data(row)

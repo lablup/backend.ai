@@ -9,12 +9,12 @@ import yarl
 
 from ai.backend.common.docker import login as registry_login
 from ai.backend.common.json import read_json
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.exceptions import ContainerRegistryProjectEmpty
 
 from .base import BaseContainerRegistry
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class DockerHubRegistry(BaseContainerRegistry):
@@ -51,10 +51,10 @@ class DockerHubRegistry(BaseContainerRegistry):
                             continue
                         yield f"{username}/{item['name']}"
                 else:
-                    log.error(
-                        "Failed to fetch repository list from {0} (status={1})",
-                        repo_list_url,
-                        resp.status,
+                    log.warning(
+                        "registry repository list fetch failed",
+                        registry_url=str(repo_list_url),
+                        response_status=resp.status,
                     )
                     break
             repo_list_url = None
@@ -93,12 +93,14 @@ class DockerRegistry_v2(BaseContainerRegistry):
                     for item in data["repositories"]:
                         if item.startswith(self.registry_info.project):
                             yield item
-                    log.debug("found {} repositories", len(data["repositories"]))
+                    log.debug(
+                        "registry repositories found", repository_count=len(data["repositories"])
+                    )
                 else:
                     log.warning(
-                        "Docker registry {0} does not allow/support catalog search. (status={1})",
-                        self.registry_url,
-                        resp.status,
+                        "registry catalog search not supported",
+                        registry_url=str(self.registry_url),
+                        response_status=resp.status,
                     )
                     break
                 catalog_url = None

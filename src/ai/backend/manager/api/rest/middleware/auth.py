@@ -15,6 +15,7 @@ This module contains:
 
 from __future__ import annotations
 
+import dataclasses
 import functools
 import hashlib
 import hmac
@@ -22,8 +23,9 @@ import ipaddress
 import logging
 import secrets
 import uuid
-from collections.abc import Awaitable, Callable, Mapping
-from contextlib import ExitStack
+from collections.abc import Awaitable, Callable, Iterable, Mapping
+from contextlib import AbstractContextManager
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any, Final
 from urllib.parse import urlparse
@@ -34,18 +36,19 @@ from aiohttp import web
 from aiohttp.typedefs import Handler, Middleware
 from dateutil.parser import parse as dtparse
 from dateutil.tz import tzutc
+from sqlalchemy.orm import aliased, load_only
 
-from ai.backend.common.contexts.client_ip import with_client_ip
-from ai.backend.common.contexts.user import with_triggered_user, with_user
+from ai.backend.common.contexts.user import with_user_context
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.exception import InvalidIpAddressValue
-from ai.backend.common.identifier.user import UserID
 from ai.backend.common.jwt.exceptions import JWTError
 from ai.backend.common.plugin.hook import FIRST_COMPLETED, PASSED
-from ai.backend.common.types import ReadableCIDR
-from ai.backend.logging import BraceStyleAdapter
-from ai.backend.logging.utils import with_log_context_fields
+from ai.backend.common.types import AccessKey, ReadableCIDR, SecretKey
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.types import WebRequestHandler
+from ai.backend.manager.data.auth.types import AuthenticatedKeypair, AuthenticatedUser
 from ai.backend.manager.errors.auth import (
     AuthorizationFailed,
     InsufficientPrivilege,
@@ -53,14 +56,18 @@ from ai.backend.manager.errors.auth import (
     InvalidClientIPConfig,
     UserNotFound,
 )
-from ai.backend.manager.errors.common import GenericForbidden, InternalServerError, RejectedByHook
-from ai.backend.manager.models.keypair import keypairs
-from ai.backend.manager.models.resource_policy import (
-    keypair_resource_policies,
-    user_resource_policies,
+from ai.backend.manager.errors.common import GenericForbidden, RejectedByHook
+from ai.backend.manager.models.keypair.row import KEYPAIR_SECRET_KEY_CONTEXT, KeyPairRow
+from ai.backend.manager.models.resource_policy.row import (
+    KeyPairResourcePolicyRow,
+    UserResourcePolicyRow,
 )
-from ai.backend.manager.models.user import UserRow, users
-from ai.backend.manager.models.utils import execute_with_retry
+from ai.backend.manager.models.resource_policy.searchable_fields import (
+    KeyPairResourcePolicySearchableFields,
+    UserResourcePolicySearchableFields,
+)
+from ai.backend.manager.models.user.row import UserRow, UserStatus
+from ai.backend.manager.secret.pool import KeyProviderPool
 
 if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
@@ -68,7 +75,11 @@ if TYPE_CHECKING:
     from ai.backend.common.plugin.hook import HookPluginContext
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
+
+TRUSTED_PROXY_NETWORKS_KEY: Final = "_trusted_proxy_networks"
+FORWARDED_URL_HEADER: Final = "X-Forwarded-URL"
+FORWARDED_PREFIX_HEADER: Final = "X-Forwarded-Prefix"
 
 _whois_timezone_info: Final = {
     "A": 1 * 3600,
@@ -350,6 +361,108 @@ def _extract_auth_params(request: web.Request) -> tuple[str, str, str] | None:
         raise InvalidAuthParameters("Missing or malformed authorization parameters") from e
 
 
+def parse_trusted_proxy_networks(
+    raw_networks: Iterable[str],
+) -> list[ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6Network]]:
+    """Parse the configured trusted proxy addresses or CIDR ranges.
+
+    A bare address is treated as a single-host network, and the wildcard form
+    (e.g. ``10.1.*.*``) accepted for ``allowed_client_ip`` is also allowed.
+    Raises ``InvalidIpAddressValue`` for a malformed entry.
+    """
+    return [ReadableCIDR(raw) for raw in raw_networks]
+
+
+def _peer_address(request: web.Request) -> str | None:
+    transport = request.transport
+    if transport is None:
+        return None
+    peername = transport.get_extra_info("peername")
+    if isinstance(peername, tuple) and peername:
+        return str(peername[0])
+    return None
+
+
+def _trusted_proxy_networks(
+    request: web.Request,
+) -> list[ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6Network]]:
+    networks: list[ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6Network]] = (
+        request.config_dict.get(TRUSTED_PROXY_NETWORKS_KEY, [])
+    )
+    return networks
+
+
+def _is_trusted_address(
+    raw_address: str,
+    networks: list[ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6Network]],
+) -> bool:
+    try:
+        address = ipaddress.ip_address(raw_address)
+    except ValueError:
+        return False
+    return any(address in network.address for network in networks if network.address is not None)
+
+
+def is_from_trusted_proxy(request: web.Request) -> bool:
+    """Tell whether the request arrived directly from a configured trusted proxy.
+
+    The decision is made on the peer address of the connection, which a client
+    cannot forge.  Returns ``False`` when no trusted proxy is configured.
+    """
+    networks = _trusted_proxy_networks(request)
+    if not networks:
+        return False
+    raw_peer = _peer_address(request)
+    if raw_peer is None:
+        return False
+    return _is_trusted_address(raw_peer, networks)
+
+
+@functools.cache
+def _warn_forwarded_url_without_trusted_proxies() -> None:
+    log.warning(
+        "x-forwarded-url accepted without origin check; configure manager.trusted-proxies",
+    )
+
+
+def _resolve_forwarded_url(request: web.Request) -> str | None:
+    """Return the ``X-Forwarded-URL`` value only when its origin may be trusted.
+
+    An untrusted origin is ignored rather than rejected so that a misconfigured
+    proxy cannot turn otherwise valid requests into hard failures.
+    """
+    upstream_url = request.headers.get(FORWARDED_URL_HEADER)
+    if upstream_url is None:
+        return None
+    if not request.config_dict.get(TRUSTED_PROXY_NETWORKS_KEY):
+        _warn_forwarded_url_without_trusted_proxies()
+        return upstream_url
+    if not is_from_trusted_proxy(request):
+        log.trace(
+            "x-forwarded-url header from untrusted peer ignored",
+            peer_address=_peer_address(request),
+        )
+        return None
+    return upstream_url
+
+
+def _resolve_forwarded_prefix(request: web.Request) -> str | None:
+    """Return the ``X-Forwarded-Prefix`` value only when its origin may be trusted.
+
+    Unlike ``X-Forwarded-URL``, there is no untrusted-origin fallback for this header.
+    """
+    raw_prefix = request.headers.get(FORWARDED_PREFIX_HEADER)
+    if raw_prefix is None:
+        return None
+    if not is_from_trusted_proxy(request):
+        log.trace(
+            "x-forwarded-prefix header from untrusted peer ignored",
+            peer_address=_peer_address(request),
+        )
+        return None
+    return raw_prefix.rstrip("/")
+
+
 def check_date(request: web.Request) -> bool:
     raw_date = request.headers.get("Date")
     if not raw_date:
@@ -392,10 +505,15 @@ async def sign_request(sign_method: str, request: web.Request, secret_key: str) 
         body_hash = hashlib.new(hash_type, body).hexdigest()
         path = request.raw_path
         host = request.host
-        if upstream_url := request.headers.get("X-Forwarded-URL", None):
-            parsed_url = urlparse(upstream_url)
-            path = parsed_url.path
-            host = parsed_url.netloc
+        upstream_url = _resolve_forwarded_url(request)
+        if upstream_url:
+            host = urlparse(upstream_url).netloc
+
+        prefix = _resolve_forwarded_prefix(request)
+        if prefix is not None:
+            path = prefix + request.raw_path
+        elif upstream_url:
+            path = urlparse(upstream_url).path
 
         sign_bytes = "{0}\n{1}\n{2}\nhost:{3}\ncontent-type:{4}\nx-{name}-version:{5}\n{6}".format(
             request.method,
@@ -416,24 +534,56 @@ async def sign_request(sign_method: str, request: web.Request, secret_key: str) 
         raise AuthorizationFailed("Invalid signature") from e
 
 
+def _forwarded_for_chain(request: web.Request) -> list[str]:
+    raw = request.headers.get("X-Forwarded-For")
+    if not raw:
+        return []
+    return [entry.strip() for entry in raw.split(",") if entry.strip()]
+
+
+def _resolve_client_ip_via_trusted_proxies(
+    request: web.Request,
+    networks: list[ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6Network]],
+) -> str | None:
+    """Walk the forwarding chain inwards and return the first untrusted address.
+
+    The chain runs from the outermost claim in ``X-Forwarded-For`` to the peer of
+    this connection.  Every trailing hop that belongs to a trusted proxy is
+    skipped, so the first address that is not one of them is the real client:
+    a client that forges ``X-Forwarded-For`` while connecting directly is caught
+    by its own peer address ending the walk.
+    """
+    chain = _forwarded_for_chain(request)
+    peer = _peer_address(request)
+    if peer is not None:
+        chain.append(peer)
+    for raw_address in reversed(chain):
+        if not _is_trusted_address(raw_address, networks):
+            return raw_address
+    return chain[0] if chain else None
+
+
 def extract_client_ip(request: web.Request) -> str | None:
     """Extract the client IP from the request.
 
-    When XForwardedStrict middleware is active, request.remote is already
-    resolved to the real client IP, so use it directly.  Otherwise, fall back
-    to manual X-Forwarded-For parsing (first IP in the comma-separated list).
+    With trusted proxies configured, the address is resolved from the forwarding
+    chain.  Otherwise, fall back to manual X-Forwarded-For parsing (first IP in
+    the comma-separated list).
     """
-    if request.app.get("_trusted_proxies_enabled"):
-        return request.remote
+    networks = _trusted_proxy_networks(request)
+    if networks:
+        return _resolve_client_ip_via_trusted_proxies(request, networks)
     raw: str | None = request.headers.get("X-Forwarded-For") or request.remote
     if raw:
         return raw.split(",")[0].strip()
     return None
 
 
-def validate_ip(request: web.Request, user: Mapping[str, Any]) -> None:
-    allowed_client_ip = user.get("allowed_client_ip", None)
-    if not allowed_client_ip or allowed_client_ip is None:
+def validate_ip(
+    request: web.Request,
+    allowed_client_ip: list[ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6Network]] | None,
+) -> None:
+    if not allowed_client_ip:
         return
     if not isinstance(allowed_client_ip, list):
         raise InvalidClientIPConfig("allowed_client_ip must be a list")
@@ -446,7 +596,10 @@ def validate_ip(request: web.Request, user: Mapping[str, Any]) -> None:
         )
     except InvalidIpAddressValue as e:
         raise InvalidAuthParameters(f"{raw_client_addr} is invalid IP address value") from e
-    if any(client_addr.address in allowed_ip_cand.address for allowed_ip_cand in allowed_client_ip):
+    if any(
+        allowed_ip_cand.address is not None and client_addr.address in allowed_ip_cand.address
+        for allowed_ip_cand in allowed_client_ip
+    ):
         return
     raise AuthorizationFailed(f"'{client_addr}' is not allowed IP address")
 
@@ -464,97 +617,133 @@ def _set_unauthenticated_state(request: web.Request) -> None:
     request["user"] = None
 
 
-async def _query_cred_by_access_key(
+@dataclass(frozen=True)
+class _AuthContext:
+    """What an authenticated request carries about its caller."""
+
+    user: AuthenticatedUser
+    keypair: AuthenticatedKeypair
+
+
+async def _query_auth_context(
     db: ExtendedAsyncSAEngine,
-    access_key: str,
-) -> tuple[Any, Any]:
-    async with db.begin_readonly() as conn:
-        j = keypairs.join(
-            keypair_resource_policies,
-            keypairs.c.resource_policy == keypair_resource_policies.c.name,
-        )
-        query = (
-            sa.select(keypairs, keypair_resource_policies)
-            .set_label_style(sa.LABEL_STYLE_TABLENAME_PLUS_COL)
-            .select_from(j)
-            .where(
-                (keypairs.c.access_key == access_key) & (keypairs.c.is_active.is_(True)),
+    key_provider_pool: KeyProviderPool,
+    keypair_condition: sa.ColumnElement[bool],
+) -> _AuthContext | None:
+    """Resolve the keypair matching ``keypair_condition`` into the context a request carries.
+
+    Only the columns that context carries are loaded, and the rows stay inside this session.
+    """
+    default_keypair = aliased(KeyPairRow)
+    async with db.begin_readonly_session_read_committed() as sess:
+        result = await sess.execute(
+            sa.select(
+                KeyPairRow,
+                UserRow,
+                KeyPairResourcePolicyRow,
+                UserResourcePolicyRow,
+                default_keypair.rate_limit,
             )
+            .join(UserRow, UserRow.uuid == KeyPairRow.user)
+            .join(
+                KeyPairResourcePolicyRow,
+                KeyPairResourcePolicyRow.name == KeyPairRow.resource_policy,
+            )
+            .join(
+                UserResourcePolicyRow,
+                UserResourcePolicyRow.name == UserRow.resource_policy,
+            )
+            .join(
+                default_keypair,
+                (default_keypair.user == UserRow.uuid) & default_keypair.is_default,
+            )
+            .options(
+                load_only(
+                    KeyPairRow.access_key,
+                    KeyPairRow.secret_key,
+                    KeyPairRow.is_admin,
+                    KeyPairRow.rate_limit,
+                ),
+                load_only(
+                    UserRow.uuid,
+                    UserRow.email,
+                    UserRow.role,
+                    UserRow.status,
+                    UserRow.domain_name,
+                    UserRow.domain_id,
+                    UserRow.sudo_session_enabled,
+                    UserRow.allowed_client_ip,
+                ),
+            )
+            .where(keypair_condition)
         )
-        result = await conn.execute(query)
-        keypair_row = result.first()
+        row = result.one_or_none()
+        if row is None:
+            return None
 
-        if keypair_row is None:
-            return None, None
-
-        j = users.join(
-            user_resource_policies,
-            users.c.resource_policy == user_resource_policies.c.name,
-        ).join(
-            keypairs,
-            users.c.uuid == keypairs.c.user,
+        keypair_row, user_row, keypair_policy_row, user_policy_row, default_rate_limit = row
+        # Deactivating or deleting a user leaves its keypairs active.
+        if user_row.status in UserStatus.auth_denied():
+            raise AuthorizationFailed(f"User account is {user_row.status}")
+        return _AuthContext(
+            user=AuthenticatedUser(
+                uuid=UserID(user_row.uuid),
+                email=user_row.email,
+                role=user_row.role,
+                domain_name=user_row.domain_name,
+                domain_id=DomainID(user_row.domain_id),
+                sudo_session_enabled=user_row.sudo_session_enabled,
+                allowed_client_ip=user_row.allowed_client_ip,
+                rate_limit=default_rate_limit,
+                resource_policy=UserResourcePolicySearchableFields.own.to_data(user_policy_row),
+            ),
+            keypair=AuthenticatedKeypair(
+                access_key=AccessKey(keypair_row.access_key),
+                secret_key=SecretKey(
+                    await key_provider_pool.decrypt(
+                        keypair_row.secret_key, KEYPAIR_SECRET_KEY_CONTEXT
+                    )
+                ),
+                is_admin=bool(keypair_row.is_admin),
+                resource_policy=KeyPairResourcePolicySearchableFields.own.to_data(
+                    keypair_policy_row
+                ),
+            ),
         )
-        query = (
-            sa.select(users, user_resource_policies)
-            .set_label_style(sa.LABEL_STYLE_TABLENAME_PLUS_COL)
-            .select_from(j)
-            .where(keypairs.c.access_key == access_key)
-        )
-        result = await conn.execute(query)
-        user_row = result.first()
-
-        return user_row, keypair_row
 
 
-def _populate_auth_result(
-    request: web.Request,
-    user_row: Any,
-    keypair_row: Any,
-) -> None:
-    if not user_row or not keypair_row:
-        return
+async def _query_auth_context_by_access_key(
+    db: ExtendedAsyncSAEngine,
+    key_provider_pool: KeyProviderPool,
+    access_key: str,
+) -> _AuthContext | None:
+    return await _query_auth_context(
+        db,
+        key_provider_pool,
+        (KeyPairRow.access_key == access_key) & (KeyPairRow.is_active.is_(True)),
+    )
 
-    keypair_mapping = keypair_row._mapping
-    user_mapping = user_row._mapping
 
-    auth_result = {
-        "is_authorized": True,
-        "keypair": {
-            col.name: keypair_mapping[f"keypairs_{col.name}"]
-            for col in keypairs.c
-            if col.name != "secret_key"
-        },
-        "user": {
-            col.name: user_mapping[f"users_{col.name}"]
-            for col in users.c
-            if col.name not in ("password", "description", "created_at")
-        },
-        "is_admin": keypair_mapping["keypairs_is_admin"],
-    }
-
-    validate_ip(request, auth_result["user"])
-
-    auth_result["keypair"]["resource_policy"] = {
-        col.name: keypair_mapping[f"keypair_resource_policies_{col.name}"]
-        for col in keypair_resource_policies.c
-    }
-    auth_result["user"]["resource_policy"] = {
-        col.name: user_mapping[f"user_resource_policies_{col.name}"]
-        for col in user_resource_policies.c
-    }
-    auth_result["user"]["id"] = keypair_mapping["keypairs_user_id"]  # legacy
-    auth_result["is_superadmin"] = auth_result["user"]["role"] == "superadmin"
-
-    request.update(auth_result)
+async def _query_auth_context_by_user_id(
+    db: ExtendedAsyncSAEngine,
+    key_provider_pool: KeyProviderPool,
+    user_id: UserID,
+) -> _AuthContext | None:
+    """Resolve a user into the context of their default keypair."""
+    return await _query_auth_context(
+        db,
+        key_provider_pool,
+        (KeyPairRow.user == user_id) & KeyPairRow.is_default,
+    )
 
 
 async def _authenticate_via_jwt(
-    request: web.Request,
     db: ExtendedAsyncSAEngine,
+    key_provider_pool: KeyProviderPool,
     jwt_validator: JWTValidator,
     valkey_stat: ValkeyStatClient,
     jwt_token: str,
-) -> None:
+) -> _AuthContext | None:
     try:
         unverified_payload = pyjwt.decode(
             jwt_token,
@@ -564,63 +753,56 @@ async def _authenticate_via_jwt(
         if not access_key:
             raise AuthorizationFailed("Access key not found in JWT token")
 
-        user_row, keypair_row = await execute_with_retry(
-            functools.partial(_query_cred_by_access_key, db, access_key)
-        )
+        context = await _query_auth_context_by_access_key(db, key_provider_pool, access_key)
 
-        if keypair_row is None:
+        if context is None:
             raise AuthorizationFailed("Access key not found in database")
+        jwt_validator.validate_token(jwt_token, context.keypair.secret_key)
 
-        secret_key = keypair_row.keypairs_secret_key
-        jwt_validator.validate_token(jwt_token, secret_key)
-
-        _populate_auth_result(request, user_row, keypair_row)
-        log.trace("JWT authentication succeeded for access_key={}", access_key)
+        log.trace("jwt authentication succeeded", access_key=access_key)
 
         await valkey_stat.increment_keypair_query_count(access_key)
+        return context
 
     except JWTError as e:
-        log.warning("JWT authentication failed: {}", e)
         raise AuthorizationFailed(f"JWT validation failed: {e}") from e
 
 
 async def _authenticate_via_hmac(
     request: web.Request,
     db: ExtendedAsyncSAEngine,
+    key_provider_pool: KeyProviderPool,
     valkey_stat: ValkeyStatClient,
-) -> None:
+) -> _AuthContext | None:
     if not check_date(request):
         raise InvalidAuthParameters("Date/time sync error")
 
     params = _extract_auth_params(request)
     if not params:
-        return
+        return None
 
     sign_method, access_key, signature = params
 
-    user_row, keypair_row = await execute_with_retry(
-        functools.partial(_query_cred_by_access_key, db, access_key)
-    )
+    context = await _query_auth_context_by_access_key(db, key_provider_pool, access_key)
 
-    if keypair_row is None:
+    if context is None:
         raise AuthorizationFailed("Access key not found in HMAC")
-
-    my_signature = await sign_request(sign_method, request, keypair_row.keypairs_secret_key)
+    my_signature = await sign_request(sign_method, request, context.keypair.secret_key)
 
     if not secrets.compare_digest(my_signature, signature):
         raise AuthorizationFailed("HMAC signature mismatch")
 
-    _populate_auth_result(request, user_row, keypair_row)
-
     await valkey_stat.increment_keypair_query_count(access_key)
+    return context
 
 
 async def _authenticate_via_hook(
     request: web.Request,
     db: ExtendedAsyncSAEngine,
+    key_provider_pool: KeyProviderPool,
     valkey_stat: ValkeyStatClient,
     hook_plugin_ctx: HookPluginContext,
-) -> None:
+) -> _AuthContext | None:
     hook_result = await hook_plugin_ctx.dispatch(
         "PRE_AUTH_MIDDLEWARE",
         (request,),
@@ -631,103 +813,64 @@ async def _authenticate_via_hook(
         raise RejectedByHook.from_hook_result(hook_result)
 
     if not hook_result.result:
-        return
+        return None
 
     access_key = hook_result.result
     if access_key is None:
-        return
+        return None
 
-    user_row, keypair_row = await execute_with_retry(
-        functools.partial(_query_cred_by_access_key, db, access_key)
-    )
+    context = await _query_auth_context_by_access_key(db, key_provider_pool, access_key)
 
-    if keypair_row is None:
+    if context is None:
         raise AuthorizationFailed("Access key not found in hook")
 
-    _populate_auth_result(request, user_row, keypair_row)
-
     await valkey_stat.increment_keypair_query_count(access_key)
+    return context
 
 
-async def _load_user_data(db: ExtendedAsyncSAEngine, user_id: UserID) -> UserData:
-    """Load a user's ``UserData`` by UUID (impersonation target). Raises if not found."""
+async def _resolve_effective_context(
+    request: web.Request,
+    db: ExtendedAsyncSAEngine,
+    key_provider_pool: KeyProviderPool,
+    authenticated: _AuthContext,
+) -> _AuthContext:
+    """The context the request runs as: the caller's, or the X-BackendAI-Act-As target's.
 
-    async def _query() -> UserRow | None:
-        async with db.begin_readonly_session_read_committed() as session:
-            row: UserRow | None = await session.scalar(
-                sa.select(UserRow).where(UserRow.uuid == user_id)
-            )
-            return row
-
-    row = await execute_with_retry(_query)
-    if row is None:
-        raise UserNotFound("Impersonation target user not found")
-    if row.role is None or row.domain_name is None:
-        raise InternalServerError(f"Impersonation target user is misconfigured (user_id={user_id})")
-    return UserData(
-        user_id=row.uuid,
-        is_authorized=True,
-        is_admin=row.role in (UserRole.ADMIN, UserRole.SUPERADMIN),
-        is_superadmin=row.role == UserRole.SUPERADMIN,
-        role=row.role,
-        domain_name=row.domain_name,
-    )
-
-
-def _authenticated_user(request: web.Request) -> UserData | None:
-    """The authenticated caller's ``UserData``, built from the auth-middleware result."""
-    user = request.get("user")
-    if not user or user.get("uuid") is None:
-        return None
-    return UserData(
-        user_id=user["uuid"],
-        is_authorized=request.get("is_authorized", False),
-        is_admin=request.get("is_admin", False),
-        is_superadmin=request.get("is_superadmin", False),
-        role=UserRole(user["role"]),
-        domain_name=user["domain_name"],
-    )
-
-
-async def _resolve_effective_user(
-    request: web.Request, db: ExtendedAsyncSAEngine, authenticated_user: UserData
-) -> UserData:
-    """The user the request runs as: the caller, or the X-BackendAI-Act-As target.
-
-    Without the header the caller is the effective user. With it, the caller must
-    be a super admin and the request runs as the target (fail-closed).
+    With the header, the caller must be a super admin and the target's default keypair is used.
     """
     raw_target = request.headers.get("X-BackendAI-Act-As")
     if not raw_target:
-        return authenticated_user
-    if not authenticated_user.is_superadmin:
+        return authenticated
+    if authenticated.user.role != UserRole.SUPERADMIN:
         raise InsufficientPrivilege("Only superadmin may use X-BackendAI-Act-As")
     try:
         target_user_id = UserID(uuid.UUID(raw_target))
     except ValueError as e:
         raise InvalidAuthParameters("X-BackendAI-Act-As must be a valid user UUID") from e
-    return await _load_user_data(db, target_user_id)
+    context = await _query_auth_context_by_user_id(db, key_provider_pool, target_user_id)
+    if context is None:
+        raise UserNotFound("Impersonation target user or its default keypair not found")
+    return context
+
+
+def _to_user_data(context: _AuthContext) -> UserData:
+    return UserData(
+        user_id=context.user.uuid,
+        is_authorized=True,
+        is_admin=context.keypair.is_admin,
+        is_superadmin=context.user.role == UserRole.SUPERADMIN,
+        role=context.user.role,
+        domain_name=context.user.domain_name,
+        domain_id=context.user.domain_id,
+    )
 
 
 def _setup_user_context(
-    request: web.Request,
     effective_user: UserData | None,
     trigger_user: UserData | None,
-) -> ExitStack:
+) -> AbstractContextManager[None]:
     """Push the already-resolved identities into the context (no I/O)."""
-    stack = ExitStack()
-
-    if effective_user is not None:
-        stack.enter_context(with_user(effective_user))
-        stack.enter_context(with_log_context_fields({"user_id": str(effective_user.user_id)}))
-    if trigger_user is not None:
-        stack.enter_context(with_triggered_user(trigger_user))
-
-    client_ip = extract_client_ip(request)
-    if client_ip:
-        stack.enter_context(with_client_ip(client_ip))
-
-    return stack
+    return with_user_context(effective_user, trigger_user)
 
 
 # ---------------------------------------------------------------------------
@@ -831,6 +974,7 @@ def superadmin_required_for_method(
 def build_auth_middleware(
     *,
     db: ExtendedAsyncSAEngine,
+    key_provider_pool: KeyProviderPool,
     jwt_validator: JWTValidator,
     valkey_stat: ValkeyStatClient,
     hook_plugin_ctx: HookPluginContext,
@@ -853,20 +997,31 @@ def build_auth_middleware(
         jwt_token = request.headers.get("X-BackendAI-Token")
         auth_header = request.headers.get("Authorization")
         if jwt_token:
-            await _authenticate_via_jwt(request, db, jwt_validator, valkey_stat, jwt_token)
+            context = await _authenticate_via_jwt(
+                db, key_provider_pool, jwt_validator, valkey_stat, jwt_token
+            )
         elif auth_header:
-            await _authenticate_via_hmac(request, db, valkey_stat)
+            context = await _authenticate_via_hmac(request, db, key_provider_pool, valkey_stat)
         else:
-            await _authenticate_via_hook(request, db, valkey_stat, hook_plugin_ctx)
+            context = await _authenticate_via_hook(
+                request, db, key_provider_pool, valkey_stat, hook_plugin_ctx
+            )
 
-        # Resolve identities (DB touched here), then push them into the context.
-        authenticated_user = _authenticated_user(request)
-        effective_user = (
-            await _resolve_effective_user(request, db, authenticated_user)
-            if authenticated_user is not None
-            else None
-        )
-        with _setup_user_context(request, effective_user, authenticated_user):
+        if context is None:
+            return await handler(request)
+
+        validate_ip(request, context.user.allowed_client_ip)
+        effective = await _resolve_effective_context(request, db, key_provider_pool, context)
+        effective_user = _to_user_data(effective)
+        request.update({
+            "is_authorized": True,
+            "is_admin": effective_user.is_admin,
+            "is_superadmin": effective_user.is_superadmin,
+            # Handlers still read these two as mappings.
+            "user": dataclasses.asdict(effective.user),
+            "keypair": dataclasses.asdict(effective.keypair),
+        })
+        with _setup_user_context(effective_user, _to_user_data(context)):
             return await handler(request)
 
     return _middleware

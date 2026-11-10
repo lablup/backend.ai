@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import secrets
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable, Coroutine
 from dataclasses import dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from decimal import Decimal
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -19,57 +20,160 @@ from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
-from ai.backend.common.data.permission.types import (
-    EntityType,
-    OperationType,
-    Permission,
-    RelationType,
-    RoleStatus,
-    ScopeType,
+from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.data.entity.agent import AgentUUID
+from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentEntityType
+from ai.backend.common.data.entity.artifact import ArtifactEntityType
+from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryEntityType
+from ai.backend.common.data.entity.deployment import DeploymentEntityType
+from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
+from ai.backend.common.data.entity.image import ImageEntityType, ImageID
+from ai.backend.common.data.entity.kernel import KernelFieldType
+from ai.backend.common.data.entity.kernel_group import KernelGroupFieldType
+from ai.backend.common.data.entity.kernel_group_environ import KernelGroupEnvironFieldType
+from ai.backend.common.data.entity.kernel_group_resource_slot import (
+    KernelGroupResourceSlotFieldType,
 )
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
+from ai.backend.common.data.entity.model_card import ModelCardEntityType
+from ai.backend.common.data.entity.notification import (
+    NotificationChannelEntityType,
+    NotificationRuleEntityType,
+)
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.resource_group import (
+    ResourceGroupEntityType,
+    ResourceGroupID,
+    ResourceGroupName,
+)
+from ai.backend.common.data.entity.resource_preset import ResourcePresetEntityType
+from ai.backend.common.data.entity.session import SessionEntityType, SessionID
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.user import UserEntityType
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
+from ai.backend.common.data.permission.types import Permission, RoleStatus
+from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.plugin.monitor import ErrorPluginContext
-from ai.backend.common.types import ResourceSlot, SessionId, SessionTypes
-from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.actions.validators.rbac import RBACValidators
-from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
-from ai.backend.manager.actions.validators.rbac.single_entity import (
-    SingleEntityActionRBACValidator,
-)
+from ai.backend.common.types import SessionTypes
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import FieldGroupMeta, GroupMeta
 from ai.backend.manager.api.adapters.session.adapter import SessionAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.api.rest.v2.session.handler import V2SessionHandler
 from ai.backend.manager.api.rest.v2.session.registry import register_v2_session_routes
-from ai.backend.manager.data.kernel.types import KernelStatus
-from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.models.kernel import kernels
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
+from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
+from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.agent.types import AgentStatus
+from ai.backend.manager.data.image.types import ImageStatus, ImageType
+from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
+from ai.backend.manager.data.kernel_group.types import (
+    KernelGroupData,
+    KernelGroupEnvironData,
+    KernelGroupResourceSlotData,
 )
+from ai.backend.manager.data.secret.types import KeyProviderType
+from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.kernel.row import kernels
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
-from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
+from ai.backend.manager.models.resource_slot.row import AgentResourceRow
+from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
+from ai.backend.manager.plugin.network import NetworkPluginContext
+from ai.backend.manager.repositories.container_registry.db_source import ContainerRegistryDBSource
+from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
+from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
+    ResourcePolicyOpsProvider,
+)
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
+from ai.backend.manager.repositories.rbac.permission_check_repository import (
+    RbacPermissionCheckRepository,
+)
+from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.repositories.session.repository import SessionRepository
+from ai.backend.manager.repositories.user.repository import UserRepository
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.session.actions.lookup_bulk_kernel_group_environ_owner import (
+    LookupBulkKernelGroupEnvironOwnerAction,
+)
+from ai.backend.manager.services.session.actions.lookup_bulk_kernel_group_owner import (
+    LookupBulkKernelGroupOwnerAction,
+)
+from ai.backend.manager.services.session.actions.lookup_bulk_kernel_group_resource_slot_owner import (
+    LookupBulkKernelGroupResourceSlotOwnerAction,
+)
+from ai.backend.manager.services.session.actions.lookup_bulk_kernel_owner import (
+    LookupBulkKernelOwnerAction,
+)
+from ai.backend.manager.services.session.actions.lookup_kernel_field_owner import (
+    LookupKernelFieldOwnerAction,
+)
+from ai.backend.manager.services.session.actions.lookup_kernel_group_environ_field_owner import (
+    LookupKernelGroupEnvironFieldOwnerAction,
+)
+from ai.backend.manager.services.session.actions.lookup_kernel_group_field_owner import (
+    LookupKernelGroupFieldOwnerAction,
+)
+from ai.backend.manager.services.session.actions.lookup_kernel_group_resource_slot_field_owner import (
+    LookupKernelGroupResourceSlotFieldOwnerAction,
+)
 from ai.backend.manager.services.session.processors import SessionProcessors
+from ai.backend.manager.services.session.resource_allocation.processors import (
+    ResourceAllocationProcessors,
+)
 from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.pool import (
+    create_agent_selector,
+)
+from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
+    SchedulingController,
+    SchedulingControllerArgs,
+)
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
-    from tests.component.conftest import ServerInfo, UserFixtureData
+    from tests.component.conftest import (
+        ProvisionedUserData,
+        ServerInfo,
+        UserFixtureData,
+        VirtualEntitySeeder,
+    )
+
+    from ai.backend.common.plugin.hook import HookPluginContext
+
+AgentFactoryFunc = Callable[[dict[str, str]], Coroutine[Any, Any, str]]
+
+
+_OWNER_ACCESSIBLE_ENTITY_TYPES: tuple[EntityType, ...] = (
+    VFolderEntityType(),
+    ImageEntityType(),
+    SessionEntityType(),
+    ArtifactEntityType(),
+    ArtifactRegistryEntityType(),
+    AppConfigFragmentEntityType(),
+    NotificationChannelEntityType(),
+    NotificationRuleEntityType(),
+    DeploymentEntityType(),
+    ModelCardEntityType(),
+)
 
 
 @dataclass
 class SessionSeedData:
-    session_id: SessionId
+    session_id: SessionID
     session_name: str
     kernel_id: uuid.UUID
     access_key: str
@@ -89,7 +193,11 @@ def rbac_permission_repo(
 def session_repository(
     database_engine: ExtendedAsyncSAEngine,
 ) -> SessionRepository:
-    return SessionRepository(database_engine)
+    return SessionRepository(
+        database_engine,
+        V2DBOpsProvider(database_engine),
+        registry_db_source=ContainerRegistryDBSource(V2DBOpsProvider(database_engine)),
+    )
 
 
 @pytest.fixture()
@@ -107,8 +215,9 @@ async def session_processors(
     error_monitor: ErrorPluginContext,
     rbac_permission_repo: PermissionControllerRepository,
     scheduling_controller_mock: AsyncMock,
+    processor_registry: ProcessorRegistry[Any],
 ) -> SessionProcessors:
-    """SessionProcessors with real SingleEntityActionRBACValidator.
+    """SessionProcessors with real single-entity RBAC validation.
 
     RBAC checks use check_permission_with_scope_chain() against the real DB.
     """
@@ -126,21 +235,58 @@ async def session_processors(
         user_repository=AsyncMock(),
     )
     service = SessionService(args)
-    real_single_entity_validator = SingleEntityActionRBACValidator(
-        rbac_permission_repo, MagicMock()
-    )
-    real_bulk_validator = BulkActionRBACValidator(rbac_permission_repo, MagicMock())
     return SessionProcessors(
-        service=service,
-        action_monitors=[],
-        validators=ActionValidators(
-            rbac=RBACValidators(
-                scope=AsyncMock(),
-                single_entity=real_single_entity_validator,
-                bulk=real_bulk_validator,
-            )
+        processor_registry.group(GroupMeta(SessionEntityType())),
+        processor_registry.group(GroupMeta(ResourceGroupEntityType())),
+        processor_registry.group(GroupMeta(SessionEntityType())).field_group(
+            FieldGroupMeta(KernelFieldType()),
+            KernelInfo,
+            LookupKernelFieldOwnerAction,
+            LookupBulkKernelOwnerAction,
         ),
+        processor_registry.group(GroupMeta(SessionEntityType())).field_group(
+            FieldGroupMeta(KernelGroupFieldType()),
+            KernelGroupData,
+            LookupKernelGroupFieldOwnerAction,
+            LookupBulkKernelGroupOwnerAction,
+        ),
+        processor_registry.group(GroupMeta(SessionEntityType())).field_group(
+            FieldGroupMeta(KernelGroupEnvironFieldType()),
+            KernelGroupEnvironData,
+            LookupKernelGroupEnvironFieldOwnerAction,
+            LookupBulkKernelGroupEnvironOwnerAction,
+        ),
+        processor_registry.group(GroupMeta(SessionEntityType())).field_group(
+            FieldGroupMeta(KernelGroupResourceSlotFieldType()),
+            KernelGroupResourceSlotData,
+            LookupKernelGroupResourceSlotFieldOwnerAction,
+            LookupBulkKernelGroupResourceSlotOwnerAction,
+        ),
+        ResourceAllocationProcessors(
+            processor_registry.group(GroupMeta(UserEntityType())),
+            processor_registry.group(GroupMeta(ProjectEntityType())),
+            processor_registry.group(GroupMeta(DomainEntityType())),
+            processor_registry.group(GroupMeta(ResourceGroupEntityType())),
+            processor_registry.group(GroupMeta(SessionEntityType())),
+            processor_registry.group(GroupMeta(ResourcePresetEntityType())),
+            MagicMock(),
+        ),
+        service,
     )
+
+
+def build_session_registries(
+    route_deps: RouteDeps,
+    session_processors: SessionProcessors,
+) -> list[RouteRegistry]:
+    """Build the v2 session route registries around the given processors."""
+    processors = MagicMock(spec=Processors)
+    processors.session = session_processors
+    adapter = SessionAdapter(processors.session, MagicMock())
+    handler = V2SessionHandler(adapter=adapter)
+    v2_reg = RouteRegistry.create("v2", route_deps.cors_options)
+    v2_reg.add_subregistry(register_v2_session_routes(handler, route_deps))
+    return [v2_reg]
 
 
 @pytest.fixture()
@@ -149,13 +295,7 @@ def server_module_registries(
     session_processors: SessionProcessors,
 ) -> list[RouteRegistry]:
     """Register v2 session routes for testing."""
-    processors = MagicMock(spec=Processors)
-    processors.session = session_processors
-    adapter = SessionAdapter(processors)
-    handler = V2SessionHandler(adapter=adapter)
-    v2_reg = RouteRegistry.create("v2", route_deps.cors_options)
-    v2_reg.add_subregistry(register_v2_session_routes(handler, route_deps))
-    return [v2_reg]
+    return build_session_registries(route_deps, session_processors)
 
 
 @pytest.fixture()
@@ -208,7 +348,7 @@ async def user_system_role(
 ) -> AsyncIterator[uuid.UUID]:
     """Create a system role with owner permissions for the regular user.
 
-    Replicates what the RoleManager does at user creation time:
+    Replicates what user provisioning does at user creation time:
     RoleRow + UserRoleRow + PermissionRows for owner-accessible entity types.
     """
     role_id = uuid.uuid4()
@@ -220,6 +360,8 @@ async def user_system_role(
                 id=role_id,
                 name=f"user-{str(user_uuid)[:8]}",
                 status=RoleStatus.ACTIVE,
+                scope_type=UserEntityType(),
+                scope_id=user_uuid,
             )
         )
         await conn.execute(
@@ -229,40 +371,27 @@ async def user_system_role(
             )
         )
         # Scope the role to the user
-        await conn.execute(
-            sa.insert(AssociationScopesEntitiesRow.__table__).values(
-                scope_type=ScopeType.USER,
-                scope_id=str(user_uuid),
-                entity_type=EntityType.ROLE,
-                entity_id=str(role_id),
-                relation_type=RelationType.AUTO,
-            )
-        )
         # Grant owner permissions for all owner-accessible entity types in user scope
-        for entity_type in EntityType.owner_accessible_entity_types_in_user():
-            for operation in OperationType.owner_operations():
+        for entity_type in _OWNER_ACCESSIBLE_ENTITY_TYPES:
+            for bit in Permission:
+                if not bit:
+                    continue
                 await conn.execute(
                     sa.insert(PermissionRow.__table__).values(
                         role_id=role_id,
-                        scope_type=ScopeType.USER,
-                        scope_id=str(user_uuid),
                         entity_type=entity_type,
-                        operation=operation,
-                        permission=Permission.from_operation(operation),
+                        permission=bit,
                     )
                 )
         # USER entity type permissions (excluding CREATE)
-        for operation in OperationType.owner_operations():
-            if operation == OperationType.CREATE:
+        for bit in Permission:
+            if not bit or bit == Permission.CREATE:
                 continue
             await conn.execute(
                 sa.insert(PermissionRow.__table__).values(
                     role_id=role_id,
-                    scope_type=ScopeType.USER,
-                    scope_id=str(user_uuid),
-                    entity_type=EntityType.USER,
-                    operation=operation,
-                    permission=Permission.from_operation(operation),
+                    entity_type=UserEntityType(),
+                    permission=bit,
                 )
             )
 
@@ -271,12 +400,6 @@ async def user_system_role(
     async with db_engine.begin() as conn:
         await conn.execute(
             PermissionRow.__table__.delete().where(PermissionRow.__table__.c.role_id == role_id)
-        )
-        await conn.execute(
-            AssociationScopesEntitiesRow.__table__.delete().where(
-                (AssociationScopesEntitiesRow.__table__.c.entity_type == EntityType.ROLE)
-                & (AssociationScopesEntitiesRow.__table__.c.entity_id == str(role_id))
-            )
         )
         await conn.execute(
             UserRoleRow.__table__.delete().where(UserRoleRow.__table__.c.role_id == role_id)
@@ -297,17 +420,17 @@ async def _seed_session(
     group_id: uuid.UUID,
     user_uuid: uuid.UUID,
     access_key: str,
-    scaling_group: str,
+    resource_group: str,
     resource_group_id: ResourceGroupID,
     status: SessionStatus = SessionStatus.RUNNING,
 ) -> SessionSeedData:
     """Insert a session + kernel row with RBAC scope association.
 
     Replicates what the scheduler does at session creation:
-    SessionRow + kernel + AssociationScopesEntitiesRow (session → user scope, session → project scope).
+    SessionRow + kernel, with the session placed under the user and project scopes.
     """
     unique = secrets.token_hex(4)
-    session_id = SessionId(uuid.uuid4())
+    session_id = SessionID(uuid.uuid4())
     session_name = f"test-session-{unique}"
     kernel_id = uuid.uuid4()
     now = datetime.now(tzutc())
@@ -331,13 +454,11 @@ async def _seed_session(
                 group_id=group_id,
                 user_uuid=user_uuid,
                 access_key=access_key,
-                scaling_group_name=scaling_group,
+                scaling_group_name=resource_group,
                 resource_group_id=resource_group_id,
                 status=status,
                 status_info="",
                 status_history=status_history,
-                occupying_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
                 created_at=now,
             )
         )
@@ -357,12 +478,10 @@ async def _seed_session(
                 group_id=group_id,
                 user_uuid=user_uuid,
                 access_key=access_key,
-                scaling_group=scaling_group,
+                scaling_group=resource_group,
                 resource_group_id=resource_group_id,
                 status=KernelStatus.RUNNING,
                 status_info="",
-                occupied_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
                 repl_in_port=0,
                 repl_out_port=0,
                 stdin_port=0,
@@ -371,25 +490,7 @@ async def _seed_session(
             )
         )
         # RBAC scope association: session → user scope (AUTO)
-        await conn.execute(
-            sa.insert(AssociationScopesEntitiesRow.__table__).values(
-                scope_type=ScopeType.USER,
-                scope_id=str(user_uuid),
-                entity_type=EntityType.SESSION,
-                entity_id=str(session_id),
-                relation_type=RelationType.AUTO,
-            )
-        )
         # RBAC scope association: session → project scope (AUTO)
-        await conn.execute(
-            sa.insert(AssociationScopesEntitiesRow.__table__).values(
-                scope_type=ScopeType.PROJECT,
-                scope_id=str(group_id),
-                entity_type=EntityType.SESSION,
-                entity_id=str(session_id),
-                relation_type=RelationType.AUTO,
-            )
-        )
 
     return SessionSeedData(
         session_id=session_id,
@@ -401,15 +502,9 @@ async def _seed_session(
     )
 
 
-async def _cleanup_session(db_engine: SAEngine, session_id: SessionId) -> None:
+async def _cleanup_session(db_engine: SAEngine, session_id: SessionID) -> None:
     """Remove session, kernel, and RBAC association rows."""
     async with db_engine.begin() as conn:
-        await conn.execute(
-            AssociationScopesEntitiesRow.__table__.delete().where(
-                (AssociationScopesEntitiesRow.__table__.c.entity_type == EntityType.SESSION)
-                & (AssociationScopesEntitiesRow.__table__.c.entity_id == str(session_id))
-            )
-        )
         await conn.execute(kernels.delete().where(kernels.c.session_id == session_id))
         await conn.execute(
             SessionRow.__table__.delete().where(SessionRow.__table__.c.id == session_id)
@@ -422,8 +517,8 @@ async def admin_session_seed(
     domain_fixture: DomainFixtureData,
     group_fixture: uuid.UUID,
     admin_user_fixture: UserFixtureData,
-    scaling_group_name: ResourceGroupName,
-    scaling_group_id: ResourceGroupID,
+    resource_group_name: ResourceGroupName,
+    resource_group_id: ResourceGroupID,
 ) -> AsyncIterator[SessionSeedData]:
     """Seed a RUNNING session owned by the admin user."""
     seed = await _seed_session(
@@ -433,11 +528,58 @@ async def admin_session_seed(
         group_id=group_fixture,
         user_uuid=admin_user_fixture.user_uuid,
         access_key=admin_user_fixture.keypair.access_key,
-        scaling_group=scaling_group_name,
-        resource_group_id=scaling_group_id,
+        resource_group=resource_group_name,
+        resource_group_id=resource_group_id,
     )
     yield seed
     await _cleanup_session(db_engine, seed.session_id)
+
+
+@pytest.fixture()
+async def place_personal_session(
+    db_engine: SAEngine,
+    domain_fixture: DomainFixtureData,
+    resource_group_name: ResourceGroupName,
+    resource_group_id: ResourceGroupID,
+    virtual_entity_seeder: VirtualEntitySeeder,
+    provision_user: Callable[[], Coroutine[Any, Any, ProvisionedUserData]],
+) -> AsyncIterator[Callable[[ProvisionedUserData], Coroutine[Any, Any, SessionID]]]:
+    """Seed a RUNNING session in a user's personal project, with the graph rows creating
+    it writes: the user and the project each own and govern it."""
+    placed: list[SessionID] = []
+
+    async def place(owner: ProvisionedUserData) -> SessionID:
+        seed = await _seed_session(
+            db_engine,
+            domain_name=domain_fixture.domain_name,
+            domain_id=domain_fixture.domain_id,
+            group_id=owner.personal_project_id,
+            user_uuid=owner.user_id,
+            access_key=owner.keypair.access_key,
+            resource_group=resource_group_name,
+            resource_group_id=resource_group_id,
+        )
+        placed.append(seed.session_id)
+        async with db_engine.begin() as conn:
+            await virtual_entity_seeder.place_entity(
+                conn,
+                SessionEntityType(),
+                seed.session_id,
+                [
+                    (UserEntityType(), owner.user_id),
+                    (ProjectEntityType(), owner.personal_project_id),
+                ],
+            )
+        return seed.session_id
+
+    yield place
+    ve = VirtualEntityRow.__table__
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            ve.delete().where(ve.c.entity_type == SessionEntityType(), ve.c.entity_id.in_(placed))
+        )
+    for session_id in placed:
+        await _cleanup_session(db_engine, session_id)
 
 
 @pytest.fixture()
@@ -446,8 +588,8 @@ async def user_session_seed(
     domain_fixture: DomainFixtureData,
     group_fixture: uuid.UUID,
     regular_user_fixture: UserFixtureData,
-    scaling_group_name: ResourceGroupName,
-    scaling_group_id: ResourceGroupID,
+    resource_group_name: ResourceGroupName,
+    resource_group_id: ResourceGroupID,
     user_system_role: uuid.UUID,
 ) -> AsyncIterator[SessionSeedData]:
     """Seed a RUNNING session owned by the regular user.
@@ -461,8 +603,261 @@ async def user_session_seed(
         group_id=group_fixture,
         user_uuid=regular_user_fixture.user_uuid,
         access_key=regular_user_fixture.keypair.access_key,
-        scaling_group=scaling_group_name,
-        resource_group_id=scaling_group_id,
+        resource_group=resource_group_name,
+        resource_group_id=resource_group_id,
     )
     yield seed
     await _cleanup_session(db_engine, seed.session_id)
+
+
+# ---------------------------------------------------------------------------
+# Compute-schedule: real scheduling controller + agent/image seeds
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture()
+async def resource_slot_types_seed(db_engine: SAEngine) -> None:
+    """Ensure resource_slot_types has seed data for cpu/mem slots."""
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sa.text(
+                "INSERT INTO resource_slot_types (slot_name, slot_type, rank)"
+                " VALUES ('cpu', 'count', 40), ('mem', 'bytes', 50)"
+                " ON CONFLICT DO NOTHING"
+            )
+        )
+
+
+@pytest.fixture()
+async def compute_registry_fixture(db_engine: SAEngine) -> AsyncIterator[uuid.UUID]:
+    """Insert a test Docker container registry and yield its UUID."""
+    registry_id = uuid.uuid4()
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sa.insert(ContainerRegistryRow.__table__).values(
+                id=registry_id,
+                url="https://registry.session.test.local",
+                registry_name=f"session-registry-{registry_id.hex[:8]}",
+                type=ContainerRegistryType.DOCKER,
+            )
+        )
+    yield registry_id
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            ContainerRegistryRow.__table__.delete().where(
+                ContainerRegistryRow.__table__.c.id == registry_id
+            )
+        )
+
+
+@pytest.fixture()
+async def compute_image_fixture(
+    db_engine: SAEngine,
+    compute_registry_fixture: uuid.UUID,
+) -> AsyncIterator[ImageID]:
+    """Insert an x86_64 image with min-only resource limits; yield its ID."""
+    image_id = ImageID(uuid.uuid4())
+    unique = secrets.token_hex(4)
+    image_name = f"compute-image-{unique}"
+    canonical = f"registry.session.test.local/testproject/{image_name}:latest"
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sa.insert(ImageRow.__table__).values(
+                id=image_id,
+                name=canonical,
+                project="testproject",
+                image=image_name,
+                tag="latest",
+                registry="registry.session.test.local",
+                registry_id=compute_registry_fixture,
+                architecture="x86_64",
+                config_digest=f"sha256:{image_id.hex * 2}",
+                size_bytes=2048000,
+                is_local=False,
+                type=ImageType.COMPUTE,
+                accelerators=None,
+                labels={},
+                resources={
+                    "cpu": {"min": "1"},
+                    "mem": {"min": "536870912"},
+                },
+                status=ImageStatus.ALIVE,
+            )
+        )
+    yield image_id
+    async with db_engine.begin() as conn:
+        await conn.execute(ImageRow.__table__.delete().where(ImageRow.__table__.c.id == image_id))
+
+
+@pytest.fixture()
+async def agent_factory(
+    db_engine: SAEngine,
+    resource_group_name: ResourceGroupName,
+    resource_group_id: ResourceGroupID,
+) -> AsyncIterator[AgentFactoryFunc]:
+    """Factory that seeds ALIVE schedulable x86_64 agents in the test scaling group."""
+    created_ids: list[str] = []
+
+    async def _create(available_slots: dict[str, str]) -> str:
+        agent_id = f"i-test-{secrets.token_hex(4)}"
+        agent_uuid = AgentUUID(uuid.uuid4())
+        async with db_engine.begin() as conn:
+            await conn.execute(
+                sa.insert(AgentRow.__table__).values(
+                    id=agent_id,
+                    uuid=agent_uuid,
+                    status=AgentStatus.ALIVE,
+                    region="local",
+                    scaling_group=resource_group_name,
+                    resource_group_id=resource_group_id,
+                    schedulable=True,
+                    addr=f"10.0.0.{len(created_ids) + 1}:6001",
+                    version="26.0.0",
+                    architecture="x86_64",
+                    compute_plugins={},
+                )
+            )
+            # The scheduling read path sources capacity from the normalized
+            # agent_resources table (filled by heartbeat in production).
+            await conn.execute(
+                sa.insert(AgentResourceRow.__table__),
+                [
+                    {
+                        "agent_id": agent_id,
+                        "agent_uuid": agent_uuid,
+                        "slot_name": slot_name,
+                        "capacity": Decimal(quantity),
+                        "reserved": Decimal(0),
+                        "used": Decimal(0),
+                    }
+                    for slot_name, quantity in available_slots.items()
+                ],
+            )
+        created_ids.append(agent_id)
+        return agent_id
+
+    yield _create
+
+    if created_ids:
+        async with db_engine.begin() as conn:
+            await conn.execute(
+                AgentResourceRow.__table__.delete().where(
+                    AgentResourceRow.__table__.c.agent_id.in_(created_ids)
+                )
+            )
+            await conn.execute(
+                AgentRow.__table__.delete().where(AgentRow.__table__.c.id.in_(created_ids))
+            )
+
+
+@pytest.fixture()
+async def compute_session_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    background_task_manager: BackgroundTaskManager,
+    error_monitor: ErrorPluginContext,
+    rbac_permission_repo: PermissionControllerRepository,
+    storage_manager: StorageSessionManager,
+    valkey_clients: ValkeyClients,
+    config_provider: ManagerConfigProvider,
+    event_producer: EventProducer,
+    network_plugin_ctx: NetworkPluginContext,
+    hook_plugin_ctx: HookPluginContext,
+    resource_slot_types_seed: None,
+    processor_registry: ProcessorRegistry[Any],
+) -> SessionProcessors:
+    """SessionProcessors wired with a real SchedulingController and UserRepository.
+
+    Drives the actual compute-schedule path (spec preparation + agent
+    selection) against the real DB instead of a mocked controller.
+    """
+    # The shared _TestConfigProvider mocks get_raw to "true" for every key,
+    # which breaks the int-typed config/agent/max-container-count read in the
+    # scheduling path; "not configured" is the realistic default here.
+    cast(MagicMock, config_provider._legacy_etcd_config_loader).get_raw = AsyncMock(
+        return_value=None
+    )
+    scheduler_repository = SchedulerRepository(
+        database_engine,
+        ReconcileOpsProvider(database_engine),
+        valkey_clients.stat,
+        valkey_clients.schedule,
+        config_provider,
+        storage_manager,
+        RbacPermissionCheckRepository(PermissionOpsProvider(database_engine), config_provider),
+    )
+    scheduling_controller = SchedulingController(
+        SchedulingControllerArgs(
+            repository=scheduler_repository,
+            config_provider=config_provider,
+            storage_manager=storage_manager,
+            event_producer=event_producer,
+            valkey_schedule=valkey_clients.schedule,
+            network_plugin_ctx=network_plugin_ctx,
+            hook_plugin_ctx=hook_plugin_ctx,
+            agent_selector=create_agent_selector(
+                config_provider.config.manager.agent_selection_resource_priority
+            ),
+        )
+    )
+    args = SessionServiceArgs(
+        agent_registry=AsyncMock(),
+        event_fetcher=AsyncMock(),
+        background_task_manager=background_task_manager,
+        event_hub=AsyncMock(),
+        error_monitor=error_monitor,
+        idle_checker_host=AsyncMock(),
+        session_repository=SessionRepository(
+            database_engine,
+            V2DBOpsProvider(database_engine),
+            registry_db_source=ContainerRegistryDBSource(V2DBOpsProvider(database_engine)),
+        ),
+        scheduler_repository=scheduler_repository,
+        scheduling_controller=scheduling_controller,
+        appproxy_client_pool=AsyncMock(),
+        user_repository=UserRepository(
+            database_engine,
+            V2DBOpsProvider(database_engine),
+            ShareOpsProvider(database_engine),
+            ResourcePolicyOpsProvider(database_engine),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        ),
+    )
+    service = SessionService(args)
+    return SessionProcessors(
+        processor_registry.group(GroupMeta(SessionEntityType())),
+        processor_registry.group(GroupMeta(ResourceGroupEntityType())),
+        processor_registry.group(GroupMeta(SessionEntityType())).field_group(
+            FieldGroupMeta(KernelFieldType()),
+            KernelInfo,
+            LookupKernelFieldOwnerAction,
+            LookupBulkKernelOwnerAction,
+        ),
+        processor_registry.group(GroupMeta(SessionEntityType())).field_group(
+            FieldGroupMeta(KernelGroupFieldType()),
+            KernelGroupData,
+            LookupKernelGroupFieldOwnerAction,
+            LookupBulkKernelGroupOwnerAction,
+        ),
+        processor_registry.group(GroupMeta(SessionEntityType())).field_group(
+            FieldGroupMeta(KernelGroupEnvironFieldType()),
+            KernelGroupEnvironData,
+            LookupKernelGroupEnvironFieldOwnerAction,
+            LookupBulkKernelGroupEnvironOwnerAction,
+        ),
+        processor_registry.group(GroupMeta(SessionEntityType())).field_group(
+            FieldGroupMeta(KernelGroupResourceSlotFieldType()),
+            KernelGroupResourceSlotData,
+            LookupKernelGroupResourceSlotFieldOwnerAction,
+            LookupBulkKernelGroupResourceSlotOwnerAction,
+        ),
+        ResourceAllocationProcessors(
+            processor_registry.group(GroupMeta(UserEntityType())),
+            processor_registry.group(GroupMeta(ProjectEntityType())),
+            processor_registry.group(GroupMeta(DomainEntityType())),
+            processor_registry.group(GroupMeta(ResourceGroupEntityType())),
+            processor_registry.group(GroupMeta(SessionEntityType())),
+            processor_registry.group(GroupMeta(ResourcePresetEntityType())),
+            MagicMock(),
+        ),
+        service,
+    )

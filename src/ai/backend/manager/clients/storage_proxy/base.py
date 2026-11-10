@@ -8,7 +8,9 @@ from typing import Any, Final, cast
 import aiohttp
 import yarl
 from aiohttp import ClientTimeout
+from opentelemetry.propagate import inject
 
+from ai.backend.common.contexts.request_id import current_request_id
 from ai.backend.common.exception import (
     ErrorCode,
     ErrorDetail,
@@ -18,11 +20,10 @@ from ai.backend.common.exception import (
     PassthroughError,
 )
 from ai.backend.common.json import load_json
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.common.middlewares.request_id import REQUEST_ID_HEADER
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.errors.storage import (
     QuotaScopeNotFoundError,
-    StorageProxyConnectionError,
-    StorageProxyTimeoutError,
     UnexpectedStorageProxyResponseError,
     VFolderBadRequest,
     VFolderGone,
@@ -33,23 +34,20 @@ from ai.backend.manager.errors.storage import (
 AUTH_TOKEN_HDR: Final = "X-BackendAI-Storage-Auth-Token"
 DEFAULT_TIMEOUT: Final = ClientTimeout(total=300, sock_connect=30)
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @dataclass
 class StorageProxyClientArgs:
-    endpoint: yarl.URL
     secret: str
 
 
 class StorageProxyHTTPClient:
     _client_session: aiohttp.ClientSession
-    _endpoint: yarl.URL
     _secret: str
 
     def __init__(self, client_session: aiohttp.ClientSession, args: StorageProxyClientArgs) -> None:
         self._client_session = client_session
-        self._endpoint = args.endpoint
         self._secret = args.secret
 
     def _handle_vfolder_failure(self, status_code: HTTPStatus) -> None:
@@ -88,6 +86,24 @@ class StorageProxyHTTPClient:
                     extra_msg=f"Unexpected error {status_code} from storage proxy",
                 )
 
+    def _log_error_response(self, status: int, data: Mapping[str, Any]) -> None:
+        error_code = str(data.get("error_code", ""))
+        error_title = str(data.get("title", ""))
+        if 400 <= status < 500:
+            log.trace(
+                "storage proxy error response",
+                response_status=status,
+                error_code=error_code,
+                error_title=error_title,
+            )
+        else:
+            log.warning(
+                "storage proxy error response",
+                response_status=status,
+                error_code=error_code,
+                error_title=error_title,
+            )
+
     async def _handle_exceptional_response(self, resp: aiohttp.ClientResponse) -> None:
         data = None
         try:
@@ -95,12 +111,11 @@ class StorageProxyHTTPClient:
         except (aiohttp.ContentTypeError, ValueError) as e:
             resp_text = await resp.text()
             log.warning(
-                "Failed to parse JSON from storage proxy error response: "
-                "status={}, content_type={}, error={}, response_text={}",
-                resp.status,
-                resp.content_type,
-                e,
-                resp_text if resp_text else "",
+                "storage proxy error response parse failed",
+                exc_info=e,
+                response_status=resp.status,
+                content_type=resp.content_type,
+                response_text=resp_text if resp_text else "",
             )
             raise PassthroughError(
                 status_code=resp.status,
@@ -111,6 +126,7 @@ class StorageProxyHTTPClient:
                 ),
                 error_message=f"Failed to parse error response from storage proxy. Original response: {resp_text if resp_text else ''}",
             ) from e
+        self._log_error_response(resp.status, data)
         try:
             err_code = ErrorCode.from_str(data.get("error_code", ""))
             err_domain = err_code.domain
@@ -132,6 +148,7 @@ class StorageProxyHTTPClient:
         method: str,
         url: str,
         *,
+        endpoint: str,
         body: Mapping[str, Any] | None = None,
         params: Mapping[str, Any] | None = None,
         request_timeout: ClientTimeout,
@@ -148,33 +165,29 @@ class StorageProxyHTTPClient:
         headers = {
             AUTH_TOKEN_HDR: self._secret,
         }
-        try:
-            async with self._client_session.request(
-                method,
-                self._endpoint / url,
-                headers=headers,
-                json=body,
-                params=params,
-                timeout=request_timeout,
-            ) as client_resp:
-                if client_resp.status // 100 == 2:
-                    yield client_resp
-                    return
-                await self._handle_exceptional_response(client_resp)
-        except TimeoutError as e:
-            raise StorageProxyTimeoutError(
-                extra_msg="Request to storage proxy timed out",
-            ) from e
-        except aiohttp.ClientConnectionError as e:
-            raise StorageProxyConnectionError(
-                extra_msg="Failed to connect to storage proxy",
-            ) from e
+        if (request_id := current_request_id()) is not None:
+            headers[REQUEST_ID_HEADER] = request_id
+        # The session predates client instrumentation, so the trace context is set here.
+        inject(headers)
+        async with self._client_session.request(
+            method,
+            yarl.URL(endpoint) / url,
+            headers=headers,
+            json=body,
+            params=params,
+            timeout=request_timeout,
+        ) as client_resp:
+            if client_resp.status // 100 == 2:
+                yield client_resp
+                return
+            await self._handle_exceptional_response(client_resp)
 
     async def request(
         self,
         method: str,
         url: str,
         *,
+        endpoint: str,
         body: Mapping[str, Any] | None = None,
         params: Mapping[str, Any] | None = None,
         request_timeout: ClientTimeout,
@@ -189,7 +202,12 @@ class StorageProxyHTTPClient:
         :return: Response data as a dictionary, or None if no content
         """
         async with self.request_stream_response(
-            method, url, body=body, params=params, request_timeout=request_timeout
+            method,
+            url,
+            endpoint=endpoint,
+            body=body,
+            params=params,
+            request_timeout=request_timeout,
         ) as response_stream:
             if response_stream.status == HTTPStatus.NO_CONTENT:
                 return None
@@ -203,6 +221,7 @@ class StorageProxyHTTPClient:
         method: str,
         url: str,
         *,
+        endpoint: str,
         body: Mapping[str, Any] | None = None,
         params: Mapping[str, Any] | None = None,
         request_timeout: ClientTimeout,
@@ -217,7 +236,12 @@ class StorageProxyHTTPClient:
         :return: Response object from the request
         """
         response = await self.request(
-            method, url, body=body, params=params, request_timeout=request_timeout
+            method,
+            url,
+            endpoint=endpoint,
+            body=body,
+            params=params,
+            request_timeout=request_timeout,
         )
         if response is None:
             raise UnexpectedStorageProxyResponseError(

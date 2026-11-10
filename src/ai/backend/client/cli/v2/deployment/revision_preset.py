@@ -10,7 +10,10 @@ from typing import Any
 import click
 
 from ai.backend.client.cli.v2.helpers import (
+    EntityLabelTerm,
     create_v2_registry,
+    entity_label_filter_options,
+    entity_label_relations,
     load_v2_config,
     parse_order_options,
     print_result,
@@ -42,6 +45,7 @@ def revision_preset() -> None:
 @click.option("--offset", type=int, default=0, help="Number of items to skip.")
 @click.option("--runtime-variant-id", default=None, type=click.UUID, help="Filter by variant ID.")
 @click.option("--name-contains", default=None, type=str, help="Filter by name substring.")
+@entity_label_filter_options
 @click.option("--order-by", multiple=True, help="Order by field:direction (e.g., rank:asc).")
 def search(
     limit: int,
@@ -49,6 +53,7 @@ def search(
     runtime_variant_id: uuid.UUID | None,
     name_contains: str | None,
     order_by: tuple[str, ...],
+    label: tuple[EntityLabelTerm, ...],
 ) -> None:
     """Search deployment revision presets."""
     from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
@@ -60,8 +65,9 @@ def search(
         DeploymentRevisionPresetOrderField,
     )
 
+    relations = entity_label_relations(label)
     filter_dto: DeploymentRevisionPresetFilter | None = None
-    if runtime_variant_id is not None or name_contains is not None:
+    if relations or runtime_variant_id is not None or name_contains is not None:
         from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 
         filter_dto = DeploymentRevisionPresetFilter(
@@ -69,6 +75,7 @@ def search(
             if runtime_variant_id is not None
             else None,
             name=StringFilter(contains=name_contains) if name_contains is not None else None,
+            AND=[DeploymentRevisionPresetFilter(labels=rel) for rel in relations] or None,
         )
     orders = (
         parse_order_options(

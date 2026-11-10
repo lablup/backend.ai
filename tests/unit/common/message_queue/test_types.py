@@ -1,6 +1,13 @@
-from uuid import UUID
+from uuid import UUID, uuid4
+
+import pytest
+from opentelemetry import trace
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+from opentelemetry.trace import SpanKind
+from pydantic import ValidationError
 
 from ai.backend.common.contexts.user import current_user, triggered_user
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.json import dump_json, load_json
 from ai.backend.common.message_queue.types import MessageMetadata
@@ -14,6 +21,7 @@ def _make_user(user_id: str, is_superadmin: bool = False) -> UserData:
         is_superadmin=is_superadmin,
         role=UserRole.SUPERADMIN if is_superadmin else UserRole.USER,
         domain_name="default",
+        domain_id=DomainID(uuid4()),
     )
 
 
@@ -26,6 +34,7 @@ class TestMessageMetadata:
             is_superadmin=False,
             role=UserRole.USER,
             domain_name="default",
+            domain_id=DomainID(uuid4()),
         )
         metadata = MessageMetadata(request_id="req-123", user=user)
 
@@ -60,6 +69,7 @@ class TestMessageMetadata:
             is_superadmin=False,
             role=UserRole.ADMIN,
             domain_name="test-domain",
+            domain_id=DomainID(uuid4()),
         )
         metadata = MessageMetadata(request_id=None, user=user)
 
@@ -90,6 +100,7 @@ class TestMessageMetadata:
                 "is_superadmin": False,
                 "role": "user",
                 "domain_name": "org1",
+                "domain_id": "11111111-2222-3333-4444-555555555555",
             },
         }
         serialized = dump_json(data)
@@ -114,6 +125,7 @@ class TestMessageMetadata:
                 "is_superadmin": True,
                 "role": "superadmin",
                 "domain_name": "system",
+                "domain_id": "11111111-2222-3333-4444-555555555555",
             },
         }
         serialized_str = dump_json(data).decode("utf-8")
@@ -126,36 +138,13 @@ class TestMessageMetadata:
         assert metadata.user.is_admin is True
         assert metadata.user.is_superadmin is True
 
-    def test_deserialize_with_legacy_user_id_field(self) -> None:
-        # Test backward compatibility - remove user_id if present
-        data = {
-            "request_id": "req-legacy",
-            "user_id": "should-be-removed",
-            "user": {
-                "user_id": "99999999-8888-7777-6666-555544443333",
-                "is_authorized": True,
-                "is_admin": False,
-                "is_superadmin": False,
-                "role": "user",
-                "domain_name": "default",
-            },
-        }
-        serialized = dump_json(data)
-
-        metadata = MessageMetadata.deserialize(serialized)
-        assert metadata.user is not None
-        assert metadata.request_id == "req-legacy"
-        assert hasattr(metadata, "user_id") is False  # user_id field should be removed
-        assert str(metadata.user.user_id) == "99999999-8888-7777-6666-555544443333"
-
     def test_deserialize_with_invalid_user_data(self) -> None:
-        # Test when user is not a dict
+        # A user entry that is not an object is a malformed message, not an absent user.
         data = {"request_id": "req-invalid", "user": "invalid-user-data"}
         serialized = dump_json(data)
 
-        metadata = MessageMetadata.deserialize(serialized)
-        assert metadata.request_id == "req-invalid"
-        assert metadata.user is None
+        with pytest.raises(ValidationError):
+            MessageMetadata.deserialize(serialized)
 
     def test_deserialize_with_no_user(self) -> None:
         data = {"request_id": "req-no-user"}
@@ -182,6 +171,7 @@ class TestMessageMetadata:
             is_superadmin=False,
             role=UserRole.USER,
             domain_name="enterprise",
+            domain_id=DomainID(uuid4()),
         )
         original = MessageMetadata(request_id="roundtrip-test", user=user)
 
@@ -221,3 +211,33 @@ class TestMessageMetadata:
         # Reset after the block — also covers the system-event case (both None).
         assert current_user() is None
         assert triggered_user() is None
+
+
+class TestMessageMetadataTraceContext:
+    def test_traceparent_round_trip(self, span_exporter: InMemorySpanExporter) -> None:
+        with trace.get_tracer(__name__).start_as_current_span("sender") as sender:
+            metadata = MessageMetadata.from_current_context()
+
+        restored = MessageMetadata.deserialize(metadata.serialize())
+        with restored.continue_trace("receiver", SpanKind.CONSUMER):
+            receiver_context = trace.get_current_span().get_span_context()
+
+        assert restored.traceparent == metadata.traceparent
+        assert receiver_context.trace_id == sender.get_span_context().trace_id
+        (receiver,) = [s for s in span_exporter.get_finished_spans() if s.name == "receiver"]
+        assert receiver.parent is not None
+        assert receiver.parent.span_id == sender.get_span_context().span_id
+
+    def test_no_traceparent_outside_span(self) -> None:
+        assert MessageMetadata.from_current_context().traceparent is None
+
+    def test_message_without_traceparent_opens_no_span(
+        self, span_exporter: InMemorySpanExporter
+    ) -> None:
+        metadata = MessageMetadata.deserialize(b'{"request_id": "req-old", "user": null}')
+
+        with metadata.continue_trace("receiver", SpanKind.CONSUMER):
+            assert trace.get_current_span().get_span_context().is_valid is False
+
+        assert metadata.traceparent is None
+        assert span_exporter.get_finished_spans() == ()

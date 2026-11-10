@@ -1,52 +1,58 @@
 from __future__ import annotations
 
-from typing import override
-
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.processor.bulk import BulkActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
-from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.services.audit_log.actions.create import (
-    CreateAuditLogAction,
-    CreateAuditLogActionResult,
+from ai.backend.manager.actions.registry.field import OwnerCandidatesFieldGroup
+from ai.backend.manager.actions.v2.bulk.processor import BulkActionProcessor
+from ai.backend.manager.actions.v2.field.bulk_processor import (
+    PartialBulkOwnerCandidatesFieldActionProcessor,
+)
+from ai.backend.manager.actions.v2.field.processor import NestedFieldSearchActionProcessor
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.ops.result import BatchOpsResult, ScopedFieldsOpsResult
+from ai.backend.manager.data.audit_log.types import AuditLogData, AuditLogScopeData
+from ai.backend.manager.services.audit_log.actions.bulk_get import BulkGetAuditLogsAction
+from ai.backend.manager.services.audit_log.actions.bulk_get_scopes import (
+    BulkGetAuditLogScopesAction,
 )
 from ai.backend.manager.services.audit_log.actions.scoped_search import (
     ScopedSearchAuditLogsAction,
-    ScopedSearchAuditLogsActionResult,
 )
-from ai.backend.manager.services.audit_log.actions.search import (
-    SearchAuditLogsAction,
-    SearchAuditLogsActionResult,
+from ai.backend.manager.services.audit_log.actions.scoped_search_scopes import (
+    ScopedSearchAuditLogScopesAction,
 )
-from ai.backend.manager.services.audit_log.service import AuditLogService
+from ai.backend.manager.services.audit_log.actions.search import SearchAuditLogsAction
 
 
-class AuditLogProcessors(AbstractProcessorPackage):
-    create: ActionProcessor[CreateAuditLogAction, CreateAuditLogActionResult]
-    search: ActionProcessor[SearchAuditLogsAction, SearchAuditLogsActionResult]
+class AuditLogProcessors:
+    """Three reads of the records kept about entities and one of the scopes nested under a
+    record, all straight against ops.
+
+    No create: audit rows are written by the monitors through the repository, which have
+    no caller identity to gate or to record. A record belongs to the entity it is about,
+    each scope it recorded and the user who triggered it, and is reached through any one
+    of them.
+    """
+
+    global_search: GlobalActionProcessor[SearchAuditLogsAction, BatchOpsResult[AuditLogData]]
     scoped_search: BulkActionProcessor[
-        ScopedSearchAuditLogsAction, ScopedSearchAuditLogsActionResult
+        ScopedSearchAuditLogsAction, ScopedFieldsOpsResult[AuditLogData]
+    ]
+    bulk_get: PartialBulkOwnerCandidatesFieldActionProcessor[BulkGetAuditLogsAction, AuditLogData]
+    scoped_search_scopes: NestedFieldSearchActionProcessor[
+        ScopedSearchAuditLogScopesAction, ScopedFieldsOpsResult[AuditLogScopeData]
+    ]
+    bulk_get_scopes: PartialBulkOwnerCandidatesFieldActionProcessor[
+        BulkGetAuditLogScopesAction, AuditLogScopeData
     ]
 
     def __init__(
         self,
-        service: AuditLogService,
-        action_monitors: list[ActionMonitor],
-        validators: ActionValidators,
+        group: OwnerCandidatesFieldGroup[AuditLogData],
+        scope_group: OwnerCandidatesFieldGroup[AuditLogScopeData],
     ) -> None:
-        self.create = ActionProcessor(service.create, action_monitors)
-        self.search = ActionProcessor(service.search, action_monitors)
-        self.scoped_search = BulkActionProcessor(
-            service.scoped_search,
-            monitors=action_monitors,
-            validators=[validators.rbac.bulk],
+        self.global_search = group.global_searcher_ops(SearchAuditLogsAction)
+        self.scoped_search = group.atomic_bulk_scoped_search_ops(ScopedSearchAuditLogsAction)
+        self.bulk_get = group.partial_bulk_get_ops(BulkGetAuditLogsAction)
+        self.scoped_search_scopes = group.nested_field_search_ops(
+            ScopedSearchAuditLogScopesAction, AuditLogScopeData
         )
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            CreateAuditLogAction.spec(),
-            SearchAuditLogsAction.spec(),
-            ScopedSearchAuditLogsAction.spec(),
-        ]
+        self.bulk_get_scopes = scope_group.partial_bulk_get_ops(BulkGetAuditLogScopesAction)

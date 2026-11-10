@@ -4,13 +4,20 @@ from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
 from typing import TYPE_CHECKING, Annotated, Any, Self, cast, override
+from uuid import UUID
 
 import strawberry
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 from strawberry.scalars import JSON
 
-from ai.backend.common.dto.manager.v2.agent.request import AgentFilter, AgentOrder
+from ai.backend.common.data.entity.agent import AgentEntityType
+from ai.backend.common.data.entity.types import RuntimeEntityID
+from ai.backend.common.dto.manager.v2.agent.request import (
+    AgentFilter,
+    AgentOrder,
+    UpdateAgentResourceGroupInput,
+)
 from ai.backend.common.dto.manager.v2.agent.response import (
     AgentNetworkInfoGQLDTO,
     AgentNode,
@@ -20,13 +27,17 @@ from ai.backend.common.dto.manager.v2.agent.response import (
     AgentSystemInfoGQLDTO,
     ComputePluginEntryDTO,
     ComputePluginsGQLDTO,
+    UpdateAgentResourceGroupPayload,
 )
 from ai.backend.common.dto.manager.v2.agent.types import (
     AgentStatusEnum,
     AgentStatusFilter,
+    AgentUsage,
+    AgentUsedBy,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import AgentId
-from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
+from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -37,7 +48,18 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_input,
     gql_pydantic_type,
 )
-from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticNodeMixin
+from ai.backend.manager.api.gql.entity_label.types.field import resolve_entity_labels
+from ai.backend.manager.api.gql.entity_label.types.filters import (
+    EntityLabelFilterGQL,
+    EntityLabelNestedFilterGQL,
+    EntityLabelOrderByGQL,
+)
+from ai.backend.manager.api.gql.entity_label.types.node import EntityLabelConnection
+from ai.backend.manager.api.gql.pydantic_compat import (
+    PydanticInputMixin,
+    PydanticNodeMixin,
+    PydanticOutputMixin,
+)
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
 
@@ -105,13 +127,61 @@ class AgentStatusFilterGQL(PydanticInputMixin[AgentStatusFilter]):
 )
 class AgentFilterGQL(PydanticInputMixin[AgentFilter]):
     id: StringFilter | None = None
+    entity_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by agent entity ID."
+        ),
+        default=None,
+    )
     status: AgentStatusFilterGQL | None = None
     schedulable: bool | None = None
     scaling_group: StringFilter | None = None
 
+    labels: EntityLabelNestedFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="Select entities by the labels on them.",
+        ),
+        default=None,
+    )
+
     AND: list[Self] | None = None
     OR: list[Self] | None = None
     NOT: list[Self] | None = None
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Entities whose use of an agent narrows the read.",
+        added_version="26.9.0",
+    ),
+    name="AgentUsedBy",
+)
+class AgentUsedByGQL(PydanticInputMixin[AgentUsedBy]):
+    """The entities whose use of an agent narrows the read."""
+
+    session: list[UUID] | None = gql_field(
+        default=None, description="Sessions running a kernel on the agent."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description=(
+            "Uses narrowing an agent query; every id is AND-ed. The caller must be able to "
+            "read each listed entity, or the request is refused. Only agents the caller can "
+            "read are returned, even when a listed entity is tied to others."
+        ),
+        added_version="26.9.0",
+    ),
+    name="AgentUsage",
+)
+class AgentUsageGQL(PydanticInputMixin[AgentUsage]):
+    """The uses that narrow an agent read."""
+
+    used_by: AgentUsedByGQL | None = gql_field(
+        default=None, description="Entities whose use of the agent narrows the read."
+    )
 
 
 @gql_pydantic_input(
@@ -121,6 +191,78 @@ class AgentFilterGQL(PydanticInputMixin[AgentFilter]):
 class AgentOrderByGQL(PydanticInputMixin[AgentOrder]):
     field: AgentOrderFieldGQL
     direction: OrderDirection = OrderDirection.ASC
+
+
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version="26.8.0",
+        description=(
+            "How to clean up sessions that conflict with an agent's resource-group change."
+        ),
+    ),
+    name="ConflictingSessionCleanupPolicy",
+)
+class ConflictingSessionCleanupPolicyGQL(StrEnum):
+    TERMINATE = "terminate"
+    RESCHEDULE = "reschedule"
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version="26.8.0",
+        description="Input for changing the resource group of an agent.",
+    ),
+    name="UpdateAgentResourceGroupInput",
+)
+class UpdateAgentResourceGroupInputGQL(PydanticInputMixin[UpdateAgentResourceGroupInput]):
+    agent_id: str = gql_field(description="ID of the agent to move.")
+    resource_group_id: UUID = gql_field(
+        description="UUID of the target resource group to move the agent into."
+    )
+    policy: ConflictingSessionCleanupPolicyGQL | None = gql_field(
+        default=None,
+        description=(
+            "How to handle sessions still running on the agent under the old resource group. "
+            "Defaults to TERMINATE, which is currently the only supported policy."
+        ),
+    )
+    force: bool = gql_field(
+        default=False,
+        description=(
+            "When false, the change is rejected with a conflict error if the agent still has "
+            "active sessions or unterminated sessions or deployments of other resource groups "
+            "designate it. When true, the group is changed anyway, the active sessions are "
+            "cleaned up per the policy, and those designations are removed."
+        ),
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.8.0",
+        description="Result of changing the resource group of an agent.",
+    ),
+    model=UpdateAgentResourceGroupPayload,
+    name="UpdateAgentResourceGroupPayload",
+)
+class UpdateAgentResourceGroupPayloadGQL(PydanticOutputMixin[UpdateAgentResourceGroupPayload]):
+    agent_id: str = gql_field(description="ID of the agent whose resource group was changed.")
+    resource_group_id: UUID = gql_field(description="UUID of the new resource group.")
+    policy: ConflictingSessionCleanupPolicyGQL = gql_field(
+        description="Cleanup policy applied to the conflicting sessions."
+    )
+    conflicting_session_ids: list[UUID] = gql_field(
+        description=(
+            "IDs of the sessions that were still running on the agent under the old resource "
+            "group at the time of the change."
+        )
+    )
+    terminating_session_ids: list[UUID] = gql_field(
+        description=(
+            "IDs of the conflicting sessions that were actually transitioned to TERMINATING "
+            "by the applied policy. Their container cleanup proceeds asynchronously."
+        )
+    )
 
 
 @gql_pydantic_type(
@@ -262,6 +404,24 @@ class AgentNetworkInfoGQL:
 )
 class AgentV2GQL(PydanticNodeMixin[AgentNode]):
     id: NodeID[str]
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="UUID of the agent.",
+        ),
+    )
+    uuid: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description=(
+                "Agent UUID. The agent's primary key is its name, so rows keyed on the "
+                "agent carry this instead."
+            ),
+            deprecated_version="26.9.0",
+            deprecation_hint="entityId",
+        ),
+        deprecation_reason="Deprecated since 26.9.0. Use entityId.",
+    )
     resource_info: AgentResourceGQL = gql_field(
         description="Hardware resource capacity, usage, and availability information. Contains capacity (total), used (occupied by sessions), and free (available) resource slots including CPU cores, memory, accelerators (GPUs, TPUs), and other compute resources."
     )
@@ -280,6 +440,37 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
     scaling_group: str = gql_field(
         description="Name of the scaling group this agent belongs to. Scaling groups are logical collections of agents used for resource scheduling, quota management, and workload isolation across different user groups or projects."
     )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="The labels on this agent.",
+        )
+    )  # type: ignore[misc]
+    async def entity_labels(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: EntityLabelFilterGQL | None = None,
+        order_by: list[EntityLabelOrderByGQL] | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> EntityLabelConnection | None:
+        return await resolve_entity_labels(
+            info,
+            RuntimeEntityID(AgentEntityType(), self.uuid),
+            filter=filter,
+            order_by=order_by,
+            before=before,
+            after=after,
+            first=first,
+            last=last,
+            limit=limit,
+            offset=offset,
+        )
 
     @gql_added_field(
         BackendAIGQLMeta(
@@ -458,8 +649,6 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
         | None
     ):
         """Fetch per-slot resource capacity and usage for this agent."""
-        from decimal import Decimal
-
         import strawberry as _strawberry
 
         from ai.backend.common.dto.manager.query import StringFilter as StringFilterDTO
@@ -484,12 +673,8 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
         if filter is not None:
             pydantic_filter = filter.to_pydantic()
             if pydantic_filter.agent_id is None:
-                pydantic_filter = AgentResourceFilterDTO(
-                    slot_name=pydantic_filter.slot_name,
-                    agent_id=StringFilterDTO(equals=agent_id),
-                    AND=pydantic_filter.AND,
-                    OR=pydantic_filter.OR,
-                    NOT=pydantic_filter.NOT,
+                pydantic_filter = pydantic_filter.model_copy(
+                    update={"agent_id": StringFilterDTO(equals=agent_id)},
                 )
         else:
             pydantic_filter = AgentResourceFilterDTO(
@@ -514,14 +699,8 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
 
         edges = []
         for item in payload.items:
-            slot_name = item.slot_name
-            node = AgentResourceSlotGQL(
-                id=_strawberry.ID(item.id),
-                slot_name=slot_name,
-                capacity=Decimal(item.capacity),
-                used=Decimal(item.used),
-            )
-            cursor = encode_cursor(slot_name)
+            node = AgentResourceSlotGQL.from_pydantic(item)
+            cursor = encode_cursor(item.field_id)
             edges.append(AgentResourceSlotEdgeGQL(node=node, cursor=cursor))
 
         return AgentResourceConnectionGQL(

@@ -25,54 +25,55 @@ from sqlalchemy.engine.row import Row
 from sqlalchemy.orm import joinedload, selectinload
 
 from ai.backend.common.config import ModelDefinition, ModelMetadata
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.user import UserEntityType
+from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.exception import ModelDefinitionValidationError, VFolderNotFound
 from ai.backend.common.types import (
     QuotaScopeID,
     QuotaScopeType,
     VFolderID,
+    VFolderMountPolicy,
     VFolderUsageMode,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.api.gql.base import resolve_entity_id
+from ai.backend.manager.data.entity_share.types import EntityShareStatus
 from ai.backend.manager.data.permission.permission_defs import (
     VFolderPermission as VFolderRBACPermission,
 )
-from ai.backend.manager.data.permission.types import (
-    EntityType as PermissionEntityType,
-)
-from ai.backend.manager.data.permission.types import (
-    ScopeType as PermissionScopeType,
-)
+from ai.backend.manager.data.vfolder.types import VFolderOperationStatus, VFolderOwnershipType
+from ai.backend.manager.defs import is_unmanaged
 from ai.backend.manager.errors.storage import (
     ModelCardParseError,
     QuotaScopeNotFoundError,
     VFolderBadRequest,
     VFolderOperationFailed,
 )
-from ai.backend.manager.models.group import GroupRow, ProjectType
+from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
+from ai.backend.manager.models.project.row import ProjectRow, ProjectType
 from ai.backend.manager.models.rbac import (
     ScopeType,
     SystemScope,
 )
 from ai.backend.manager.models.rbac.context import ClientContext
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
-from ai.backend.manager.models.user import UserRow
-from ai.backend.manager.models.vfolder import (
-    DEAD_VFOLDER_STATUSES,
-    VFolderOperationStatus,
-    VFolderOwnershipType,
-    VFolderPermission,
+from ai.backend.manager.models.user.row import UserRow
+from ai.backend.manager.models.vfolder.row import (
     VFolderRow,
-    ensure_quota_scope_accessible_by_user,
+    VFolderUserMountPolicyRow,
     get_permission_ctx,
-    is_unmanaged,
-    vfolder_permissions,
     vfolders,
+)
+from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_query
+from ai.backend.manager.repositories.vfolder.quota_scope import (
+    ensure_quota_scope_accessible_by_user,
+)
+from ai.backend.manager.services.vfolder.actions.bulk_load_mount_levels import (
+    BulkLoadVFolderMountLevelsAction,
 )
 
 # Re-export for backward compatibility
@@ -108,7 +109,22 @@ from .gql_relay import AsyncNode, Connection, ConnectionResolverResult
 if TYPE_CHECKING:
     from .schema import GraphQueryContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
+
+
+def _lent_to_users() -> sa.sql.ColumnElement[bool]:
+    """The vfolder shares settled to a person."""
+    shares = EntityShareRow.__table__
+    return sa.and_(
+        shares.c.target_entity_type == VFolderEntityType(),
+        shares.c.recipient_entity_type == UserEntityType(),
+        shares.c.status == EntityShareStatus.ACCEPTED,
+    )
+
+
+def _legacy_permission(policy: VFolderMountPolicy) -> str | None:
+    """The legacy ``permission`` field has no value for a folder that mounts to no one."""
+    return None if policy == VFolderMountPolicy.NONE else policy.value
 
 
 class VFolderPermissionValueField(graphene.Scalar):  # type: ignore[misc]
@@ -181,8 +197,8 @@ class VirtualFolderNode(graphene.ObjectType):  # type: ignore[misc]
             VFolderUsageMode,
         ),
         "permission": (
-            "permission",
-            VFolderPermission,
+            "default_mount_permission",
+            VFolderMountPolicy,
         ),
         "ownership_type": (
             "ownership_type",
@@ -208,7 +224,7 @@ class VirtualFolderNode(graphene.ObjectType):  # type: ignore[misc]
         "user": ("user", None),
         "creator": ("creator", None),
         "usage_mode": ("usage_mode", None),
-        "permission": ("permission", None),
+        "permission": ("default_mount_permission", None),
         "ownership_type": ("ownership_type", None),
         "max_files": ("max_files", None),
         "max_size": ("max_size", None),
@@ -231,6 +247,34 @@ class VirtualFolderNode(graphene.ObjectType):  # type: ignore[misc]
         except ParserError:
             return cast(datetime, self.created_at)
 
+    async def resolve_permission(self, info: graphene.ResolveInfo) -> str | None:
+        if self.row_id is None:
+            return None
+        graph_ctx: GraphQueryContext = info.context
+        loader = graph_ctx.dataloader_manager.get_loader_by_func(
+            graph_ctx, VirtualFolderNode.batch_load_mount_levels
+        )
+        level: str | None = await loader.load(self.row_id)
+        return level
+
+    @classmethod
+    async def batch_load_mount_levels(
+        cls,
+        graph_ctx: GraphQueryContext,
+        vfolder_ids: Sequence[uuid.UUID],
+    ) -> list[str | None]:
+        """The mount level the caller gets on each folder, null where they get none."""
+        result = await graph_ctx.processors.vfolder.bulk_load_mount_levels.run(
+            BulkLoadVFolderMountLevelsAction(
+                vfolder_ids=[VFolderUUID(vfolder_id) for vfolder_id in vfolder_ids]
+            )
+        )
+        levels = result.values()
+        return [
+            _legacy_permission(levels.get(VFolderUUID(vfolder_id), VFolderMountPolicy.NONE))
+            for vfolder_id in vfolder_ids
+        ]
+
     @classmethod
     def from_row(
         cls,
@@ -252,7 +296,6 @@ class VirtualFolderNode(graphene.ObjectType):  # type: ignore[misc]
             creator=row.creator,
             unmanaged_path=row.unmanaged_path or None,
             usage_mode=row.usage_mode,
-            permission=row.permission,
             ownership_type=row.ownership_type,
             max_files=row.max_files,
             max_size=row.max_size,  # in B
@@ -293,7 +336,6 @@ class VirtualFolderNode(graphene.ObjectType):  # type: ignore[misc]
         permission: VFolderRBACPermission = VFolderRBACPermission.READ_ATTRIBUTE,
     ) -> Self | None:
         graph_ctx: GraphQueryContext = info.context
-        _, vfolder_row_id = AsyncNode.resolve_global_id(info, id)
         query = sa.select(VFolderRow).options(
             joinedload(VFolderRow.user_row),
             joinedload(VFolderRow.group_row),
@@ -309,7 +351,8 @@ class VirtualFolderNode(graphene.ObjectType):  # type: ignore[misc]
             cond = permission_ctx.query_condition
             if cond is None:
                 return None
-            query = query.where(sa.and_(cond, VFolderRow.id == uuid.UUID(vfolder_row_id)))
+            vfolder_id = resolve_entity_id(id, VFolderUUID)
+            query = query.where(sa.and_(cond, VFolderRow.id == vfolder_id))
             async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
                 vfolder_row = await db_session.scalar(query)
         if vfolder_row is None:
@@ -507,8 +550,8 @@ class ModelCard(graphene.ObjectType):  # type: ignore[misc]
             VFolderUsageMode,
         ),
         "permission": (
-            "vfolders_permission",
-            VFolderPermission,
+            "vfolders_default_mount_permission",
+            VFolderMountPolicy,
         ),
         "ownership_type": (
             "vfolders_ownership_type",
@@ -536,7 +579,7 @@ class ModelCard(graphene.ObjectType):  # type: ignore[misc]
         "user_email": ("users_email", None),
         "creator": ("vfolders_creator", None),
         "usage_mode": ("vfolders_usage_mode", None),
-        "permission": ("vfolders_permission", None),
+        "permission": ("vfolders_default_mount_permission", None),
         "ownership_type": ("vfolders_ownership_type", None),
         "max_files": ("vfolders_max_files", None),
         "max_size": ("vfolders_max_size", None),
@@ -607,11 +650,10 @@ class ModelCard(graphene.ObjectType):  # type: ignore[misc]
         try:
             return await cls.parse_row(graph_ctx, vfolder_row)
         except Exception as e:
-            log.exception(
-                "Failed to parse model card from vfolder (id: {}, error: {})",
-                vfolder_row.id,
-                repr(e),
-            )
+            if isinstance(e, (ModelCardParseError, UnicodeDecodeError)):
+                log.trace("model card parse failed: {}", e, vfolder_id=vfolder_row.id)
+            else:
+                log.warning("model card load failed", exc_info=e, vfolder_id=vfolder_row.id)
             if (
                 graph_ctx.user["role"] in (UserRole.SUPERADMIN, UserRole.ADMIN)
                 or vfolder_row.creator == graph_ctx.user["email"]
@@ -711,19 +753,19 @@ class ModelCard(graphene.ObjectType):  # type: ignore[misc]
     async def get_node(cls, info: graphene.ResolveInfo, id: str) -> Self | None:
         graph_ctx: GraphQueryContext = info.context
 
-        _, vfolder_row_id = AsyncNode.resolve_global_id(info, id)
+        vfolder_id = resolve_entity_id(id, VFolderUUID)
         async with graph_ctx.db.begin_readonly_session() as db_session:
             vfolder_row = await VFolderRow.get(
-                db_session, uuid.UUID(vfolder_row_id), load_user=True, load_group=True
+                db_session, vfolder_id, load_user=True, load_group=True
             )
             if vfolder_row.usage_mode != VFolderUsageMode.MODEL:
                 raise ValueError(
                     f"The vfolder is not model. expect: {VFolderUsageMode.MODEL.value}, got:"
-                    f" {vfolder_row.usage_mode.value}. (id: {vfolder_row_id})"
+                    f" {vfolder_row.usage_mode.value}. (id: {vfolder_id})"
                 )
-            if vfolder_row.status in DEAD_VFOLDER_STATUSES:
+            if vfolder_row.status in VFolderOperationStatus.dead():
                 raise ValueError(
-                    f"The vfolder is deleted. (id: {vfolder_row_id}, status: {vfolder_row.status})"
+                    f"The vfolder is deleted. (id: {vfolder_id}, status: {vfolder_row.status})"
                 )
         return await cls.from_row(graph_ctx, vfolder_row)
 
@@ -773,16 +815,16 @@ class ModelCard(graphene.ObjectType):  # type: ignore[misc]
             model_store_project_gids = (
                 (
                     await db_session.execute(
-                        sa.select(GroupRow.id).where(
-                            (GroupRow.type == ProjectType.MODEL_STORE)
-                            & (GroupRow.domain_name == graph_ctx.user["domain_name"])
+                        sa.select(ProjectRow.id).where(
+                            (ProjectRow.type == ProjectType.MODEL_STORE)
+                            & (ProjectRow.domain_name == graph_ctx.user["domain_name"])
                         )
                     )
                 )
                 .scalars()
                 .all()
             )
-            additional_cond = (VFolderRow.status.not_in(DEAD_VFOLDER_STATUSES)) & (
+            additional_cond = (VFolderRow.status.not_in(VFolderOperationStatus.dead())) & (
                 VFolderRow.group.in_(model_store_project_gids)
             )
             query = query.where(additional_cond)
@@ -858,7 +900,6 @@ class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
                     domain_name=row.domain_name,
                     unmanaged_path=row.unmanaged_path or None,
                     usage_mode=row.usage_mode,
-                    permission=row.permission,
                     ownership_type=row.ownership_type,
                     max_files=row.max_files,
                     max_size=row.max_size,  # in MiB
@@ -882,7 +923,6 @@ class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
                     domain_name=row.domain_name,
                     unmanaged_path=row.unmanaged_path or None,
                     usage_mode=row.usage_mode,
-                    permission=row.permission,
                     ownership_type=row.ownership_type,
                     max_files=row.max_files,
                     max_size=row.max_size,  # in MiB
@@ -909,7 +949,6 @@ class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
             creator=row.creator,
             unmanaged_path=row.unmanaged_path or None,
             usage_mode=row.usage_mode,
-            permission=row.permission,
             ownership_type=row.ownership_type,
             max_files=row.max_files,
             max_size=row.max_size,
@@ -919,6 +958,14 @@ class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
             status=row.status,
             cur_size=row.cur_size,
         )
+
+    async def resolve_permission(self, info: graphene.ResolveInfo) -> str | None:
+        graph_ctx: GraphQueryContext = info.context
+        loader = graph_ctx.dataloader_manager.get_loader_by_func(
+            graph_ctx, VirtualFolderNode.batch_load_mount_levels
+        )
+        level: str | None = await loader.load(self.id)
+        return level
 
     async def resolve_num_files(self, info: graphene.ResolveInfo) -> int:
         # TODO: measure on-the-fly
@@ -941,8 +988,8 @@ class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
             lambda s: VFolderUsageMode(s),
         ),
         "permission": (
-            "vfolders_permission",
-            lambda s: VFolderPermission(s),
+            "vfolders_default_mount_permission",
+            lambda s: VFolderMountPolicy(s),
         ),
         "ownership_type": (
             "vfolders_ownership_type",
@@ -971,7 +1018,7 @@ class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
         "user_email": ("users_email", None),
         "creator": ("vfolders_creator", None),
         "usage_mode": ("vfolders_usage_mode", None),
-        "permission": ("vfolders_permission", None),
+        "permission": ("vfolders_default_mount_permission", None),
         "ownership_type": ("vfolders_ownership_type", None),
         "max_files": ("vfolders_max_files", None),
         "max_size": ("vfolders_max_size", None),
@@ -992,8 +1039,8 @@ class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
         user_id: uuid.UUID | None = None,
         filter: str | None = None,
     ) -> int:
-        from ai.backend.manager.models.group import groups
-        from ai.backend.manager.models.user import users
+        from ai.backend.manager.models.project.row import groups
+        from ai.backend.manager.models.user.row import users
 
         j = vfolders.join(users, vfolders.c.user == users.c.uuid, isouter=True).join(
             groups, vfolders.c.group == groups.c.id, isouter=True
@@ -1025,8 +1072,8 @@ class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
         filter: str | None = None,
         order: str | None = None,
     ) -> Sequence[VirtualFolder]:
-        from ai.backend.manager.models.group import groups
-        from ai.backend.manager.models.user import users
+        from ai.backend.manager.models.project.row import groups
+        from ai.backend.manager.models.user.row import users
 
         j = vfolders.join(users, vfolders.c.user == users.c.uuid, isouter=True).join(
             groups, vfolders.c.group == groups.c.id, isouter=True
@@ -1103,7 +1150,7 @@ class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
         domain_name: str | None = None,
         group_id: uuid.UUID | None = None,
     ) -> Sequence[Sequence[VirtualFolder]]:
-        from ai.backend.manager.models.user import users
+        from ai.backend.manager.models.user.row import users
 
         # TODO: num_attached count group-by
         j = sa.join(vfolders, users, vfolders.c.user == users.c.uuid)
@@ -1137,20 +1184,21 @@ class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
         user_id: uuid.UUID | None = None,
         filter: str | None = None,
     ) -> int:
-        from ai.backend.manager.models.user import users
+        from ai.backend.manager.models.user.row import users
 
+        shares = EntityShareRow.__table__
         j = vfolders.join(
-            vfolder_permissions,
-            vfolders.c.id == vfolder_permissions.c.vfolder,
+            shares,
+            sa.and_(vfolders.c.id == shares.c.target_entity_id, _lent_to_users()),
         ).join(
             users,
-            vfolder_permissions.c.user == users.c.uuid,
+            shares.c.recipient_entity_id == users.c.uuid,
         )
         query = (
             sa.select(sa.func.count())
             .select_from(j)
             .where(
-                (vfolder_permissions.c.user == user_id)
+                (shares.c.recipient_entity_id == user_id)
                 & (vfolders.c.ownership_type == VFolderOwnershipType.USER),
             )
         )
@@ -1176,20 +1224,21 @@ class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
         filter: str | None = None,
         order: str | None = None,
     ) -> list[VirtualFolder]:
-        from ai.backend.manager.models.user import users
+        from ai.backend.manager.models.user.row import users
 
+        shares = EntityShareRow.__table__
         j = vfolders.join(
-            vfolder_permissions,
-            vfolders.c.id == vfolder_permissions.c.vfolder,
+            shares,
+            sa.and_(vfolders.c.id == shares.c.target_entity_id, _lent_to_users()),
         ).join(
             users,
-            vfolder_permissions.c.user == users.c.uuid,
+            shares.c.recipient_entity_id == users.c.uuid,
         )
         query = (
             sa.select(vfolders, users.c.email)
             .select_from(j)
             .where(
-                (vfolder_permissions.c.user == user_id)
+                (shares.c.recipient_entity_id == user_id)
                 & (vfolders.c.ownership_type == VFolderOwnershipType.USER),
             )
             .limit(limit)
@@ -1222,21 +1271,24 @@ class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
         user_id: uuid.UUID | None = None,
         filter: str | None = None,
     ) -> int:
-        from ai.backend.manager.models.group import groups
+        from ai.backend.manager.models.project.row import groups
 
-        membership_query = sa.select(AssociationScopesEntitiesRow.scope_id).where(
-            AssociationScopesEntitiesRow.scope_type == PermissionScopeType.PROJECT,
-            AssociationScopesEntitiesRow.entity_type == PermissionEntityType.USER,
-            AssociationScopesEntitiesRow.entity_id == str(user_id),
-        )
+        membership_query = user_scope_membership_query(ProjectEntityType(), user_id)
 
         async with graph_ctx.db.begin_readonly() as conn:
             membership_result = await conn.execute(membership_query)
 
         grps = membership_result.fetchall()
-        group_ids = [uuid.UUID(g.scope_id) for g in grps]
+        group_ids = [g.scope_id for g in grps]
         j = sa.join(vfolders, groups, vfolders.c.group == groups.c.id)
-        query = sa.select(sa.func.count()).select_from(j).where(vfolders.c.group.in_(group_ids))
+        query = (
+            sa.select(sa.func.count())
+            .select_from(j)
+            .where(
+                (vfolders.c.ownership_type == VFolderOwnershipType.GROUP)
+                & (vfolders.c.group.in_(group_ids))
+            )
+        )
 
         if domain_name is not None:
             query = query.where(groups.c.domain_name == domain_name)
@@ -1260,17 +1312,13 @@ class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
         filter: str | None = None,
         order: str | None = None,
     ) -> list[VirtualFolder]:
-        from ai.backend.manager.models.group import groups
+        from ai.backend.manager.models.project.row import groups
 
-        membership_query = sa.select(AssociationScopesEntitiesRow.scope_id).where(
-            AssociationScopesEntitiesRow.scope_type == PermissionScopeType.PROJECT,
-            AssociationScopesEntitiesRow.entity_type == PermissionEntityType.USER,
-            AssociationScopesEntitiesRow.entity_id == str(user_id),
-        )
+        membership_query = user_scope_membership_query(ProjectEntityType(), user_id)
         async with graph_ctx.db.begin_readonly() as conn:
             membership_result = await conn.execute(membership_query)
         grps = membership_result.fetchall()
-        group_ids = [uuid.UUID(g.scope_id) for g in grps]
+        group_ids = [g.scope_id for g in grps]
         j = vfolders.join(groups, vfolders.c.group == groups.c.id)
         query = (
             sa.select(
@@ -1278,7 +1326,10 @@ class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
                 groups.c.name.label("groups_name"),
             )
             .select_from(j)
-            .where(vfolders.c.group.in_(group_ids))
+            .where(
+                (vfolders.c.ownership_type == VFolderOwnershipType.GROUP)
+                & (vfolders.c.group.in_(group_ids))
+            )
             .limit(limit)
             .offset(offset)
         )
@@ -1334,21 +1385,60 @@ class VirtualFolderPermissionGQL(graphene.ObjectType):  # type: ignore[misc]
             user_email=row.email,
         )
 
+    # ``permission`` filters and orders on the policy row alone: a level answered by
+    # the folder's default has no row to match.
     _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
-        "permission": ("vfolder_permissions_permission", VFolderPermission),
-        "vfolder": ("vfolder_permissions_vfolder", None),
+        "permission": ("vfolder_user_mount_policies_permission", VFolderMountPolicy),
+        "vfolder": ("entity_shares_target_entity_id", None),
         "vfolder_name": ("vfolders_name", None),
-        "user": ("vfolder_permissions_user", None),
+        "user": ("entity_shares_recipient_entity_id", None),
         "user_email": ("users_email", None),
     }
 
     _queryorder_colmap: Mapping[str, OrderSpecItem] = {
-        "permission": ("vfolder_permissions_permission", None),
-        "vfolder": ("vfolder_permissions_vfolder", None),
+        "permission": ("vfolder_user_mount_policies_permission", None),
+        "vfolder": ("entity_shares_target_entity_id", None),
         "vfolder_name": ("vfolders_name", None),
-        "user": ("vfolder_permissions_user", None),
+        "user": ("entity_shares_recipient_entity_id", None),
         "user_email": ("users_email", None),
     }
+
+    @classmethod
+    def _shared_join(cls) -> sa.sql.Join:
+        """Folders lent to a person, with the level each is set to get."""
+        from ai.backend.manager.models.user.row import users
+
+        shares = EntityShareRow.__table__
+        policies = VFolderUserMountPolicyRow.__table__
+        return (
+            shares.join(
+                vfolders, sa.and_(vfolders.c.id == shares.c.target_entity_id, _lent_to_users())
+            )
+            .join(users, users.c.uuid == shares.c.recipient_entity_id)
+            .outerjoin(
+                policies,
+                sa.and_(
+                    policies.c.vfolder_id == vfolders.c.id,
+                    policies.c.user_id == shares.c.recipient_entity_id,
+                ),
+            )
+        )
+
+    @classmethod
+    def _shared_select(cls) -> sa.sql.Select[Any]:
+        from ai.backend.manager.models.user.row import users
+
+        shares = EntityShareRow.__table__
+        policies = VFolderUserMountPolicyRow.__table__
+        return sa.select(
+            sa.func.coalesce(policies.c.permission, vfolders.c.default_mount_permission).label(
+                "permission"
+            ),
+            shares.c.target_entity_id.label("vfolder"),
+            shares.c.recipient_entity_id.label("user"),
+            vfolders.c.name,
+            users.c.email,
+        ).select_from(cls._shared_join())
 
     @classmethod
     async def load_count(
@@ -1358,12 +1448,7 @@ class VirtualFolderPermissionGQL(graphene.ObjectType):  # type: ignore[misc]
         user_id: uuid.UUID | None = None,
         filter: str | None = None,
     ) -> int:
-        from ai.backend.manager.models.user import users
-
-        j = vfolder_permissions.join(vfolders, vfolders.c.id == vfolder_permissions.c.vfolder).join(
-            users, users.c.uuid == vfolder_permissions.c.user
-        )
-        query = sa.select(sa.func.count()).select_from(j)
+        query = sa.select(sa.func.count()).select_from(cls._shared_join())
         if user_id is not None:
             query = query.where(vfolders.c.user == user_id)
         if filter is not None:
@@ -1384,17 +1469,7 @@ class VirtualFolderPermissionGQL(graphene.ObjectType):  # type: ignore[misc]
         filter: str | None = None,
         order: str | None = None,
     ) -> list[VirtualFolderPermissionGQL]:
-        from ai.backend.manager.models.user import users
-
-        j = vfolder_permissions.join(vfolders, vfolders.c.id == vfolder_permissions.c.vfolder).join(
-            users, users.c.uuid == vfolder_permissions.c.user
-        )
-        query = (
-            sa.select(vfolder_permissions, vfolders.c.name, users.c.email)
-            .select_from(j)
-            .limit(limit)
-            .offset(offset)
-        )
+        query = cls._shared_select().limit(limit).offset(offset)
         if user_id is not None:
             query = query.where(vfolders.c.user == user_id)
         if filter is not None:
@@ -1471,31 +1546,31 @@ class QuotaScope(graphene.ObjectType):  # type: ignore[misc]
             async with graph_ctx.db.begin_readonly_session() as sess:
                 await ensure_quota_scope_accessible_by_user(sess, qsid, graph_ctx.user)
                 if qsid.scope_type == QuotaScopeType.USER:
-                    query = (
+                    user_query = (
                         sa.select(UserRow)
                         .where(UserRow.uuid == qsid.scope_id)
                         .options(selectinload(UserRow.resource_policy_row))
                     )
-                    result = await sess.scalar(query)
-                    if result is None:
+                    user_row = await sess.scalar(user_query)
+                    if user_row is None:
                         raise QuotaScopeNotFoundError(
                             f"User not found for quota scope id: {self.quota_scope_id}"
                         ) from e
                     resource_policy_constraint: int | None = (
-                        result.resource_policy_row.max_quota_scope_size
+                        user_row.resource_policy_row.max_quota_scope_size
                     )
                 else:
-                    query = (
-                        sa.select(GroupRow)
-                        .where(GroupRow.id == qsid.scope_id)
-                        .options(selectinload(GroupRow.resource_policy_row))
+                    group_query = (
+                        sa.select(ProjectRow)
+                        .where(ProjectRow.id == qsid.scope_id)
+                        .options(selectinload(ProjectRow.resource_policy_row))
                     )
-                    result = await sess.scalar(query)
-                    if result is None:
+                    group_row = await sess.scalar(group_query)
+                    if group_row is None:
                         raise QuotaScopeNotFoundError(
                             f"Group not found for quota scope id: {self.quota_scope_id}"
                         ) from e
-                    resource_policy_constraint = result.resource_policy_row.max_quota_scope_size
+                    resource_policy_constraint = group_row.resource_policy_row.max_quota_scope_size
                 if resource_policy_constraint is not None and resource_policy_constraint < 0:
                     resource_policy_constraint = None
 

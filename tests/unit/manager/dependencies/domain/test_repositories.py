@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.dependencies.domain.repositories import (
     RepositoriesDependency,
     RepositoriesInput,
 )
+from ai.backend.manager.secret.pool import KeyProviderPool
 
 
 class TestRepositoriesDependency:
@@ -32,6 +34,9 @@ class TestRepositoriesDependency:
             db=db,
             storage_manager=storage_manager,
             config_provider=config_provider,
+            key_provider_pool=KeyProviderPool(
+                providers=[], write_provider_type=KeyProviderType.PLAIN
+            ),
             valkey_stat=valkey_stat,
             valkey_live=valkey_live,
             valkey_schedule=valkey_schedule,

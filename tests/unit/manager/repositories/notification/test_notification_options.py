@@ -12,6 +12,8 @@ from datetime import UTC, datetime, timedelta
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.auth.password import PasswordInfo
+from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.data.notification import (
     NotificationChannelType,
@@ -19,59 +21,62 @@ from ai.backend.common.data.notification import (
     WebhookSpec,
 )
 from ai.backend.common.types import BinarySize, ResourceSlot
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
-from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
-from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
-from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.notification import (
+from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
+from ai.backend.manager.data.notification.types import (
+    NotificationChannelData,
+    NotificationRuleData,
+)
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.deployment_auto_scaling_policy.row import (
+    DeploymentAutoScalingPolicyRow,
+)
+from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
+from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.endpoint.row import EndpointRow
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.notification.row import (
     NotificationChannelRow,
     NotificationRuleRow,
 )
-from ai.backend.manager.models.notification.conditions import (
-    NotificationChannelConditions,
-    NotificationRuleConditions,
+from ai.backend.manager.models.notification.searchable_fields import (
+    NotificationChannelSearchableFields,
+    NotificationRuleSearchableFields,
 )
-from ai.backend.manager.models.notification.orders import (
-    NotificationChannelOrders,
-    NotificationRuleOrders,
+from ai.backend.manager.models.notification.searchers import (
+    NotificationChannelSearcher,
+    NotificationRuleSearcher,
 )
-from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
-from ai.backend.manager.models.replica_group import ReplicaGroupRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
+from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.resource_preset import ResourcePresetRow
-from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
-from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.user import (
-    PasswordHashAlgorithm,
-    PasswordInfo,
-    UserRole,
-    UserRow,
-    UserStatus,
-)
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
+from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
+from ai.backend.manager.models.routing.row import RoutingRow
+from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.specs.pagination import (
     CursorBackwardPagination,
     CursorForwardPagination,
     OffsetPagination,
 )
-from ai.backend.manager.repositories.notification import NotificationRepository
+from ai.backend.manager.models.user.row import PasswordHashAlgorithm, UserRole, UserRow, UserStatus
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.vfolder.row import VFolderRow
+from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 
 class TestNotificationOptions:
@@ -90,7 +95,7 @@ class TestNotificationOptions:
             [
                 # Base rows in FK dependency order (parents before children)
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -98,7 +103,7 @@ class TestNotificationOptions:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
@@ -122,15 +127,17 @@ class TestNotificationOptions:
             yield database_connection
 
     @pytest.fixture
-    async def test_domain_name(
+    async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> str:
+    ) -> DomainFixtureData:
         """Create test domain and return domain name"""
+        domain_id = DomainID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=domain_id,
                 name=domain_name,
                 description="Test domain for notification",
                 is_active=True,
@@ -141,7 +148,7 @@ class TestNotificationOptions:
             db_sess.add(domain)
             await db_sess.commit()
 
-        return domain_name
+        return DomainFixtureData(domain_name=DomainName(domain_name), domain_id=domain_id)
 
     @pytest.fixture
     async def test_resource_policy_name(
@@ -168,7 +175,7 @@ class TestNotificationOptions:
     async def test_user(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_resource_policy_name: str,
     ) -> uuid.UUID:
         """Create test user and return user UUID"""
@@ -190,9 +197,10 @@ class TestNotificationOptions:
                 need_password_change=False,
                 status=UserStatus.ACTIVE,
                 status_info="active",
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 role=UserRole.USER,
                 resource_policy=test_resource_policy_name,
+                domain_id=test_domain.domain_id,
             )
             db_sess.add(user)
             await db_sess.commit()
@@ -200,12 +208,19 @@ class TestNotificationOptions:
         return user_uuid
 
     @pytest.fixture
-    def notification_repository(
+    def channel_ops(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> NotificationRepository:
-        """Create NotificationRepository instance with database"""
-        return NotificationRepository(db=db_with_cleanup)
+    ) -> OpsRepository[NotificationChannelData]:
+        """Searches run through the generic ops repository the v2 searchers wire to."""
+        return OpsRepository(V2DBOpsProvider(db_with_cleanup))
+
+    @pytest.fixture
+    def rule_ops(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> OpsRepository[NotificationRuleData]:
+        return OpsRepository(V2DBOpsProvider(db_with_cleanup))
 
     @pytest.fixture
     async def sample_channels_for_filter(
@@ -383,25 +398,25 @@ class TestNotificationOptions:
 
         return rule_ids
 
-    # NotificationChannelConditions Tests
+    # Notification channel filter tests
 
     async def test_channel_by_name_contains_case_sensitive(
         self,
-        notification_repository: NotificationRepository,
+        channel_ops: OpsRepository[NotificationChannelData],
         sample_channels_for_filter: list[uuid.UUID],
     ) -> None:
         """Test case-sensitive name contains filter"""
         # sample_channels_for_filter creates channels with various names
-        querier = BatchQuerier(
+        searcher = NotificationChannelSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
-                NotificationChannelConditions.by_name_contains(
+                NotificationChannelSearchableFields.own.name.filter.contains(
                     StringMatchSpec("Test", case_insensitive=False, negated=False)
                 )
             ],
             orders=[],
         )
-        channels = await notification_repository.search_channels(querier=querier)
+        channels = await channel_ops.search_in_global(searcher)
 
         # Should match "Test Channel" only, not "test channel"
         assert len(channels.items) == 1
@@ -409,21 +424,21 @@ class TestNotificationOptions:
 
     async def test_channel_by_name_contains_case_insensitive(
         self,
-        notification_repository: NotificationRepository,
+        channel_ops: OpsRepository[NotificationChannelData],
         sample_channels_for_filter: list[uuid.UUID],
     ) -> None:
         """Test case-insensitive name contains filter"""
         # sample_channels_for_filter creates channels with various names
-        querier = BatchQuerier(
+        searcher = NotificationChannelSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
-                NotificationChannelConditions.by_name_contains(
+                NotificationChannelSearchableFields.own.name.filter.contains(
                     StringMatchSpec("test", case_insensitive=True, negated=False)
                 )
             ],
             orders=[],
         )
-        channels = await notification_repository.search_channels(querier=querier)
+        channels = await channel_ops.search_in_global(searcher)
 
         # Should match both "Test Channel" and "test channel"
         assert len(channels.items) == 2
@@ -432,21 +447,21 @@ class TestNotificationOptions:
 
     async def test_channel_by_name_equals_case_sensitive(
         self,
-        notification_repository: NotificationRepository,
+        channel_ops: OpsRepository[NotificationChannelData],
         sample_channels_for_filter: list[uuid.UUID],
     ) -> None:
         """Test case-sensitive name equals filter"""
         # sample_channels_for_filter creates channels with various names
-        querier = BatchQuerier(
+        searcher = NotificationChannelSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
-                NotificationChannelConditions.by_name_equals(
+                NotificationChannelSearchableFields.own.name.filter.equals(
                     StringMatchSpec("Test Channel", case_insensitive=False, negated=False)
                 )
             ],
             orders=[],
         )
-        channels = await notification_repository.search_channels(querier=querier)
+        channels = await channel_ops.search_in_global(searcher)
 
         # Should match exactly "Test Channel"
         assert len(channels.items) == 1
@@ -454,21 +469,21 @@ class TestNotificationOptions:
 
     async def test_channel_by_name_equals_case_insensitive(
         self,
-        notification_repository: NotificationRepository,
+        channel_ops: OpsRepository[NotificationChannelData],
         sample_channels_for_filter: list[uuid.UUID],
     ) -> None:
         """Test case-insensitive name equals filter"""
         # sample_channels_for_filter creates channels with various names
-        querier = BatchQuerier(
+        searcher = NotificationChannelSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
-                NotificationChannelConditions.by_name_equals(
+                NotificationChannelSearchableFields.own.name.filter.equals(
                     StringMatchSpec("test channel", case_insensitive=True, negated=False)
                 )
             ],
             orders=[],
         )
-        channels = await notification_repository.search_channels(querier=querier)
+        channels = await channel_ops.search_in_global(searcher)
 
         # Should match both "Test Channel" and "test channel"
         assert len(channels.items) == 2
@@ -477,19 +492,21 @@ class TestNotificationOptions:
 
     async def test_channel_by_channel_types(
         self,
-        notification_repository: NotificationRepository,
+        channel_ops: OpsRepository[NotificationChannelData],
         sample_channels_for_filter: list[uuid.UUID],
     ) -> None:
         """Test filter by channel types"""
         # sample_channels_for_filter creates all WEBHOOK type channels
-        querier = BatchQuerier(
+        searcher = NotificationChannelSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
-                NotificationChannelConditions.by_channel_types([NotificationChannelType.WEBHOOK])
+                NotificationChannelSearchableFields.own.channel_type.filter.in_([
+                    NotificationChannelType.WEBHOOK
+                ])
             ],
             orders=[],
         )
-        channels = await notification_repository.search_channels(querier=querier)
+        channels = await channel_ops.search_in_global(searcher)
 
         # Should match all 5 channels
         assert len(channels.items) == 5
@@ -497,54 +514,54 @@ class TestNotificationOptions:
 
     async def test_channel_by_enabled_true(
         self,
-        notification_repository: NotificationRepository,
+        channel_ops: OpsRepository[NotificationChannelData],
         sample_channels_for_filter: list[uuid.UUID],
     ) -> None:
         """Test filter by enabled=True"""
         # sample_channels_for_filter creates 4 enabled and 1 disabled
-        querier = BatchQuerier(
+        searcher = NotificationChannelSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
-            conditions=[NotificationChannelConditions.by_enabled(True)],
+            conditions=[NotificationChannelSearchableFields.own.enabled.filter.equals(True)],
             orders=[],
         )
-        channels = await notification_repository.search_channels(querier=querier)
+        channels = await channel_ops.search_in_global(searcher)
 
         assert len(channels.items) == 4
         assert all(ch.enabled for ch in channels.items)
 
     async def test_channel_by_enabled_false(
         self,
-        notification_repository: NotificationRepository,
+        channel_ops: OpsRepository[NotificationChannelData],
         sample_channels_for_filter: list[uuid.UUID],
     ) -> None:
         """Test filter by enabled=False"""
         # sample_channels_for_filter creates 4 enabled and 1 disabled
-        querier = BatchQuerier(
+        searcher = NotificationChannelSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
-            conditions=[NotificationChannelConditions.by_enabled(False)],
+            conditions=[NotificationChannelSearchableFields.own.enabled.filter.equals(False)],
             orders=[],
         )
-        channels = await notification_repository.search_channels(querier=querier)
+        channels = await channel_ops.search_in_global(searcher)
 
         assert len(channels.items) == 1
         assert not channels.items[0].enabled
         assert channels.items[0].name == "Dev Notification"
 
-    # NotificationChannelOrders Tests
+    # Notification channel order tests
 
     async def test_channel_order_by_name_ascending(
         self,
-        notification_repository: NotificationRepository,
+        channel_ops: OpsRepository[NotificationChannelData],
         sample_channels_for_order: list[uuid.UUID],
     ) -> None:
         """Test ordering by name ascending (A-Z)"""
         # sample_channels_for_order creates: Zebra, Alpha, Beta
-        querier = BatchQuerier(
+        searcher = NotificationChannelSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
-            orders=[NotificationChannelOrders.name(ascending=True)],
+            orders=[NotificationChannelSearchableFields.own.name.order.apply(ascending=True)],
         )
-        channels = await notification_repository.search_channels(querier=querier)
+        channels = await channel_ops.search_in_global(searcher)
 
         assert len(channels.items) == 3
         assert channels.items[0].name == "Alpha Channel"
@@ -553,17 +570,17 @@ class TestNotificationOptions:
 
     async def test_channel_order_by_name_descending(
         self,
-        notification_repository: NotificationRepository,
+        channel_ops: OpsRepository[NotificationChannelData],
         sample_channels_for_order: list[uuid.UUID],
     ) -> None:
         """Test ordering by name descending (Z-A)"""
         # sample_channels_for_order creates: Zebra, Alpha, Beta
-        querier = BatchQuerier(
+        searcher = NotificationChannelSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
-            orders=[NotificationChannelOrders.name(ascending=False)],
+            orders=[NotificationChannelSearchableFields.own.name.order.apply(ascending=False)],
         )
-        channels = await notification_repository.search_channels(querier=querier)
+        channels = await channel_ops.search_in_global(searcher)
 
         assert len(channels.items) == 3
         assert channels.items[0].name == "Zebra Channel"
@@ -572,17 +589,17 @@ class TestNotificationOptions:
 
     async def test_channel_order_by_created_at_ascending(
         self,
-        notification_repository: NotificationRepository,
+        channel_ops: OpsRepository[NotificationChannelData],
         sample_channels_for_order: list[uuid.UUID],
     ) -> None:
         """Test ordering by created_at ascending (oldest first)"""
         # sample_channels_for_order creates with different created_at timestamps
-        querier = BatchQuerier(
+        searcher = NotificationChannelSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
-            orders=[NotificationChannelOrders.created_at(ascending=True)],
+            orders=[NotificationChannelSearchableFields.own.created_at.order.apply(ascending=True)],
         )
-        channels = await notification_repository.search_channels(querier=querier)
+        channels = await channel_ops.search_in_global(searcher)
 
         assert len(channels.items) == 3
         # Oldest to newest
@@ -592,17 +609,19 @@ class TestNotificationOptions:
 
     async def test_channel_order_by_created_at_descending(
         self,
-        notification_repository: NotificationRepository,
+        channel_ops: OpsRepository[NotificationChannelData],
         sample_channels_for_order: list[uuid.UUID],
     ) -> None:
         """Test ordering by created_at descending (newest first)"""
         # sample_channels_for_order creates with different created_at timestamps
-        querier = BatchQuerier(
+        searcher = NotificationChannelSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
-            orders=[NotificationChannelOrders.created_at(ascending=False)],
+            orders=[
+                NotificationChannelSearchableFields.own.created_at.order.apply(ascending=False)
+            ],
         )
-        channels = await notification_repository.search_channels(querier=querier)
+        channels = await channel_ops.search_in_global(searcher)
 
         assert len(channels.items) == 3
         # Newest to oldest
@@ -612,17 +631,17 @@ class TestNotificationOptions:
 
     async def test_channel_order_by_updated_at_ascending(
         self,
-        notification_repository: NotificationRepository,
+        channel_ops: OpsRepository[NotificationChannelData],
         sample_channels_for_order: list[uuid.UUID],
     ) -> None:
         """Test ordering by updated_at ascending"""
         # sample_channels_for_order creates with different updated_at timestamps
-        querier = BatchQuerier(
+        searcher = NotificationChannelSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
-            orders=[NotificationChannelOrders.updated_at(ascending=True)],
+            orders=[NotificationChannelSearchableFields.own.updated_at.order.apply(ascending=True)],
         )
-        channels = await notification_repository.search_channels(querier=querier)
+        channels = await channel_ops.search_in_global(searcher)
 
         assert len(channels.items) == 3
         # Oldest update to newest update
@@ -632,17 +651,19 @@ class TestNotificationOptions:
 
     async def test_channel_order_by_updated_at_descending(
         self,
-        notification_repository: NotificationRepository,
+        channel_ops: OpsRepository[NotificationChannelData],
         sample_channels_for_order: list[uuid.UUID],
     ) -> None:
         """Test ordering by updated_at descending"""
         # sample_channels_for_order creates with different updated_at timestamps
-        querier = BatchQuerier(
+        searcher = NotificationChannelSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
-            orders=[NotificationChannelOrders.updated_at(ascending=False)],
+            orders=[
+                NotificationChannelSearchableFields.own.updated_at.order.apply(ascending=False)
+            ],
         )
-        channels = await notification_repository.search_channels(querier=querier)
+        channels = await channel_ops.search_in_global(searcher)
 
         assert len(channels.items) == 3
         # Newest update to oldest update
@@ -650,25 +671,25 @@ class TestNotificationOptions:
         assert channels.items[1].name == "Alpha Channel"
         assert channels.items[2].name == "Beta Channel"
 
-    # NotificationRuleConditions Tests
+    # Notification rule filter tests
 
     async def test_rule_by_name_contains_case_sensitive(
         self,
-        notification_repository: NotificationRepository,
+        rule_ops: OpsRepository[NotificationRuleData],
         sample_rules_for_filter: list[uuid.UUID],
     ) -> None:
         """Test case-sensitive name contains filter for rules"""
         # sample_rules_for_filter creates rules with various names
-        querier = BatchQuerier(
+        searcher = NotificationRuleSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
-                NotificationRuleConditions.by_name_contains(
+                NotificationRuleSearchableFields.own.name.filter.contains(
                     StringMatchSpec("Test", case_insensitive=False, negated=False)
                 )
             ],
             orders=[],
         )
-        rules = await notification_repository.search_rules(querier=querier)
+        rules = await rule_ops.search_in_global(searcher)
 
         # Should match "Test Rule" only, not "test rule"
         assert len(rules.items) == 1
@@ -676,21 +697,21 @@ class TestNotificationOptions:
 
     async def test_rule_by_name_contains_case_insensitive(
         self,
-        notification_repository: NotificationRepository,
+        rule_ops: OpsRepository[NotificationRuleData],
         sample_rules_for_filter: list[uuid.UUID],
     ) -> None:
         """Test case-insensitive name contains filter for rules"""
         # sample_rules_for_filter creates rules with various names
-        querier = BatchQuerier(
+        searcher = NotificationRuleSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
-                NotificationRuleConditions.by_name_contains(
+                NotificationRuleSearchableFields.own.name.filter.contains(
                     StringMatchSpec("test", case_insensitive=True, negated=False)
                 )
             ],
             orders=[],
         )
-        rules = await notification_repository.search_rules(querier=querier)
+        rules = await rule_ops.search_in_global(searcher)
 
         # Should match both "Test Rule" and "test rule"
         assert len(rules.items) == 2
@@ -699,21 +720,21 @@ class TestNotificationOptions:
 
     async def test_rule_by_name_equals_case_sensitive(
         self,
-        notification_repository: NotificationRepository,
+        rule_ops: OpsRepository[NotificationRuleData],
         sample_rules_for_filter: list[uuid.UUID],
     ) -> None:
         """Test case-sensitive name equals filter for rules"""
         # sample_rules_for_filter creates rules with various names
-        querier = BatchQuerier(
+        searcher = NotificationRuleSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
-                NotificationRuleConditions.by_name_equals(
+                NotificationRuleSearchableFields.own.name.filter.equals(
                     StringMatchSpec("Test Rule", case_insensitive=False, negated=False)
                 )
             ],
             orders=[],
         )
-        rules = await notification_repository.search_rules(querier=querier)
+        rules = await rule_ops.search_in_global(searcher)
 
         # Should match exactly "Test Rule"
         assert len(rules.items) == 1
@@ -721,21 +742,21 @@ class TestNotificationOptions:
 
     async def test_rule_by_name_equals_case_insensitive(
         self,
-        notification_repository: NotificationRepository,
+        rule_ops: OpsRepository[NotificationRuleData],
         sample_rules_for_filter: list[uuid.UUID],
     ) -> None:
         """Test case-insensitive name equals filter for rules"""
         # sample_rules_for_filter creates rules with various names
-        querier = BatchQuerier(
+        searcher = NotificationRuleSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
-                NotificationRuleConditions.by_name_equals(
+                NotificationRuleSearchableFields.own.name.filter.equals(
                     StringMatchSpec("test rule", case_insensitive=True, negated=False)
                 )
             ],
             orders=[],
         )
-        rules = await notification_repository.search_rules(querier=querier)
+        rules = await rule_ops.search_in_global(searcher)
 
         # Should match both "Test Rule" and "test rule"
         assert len(rules.items) == 2
@@ -744,19 +765,21 @@ class TestNotificationOptions:
 
     async def test_rule_by_rule_types(
         self,
-        notification_repository: NotificationRepository,
+        rule_ops: OpsRepository[NotificationRuleData],
         sample_rules_for_filter: list[uuid.UUID],
     ) -> None:
         """Test filter by rule types"""
         # sample_rules_for_filter creates 3 SESSION_STARTED and 2 SESSION_TERMINATED
-        querier = BatchQuerier(
+        searcher = NotificationRuleSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
-                NotificationRuleConditions.by_rule_types([NotificationRuleType.SESSION_STARTED])
+                NotificationRuleSearchableFields.own.rule_type.filter.in_([
+                    NotificationRuleType.SESSION_STARTED
+                ])
             ],
             orders=[],
         )
-        rules = await notification_repository.search_rules(querier=querier)
+        rules = await rule_ops.search_in_global(searcher)
 
         # Should match 3 SESSION_STARTED rules
         assert len(rules.items) == 3
@@ -764,54 +787,54 @@ class TestNotificationOptions:
 
     async def test_rule_by_enabled_true(
         self,
-        notification_repository: NotificationRepository,
+        rule_ops: OpsRepository[NotificationRuleData],
         sample_rules_for_filter: list[uuid.UUID],
     ) -> None:
         """Test filter by enabled=True"""
         # sample_rules_for_filter creates 4 enabled and 1 disabled
-        querier = BatchQuerier(
+        searcher = NotificationRuleSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
-            conditions=[NotificationRuleConditions.by_enabled(True)],
+            conditions=[NotificationRuleSearchableFields.own.enabled.filter.equals(True)],
             orders=[],
         )
-        rules = await notification_repository.search_rules(querier=querier)
+        rules = await rule_ops.search_in_global(searcher)
 
         assert len(rules.items) == 4
         assert all(rule.enabled for rule in rules.items)
 
     async def test_rule_by_enabled_false(
         self,
-        notification_repository: NotificationRepository,
+        rule_ops: OpsRepository[NotificationRuleData],
         sample_rules_for_filter: list[uuid.UUID],
     ) -> None:
         """Test filter by enabled=False"""
         # sample_rules_for_filter creates 4 enabled and 1 disabled
-        querier = BatchQuerier(
+        searcher = NotificationRuleSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
-            conditions=[NotificationRuleConditions.by_enabled(False)],
+            conditions=[NotificationRuleSearchableFields.own.enabled.filter.equals(False)],
             orders=[],
         )
-        rules = await notification_repository.search_rules(querier=querier)
+        rules = await rule_ops.search_in_global(searcher)
 
         assert len(rules.items) == 1
         assert not rules.items[0].enabled
         assert rules.items[0].name == "Dev Notification"
 
-    # NotificationRuleOrders Tests
+    # Notification rule order tests
 
     async def test_rule_order_by_name_ascending(
         self,
-        notification_repository: NotificationRepository,
+        rule_ops: OpsRepository[NotificationRuleData],
         sample_rules_for_order: list[uuid.UUID],
     ) -> None:
         """Test ordering by name ascending (A-Z)"""
         # sample_rules_for_order creates: Zebra, Alpha, Beta
-        querier = BatchQuerier(
+        searcher = NotificationRuleSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
-            orders=[NotificationRuleOrders.name(ascending=True)],
+            orders=[NotificationRuleSearchableFields.own.name.order.apply(ascending=True)],
         )
-        rules = await notification_repository.search_rules(querier=querier)
+        rules = await rule_ops.search_in_global(searcher)
 
         assert len(rules.items) == 3
         assert rules.items[0].name == "Alpha Rule"
@@ -820,17 +843,17 @@ class TestNotificationOptions:
 
     async def test_rule_order_by_name_descending(
         self,
-        notification_repository: NotificationRepository,
+        rule_ops: OpsRepository[NotificationRuleData],
         sample_rules_for_order: list[uuid.UUID],
     ) -> None:
         """Test ordering by name descending (Z-A)"""
         # sample_rules_for_order creates: Zebra, Alpha, Beta
-        querier = BatchQuerier(
+        searcher = NotificationRuleSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
-            orders=[NotificationRuleOrders.name(ascending=False)],
+            orders=[NotificationRuleSearchableFields.own.name.order.apply(ascending=False)],
         )
-        rules = await notification_repository.search_rules(querier=querier)
+        rules = await rule_ops.search_in_global(searcher)
 
         assert len(rules.items) == 3
         assert rules.items[0].name == "Zebra Rule"
@@ -839,17 +862,17 @@ class TestNotificationOptions:
 
     async def test_rule_order_by_created_at_ascending(
         self,
-        notification_repository: NotificationRepository,
+        rule_ops: OpsRepository[NotificationRuleData],
         sample_rules_for_order: list[uuid.UUID],
     ) -> None:
         """Test ordering by created_at ascending (oldest first)"""
         # sample_rules_for_order creates with different created_at timestamps
-        querier = BatchQuerier(
+        searcher = NotificationRuleSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
-            orders=[NotificationRuleOrders.created_at(ascending=True)],
+            orders=[NotificationRuleSearchableFields.own.created_at.order.apply(ascending=True)],
         )
-        rules = await notification_repository.search_rules(querier=querier)
+        rules = await rule_ops.search_in_global(searcher)
 
         assert len(rules.items) == 3
         # Oldest to newest
@@ -859,17 +882,17 @@ class TestNotificationOptions:
 
     async def test_rule_order_by_created_at_descending(
         self,
-        notification_repository: NotificationRepository,
+        rule_ops: OpsRepository[NotificationRuleData],
         sample_rules_for_order: list[uuid.UUID],
     ) -> None:
         """Test ordering by created_at descending (newest first)"""
         # sample_rules_for_order creates with different created_at timestamps
-        querier = BatchQuerier(
+        searcher = NotificationRuleSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
-            orders=[NotificationRuleOrders.created_at(ascending=False)],
+            orders=[NotificationRuleSearchableFields.own.created_at.order.apply(ascending=False)],
         )
-        rules = await notification_repository.search_rules(querier=querier)
+        rules = await rule_ops.search_in_global(searcher)
 
         assert len(rules.items) == 3
         # Newest to oldest
@@ -879,17 +902,17 @@ class TestNotificationOptions:
 
     async def test_rule_order_by_updated_at_ascending(
         self,
-        notification_repository: NotificationRepository,
+        rule_ops: OpsRepository[NotificationRuleData],
         sample_rules_for_order: list[uuid.UUID],
     ) -> None:
         """Test ordering by updated_at ascending"""
         # sample_rules_for_order creates with different updated_at timestamps
-        querier = BatchQuerier(
+        searcher = NotificationRuleSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
-            orders=[NotificationRuleOrders.updated_at(ascending=True)],
+            orders=[NotificationRuleSearchableFields.own.updated_at.order.apply(ascending=True)],
         )
-        rules = await notification_repository.search_rules(querier=querier)
+        rules = await rule_ops.search_in_global(searcher)
 
         assert len(rules.items) == 3
         # Oldest update to newest update
@@ -899,17 +922,17 @@ class TestNotificationOptions:
 
     async def test_rule_order_by_updated_at_descending(
         self,
-        notification_repository: NotificationRepository,
+        rule_ops: OpsRepository[NotificationRuleData],
         sample_rules_for_order: list[uuid.UUID],
     ) -> None:
         """Test ordering by updated_at descending"""
         # sample_rules_for_order creates with different updated_at timestamps
-        querier = BatchQuerier(
+        searcher = NotificationRuleSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
-            orders=[NotificationRuleOrders.updated_at(ascending=False)],
+            orders=[NotificationRuleSearchableFields.own.updated_at.order.apply(ascending=False)],
         )
-        rules = await notification_repository.search_rules(querier=querier)
+        rules = await rule_ops.search_in_global(searcher)
 
         assert len(rules.items) == 3
         # Newest update to oldest update
@@ -919,20 +942,20 @@ class TestNotificationOptions:
 
     async def test_channel_no_match_returns_empty(
         self,
-        notification_repository: NotificationRepository,
+        channel_ops: OpsRepository[NotificationChannelData],
         sample_channels_for_filter: list[uuid.UUID],
     ) -> None:
         """Test that searching for non-existent channel returns empty with total_count=0"""
-        querier = BatchQuerier(
+        searcher = NotificationChannelSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
-                NotificationChannelConditions.by_name_equals(
+                NotificationChannelSearchableFields.own.name.filter.equals(
                     StringMatchSpec("NonexistentChannelName", case_insensitive=False, negated=False)
                 )
             ],
             orders=[],
         )
-        channels = await notification_repository.search_channels(querier=querier)
+        channels = await channel_ops.search_in_global(searcher)
 
         # WHERE condition matches nothing
         assert len(channels.items) == 0
@@ -940,20 +963,20 @@ class TestNotificationOptions:
 
     async def test_rule_no_match_returns_empty(
         self,
-        notification_repository: NotificationRepository,
+        rule_ops: OpsRepository[NotificationRuleData],
         sample_rules_for_filter: list[uuid.UUID],
     ) -> None:
         """Test that searching for non-existent rule returns empty with total_count=0"""
-        querier = BatchQuerier(
+        searcher = NotificationRuleSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
-                NotificationRuleConditions.by_name_equals(
+                NotificationRuleSearchableFields.own.name.filter.equals(
                     StringMatchSpec("NonexistentRuleName", case_insensitive=False, negated=False)
                 )
             ],
             orders=[],
         )
-        rules = await notification_repository.search_rules(querier=querier)
+        rules = await rule_ops.search_in_global(searcher)
 
         # WHERE condition matches nothing
         assert len(rules.items) == 0
@@ -979,7 +1002,7 @@ class TestNotificationCursorPagination:
             [
                 # Base rows in FK dependency order (parents before children)
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -987,7 +1010,7 @@ class TestNotificationCursorPagination:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
@@ -1011,15 +1034,17 @@ class TestNotificationCursorPagination:
             yield database_connection
 
     @pytest.fixture
-    async def test_domain_name(
+    async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> str:
+    ) -> DomainFixtureData:
         """Create test domain and return domain name"""
+        domain_id = DomainID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=domain_id,
                 name=domain_name,
                 description="Test domain for cursor pagination",
                 is_active=True,
@@ -1030,7 +1055,7 @@ class TestNotificationCursorPagination:
             db_sess.add(domain)
             await db_sess.commit()
 
-        return domain_name
+        return DomainFixtureData(domain_name=DomainName(domain_name), domain_id=domain_id)
 
     @pytest.fixture
     async def test_resource_policy_name(
@@ -1057,7 +1082,7 @@ class TestNotificationCursorPagination:
     async def test_user(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_resource_policy_name: str,
     ) -> uuid.UUID:
         """Create test user and return user UUID"""
@@ -1079,9 +1104,10 @@ class TestNotificationCursorPagination:
                 need_password_change=False,
                 status=UserStatus.ACTIVE,
                 status_info="active",
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 role=UserRole.USER,
                 resource_policy=test_resource_policy_name,
+                domain_id=test_domain.domain_id,
             )
             db_sess.add(user)
             await db_sess.commit()
@@ -1089,12 +1115,28 @@ class TestNotificationCursorPagination:
         return user_uuid
 
     @pytest.fixture
-    def notification_repository(
+    def channel_ops(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> NotificationRepository:
-        """Create NotificationRepository instance with database"""
-        return NotificationRepository(db=db_with_cleanup)
+    ) -> OpsRepository[NotificationChannelData]:
+        """Searches run through the generic ops repository the v2 searchers wire to."""
+        return OpsRepository(V2DBOpsProvider(db_with_cleanup))
+
+    @pytest.fixture
+    def rule_ops(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> OpsRepository[NotificationRuleData]:
+        return OpsRepository(V2DBOpsProvider(db_with_cleanup))
+
+    @pytest.fixture
+    def channel_pagination_spec(self) -> PaginationSpec:
+        return PaginationSpec(
+            forward_order=NotificationChannelSearchableFields.own.created_at.order.apply(
+                ascending=False
+            ),
+            cursor_column=NotificationChannelRow.id,
+        )
 
     @pytest.fixture
     async def channels_for_cursor_pagination(
@@ -1133,7 +1175,7 @@ class TestNotificationCursorPagination:
 
     async def test_forward_pagination_first_page_shows_newest_first(
         self,
-        notification_repository: NotificationRepository,
+        channel_ops: OpsRepository[NotificationChannelData],
         channels_for_cursor_pagination: list[uuid.UUID],
     ) -> None:
         """Test forward pagination first page shows newest items first (DESC order).
@@ -1141,14 +1183,16 @@ class TestNotificationCursorPagination:
         With 5 channels (oldest to newest: Channel-1 to Channel-5),
         first page with first=3 should return: Channel-5, Channel-4, Channel-3
         """
-        querier = BatchQuerier(
+        searcher = NotificationChannelSearcher(
             pagination=CursorForwardPagination(
                 first=3,
-                cursor_order=NotificationChannelOrders.created_at(ascending=False),  # DESC
+                cursor_order=NotificationChannelSearchableFields.own.created_at.order.apply(
+                    ascending=False
+                ),  # DESC
                 cursor_condition=None,  # No cursor = first page
             ),
         )
-        result = await notification_repository.search_channels(querier=querier)
+        result = await channel_ops.search_in_global(searcher)
 
         assert len(result.items) == 3
         # Should be newest first
@@ -1160,7 +1204,8 @@ class TestNotificationCursorPagination:
 
     async def test_forward_pagination_with_cursor_shows_older_items(
         self,
-        notification_repository: NotificationRepository,
+        channel_pagination_spec: PaginationSpec,
+        channel_ops: OpsRepository[NotificationChannelData],
         channels_for_cursor_pagination: list[uuid.UUID],
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> None:
@@ -1178,17 +1223,18 @@ class TestNotificationCursorPagination:
             )
             channel_3_id = db_result.scalar_one()
 
-        # Forward cursor condition: created_at < cursor's created_at
-        cursor_condition = NotificationChannelConditions.by_cursor_forward(str(channel_3_id))
+        cursor_condition = channel_pagination_spec.forward_condition(str(channel_3_id))
 
-        querier = BatchQuerier(
+        searcher = NotificationChannelSearcher(
             pagination=CursorForwardPagination(
                 first=3,
-                cursor_order=NotificationChannelOrders.created_at(ascending=False),  # DESC
+                cursor_order=NotificationChannelSearchableFields.own.created_at.order.apply(
+                    ascending=False
+                ),  # DESC
                 cursor_condition=cursor_condition,
             ),
         )
-        search_result = await notification_repository.search_channels(querier=querier)
+        search_result = await channel_ops.search_in_global(searcher)
 
         # Should return older items (Channel-2, Channel-1)
         assert len(search_result.items) == 2
@@ -1199,7 +1245,7 @@ class TestNotificationCursorPagination:
 
     async def test_backward_pagination_last_page_fetches_oldest_first(
         self,
-        notification_repository: NotificationRepository,
+        channel_ops: OpsRepository[NotificationChannelData],
         channels_for_cursor_pagination: list[uuid.UUID],
     ) -> None:
         """Test backward pagination without cursor fetches from the end (oldest first in DB order).
@@ -1207,14 +1253,16 @@ class TestNotificationCursorPagination:
         With 5 channels, last=3 without cursor should fetch the 3 newest items
         but in ASC order for DB query, then results need to be reversed for display.
         """
-        querier = BatchQuerier(
+        searcher = NotificationChannelSearcher(
             pagination=CursorBackwardPagination(
                 last=3,
-                cursor_order=NotificationChannelOrders.created_at(ascending=True),  # ASC
+                cursor_order=NotificationChannelSearchableFields.own.created_at.order.apply(
+                    ascending=True
+                ),  # ASC
                 cursor_condition=None,  # No cursor = last page
             ),
         )
-        result = await notification_repository.search_channels(querier=querier)
+        result = await channel_ops.search_in_global(searcher)
 
         # Backward pagination returns in ascending order (oldest first in this slice)
         # These are the 3 oldest items: Channel-1, Channel-2, Channel-3
@@ -1227,7 +1275,8 @@ class TestNotificationCursorPagination:
 
     async def test_backward_pagination_with_cursor_shows_newer_items(
         self,
-        notification_repository: NotificationRepository,
+        channel_pagination_spec: PaginationSpec,
+        channel_ops: OpsRepository[NotificationChannelData],
         channels_for_cursor_pagination: list[uuid.UUID],
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> None:
@@ -1245,17 +1294,18 @@ class TestNotificationCursorPagination:
             )
             channel_3_id = db_result.scalar_one()
 
-        # Backward cursor condition: created_at > cursor's created_at
-        cursor_condition = NotificationChannelConditions.by_cursor_backward(str(channel_3_id))
+        cursor_condition = channel_pagination_spec.backward_condition(str(channel_3_id))
 
-        querier = BatchQuerier(
+        searcher = NotificationChannelSearcher(
             pagination=CursorBackwardPagination(
                 last=3,
-                cursor_order=NotificationChannelOrders.created_at(ascending=True),  # ASC
+                cursor_order=NotificationChannelSearchableFields.own.created_at.order.apply(
+                    ascending=True
+                ),  # ASC
                 cursor_condition=cursor_condition,
             ),
         )
-        search_result = await notification_repository.search_channels(querier=querier)
+        search_result = await channel_ops.search_in_global(searcher)
 
         # Should return newer items (Channel-4, Channel-5) in ASC order
         assert len(search_result.items) == 2

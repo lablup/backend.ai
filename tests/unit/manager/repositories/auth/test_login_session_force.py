@@ -9,37 +9,42 @@ from dataclasses import dataclass
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.auth.login_session_types import (
     LoginAttemptResult,
     LoginSessionStatus,
 )
-from ai.backend.manager.errors.auth import AuthorizationFailed
-from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.data.secret.types import KeyProviderType
+from ai.backend.manager.errors.auth import AuthorizationFailed, LoginSessionNotFoundError
+from ai.backend.manager.models.agent.row import AgentRow
 
 # ORM cluster registration: configure_mappers() (triggered when this isolated
 # test registers a domain-cluster row) resolves string relationships against the
 # registry. These rows are reachable via relationships but are not otherwise
 # imported/registered by this test; _ORM_CLUSTER keeps them live.
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.login_client_type.row import LoginClientTypeRow
 from ai.backend.manager.models.login_session.row import LoginHistoryRow, LoginSessionRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.resource_group.row import ResourceGroupForDomainRow
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
-from ai.backend.manager.models.user import UserRole, UserRow
+from ai.backend.manager.models.user.row import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.auth.db_source.db_source import AuthDBSource
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.secret.pool import KeyProviderPool
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
 
 _ORM_CLUSTER = (
     AgentRow,
-    ScalingGroupForDomainRow,
+    ResourceGroupForDomainRow,
 )
 
 
@@ -76,13 +81,18 @@ class TestLoginSessionForce:
 
     @pytest.fixture
     async def auth_db_source(self, db_with_cleanup: ExtendedAsyncSAEngine) -> AuthDBSource:
-        return AuthDBSource(db_with_cleanup)
+        return AuthDBSource(
+            db_with_cleanup,
+            V2DBOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
 
     @pytest.fixture
     async def sample_user(
         self, db_with_cleanup: ExtendedAsyncSAEngine
     ) -> AsyncGenerator[SampleUserData, None]:
         """Create a user with domain, resource policies, and keypair."""
+        domain_id = DomainID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4()}"
         user_uuid = uuid.uuid4()
         email = f"test-{uuid.uuid4()}@example.com"
@@ -92,6 +102,7 @@ class TestLoginSessionForce:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="test",
                     is_active=True,
@@ -137,22 +148,22 @@ class TestLoginSessionForce:
                 role=UserRole.USER,
                 resource_policy="test-user-policy",
                 need_password_change=False,
+                domain_id=domain_id,
             )
             db_sess.add(user)
             await db_sess.flush()
 
             keypair = KeyPairRow(
                 access_key=access_key,
-                secret_key="test_secret_key",
-                user_id=email,
+                secret_key=SecretValue("test_secret_key"),
                 user=user_uuid,
                 is_active=True,
+                is_default=True,
                 resource_policy="test-keypair-policy",
             )
             db_sess.add(keypair)
             await db_sess.flush()
 
-            user.main_access_key = access_key
             await db_sess.commit()
 
         yield SampleUserData(
@@ -379,8 +390,8 @@ class TestLoginSessionForce:
         assert await self._count_active_sessions(db_with_cleanup, sample_user.user_id) == 1
 
         # Logout (invalidate session by token)
-        await auth_db_source.delete_session_by_token(
-            result1.session_token, LoginAttemptResult.LOGOUT
+        await auth_db_source.delete_owned_session_by_token(
+            result1.session_token, UserID(sample_user.user_id), LoginAttemptResult.LOGOUT
         )
         assert await self._count_active_sessions(db_with_cleanup, sample_user.user_id) == 0
 
@@ -400,3 +411,116 @@ class TestLoginSessionForce:
         )
         assert result2.session_token != result1.session_token
         assert await self._count_active_sessions(db_with_cleanup, sample_user.user_id) == 1
+
+    async def test_logout_with_another_users_token_keeps_session(
+        self,
+        auth_db_source: AuthDBSource,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        sample_user: SampleUserData,
+    ) -> None:
+        created = await auth_db_source.create_login_session(
+            user_id=sample_user.user_id,
+            access_key=sample_user.access_key,
+            domain_name=sample_user.domain_name,
+        )
+
+        with pytest.raises(LoginSessionNotFoundError):
+            await auth_db_source.delete_owned_session_by_token(
+                created.session_token, UserID(uuid.uuid4()), LoginAttemptResult.LOGOUT
+            )
+
+        assert await self._count_active_sessions(db_with_cleanup, sample_user.user_id) == 1
+        assert (
+            await self._count_login_history(
+                db_with_cleanup, sample_user.user_id, LoginAttemptResult.LOGOUT
+            )
+            == 0
+        )
+
+    async def test_logout_with_missing_token_raises_not_found(
+        self, auth_db_source: AuthDBSource, sample_user: SampleUserData
+    ) -> None:
+        with pytest.raises(LoginSessionNotFoundError):
+            await auth_db_source.delete_owned_session_by_token(
+                "missing-token", UserID(sample_user.user_id), LoginAttemptResult.LOGOUT
+            )
+
+    @pytest.fixture
+    async def mixed_session_tokens(
+        self, db_with_cleanup: ExtendedAsyncSAEngine, sample_user: SampleUserData
+    ) -> dict[str, str]:
+        other_user_id = uuid.uuid4()
+        other_email = f"other-{other_user_id}@example.com"
+        tokens = {name: uuid.uuid4().hex for name in ("active", "invalidated", "other")}
+        async with db_with_cleanup.begin_session() as db_session:
+            domain_id = await db_session.scalar(
+                sa.select(DomainRow.id).where(DomainRow.name == sample_user.domain_name)
+            )
+            db_session.add(
+                UserRow(
+                    uuid=other_user_id,
+                    username=other_email,
+                    email=other_email,
+                    password=self._make_password_info(),
+                    domain_name=sample_user.domain_name,
+                    domain_id=domain_id,
+                    role=UserRole.USER,
+                    resource_policy="test-user-policy",
+                    need_password_change=False,
+                )
+            )
+            await db_session.flush()
+            db_session.add_all([
+                LoginSessionRow(
+                    user_id=UserID(sample_user.user_id),
+                    access_key=sample_user.access_key,
+                    session_token=tokens["active"],
+                    status=LoginSessionStatus.ACTIVE,
+                ),
+                LoginSessionRow(
+                    user_id=UserID(sample_user.user_id),
+                    access_key=sample_user.access_key,
+                    session_token=tokens["invalidated"],
+                    status=LoginSessionStatus.INVALIDATED,
+                    invalidated_at=sa.func.now(),
+                ),
+                LoginSessionRow(
+                    user_id=UserID(other_user_id),
+                    access_key=f"AKIA{uuid.uuid4().hex[:16]}",
+                    session_token=tokens["other"],
+                    status=LoginSessionStatus.ACTIVE,
+                ),
+            ])
+            await db_session.commit()
+        return tokens
+
+    async def test_invalidate_returns_only_newly_invalidated_tokens(
+        self,
+        auth_db_source: AuthDBSource,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        sample_user: SampleUserData,
+        mixed_session_tokens: dict[str, str],
+    ) -> None:
+        tokens = await auth_db_source.invalidate_active_login_sessions(UserID(sample_user.user_id))
+
+        assert tokens == [mixed_session_tokens["active"]]
+        assert await self._count_active_sessions(db_with_cleanup, sample_user.user_id) == 0
+        async with db_with_cleanup.begin_readonly() as conn:
+            other_status = await conn.scalar(
+                sa.select(LoginSessionRow.status).where(
+                    LoginSessionRow.session_token == mixed_session_tokens["other"]
+                )
+            )
+        assert other_status == LoginSessionStatus.ACTIVE
+
+    async def test_repeated_invalidation_returns_no_tokens(
+        self,
+        auth_db_source: AuthDBSource,
+        sample_user: SampleUserData,
+        mixed_session_tokens: dict[str, str],
+    ) -> None:
+        await auth_db_source.invalidate_active_login_sessions(UserID(sample_user.user_id))
+
+        tokens = await auth_db_source.invalidate_active_login_sessions(UserID(sample_user.user_id))
+
+        assert tokens == []

@@ -15,6 +15,7 @@ Test Scenarios:
 from __future__ import annotations
 
 import dataclasses
+import logging
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
@@ -26,24 +27,32 @@ from ai.backend.common.clients.valkey_client.valkey_schedule import (
     ReplicaHealthStatus as ValkeyReplicaHealthStatus,
 )
 from ai.backend.common.config import ModelHealthCheck
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
+from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.response import (
     BulkUpdateRoutesResponse,
 )
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.types import UpdatedRoutesItem
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
-from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.deployment.types import (
+    RouteData,
     RouteHealthStatus,
     RouteStatus,
+    RouteSubStatus,
     RouteTrafficStatus,
 )
 from ai.backend.manager.data.model_serving.types import AppProxyRouteEntry
-from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
-from ai.backend.manager.repositories.deployment.types import RouteData
+from ai.backend.manager.data.resource.types import ResourceGroupProxyTarget
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
 from ai.backend.manager.sokovan.deployment.route.recorder.context import RouteRecorderContext
+
+_TRACE_LEVEL = 5
+
+
+def _provisioning_failure_records(caplog: pytest.LogCaptureFixture) -> list[logging.LogRecord]:
+    return [r for r in caplog.records if r.getMessage().startswith("route provisioning failed")]
+
 
 # =============================================================================
 # TestProvisionRoutes (RP-001 ~ RP-003)
@@ -154,6 +163,49 @@ class TestProvisionRoutes:
         # Assert
         assert len(result.successes) == 0
         assert len(result.errors) == 1
+
+    async def test_provisioning_rejection_logged_at_trace(
+        self,
+        route_executor: RouteExecutor,
+        mock_deployment_repo: AsyncMock,
+        provisioning_route: RouteData,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """A client-side rejection (missing deployment) is logged at trace without a traceback."""
+        caplog.set_level(_TRACE_LEVEL, logger="ai.backend.manager.sokovan")
+        mock_deployment_repo.get_deployments_by_ids.return_value = []
+
+        with RouteRecorderContext.scope("test", entity_ids=[provisioning_route.route_id]):
+            await route_executor.provision_routes([provisioning_route])
+
+        failures = _provisioning_failure_records(caplog)
+        assert len(failures) == 1
+        assert failures[0].levelno == _TRACE_LEVEL
+        assert failures[0].__dict__["log_tag_route_id"] == str(provisioning_route.route_id)
+
+    async def test_provisioning_server_fault_logged_as_error(
+        self,
+        route_executor: RouteExecutor,
+        mock_deployment_repo: AsyncMock,
+        provisioning_route: RouteData,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """A failure that is not a rejection is a server fault, logged with its traceback."""
+        caplog.set_level(_TRACE_LEVEL, logger="ai.backend.manager.sokovan")
+        deployment = MagicMock()
+        deployment.id = provisioning_route.deployment_id
+        mock_deployment_repo.get_deployments_by_ids.return_value = [deployment]
+        mock_deployment_repo.fetch_deployment_context.side_effect = RuntimeError("db bug")
+
+        with RouteRecorderContext.scope("test", entity_ids=[provisioning_route.route_id]):
+            result = await route_executor.provision_routes([provisioning_route])
+
+        assert len(result.errors) == 1
+        failures = _provisioning_failure_records(caplog)
+        assert len(failures) == 1
+        assert failures[0].levelno == logging.ERROR
+        assert failures[0].exc_info is not None
+        assert failures[0].__dict__["log_tag_route_id"] == str(provisioning_route.route_id)
 
     @pytest.mark.skip(
         reason=(
@@ -508,6 +560,75 @@ class TestCheckRunningRoutes:
         assert len(result.successes) == 1
         assert len(result.errors) == 1
 
+    @pytest.mark.parametrize(
+        "sub_status",
+        [RouteSubStatus.WARMING_UP, RouteSubStatus.STARTING],
+    )
+    async def test_provisioning_route_with_terminated_session_in_errors(
+        self,
+        route_executor: RouteExecutor,
+        mock_deployment_repo: AsyncMock,
+        running_route: RouteData,
+        session_status_terminated: MagicMock,
+        sub_status: RouteSubStatus,
+    ) -> None:
+        """RR-005: PROVISIONING route whose session died is in errors.
+
+        Given: PROVISIONING route with a session that is already terminal
+        When: Check running routes
+        Then: Route in errors list, without waiting for the initial delay
+        """
+        # Arrange
+        route = dataclasses.replace(
+            running_route,
+            status=RouteStatus.PROVISIONING,
+            sub_status=sub_status,
+            health_status=RouteHealthStatus.NOT_CHECKED,
+        )
+        mock_deployment_repo.fetch_session_statuses_by_route_ids.return_value = {
+            route.route_id: session_status_terminated
+        }
+
+        entity_ids = [route.route_id]
+        with RouteRecorderContext.scope("test", entity_ids=entity_ids):
+            # Act
+            result = await route_executor.check_running_routes([route])
+
+        # Assert
+        assert len(result.successes) == 0
+        assert len(result.errors) == 1
+
+    async def test_route_without_session_in_successes(
+        self,
+        route_executor: RouteExecutor,
+        mock_deployment_repo: AsyncMock,
+        running_route: RouteData,
+    ) -> None:
+        """RR-006: PROVISIONING route not yet bound to a session passes.
+
+        Given: PROVISIONING+PENDING route with no session_id
+        When: Check running routes
+        Then: Route in successes list
+        """
+        # Arrange
+        route = dataclasses.replace(
+            running_route,
+            status=RouteStatus.PROVISIONING,
+            sub_status=RouteSubStatus.PENDING,
+            health_status=RouteHealthStatus.NOT_CHECKED,
+            session_id=None,
+        )
+        mock_deployment_repo.fetch_session_statuses_by_route_ids.return_value = {}
+
+        entity_ids = [route.route_id]
+        with RouteRecorderContext.scope("test", entity_ids=entity_ids):
+            # Act
+            result = await route_executor.check_running_routes([route])
+
+        # Assert
+        assert len(result.successes) == 1
+        assert len(result.errors) == 0
+
 
 # =============================================================================
 # TestCleanupRoutesByConfig (RE-001 ~ RE-003)
@@ -544,7 +665,7 @@ class TestCleanupRoutesByConfig:
         deployment.current_revision = current_revision_mock
         deployment.deploying_revision = None
         mock_deployment_repo.get_deployments_by_ids.return_value = [deployment]
-        mock_deployment_repo.get_scaling_group_cleanup_configs.return_value = {
+        mock_deployment_repo.get_resource_group_cleanup_configs.return_value = {
             "default": cleanup_config_unhealthy_only
         }
 
@@ -580,7 +701,7 @@ class TestCleanupRoutesByConfig:
         deployment.current_revision = current_revision_mock
         deployment.deploying_revision = None
         mock_deployment_repo.get_deployments_by_ids.return_value = [deployment]
-        mock_deployment_repo.get_scaling_group_cleanup_configs.return_value = {
+        mock_deployment_repo.get_resource_group_cleanup_configs.return_value = {
             "default": cleanup_config_unhealthy_only
         }
 
@@ -653,7 +774,7 @@ class TestCleanupRoutesByConfig:
         deployment.current_revision = current_revision_mock
         deployment.deploying_revision = deploying_revision_mock
         mock_deployment_repo.get_deployments_by_ids.return_value = [deployment]
-        mock_deployment_repo.get_scaling_group_cleanup_configs.return_value = {
+        mock_deployment_repo.get_resource_group_cleanup_configs.return_value = {
             "default": cleanup_config_unhealthy_only
         }
 
@@ -702,7 +823,7 @@ class TestCleanupRoutesByConfig:
         deployment.current_revision = None
         deployment.deploying_revision = deploying_revision_mock
         mock_deployment_repo.get_deployments_by_ids.return_value = [deployment]
-        mock_deployment_repo.get_scaling_group_cleanup_configs.return_value = {
+        mock_deployment_repo.get_resource_group_cleanup_configs.return_value = {
             "default": cleanup_config_unhealthy_only
         }
 
@@ -748,7 +869,7 @@ class TestCleanupRoutesByConfig:
         deployment.current_revision = None
         deployment.deploying_revision = None
         mock_deployment_repo.get_deployments_by_ids.return_value = [deployment]
-        mock_deployment_repo.get_scaling_group_cleanup_configs.return_value = {
+        mock_deployment_repo.get_resource_group_cleanup_configs.return_value = {
             "default": cleanup_config_unhealthy_only
         }
 
@@ -1021,8 +1142,8 @@ def _wire_proxy_target(
     """
     deployments = [_make_deployment_mock(UUID(str(eid)), resource_group) for eid in endpoint_ids]
     mock_deployment_repo.get_deployments_by_ids.return_value = deployments
-    mock_deployment_repo.fetch_scaling_group_proxy_targets.return_value = {
-        resource_group: ScalingGroupProxyTarget(addr=addr, api_token=token),
+    mock_deployment_repo.fetch_resource_group_proxy_targets.return_value = {
+        resource_group: ResourceGroupProxyTarget(addr=addr, api_token=token),
     }
     mock_deployment_repo.fetch_route_connection_infos.return_value = {
         UUID(str(eid)): [
@@ -1160,10 +1281,10 @@ class TestSyncAppproxy:
 
         await route_executor.sync_appproxy(routes)
 
-        querier = mock_deployment_repo.fetch_route_connection_infos.await_args.kwargs[
-            "route_querier"
+        searcher = mock_deployment_repo.fetch_route_connection_infos.await_args.kwargs[
+            "route_searcher"
         ]
-        compiled = [str(condition()) for condition in querier.conditions]
+        compiled = [str(condition()) for condition in searcher.conditions]
         assert not any("health_status" in clause for clause in compiled), (
             f"sync_appproxy must not filter by health; got {compiled}"
         )

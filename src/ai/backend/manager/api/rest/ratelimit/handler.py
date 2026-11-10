@@ -2,27 +2,51 @@
 
 This module provides the ``rlim_middleware`` function which is installed
 as a global aiohttp middleware.  There are no route handlers — rate
-limiting is applied transparently to all authorized requests.
+limiting is applied transparently to every request.
 """
 
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Final
 
 from aiohttp import web
+from multidict import CIMultiDict
 
-from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import (
+    RateLimitState,
+    ValkeyRateLimitClient,
+)
+from ai.backend.common.contexts.client_ip import current_client_ip
+from ai.backend.common.exception import UnreachableError
+from ai.backend.common.web.reserved_response_headers import reserve_response_headers
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.types import WebRequestHandler
 
 if TYPE_CHECKING:
     from aiohttp.typedefs import Middleware
 from ai.backend.manager.errors.api import RateLimitExceeded
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
-_rlim_window: Final = 60 * 15
+_RATELIMIT_WINDOW_SECONDS: Final = 60 * 15
+_ANONYMOUS_RATELIMIT: Final = 1000
+_HEALTH_PATH: Final = "/health"
+
+
+@dataclass(frozen=True)
+class RateLimitQuota:
+    limit: int
+    remaining: int
+    reset_after_seconds: int
+    window_seconds: int
+
+    def apply_to(self, headers: CIMultiDict[str]) -> None:
+        headers["X-RateLimit-Limit"] = str(self.limit)
+        headers["X-RateLimit-Remaining"] = str(self.remaining)
+        headers["X-RateLimit-Reset"] = str(self.reset_after_seconds)
+        headers["X-RateLimit-Window"] = str(self.window_seconds)
 
 
 def make_rlim_middleware(
@@ -35,27 +59,37 @@ def make_rlim_middleware(
         request: web.Request,
         handler: WebRequestHandler,
     ) -> web.StreamResponse:
-        """Global middleware implementing a rolling-counter rate limiter."""
+        """Global middleware implementing a fixed-window rate limiter."""
+        # TODO: let the health routes declare the exemption as a handler attribute.
+        if request.path == _HEALTH_PATH or request.path.startswith(f"{_HEALTH_PATH}/"):
+            return await handler(request)
+        rlim_window: RateLimitState
         if request["is_authorized"]:
-            rate_limit = request["keypair"]["rate_limit"]
-            access_key = request["keypair"]["access_key"]
-            rolling_count = await valkey_client.execute_rate_limit_logic(
-                access_key=access_key,
-                window=_rlim_window,
+            rlim_window = await valkey_client.consume_user_rlim_window(
+                user_id=request["user"]["uuid"],
+                window_seconds=_RATELIMIT_WINDOW_SECONDS,
+                limit=request["user"]["rate_limit"],
             )
-            if rate_limit is not None and rolling_count > rate_limit:
-                raise RateLimitExceeded
-            remaining = rate_limit - rolling_count if rate_limit is not None else rolling_count
-            response = await handler(request)
-            response.headers["X-RateLimit-Limit"] = str(rate_limit)
-            response.headers["X-RateLimit-Remaining"] = str(remaining)
-            response.headers["X-RateLimit-Window"] = str(_rlim_window)
-            return response
-        # No checks for rate limiting for non-authorized queries.
-        response = await handler(request)
-        response.headers["X-RateLimit-Limit"] = "1000"
-        response.headers["X-RateLimit-Remaining"] = "1000"
-        response.headers["X-RateLimit-Window"] = str(_rlim_window)
-        return response
+        else:
+            client_ip = current_client_ip()
+            if client_ip is None:
+                raise UnreachableError("a request over a socket always has a peer address")
+            rlim_window = await valkey_client.consume_ip_rlim_window(
+                client_ip=client_ip,
+                window_seconds=_RATELIMIT_WINDOW_SECONDS,
+                limit=_ANONYMOUS_RATELIMIT,
+            )
+        reserve_response_headers(
+            request,
+            RateLimitQuota(
+                limit=rlim_window.limit,
+                remaining=max(rlim_window.limit - rlim_window.count, 0),
+                reset_after_seconds=rlim_window.reset_after_seconds,
+                window_seconds=_RATELIMIT_WINDOW_SECONDS,
+            ),
+        )
+        if rlim_window.count > rlim_window.limit:
+            raise RateLimitExceeded
+        return await handler(request)
 
     return rlim_middleware

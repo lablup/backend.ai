@@ -16,12 +16,15 @@ from ai.backend.common.dto.manager.resource_slot.response import (
     PaginationInfo,
     SearchResourceSlotTypesResponse,
 )
-from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.services.resource_slot.actions.get_resource_slot_type import (
-    GetResourceSlotTypeAction,
+from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.models.resource_slot.scopes import PublicResourceSlotTypeTarget
+from ai.backend.manager.models.specs.searcher import ScopedSearcher
+from ai.backend.manager.services.resource_slot.actions.get import GetResourceSlotTypeAction
+from ai.backend.manager.services.resource_slot.actions.lookup import (
+    LookupResourceSlotTypeAction,
 )
-from ai.backend.manager.services.resource_slot.actions.search_resource_slot_types import (
-    SearchResourceSlotTypesAction,
+from ai.backend.manager.services.resource_slot.actions.scoped_search_resource_slot_types import (
+    ScopedSearchResourceSlotTypesAction,
 )
 
 from .adapter import ResourceSlotAdapter
@@ -29,7 +32,7 @@ from .adapter import ResourceSlotAdapter
 if TYPE_CHECKING:
     from ai.backend.manager.services.resource_slot.processors import ResourceSlotProcessors
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ResourceSlotHandler:
@@ -44,12 +47,15 @@ class ResourceSlotHandler:
         body: BodyParam[SearchResourceSlotTypesRequest],
     ) -> APIResponse:
         """Search resource slot types with filters, orders, and pagination."""
-        log.info("SEARCH_RESOURCE_SLOT_TYPES")
 
-        querier = self._adapter.build_querier(body.parsed)
+        searcher = self._adapter.build_searcher(body.parsed)
 
-        action_result = await self._resource_slot.search_resource_slot_types.wait_for_complete(
-            SearchResourceSlotTypesAction(querier=querier)
+        action_result = await self._resource_slot.scoped_search_resource_slot_types.run(
+            ScopedSearchResourceSlotTypesAction(
+                searcher=ScopedSearcher(
+                    scopes=[PublicResourceSlotTypeTarget()], used_by=(), searcher=searcher
+                )
+            )
         )
 
         resp = SearchResourceSlotTypesResponse(
@@ -68,13 +74,15 @@ class ResourceSlotHandler:
     ) -> APIResponse:
         """Get a single resource slot type by slot_name."""
         slot_name = path.parsed.slot_name
-        log.info("GET_RESOURCE_SLOT_TYPE (slot_name:{})", slot_name)
 
-        action_result = await self._resource_slot.get_resource_slot_type.wait_for_complete(
-            GetResourceSlotTypeAction(slot_name=slot_name)
+        resolved = await self._resource_slot.lookup_resource_slot_type.run(
+            LookupResourceSlotTypeAction(slot_name=slot_name)
+        )
+        action_result = await self._resource_slot.get_resource_slot_type.run(
+            GetResourceSlotTypeAction(slot_type_id=resolved.entity_id())
         )
 
         resp = GetResourceSlotTypeResponse(
-            item=self._adapter.convert_to_dto(action_result.item),
+            item=self._adapter.convert_to_dto(action_result.data),
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)

@@ -25,6 +25,8 @@ from ai.backend.client.v2.exceptions import (
 )
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.dto.manager.deployment.types import OrderDirection
 from ai.backend.common.dto.manager.group.request import GroupFilter, SearchGroupsRequest
 from ai.backend.common.dto.manager.group.response import (
@@ -36,20 +38,26 @@ from ai.backend.common.dto.manager.group.types import GroupOrder, GroupOrderFiel
 from ai.backend.common.dto.manager.infra.request import UsagePerPeriodRequest
 from ai.backend.common.dto.manager.infra.response import UsagePerPeriodResponse
 from ai.backend.common.dto.manager.query import StringFilter
-from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.types import (
     QuotaScopeID,
     QuotaScopeType,
     ResourceSlot,
     SessionTypes,
 )
+from ai.backend.manager.data.image.types import ImageType
+from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.model_serving.types import EndpointLifecycle
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
-from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
-from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.models.image import ImageRow, ImageType
-from ai.backend.manager.models.kernel import KernelRow, KernelStatus
-from ai.backend.manager.models.session import SessionRow, SessionStatus
-from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.endpoint.row import EndpointRow
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.vfolder.row import VFolderRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 
@@ -64,7 +72,7 @@ async def test_group_for_deletion(
     group_name = f"delete-test-{secrets.token_hex(4)}"
     async with db_engine.begin() as conn:
         await conn.execute(
-            sa.insert(GroupRow.__table__).values(
+            sa.insert(ProjectRow.__table__).values(
                 id=group_id,
                 name=group_name,
                 description=f"Group for deletion test {group_name}",
@@ -73,18 +81,48 @@ async def test_group_for_deletion(
                 resource_policy=resource_policy_fixture,
             )
         )
+        virtual_entity_id = uuid.uuid4()
+        await conn.execute(
+            sa.insert(VirtualEntityRow.__table__).values(
+                id=virtual_entity_id,
+                entity_type=ProjectEntityType(),
+                entity_id=group_id,
+            )
+        )
+        await conn.execute(
+            sa.insert(EntityMembershipRow.__table__).values(
+                virtual_entity_id=virtual_entity_id,
+                member_entity_id=virtual_entity_id,
+                capped=False,
+            )
+        )
+        await conn.execute(
+            sa.insert(ScopeBindingRow.__table__).values(
+                virtual_entity_id=virtual_entity_id,
+                scope_entity_id=virtual_entity_id,
+                permission_cap=None,
+            )
+        )
     yield group_id
     # Cleanup: force delete if still exists
     async with db_engine.begin() as conn:
-        await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == group_id))
+        await conn.execute(
+            VirtualEntityRow.__table__.delete().where(
+                VirtualEntityRow.__table__.c.entity_type == ProjectEntityType(),
+                VirtualEntityRow.__table__.c.entity_id == group_id,
+            )
+        )
+        await conn.execute(
+            ProjectRow.__table__.delete().where(ProjectRow.__table__.c.id == group_id)
+        )
 
 
 @pytest.fixture()
 async def group_with_vfolder_mounted(
     db_engine: SAEngine,
     domain_fixture: DomainFixtureData,
-    scaling_group_name: ResourceGroupName,
-    scaling_group_id: ResourceGroupID,
+    resource_group_name: ResourceGroupName,
+    resource_group_id: ResourceGroupID,
     resource_policy_fixture: str,
     regular_user_fixture: Any,
 ) -> AsyncIterator[uuid.UUID]:
@@ -100,13 +138,35 @@ async def group_with_vfolder_mounted(
     async with db_engine.begin() as conn:
         # Create group
         await conn.execute(
-            sa.insert(GroupRow.__table__).values(
+            sa.insert(ProjectRow.__table__).values(
                 id=group_id,
                 name=group_name,
                 description="Group with mounted vfolder",
                 is_active=True,
                 domain_name=domain_fixture.domain_name,
                 resource_policy=resource_policy_fixture,
+            )
+        )
+        virtual_entity_id = uuid.uuid4()
+        await conn.execute(
+            sa.insert(VirtualEntityRow.__table__).values(
+                id=virtual_entity_id,
+                entity_type=ProjectEntityType(),
+                entity_id=group_id,
+            )
+        )
+        await conn.execute(
+            sa.insert(EntityMembershipRow.__table__).values(
+                virtual_entity_id=virtual_entity_id,
+                member_entity_id=virtual_entity_id,
+                capped=False,
+            )
+        )
+        await conn.execute(
+            sa.insert(ScopeBindingRow.__table__).values(
+                virtual_entity_id=virtual_entity_id,
+                scope_entity_id=virtual_entity_id,
+                permission_cap=None,
             )
         )
         # Create vfolder
@@ -134,11 +194,9 @@ async def group_with_vfolder_mounted(
                 domain_id=domain_fixture.domain_id,
                 group_id=group_id,
                 user_uuid=user_uuid,
-                scaling_group_name=scaling_group_name,
-                resource_group_id=scaling_group_id,
+                scaling_group_name=resource_group_name,
+                resource_group_id=resource_group_id,
                 status=SessionStatus.RUNNING,
-                occupying_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
             )
         )
         # Create active kernel with mount
@@ -157,12 +215,10 @@ async def group_with_vfolder_mounted(
                 group_id=group_id,
                 user_uuid=user_uuid,
                 domain_name=domain_fixture.domain_name,
-                scaling_group=scaling_group_name,
-                resource_group_id=scaling_group_id,
+                scaling_group=resource_group_name,
+                resource_group_id=resource_group_id,
                 status=KernelStatus.RUNNING,
                 image="python:3.9",
-                occupied_slots=ResourceSlot({}),
-                requested_slots=ResourceSlot({}),
                 repl_in_port=0,
                 repl_out_port=0,
                 stdin_port=0,
@@ -184,15 +240,23 @@ async def group_with_vfolder_mounted(
         await conn.execute(
             VFolderRow.__table__.delete().where(VFolderRow.__table__.c.id == vfolder_id)
         )
-        await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == group_id))
+        await conn.execute(
+            VirtualEntityRow.__table__.delete().where(
+                VirtualEntityRow.__table__.c.entity_type == ProjectEntityType(),
+                VirtualEntityRow.__table__.c.entity_id == group_id,
+            )
+        )
+        await conn.execute(
+            ProjectRow.__table__.delete().where(ProjectRow.__table__.c.id == group_id)
+        )
 
 
 @pytest.fixture()
 async def group_with_active_kernel(
     db_engine: SAEngine,
     domain_fixture: DomainFixtureData,
-    scaling_group_name: ResourceGroupName,
-    scaling_group_id: ResourceGroupID,
+    resource_group_name: ResourceGroupName,
+    resource_group_id: ResourceGroupID,
     resource_policy_fixture: str,
     regular_user_fixture: Any,
 ) -> AsyncIterator[uuid.UUID]:
@@ -207,13 +271,35 @@ async def group_with_active_kernel(
     async with db_engine.begin() as conn:
         # Create group
         await conn.execute(
-            sa.insert(GroupRow.__table__).values(
+            sa.insert(ProjectRow.__table__).values(
                 id=group_id,
                 name=group_name,
                 description="Group with active kernel",
                 is_active=True,
                 domain_name=domain_fixture.domain_name,
                 resource_policy=resource_policy_fixture,
+            )
+        )
+        virtual_entity_id = uuid.uuid4()
+        await conn.execute(
+            sa.insert(VirtualEntityRow.__table__).values(
+                id=virtual_entity_id,
+                entity_type=ProjectEntityType(),
+                entity_id=group_id,
+            )
+        )
+        await conn.execute(
+            sa.insert(EntityMembershipRow.__table__).values(
+                virtual_entity_id=virtual_entity_id,
+                member_entity_id=virtual_entity_id,
+                capped=False,
+            )
+        )
+        await conn.execute(
+            sa.insert(ScopeBindingRow.__table__).values(
+                virtual_entity_id=virtual_entity_id,
+                scope_entity_id=virtual_entity_id,
+                permission_cap=None,
             )
         )
         # Create session (required FK for kernel)
@@ -229,11 +315,9 @@ async def group_with_active_kernel(
                 domain_id=domain_fixture.domain_id,
                 group_id=group_id,
                 user_uuid=user_uuid,
-                scaling_group_name=scaling_group_name,
-                resource_group_id=scaling_group_id,
+                scaling_group_name=resource_group_name,
+                resource_group_id=resource_group_id,
                 status=SessionStatus.RUNNING,
-                occupying_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
             )
         )
         # Create active kernel
@@ -252,12 +336,10 @@ async def group_with_active_kernel(
                 group_id=group_id,
                 user_uuid=user_uuid,
                 domain_name=domain_fixture.domain_name,
-                scaling_group=scaling_group_name,
-                resource_group_id=scaling_group_id,
+                scaling_group=resource_group_name,
+                resource_group_id=resource_group_id,
                 status=KernelStatus.RUNNING,
                 image="python:3.9",
-                occupied_slots=ResourceSlot({}),
-                requested_slots=ResourceSlot({}),
                 repl_in_port=0,
                 repl_out_port=0,
                 stdin_port=0,
@@ -275,7 +357,15 @@ async def group_with_active_kernel(
         await conn.execute(
             SessionRow.__table__.delete().where(SessionRow.__table__.c.id == session_id)
         )
-        await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == group_id))
+        await conn.execute(
+            VirtualEntityRow.__table__.delete().where(
+                VirtualEntityRow.__table__.c.entity_type == ProjectEntityType(),
+                VirtualEntityRow.__table__.c.entity_id == group_id,
+            )
+        )
+        await conn.execute(
+            ProjectRow.__table__.delete().where(ProjectRow.__table__.c.id == group_id)
+        )
 
 
 @pytest.fixture()
@@ -284,7 +374,7 @@ async def group_with_active_endpoint(
     domain_fixture: DomainFixtureData,
     resource_policy_fixture: str,
     regular_user_fixture: Any,
-    scaling_group_name: ResourceGroupName,
+    resource_group_name: ResourceGroupName,
 ) -> AsyncIterator[uuid.UUID]:
     """Create group with active endpoint."""
     group_id = uuid.uuid4()
@@ -297,13 +387,35 @@ async def group_with_active_endpoint(
     async with db_engine.begin() as conn:
         # Create group
         await conn.execute(
-            sa.insert(GroupRow.__table__).values(
+            sa.insert(ProjectRow.__table__).values(
                 id=group_id,
                 name=group_name,
                 description="Group with active endpoint",
                 is_active=True,
                 domain_name=domain_fixture.domain_name,
                 resource_policy=resource_policy_fixture,
+            )
+        )
+        virtual_entity_id = uuid.uuid4()
+        await conn.execute(
+            sa.insert(VirtualEntityRow.__table__).values(
+                id=virtual_entity_id,
+                entity_type=ProjectEntityType(),
+                entity_id=group_id,
+            )
+        )
+        await conn.execute(
+            sa.insert(EntityMembershipRow.__table__).values(
+                virtual_entity_id=virtual_entity_id,
+                member_entity_id=virtual_entity_id,
+                capped=False,
+            )
+        )
+        await conn.execute(
+            sa.insert(ScopeBindingRow.__table__).values(
+                virtual_entity_id=virtual_entity_id,
+                scope_entity_id=virtual_entity_id,
+                permission_cap=None,
             )
         )
         # Create container registry (required by image)
@@ -344,7 +456,7 @@ async def group_with_active_endpoint(
                 domain=domain_fixture.domain_name,
                 created_user=user_uuid,
                 session_owner=user_uuid,
-                resource_group=scaling_group_name,
+                resource_group=resource_group_name,
                 image=image_id,
                 resource_slots=ResourceSlot({"cpu": "1", "mem": "1073741824"}),
                 lifecycle_stage=EndpointLifecycle.CREATED,
@@ -364,7 +476,15 @@ async def group_with_active_endpoint(
                 ContainerRegistryRow.__table__.c.id == registry_id
             )
         )
-        await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == group_id))
+        await conn.execute(
+            VirtualEntityRow.__table__.delete().where(
+                VirtualEntityRow.__table__.c.entity_type == ProjectEntityType(),
+                VirtualEntityRow.__table__.c.entity_id == group_id,
+            )
+        )
+        await conn.execute(
+            ProjectRow.__table__.delete().where(ProjectRow.__table__.c.id == group_id)
+        )
 
 
 @pytest.fixture()
@@ -381,13 +501,35 @@ async def multiple_test_groups(
         for i in range(5):
             group_id = uuid.uuid4()
             await conn.execute(
-                sa.insert(GroupRow.__table__).values(
+                sa.insert(ProjectRow.__table__).values(
                     id=group_id,
                     name=f"search-test-{unique}-{i}",
                     description=f"Search test group {i}",
                     is_active=True,
                     domain_name=domain_fixture.domain_name,
                     resource_policy=resource_policy_fixture,
+                )
+            )
+            virtual_entity_id = uuid.uuid4()
+            await conn.execute(
+                sa.insert(VirtualEntityRow.__table__).values(
+                    id=virtual_entity_id,
+                    entity_type=ProjectEntityType(),
+                    entity_id=group_id,
+                )
+            )
+            await conn.execute(
+                sa.insert(EntityMembershipRow.__table__).values(
+                    virtual_entity_id=virtual_entity_id,
+                    member_entity_id=virtual_entity_id,
+                    capped=False,
+                )
+            )
+            await conn.execute(
+                sa.insert(ScopeBindingRow.__table__).values(
+                    virtual_entity_id=virtual_entity_id,
+                    scope_entity_id=virtual_entity_id,
+                    permission_cap=None,
                 )
             )
             group_ids.append(group_id)
@@ -398,7 +540,13 @@ async def multiple_test_groups(
     async with db_engine.begin() as conn:
         for group_id in group_ids:
             await conn.execute(
-                GroupRow.__table__.delete().where(GroupRow.__table__.c.id == group_id)
+                VirtualEntityRow.__table__.delete().where(
+                    VirtualEntityRow.__table__.c.entity_type == ProjectEntityType(),
+                    VirtualEntityRow.__table__.c.entity_id == group_id,
+                )
+            )
+            await conn.execute(
+                ProjectRow.__table__.delete().where(ProjectRow.__table__.c.id == group_id)
             )
 
 
@@ -466,8 +614,8 @@ class TestGroupPurge:
         # Verify group is completely removed from DB
         async with db_engine.begin() as conn:
             query_result = await conn.execute(
-                sa.select(GroupRow.__table__).where(
-                    GroupRow.__table__.c.id == test_group_for_deletion
+                sa.select(ProjectRow.__table__).where(
+                    ProjectRow.__table__.c.id == test_group_for_deletion
                 )
             )
             row = query_result.fetchone()
@@ -555,8 +703,8 @@ class TestGroupSearch:
         # Get actual name of one of the test groups
         async with db_engine.begin() as conn:
             query_result = await conn.execute(
-                sa.select(GroupRow.__table__.c.name).where(
-                    GroupRow.__table__.c.id == multiple_test_groups[0]
+                sa.select(ProjectRow.__table__.c.name).where(
+                    ProjectRow.__table__.c.id == multiple_test_groups[0]
                 )
             )
             group_name = query_result.scalar_one()

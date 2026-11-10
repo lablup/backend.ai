@@ -4,49 +4,28 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 
+from ai.backend.common.data.entity.permission import PermissionID
+from ai.backend.common.data.entity.role import RoleID
+from ai.backend.common.data.entity.types import EntityType, FieldData
 from ai.backend.manager.data.common.types import SearchResult
 
-from .id import ScopeId
-from .types import EntityType, OperationType, Permission, ScopeType
+from .types import Permission
 
 
 @dataclass
 class PermissionCreator:
     role_id: uuid.UUID
-    scope_type: ScopeType
-    scope_id: str
     entity_type: EntityType
-    operation: OperationType
     permission: Permission
 
 
 @dataclass
-class PermissionData:
-    id: uuid.UUID
-    role_id: uuid.UUID
-    scope_type: ScopeType
-    scope_id: str
+class PermissionData(FieldData):
+    id: PermissionID
+    role_id: RoleID
     entity_type: EntityType
-    operation: OperationType
     permission: Permission
     created_at: datetime
-
-
-@dataclass
-class ScopedPermissionCreateInput:
-    """
-    Input for creating a scoped permission using scope information.
-    Used in update_role_permissions API to add permissions by scope.
-    """
-
-    scope_type: ScopeType
-    scope_id: str
-    entity_type: EntityType
-    operation: OperationType
-
-    def to_scope_id(self) -> ScopeId:
-        """Convert to ScopeId."""
-        return ScopeId(scope_type=self.scope_type, scope_id=self.scope_id)
 
 
 @dataclass(frozen=True)

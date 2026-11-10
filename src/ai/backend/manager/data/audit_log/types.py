@@ -4,23 +4,37 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from ai.backend.manager.actions.types import OperationStatus
+from ai.backend.common.data.entity.action import ActionID
+from ai.backend.common.data.entity.audit_log import AuditLogID, AuditLogScopeID
+from ai.backend.common.data.entity.types import FieldData
+from ai.backend.manager.actions.types import ActionKind, OperationStatus
 
 
 @dataclass
-class AuditLogData:
-    id: uuid.UUID
-    action_id: uuid.UUID
-    entity_type: str
+class AuditLogData(FieldData):
+    """One audit record, mirroring the row.
+
+    ``action_kind`` says which shape wrote it; only that shape's target columns are
+    set. ``id`` is this record; ``target_entity_id`` is what it is about.
+    """
+
+    id: AuditLogID
+    action_id: ActionID
+    action_kind: ActionKind | None
+    action_name: str
+    entity_type: str | None
     operation: str
     created_at: datetime
     description: str
     status: OperationStatus
-    entity_id: str | None
+    target_entity_id: uuid.UUID | None
+    lookup_kind: str | None
+    lookup_key: str | None
     request_id: str | None
     triggered_by: str | None
     acted_as: uuid.UUID | None
     duration: timedelta | None
+    client_ip: str | None
 
 
 @dataclass
@@ -31,3 +45,13 @@ class AuditLogListResult:
     total_count: int
     has_next_page: bool
     has_previous_page: bool
+
+
+@dataclass(frozen=True)
+class AuditLogScopeData(FieldData):
+    """One scope an audited run covered."""
+
+    id: AuditLogScopeID
+    audit_log_id: AuditLogID
+    scope_type: str
+    scope_id: uuid.UUID

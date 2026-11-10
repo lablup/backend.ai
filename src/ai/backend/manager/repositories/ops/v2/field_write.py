@@ -1,0 +1,253 @@
+"""Field writes of the v2 ops: rows owned by another entity, authorized
+through the owner. Plain row writes — nothing becomes a scope and nothing is
+joined."""
+
+from __future__ import annotations
+
+from collections.abc import Mapping, Sequence
+from typing import Any
+
+from ai.backend.common.data.entity.types import EntityIdentifier, FieldData, FieldIdentifier
+from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
+from ai.backend.manager.errors.base.field import FieldNotFoundError
+from ai.backend.manager.models.base import Base
+from ai.backend.manager.models.specs.creator import (
+    FieldCreator,
+    FieldToCreate,
+    NestedFieldCreator,
+    NestedFieldToCreate,
+)
+from ai.backend.manager.models.specs.purger import FieldBatchPurger, GuardedFieldPurger
+from ai.backend.manager.models.specs.types import BulkResultWithFailures
+from ai.backend.manager.models.specs.upserter import FieldUpserter
+from ai.backend.manager.repositories.ops.v2.write_base import V2WriteOpsBase
+
+
+class V2FieldWriteOps(V2WriteOpsBase):
+    """Field writes, bound to a single session."""
+
+    async def create_field[TOwnerID: EntityIdentifier, TRow: Base, TData: FieldData](
+        self, owner_id: TOwnerID, creator: FieldCreator[TOwnerID, TRow, TData]
+    ) -> TData:
+        """Insert one field row under its owner's settled identifier."""
+        row = creator.build_row(owner_id)
+        await self._insert_row(row, creator.integrity_error_checks())
+        return creator.to_data(row)
+
+    async def atomic_create_fields[TOwnerID: EntityIdentifier, TRow: Base, TData: FieldData](
+        self, creations: Sequence[FieldToCreate[TOwnerID, TRow, TData]]
+    ) -> list[TData]:
+        """Insert field rows atomically, each under the owner named beside it."""
+        if not creations:
+            return []
+        rows = [c.creator.build_row(c.owner_id) for c in creations]
+        await self._insert_rows(rows, creations[0].creator.integrity_error_checks())
+        return [c.creator.to_data(row) for c, row in zip(creations, rows, strict=True)]
+
+    async def atomic_create_fields_with_nested[
+        TOwnerID: EntityIdentifier,
+        TRow: Base,
+        TData: FieldData,
+        TNestedRow: Base,
+        TNestedData: FieldData,
+    ](
+        self,
+        creations: Sequence[FieldToCreate[TOwnerID, TRow, TData]],
+        nested_creators: Sequence[NestedFieldCreator[Any, TNestedRow, TNestedData]],
+    ) -> list[TData]:
+        """Insert field rows and the rows each of them owns, in one transaction.
+
+        Every nested spec is built under every row written. The owner ids do not exist
+        until the parents are written, so a failed nested row takes the parents down.
+        """
+        if not creations:
+            return []
+        rows = [c.creator.build_row(c.owner_id) for c in creations]
+        await self._insert_rows(rows, creations[0].creator.integrity_error_checks())
+        if nested_creators:
+            owner_ids = [c.creator.field_id(row) for c, row in zip(creations, rows, strict=True)]
+            await self._insert_rows(
+                [
+                    nested.build_row(owner_id)
+                    for owner_id in owner_ids
+                    for nested in nested_creators
+                ],
+                nested_creators[0].integrity_error_checks(),
+            )
+        return [c.creator.to_data(row) for c, row in zip(creations, rows, strict=True)]
+
+    async def atomic_create_nested_fields[
+        TOwnerID: FieldIdentifier,
+        TRow: Base,
+        TData: FieldData,
+    ](self, creations: Sequence[NestedFieldToCreate[TOwnerID, TRow, TData]]) -> list[TData]:
+        """Insert nested rows atomically, each under the field row named beside it.
+
+        The owners are already written, so this is the path for a batch whose rows
+        differ per owner; :meth:`atomic_create_fields_with_nested` is for the batch
+        that shares one set of nested specs.
+        """
+        if not creations:
+            return []
+        rows = [c.creator.build_row(c.owner_id) for c in creations]
+        await self._insert_rows(rows, creations[0].creator.integrity_error_checks())
+        return [c.creator.to_data(row) for c, row in zip(creations, rows, strict=True)]
+
+    async def atomic_create_field_entities[
+        TOwnerID: EntityIdentifier,
+        TRow: Base,
+        TData: FieldData,
+    ](
+        self, owner_id: TOwnerID, creators: Sequence[FieldCreator[TOwnerID, TRow, TData]]
+    ) -> list[TData]:
+        """Insert field rows sharing one owner, atomically in a single flush."""
+        if not creators:
+            return []
+        rows = [creator.build_row(owner_id) for creator in creators]
+        # First creator's checks: all specs share the same creator subclass.
+        await self._insert_rows(rows, creators[0].integrity_error_checks())
+        return [creator.to_data(row) for creator, row in zip(creators, rows, strict=True)]
+
+    async def batch_purge_field_entities[TOwnerID: EntityIdentifier, TRow: Base, TData](
+        self, owner_id: TOwnerID, purger: FieldBatchPurger[TOwnerID, TRow, TData]
+    ) -> list[TData]:
+        """Delete the owner's field rows the spec selects, in chunks, returning what
+        was removed. Bounded by the owner, as every field write is."""
+        return await self._batch_purge_returning(
+            None,
+            lambda: purger.build_subquery(owner_id),
+            purger.conflict_checks(),
+            purger.to_data,
+        )
+
+    async def purge_field_entity[TRow: Base, TData: FieldData](
+        self, purger: GuardedFieldPurger[TRow, TData]
+    ) -> TData | None:
+        """Delete the field row the id names while its guards hold; ``None`` if
+        already gone, the failing guard's error if it refused. The delete is
+        authorized through the owner."""
+        await self._validate_conflict_checks(purger.conflict_checks())
+        row = await self._delete_row_returning(
+            purger.row_class(),
+            purger.target_id_column(),
+            purger.target_id_value(),
+            purger.guard_checks(),
+        )
+        if row is None:
+            return None
+        return purger.to_data(row)
+
+    async def partial_bulk_purge_field_entities[TRow: Base, TData: FieldData](
+        self, purgers: Mapping[FieldIdentifier, GuardedFieldPurger[TRow, TData]]
+    ) -> BulkFieldOpsResult[TData]:
+        """Delete each named field row independently in its own savepoint; a
+        missing row is answered with :class:`FieldNotFoundError` rather than
+        skipped. Authorized through the owner, like the single field purge."""
+        successes: dict[FieldIdentifier, TData] = {}
+        errors: dict[FieldIdentifier, Exception] = {}
+        for field_id, purger in purgers.items():
+            try:
+                async with self._sess.begin_nested():
+                    data = await self.purge_field_entity(purger)
+                    if data is None:
+                        raise FieldNotFoundError(
+                            f"{purger.row_class().__name__} {field_id} not found",
+                            field_type=field_id.field_type(),
+                            operation=ActionOperationType.PURGE,
+                        )
+                    successes[field_id] = data
+            except Exception as e:
+                errors[field_id] = e
+        return BulkFieldOpsResult(successes=successes, errors=errors)
+
+    async def upsert_field_entity[TOwnerID: EntityIdentifier, TRow: Base, TData: FieldData](
+        self, owner_id: TOwnerID, upserter: FieldUpserter[TOwnerID, TRow, TData]
+    ) -> TData:
+        """Insert or update a field row on conflict, under the owner's settled
+        identifier."""
+        row = await self._upsert_row_returning(
+            upserter.row_class(),
+            upserter.index_elements(),
+            upserter.build_insert_values(owner_id),
+            upserter.build_update_values(),
+            upserter.integrity_error_checks(),
+        )
+        return upserter.to_data(row)
+
+    async def atomic_upsert_field_entities[
+        TOwnerID: EntityIdentifier,
+        TRow: Base,
+        TData: FieldData,
+    ](
+        self, owner_id: TOwnerID, upserters: Sequence[FieldUpserter[TOwnerID, TRow, TData]]
+    ) -> list[TData]:
+        """Insert-or-update every field row of one owner atomically.
+
+        One statement per row, as :meth:`V2EntityWriteOps.atomic_upsert_entities` runs
+        them: each carries its own update values, so they cannot be folded into a
+        single insert.
+        """
+        if not upserters:
+            return []
+        rows = [
+            await self._upsert_row_returning(
+                upserter.row_class(),
+                upserter.index_elements(),
+                upserter.build_insert_values(owner_id),
+                upserter.build_update_values(),
+                upserter.integrity_error_checks(),
+            )
+            for upserter in upserters
+        ]
+        return [upserter.to_data(row) for upserter, row in zip(upserters, rows, strict=True)]
+
+    async def insert_field_entity_if_absent[
+        TOwnerID: EntityIdentifier,
+        TRow: Base,
+        TData: FieldData,
+    ](self, owner_id: TOwnerID, upserter: FieldUpserter[TOwnerID, TRow, TData]) -> bool:
+        """Insert a field row under the owner's settled identifier unless a row holds its
+        conflict key, answering whether it was inserted; a row already there is left as
+        it stands."""
+        inserted = await self._insert_row_if_absent(
+            upserter.row_class(),
+            upserter.index_elements(),
+            upserter.build_insert_values(owner_id),
+            upserter.integrity_error_checks(),
+        )
+        return inserted is not None
+
+    async def atomic_insert_field_entities_if_absent[
+        TOwnerID: EntityIdentifier,
+        TRow: Base,
+        TData: FieldData,
+    ](
+        self, owner_id: TOwnerID, upserters: Sequence[FieldUpserter[TOwnerID, TRow, TData]]
+    ) -> list[bool]:
+        """:meth:`insert_field_entity_if_absent` for every row of one owner, all or
+        nothing."""
+        return [
+            await self.insert_field_entity_if_absent(owner_id, upserter) for upserter in upserters
+        ]
+
+    async def partial_bulk_upsert_field_entities[
+        TOwnerID: EntityIdentifier,
+        TRow: Base,
+        TData: FieldData,
+    ](
+        self, upserters: Mapping[TOwnerID, Sequence[FieldUpserter[TOwnerID, TRow, TData]]]
+    ) -> BulkResultWithFailures[list[TData]]:
+        """Insert-or-update each owner's field rows in that owner's own savepoint,
+        answering per owner; one owner's rows stand or fall together."""
+        successes: dict[EntityIdentifier, list[TData]] = {}
+        errors: dict[EntityIdentifier, Exception] = {}
+        for owner_id, owner_upserters in upserters.items():
+            try:
+                async with self._sess.begin_nested():
+                    successes[owner_id] = await self.atomic_upsert_field_entities(
+                        owner_id, owner_upserters
+                    )
+            except Exception as e:
+                errors[owner_id] = e
+        return BulkResultWithFailures(successes=successes, errors=errors)

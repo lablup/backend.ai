@@ -1,0 +1,111 @@
+"""Sidecar writes of the v2 ops: rows that ride beside the entity graph.
+
+Plain row writes — nothing becomes a scope, nothing is joined, and no owner is
+injected. What a row names of an entity is a value it records.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Sequence
+from typing import Any
+
+from ai.backend.common.data.entity.types import FieldData
+from ai.backend.manager.models.base import Base
+from ai.backend.manager.models.specs.creator import (
+    DanglingFieldCreator,
+    GuardedDanglingFieldCreator,
+    NestedFieldCreator,
+)
+from ai.backend.manager.models.specs.upserter import DanglingFieldUpserter
+from ai.backend.manager.repositories.ops.v2.write_base import V2WriteOpsBase
+
+
+class V2DanglingFieldWriteOps(V2WriteOpsBase):
+    """Sidecar writes, bound to a single session."""
+
+    async def create_dangling_field[TRow: Base, TData: FieldData](
+        self, creator: GuardedDanglingFieldCreator[TRow, TData]
+    ) -> TData:
+        """Insert one row that names a kind and no owner, after what the spec refuses."""
+        await self._validate_precondition_checks(creator.precondition_checks())
+        row = creator.build_row()
+        await self._insert_row(row, creator.integrity_error_checks())
+        return creator.to_data(row)
+
+    async def atomic_create_dangling_fields[TRow: Base, TData: FieldData](
+        self, creators: Sequence[DanglingFieldCreator[TRow, TData]]
+    ) -> list[TData]:
+        """Insert such rows atomically in a single flush."""
+        if not creators:
+            return []
+        rows = [creator.build_row() for creator in creators]
+        # First creator's checks: all specs share the same creator subclass.
+        await self._insert_rows(rows, creators[0].integrity_error_checks())
+        return [creator.to_data(row) for creator, row in zip(creators, rows, strict=True)]
+
+    async def atomic_create_dangling_fields_with_nested[
+        TRow: Base,
+        TData: FieldData,
+        TFieldRow: Base,
+        TFieldData: FieldData,
+    ](
+        self,
+        creators: Sequence[DanglingFieldCreator[TRow, TData]],
+        field_creators: Sequence[NestedFieldCreator[Any, TFieldRow, TFieldData]],
+    ) -> list[TData]:
+        """Insert sidecar rows and the rows each of them owns, in one transaction.
+
+        Every field spec is built under every row written, which is how a batch sharing
+        one set of owned rows is expressed. The owner ids do not exist until the parents
+        are written, so a failed field row takes the parents down with it.
+        """
+        if not creators:
+            return []
+        rows = [creator.build_row() for creator in creators]
+        await self._insert_rows(rows, creators[0].integrity_error_checks())
+        if field_creators:
+            owner_ids = [creator.field_id(row) for creator, row in zip(creators, rows, strict=True)]
+            await self._insert_rows(
+                [
+                    field_creator.build_row(owner_id)
+                    for owner_id in owner_ids
+                    for field_creator in field_creators
+                ],
+                field_creators[0].integrity_error_checks(),
+            )
+        return [creator.to_data(row) for creator, row in zip(creators, rows, strict=True)]
+
+    async def upsert_dangling_field[TRow: Base, TData: FieldData](
+        self, upserter: DanglingFieldUpserter[TRow, TData]
+    ) -> TData:
+        """Insert or update on conflict a row that names no owner."""
+        row = await self._upsert_row_returning(
+            upserter.row_class(),
+            upserter.index_elements(),
+            upserter.build_insert_values(),
+            upserter.build_update_values(),
+            upserter.integrity_error_checks(),
+        )
+        return upserter.to_data(row)
+
+    async def atomic_upsert_dangling_fields[TRow: Base, TData: FieldData](
+        self, upserters: Sequence[DanglingFieldUpserter[TRow, TData]]
+    ) -> list[TData]:
+        """Insert-or-update every row atomically.
+
+        One statement per row, as the entity and field bulk upserts run them: each
+        carries its own update values, so they cannot be folded into a single insert.
+        """
+        if not upserters:
+            return []
+        rows = [
+            await self._upsert_row_returning(
+                upserter.row_class(),
+                upserter.index_elements(),
+                upserter.build_insert_values(),
+                upserter.build_update_values(),
+                upserter.integrity_error_checks(),
+            )
+            for upserter in upserters
+        ]
+        return [upserter.to_data(row) for upserter, row in zip(upserters, rows, strict=True)]

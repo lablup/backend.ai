@@ -1,77 +1,111 @@
-from typing import override
+from __future__ import annotations
 
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
-from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.common.data.entity.resource_policy import ProjectResourcePolicyUUID
+from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.lookup.bulk_processor import BulkLookupActionProcessor
+from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
+from ai.backend.manager.actions.v2.ops.result import (
+    BatchOpsResult,
+    BulkLookupOpsResult,
+    CreatedEntityOpsResult,
+    EntityOpsResult,
+    LookupOpsResult,
+    ScopedBatchOpsResult,
+)
+from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
+from ai.backend.manager.actions.v2.single_entity.processor import (
+    SingleEntityActionProcessor,
+)
+from ai.backend.manager.data.resource.types import ProjectResourcePolicyData
+from ai.backend.manager.services.project_resource_policy.actions.bulk_get import (
+    BulkGetProjectResourcePoliciesAction,
+)
+from ai.backend.manager.services.project_resource_policy.actions.bulk_lookup import (
+    BulkLookupProjectResourcePoliciesAction,
+)
 from ai.backend.manager.services.project_resource_policy.actions.create_project_resource_policy import (
     CreateProjectResourcePolicyAction,
-    CreateProjectResourcePolicyActionResult,
 )
-from ai.backend.manager.services.project_resource_policy.actions.delete_project_resource_policy import (
-    DeleteProjectResourcePolicyAction,
-    DeleteProjectResourcePolicyActionResult,
-)
-from ai.backend.manager.services.project_resource_policy.actions.get_project_resource_policy import (
+from ai.backend.manager.services.project_resource_policy.actions.get import (
     GetProjectResourcePolicyAction,
-    GetProjectResourcePolicyActionResult,
 )
-from ai.backend.manager.services.project_resource_policy.actions.modify_project_resource_policy import (
-    ModifyProjectResourcePolicyAction,
-    ModifyProjectResourcePolicyActionResult,
+from ai.backend.manager.services.project_resource_policy.actions.global_search_project_resource_policies import (
+    GlobalSearchProjectResourcePoliciesAction,
+)
+from ai.backend.manager.services.project_resource_policy.actions.lookup import (
+    LookupProjectResourcePolicyAction,
+)
+from ai.backend.manager.services.project_resource_policy.actions.partial_bulk_purge_project_resource_policies import (
+    PartialBulkPurgeProjectResourcePoliciesAction,
+)
+from ai.backend.manager.services.project_resource_policy.actions.partial_bulk_update_project_resource_policies import (
+    PartialBulkUpdateProjectResourcePoliciesAction,
+)
+from ai.backend.manager.services.project_resource_policy.actions.purge_project_resource_policy import (
+    PurgeProjectResourcePolicyAction,
 )
 from ai.backend.manager.services.project_resource_policy.actions.search_project_resource_policies import (
     SearchProjectResourcePoliciesAction,
-    SearchProjectResourcePoliciesActionResult,
 )
-from ai.backend.manager.services.project_resource_policy.service import ProjectResourcePolicyService
+from ai.backend.manager.services.project_resource_policy.actions.update_project_resource_policy import (
+    UpdateProjectResourcePolicyAction,
+)
 
 
-class ProjectResourcePolicyProcessors(AbstractProcessorPackage):
-    get_project_resource_policy: ActionProcessor[
-        GetProjectResourcePolicyAction, GetProjectResourcePolicyActionResult
+class ProjectResourcePolicyProcessors:
+    """Every operation runs straight against ops, so this domain has no service."""
+
+    get: SingleEntityActionProcessor[
+        GetProjectResourcePolicyAction, EntityOpsResult[ProjectResourcePolicyData]
     ]
-    search_project_resource_policies: ActionProcessor[
-        SearchProjectResourcePoliciesAction, SearchProjectResourcePoliciesActionResult
+    lookup: LookupActionProcessor[
+        LookupProjectResourcePolicyAction, LookupOpsResult[ProjectResourcePolicyUUID]
     ]
-    create_project_resource_policy: ActionProcessor[
-        CreateProjectResourcePolicyAction, CreateProjectResourcePolicyActionResult
+    bulk_lookup_names: BulkLookupActionProcessor[
+        BulkLookupProjectResourcePoliciesAction, BulkLookupOpsResult[str, ProjectResourcePolicyUUID]
     ]
-    modify_project_resource_policy: ActionProcessor[
-        ModifyProjectResourcePolicyAction, ModifyProjectResourcePolicyActionResult
+    bulk_get_ids: PartialBulkActionProcessor[
+        BulkGetProjectResourcePoliciesAction, ProjectResourcePolicyData
     ]
-    delete_project_resource_policy: ActionProcessor[
-        DeleteProjectResourcePolicyAction, DeleteProjectResourcePolicyActionResult
+    search: ScopeActionProcessor[
+        SearchProjectResourcePoliciesAction, ScopedBatchOpsResult[ProjectResourcePolicyData]
+    ]
+    global_search: GlobalActionProcessor[
+        GlobalSearchProjectResourcePoliciesAction, BatchOpsResult[ProjectResourcePolicyData]
+    ]
+    global_create: GlobalActionProcessor[
+        CreateProjectResourcePolicyAction, CreatedEntityOpsResult[ProjectResourcePolicyData]
+    ]
+    update: SingleEntityActionProcessor[
+        UpdateProjectResourcePolicyAction, EntityOpsResult[ProjectResourcePolicyData]
+    ]
+    purge: SingleEntityActionProcessor[
+        PurgeProjectResourcePolicyAction, EntityOpsResult[ProjectResourcePolicyData]
+    ]
+    partial_bulk_update: PartialBulkActionProcessor[
+        PartialBulkUpdateProjectResourcePoliciesAction, ProjectResourcePolicyData
+    ]
+    partial_bulk_purge: PartialBulkActionProcessor[
+        PartialBulkPurgeProjectResourcePoliciesAction, ProjectResourcePolicyData
     ]
 
-    def __init__(
-        self,
-        service: ProjectResourcePolicyService,
-        action_monitors: list[ActionMonitor],
-        validators: ActionValidators,
-    ) -> None:
-        self.get_project_resource_policy = ActionProcessor(
-            service.get_project_resource_policy, action_monitors
+    def __init__(self, group: ProcessorGroup[ProjectResourcePolicyData]) -> None:
+        self.get = group.single_get_ops(GetProjectResourcePolicyAction)
+        self.lookup = group.lookup_ops(LookupProjectResourcePolicyAction)
+        self.bulk_lookup_names = group.public_bulk_lookup_ops(
+            BulkLookupProjectResourcePoliciesAction
         )
-        self.search_project_resource_policies = ActionProcessor(
-            service.search_project_resource_policies, action_monitors
+        self.bulk_get_ids = group.partial_bulk_get_ops(BulkGetProjectResourcePoliciesAction)
+        self.search = group.scoped_search_ops(SearchProjectResourcePoliciesAction)
+        self.global_search = group.global_searcher_ops(GlobalSearchProjectResourcePoliciesAction)
+        self.global_create = group.global_create_ops(CreateProjectResourcePolicyAction)
+        self.update = group.single_update_ops(UpdateProjectResourcePolicyAction)
+        self.purge = group.entity_purge_ops(PurgeProjectResourcePolicyAction)
+        self.partial_bulk_update = group.partial_bulk_update_ops(
+            PartialBulkUpdateProjectResourcePoliciesAction
         )
-        self.create_project_resource_policy = ActionProcessor(
-            service.create_project_resource_policy, action_monitors
+        self.partial_bulk_purge = group.entity_partial_bulk_purge_ops(
+            PartialBulkPurgeProjectResourcePoliciesAction
         )
-        self.modify_project_resource_policy = ActionProcessor(
-            service.modify_project_resource_policy, action_monitors
-        )
-        self.delete_project_resource_policy = ActionProcessor(
-            service.delete_project_resource_policy, action_monitors
-        )
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            GetProjectResourcePolicyAction.spec(),
-            SearchProjectResourcePoliciesAction.spec(),
-            CreateProjectResourcePolicyAction.spec(),
-            ModifyProjectResourcePolicyAction.spec(),
-            DeleteProjectResourcePolicyAction.spec(),
-        ]

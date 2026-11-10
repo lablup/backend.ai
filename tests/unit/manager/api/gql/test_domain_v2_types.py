@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
+import uuid
 from datetime import UTC, datetime
 
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.dto.manager.v2.domain.response import (
     DomainBasicInfo,
     DomainLifecycleInfo,
     DomainNode,
     DomainRegistryInfo,
 )
-from ai.backend.manager.api.gql.domain_v2.types import (
+from ai.backend.manager.api.gql.domain_v2.types.node import (
     DomainV2GQL,
 )
 
@@ -22,12 +24,15 @@ def _make_domain_node(
     integration_name: str | None = "integration-123",
     allowed_docker_registries: list[str] | None = None,
     is_active: bool = True,
+    is_default: bool = False,
     created_at: datetime | None = None,
     modified_at: datetime | None = None,
 ) -> DomainNode:
     now = datetime.now(tz=UTC)
+    domain_id = DomainID(uuid.uuid4())
     return DomainNode(
-        id=name,
+        id=domain_id,
+        entity_id=domain_id,
         basic_info=DomainBasicInfo(
             name=name,
             description=description,
@@ -38,6 +43,7 @@ def _make_domain_node(
         ),
         lifecycle=DomainLifecycleInfo(
             is_active=is_active,
+            is_default=is_default,
             created_at=created_at or now,
             modified_at=modified_at or now,
         ),
@@ -57,6 +63,7 @@ class TestDomainV2GQL:
             integration_name="integration-123",
             allowed_docker_registries=["docker.io", "ghcr.io"],
             is_active=True,
+            is_default=False,
             created_at=created,
             modified_at=modified,
         )
@@ -76,14 +83,15 @@ class TestDomainV2GQL:
         assert domain_gql.lifecycle.created_at == created
         assert domain_gql.lifecycle.modified_at == modified
 
-    def test_from_pydantic_primary_key_is_name(self) -> None:
-        """Test that id field contains domain name, not UUID."""
+    def test_from_pydantic_id_is_the_domain_uuid(self) -> None:
+        """Test that the id field carries the domain uuid, not the name."""
         dto = _make_domain_node(name="my-domain")
 
         domain_gql = DomainV2GQL.from_pydantic(dto)
 
-        # ID should be the domain name
-        assert str(domain_gql.id) == "my-domain"
+        assert str(domain_gql.id) == str(dto.id)
+        assert domain_gql.entity_id == dto.entity_id
+        assert domain_gql.basic_info.name == "my-domain"
 
     def test_from_pydantic_empty_registries(self) -> None:
         """Test with empty allowed_docker_registries."""
@@ -99,6 +107,7 @@ class TestDomainV2GQL:
             description=None,
             integration_name=None,
             is_active=False,
+            is_default=False,
         )
 
         domain_gql = DomainV2GQL.from_pydantic(dto)

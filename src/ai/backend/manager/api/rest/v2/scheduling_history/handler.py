@@ -9,10 +9,14 @@ from typing import TYPE_CHECKING, Final
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.dto.manager.v2.scheduling_history.request import (
     AdminSearchDeploymentHistoriesInput,
+    AdminSearchKernelHistoriesInput,
+    AdminSearchReplicaGroupHistoriesInput,
     AdminSearchRouteHistoriesInput,
     AdminSearchSessionHistoriesInput,
+    ScopedSearchKernelHistoriesInput,
+    ScopedSearchReplicaGroupHistoriesInput,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.v2.path_params import (
     DeploymentIdPathParam,
     RouteIdPathParam,
@@ -22,7 +26,7 @@ from ai.backend.manager.api.rest.v2.path_params import (
 if TYPE_CHECKING:
     from ai.backend.manager.api.adapters.scheduling_history.adapter import SchedulingHistoryAdapter
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class V2SchedulingHistoryHandler:
@@ -55,6 +59,28 @@ class V2SchedulingHistoryHandler:
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
+    # ========== Kernel History ==========
+
+    async def admin_search_kernel_history(
+        self,
+        body: BodyParam[AdminSearchKernelHistoriesInput],
+    ) -> APIResponse:
+        """Search kernel scheduling histories with admin scope."""
+        result = await self._adapter.admin_search_kernel_history(
+            body.parsed,
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def scoped_search_kernel_history(
+        self,
+        body: BodyParam[ScopedSearchKernelHistoriesInput],
+    ) -> APIResponse:
+        """Search kernel scheduling histories under a non-admin scope."""
+        result = await self._adapter.scoped_search_kernel_history(
+            body.parsed,
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
     # ========== Deployment History ==========
 
     async def admin_search_deployment_history(
@@ -75,6 +101,28 @@ class V2SchedulingHistoryHandler:
         """Search deployment histories scoped to a specific deployment."""
         result = await self._adapter.deployment_scoped_search(
             path.parsed.deployment_id,
+            body.parsed,
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    # ========== Replica Group History ==========
+
+    async def admin_search_replica_group_history(
+        self,
+        body: BodyParam[AdminSearchReplicaGroupHistoriesInput],
+    ) -> APIResponse:
+        """Search replica-group scheduling histories with admin scope."""
+        result = await self._adapter.admin_search_replica_group_history(
+            body.parsed,
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def scoped_search_replica_group_history(
+        self,
+        body: BodyParam[ScopedSearchReplicaGroupHistoriesInput],
+    ) -> APIResponse:
+        """Search replica-group scheduling histories under a non-admin scope."""
+        result = await self._adapter.scoped_search_replica_group_history(
             body.parsed,
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)

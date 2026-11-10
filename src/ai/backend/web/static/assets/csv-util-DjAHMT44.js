@@ -1,0 +1,9 @@
+import{m as a,p as S,a as C,q as y}from"./lodash-RhKGq0BF.js";/**
+ @license
+ Copyright (c) 2015-2026 Lablup Inc. All rights reserved.
+ */const u=/^[=@\t\r]/,g=t=>u.test(t)?!0:/^[+-]/.test(t)&&t!=="-"&&!Number.isFinite(Number(t)),b=Symbol("csvLiteral"),j=t=>({[b]:!0,value:t==null?"":String(t)}),w=t=>typeof t=="object"&&t!==null&&b in t,h=t=>`"${t.replace(/"/g,'""')}"`;function l(t){return t==null?"":w(t)?h(t.value):typeof t=="number"||typeof t=="boolean"?String(t):(t=C(t)?t:JSON.stringify(t),g(t)&&(t=`'${t}`),h(t))}const L=(t,e)=>{const n=a(t,s=>y(s,"__fragments","__fragmentOwner","__id")),o=S(n[0]),c=a(n,s=>a(s,(r,d)=>{var p;return e!=null&&e[d]&&((p=e[d])==null?void 0:p.call(e,r))||r})).map(s=>s.map(l).join(",")).join(`
+`);return[o.map(l).join(","),c].join(`
+`)},V=(t,e)=>{const n=URL.createObjectURL(t),o=document.createElement("a");o.href=n,o.download=e,document.body.appendChild(o),o.click(),document.body.removeChild(o),setTimeout(()=>URL.revokeObjectURL(n),100)},m="\uFEFF",R=(t,e)=>{const n=t.startsWith(m)?t:m+t,o=new Blob([n],{type:"text/csv;charset=utf-8;"});V(o,e.toLowerCase().endsWith(".csv")?e:`${e}.csv`)},E=(t,e,n)=>{const o=L(t,n);R(o,e)},O=t=>{t.charCodeAt(0)===65279&&(t=t.slice(1));const e=[];let n="",o=[],i=!1;for(let s=0;s<t.length;s++){const r=t[s];i?r==='"'?t[s+1]==='"'?(n+='"',s++):i=!1:n+=r:r==='"'?i=!0:r===","?(o.push(n),n=""):r===`
+`||r==="\r"?(r==="\r"&&t[s+1]===`
+`&&s++,o.push(n),n="",e.push(o),o=[]):n+=r}if(i)throw new Error("Unterminated quoted field in CSV");(n.length>0||o.length>0)&&(o.push(n),e.push(o));const c=e.filter(s=>s.some(r=>r.trim()!==""));if(c.length===0)return[];const f=c[0].map(s=>s.trim());return c.slice(1).map(s=>{const r={};return f.forEach((d,p)=>{r[d]=(s[p]??"").trim()}),r})};export{V as a,E as b,j as c,R as d,l as e,O as p};
+//# sourceMappingURL=csv-util-DjAHMT44.js.map

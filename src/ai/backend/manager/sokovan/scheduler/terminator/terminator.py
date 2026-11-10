@@ -10,19 +10,20 @@ from uuid import UUID
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import HealthCheckStatus
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import AgentId, KernelId, ResourceSlot, SessionId
-from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.clients.agent import AgentClientPool
+from ai.backend.logging.structured import StructuredLogger, with_log_context
+from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.data.kernel.types import KernelInfo
-from ai.backend.manager.repositories.scheduler import (
-    KernelTerminationResult,
-    SchedulerRepository,
-    TerminatingSessionData,
-)
+from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
 from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
+from ai.backend.manager.views.sokovan.session import (
+    KernelTerminationResult,
+    TerminatingSessionData,
+)
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @dataclass
@@ -71,10 +72,13 @@ class SessionTerminator:
         :return: Empty ScheduleResult (no status updates performed here)
         """
         if not terminating_sessions:
-            log.debug("No sessions to terminate")
-            return ScheduleResult(scheduled_session_ids=[], scheduling_failures=[])
-
-        log.info("Processing {} sessions for termination", len(terminating_sessions))
+            log.debug("no sessions to terminate")
+            return ScheduleResult(
+                scheduled_session_ids=[],
+                scheduling_failures=[],
+                reserved_session_ids=[],
+                preemption_plan=[],
+            )
 
         # Collect all termination tasks from all sessions
         all_tasks: list[Awaitable[KernelTerminationResult]] = []
@@ -98,17 +102,17 @@ class SessionTerminator:
 
         # Kernels without agents will be handled by retry/timeout mechanism
         if skipped_kernels > 0:
-            log.info(
-                "Found {} kernels without agents, will be handled by retry/timeout",
-                skipped_kernels,
-            )
+            log.debug("kernels without agents left to retry", kernel_count=skipped_kernels)
 
         # Execute all termination tasks concurrently across all sessions
         if not all_tasks:
-            log.debug("No kernels with agents to terminate")
-            return ScheduleResult(scheduled_session_ids=[], scheduling_failures=[])
-
-        log.info("Terminating {} kernels in parallel", len(all_tasks))
+            log.debug("no kernels with agents to terminate")
+            return ScheduleResult(
+                scheduled_session_ids=[],
+                scheduling_failures=[],
+                reserved_session_ids=[],
+                preemption_plan=[],
+            )
 
         # Use gather with return_exceptions to ensure partial failures don't block others
         with RecorderContext[SessionId].shared_phase(
@@ -133,20 +137,26 @@ class SessionTerminator:
                 continue
             success_count += 1
 
-        log.info(
-            "Termination RPC calls completed: {} successful, {} failed",
-            success_count,
-            failed_count,
+        log.debug(
+            "session termination requested",
+            session_count=len(terminating_sessions),
+            success_count=success_count,
+            failure_count=failed_count,
         )
 
-        return ScheduleResult(scheduled_session_ids=[], scheduling_failures=[])
+        return ScheduleResult(
+            scheduled_session_ids=[],
+            scheduling_failures=[],
+            reserved_session_ids=[],
+            preemption_plan=[],
+        )
 
     async def _terminate_kernel(
         self,
         agent_id: AgentId,
         kernel_id: KernelId,
         session_id: SessionId,
-        reason: str,
+        reason: KernelLifecycleEventReason,
         occupied_slots: ResourceSlot,
     ) -> KernelTerminationResult:
         """
@@ -158,31 +168,33 @@ class SessionTerminator:
         :param reason: The reason for termination
         :return: KernelTerminationResult with success status
         """
-        try:
-            async with self._agent_client_pool.acquire(agent_id) as client:
-                # Call agent's destroy_kernel RPC method with correct parameters
-                await client.destroy_kernel(kernel_id, session_id, reason, suppress_events=False)
-            return KernelTerminationResult(
-                kernel_id=kernel_id,
-                agent_id=agent_id,
-                occupied_slots=occupied_slots,
-                success=True,
-            )
-        except Exception as e:
-            log.warning(
-                "Failed to terminate kernel {} on agent {}: {}",
-                kernel_id,
-                agent_id,
-                e,
-            )
-
-            return KernelTerminationResult(
-                kernel_id=kernel_id,
-                agent_id=agent_id,
-                occupied_slots=occupied_slots,
-                success=False,
-                error=str(e),
-            )
+        with with_log_context(session_id=session_id):
+            try:
+                async with self._agent_client_pool.acquire(agent_id) as client:
+                    # Call agent's destroy_kernel RPC method with correct parameters
+                    await client.destroy_kernel(
+                        kernel_id, session_id, reason, suppress_events=False
+                    )
+                return KernelTerminationResult(
+                    kernel_id=kernel_id,
+                    agent_id=agent_id,
+                    occupied_slots=occupied_slots,
+                    success=True,
+                )
+            except Exception as e:
+                log.warning(
+                    "kernel termination failed",
+                    kernel_id=kernel_id,
+                    agent_id=agent_id,
+                    exc_info=e,
+                )
+                return KernelTerminationResult(
+                    kernel_id=kernel_id,
+                    agent_id=agent_id,
+                    occupied_slots=occupied_slots,
+                    success=False,
+                    error=str(e),
+                )
 
     async def check_stale_kernels(
         self,
@@ -246,14 +258,17 @@ class SessionTerminator:
                     is_running = await client.check_running(kernel_info.id)
                 if is_running is False:
                     dead_kernel_ids.append(KernelId(kernel_info.id))
+                    log.info(
+                        "stale kernel found",
+                        kernel_id=kernel_info.id,
+                        session_id=kernel_info.session.session_id,
+                    )
             except Exception as e:
                 log.warning(
-                    "Failed to check kernel {} status: {}. Skipping.",
-                    kernel_info.id,
-                    e,
+                    "kernel status check failed",
+                    kernel_id=kernel_info.id,
+                    session_id=kernel_info.session.session_id,
+                    exc_info=e,
                 )
-
-        if dead_kernel_ids:
-            log.info("Found {} stale kernels to be terminated", len(dead_kernel_ids))
 
         return dead_kernel_ids

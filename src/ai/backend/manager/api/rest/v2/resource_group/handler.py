@@ -7,11 +7,15 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
+from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.dto.manager.v2.resource_group.request import (
     AdminSearchResourceGroupsInput,
     CreateResourceGroupInput,
+    PartialBulkPurgeResourceGroupsInput,
+    PartialBulkUpdateResourceGroupsInput,
     ReplaceResourceGroupDefaultDeploymentOptionsInput,
     ReplaceResourceGroupDefaultSessionOptionsInput,
+    ScopedSearchResourceGroupsInput,
     UpdateAllowedDomainsForResourceGroupInput,
     UpdateAllowedProjectsForResourceGroupInput,
     UpdateAllowedResourceGroupsForDomainInput,
@@ -23,19 +27,18 @@ from ai.backend.common.dto.manager.v2.resource_group.request import (
 from ai.backend.common.dto.manager.v2.resource_group.response import (
     AdminSearchResourceGroupsPayload,
 )
-from ai.backend.common.identifier.resource_group import ResourceGroupName
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.v2.path_params import (
     DomainNamePathParam,
     ProjectIdPathParam,
+    ResourceGroupIdPathParam,
     ResourceGroupNamePathParam,
 )
-from ai.backend.manager.errors.resource import ScalingGroupNotFound
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.adapters.resource_group.adapter import ResourceGroupAdapter
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class V2ResourceGroupHandler:
@@ -43,6 +46,20 @@ class V2ResourceGroupHandler:
 
     def __init__(self, *, adapter: ResourceGroupAdapter) -> None:
         self._adapter = adapter
+
+    async def scoped_search(
+        self,
+        body: BodyParam[ScopedSearchResourceGroupsInput],
+    ) -> APIResponse:
+        """Search the resource groups the named scopes reach, combined with OR."""
+        result = await self._adapter.scoped_search(body.parsed)
+        payload = AdminSearchResourceGroupsPayload(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=payload)
 
     async def search(
         self,
@@ -71,27 +88,61 @@ class V2ResourceGroupHandler:
         path: PathParam[ResourceGroupNamePathParam],
     ) -> APIResponse:
         """Retrieve a single resource group by name."""
-        results = await self._adapter.batch_load_by_names([path.parsed.name])
-        result = results[0]
-        if result is None:
-            raise ScalingGroupNotFound(path.parsed.name)
+        result = await self._adapter.get(path.parsed.name)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def update(
         self,
+        path: PathParam[ResourceGroupIdPathParam],
+        body: BodyParam[UpdateResourceGroupInput],
+    ) -> APIResponse:
+        """Update a resource group."""
+        result = await self._adapter.update(
+            ResourceGroupID(path.parsed.resource_group_id), body.parsed
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def purge(
+        self,
+        path: PathParam[ResourceGroupIdPathParam],
+    ) -> APIResponse:
+        """Purge a resource group."""
+        result = await self._adapter.purge(ResourceGroupID(path.parsed.resource_group_id))
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_update(
+        self,
+        body: BodyParam[PartialBulkUpdateResourceGroupsInput],
+    ) -> APIResponse:
+        """Update several resource groups, answering for each one."""
+        result = await self._adapter.partial_bulk_update(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_purge(
+        self,
+        body: BodyParam[PartialBulkPurgeResourceGroupsInput],
+    ) -> APIResponse:
+        """Purge several resource groups, answering for each one."""
+        result = await self._adapter.partial_bulk_purge(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def admin_update(
+        self,
         path: PathParam[ResourceGroupNamePathParam],
         body: BodyParam[UpdateResourceGroupInput],
     ) -> APIResponse:
-        """Update an existing resource group."""
-        result = await self._adapter.update(path.parsed.name, body.parsed)
+        """Deprecated. Use `PATCH /v2/resource-groups/{resource_group_id}`."""
+        resource_group_id = await self._adapter.lookup_name(path.parsed.name)
+        result = await self._adapter.update(resource_group_id, body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
-    async def delete(
+    async def admin_delete(
         self,
         path: PathParam[ResourceGroupNamePathParam],
     ) -> APIResponse:
-        """Purge a resource group by name."""
-        result = await self._adapter.purge(path.parsed.name)
+        """Deprecated. Use `DELETE /v2/resource-groups/{resource_group_id}`."""
+        resource_group_id = await self._adapter.lookup_name(path.parsed.name)
+        result = await self._adapter.purge(resource_group_id)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def get_resource_info(

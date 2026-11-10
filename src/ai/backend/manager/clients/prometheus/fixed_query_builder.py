@@ -1,5 +1,4 @@
-import re
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Final
 
@@ -14,27 +13,60 @@ from ai.backend.manager.clients.prometheus.metric_types import (
     ContainerLiveStatQueries,
     ContainerMetricOptionalLabel,
     MetricType,
+    resolve_container_metric_unit_hint,
 )
-from ai.backend.manager.clients.prometheus.preset import LabelMatcher, MetricPreset
+from ai.backend.manager.clients.prometheus.preset import LabelMatcher, MetricPreset, regex_union
 from ai.backend.manager.clients.prometheus.querier import ContainerMetricQuerier
 from ai.backend.manager.clients.prometheus.types import ValueType
 
 _GAUGE_TEMPLATE: Final[str] = (
-    f"sum by ({{group_by}})({CONTAINER_UTILIZATION_METRIC_NAME}{{{{{{labels}}}}}})"
+    "sum by (${{group_by}})(" + CONTAINER_UTILIZATION_METRIC_NAME + "{${{labels}}})"
 )
 _RATE_TEMPLATE: Final[str] = (
-    "sum by ({group_by})(rate("
-    f"{CONTAINER_UTILIZATION_METRIC_NAME}{{{{{{labels}}}}}}[{{window}}]))"
+    "sum by (${{group_by}})(rate("
+    + CONTAINER_UTILIZATION_METRIC_NAME
+    + "{${{labels}}}[${{window}}]))"
 )
 _DIFF_TEMPLATE: Final[str] = (
-    "sum by ({group_by})(rate("
-    f"{CONTAINER_UTILIZATION_METRIC_NAME}{{{{{{labels}}}}}}[{{window}}]))"
+    "sum by (${{group_by}})(rate("
+    + CONTAINER_UTILIZATION_METRIC_NAME
+    + "{${{labels}}}[${{window}}]))"
 )
-_LIVE_STAT_MAX_TEMPLATE: Final[str] = f"max_over_time(({_GAUGE_TEMPLATE})[{{window}}:])"
-_LIVE_STAT_AVG_TEMPLATE: Final[str] = f"avg_over_time(({_GAUGE_TEMPLATE})[{{window}}:])"
-_LIVE_STAT_RATE_MAX_TEMPLATE: Final[str] = f"max_over_time(({_RATE_TEMPLATE})[{{window}}:])"
-_LIVE_STAT_RATE_AVG_TEMPLATE: Final[str] = f"avg_over_time(({_RATE_TEMPLATE})[{{window}}:])"
-
+# pct = current / capacity * 100. The `> 0` on capacity drops the series
+# instead of dividing by zero.
+_PCT_CURRENT_SELECTOR: Final[str] = (
+    CONTAINER_UTILIZATION_METRIC_NAME + '{${{labels}},value_type="current"}'
+)
+_PCT_CAPACITY_SELECTOR: Final[str] = (
+    CONTAINER_UTILIZATION_METRIC_NAME + '{${{labels}},value_type="capacity"}'
+)
+# `current` is a gauge already in the unit of capacity (percent, bytes).
+_PCT_TEMPLATE: Final[str] = (
+    "label_replace("
+    "sum by (${{group_by}})(" + _PCT_CURRENT_SELECTOR + ")"
+    " / (sum by (${{group_by}})(" + _PCT_CAPACITY_SELECTOR + ") > 0)"
+    ' * 100, "value_type", "pct", "", "")'
+)
+# `current` is a cumulative counter (CPU msec) whose rate() is millicores, and
+# capacity is the unit (one core), so each kernel's ratio is the share of one core
+# and the ratios are summed: dividing the sums would average the kernels instead.
+_MILLICORES_UNIT_HINT: Final[str] = "millicores"
+_PCT_MILLICORES_TEMPLATE: Final[str] = (
+    "label_replace("
+    "sum by (${{group_by}})("
+    "rate(" + _PCT_CURRENT_SELECTOR + "[${{window}}])"
+    " / ignoring(value_type) (" + _PCT_CAPACITY_SELECTOR + " > 0)"
+    ') * 100, "value_type", "pct", "", "")'
+)
+_SERIES_TEMPLATES: Final[Mapping[MetricType, str]] = {
+    MetricType.GAUGE: _GAUGE_TEMPLATE,
+    MetricType.RATE: _RATE_TEMPLATE,
+    MetricType.DIFF: _DIFF_TEMPLATE,
+}
+_LIVE_STAT_MAX_TEMPLATE: Final[str] = "max_over_time((" + _GAUGE_TEMPLATE + ")[${{window}}:])"
+_LIVE_STAT_AVG_TEMPLATE: Final[str] = "avg_over_time((" + _GAUGE_TEMPLATE + ")[${{window}}:])"
+_LIVE_STAT_RATE_MAX_TEMPLATE: Final[str] = "max_over_time((" + _RATE_TEMPLATE + ")[${{window}}:])"
+_LIVE_STAT_RATE_AVG_TEMPLATE: Final[str] = "avg_over_time((" + _RATE_TEMPLATE + ")[${{window}}:])"
 _INSTANT_GROUP_BY: Final[frozenset[str]] = frozenset({
     "kernel_id",
     "container_metric_name",
@@ -52,15 +84,11 @@ class LabelValuesQuery:
     metric_match: str
 
 
-def _regex_union(values: Sequence[str]) -> str:
-    return "|".join(re.escape(value).replace(r"\-", "-") for value in values)
-
-
 def _value_type_regex(value_types: Sequence[ValueType]) -> str:
-    return _regex_union([value_type.value for value_type in value_types])
+    return regex_union([value_type.value for value_type in value_types])
 
 
-_LIVE_STAT_RATE_METRIC_REGEX: Final[str] = _regex_union(sorted(RATE_METRICS | DIFF_METRICS))
+_LIVE_STAT_RATE_METRIC_REGEX: Final[str] = regex_union(sorted(RATE_METRICS | DIFF_METRICS))
 _INSTANT_VALUE_TYPE_REGEX: Final[str] = _value_type_regex([
     ValueType.CURRENT,
     ValueType.CAPACITY,
@@ -98,7 +126,6 @@ class ContainerMetricQueryBuilder:
         metric_name: str,
         label: ContainerMetricOptionalLabel,
     ) -> MetricPreset:
-        metric_type = self.get_container_metric_type(metric_name, label)
         querier = ContainerMetricQuerier(
             metric_name=metric_name,
             value_type=ValueType(label.value_type.value),
@@ -109,20 +136,23 @@ class ContainerMetricQueryBuilder:
             project_id=label.project_id,
         )
         return MetricPreset(
-            template=self._get_template(metric_type),
+            template=self._get_template(metric_name, label),
             labels=querier.labels(),
             group_by=querier.group_by_labels(),
             window=self._timewindow,
         )
 
-    def _get_template(self, metric_type: MetricType) -> str:
-        match metric_type:
-            case MetricType.GAUGE:
-                return _GAUGE_TEMPLATE
-            case MetricType.RATE:
-                return _RATE_TEMPLATE
-            case MetricType.DIFF:
-                return _DIFF_TEMPLATE
+    def _get_template(self, metric_name: str, label: ContainerMetricOptionalLabel) -> str:
+        match label.value_type:
+            case ValueType.CURRENT | ValueType.CAPACITY:
+                return _SERIES_TEMPLATES[self.get_container_metric_type(metric_name, label)]
+            case ValueType.PCT:
+                return self._get_pct_template(metric_name)
+
+    def _get_pct_template(self, metric_name: str) -> str:
+        if resolve_container_metric_unit_hint(metric_name) == _MILLICORES_UNIT_HINT:
+            return _PCT_MILLICORES_TEMPLATE
+        return _PCT_TEMPLATE
 
 
 class ContainerLiveStatQueryBuilder:
@@ -138,7 +168,7 @@ class ContainerLiveStatQueryBuilder:
         self,
         kernel_ids: Sequence[KernelId],
     ) -> ContainerLiveStatQueries:
-        kernel_id_regex = _regex_union([str(kid) for kid in kernel_ids])
+        kernel_id_regex = regex_union([str(kid) for kid in kernel_ids])
 
         instant_labels = {
             "kernel_id": LabelMatcher.regex(kernel_id_regex),

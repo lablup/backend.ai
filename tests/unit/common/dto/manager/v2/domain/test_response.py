@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import json
+import uuid
 from datetime import UTC, datetime
 
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.dto.manager.pagination import PaginationInfo
 from ai.backend.common.dto.manager.v2.domain.response import (
     DeleteDomainPayload,
@@ -18,11 +20,12 @@ from ai.backend.common.dto.manager.v2.domain.response import (
 )
 
 
-def make_domain_node(name: str = "test-domain") -> DomainNode:
+def make_domain_node(name: str = "test-domain", domain_id: DomainID | None = None) -> DomainNode:
     """Helper to create a valid DomainNode for testing."""
     now = datetime.now(tz=UTC)
     return DomainNode(
-        id=name,
+        id=domain_id if domain_id is not None else DomainID(uuid.uuid4()),
+        entity_id=uuid.uuid4(),
         basic_info=DomainBasicInfo(
             name=name,
             description="Test domain",
@@ -33,6 +36,7 @@ def make_domain_node(name: str = "test-domain") -> DomainNode:
         ),
         lifecycle=DomainLifecycleInfo(
             is_active=True,
+            is_default=False,
             created_at=now,
             modified_at=now,
         ),
@@ -92,18 +96,24 @@ class TestDomainLifecycleInfo:
 
     def test_creation_with_all_fields(self) -> None:
         now = datetime.now(tz=UTC)
-        info = DomainLifecycleInfo(is_active=True, created_at=now, modified_at=now)
+        info = DomainLifecycleInfo(
+            is_active=True, is_default=False, created_at=now, modified_at=now
+        )
         assert info.is_active is True
         assert info.created_at == now
 
     def test_inactive_domain(self) -> None:
         now = datetime.now(tz=UTC)
-        info = DomainLifecycleInfo(is_active=False, created_at=now, modified_at=now)
+        info = DomainLifecycleInfo(
+            is_active=False, is_default=False, created_at=now, modified_at=now
+        )
         assert info.is_active is False
 
     def test_round_trip(self) -> None:
         now = datetime.now(tz=UTC)
-        info = DomainLifecycleInfo(is_active=True, created_at=now, modified_at=now)
+        info = DomainLifecycleInfo(
+            is_active=True, is_default=False, created_at=now, modified_at=now
+        )
         json_data = info.model_dump_json()
         restored = DomainLifecycleInfo.model_validate_json(json_data)
         assert restored.is_active is True
@@ -114,15 +124,16 @@ class TestDomainNode:
     """Tests for DomainNode model with nested sub-models."""
 
     def test_creation_with_all_nested_groups(self) -> None:
-        node = make_domain_node("my-domain")
-        assert node.id == "my-domain"
+        domain_id = DomainID(uuid.uuid4())
+        node = make_domain_node("my-domain", domain_id=domain_id)
+        assert node.id == domain_id
         assert node.basic_info.name == "my-domain"
         assert node.registry.allowed_docker_registries == ["registry.example.com"]
         assert node.lifecycle.is_active is True
 
-    def test_id_is_string(self) -> None:
+    def test_id_is_the_domain_uuid(self) -> None:
         node = make_domain_node("test")
-        assert isinstance(node.id, str)
+        assert isinstance(node.id, uuid.UUID)
 
     def test_nested_basic_info(self) -> None:
         node = make_domain_node("prod")
@@ -143,7 +154,7 @@ class TestDomainNode:
         node = make_domain_node("serialized-domain")
         json_str = node.model_dump_json()
         restored = DomainNode.model_validate_json(json_str)
-        assert restored.id == "serialized-domain"
+        assert restored.id == node.id
         assert restored.basic_info.name == "serialized-domain"
         assert restored.lifecycle.is_active is True
 
@@ -163,14 +174,14 @@ class TestDomainPayload:
     def test_creation_with_domain_node(self) -> None:
         node = make_domain_node("test")
         payload = DomainPayload(domain=node)
-        assert payload.domain.id == "test"
+        assert payload.domain.id == node.id
 
     def test_round_trip(self) -> None:
         node = make_domain_node("production")
         payload = DomainPayload(domain=node)
         json_str = payload.model_dump_json()
         restored = DomainPayload.model_validate_json(json_str)
-        assert restored.domain.id == "production"
+        assert restored.domain.id == node.id
         assert restored.domain.basic_info.name == "production"
 
 
@@ -203,7 +214,7 @@ class TestSearchDomainsPayload:
         json_str = payload.model_dump_json()
         restored = SearchDomainsPayload.model_validate_json(json_str)
         assert len(restored.items) == 1
-        assert restored.items[0].id == "round-trip-domain"
+        assert restored.items[0].id == node.id
         assert restored.pagination.total == 1
 
 
@@ -211,15 +222,15 @@ class TestDeleteDomainPayload:
     """Tests for DeleteDomainPayload model."""
 
     def test_deleted_true(self) -> None:
-        payload = DeleteDomainPayload(deleted=True)
+        payload = DeleteDomainPayload(deleted=True, domain=make_domain_node())
         assert payload.deleted is True
 
     def test_deleted_false(self) -> None:
-        payload = DeleteDomainPayload(deleted=False)
+        payload = DeleteDomainPayload(deleted=False, domain=make_domain_node())
         assert payload.deleted is False
 
     def test_round_trip(self) -> None:
-        payload = DeleteDomainPayload(deleted=True)
+        payload = DeleteDomainPayload(deleted=True, domain=make_domain_node())
         json_str = payload.model_dump_json()
         restored = DeleteDomainPayload.model_validate_json(json_str)
         assert restored.deleted is True

@@ -11,6 +11,7 @@ import aiohttp_cors
 import sqlalchemy as sa
 from aiohttp import web
 
+from ai.backend.appproxy.common.errors import ObjectNotFound
 from ai.backend.appproxy.common.types import (
     AppMode,
     CORSOptions,
@@ -27,11 +28,11 @@ from ai.backend.common.dto.internal.health import (
     HealthStatus,
 )
 from ai.backend.common.types import BackendAISchema, ModelServiceStatus
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .utils import auth_required
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 # NOTE: Coordinator no longer tracks per-route health state (removed along with
 # HealthCheckEngine). HTTP health is handled by Traefik's loadBalancer.healthCheck
@@ -216,7 +217,10 @@ async def get_endpoints_health(request: web.Request) -> PydanticResponse[HealthS
                 endpoint_statuses.append(endpoint_status)
 
             except Exception as e:
-                log.error("Failed to find circuit for endpoint {}: {}", endpoint.id, e)
+                if isinstance(e, ObjectNotFound):
+                    log.trace("no circuit found for endpoint", endpoint_id=endpoint.id)
+                else:
+                    log.exception("failed to build endpoint health status", endpoint_id=endpoint.id)
                 # Create empty status for endpoints without circuits
                 endpoint_status = EndpointHealthStatusModel(
                     endpoint_id=endpoint.id,
@@ -296,7 +300,6 @@ def _build_coordinator_health_response(connectivity: ConnectivityCheckResponse) 
     DEGRADED in the body but not surfaced via HTTP status."""
     response = HealthResponse(
         status=HealthStatus.OK if connectivity.overall_healthy else HealthStatus.DEGRADED,
-        version=__version__,
         component="appproxy-coordinator",
         connectivity=connectivity,
     )
@@ -308,7 +311,6 @@ def _build_coordinator_probe_response(connectivity: ConnectivityCheckResponse) -
     is_healthy = connectivity.overall_healthy
     response = HealthResponse(
         status=HealthStatus.OK if is_healthy else HealthStatus.ERROR,
-        version=__version__,
         component="appproxy-coordinator",
         connectivity=connectivity,
     )

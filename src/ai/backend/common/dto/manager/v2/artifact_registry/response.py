@@ -51,6 +51,9 @@ class ArtifactRegistryGQLNode(BaseResponseModel):
     """DTO for ArtifactRegistry GQL type."""
 
     id: UUID = Field(description="Internal identifier of the artifact registry metadata record.")
+    entity_id: UUID = Field(
+        description="UUID of the artifact registry. Added in 26.9.0.",
+    )
     registry_id: UUID = Field(description="Identifier of the actual registry implementation.")
     name: str = Field(description="Name of the artifact registry.")
     type: ArtifactRegistryType = Field(description="Type of the artifact registry.")

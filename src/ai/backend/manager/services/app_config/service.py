@@ -1,0 +1,175 @@
+from __future__ import annotations
+
+from collections.abc import Mapping, Sequence
+from typing import Any
+
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, PartialBulkResult
+from ai.backend.manager.actions.v2.ops.result import EntityOpsResult
+from ai.backend.manager.data.app_config.types import (
+    AppConfigAllowListData,
+    AppConfigData,
+    AppConfigDefinitionData,
+    AppConfigFragmentData,
+)
+from ai.backend.manager.models.app_config_allow_list.purgers import AppConfigAllowListPurger
+from ai.backend.manager.models.app_config_definition.purgers import AppConfigDefinitionPurger
+from ai.backend.manager.models.scopes import OperationScope
+from ai.backend.manager.models.specs.searcher import Searcher
+from ai.backend.manager.repositories.app_config.repository import AppConfigRepository
+from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.services.app_config.actions.allow_list.partial_bulk_purge import (
+    PartialBulkPurgeAppConfigAllowListsAction,
+)
+from ai.backend.manager.services.app_config.actions.allow_list.purge import (
+    PurgeAppConfigAllowListAction,
+)
+from ai.backend.manager.services.app_config.actions.definition.partial_bulk_purge import (
+    PartialBulkPurgeAppConfigDefinitionsAction,
+)
+from ai.backend.manager.services.app_config.actions.definition.purge import (
+    PurgeAppConfigDefinitionAction,
+)
+from ai.backend.manager.services.app_config.actions.search import (
+    AnonymousSearchAppConfigsAction,
+    SearchAppConfigsAction,
+    SearchAppConfigsActionResult,
+)
+
+__all__ = ("AppConfigService",)
+
+
+def _recursive_override(base: Mapping[str, Any], override: Mapping[str, Any]) -> dict[str, Any]:
+    """Merge ``override`` onto ``base``: nested dicts recurse, everything else replaces whole.
+
+    Lists replace wholesale (no per-index blending) and an explicit ``None`` overwrites rather
+    than being skipped — unlike :func:`ai.backend.common.utils.deep_merge`.
+    """
+    result: dict[str, Any] = dict(base)
+    for key, override_value in override.items():
+        base_value = result.get(key)
+        if isinstance(base_value, Mapping) and isinstance(override_value, Mapping):
+            result[key] = _recursive_override(base_value, override_value)
+        else:
+            result[key] = override_value
+    return result
+
+
+def _merge_configs(fragments: Sequence[AppConfigFragmentData]) -> dict[str, Any]:
+    """Deep-merge fragment configs, lowest ``rank`` first — the caller passes them ordered."""
+    merged: dict[str, Any] = {}
+    for fragment in fragments:
+        merged = _recursive_override(merged, fragment.config)
+    return merged
+
+
+class AppConfigService:
+    """The merged ``AppConfig`` view and the purges that clear what a row cascades to.
+
+    The fragment read is a plain scoped search, so it runs against ops; what keeps a
+    service here is the merge, which turns many rows into one value per name.
+    """
+
+    _repository: OpsRepository[AppConfigFragmentData]
+    _app_config_repository: AppConfigRepository
+
+    def __init__(
+        self,
+        repository: OpsRepository[AppConfigFragmentData],
+        app_config_repository: AppConfigRepository,
+    ) -> None:
+        self._repository = repository
+        self._app_config_repository = app_config_repository
+
+    async def purge_definition(
+        self, action: PurgeAppConfigDefinitionAction
+    ) -> EntityOpsResult[AppConfigDefinitionData]:
+        """Purge a config name with the allow-list entries and fragments under it."""
+        data = await self._app_config_repository.purge_definition(action.to_purger())
+        return EntityOpsResult(data=data)
+
+    async def purge_allow_list(
+        self, action: PurgeAppConfigAllowListAction
+    ) -> EntityOpsResult[AppConfigAllowListData]:
+        """Purge an allow-list entry with the fragments it admits."""
+        data = await self._app_config_repository.purge_allow_list(action.to_purger())
+        return EntityOpsResult(data=data)
+
+    async def partial_bulk_purge_definitions(
+        self, action: PartialBulkPurgeAppConfigDefinitionsAction
+    ) -> PartialBulkResult[AppConfigDefinitionData]:
+        """Purge each named config name with what lies under it, answering for every one."""
+        result = await self._app_config_repository.partial_bulk_purge_definitions([
+            AppConfigDefinitionPurger(definition_id=definition_id) for definition_id in action.ids
+        ])
+        return PartialBulkResult(
+            items=[
+                PartialBulkEntityResult[AppConfigDefinitionData].succeeded(
+                    definition_id, result.successes[definition_id]
+                )
+                if definition_id in result.successes
+                else PartialBulkEntityResult[AppConfigDefinitionData].failed(
+                    definition_id, result.errors[definition_id]
+                )
+                for definition_id in action.ids
+            ]
+        )
+
+    async def partial_bulk_purge_allow_lists(
+        self, action: PartialBulkPurgeAppConfigAllowListsAction
+    ) -> PartialBulkResult[AppConfigAllowListData]:
+        """Purge each named allow-list entry with its fragments, answering for every one."""
+        result = await self._app_config_repository.partial_bulk_purge_allow_lists([
+            AppConfigAllowListPurger(allow_list_id=allow_list_id) for allow_list_id in action.ids
+        ])
+        return PartialBulkResult(
+            items=[
+                PartialBulkEntityResult[AppConfigAllowListData].succeeded(
+                    allow_list_id, result.successes[allow_list_id]
+                )
+                if allow_list_id in result.successes
+                else PartialBulkEntityResult[AppConfigAllowListData].failed(
+                    allow_list_id, result.errors[allow_list_id]
+                )
+                for allow_list_id in action.ids
+            ]
+        )
+
+    async def search_app_configs(
+        self, action: SearchAppConfigsAction
+    ) -> SearchAppConfigsActionResult:
+        """The merged ``AppConfig`` for each of ``config_names``.
+
+        One entry per requested name, in request order; a repeated name is repeated in the
+        output. A name nothing contributes to yields an empty merge rather than failing
+        the whole call.
+        """
+        return await self._merge(
+            action.operation_scopes(), action.to_searcher(), action.config_names
+        )
+
+    async def anonymous_search_app_configs(
+        self, action: AnonymousSearchAppConfigsAction
+    ) -> SearchAppConfigsActionResult:
+        """The merge a caller sees before signing in: published fragments only."""
+        return await self._merge(
+            action.operation_scopes(), action.to_searcher(), action.config_names
+        )
+
+    async def _merge(
+        self,
+        scopes: Sequence[OperationScope],
+        searcher: Searcher[Any, AppConfigFragmentData],
+        config_names: Sequence[str],
+    ) -> SearchAppConfigsActionResult:
+        """Group the found fragments by name and merge each name's own, which arrive rank-ordered."""
+        fragments = (await self._repository.search_in_scopes(scopes, searcher)).items
+        app_configs: list[AppConfigData] = []
+        for config_name in config_names:
+            visible = [fragment for fragment in fragments if fragment.config_name == config_name]
+            app_configs.append(
+                AppConfigData(
+                    config_name=config_name,
+                    config=_merge_configs(visible),
+                )
+            )
+        return SearchAppConfigsActionResult(app_configs=app_configs)

@@ -32,12 +32,12 @@ from tenacity import (
 )
 
 from ai.backend.common.exception import DatabaseError
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.errors.resource import DBOperationFailed
 from ai.backend.manager.types import Sentinel
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 column_constraints = ["nullable", "index", "unique", "primary_key"]
 
 # TODO: Implement begin(), begin_readonly() for AsyncSession also
@@ -48,6 +48,10 @@ class ExtendedAsyncSAEngine(SAEngine):
     A subclass to add a few more convenience methods to the SQLAlchemy's async engine.
     """
 
+    _txn_concurrency_threshold: int
+    _readonly_txn_over_threshold: bool
+    _generic_txn_over_threshold: bool
+
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         self._txn_concurrency_threshold = kwargs.pop("_txn_concurrency_threshold", 0)
         self.lock_conn_timeout: float | None = (
@@ -56,34 +60,43 @@ class ExtendedAsyncSAEngine(SAEngine):
         super().__init__(*args, **kwargs)
         self._readonly_txn_count = 0
         self._generic_txn_count = 0
+        self._readonly_txn_over_threshold = False
+        self._generic_txn_over_threshold = False
         self._sess_factory = async_sessionmaker(self, expire_on_commit=False)
         self._readonly_sess_factory = async_sessionmaker(self)
 
     def _check_generic_txn_cnt(self) -> None:
-        if (
-            self._txn_concurrency_threshold > 0
-            and self._generic_txn_count >= self._txn_concurrency_threshold
-        ):
+        over = self._is_over_txn_threshold(self._generic_txn_count)
+        if over and not self._generic_txn_over_threshold:
             log.warning(
-                "The number of concurrent generic transactions ({}) "
-                "looks too high (warning threshold: {}).",
-                self._generic_txn_count,
-                self._txn_concurrency_threshold,
-                stack_info=False,
+                "concurrent generic transactions above threshold",
+                txn_count=self._generic_txn_count,
+                threshold_count=self._txn_concurrency_threshold,
             )
+        elif not over and self._generic_txn_over_threshold:
+            log.debug(
+                "concurrent generic transactions back below threshold",
+                threshold_count=self._txn_concurrency_threshold,
+            )
+        self._generic_txn_over_threshold = over
 
     def _check_readonly_txn_cnt(self) -> None:
-        if (
-            self._txn_concurrency_threshold > 0
-            and self._readonly_txn_count >= self._txn_concurrency_threshold
-        ):
+        over = self._is_over_txn_threshold(self._readonly_txn_count)
+        if over and not self._readonly_txn_over_threshold:
             log.warning(
-                "The number of concurrent read-only transactions ({}) "
-                "looks too high (warning threshold: {}).",
-                self._readonly_txn_count,
-                self._txn_concurrency_threshold,
-                stack_info=False,
+                "concurrent read-only transactions above threshold",
+                txn_count=self._readonly_txn_count,
+                threshold_count=self._txn_concurrency_threshold,
             )
+        elif not over and self._readonly_txn_over_threshold:
+            log.debug(
+                "concurrent read-only transactions back below threshold",
+                threshold_count=self._txn_concurrency_threshold,
+            )
+        self._readonly_txn_over_threshold = over
+
+    def _is_over_txn_threshold(self, txn_count: int) -> bool:
+        return self._txn_concurrency_threshold > 0 and txn_count >= self._txn_concurrency_threshold
 
     @actxmgr
     async def _begin(self, connection: SAConnection) -> AsyncIterator[SAConnection]:
@@ -100,6 +113,7 @@ class ExtendedAsyncSAEngine(SAEngine):
                 yield connection
             finally:
                 self._generic_txn_count -= 1
+                self._check_generic_txn_cnt()
 
     @actxmgr
     async def _begin_readonly(
@@ -119,6 +133,7 @@ class ExtendedAsyncSAEngine(SAEngine):
                 yield conn_with_exec_opts
             finally:
                 self._readonly_txn_count -= 1
+                self._check_readonly_txn_cnt()
 
     @actxmgr
     @override
@@ -303,8 +318,8 @@ class ExtendedAsyncSAEngine(SAEngine):
                         )
                     except sa.exc.InterfaceError:
                         log.warning(
-                            "DB Connection for lock(id: {:d}) has already been closed. Skip unlock",
-                            lock_id,
+                            "lock connection already closed, unlock skipped",
+                            lock_id=lock_id,
                         )
 
 

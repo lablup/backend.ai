@@ -25,7 +25,6 @@ from ai.backend.manager.models.rbac_models.migration.enums import (
     ScopeType,
 )
 from ai.backend.manager.models.rbac_models.migration.models import (
-    get_roles_table,
     get_user_roles_table,
     mapper_registry,
 )
@@ -39,7 +38,6 @@ from ai.backend.manager.models.rbac_models.migration.user import (
 )
 from ai.backend.manager.models.rbac_models.migration.utils import (
     insert_skip_on_conflict,
-    query_role_rows_by_name,
 )
 
 # revision identifiers, used by Alembic.
@@ -47,6 +45,23 @@ revision = "2c9000848b6e"
 down_revision = "4f08ccd6cb8e"
 branch_labels = None
 depends_on = None
+
+# Metadata local to this revision so that the table snapshots below cannot be
+# altered by definitions living in other revisions.
+_local_metadata = sa.MetaData()
+
+
+def _get_roles_table() -> sa.Table:
+    """Snapshot of the ``roles`` columns this revision touches."""
+    return sa.Table(
+        "roles",
+        _local_metadata,
+        IDColumn(),
+        sa.Column("name", sa.String(64), nullable=False),
+        sa.Column("status", sa.VARCHAR(16), nullable=False, server_default="active"),
+        sa.Column("source", sa.VARCHAR(16), nullable=False, server_default="system"),
+        extend_existing=True,
+    )
 
 
 def _get_permissions_table() -> sa.Table:
@@ -88,7 +103,7 @@ def _query_users_without_system_roles(
 ) -> Sequence[Row[Any]]:
     users_table = _get_users_table()
     user_roles_table = get_user_roles_table()
-    roles_table = get_roles_table()
+    roles_table = _get_roles_table()
     # Subquery: user_ids that already have a system role
     system_role_subq = (
         sa.select(user_roles_table.c.user_id)
@@ -111,7 +126,7 @@ def _query_users_without_system_roles(
 
 
 def _backfill_roles_and_permissions(db_conn: Connection, rows: Sequence[Row[Any]]) -> None:
-    roles_table = get_roles_table()
+    roles_table = _get_roles_table()
     from ai.backend.manager.models.rbac_models.migration.enums import RoleSource, RoleStatus
 
     # Create roles (skip if already exists by name)
@@ -124,7 +139,11 @@ def _backfill_roles_and_permissions(db_conn: Connection, rows: Sequence[Row[Any]
     insert_skip_on_conflict(db_conn, roles_table, role_inputs)
 
     # Resolve role IDs
-    role_rows = query_role_rows_by_name(db_conn, list(uuid_by_role_name.keys()))
+    role_rows = db_conn.execute(
+        sa.select(roles_table.c.id, roles_table.c.name).where(
+            roles_table.c.name.in_(list(uuid_by_role_name.keys()))
+        )
+    ).all()
     role_id_user_id_map: dict[uuid.UUID, uuid.UUID] = {
         r.id: uuid_by_role_name[r.name] for r in role_rows
     }

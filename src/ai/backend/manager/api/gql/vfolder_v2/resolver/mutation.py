@@ -10,8 +10,15 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     PurgeVFolderInput,
     PurgeVFolderOptions,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_mutation
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.api.gql.vfolder_v2.types.mount_policy import (
+    SetVFolderMountPolicyInputGQL,
+    SetVFolderMountPolicyPayloadGQL,
+    UnsetVFolderMountPolicyInputGQL,
+    UnsetVFolderMountPolicyPayloadGQL,
+)
 from ai.backend.manager.api.gql.vfolder_v2.types.mutations import (
     BulkDeleteVFoldersInputGQL,
     BulkDeleteVFoldersPayloadGQL,
@@ -35,9 +42,15 @@ from ai.backend.manager.api.gql.vfolder_v2.types.mutations import (
     MkdirPayloadGQL,
     MoveFileInputGQL,
     MoveFilePayloadGQL,
+    PartialBulkDeleteVFoldersInputGQL,
+    PartialBulkRestoreVFoldersInputGQL,
+    PartialBulkUpdateVFoldersInputGQL,
+    PartialBulkVFoldersPayloadGQL,
     PurgeVFolderOptionsInputGQL,
     PurgeVFolderPayloadGQL,
     RestoreVFolderPayloadGQL,
+    UpdateVFolderInputGQL,
+    UpdateVFolderPayloadGQL,
     UploadSessionInputGQL,
     UploadSessionPayloadGQL,
 )
@@ -55,6 +68,63 @@ async def create_vfolder_v2(
 ) -> CreateVFolderPayloadGQL | None:
     payload = await info.context.adapters.vfolder.create(input.to_pydantic())
     return CreateVFolderPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Update a virtual folder. Only provided fields will be updated.",
+    )
+)
+async def update_vfolder_v2(
+    info: Info[StrawberryGQLContext],
+    vfolder_id: UUID,
+    input: UpdateVFolderInputGQL,
+) -> UpdateVFolderPayloadGQL:
+    payload = await info.context.adapters.vfolder.update(vfolder_id, input.to_pydantic())
+    return UpdateVFolderPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Update several virtual folders, answering for each one.",
+    )
+)
+async def partial_bulk_update_vfolders_v2(
+    info: Info[StrawberryGQLContext],
+    input: PartialBulkUpdateVFoldersInputGQL,
+) -> PartialBulkVFoldersPayloadGQL:
+    payload = await info.context.adapters.vfolder.partial_bulk_update(input.to_pydantic())
+    return PartialBulkVFoldersPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Soft-delete several virtual folders, answering for each one.",
+    )
+)
+async def partial_bulk_delete_vfolders_v2(
+    info: Info[StrawberryGQLContext],
+    input: PartialBulkDeleteVFoldersInputGQL,
+) -> PartialBulkVFoldersPayloadGQL:
+    payload = await info.context.adapters.vfolder.partial_bulk_delete(input.to_pydantic())
+    return PartialBulkVFoldersPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Restore several soft-deleted virtual folders, answering for each one.",
+    )
+)
+async def partial_bulk_restore_vfolders_v2(
+    info: Info[StrawberryGQLContext],
+    input: PartialBulkRestoreVFoldersInputGQL,
+) -> PartialBulkVFoldersPayloadGQL:
+    payload = await info.context.adapters.vfolder.partial_bulk_restore(input.to_pydantic())
+    return PartialBulkVFoldersPayloadGQL.from_pydantic(payload)
 
 
 @gql_mutation(
@@ -234,7 +304,10 @@ async def vfolder_create_download_session_v2(
     BackendAIGQLMeta(
         added_version="26.4.2",
         description="Soft-delete multiple virtual folders.",
-    )
+    ),
+    deprecation_reason=(
+        f"Deprecated since {NEXT_RELEASE_VERSION}. Use `partialBulkDeleteVfoldersV2`."
+    ),
 )
 async def bulk_delete_vfolders_v2(
     info: Info[StrawberryGQLContext],
@@ -290,3 +363,41 @@ async def bulk_purge_vfolders_v2(
     dto = input.to_pydantic()
     payload = await ctx.adapters.vfolder.bulk_purge(dto)
     return BulkPurgeVFoldersPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="26.9.0",
+        description=(
+            "Set the mount level one user gets on a virtual folder. "
+            "Requires UPDATE on the folder; a requester who reaches the folder through a "
+            "share may not hand out more than they mount at."
+        ),
+    ),
+    name="setVFolderMountPolicy",
+)
+async def set_vfolder_mount_policy(
+    info: Info[StrawberryGQLContext],
+    vfolder_id: UUID,
+    input: SetVFolderMountPolicyInputGQL,
+) -> SetVFolderMountPolicyPayloadGQL | None:
+    payload = await info.context.adapters.vfolder.set_mount_policy(vfolder_id, input.to_pydantic())
+    return SetVFolderMountPolicyPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="26.9.0",
+        description="Take back the mount level one user was given on a virtual folder.",
+    ),
+    name="unsetVFolderMountPolicy",
+)
+async def unset_vfolder_mount_policy(
+    info: Info[StrawberryGQLContext],
+    vfolder_id: UUID,
+    input: UnsetVFolderMountPolicyInputGQL,
+) -> UnsetVFolderMountPolicyPayloadGQL | None:
+    payload = await info.context.adapters.vfolder.unset_mount_policy(
+        vfolder_id, input.to_pydantic()
+    )
+    return UnsetVFolderMountPolicyPayloadGQL.from_pydantic(payload)

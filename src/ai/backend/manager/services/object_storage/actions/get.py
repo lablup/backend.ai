@@ -1,31 +1,31 @@
-import uuid
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.object_storage import ObjectStorageID
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.manager.actions.v2.ops.base import GetSingleEntityOpsAction
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
-from ai.backend.manager.services.object_storage.actions.base import ObjectStorageAction
+from ai.backend.manager.models.object_storage.queriers import ObjectStorageQuerier
+from ai.backend.manager.models.object_storage.row import ObjectStorageRow
 
 
 @dataclass
-class GetObjectStorageAction(ObjectStorageAction):
-    storage_id: uuid.UUID
+class GetObjectStorageAction(GetSingleEntityOpsAction[ObjectStorageRow, ObjectStorageData]):
+    """Read one object storage registration."""
 
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.storage_id)
+    storage_id: ObjectStorageID
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.GET
-
-
-@dataclass
-class GetObjectStorageActionResult(BaseActionResult):
-    result: ObjectStorageData
+    def action_name(cls) -> str:
+        return "get_object_storage"
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.result.id)
+    def entity_id(self) -> EntityIdentifier:
+        return self.storage_id
+
+    @override
+    def to_querier(self) -> ObjectStorageQuerier:
+        return ObjectStorageQuerier(storage_id=self.storage_id)

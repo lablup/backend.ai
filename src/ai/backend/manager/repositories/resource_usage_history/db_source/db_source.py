@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import date, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, cast
@@ -13,45 +13,46 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import CursorResult
 
+from ai.backend.common.data.entity.kernel import KernelID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot
-from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.resource_usage_history import (
+from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.data.resource_usage_history.types import (
+    KernelUsageRecordData,
+)
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.resource_usage_history.creators import KernelUsageRecordCreator
+from ai.backend.manager.models.resource_usage_history.row import (
     DomainUsageBucketRow,
     KernelUsageRecordRow,
     ProjectUsageBucketRow,
     UsageBucketEntryRow,
     UserUsageBucketRow,
 )
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    BulkCreator,
-    Creator,
-    Upserter,
-    execute_batch_querier,
-    execute_bulk_creator,
-    execute_creator,
-    execute_upserter,
+from ai.backend.manager.models.resource_usage_history.scopes import (
+    DomainUsageBucketTarget,
+    ProjectUsageBucketTarget,
+    UserUsageBucketTarget,
 )
+from ai.backend.manager.models.resource_usage_history.searchers import (
+    DomainUsageBucketSearcher,
+    KernelUsageRecordSearcher,
+    ProjectUsageBucketSearcher,
+    UserUsageBucketSearcher,
+)
+from ai.backend.manager.models.specs.creator import NestedFieldToCreate
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.resource_usage_history.types import (
-    DomainUsageBucketData,
     DomainUsageBucketSearchResult,
-    DomainUsageBucketSearchScope,
-    KernelUsageRecordData,
     KernelUsageRecordSearchResult,
-    ProjectUsageBucketData,
     ProjectUsageBucketSearchResult,
-    ProjectUsageBucketSearchScope,
-    UserUsageBucketData,
     UserUsageBucketSearchResult,
-    UserUsageBucketSearchScope,
 )
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-    from ai.backend.manager.data.fair_share import (
-        BucketDelta,
+    from ai.backend.manager.data.fair_share.types import (
         DomainUsageBucketKey,
         ProjectUsageBucketKey,
         UsageBucketAggregationResult,
@@ -59,7 +60,7 @@ if TYPE_CHECKING:
     )
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 __all__ = ("ResourceUsageHistoryDBSource",)
 
@@ -69,36 +70,63 @@ class ResourceUsageHistoryDBSource:
 
     _db: ExtendedAsyncSAEngine
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+    def __init__(self, db: ExtendedAsyncSAEngine, v2_ops: V2DBOpsProvider) -> None:
         self._db = db
+        self._v2_ops = v2_ops
 
     # ==================== Kernel Usage Records ====================
 
     async def create_kernel_usage_record(
         self,
-        creator: Creator[KernelUsageRecordRow],
+        kernel_id: KernelID,
+        creator: KernelUsageRecordCreator,
     ) -> KernelUsageRecordData:
         """Create a single kernel usage record."""
-        async with self._db.begin_session() as db_sess:
-            result = await execute_creator(db_sess, creator)
-            return KernelUsageRecordData.from_row(result.row)
+        async with self._v2_ops.write_ops() as w:
+            records = await w.atomic_create_nested_fields([
+                NestedFieldToCreate(owner_id=kernel_id, creator=creator)
+            ])
+        return records[0]
 
     async def bulk_create_kernel_usage_records(
         self,
-        bulk_creator: BulkCreator[KernelUsageRecordRow],
+        creations: Sequence[
+            NestedFieldToCreate[KernelID, KernelUsageRecordRow, KernelUsageRecordData]
+        ],
     ) -> list[KernelUsageRecordData]:
         """Bulk create kernel usage records.
 
         This is the primary method used by UsageAggregationService to record
         per-period usage slices for all running kernels.
         """
-        async with self._db.begin_session() as db_sess:
-            result = await execute_bulk_creator(db_sess, bulk_creator)
-            return [KernelUsageRecordData.from_row(row) for row in result.rows]
+        async with self._v2_ops.write_ops() as w:
+            return await w.atomic_create_nested_fields(creations)
+
+    async def _add_usage_records(
+        self,
+        db_sess: SASession,
+        creations: Sequence[
+            NestedFieldToCreate[KernelID, KernelUsageRecordRow, KernelUsageRecordData]
+        ],
+    ) -> list[KernelUsageRecordData]:
+        """Write the usage slices into the caller's transaction.
+
+        The writes that follow have to land with these or not at all, and ops are handed
+        out session-bound, so the rows go in here rather than through the field write
+        path the other creates take.
+        """
+        if not creations:
+            return []
+        rows = [c.creator.build_row(c.owner_id) for c in creations]
+        db_sess.add_all(rows)
+        await db_sess.flush()
+        return [c.creator.to_data(row) for c, row in zip(creations, rows, strict=True)]
 
     async def bulk_create_kernel_usage_records_with_observation_update(
         self,
-        bulk_creator: BulkCreator[KernelUsageRecordRow],
+        creations: Sequence[
+            NestedFieldToCreate[KernelID, KernelUsageRecordRow, KernelUsageRecordData]
+        ],
         kernel_observation_times: Mapping[uuid.UUID, datetime],
     ) -> tuple[list[KernelUsageRecordData], int]:
         """Bulk create kernel usage records and update observation timestamps atomically.
@@ -114,10 +142,9 @@ class ResourceUsageHistoryDBSource:
         Returns:
             Tuple of (created records data, number of kernels with updated observation times)
         """
-        async with self._db.begin_session() as db_sess:
+        async with self._db.begin_session_read_committed() as db_sess:
             # Step 1: Bulk create kernel usage records
-            result = await execute_bulk_creator(db_sess, bulk_creator)
-            records = [KernelUsageRecordData.from_row(row) for row in result.rows]
+            records = await self._add_usage_records(db_sess, creations)
 
             # Step 2: Update last_observed_at for kernels
             updated_count = 0
@@ -140,7 +167,9 @@ class ResourceUsageHistoryDBSource:
 
     async def record_fair_share_observation(
         self,
-        bulk_creator: BulkCreator[KernelUsageRecordRow],
+        creations: Sequence[
+            NestedFieldToCreate[KernelID, KernelUsageRecordRow, KernelUsageRecordData]
+        ],
         kernel_observation_times: Mapping[uuid.UUID, datetime],
         aggregation_result: UsageBucketAggregationResult,
         decay_unit_days: int = 1,
@@ -165,22 +194,19 @@ class ResourceUsageHistoryDBSource:
             Tuple of (created records data, number of kernels with updated observation times)
         """
         log.debug(
-            "[DBSource] record_fair_share_observation: specs_count={}, "
-            "kernel_observation_times_count={}, user_deltas={}, project_deltas={}, "
-            "domain_deltas={}",
-            len(bulk_creator.specs),
-            len(kernel_observation_times),
-            len(aggregation_result.user_usage_deltas),
-            len(aggregation_result.project_usage_deltas),
-            len(aggregation_result.domain_usage_deltas),
+            "fair share observation recording",
+            usage_record_count=len(creations),
+            observed_kernel_count=len(kernel_observation_times),
+            user_delta_count=len(aggregation_result.user_usage_deltas),
+            project_delta_count=len(aggregation_result.project_usage_deltas),
+            domain_delta_count=len(aggregation_result.domain_usage_deltas),
         )
 
-        async with self._db.begin_session() as db_sess:
+        async with self._db.begin_session_read_committed() as db_sess:
             # Step 1: Bulk create kernel usage records
-            result = await execute_bulk_creator(db_sess, bulk_creator)
-            records = [KernelUsageRecordData.from_row(row) for row in result.rows]
+            records = await self._add_usage_records(db_sess, creations)
 
-            log.debug("[DBSource] Created {} kernel usage records", len(records))
+            log.debug("kernel usage records created", usage_record_count=len(records))
 
             # Step 2: Update last_observed_at for kernels
             updated_count = 0
@@ -198,7 +224,7 @@ class ResourceUsageHistoryDBSource:
                     update_result = await db_sess.execute(update_stmt)
                     updated_count += cast(CursorResult[Any], update_result).rowcount
 
-            log.debug("[DBSource] Updated last_observed_at for {} kernels", updated_count)
+            log.debug("kernel last observation time updated", kernel_count=updated_count)
 
             # Step 3: Increment usage buckets
             await self._increment_user_usage_buckets(
@@ -211,166 +237,92 @@ class ResourceUsageHistoryDBSource:
                 db_sess, aggregation_result.domain_usage_deltas, decay_unit_days
             )
 
-            log.debug("[DBSource] Incremented usage buckets successfully")
+            log.debug("usage buckets incremented")
 
             return records, updated_count
 
     async def search_kernel_usage_records(
         self,
-        querier: BatchQuerier,
+        searcher: KernelUsageRecordSearcher,
     ) -> KernelUsageRecordSearchResult:
         """Search kernel usage records with pagination."""
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(KernelUsageRecordRow)
-            result = await execute_batch_querier(db_sess, query, querier)
-            items = [
-                KernelUsageRecordData.from_row(row.KernelUsageRecordRow) for row in result.rows
-            ]
-            return KernelUsageRecordSearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
+        async with self._v2_ops.read_ops() as r:
+            result = await r.search_in_global(searcher)
+        return KernelUsageRecordSearchResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     # ==================== Domain Usage Buckets ====================
 
-    async def create_domain_usage_bucket(
-        self,
-        creator: Creator[DomainUsageBucketRow],
-    ) -> DomainUsageBucketData:
-        """Create a new domain usage bucket."""
-        async with self._db.begin_session() as db_sess:
-            result = await execute_creator(db_sess, creator)
-            return DomainUsageBucketData.from_row(result.row)
-
-    async def upsert_domain_usage_bucket(
-        self,
-        upserter: Upserter[DomainUsageBucketRow],
-    ) -> DomainUsageBucketData:
-        """Upsert a domain usage bucket."""
-        async with self._db.begin_session() as db_sess:
-            result = await execute_upserter(
-                db_sess,
-                upserter,
-                index_elements=["domain_name", "resource_group", "period_start"],
-            )
-            return DomainUsageBucketData.from_row(result.row)
-
     async def search_domain_usage_buckets(
         self,
-        querier: BatchQuerier,
-        scope: DomainUsageBucketSearchScope | None = None,
+        searcher: DomainUsageBucketSearcher,
+        scope: DomainUsageBucketTarget | None = None,
     ) -> DomainUsageBucketSearchResult:
         """Search domain usage buckets with pagination."""
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(DomainUsageBucketRow)
-            result = await execute_batch_querier(
-                db_sess, query, querier, scopes=[scope] if scope is not None else ()
+        async with self._v2_ops.read_ops() as r:
+            result = (
+                await r.search_in_global(searcher)
+                if scope is None
+                else await r.search_with_scopes([scope], searcher)
             )
-            items = [
-                DomainUsageBucketData.from_row(row.DomainUsageBucketRow) for row in result.rows
-            ]
-            return DomainUsageBucketSearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
+        return DomainUsageBucketSearchResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     # ==================== Project Usage Buckets ====================
 
-    async def create_project_usage_bucket(
-        self,
-        creator: Creator[ProjectUsageBucketRow],
-    ) -> ProjectUsageBucketData:
-        """Create a new project usage bucket."""
-        async with self._db.begin_session() as db_sess:
-            result = await execute_creator(db_sess, creator)
-            return ProjectUsageBucketData.from_row(result.row)
-
-    async def upsert_project_usage_bucket(
-        self,
-        upserter: Upserter[ProjectUsageBucketRow],
-    ) -> ProjectUsageBucketData:
-        """Upsert a project usage bucket."""
-        async with self._db.begin_session() as db_sess:
-            result = await execute_upserter(
-                db_sess,
-                upserter,
-                index_elements=["project_id", "resource_group", "period_start"],
-            )
-            return ProjectUsageBucketData.from_row(result.row)
-
     async def search_project_usage_buckets(
         self,
-        querier: BatchQuerier,
-        scope: ProjectUsageBucketSearchScope | None = None,
+        searcher: ProjectUsageBucketSearcher,
+        scope: ProjectUsageBucketTarget | None = None,
     ) -> ProjectUsageBucketSearchResult:
         """Search project usage buckets with pagination."""
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(ProjectUsageBucketRow)
-            result = await execute_batch_querier(
-                db_sess, query, querier, scopes=[scope] if scope is not None else ()
+        async with self._v2_ops.read_ops() as r:
+            result = (
+                await r.search_in_global(searcher)
+                if scope is None
+                else await r.search_with_scopes([scope], searcher)
             )
-            items = [
-                ProjectUsageBucketData.from_row(row.ProjectUsageBucketRow) for row in result.rows
-            ]
-            return ProjectUsageBucketSearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
+        return ProjectUsageBucketSearchResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     # ==================== User Usage Buckets ====================
 
-    async def create_user_usage_bucket(
-        self,
-        creator: Creator[UserUsageBucketRow],
-    ) -> UserUsageBucketData:
-        """Create a new user usage bucket."""
-        async with self._db.begin_session() as db_sess:
-            result = await execute_creator(db_sess, creator)
-            return UserUsageBucketData.from_row(result.row)
-
-    async def upsert_user_usage_bucket(
-        self,
-        upserter: Upserter[UserUsageBucketRow],
-    ) -> UserUsageBucketData:
-        """Upsert a user usage bucket."""
-        async with self._db.begin_session() as db_sess:
-            result = await execute_upserter(
-                db_sess,
-                upserter,
-                index_elements=["user_uuid", "project_id", "resource_group", "period_start"],
-            )
-            return UserUsageBucketData.from_row(result.row)
-
     async def search_user_usage_buckets(
         self,
-        querier: BatchQuerier,
-        scope: UserUsageBucketSearchScope | None = None,
+        searcher: UserUsageBucketSearcher,
+        scope: UserUsageBucketTarget | None = None,
     ) -> UserUsageBucketSearchResult:
         """Search user usage buckets with pagination."""
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(UserUsageBucketRow)
-            result = await execute_batch_querier(
-                db_sess, query, querier, scopes=[scope] if scope is not None else ()
+        async with self._v2_ops.read_ops() as r:
+            result = (
+                await r.search_in_global(searcher)
+                if scope is None
+                else await r.search_with_scopes([scope], searcher)
             )
-            items = [UserUsageBucketData.from_row(row.UserUsageBucketRow) for row in result.rows]
-            return UserUsageBucketSearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
+        return UserUsageBucketSearchResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     # ==================== Aggregation Queries ====================
 
     async def get_aggregated_usage_by_user(
         self,
-        resource_group: str,
+        resource_group_id: ResourceGroupID,
         lookback_start: date,
         lookback_end: date,
     ) -> Mapping[tuple[uuid.UUID, uuid.UUID], ResourceSlot]:
@@ -381,13 +333,13 @@ class ResourceUsageHistoryDBSource:
         """
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             return await self._fetch_aggregated_usage_by_user(
-                db_sess, resource_group, lookback_start, lookback_end
+                db_sess, resource_group_id, lookback_start, lookback_end
             )
 
     async def _fetch_aggregated_usage_by_user(
         self,
         db_sess: SASession,
-        resource_group: str,
+        resource_group_id: ResourceGroupID,
         lookback_start: date,
         lookback_end: date,
     ) -> Mapping[tuple[uuid.UUID, uuid.UUID], ResourceSlot]:
@@ -398,7 +350,7 @@ class ResourceUsageHistoryDBSource:
                 UserUsageBucketRow.user_uuid,
                 UserUsageBucketRow.project_id,
                 ube.c.slot_name,
-                sa.func.sum(ube.c.amount).label("total_amount"),
+                sa.func.sum(ube.c.resource_usage).label("total_resource_usage"),
             )
             .select_from(
                 sa.join(
@@ -409,7 +361,7 @@ class ResourceUsageHistoryDBSource:
             )
             .where(
                 sa.and_(
-                    UserUsageBucketRow.resource_group == resource_group,
+                    UserUsageBucketRow.resource_group_id == resource_group_id,
                     UserUsageBucketRow.period_start >= lookback_start,
                     UserUsageBucketRow.period_start <= lookback_end,
                     ube.c.bucket_type == "user",
@@ -429,12 +381,12 @@ class ResourceUsageHistoryDBSource:
             key = (row.user_uuid, row.project_id)
             if key not in aggregated:
                 aggregated[key] = ResourceSlot()
-            aggregated[key][row.slot_name] = row.total_amount
+            aggregated[key][row.slot_name] = row.total_resource_usage
         return aggregated
 
     async def get_aggregated_usage_by_project(
         self,
-        resource_group: str,
+        resource_group_id: ResourceGroupID,
         lookback_start: date,
         lookback_end: date,
     ) -> Mapping[uuid.UUID, ResourceSlot]:
@@ -448,7 +400,7 @@ class ResourceUsageHistoryDBSource:
                 sa.select(
                     ProjectUsageBucketRow.project_id,
                     ube.c.slot_name,
-                    sa.func.sum(ube.c.amount).label("total_amount"),
+                    sa.func.sum(ube.c.resource_usage).label("total_resource_usage"),
                 )
                 .select_from(
                     sa.join(
@@ -459,7 +411,7 @@ class ResourceUsageHistoryDBSource:
                 )
                 .where(
                     sa.and_(
-                        ProjectUsageBucketRow.resource_group == resource_group,
+                        ProjectUsageBucketRow.resource_group_id == resource_group_id,
                         ProjectUsageBucketRow.period_start >= lookback_start,
                         ProjectUsageBucketRow.period_start <= lookback_end,
                         ube.c.bucket_type == "project",
@@ -477,12 +429,12 @@ class ResourceUsageHistoryDBSource:
             for row in rows:
                 if row.project_id not in aggregated:
                     aggregated[row.project_id] = ResourceSlot()
-                aggregated[row.project_id][row.slot_name] = row.total_amount
+                aggregated[row.project_id][row.slot_name] = row.total_resource_usage
             return aggregated
 
     async def get_aggregated_usage_by_domain(
         self,
-        resource_group: str,
+        resource_group_id: ResourceGroupID,
         lookback_start: date,
         lookback_end: date,
     ) -> Mapping[str, ResourceSlot]:
@@ -496,7 +448,7 @@ class ResourceUsageHistoryDBSource:
                 sa.select(
                     DomainUsageBucketRow.domain_name,
                     ube.c.slot_name,
-                    sa.func.sum(ube.c.amount).label("total_amount"),
+                    sa.func.sum(ube.c.resource_usage).label("total_resource_usage"),
                 )
                 .select_from(
                     sa.join(
@@ -507,7 +459,7 @@ class ResourceUsageHistoryDBSource:
                 )
                 .where(
                     sa.and_(
-                        DomainUsageBucketRow.resource_group == resource_group,
+                        DomainUsageBucketRow.resource_group_id == resource_group_id,
                         DomainUsageBucketRow.period_start >= lookback_start,
                         DomainUsageBucketRow.period_start <= lookback_end,
                         ube.c.bucket_type == "domain",
@@ -525,7 +477,7 @@ class ResourceUsageHistoryDBSource:
             for row in rows:
                 if row.domain_name not in aggregated:
                     aggregated[row.domain_name] = ResourceSlot()
-                aggregated[row.domain_name][row.slot_name] = row.total_amount
+                aggregated[row.domain_name][row.slot_name] = row.total_resource_usage
             return aggregated
 
     # ==================== Bucket Delta Updates ====================
@@ -554,7 +506,7 @@ class ResourceUsageHistoryDBSource:
         ):
             return
 
-        async with self._db.begin_session() as db_sess:
+        async with self._db.begin_session_read_committed() as db_sess:
             # Process user buckets
             await self._increment_user_usage_buckets(
                 db_sess, aggregation_result.user_usage_deltas, decay_unit_days
@@ -573,7 +525,7 @@ class ResourceUsageHistoryDBSource:
     async def _increment_user_usage_buckets(
         self,
         db_sess: SASession,
-        deltas: Mapping[UserUsageBucketKey, BucketDelta],
+        deltas: Mapping[UserUsageBucketKey, ResourceSlot],
         decay_unit_days: int,
     ) -> None:
         """Increment user usage buckets with deltas."""
@@ -584,14 +536,10 @@ class ResourceUsageHistoryDBSource:
         keys_list = list(deltas.keys())
         existing = await self._fetch_existing_user_buckets(db_sess, keys_list)
 
-        for key, bucket_delta in deltas.items():
-            lookup_key = (key.user_uuid, key.project_id, key.resource_group, key.period_date)
+        for key, delta_usage in deltas.items():
+            lookup_key = (key.user_uuid, key.project_id, key.resource_group_id, key.period_date)
             existing_usage = existing.get(lookup_key, ResourceSlot())
-            # JSONB stores resource-seconds (amount * seconds) for legacy compatibility
-            resource_seconds = self._calculate_resource_seconds(
-                bucket_delta.slots, bucket_delta.duration_seconds
-            )
-            new_usage = existing_usage + resource_seconds
+            new_usage = existing_usage + delta_usage
 
             # Upsert with merged usage (JSONB)
             stmt = (
@@ -608,12 +556,13 @@ class ResourceUsageHistoryDBSource:
                     resource_usage=new_usage,
                 )
                 .on_conflict_do_update(
-                    index_elements=["user_uuid", "project_id", "resource_group", "period_start"],
-                    set_={
-                        "resource_group_id": key.resource_group_id,
-                        "resource_usage": new_usage,
-                        "updated_at": sa.func.now(),
-                    },
+                    index_elements=[
+                        "user_uuid",
+                        "project_id",
+                        "resource_group_id",
+                        "period_start",
+                    ],
+                    set_={"resource_usage": new_usage, "updated_at": sa.func.now()},
                 )
                 .returning(UserUsageBucketRow.__table__.c.id)
             )
@@ -625,14 +574,14 @@ class ResourceUsageHistoryDBSource:
                 db_sess,
                 bucket_id,
                 "user",
-                bucket_delta,
+                delta_usage,
             )
 
     async def _fetch_existing_user_buckets(
         self,
         db_sess: SASession,
         keys: list[UserUsageBucketKey],
-    ) -> dict[tuple[uuid.UUID, uuid.UUID, str, date], ResourceSlot]:
+    ) -> dict[tuple[uuid.UUID, uuid.UUID, ResourceGroupID, date], ResourceSlot]:
         """Fetch existing user buckets for the given keys."""
         if not keys:
             return {}
@@ -642,7 +591,7 @@ class ResourceUsageHistoryDBSource:
             sa.and_(
                 UserUsageBucketRow.user_uuid == key.user_uuid,
                 UserUsageBucketRow.project_id == key.project_id,
-                UserUsageBucketRow.resource_group == key.resource_group,
+                UserUsageBucketRow.resource_group_id == key.resource_group_id,
                 UserUsageBucketRow.period_start == key.period_date,
             )
             for key in keys
@@ -651,7 +600,7 @@ class ResourceUsageHistoryDBSource:
         query = sa.select(
             UserUsageBucketRow.user_uuid,
             UserUsageBucketRow.project_id,
-            UserUsageBucketRow.resource_group,
+            UserUsageBucketRow.resource_group_id,
             UserUsageBucketRow.period_start,
             UserUsageBucketRow.resource_usage,
         ).where(sa.or_(*conditions))
@@ -661,7 +610,7 @@ class ResourceUsageHistoryDBSource:
             (
                 row.user_uuid,
                 row.project_id,
-                row.resource_group,
+                row.resource_group_id,
                 row.period_start,
             ): row.resource_usage
             for row in result.all()
@@ -670,7 +619,7 @@ class ResourceUsageHistoryDBSource:
     async def _increment_project_usage_buckets(
         self,
         db_sess: SASession,
-        deltas: Mapping[ProjectUsageBucketKey, BucketDelta],
+        deltas: Mapping[ProjectUsageBucketKey, ResourceSlot],
         decay_unit_days: int,
     ) -> None:
         """Increment project usage buckets with deltas."""
@@ -681,13 +630,10 @@ class ResourceUsageHistoryDBSource:
         keys_list = list(deltas.keys())
         existing = await self._fetch_existing_project_buckets(db_sess, keys_list)
 
-        for key, bucket_delta in deltas.items():
-            lookup_key = (key.project_id, key.resource_group, key.period_date)
+        for key, delta_usage in deltas.items():
+            lookup_key = (key.project_id, key.resource_group_id, key.period_date)
             existing_usage = existing.get(lookup_key, ResourceSlot())
-            resource_seconds = self._calculate_resource_seconds(
-                bucket_delta.slots, bucket_delta.duration_seconds
-            )
-            new_usage = existing_usage + resource_seconds
+            new_usage = existing_usage + delta_usage
 
             # Upsert with merged usage (JSONB)
             stmt = (
@@ -703,12 +649,8 @@ class ResourceUsageHistoryDBSource:
                     resource_usage=new_usage,
                 )
                 .on_conflict_do_update(
-                    index_elements=["project_id", "resource_group", "period_start"],
-                    set_={
-                        "resource_group_id": key.resource_group_id,
-                        "resource_usage": new_usage,
-                        "updated_at": sa.func.now(),
-                    },
+                    index_elements=["project_id", "resource_group_id", "period_start"],
+                    set_={"resource_usage": new_usage, "updated_at": sa.func.now()},
                 )
                 .returning(ProjectUsageBucketRow.__table__.c.id)
             )
@@ -720,14 +662,14 @@ class ResourceUsageHistoryDBSource:
                 db_sess,
                 bucket_id,
                 "project",
-                bucket_delta,
+                delta_usage,
             )
 
     async def _fetch_existing_project_buckets(
         self,
         db_sess: SASession,
         keys: list[ProjectUsageBucketKey],
-    ) -> dict[tuple[uuid.UUID, str, date], ResourceSlot]:
+    ) -> dict[tuple[uuid.UUID, ResourceGroupID, date], ResourceSlot]:
         """Fetch existing project buckets for the given keys."""
         if not keys:
             return {}
@@ -735,7 +677,7 @@ class ResourceUsageHistoryDBSource:
         conditions = [
             sa.and_(
                 ProjectUsageBucketRow.project_id == key.project_id,
-                ProjectUsageBucketRow.resource_group == key.resource_group,
+                ProjectUsageBucketRow.resource_group_id == key.resource_group_id,
                 ProjectUsageBucketRow.period_start == key.period_date,
             )
             for key in keys
@@ -743,21 +685,21 @@ class ResourceUsageHistoryDBSource:
 
         query = sa.select(
             ProjectUsageBucketRow.project_id,
-            ProjectUsageBucketRow.resource_group,
+            ProjectUsageBucketRow.resource_group_id,
             ProjectUsageBucketRow.period_start,
             ProjectUsageBucketRow.resource_usage,
         ).where(sa.or_(*conditions))
 
         result = await db_sess.execute(query)
         return {
-            (row.project_id, row.resource_group, row.period_start): row.resource_usage
+            (row.project_id, row.resource_group_id, row.period_start): row.resource_usage
             for row in result.all()
         }
 
     async def _increment_domain_usage_buckets(
         self,
         db_sess: SASession,
-        deltas: Mapping[DomainUsageBucketKey, BucketDelta],
+        deltas: Mapping[DomainUsageBucketKey, ResourceSlot],
         decay_unit_days: int,
     ) -> None:
         """Increment domain usage buckets with deltas."""
@@ -768,13 +710,10 @@ class ResourceUsageHistoryDBSource:
         keys_list = list(deltas.keys())
         existing = await self._fetch_existing_domain_buckets(db_sess, keys_list)
 
-        for key, bucket_delta in deltas.items():
-            lookup_key = (key.domain_name, key.resource_group, key.period_date)
+        for key, delta_usage in deltas.items():
+            lookup_key = (key.domain_name, key.resource_group_id, key.period_date)
             existing_usage = existing.get(lookup_key, ResourceSlot())
-            resource_seconds = self._calculate_resource_seconds(
-                bucket_delta.slots, bucket_delta.duration_seconds
-            )
-            new_usage = existing_usage + resource_seconds
+            new_usage = existing_usage + delta_usage
 
             # Upsert with merged usage (JSONB)
             stmt = (
@@ -789,12 +728,8 @@ class ResourceUsageHistoryDBSource:
                     resource_usage=new_usage,
                 )
                 .on_conflict_do_update(
-                    index_elements=["domain_name", "resource_group", "period_start"],
-                    set_={
-                        "resource_group_id": key.resource_group_id,
-                        "resource_usage": new_usage,
-                        "updated_at": sa.func.now(),
-                    },
+                    index_elements=["domain_name", "resource_group_id", "period_start"],
+                    set_={"resource_usage": new_usage, "updated_at": sa.func.now()},
                 )
                 .returning(DomainUsageBucketRow.__table__.c.id)
             )
@@ -806,14 +741,14 @@ class ResourceUsageHistoryDBSource:
                 db_sess,
                 bucket_id,
                 "domain",
-                bucket_delta,
+                delta_usage,
             )
 
     async def _fetch_existing_domain_buckets(
         self,
         db_sess: SASession,
         keys: list[DomainUsageBucketKey],
-    ) -> dict[tuple[str, str, date], ResourceSlot]:
+    ) -> dict[tuple[str, ResourceGroupID, date], ResourceSlot]:
         """Fetch existing domain buckets for the given keys."""
         if not keys:
             return {}
@@ -821,7 +756,7 @@ class ResourceUsageHistoryDBSource:
         conditions = [
             sa.and_(
                 DomainUsageBucketRow.domain_name == key.domain_name,
-                DomainUsageBucketRow.resource_group == key.resource_group,
+                DomainUsageBucketRow.resource_group_id == key.resource_group_id,
                 DomainUsageBucketRow.period_start == key.period_date,
             )
             for key in keys
@@ -829,14 +764,14 @@ class ResourceUsageHistoryDBSource:
 
         query = sa.select(
             DomainUsageBucketRow.domain_name,
-            DomainUsageBucketRow.resource_group,
+            DomainUsageBucketRow.resource_group_id,
             DomainUsageBucketRow.period_start,
             DomainUsageBucketRow.resource_usage,
         ).where(sa.or_(*conditions))
 
         result = await db_sess.execute(query)
         return {
-            (row.domain_name, row.resource_group, row.period_start): row.resource_usage
+            (row.domain_name, row.resource_group_id, row.period_start): row.resource_usage
             for row in result.all()
         }
 
@@ -847,39 +782,30 @@ class ResourceUsageHistoryDBSource:
         db_sess: SASession,
         bucket_id: uuid.UUID,
         bucket_type: str,
-        bucket_delta: BucketDelta,
+        usage: ResourceSlot,
     ) -> None:
         """Upsert normalized usage_bucket_entries for a bucket.
 
-        For each slot in the delta, insert or update an entry row.
-        ``amount`` stores the raw resource amount (not pre-multiplied)
-        and ``duration_seconds`` stores the actual observation duration.
-        The product ``amount * duration_seconds`` is computed at SQL query
-        time where PostgreSQL auto-extends NUMERIC precision, eliminating
-        overflow risk for large memory values.
+        ``resource_usage`` accumulates server-side.
 
         ``capacity`` is set to 0 here; it is updated separately during
         fair share factor calculation when the cluster capacity is known.
         """
         entry_table = UsageBucketEntryRow.__table__
-        for slot_name, value in bucket_delta.slots.items():
+        for slot_name, delta_slot_seconds in usage.items():
             stmt = (
                 pg_insert(entry_table)
                 .values(
                     bucket_id=bucket_id,
                     bucket_type=bucket_type,
                     slot_name=slot_name,
-                    amount=value,
-                    duration_seconds=bucket_delta.duration_seconds,
+                    resource_usage=delta_slot_seconds,
                     capacity=0,
                 )
                 .on_conflict_do_update(
                     constraint="pk_usage_bucket_entries",
                     set_={
-                        "amount": entry_table.c.amount + value,
-                        "duration_seconds": (
-                            entry_table.c.duration_seconds + bucket_delta.duration_seconds
-                        ),
+                        "resource_usage": (entry_table.c.resource_usage + delta_slot_seconds),
                     },
                 )
             )
@@ -887,7 +813,7 @@ class ResourceUsageHistoryDBSource:
 
     async def update_bucket_entry_capacities(
         self,
-        scaling_group: str,
+        resource_group_id: ResourceGroupID,
         capacity_by_slot: Mapping[str, Decimal],
     ) -> None:
         """Update capacity column on usage_bucket_entries for a scaling group.
@@ -896,7 +822,7 @@ class ResourceUsageHistoryDBSource:
         Updates all entries whose parent bucket belongs to the given scaling group.
 
         Args:
-            scaling_group: Scaling group name to filter buckets
+            resource_group_id: Resource group ID used to filter buckets
             capacity_by_slot: Mapping of slot_name to capacity value
         """
         if not capacity_by_slot:
@@ -904,7 +830,7 @@ class ResourceUsageHistoryDBSource:
 
         entry_table = UsageBucketEntryRow.__table__
 
-        async with self._db.begin_session() as db_sess:
+        async with self._db.begin_session_read_committed() as db_sess:
             for slot_name, capacity in capacity_by_slot.items():
                 # Update entries across all bucket types for this scaling group
                 for bucket_row_cls in (
@@ -916,7 +842,7 @@ class ResourceUsageHistoryDBSource:
                     # Subquery: bucket_ids in this scaling group
                     bucket_ids_subq = (
                         sa.select(parent_table.c.id)
-                        .where(parent_table.c.resource_group == scaling_group)
+                        .where(parent_table.c.resource_group_id == resource_group_id)
                         .scalar_subquery()
                     )
                     stmt = (
@@ -930,15 +856,3 @@ class ResourceUsageHistoryDBSource:
                         .values(capacity=capacity)
                     )
                     await db_sess.execute(stmt)
-
-    @staticmethod
-    def _calculate_resource_seconds(
-        slots: ResourceSlot,
-        seconds: int,
-    ) -> ResourceSlot:
-        """Convert resource slots to resource-seconds for legacy JSONB storage.
-
-        Multiplies each resource value by the number of seconds to get
-        the total resource-seconds consumed during the period.
-        """
-        return ResourceSlot({key: value * Decimal(str(seconds)) for key, value in slots.items()})

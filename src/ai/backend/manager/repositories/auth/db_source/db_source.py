@@ -2,62 +2,71 @@
 
 from __future__ import annotations
 
+import asyncio
+import secrets
 import uuid as uuid_mod
+from collections.abc import Collection
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, cast
 from uuid import UUID
 
 import sqlalchemy as sa
-from sqlalchemy.orm import joinedload, selectinload
+from sqlalchemy.dialects import postgresql as pgsql
 
+from ai.backend.common.auth.password import HashInfo, PasswordInfo
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import BackendAIError, UserNotFound
-from ai.backend.common.identifier.user import UserID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.auth.login_session_types import (
     LoginAttemptResult,
-    LoginHistoryData,
-    LoginSessionData,
     LoginSessionStatus,
 )
-from ai.backend.manager.data.auth.types import GroupMembershipData, UserData
-from ai.backend.manager.data.common.types import SearchResult
-from ai.backend.manager.data.permission.types import EntityType, ScopeType
+from ai.backend.manager.data.auth.types import (
+    GroupMembershipData,
+    KeyPairSigningMaterial,
+    UserCreationData,
+    UserData,
+)
+from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.errors.auth import (
-    AccessKeyNotFound,
     AuthorizationFailed,
     GroupMembershipNotFoundError,
     LoginSessionNotFoundError,
-    UserCreationError,
 )
 from ai.backend.manager.errors.common import InternalServerError
-from ai.backend.manager.models.hasher.types import HashInfo, PasswordInfo
-from ai.backend.manager.models.keypair import KeyPairRow, keypairs
-from ai.backend.manager.models.login_session.row import LoginHistoryRow, LoginSessionRow
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
+from ai.backend.manager.errors.user import KeyPairNotFound, UserCreationBadRequest
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.hasher.factory import compare_to_hashed_password
+from ai.backend.manager.models.keypair.queriers import DefaultKeypairQuerier
+from ai.backend.manager.models.keypair.row import (
+    KEYPAIR_SECRET_KEY_CONTEXT,
+    keypairs,
 )
-from ai.backend.manager.models.scopes import SearchScope
-from ai.backend.manager.models.user import (
+from ai.backend.manager.models.login_session.row import LoginHistoryRow, LoginSessionRow
+from ai.backend.manager.models.specs.lookup import DataLookup
+from ai.backend.manager.models.specs.querier import DataQuerier
+from ai.backend.manager.models.user.creators import UserCreator
+from ai.backend.manager.models.user.row import (
     UserRole,
     UserRow,
     UserStatus,
-    check_credential,
-    compare_to_hashed_password,
     users,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base.creator import Creator, execute_creator
-from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
-from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
-from ai.backend.manager.repositories.permission_controller.role_manager import (
-    RoleManager,
-    UserSystemRoleSpec,
-)
+from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
+from ai.backend.manager.repositories.auth.keypair_secrets import generate_keypair_data
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.user.provider import UserOpsProvider
+from ai.backend.manager.repositories.ops.v2.user.write import FullUserCreator
+from ai.backend.manager.secret.pool import KeyProviderPool
+from ai.backend.manager.views.auth import UserCredential
 
 auth_db_source_resilience = Resilience(
     policies=[
@@ -98,27 +107,28 @@ class AuthDBSource:
     """
 
     _db: ExtendedAsyncSAEngine
+    _user_ops_provider: UserOpsProvider
+    _v2_ops: V2DBOpsProvider
+    _key_provider_pool: KeyProviderPool
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+    def __init__(
+        self,
+        db: ExtendedAsyncSAEngine,
+        v2_ops_provider: V2DBOpsProvider,
+        key_provider_pool: KeyProviderPool,
+    ) -> None:
         self._db = db
-        self._role_manager = RoleManager()
+        self._user_ops_provider = UserOpsProvider(db)
+        self._v2_ops = v2_ops_provider
+        self._key_provider_pool = key_provider_pool
 
     @auth_db_source_resilience.apply()
     async def fetch_group_membership(self, group_id: UUID, user_id: UUID) -> GroupMembershipData:
         """Fetch group membership from database."""
         async with self._db.begin() as conn:
-            query = sa.select(
-                AssociationScopesEntitiesRow.scope_id,
-                AssociationScopesEntitiesRow.entity_id,
-            ).where(
-                AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                AssociationScopesEntitiesRow.scope_id == str(group_id),
-                AssociationScopesEntitiesRow.entity_id == str(user_id),
-            )
-            result = await conn.execute(query)
-            row = result.first()
-            if not row:
+            query = sa.select(user_scope_membership_exists(ProjectEntityType(), group_id, user_id))
+            is_member = (await conn.execute(query)).scalar()
+            if not is_member:
                 raise GroupMembershipNotFoundError(
                     extra_msg="No such project or you are not the member of it."
                 )
@@ -134,46 +144,41 @@ class AuthDBSource:
             return row is not None
 
     @auth_db_source_resilience.apply()
+    async def fetch_domain_id(self, domain_name: str) -> DomainID:
+        """The id of the domain a signup names."""
+        async with self._db.begin_readonly() as conn:
+            domain_id = await conn.scalar(
+                sa.select(DomainRow.id).where(DomainRow.name == domain_name)
+            )
+        if domain_id is None:
+            raise UserCreationBadRequest(f"Domain '{domain_name}' does not exist.")
+        return DomainID(domain_id)
+
+    @auth_db_source_resilience.apply()
     async def insert_user_with_keypair(
         self,
-        user_data: dict[str, Any],
-        keypair_data: dict[str, Any],
-    ) -> UserData:
-        """Insert a new user with the default keypair."""
-        async with self._db.begin_session_read_committed() as db_session:
-            conn = await db_session.connection()
-
-            # Create user
-            query = users.insert().values(user_data)
-            result = await conn.execute(query)
-            if result.rowcount == 0:
-                raise UserCreationError("Failed to create user")
-
-            # Get created user
-            user_query = users.select().where(users.c.email == user_data["email"])
-            result = await conn.execute(user_query)
-            user_row = result.first()
-            if user_row is None:
-                raise UserCreationError("Failed to retrieve created user")
-
-            # Create keypair
-            keypair_data["user"] = user_row.uuid
-            keypair_query = keypairs.insert().values(keypair_data)
-            await conn.execute(keypair_query)
-
-            # Create RBAC system role and map user to role
-            role_spec = UserSystemRoleSpec(user_id=user_row.uuid)
-            role = await self._role_manager.create_system_role(db_session, role_spec)
-            user_role_creator = Creator(
-                spec=UserRoleCreatorSpec(user_id=user_row.uuid, role_id=role.id)
+        user_spec: UserCreator,
+        project_ids: Collection[ProjectID],
+        *,
+        keypair_resource_policy: str,
+        keypair_rate_limit: int | None = None,
+    ) -> UserCreationData:
+        """Provision a signup user in one transaction: the row, its default keypair,
+        and its domain/project (model-store included) scope enrollments."""
+        async with self._user_ops_provider.write_ops() as w:
+            result = await w.create_user(
+                FullUserCreator(
+                    user=user_spec,
+                    keypair_secrets=await generate_keypair_data(self._key_provider_pool),
+                    keypair_resource_policy=keypair_resource_policy,
+                    keypair_rate_limit=keypair_rate_limit,
+                )
             )
-            await execute_creator(db_session, user_role_creator)
-
-            # Provision roles from active user-scope presets and assign the
-            # auto_assign ones to the new user.
-            await self._role_manager.create_preset_roles_for_user(db_session, user_row.uuid)
-
-            return self._user_row_to_data(user_row)
+            await w.join_projects(UserID(result.user.id), user_spec.domain_id, project_ids)
+            return UserCreationData(
+                user=result.user,
+                keypair=result.keypair,
+            )
 
     @auth_db_source_resilience.apply()
     async def modify_user_full_name(self, email: str, domain_name: str, full_name: str) -> None:
@@ -240,7 +245,9 @@ class AuthDBSource:
 
             # Deactivate keypairs
             keypair_query = (
-                keypairs.update().values(is_active=False).where(keypairs.c.user_id == email)
+                keypairs.update()
+                .values(is_active=False)
+                .where(keypairs.c.user.in_(sa.select(users.c.uuid).where(users.c.email == email)))
             )
             await conn.execute(keypair_query)
 
@@ -262,6 +269,51 @@ class AuthDBSource:
             query = keypairs.update().values(data).where(keypairs.c.access_key == access_key)
             await conn.execute(query)
 
+    @auth_db_source_resilience.apply()
+    async def verify_keypair_secret(self, access_key: str, secret_key: str) -> bool:
+        """Whether an active keypair holds the given secret key."""
+        async with self._db.begin_readonly() as conn:
+            row = (
+                await conn.execute(
+                    sa.select(keypairs.c.secret_key, keypairs.c.is_active).where(
+                        keypairs.c.access_key == access_key
+                    )
+                )
+            ).first()
+        if row is None or row.secret_key is None or not row.is_active:
+            return False
+        stored = await self._key_provider_pool.decrypt(row.secret_key, KEYPAIR_SECRET_KEY_CONTEXT)
+        return secrets.compare_digest(stored.encode("utf-8"), secret_key.encode("utf-8"))
+
+    @auth_db_source_resilience.apply()
+    async def fetch_keypair_signing_material(self, access_key: str) -> KeyPairSigningMaterial:
+        """Read the owner and the decrypted secret key of an active keypair."""
+        async with self._db.begin_readonly() as conn:
+            row = (
+                await conn.execute(
+                    sa.select(keypairs.c.user, keypairs.c.secret_key).where(
+                        keypairs.c.access_key == access_key,
+                        keypairs.c.is_active.is_(True),
+                    )
+                )
+            ).first()
+        if row is None or row.secret_key is None:
+            raise KeyPairNotFound(f"No active keypair holds the access key {access_key}")
+        return KeyPairSigningMaterial(
+            user_id=row.user,
+            secret_key=await self._key_provider_pool.decrypt(
+                row.secret_key, KEYPAIR_SECRET_KEY_CONTEXT
+            ),
+        )
+
+    @auth_db_source_resilience.apply()
+    async def lookup[TEntityID: EntityIdentifier](
+        self, lookup: DataLookup[Any, TEntityID]
+    ) -> TEntityID | None:
+        """The id a key names, or None when it names nothing."""
+        async with self._v2_ops.read_ops() as r:
+            return await r.lookup_entity_id(lookup)
+
     def _user_row_to_data(self, row: UserRow | sa.Row[Any]) -> UserData:
         """Convert UserRow to UserData."""
         return UserData(
@@ -276,7 +328,7 @@ class AuthDBSource:
             status=row.status or UserStatus.ACTIVE,
             status_info=row.status_info,
             created_at=row.created_at,
-            modified_at=row.modified_at,
+            modified_at=row.updated_at,
             password_changed_at=row.password_changed_at,
             domain_name=row.domain_name or "",
             role=row.role or UserRole.USER,
@@ -302,15 +354,6 @@ class AuthDBSource:
             if row is None:
                 raise ValueError("Unknown owner access key")
             return row.domain_name, row.role
-
-    @auth_db_source_resilience.apply()
-    async def fetch_user_id_by_access_key(self, access_key: AccessKey) -> UserID:
-        async with self._db.begin_readonly_session() as db_session:
-            query = sa.select(KeyPairRow.user).where(KeyPairRow.access_key == access_key)
-            user_id = await db_session.scalar(query)
-            if user_id is None:
-                raise AccessKeyNotFound("Unknown access key")
-            return UserID(user_id)
 
     @auth_db_source_resilience.apply()
     async def fetch_user_info_by_email(self, email: str) -> tuple[UUID, UserRole, str]:
@@ -340,9 +383,14 @@ class AuthDBSource:
                 .where((users.c.email == email) & (users.c.domain_name == domain_name))
             )
 
+    @auth_db_source_resilience.apply()
+    async def query_user_data[TData](self, querier: DataQuerier[UserRow, TData]) -> TData | None:
+        """The user a querier names, or None when it names nothing."""
+        async with self._v2_ops.read_ops() as r:
+            return await r.query_data(querier)
+
     async def _check_password(
         self,
-        conn: sa.ext.asyncio.AsyncConnection,
         row: sa.Row[Any],
         target_password_info: PasswordInfo,
     ) -> None:
@@ -350,7 +398,9 @@ class AuthDBSource:
         if row.password is None:
             raise AuthorizationFailed("User credential mismatch.")
         try:
-            if not compare_to_hashed_password(target_password_info.password, row.password):
+            if not await asyncio.to_thread(
+                compare_to_hashed_password, target_password_info.password, row.password
+            ):
                 raise AuthorizationFailed("User credential mismatch.")
         except ValueError:
             raise AuthorizationFailed("User credential mismatch.") from None
@@ -379,6 +429,7 @@ class AuthDBSource:
         domain_name: str,
         result: LoginAttemptResult,
         fail_reason: str | None,
+        client_ip: str | None,
     ) -> None:
         """Insert a login history record (internal, within an existing connection)."""
         await conn.execute(
@@ -387,6 +438,7 @@ class AuthDBSource:
                 domain_name=domain_name,
                 result=result,
                 fail_reason=fail_reason,
+                client_ip=client_ip,
             )
         )
 
@@ -397,6 +449,7 @@ class AuthDBSource:
         domain_name: str,
         result: LoginAttemptResult,
         fail_reason: str | None = None,
+        client_ip: str | None = None,
     ) -> None:
         """Insert a login history record (public, manages its own transaction)."""
         async with self._db.begin_session() as db_session:
@@ -406,6 +459,7 @@ class AuthDBSource:
                     domain_name=domain_name,
                     result=result,
                     fail_reason=fail_reason,
+                    client_ip=client_ip,
                 )
             )
 
@@ -438,7 +492,7 @@ class AuthDBSource:
             if row is None:
                 raise AuthorizationFailed("User credential mismatch.")
 
-            await self._check_password(conn, row, target_password_info)
+            await self._check_password(row, target_password_info)
             await self._migrate_password_hash(conn, row, domain_name, email, target_password_info)
 
             # Fetch active sessions for the user within the same connection
@@ -473,6 +527,7 @@ class AuthDBSource:
         self,
         session_tokens: list[str],
         result: LoginAttemptResult,
+        client_ip: str | None = None,
     ) -> None:
         """Delete the given login sessions and record history for each.
 
@@ -491,11 +546,12 @@ class AuthDBSource:
                 .cte("deleted")
             )
             insert_query = lh.insert().from_select(
-                ["user_id", "domain_name", "result"],
+                ["user_id", "domain_name", "result", "client_ip"],
                 sa.select(
                     deleted.c.user_id,
                     users.c.domain_name,
                     sa.literal(result.value).label("result"),
+                    sa.literal(client_ip, type_=pgsql.INET).label("client_ip"),
                 ).select_from(deleted.join(users, deleted.c.user_id == users.c.uuid)),
             )
             await conn.execute(insert_query)
@@ -509,6 +565,7 @@ class AuthDBSource:
         domain_name: str,
         *,
         login_client_type_id: UUID | None = None,
+        client_ip: str | None = None,
     ) -> LoginSessionCreationResult:
         """Create a new active login session and record a successful login history entry.
 
@@ -531,7 +588,12 @@ class AuthDBSource:
 
             # Record successful login in the same transaction.
             await self._record_login_history(
-                conn, user_id, domain_name, LoginAttemptResult.SUCCESS, fail_reason=None
+                conn,
+                user_id,
+                domain_name,
+                LoginAttemptResult.SUCCESS,
+                fail_reason=None,
+                client_ip=client_ip,
             )
 
             await conn.commit()
@@ -542,32 +604,38 @@ class AuthDBSource:
         self,
         domain_name: str,
         email: str,
-        password: str,
-    ) -> sa.RowMapping:
+        target_password_info: PasswordInfo,
+    ) -> UserCredential:
         """Verify credentials without password migration (for signout, etc.)"""
-        return await check_credential(
-            db=self._db,
-            domain=domain_name,
-            email=email,
-            password=password,
-        )
+        async with self._db.begin_readonly_read_committed() as conn:
+            result = await conn.execute(
+                sa.select(users.c.uuid, users.c.password).where(
+                    (users.c.email == email) & (users.c.domain_name == domain_name)
+                ),
+            )
+            row = result.first()
+            if row is None:
+                raise AuthorizationFailed("User credential mismatch.")
+            await self._check_password(row, target_password_info)
+        return UserCredential(user_id=UserID(row.uuid), hashed_password=row.password)
 
     @auth_db_source_resilience.apply()
-    async def fetch_user_row_by_uuid(self, user_uuid: UUID) -> UserRow:
-        """Fetch user row by UUID from database."""
+    async def fetch_default_keypair(self, user_uuid: UUID) -> KeyPairData:
+        """Read the keypair a user authorizes with.
+
+        Every user holding keypairs has one marked, so no mark is a fault rather than
+        an answer. An admin creating a keypair for them is the way back.
+        """
         async with self._db.begin_readonly_session_read_committed() as db_session:
-            user_query = (
-                sa.select(UserRow)
-                .where(UserRow.uuid == user_uuid)
-                .options(
-                    joinedload(UserRow.main_keypair).joinedload(KeyPairRow.resource_policy_row),
-                    selectinload(UserRow.keypairs).joinedload(KeyPairRow.resource_policy_row),
-                )
-            )
-            user_row = await db_session.scalar(user_query)
-            if user_row is None:
+            if not await db_session.scalar(sa.select(sa.exists().where(UserRow.uuid == user_uuid))):
                 raise UserNotFound(extra_data=user_uuid)
-            return user_row
+            querier = DefaultKeypairQuerier()
+            marked = await db_session.scalar(
+                querier.build_select().where(querier.owner_id_column() == user_uuid)
+            )
+            if marked is None:
+                raise KeyPairNotFound(f"User {user_uuid} holds no active default keypair")
+            return querier.to_data(marked)
 
     @auth_db_source_resilience.apply()
     async def fetch_current_time(self) -> datetime:
@@ -612,35 +680,39 @@ class AuthDBSource:
             ]
 
     @auth_db_source_resilience.apply()
-    async def delete_session_by_token(
+    async def delete_owned_session_by_token(
         self,
         session_token: str,
+        user_id: UserID,
         result: LoginAttemptResult,
+        client_ip: str | None = None,
     ) -> None:
-        """Delete a single login session by its token and record history.
-
-        Uses a CTE to atomically DELETE + INSERT into login_history with a
-        JOIN on users to obtain domain_name. No-op if the session is not found.
+        """Validate ownership, delete the session, and record history in one transaction.
+        Raise LoginSessionNotFoundError if the token is missing or belongs to another user.
         """
         ls = LoginSessionRow.__table__
         lh = LoginHistoryRow.__table__
-        async with self._db.connect() as conn:
+        async with self._db.begin() as conn:
+            session_id = await conn.scalar(
+                sa.select(ls.c.id)
+                .where((ls.c.session_token == session_token) & (ls.c.user_id == user_id))
+                .with_for_update()
+            )
+            if session_id is None:
+                raise LoginSessionNotFoundError()
             deleted = (
-                sa.delete(ls)
-                .where(ls.c.session_token == session_token)
-                .returning(ls.c.user_id)
-                .cte("deleted")
+                sa.delete(ls).where(ls.c.id == session_id).returning(ls.c.user_id).cte("deleted")
             )
             insert_query = lh.insert().from_select(
-                ["user_id", "domain_name", "result"],
+                ["user_id", "domain_name", "result", "client_ip"],
                 sa.select(
                     deleted.c.user_id,
                     users.c.domain_name,
                     sa.literal(result.value).label("result"),
+                    sa.literal(client_ip, type_=pgsql.INET).label("client_ip"),
                 ).select_from(deleted.join(users, deleted.c.user_id == users.c.uuid)),
             )
             await conn.execute(insert_query)
-            await conn.commit()
 
     @auth_db_source_resilience.apply()
     async def delete_sessions_by_user(
@@ -648,6 +720,7 @@ class AuthDBSource:
         user_id: UUID,
         domain_name: str,
         result: LoginAttemptResult,
+        client_ip: str | None = None,
     ) -> list[str]:
         """Delete all login sessions for a user, record history, return tokens.
 
@@ -669,6 +742,7 @@ class AuthDBSource:
                             "user_id": user_id,
                             "domain_name": domain_name,
                             "result": result,
+                            "client_ip": client_ip,
                         }
                         for _ in deleted_tokens
                     ],
@@ -677,58 +751,11 @@ class AuthDBSource:
             return deleted_tokens
 
     @auth_db_source_resilience.apply()
-    async def admin_search_login_sessions(
-        self,
-        querier: BatchQuerier,
-    ) -> SearchResult[LoginSessionData]:
-        """Search all login sessions without scope restriction (admin only)."""
-        async with self._db.begin_readonly_session() as db_session:
-            query = sa.select(LoginSessionRow)
-            result = await execute_batch_querier(db_session, query, querier)
-            items = [row.LoginSessionRow.to_data() for row in result.rows]
-            return SearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
-    @auth_db_source_resilience.apply()
-    async def search_login_sessions(
-        self,
-        scope: SearchScope,
-        querier: BatchQuerier,
-    ) -> SearchResult[LoginSessionData]:
-        """Search login sessions within a given scope."""
-        async with self._db.begin_readonly_session() as db_session:
-            query = sa.select(LoginSessionRow)
-            result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
-            items = [row.LoginSessionRow.to_data() for row in result.rows]
-            return SearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
-    @auth_db_source_resilience.apply()
-    async def fetch_login_session_by_id(self, session_id: UUID) -> LoginSessionData:
-        """Fetch a single login session by its ID.
-
-        Raises LoginSessionNotFoundError if the session does not exist.
-        """
-        async with self._db.begin_readonly_session() as db_session:
-            query = sa.select(LoginSessionRow).where(LoginSessionRow.id == session_id)
-            row = await db_session.scalar(query)
-            if row is None:
-                raise LoginSessionNotFoundError(extra_msg=f"Login session not found: {session_id}")
-            return row.to_data()
-
-    @auth_db_source_resilience.apply()
     async def delete_session_by_id(
         self,
         session_id: UUID,
         result: LoginAttemptResult,
+        client_ip: str | None = None,
     ) -> str:
         """Delete a login session by its ID, record history, return session_token.
 
@@ -762,44 +789,25 @@ class AuthDBSource:
                     user_id=row.user_id,
                     domain_name=domain_name,
                     result=result,
+                    client_ip=client_ip,
                 )
             )
             await conn.commit()
             return session_token
 
-    # --- Login History ---
-
     @auth_db_source_resilience.apply()
-    async def admin_search_login_history(
-        self,
-        querier: BatchQuerier,
-    ) -> SearchResult[LoginHistoryData]:
-        """Search all login history without scope restriction (admin only)."""
-        async with self._db.begin_readonly_session() as db_session:
-            query = sa.select(LoginHistoryRow)
-            result = await execute_batch_querier(db_session, query, querier)
-            items = [row.LoginHistoryRow.to_data() for row in result.rows]
-            return SearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
+    async def invalidate_active_login_sessions(self, user_id: UserID) -> list[str]:
+        """Invalidate the user's active sessions and return only their newly invalidated tokens.
+        Exclude already invalidated sessions and sessions belonging to other users.
+        """
+        async with self._db.begin_session() as db_session:
+            result = await db_session.execute(
+                sa.update(LoginSessionRow)
+                .where(
+                    (LoginSessionRow.user_id == user_id)
+                    & (LoginSessionRow.status == LoginSessionStatus.ACTIVE)
+                )
+                .values(status=LoginSessionStatus.INVALIDATED, invalidated_at=sa.func.now())
+                .returning(LoginSessionRow.session_token)
             )
-
-    @auth_db_source_resilience.apply()
-    async def search_login_history(
-        self,
-        scope: SearchScope,
-        querier: BatchQuerier,
-    ) -> SearchResult[LoginHistoryData]:
-        """Search login history within a given scope."""
-        async with self._db.begin_readonly_session() as db_session:
-            query = sa.select(LoginHistoryRow)
-            result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
-            items = [row.LoginHistoryRow.to_data() for row in result.rows]
-            return SearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
+            return list(result.scalars())

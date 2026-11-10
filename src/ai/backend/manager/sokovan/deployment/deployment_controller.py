@@ -8,16 +8,19 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
+from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.replica import ReplicaID
+from ai.backend.common.data.entity.resource_group import ResourceGroupName
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
+from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
-from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.exception import UnreachableError
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
-from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
-from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.identifier.resource_group import ResourceGroupName
-from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.schema.deployment import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.common.types import (
     ClusterMode,
@@ -25,7 +28,7 @@ from ai.backend.common.types import (
     MountPermission,
     ResourceSlot,
 )
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.creator import (
@@ -53,54 +56,50 @@ from ai.backend.manager.data.deployment_revision_preset.types import (
     DeploymentRevisionPresetData,
 )
 from ai.backend.manager.data.image.types import ImageIdentifier
-from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.deployment import EndpointNotFound
 from ai.backend.manager.errors.storage import VFolderPermissionError
-from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.models.routing.conditions import RouteConditions
-from ai.backend.manager.models.runtime_variant_preset.types import RuntimeVariantPresetValueEntry
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
-from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.deployment import DeploymentRepository
-from ai.backend.manager.repositories.deployment.creators import (
-    DeploymentCreatorSpec,
+from ai.backend.manager.models.deployment_revision.creators import DeploymentRevisionCreator
+from ai.backend.manager.models.endpoint.creators import (
+    DeploymentCreator,
     DeploymentMetadataFields,
     DeploymentNetworkFields,
     DeploymentReplicaFields,
 )
-from ai.backend.manager.repositories.deployment.creators.revision import (
-    DeploymentRevisionCreatorSpec,
-)
-from ai.backend.manager.repositories.deployment.updaters import (
-    DeploymentUpdaterSpec,
-    RouteUpdaterSpec,
-)
+from ai.backend.manager.models.endpoint.updaters import DeploymentUpdater
+from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
+from ai.backend.manager.models.routing.searchers import RouteInfoSearcher
+from ai.backend.manager.models.routing.updaters import ReplicaUpdater
+from ai.backend.manager.models.runtime_variant_preset.types import RuntimeVariantPresetValueEntry
+from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.sokovan.deployment.exceptions import (
     InvalidEndpointState,
 )
-from ai.backend.manager.sokovan.deployment.revision_draft import RevisionDraftReader
+from ai.backend.manager.sokovan.deployment.revision_draft.reader import RevisionDraftReader
 from ai.backend.manager.sokovan.deployment.types import (
     ActivateRevisionResult,
     DeploymentLifecycleType,
 )
-from ai.backend.manager.sokovan.deployment.validators import (
+from ai.backend.manager.sokovan.deployment.validators.base import (
     DeploymentRevisionValidationContext,
     DeploymentRevisionValidator,
+)
+from ai.backend.manager.sokovan.deployment.validators.required_resource_slot_rule import (
     RequiredResourceSlotRule,
 )
-from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
+    SchedulingController,
+)
 from ai.backend.manager.sokovan.scheduling_controller.types import SessionValidationSpec
 from ai.backend.manager.types import OptionalState
 
 if TYPE_CHECKING:
     from ai.backend.manager.repositories.deployment_revision_preset.repository import (
-        DeploymentRevisionPresetRepository,
+        DeploymentPresetRepository,
     )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @dataclass
@@ -114,7 +113,7 @@ class DeploymentControllerArgs:
     event_producer: EventProducer
     valkey_schedule: ValkeyScheduleClient
     revision_draft_reader: RevisionDraftReader
-    deployment_revision_preset_repository: "DeploymentRevisionPresetRepository | None"
+    deployment_revision_preset_repository: "DeploymentPresetRepository | None"
 
 
 class DeploymentController:
@@ -136,7 +135,7 @@ class DeploymentController:
     _event_producer: EventProducer
     _valkey_schedule: ValkeyScheduleClient
     _revision_draft_reader: RevisionDraftReader
-    _deployment_revision_preset_repository: "DeploymentRevisionPresetRepository | None"
+    _deployment_revision_preset_repository: "DeploymentPresetRepository | None"
     _deployment_revision_validator: DeploymentRevisionValidator
 
     def __init__(self, args: DeploymentControllerArgs) -> None:
@@ -172,7 +171,7 @@ class DeploymentController:
         Returns:
             DeploymentInfo for the newly created endpoint.
         """
-        log.info("Creating deployment '{}'", creator.metadata.name)
+        log.trace("deployment creating", deployment_name=creator.metadata.name)
         resolved = await self._apply_deployment_level_preset(creator)
         metadata = resolved.metadata
         replica_spec = resolved.replica_spec
@@ -193,14 +192,14 @@ class DeploymentController:
                     ResourceGroupName(metadata.resource_group)
                 )
             )
-        creator_spec = DeploymentCreatorSpec(
+        deployment_creator = DeploymentCreator(
             metadata=DeploymentMetadataFields(
                 name=metadata.name,
                 domain=metadata.domain,
-                project_id=metadata.project,
+                project_id=ProjectID(metadata.project),
                 resource_group=metadata.resource_group,
                 created_user_id=metadata.created_user,
-                session_owner_id=metadata.session_owner,
+                session_owner_id=UserID(metadata.session_owner),
                 revision_history_limit=metadata.revision_history_limit,
                 tag=metadata.tag,
             ),
@@ -213,17 +212,10 @@ class DeploymentController:
                 url=network_spec.url,
             ),
             options=options,
-            revision=None,
         )
-        rbac_creator: RBACEntityCreator[EndpointRow] = RBACEntityCreator(
-            spec=creator_spec,
-            element_type=RBACElementType.MODEL_DEPLOYMENT,
-            scope_ref=RBACElementRef(
-                element_type=RBACElementType.USER, element_id=str(metadata.created_user)
-            ),
-            additional_scope_refs=[],
+        return await self._deployment_repository.create_endpoint(
+            deployment_creator, resolved.policy
         )
-        return await self._deployment_repository.create_endpoint(rbac_creator, resolved.policy)
 
     async def build_creator_from_legacy_draft(
         self,
@@ -237,10 +229,10 @@ class DeploymentController:
         ``ImageID`` up front because the draft chain now carries a single
         image pointer (no canonical + architecture pair).
         """
-        log.info(
-            "Building creator from legacy draft '{}' in project {}",
-            draft.name,
-            draft.project,
+        log.trace(
+            "deployment creator building from legacy draft",
+            deployment_name=draft.name,
+            project_id=draft.project,
         )
         image_id = await self._resolve_draft_image_id(
             draft.draft_model_revision.image_identifier,
@@ -304,20 +296,19 @@ class DeploymentController:
     async def update_deployment(
         self,
         endpoint_id: DeploymentID,
-        spec: DeploymentUpdaterSpec,
+        updater: DeploymentUpdater,
     ) -> DeploymentInfo:
         """
         Update an existing deployment with new specifications.
 
         Args:
             endpoint_id: ID of the deployment to update
-            spec: Deployment updater specification
+            updater: Update spec for the deployment
 
         Returns:
             DeploymentInfo: Information about the updated deployment
         """
-        log.info("Updating deployment {}", endpoint_id)
-        updater = Updater[EndpointRow](spec=spec, pk_value=endpoint_id)
+        log.trace("deployment updating", deployment_id=endpoint_id)
         modified_endpoint = await self._deployment_repository.get_modified_endpoint(
             endpoint_id=endpoint_id, updater=updater
         )
@@ -331,7 +322,7 @@ class DeploymentController:
         try:
             await self.mark_lifecycle_needed(DeploymentLifecycleType.CHECK_REPLICA)
         except Exception as e:
-            log.error("Failed to mark deployment lifecycle needed: {}", e)
+            log.warning("deployment lifecycle request failed", exc_info=e)
         return res
 
     async def destroy_deployment(
@@ -366,9 +357,7 @@ class DeploymentController:
         sub_step_value = sub_step.value if sub_step is not None else None
         await self._valkey_schedule.mark_deployment_needed(lifecycle_type.value, sub_step_value)
         log.debug(
-            "Marked deployment lifecycle needed for type: {}, sub_step: {}",
-            lifecycle_type.value,
-            sub_step_value,
+            "deployment lifecycle requested", lifecycle_type=lifecycle_type, sub_step=sub_step_value
         )
 
     # ========== Revision Trigger Operations ==========
@@ -400,7 +389,7 @@ class DeploymentController:
         card deploy) leave ``overrides.runtime_variant_id`` unset — in that
         case the preset's ``runtime_variant_id`` is used as the effective id.
         """
-        log.info("Adding revision to deployment {}", endpoint_id)
+        log.trace("deployment revision adding", deployment_id=endpoint_id)
 
         runtime_variant_id = overrides.runtime_variant_id
         if runtime_variant_id is None and preset_id is not None:
@@ -436,8 +425,7 @@ class DeploymentController:
         resolved_model_definition = merged.model_definition.to_resolved()
         if not resolved_model_definition.models:
             raise InvalidAPIParameters("model_definition.models must contain at least one entry")
-        spec = DeploymentRevisionCreatorSpec(
-            deployment_id=DeploymentID(endpoint_id),
+        revision_creator = DeploymentRevisionCreator(
             image_id=merged.image_id,
             resource_group=endpoint_info.metadata.resource_group,
             resource_slots=ResourceSlot(merged.resource_slots or {}),
@@ -463,17 +451,9 @@ class DeploymentController:
             revision_preset_id=preset_id,
         )
         validation_ctx = await self._build_deployment_revision_validation_context()
-        self._deployment_revision_validator.validate(spec, validation_ctx)
-        rbac_creator = RBACEntityCreator(
-            spec=spec,
-            element_type=RBACElementType.DEPLOYMENT_REVISION,
-            scope_ref=RBACElementRef(
-                element_type=RBACElementType.MODEL_DEPLOYMENT,
-                element_id=str(endpoint_id),
-            ),
-        )
+        self._deployment_revision_validator.validate(revision_creator, validation_ctx)
         revision_data = await self._deployment_repository.create_revision_with_next_number(
-            rbac_creator, endpoint_id
+            revision_creator, endpoint_id
         )
         await self._prune_revision_history(
             endpoint_id, endpoint_info.metadata.revision_history_limit
@@ -521,16 +501,15 @@ class DeploymentController:
         DEPLOYING lifecycle.
         """
         # Snapshot each extra mount's permission at revision-write time.
-        # The vfolder's current stored permission is always read and caps
-        # the caller's request so a mount cannot be elevated beyond what
-        # the vfolder grants (``vfolder_perm.cap(user_perm)``). Entries
-        # with ``mount_perm is None`` fall through to the vfolder's own
-        # permission. The resolved ``MountInfoEntry`` is frozen on the
-        # row so later vfolder permission changes cannot retroactively
-        # alter sessions spawned from this revision.
-        vfolder_perms = await self._deployment_repository.resolve_vfolder_permissions([
-            m.vfolder_id for m in revision.mounts.extra_mounts
-        ])
+        # The level the requester mounts the folder at caps the caller's
+        # request so a mount cannot be elevated beyond it
+        # (``vfolder_perm.cap(user_perm)``). Entries with ``mount_perm is
+        # None`` fall through to that level. The resolved ``MountInfoEntry``
+        # is frozen on the row so later mount policy changes cannot
+        # retroactively alter sessions spawned from this revision.
+        vfolder_perms = await self._deployment_repository.resolve_user_vfolder_permissions(
+            requester_id, [m.vfolder_id for m in revision.mounts.extra_mounts]
+        )
         extra_mount_entries = [
             MountInfoEntry(
                 vfolder_id=m.vfolder_id,
@@ -609,11 +588,11 @@ class DeploymentController:
             sub_step=DeploymentLifecycleSubStep.DEPLOYING_INITIALIZING,
         )
 
-        log.info(
-            "Started deploying revision {} for deployment {} (current: {})",
-            revision_id,
-            deployment_id,
-            previous_revision_id,
+        log.trace(
+            "deployment revision deploying",
+            deployment_id=deployment_id,
+            revision_id=revision_id,
+            previous_revision_id=previous_revision_id,
         )
 
         # 5. Return result with updated info and policy
@@ -692,7 +671,7 @@ class DeploymentController:
         architecture = image_identifier.architecture
         if not architecture:
             architecture = (
-                await self._deployment_repository.get_default_architecture_from_scaling_group(
+                await self._deployment_repository.get_default_architecture_from_resource_group(
                     resource_group
                 )
             )
@@ -725,9 +704,7 @@ class DeploymentController:
             )
         except Exception:
             log.warning(
-                "Failed to prune revision history for deployment {}, skipping",
-                deployment_id,
-                exc_info=True,
+                "revision history pruning failed", deployment_id=deployment_id, exc_info=True
             )
 
     # ========== Deployment-level Preset Resolution ==========
@@ -839,16 +816,20 @@ class DeploymentController:
         Returns:
             Updated RouteInfo if found, None otherwise
         """
-        spec = RouteUpdaterSpec(
+        updater = ReplicaUpdater(
+            replica_id=ReplicaID(route_id),
             traffic_status=OptionalState.update(traffic_status),
         )
-        updater: Updater[RoutingRow] = Updater(spec=spec, pk_value=route_id)
         success = await self._deployment_repository.update_route(updater)
         if not success:
             return None
-        querier = BatchQuerier(
+        searcher = RouteInfoSearcher(
             pagination=OffsetPagination(limit=1),
-            conditions=[RouteConditions.by_ids([route_id])],
+            conditions=[
+                ReplicaSearchableFields.own.field_id.filter.in_(
+                    UUIDInMatchSpec(values=[route_id], negated=False)
+                )
+            ],
         )
-        result = await self._deployment_repository.search_routes(querier)
+        result = await self._deployment_repository.search_routes(searcher)
         return result.items[0] if result.items else None

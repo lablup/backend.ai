@@ -11,7 +11,7 @@ import aiofiles.os
 from ai.backend.common.artifact_storage import AbstractStorage
 from ai.backend.common.dto.storage.response import VFSFileMetaResponse
 from ai.backend.common.types import StreamReader, VFolderID
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage.errors import (
     FileStreamDownloadError,
     FileStreamUploadError,
@@ -20,7 +20,7 @@ from ai.backend.storage.errors import (
 if TYPE_CHECKING:
     from ai.backend.storage.volumes.abc import AbstractVolume
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class VolumeDownloadStreamReader(StreamReader):
@@ -82,10 +82,9 @@ class VFolderStorage(AbstractStorage):
         self._volume = volume
         self._vfolder_id = vfolder_id
 
-        log.info(
-            "VFolderStorage initialized: name={}, vfolder_id={}, volume_type={}",
+        log.debug(
+            "VFolderStorage initialized: name={}, volume_type={}",
             name,
-            vfolder_id,
             type(volume).__name__,
         )
 
@@ -195,7 +194,7 @@ class VFolderStorage(AbstractStorage):
             log.debug("Deleted via volume adapter: {}", filepath)
         except Exception as e:
             # Log but don't fail if file doesn't exist
-            log.warning("Failed to delete {}: {}", filepath, e)
+            log.debug("deleting {} via volume adapter failed: {!r}", filepath, e)
 
     @override
     async def get_file_info(self, filepath: str) -> VFSFileMetaResponse:

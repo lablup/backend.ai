@@ -1,3 +1,0 @@
-mypy==1.18.2
-pydantic~=2.11.3
-strawberry-graphql~=0.314.0

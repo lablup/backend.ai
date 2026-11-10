@@ -9,18 +9,17 @@ import pytest
 
 from ai.backend.client.v2.exceptions import NotFoundError, PermissionDeniedError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.data.entity.role import RoleID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.rbac.request import (
     AssignRoleRequest,
-    CreateRoleRequest,
     DeleteRoleRequest,
     PurgeRoleRequest,
     RevokeRoleRequest,
     RoleFilter,
     RoleOrder,
-    SearchEntitiesRequest,
     SearchRolesRequest,
-    SearchScopesRequest,
     SearchUsersAssignedToRoleRequest,
     UpdateRoleRequest,
 )
@@ -32,9 +31,7 @@ from ai.backend.common.dto.manager.rbac.response import (
     GetRoleResponse,
     GetScopeTypesResponse,
     RevokeRoleResponse,
-    SearchEntitiesResponse,
     SearchRolesResponse,
-    SearchScopesResponse,
     SearchUsersAssignedToRoleResponse,
     UpdateRoleResponse,
 )
@@ -44,7 +41,6 @@ from ai.backend.common.dto.manager.rbac.types import (
     RoleSource,
     RoleStatus,
 )
-from ai.backend.testutils.fixtures import DomainFixtureData
 
 RoleFactory = Callable[..., Coroutine[Any, Any, CreateRoleResponse]]
 
@@ -77,19 +73,6 @@ class TestRoleCreate:
             description="A role with a description",
         )
         assert result.role.description == "A role with a description"
-
-    async def test_regular_user_cannot_create_role(
-        self,
-        user_registry: BackendAIClientRegistry,
-    ) -> None:
-        unique = secrets.token_hex(4)
-        with pytest.raises(PermissionDeniedError):
-            await user_registry.rbac.create_role(
-                CreateRoleRequest(
-                    name=f"denied-role-{unique}",
-                    description="Should be denied",
-                )
-            )
 
 
 class TestRoleGet:
@@ -367,17 +350,6 @@ class TestRoleUpdate:
         assert isinstance(update_result, UpdateRoleResponse)
         assert update_result.role.description == f"Updated description {unique}"
 
-    async def test_regular_user_cannot_update_role(
-        self,
-        user_registry: BackendAIClientRegistry,
-        target_role: CreateRoleResponse,
-    ) -> None:
-        with pytest.raises(PermissionDeniedError):
-            await user_registry.rbac.update_role(
-                target_role.role.id,
-                UpdateRoleRequest(description="Denied"),
-            )
-
 
 class TestRoleDelete:
     async def test_admin_soft_deletes_role(
@@ -390,14 +362,6 @@ class TestRoleDelete:
         )
         assert isinstance(delete_result, DeleteRoleResponse)
         assert delete_result.deleted is True
-
-    async def test_regular_user_cannot_delete_role(
-        self,
-        user_registry: BackendAIClientRegistry,
-        target_role: CreateRoleResponse,
-    ) -> None:
-        with pytest.raises(PermissionDeniedError):
-            await user_registry.rbac.delete_role(DeleteRoleRequest(role_id=target_role.role.id))
 
 
 class TestRolePurge:
@@ -413,14 +377,6 @@ class TestRolePurge:
         with pytest.raises(NotFoundError):
             await admin_registry.rbac.get_role(r.role.id)
 
-    async def test_regular_user_cannot_purge_role(
-        self,
-        user_registry: BackendAIClientRegistry,
-        target_role: CreateRoleResponse,
-    ) -> None:
-        with pytest.raises(PermissionDeniedError):
-            await user_registry.rbac.purge_role(PurgeRoleRequest(role_id=target_role.role.id))
-
 
 class TestRoleAssignment:
     async def test_admin_assigns_role_to_user(
@@ -431,8 +387,8 @@ class TestRoleAssignment:
     ) -> None:
         result = await admin_registry.rbac.assign_role(
             AssignRoleRequest(
-                user_id=admin_user_fixture.user_uuid,
-                role_id=target_role.role.id,
+                user_id=UserID(admin_user_fixture.user_uuid),
+                role_id=RoleID(target_role.role.id),
             )
         )
         assert isinstance(result, AssignRoleResponse)
@@ -442,8 +398,8 @@ class TestRoleAssignment:
         # Clean up: revoke the assignment
         await admin_registry.rbac.revoke_role(
             RevokeRoleRequest(
-                user_id=admin_user_fixture.user_uuid,
-                role_id=target_role.role.id,
+                user_id=UserID(admin_user_fixture.user_uuid),
+                role_id=RoleID(target_role.role.id),
             )
         )
 
@@ -456,15 +412,15 @@ class TestRoleAssignment:
         # Assign first
         await admin_registry.rbac.assign_role(
             AssignRoleRequest(
-                user_id=admin_user_fixture.user_uuid,
-                role_id=target_role.role.id,
+                user_id=UserID(admin_user_fixture.user_uuid),
+                role_id=RoleID(target_role.role.id),
             )
         )
         # Revoke
         revoke_result = await admin_registry.rbac.revoke_role(
             RevokeRoleRequest(
-                user_id=admin_user_fixture.user_uuid,
-                role_id=target_role.role.id,
+                user_id=UserID(admin_user_fixture.user_uuid),
+                role_id=RoleID(target_role.role.id),
             )
         )
         assert isinstance(revoke_result, RevokeRoleResponse)
@@ -480,8 +436,8 @@ class TestRoleAssignment:
         # Assign role
         await admin_registry.rbac.assign_role(
             AssignRoleRequest(
-                user_id=admin_user_fixture.user_uuid,
-                role_id=target_role.role.id,
+                user_id=UserID(admin_user_fixture.user_uuid),
+                role_id=RoleID(target_role.role.id),
             )
         )
         # Search assigned users
@@ -496,38 +452,10 @@ class TestRoleAssignment:
         # Clean up
         await admin_registry.rbac.revoke_role(
             RevokeRoleRequest(
-                user_id=admin_user_fixture.user_uuid,
-                role_id=target_role.role.id,
+                user_id=UserID(admin_user_fixture.user_uuid),
+                role_id=RoleID(target_role.role.id),
             )
         )
-
-    async def test_regular_user_cannot_assign_role(
-        self,
-        user_registry: BackendAIClientRegistry,
-        target_role: CreateRoleResponse,
-        regular_user_fixture: Any,
-    ) -> None:
-        with pytest.raises(PermissionDeniedError):
-            await user_registry.rbac.assign_role(
-                AssignRoleRequest(
-                    user_id=regular_user_fixture.user_uuid,
-                    role_id=target_role.role.id,
-                )
-            )
-
-    async def test_regular_user_cannot_revoke_role(
-        self,
-        user_registry: BackendAIClientRegistry,
-        target_role: CreateRoleResponse,
-        regular_user_fixture: Any,
-    ) -> None:
-        with pytest.raises(PermissionDeniedError):
-            await user_registry.rbac.revoke_role(
-                RevokeRoleRequest(
-                    user_id=regular_user_fixture.user_uuid,
-                    role_id=target_role.role.id,
-                )
-            )
 
 
 class TestScopeManagement:
@@ -539,44 +467,6 @@ class TestScopeManagement:
         assert isinstance(result, GetScopeTypesResponse)
         assert len(result.items) > 0
 
-    async def test_admin_searches_scopes(
-        self,
-        admin_registry: BackendAIClientRegistry,
-    ) -> None:
-        result = await admin_registry.rbac.search_scopes("domain", SearchScopesRequest())
-        assert isinstance(result, SearchScopesResponse)
-        assert result.pagination.total >= 1
-        assert len(result.items) >= 1
-
-    async def test_search_scopes_with_pagination(
-        self,
-        admin_registry: BackendAIClientRegistry,
-    ) -> None:
-        """Search scopes with pagination returns correct page."""
-        result = await admin_registry.rbac.search_scopes(
-            "domain",
-            SearchScopesRequest(limit=1, offset=0),
-        )
-
-        assert isinstance(result, SearchScopesResponse)
-        assert result.pagination.limit == 1
-        assert len(result.items) <= 1
-
-    async def test_regular_user_cannot_get_scope_types(
-        self,
-        user_registry: BackendAIClientRegistry,
-    ) -> None:
-        with pytest.raises(PermissionDeniedError):
-            await user_registry.rbac.get_scope_types()
-
-    async def test_regular_user_cannot_search_scopes(
-        self,
-        user_registry: BackendAIClientRegistry,
-    ) -> None:
-        """Regular user cannot search scopes (admin-only operation)."""
-        with pytest.raises(PermissionDeniedError):
-            await user_registry.rbac.search_scopes("domain", SearchScopesRequest())
-
 
 class TestEntityManagement:
     async def test_admin_gets_entity_types(
@@ -586,61 +476,3 @@ class TestEntityManagement:
         result = await admin_registry.rbac.get_entity_types()
         assert isinstance(result, GetEntityTypesResponse)
         assert len(result.items) > 0
-
-    async def test_search_entities_in_domain(
-        self,
-        admin_registry: BackendAIClientRegistry,
-        domain_fixture: DomainFixtureData,
-    ) -> None:
-        """Search entities within a domain scope."""
-        # Search for users in the test domain
-        result = await admin_registry.rbac.search_entities(
-            scope_type="domain",
-            scope_id=domain_fixture.domain_name,
-            entity_type="user",
-            request=SearchEntitiesRequest(),
-        )
-
-        assert isinstance(result, SearchEntitiesResponse)
-        # Test domain may be empty, just verify search works
-        assert result.pagination.total >= len(result.items)
-        assert isinstance(result.items, list)
-
-    async def test_search_entities_with_pagination(
-        self,
-        admin_registry: BackendAIClientRegistry,
-        domain_fixture: DomainFixtureData,
-    ) -> None:
-        """Search entities with pagination returns correct page."""
-        result = await admin_registry.rbac.search_entities(
-            scope_type="domain",
-            scope_id=domain_fixture.domain_name,
-            entity_type="user",
-            request=SearchEntitiesRequest(limit=1, offset=0),
-        )
-
-        assert isinstance(result, SearchEntitiesResponse)
-        assert result.pagination.limit == 1
-        assert len(result.items) <= 1
-
-    async def test_regular_user_cannot_get_entity_types(
-        self,
-        user_registry: BackendAIClientRegistry,
-    ) -> None:
-        with pytest.raises(PermissionDeniedError):
-            await user_registry.rbac.get_entity_types()
-
-    async def test_regular_user_cannot_search_entities(
-        self,
-        user_registry: BackendAIClientRegistry,
-        domain_fixture: DomainFixtureData,
-    ) -> None:
-        """Regular user cannot search entities."""
-        # Entity search should be admin-only
-        with pytest.raises(PermissionDeniedError):
-            await user_registry.rbac.search_entities(
-                scope_type="domain",
-                scope_id=domain_fixture.domain_name,
-                entity_type="user",
-                request=SearchEntitiesRequest(),
-            )

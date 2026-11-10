@@ -6,36 +6,33 @@ using the ``SessionDependencyRow`` association table.
 
 from __future__ import annotations
 
-from typing import Any, cast
-from uuid import UUID
+from typing import Any
 
 import aiotools
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-from ai.backend.common.types import AccessKey
-from ai.backend.manager.errors.kernel import InvalidSessionData, SessionNotFound
-from ai.backend.manager.models.kernel import kernels
-from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
+from ai.backend.common.types import SessionId
+from ai.backend.manager.errors.kernel import InvalidSessionData, KernelNotFound, SessionNotFound
+from ai.backend.manager.models.kernel.row import kernels
+from ai.backend.manager.models.session.row import SessionDependencyRow, SessionRow
 
 
 @aiotools.lru_cache(maxsize=100)
 async def _find_dependency_sessions(
-    session_name_or_id: UUID | str,
+    root_session_id: SessionId,
     db_session: SASession,
-    access_key: AccessKey,
 ) -> dict[str, list[Any] | str]:
-    sessions = await SessionRow.match_sessions(
-        db_session,
-        session_name_or_id,
-        access_key=access_key,
-    )
+    session = (
+        await db_session.execute(
+            sa.select(SessionRow.id, SessionRow.name).where(SessionRow.id == root_session_id)
+        )
+    ).first()
+    if session is None:
+        raise SessionNotFound(f"Session (id={root_session_id}) does not exist.")
 
-    if len(sessions) < 1:
-        raise SessionNotFound("session not found!")
-
-    session_id = str(sessions[0].id)
-    session_name = sessions[0].name
+    session_id = str(session.id)
+    session_name = session.name
 
     if not isinstance(session_name, str):
         raise InvalidSessionData("Invalid session_name type")
@@ -58,7 +55,7 @@ async def _find_dependency_sessions(
 
     kernel_query_result = (await db_session.execute(kernel_query)).first()
     if kernel_query_result is None:
-        raise ValueError(f"Kernel not found for session {session_id}")
+        raise KernelNotFound(f"Kernel not found for session {session_id}")
 
     session_info: dict[str, list[Any] | str] = {
         "session_id": session_id,
@@ -66,7 +63,7 @@ async def _find_dependency_sessions(
         "status": str(kernel_query_result[0]),
         "status_changed": str(kernel_query_result[1]),
         "depends_on": [
-            await _find_dependency_sessions(dependency_session_id, db_session, access_key)
+            await _find_dependency_sessions(SessionId(dependency_session_id), db_session)
             for dependency_session_id in dependency_session_ids
         ],
     }
@@ -75,40 +72,7 @@ async def _find_dependency_sessions(
 
 
 async def find_dependency_sessions(
-    session_name_or_id: UUID | str,
+    root_session_id: SessionId,
     db_session: SASession,
-    access_key: AccessKey,
 ) -> dict[str, list[Any] | str]:
-    return await _find_dependency_sessions(session_name_or_id, db_session, access_key)
-
-
-async def find_dependent_sessions(
-    root_session_name_or_id: str | UUID,
-    db_session: SASession,
-    access_key: AccessKey,
-    *,
-    allow_stale: bool = False,
-) -> set[UUID]:
-    async def _find_dependent_sessions(session_id: UUID) -> set[UUID]:
-        result = await db_session.execute(
-            sa.select(SessionDependencyRow).where(SessionDependencyRow.depends_on == session_id)
-        )
-        dependent_sessions: set[UUID] = {x.session_id for x in result.scalars()}
-
-        recursive_dependent_sessions: list[set[UUID]] = [
-            await _find_dependent_sessions(dependent_session)
-            for dependent_session in dependent_sessions
-        ]
-
-        for recursive_dependent_session in recursive_dependent_sessions:
-            dependent_sessions |= recursive_dependent_session
-
-        return dependent_sessions
-
-    root_session = await SessionRow.get_session(
-        db_session,
-        root_session_name_or_id,
-        access_key=access_key,
-        allow_stale=allow_stale,
-    )
-    return await _find_dependent_sessions(cast(UUID, root_session.id))
+    return await _find_dependency_sessions(root_session_id, db_session)

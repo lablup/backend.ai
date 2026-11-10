@@ -14,20 +14,26 @@ from __future__ import annotations
 
 import pytest
 
+from ai.backend.manager.data.dotfile.types import DotfileBundle
+from ai.backend.manager.data.resource.types import SlotTypeInfo
 from ai.backend.manager.data.session.creation import (
-    ScalingGroupNetworkInfo,
+    ContainerUserInfo,
+    ResourceGroupNetworkInfo,
 )
 from ai.backend.manager.data.session.draft import (
     SessionNetworkDraft,
     SessionResourceSpecDraft,
 )
 from ai.backend.manager.data.session.options import DefaultSessionOptions
-from ai.backend.manager.models.network import NetworkType
-from ai.backend.manager.sokovan.scheduling_controller.preparers.assign_network_config_rule import (
+from ai.backend.manager.models.network.row import NetworkType
+from ai.backend.manager.sokovan.scheduling_controller.preparers.specs.assign_network_config_rule import (
     AssignNetworkConfigRule,
 )
-from ai.backend.manager.sokovan.scheduling_controller.preparers.draft_rule import (
-    SessionSpecPreparationContext,
+from ai.backend.manager.views.sokovan.session_creation import (
+    GlobalEnqueueInfo,
+    ResourceGroupEnqueueInfo,
+    SessionSpecContext,
+    UserEnqueueInfo,
 )
 
 
@@ -36,13 +42,30 @@ def rule() -> AssignNetworkConfigRule:
     return AssignNetworkConfigRule()
 
 
-def _context(
-    *, use_host_network: bool = False, scaling_group: bool = True
-) -> SessionSpecPreparationContext:
-    return SessionSpecPreparationContext(
-        resource_group_defaults=DefaultSessionOptions(),
-        resource_group_network=(
-            ScalingGroupNetworkInfo(use_host_network=use_host_network) if scaling_group else None
+def _context(*, use_host_network: bool = False, resource_group: bool = True) -> SessionSpecContext:
+    return SessionSpecContext(
+        resource_group=ResourceGroupEnqueueInfo(
+            defaults=DefaultSessionOptions(),
+            network=(
+                ResourceGroupNetworkInfo(use_host_network=use_host_network)
+                if resource_group
+                else None
+            ),
+            allow_fractional=False,
+            served_slot_names=frozenset(),
+        ),
+        user=UserEnqueueInfo(
+            policy=None,
+            container_user=ContainerUserInfo(),
+            dotfiles=DotfileBundle(),
+            default_bootstrap_script=None,
+            pending_session_count=0,
+            pending_session_resource_slots={},
+            vfolder_mounts_by_role={},
+        ),
+        global_info=GlobalEnqueueInfo(
+            image_infos={},
+            slot_type_info=SlotTypeInfo(types={}, required=frozenset()),
         ),
     )
 
@@ -97,5 +120,5 @@ class TestAssignNetworkConfigRule:
     ) -> None:
         """No scaling-group info in the context still yields VOLATILE."""
         draft = SessionResourceSpecDraft()
-        result = await rule.prepare(draft, _context(scaling_group=False))
+        result = await rule.prepare(draft, _context(resource_group=False))
         assert result.network.network_type == NetworkType.VOLATILE

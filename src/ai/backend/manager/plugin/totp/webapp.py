@@ -11,7 +11,7 @@ import trafaret as t
 from aiohttp import web
 
 from ai.backend.common.exception import InvalidAPIParameters
-from ai.backend.common.logging_utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.middleware.auth import auth_required
 from ai.backend.manager.api.rest.types import CORSOptions, WebMiddleware
 from ai.backend.manager.api.utils import check_api_params
@@ -23,7 +23,7 @@ from .config import TOTPConfig
 from .exception import AuthorizationFailed, ExpiredToken, InvalidToken
 from .utils import InvalidTokenError, TokenExpired, TokenParser
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @auth_required
@@ -32,7 +32,6 @@ async def initialize_otp_activation(request: web.Request) -> web.Response:
     db = root_app["_db"]
     ctx = cast(PrivateContext, request.app["context"])
     email = request["user"]["email"]
-    log.info("TOTP.INITIALIZE_OTP_ACTIVATION()")
     async with db.begin_readonly() as conn:
         query = (
             sa.select(users.c.totp_activated, users.c.totp_key)
@@ -76,7 +75,6 @@ async def finalize_otp_activation(request: web.Request, params: Any) -> web.Resp
     root_app = request.app["_root_app"]
     db = root_app["_db"]
     email = request["user"]["email"]
-    log.info("TOTP.FINALIZE_OTP_ACTIVATION(otp: {})", params["otp"])
 
     async with db.begin_readonly() as conn:
         query = (
@@ -113,11 +111,11 @@ async def deactivate_totp(request: web.Request) -> web.Response:
     db = root_app["_db"]
     email = request["user"]["email"]
     if "email" in request.query:
-        if not request["is_admin"]:
+        # Only a superadmin deactivates another user's TOTP.
+        if not request["is_superadmin"]:
             raise GenericForbidden
         email = request.query["email"]
 
-    log.info("TOTP.DEACTIVATE_TOTP(email: {})", email)
     async with db.begin_readonly() as conn:
         query = (
             sa.select(users.c.totp_activated, users.c.totp_key)
@@ -154,7 +152,6 @@ async def initialize_anonymous_otp_activation(request: web.Request, params: Any)
     root_app = request.app["_root_app"]
     db = root_app["_db"]
     ctx = cast(PrivateContext, request.app["context"])
-    log.info("TOTP.INITIALIZE_OTP_ACTIVATION()")
     raw_token = params["registration_token"]
     try:
         token = ctx.token_parser.deserialize(raw_token)
@@ -194,7 +191,6 @@ async def finalize_anonymous_otp_activation(request: web.Request, params: Any) -
     root_app = request.app["_root_app"]
     db = root_app["_db"]
     ctx = cast(PrivateContext, request.app["context"])
-    log.info("TOTP.FINALIZE_OTP_ACTIVATION(otp: {})", params["otp"])
     raw_token = params["registration_token"]
     try:
         token = ctx.token_parser.deserialize(raw_token)

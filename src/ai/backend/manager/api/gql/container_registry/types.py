@@ -11,8 +11,11 @@ from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 from strawberry.scalars import JSON
 
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
+from ai.backend.common.dto.manager.v2.container_registry.response import ContainerRegistryNode
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_added_field,
     gql_connection_type,
     gql_enum,
     gql_field,
@@ -45,9 +48,15 @@ class ContainerRegistryTypeGQL(StrEnum):
     ),
     name="ContainerRegistryV2",
 )
-class ContainerRegistryGQL(PydanticNodeMixin[Any]):
+class ContainerRegistryGQL(PydanticNodeMixin[ContainerRegistryNode]):
     id: NodeID[str] = gql_field(
         description="Relay-style global node identifier for the container registry"
+    )
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="UUID of the container registry.",
+        ),
     )
     url: str = gql_field(description="URL of the container registry")
     registry_name: str = gql_field(description="Name of the container registry")
@@ -81,7 +90,7 @@ class ContainerRegistryGQL(PydanticNodeMixin[Any]):
         required: bool = False,
     ) -> Iterable[Self | None]:
         results = await info.context.data_loaders.container_registry_loader.load_many([
-            UUID(nid) for nid in node_ids
+            ContainerRegistryID(UUID(nid)) for nid in node_ids
         ])
         return cast(list[Self | None], results)
 

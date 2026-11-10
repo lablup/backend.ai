@@ -29,33 +29,27 @@ class TestEtcdConfigRepository:
         repository: EtcdConfigRepository,
         mock_db_engine: MagicMock,
     ) -> None:
-        """When agents exist with slots, returns the union of all slot keys."""
-        agent1 = MagicMock()
-        agent1.available_slots = MagicMock()
-        agent1.available_slots.keys.return_value = ["cpu", "mem"]
-
-        agent2 = MagicMock()
-        agent2.available_slots = MagicMock()
-        agent2.available_slots.keys.return_value = ["cpu", "cuda.device"]
-
+        """The distinct slot names the query answers with come back as a set."""
         session = await mock_db_engine.begin_readonly_session().__aenter__()
-        result_mock = MagicMock()
-        result_mock.scalars.return_value.all.return_value = [agent1, agent2]
-        session.execute = AsyncMock(return_value=result_mock)
+        result = MagicMock()
+        result.all.return_value = ["cpu", "mem", "cuda.device"]
+        session.scalars = AsyncMock(return_value=result)
 
-        result = await repository.get_available_agent_slots("default")
-        assert result == {"cpu", "mem", "cuda.device"}
+        assert await repository.get_available_agent_slots("default") == {
+            "cpu",
+            "mem",
+            "cuda.device",
+        }
 
     async def test_get_available_agent_slots_empty_when_no_agents(
         self,
         repository: EtcdConfigRepository,
         mock_db_engine: MagicMock,
     ) -> None:
-        """When no agents match, returns an empty set."""
+        """When no agent matches, the answer is an empty set."""
         session = await mock_db_engine.begin_readonly_session().__aenter__()
-        result_mock = MagicMock()
-        result_mock.scalars.return_value.all.return_value = []
-        session.execute = AsyncMock(return_value=result_mock)
+        result = MagicMock()
+        result.all.return_value = []
+        session.scalars = AsyncMock(return_value=result)
 
-        result = await repository.get_available_agent_slots("nonexistent-sgroup")
-        assert result == set()
+        assert await repository.get_available_agent_slots("nonexistent-sgroup") == set()

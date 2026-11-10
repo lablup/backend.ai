@@ -34,6 +34,10 @@ RESERVED_VFOLDERS = [
     ".jupyter",
     ".tmux.conf",
     ".ssh",
+    # The agent always bind-mounts the scratch directory at /home/work,
+    # so mounting a vfolder exactly there makes dockerd reject the container
+    # with "Duplicate mount point: /home/work".
+    "/home/work",
     "/bin",
     "/boot",
     "/dev",
@@ -58,12 +62,11 @@ RESERVED_VFOLDER_PATTERNS = [re.compile(x) for x in _RESERVED_VFOLDER_PATTERNS]
 API_VFOLDER_LENGTH_LIMIT: Final[int] = 64
 MODEL_VFOLDER_LENGTH_LIMIT: Final[int] = 128
 
-DEFAULT_VFOLDER_PERMISSION_MODE: Final[int] = 0o755
+DEFAULT_VFOLDER_PERMISSION_MODE: Final[int] = 0o775
 VFOLDER_GROUP_PERMISSION_MODE: Final[int] = 0o775
 
 DEFAULT_DOMAIN_NAME: Final[str] = "default"
 
 NOOP_STORAGE_VOLUME_NAME: Final[str] = "noop"
-NOOP_STORAGE_BACKEND_TYPE: Final[str] = "noop"
 
 UNKNOWN_CONTAINER_ID: Final[str] = "unknown"

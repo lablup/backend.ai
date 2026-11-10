@@ -47,7 +47,7 @@ services:
       - "9187:9187"
 
   backendai-half-redis:
-    image: valkey/valkey:9.1.0-alpine
+    image: valkey/valkey:9.1.1-alpine
     restart: unless-stopped
     networks:
       - half
@@ -234,11 +234,16 @@ services:
     networks:
       - half
     ports:
-      - "4000:4000"
-    command: ["supergraph"]
+      - "127.0.0.1:4000:4000"
+    command: ["supergraph", "--host", "0.0.0.0"]
     environment:
-      - HOST=0.0.0.0
       - PORT=4000
+      - BACKENDAI_MANAGER_ENDPOINTS=${BACKENDAI_MANAGER_ENDPOINTS:-}
+      - BACKENDAI_MANAGER_HEALTH_CHECK_INTERVAL=${BACKENDAI_MANAGER_HEALTH_CHECK_INTERVAL:-}
+      - BACKENDAI_MANAGER_HEALTH_CHECK_PROBE_TIMEOUT=${BACKENDAI_MANAGER_HEALTH_CHECK_PROBE_TIMEOUT:-}
+      - BACKENDAI_MANAGER_HEALTH_CHECK_FAILURE_THRESHOLD=${BACKENDAI_MANAGER_HEALTH_CHECK_FAILURE_THRESHOLD:-}
+      - BACKENDAI_MANAGER_CONNECT_TIMEOUT=${BACKENDAI_MANAGER_CONNECT_TIMEOUT:-}
+      - BACKENDAI_MANAGER_REQUEST_TIMEOUT=${BACKENDAI_MANAGER_REQUEST_TIMEOUT:-}
     configs:
       - source: supergraph_schema
         target: /gateway/supergraph.graphql

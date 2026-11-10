@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any, override
+from uuid import UUID
 
 import strawberry
 from strawberry import Info
@@ -48,6 +50,12 @@ if TYPE_CHECKING:
 )
 class KeypairResourcePolicyV2GQL(PydanticNodeMixin[KeypairResourcePolicyNode]):
     id: NodeID[str] = gql_field(description="Policy name (primary key).")
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="UUID of the policy.",
+        ),
+    )
     name: str = gql_field(description="Policy name.")
     created_at: datetime | None = gql_field(description="Timestamp when the policy was created.")
     default_for_unspecified: str = gql_field(
@@ -60,6 +68,15 @@ class KeypairResourcePolicyV2GQL(PydanticNodeMixin[KeypairResourcePolicyNode]):
     max_concurrent_sessions: int = gql_field(description="Maximum concurrent sessions allowed.")
     max_pending_session_count: int | None = gql_field(
         description="Maximum pending sessions. Null means unlimited."
+    )
+    max_priority: int | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.8.0",
+            description=(
+                "Highest scheduling priority a session created with this policy may declare."
+                " Null means uncapped."
+            ),
+        ),
     )
     max_pending_session_resource_slots: list[ResourceLimitEntryGQL] | None = gql_field(
         description="Maximum resource slots for pending sessions. Null means unlimited."
@@ -78,7 +95,10 @@ class KeypairResourcePolicyV2GQL(PydanticNodeMixin[KeypairResourcePolicyNode]):
     @gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.4",
-            description="Keypairs assigned to this resource policy.",
+            description=(
+                "Keypairs assigned to this resource policy. Superadmin only — the policy "
+                "node itself is readable by its own holder."
+            ),
         )
     )  # type: ignore[misc]
     async def keypairs(
@@ -111,20 +131,21 @@ class KeypairResourcePolicyV2GQL(PydanticNodeMixin[KeypairResourcePolicyNode]):
     ):
         from strawberry.relay import PageInfo
 
-        from ai.backend.common.dto.manager.v2.keypair.request import SearchKeypairsRequest
+        from ai.backend.common.dto.manager.v2.keypair.request import AdminSearchKeypairsInput
         from ai.backend.manager.api.gql.base import encode_cursor
         from ai.backend.manager.api.gql.keypair.types.node import (
             KeyPairConnection,
             KeyPairEdge,
             KeyPairGQL,
         )
-        from ai.backend.manager.repositories.keypair.types import (
-            KeypairResourcePolicyKeypairSearchScope,
-        )
 
-        result = await info.context.adapters.user.gql_search_keypairs_by_resource_policy(
-            scope=KeypairResourcePolicyKeypairSearchScope(resource_policy_name=self.name),
-            input=SearchKeypairsRequest(
+        # The node this field hangs off is also returned by `my_keypair_resource_policy_v2`,
+        # which any authenticated user may call. So this reads through the admin keypair
+        # action narrowed to one policy rather than a path of its own: the SUPERADMIN
+        # check sits on that action's processor, where no resolver can miss it.
+        result = await info.context.adapters.user.gql_admin_search_keypairs(
+            resource_policy_name=self.name,
+            input=AdminSearchKeypairsInput(
                 filter=filter.to_pydantic() if filter is not None else None,
                 order=[o.to_pydantic() for o in order_by] if order_by is not None else None,
                 first=first,
@@ -135,8 +156,10 @@ class KeypairResourcePolicyV2GQL(PydanticNodeMixin[KeypairResourcePolicyNode]):
                 offset=offset,
             ),
         )
-        nodes = [KeyPairGQL.from_pydantic(item) for item in result.items]
-        edges = [KeyPairEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
+        edges = [
+            KeyPairEdge(node=KeyPairGQL.from_pydantic(item), cursor=encode_cursor(item.field_id))
+            for item in result.items
+        ]
         return KeyPairConnection(
             edges=edges,
             page_info=PageInfo(
@@ -147,6 +170,27 @@ class KeypairResourcePolicyV2GQL(PydanticNodeMixin[KeypairResourcePolicyNode]):
             ),
             count=result.total_count,
         )
+
+    @classmethod
+    @override
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[KeypairResourcePolicyV2GQL | None]:
+        loaders = info.context.data_loaders
+        ids = await loaders.keypair_resource_policy_id_by_name_loader.load_many(list(node_ids))
+        found = [node_id for node_id in ids if node_id is not None]
+        by_id = dict(
+            zip(
+                found,
+                await loaders.keypair_resource_policy_by_id_loader.load_many(found),
+                strict=True,
+            )
+        )
+        return [by_id[node_id] if node_id is not None else None for node_id in ids]
 
 
 KeypairResourcePolicyV2Edge = Edge[KeypairResourcePolicyV2GQL]
@@ -178,6 +222,12 @@ class KeypairResourcePolicyV2Connection(Connection[KeypairResourcePolicyV2GQL]):
 )
 class UserResourcePolicyV2GQL(PydanticNodeMixin[UserResourcePolicyNode]):
     id: NodeID[str] = gql_field(description="Policy name (primary key).")
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="UUID of the policy.",
+        ),
+    )
     name: str = gql_field(description="Policy name.")
     created_at: datetime | None = gql_field(description="Timestamp when the policy was created.")
     max_vfolder_count: int = gql_field(description="Maximum vfolders a user can create.")
@@ -199,6 +249,27 @@ class UserResourcePolicyV2GQL(PydanticNodeMixin[UserResourcePolicyNode]):
     max_customized_image_count: int = gql_field(
         description="Maximum customized images a user can create."
     )
+
+    @classmethod
+    @override
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[UserResourcePolicyV2GQL | None]:
+        loaders = info.context.data_loaders
+        ids = await loaders.user_resource_policy_id_by_name_loader.load_many(list(node_ids))
+        found = [node_id for node_id in ids if node_id is not None]
+        by_id = dict(
+            zip(
+                found,
+                await loaders.user_resource_policy_by_id_loader.load_many(found),
+                strict=True,
+            )
+        )
+        return [by_id[node_id] if node_id is not None else None for node_id in ids]
 
 
 UserResourcePolicyV2Edge = Edge[UserResourcePolicyV2GQL]
@@ -230,6 +301,12 @@ class UserResourcePolicyV2Connection(Connection[UserResourcePolicyV2GQL]):
 )
 class ProjectResourcePolicyV2GQL(PydanticNodeMixin[ProjectResourcePolicyNode]):
     id: NodeID[str] = gql_field(description="Policy name (primary key).")
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="UUID of the policy.",
+        ),
+    )
     name: str = gql_field(description="Policy name.")
     created_at: datetime | None = gql_field(description="Timestamp when the policy was created.")
     max_vfolder_count: int = gql_field(description="Maximum vfolders a project can have.")
@@ -237,6 +314,27 @@ class ProjectResourcePolicyV2GQL(PydanticNodeMixin[ProjectResourcePolicyNode]):
     max_network_count: int = gql_field(
         description="Maximum networks a project can create. -1 means unlimited."
     )
+
+    @classmethod
+    @override
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[ProjectResourcePolicyV2GQL | None]:
+        loaders = info.context.data_loaders
+        ids = await loaders.project_resource_policy_id_by_name_loader.load_many(list(node_ids))
+        found = [node_id for node_id in ids if node_id is not None]
+        by_id = dict(
+            zip(
+                found,
+                await loaders.project_resource_policy_by_id_loader.load_many(found),
+                strict=True,
+            )
+        )
+        return [by_id[node_id] if node_id is not None else None for node_id in ids]
 
 
 ProjectResourcePolicyV2Edge = Edge[ProjectResourcePolicyV2GQL]

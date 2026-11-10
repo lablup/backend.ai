@@ -5,23 +5,25 @@ Based on BEP-1033 test scenarios for launcher testing.
 Test Scenarios:
 - SC-LA-001 ~ SC-LA-004: Image Pulling
 - SC-LA-005 ~ SC-LA-008: Kernel Creation
-- SC-LA-009 ~ SC-LA-013: Network Setup
+- SC-LA-009 ~ SC-LA-015: Network Setup
 """
 
 from __future__ import annotations
 
+import logging
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
 import pytest
 
-from ai.backend.manager.data.sokovan import (
-    ImageConfigData,
+from ai.backend.common.types import AutoPullBehavior
+from ai.backend.manager.sokovan.recorder.context import RecorderContext
+from ai.backend.manager.sokovan.scheduler.launcher.launcher import SessionLauncher
+from ai.backend.manager.views.sokovan.image import ImageConfigData
+from ai.backend.manager.views.sokovan.lifecycle import (
     SessionDataForPull,
     SessionDataForStart,
 )
-from ai.backend.manager.sokovan.recorder import RecorderContext
-from ai.backend.manager.sokovan.scheduler.launcher.launcher import SessionLauncher
 
 # =============================================================================
 # TestSessionLauncherImagePulling (SC-LA-001 ~ SC-LA-004)
@@ -260,9 +262,95 @@ class TestSessionLauncherKernelCreation:
         mock_client = mock_agent_client_pool._mock_client
         assert mock_client.create_kernels.await_count == 2
 
+    @pytest.mark.parametrize("auto_pull", list(AutoPullBehavior))
+    async def test_kernel_creation_follows_auto_pull_config(
+        self,
+        auto_pull: AutoPullBehavior,
+        launcher: SessionLauncher,
+        mock_config_provider: MagicMock,
+        mock_agent_client_pool: MagicMock,
+        session_for_start_single_kernel: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        """Kernel creation carries the configured auto_pull behavior.
+
+        Given: auto_pull configured in docker.image
+        When: Start session
+        Then: create_kernels receives that behavior in the kernel and image configs
+        """
+        mock_config_provider.config.docker.image.auto_pull.value = auto_pull.value
+
+        session_ids = [session_for_start_single_kernel.session_id]
+        with RecorderContext.scope("test", entity_ids=session_ids):
+            await launcher.start_sessions_for_handler(
+                [session_for_start_single_kernel],
+                image_config_default,
+            )
+
+        mock_client = mock_agent_client_pool._mock_client
+        mock_client.create_kernels.assert_awaited_once()
+        kernel_configs = mock_client.create_kernels.call_args[0][2]
+        assert [c["auto_pull"] for c in kernel_configs] == [auto_pull]
+        assert [c["image"]["auto_pull"] for c in kernel_configs] == [auto_pull]
+
+    async def test_agent_kernel_creation_failure_logged_at_error(
+        self,
+        launcher: SessionLauncher,
+        mock_agent_client_pool: MagicMock,
+        mock_valkey_schedule: AsyncMock,
+        session_for_start_single_kernel: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """Kernel creation fails on one agent -> that exception is logged at error."""
+        error = RuntimeError("agent refused kernel creation")
+        mock_agent_client_pool._mock_client.create_kernels.side_effect = error
+
+        session_ids = [session_for_start_single_kernel.session_id]
+        with RecorderContext.scope("test", entity_ids=session_ids):
+            await launcher.start_sessions_for_handler(
+                [session_for_start_single_kernel],
+                image_config_default,
+            )
+
+        (record,) = [r for r in caplog.records if r.levelno >= logging.ERROR]
+        assert record.__dict__["log_tag_agent_id"] == "agent-1"
+        assert record.__dict__["log_tag_session_id"] == str(
+            session_for_start_single_kernel.session_id
+        )
+        assert record.exc_info is not None
+        assert record.exc_info[1] is error
+        mock_valkey_schedule.record_session_failed_agents.assert_awaited_once()
+
+    async def test_system_session_environ_overrides_the_session_environ(
+        self,
+        launcher: SessionLauncher,
+        mock_agent_client_pool: MagicMock,
+        session_name_bound_to_key_a: None,
+        session_for_start_with_user_environ: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        """A system session environ value wins over the session's own entry under its key.
+
+        Given: The session's environ sets A and U; a public row binds the session name to A
+        When: Start session
+        Then: The kernel's environ has the session name under A and the session's U
+        """
+        session_ids = [session_for_start_with_user_environ.session_id]
+        with RecorderContext.scope("test", entity_ids=session_ids):
+            await launcher.start_sessions_for_handler(
+                [session_for_start_with_user_environ],
+                image_config_default,
+            )
+
+        kernel_configs = mock_agent_client_pool._mock_client.create_kernels.call_args[0][2]
+        environ = kernel_configs[0]["environ"]
+        assert environ["A"] == "test-session"
+        assert environ["U"] == "mine"
+
 
 # =============================================================================
-# TestSessionLauncherNetworkSetup (SC-LA-009 ~ SC-LA-013)
+# TestSessionLauncherNetworkSetup (SC-LA-009 ~ SC-LA-015)
 # =============================================================================
 
 
@@ -368,6 +456,55 @@ class TestSessionLauncherNetworkSetup:
 
         # Assert - Network ID was updated
         mock_repository.update_session_network_id.assert_awaited()
+
+    async def test_persistent_network_uses_ref_name(
+        self,
+        launcher: SessionLauncher,
+        mock_agent_client_pool: MagicMock,
+        session_for_start_persistent_network: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        """SC-LA-014: Persistent network is addressed by its ref_name.
+
+        Given: Session attached to a pre-created persistent network
+        When: Start session
+        Then: Kernels join the plugin-generated network under the network's driver
+        """
+        session_ids = [session_for_start_persistent_network.session_id]
+        with RecorderContext.scope("test", entity_ids=session_ids):
+            await launcher.start_sessions_for_handler(
+                [session_for_start_persistent_network],
+                image_config_default,
+            )
+
+        mock_client = mock_agent_client_pool._mock_client
+        cluster_info = mock_client.create_kernels.call_args[0][3]
+        assert cluster_info["network_config"] == {
+            "mode": "bridge",
+            "network_name": "bai-multinode-00000000-0000-0000-0000-0000000000b2-nw",
+        }
+
+    async def test_persistent_network_id_not_overwritten(
+        self,
+        launcher: SessionLauncher,
+        mock_repository: AsyncMock,
+        session_for_start_persistent_network: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        """SC-LA-015: Persistent network reference survives the start.
+
+        Given: Session whose network_id points at a networks row
+        When: Start session
+        Then: The reference is left alone, so teardown can still resolve it
+        """
+        session_ids = [session_for_start_persistent_network.session_id]
+        with RecorderContext.scope("test", entity_ids=session_ids):
+            await launcher.start_sessions_for_handler(
+                [session_for_start_persistent_network],
+                image_config_default,
+            )
+
+        mock_repository.update_session_network_id.assert_not_awaited()
 
     async def test_no_network_plugin_error(
         self,

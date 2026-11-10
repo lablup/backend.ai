@@ -1,10 +1,31 @@
-from typing import override
-
-from ai.backend.manager.actions.monitors.audit_log import AuditLogMonitor
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
-from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.common.data.entity.agent import AgentUUID
+from ai.backend.common.data.entity.agent_resource import AgentResourceFieldType
+from ai.backend.common.types import AgentId
+from ai.backend.manager.actions.registry.field import LookupFieldGroup
+from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.registry.types import FieldGroupMeta
+from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
+from ai.backend.manager.actions.v2.bulk.processor import BulkActionProcessor
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.lookup.bulk_processor import BulkLookupActionProcessor
+from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
+from ai.backend.manager.actions.v2.ops.result import (
+    BatchOpsResult,
+    BulkLookupOpsResult,
+    LookupOpsResult,
+    ScopedFieldsOpsResult,
+)
+from ai.backend.manager.data.agent.types import AgentData
+from ai.backend.manager.data.permission.permission_defs import AgentPermission
+from ai.backend.manager.data.resource_slot.types import AgentResourceData
+from ai.backend.manager.services.agent.actions.bulk_get import BulkGetAgentsAction
+from ai.backend.manager.services.agent.actions.bulk_load_container_counts import (
+    BulkLoadContainerCountsAction,
+)
+from ai.backend.manager.services.agent.actions.bulk_load_permissions import (
+    BulkLoadAgentPermissionsAction,
+)
+from ai.backend.manager.services.agent.actions.bulk_lookup import BulkLookupAgentsAction
 from ai.backend.manager.services.agent.actions.get_total_resources import (
     GetTotalResourcesAction,
     GetTotalResourcesActionResult,
@@ -13,41 +34,30 @@ from ai.backend.manager.services.agent.actions.get_watcher_status import (
     GetWatcherStatusAction,
     GetWatcherStatusActionResult,
 )
-from ai.backend.manager.services.agent.actions.handle_heartbeat import (
-    HandleHeartbeatAction,
-    HandleHeartbeatActionResult,
-)
 from ai.backend.manager.services.agent.actions.load_container_counts import (
     LoadContainerCountsAction,
     LoadContainerCountsActionResult,
 )
-from ai.backend.manager.services.agent.actions.mark_agent_exit import (
-    MarkAgentExitAction,
-    MarkAgentExitActionResult,
-)
-from ai.backend.manager.services.agent.actions.mark_agent_running import (
-    MarkAgentRunningAction,
-    MarkAgentRunningActionResult,
+from ai.backend.manager.services.agent.actions.lookup import LookupAgentAction
+from ai.backend.manager.services.agent.actions.lookup_resource_owner import (
+    LookupAgentResourceOwnerAction,
+    LookupBulkAgentResourceOwnerAction,
 )
 from ai.backend.manager.services.agent.actions.recalculate_usage import (
     RecalculateUsageAction,
     RecalculateUsageActionResult,
 )
-from ai.backend.manager.services.agent.actions.remove_agent_from_images import (
-    RemoveAgentFromImagesAction,
-    RemoveAgentFromImagesActionResult,
+from ai.backend.manager.services.agent.actions.scoped_search_resources import (
+    ScopedSearchAgentResourcesAction,
 )
-from ai.backend.manager.services.agent.actions.remove_agent_from_images_by_canonicals import (
-    RemoveAgentFromImagesByCanonicalsAction,
-    RemoveAgentFromImagesByCanonicalsActionResult,
-)
-from ai.backend.manager.services.agent.actions.search_agents import (
-    SearchAgentsAction,
-    SearchAgentsActionResult,
-)
+from ai.backend.manager.services.agent.actions.search_agents import SearchAgentsAction
 from ai.backend.manager.services.agent.actions.sync_agent_registry import (
     SyncAgentRegistryAction,
     SyncAgentRegistryActionResult,
+)
+from ai.backend.manager.services.agent.actions.update_resource_group import (
+    UpdateAgentResourceGroupAction,
+    UpdateAgentResourceGroupActionResult,
 )
 from ai.backend.manager.services.agent.actions.watcher_agent_restart import (
     WatcherAgentRestartAction,
@@ -64,74 +74,90 @@ from ai.backend.manager.services.agent.actions.watcher_agent_stop import (
 from ai.backend.manager.services.agent.service import AgentService
 
 
-class AgentProcessors(AbstractProcessorPackage):
-    sync_agent_registry: ActionProcessor[SyncAgentRegistryAction, SyncAgentRegistryActionResult]
-    get_watcher_status: ActionProcessor[GetWatcherStatusAction, GetWatcherStatusActionResult]
-    watcher_agent_start: ActionProcessor[WatcherAgentStartAction, WatcherAgentStartActionResult]
-    watcher_agent_restart: ActionProcessor[
+class AgentProcessors:
+    lookup: LookupActionProcessor[LookupAgentAction, LookupOpsResult[AgentUUID]]
+    bulk_lookup: BulkLookupActionProcessor[
+        BulkLookupAgentsAction, BulkLookupOpsResult[AgentId, AgentUUID]
+    ]
+    bulk_get: PartialBulkActionProcessor[BulkGetAgentsAction, AgentData]
+    bulk_load_container_counts: PartialBulkActionProcessor[BulkLoadContainerCountsAction, int]
+    bulk_load_permissions: PartialBulkActionProcessor[
+        BulkLoadAgentPermissionsAction, list[AgentPermission]
+    ]
+    scoped_search_resources: BulkActionProcessor[
+        ScopedSearchAgentResourcesAction, ScopedFieldsOpsResult[AgentResourceData]
+    ]
+    sync_agent_registry: GlobalActionProcessor[
+        SyncAgentRegistryAction, SyncAgentRegistryActionResult
+    ]
+    get_watcher_status: GlobalActionProcessor[GetWatcherStatusAction, GetWatcherStatusActionResult]
+    watcher_agent_start: GlobalActionProcessor[
+        WatcherAgentStartAction, WatcherAgentStartActionResult
+    ]
+    watcher_agent_restart: GlobalActionProcessor[
         WatcherAgentRestartAction, WatcherAgentRestartActionResult
     ]
-    watcher_agent_stop: ActionProcessor[WatcherAgentStopAction, WatcherAgentStopActionResult]
-    recalculate_usage: ActionProcessor[RecalculateUsageAction, RecalculateUsageActionResult]
-    get_total_resources: ActionProcessor[GetTotalResourcesAction, GetTotalResourcesActionResult]
-    handle_heartbeat: ActionProcessor[HandleHeartbeatAction, HandleHeartbeatActionResult]
-    mark_agent_exit: ActionProcessor[MarkAgentExitAction, MarkAgentExitActionResult]
-    mark_agent_running: ActionProcessor[MarkAgentRunningAction, MarkAgentRunningActionResult]
-    remove_agent_from_images_by_canonicals: ActionProcessor[
-        RemoveAgentFromImagesByCanonicalsAction, RemoveAgentFromImagesByCanonicalsActionResult
+    watcher_agent_stop: GlobalActionProcessor[WatcherAgentStopAction, WatcherAgentStopActionResult]
+    recalculate_usage: GlobalActionProcessor[RecalculateUsageAction, RecalculateUsageActionResult]
+    update_resource_group: GlobalActionProcessor[
+        UpdateAgentResourceGroupAction, UpdateAgentResourceGroupActionResult
     ]
-    remove_agent_from_images: ActionProcessor[
-        RemoveAgentFromImagesAction, RemoveAgentFromImagesActionResult
+    get_total_resources: GlobalActionProcessor[
+        GetTotalResourcesAction, GetTotalResourcesActionResult
     ]
-    search_agents: ActionProcessor[SearchAgentsAction, SearchAgentsActionResult]
-    load_container_counts: ActionProcessor[
+    search_agents: GlobalActionProcessor[SearchAgentsAction, BatchOpsResult[AgentData]]
+    load_container_counts: GlobalActionProcessor[
         LoadContainerCountsAction, LoadContainerCountsActionResult
     ]
 
     def __init__(
         self,
+        group: ProcessorGroup[AgentData],
         service: AgentService,
-        action_monitors: list[ActionMonitor],
-        validators: ActionValidators,
     ) -> None:
-        monitors_without_audit_log = [
-            monitor for monitor in action_monitors if not isinstance(monitor, AuditLogMonitor)
-        ]
-
-        self.sync_agent_registry = ActionProcessor(service.sync_agent_registry, action_monitors)
-        self.get_watcher_status = ActionProcessor(service.get_watcher_status, action_monitors)
-        self.watcher_agent_start = ActionProcessor(service.watcher_agent_start, action_monitors)
-        self.watcher_agent_restart = ActionProcessor(service.watcher_agent_restart, action_monitors)
-        self.watcher_agent_stop = ActionProcessor(service.watcher_agent_stop, action_monitors)
-        self.recalculate_usage = ActionProcessor(service.recalculate_usage, action_monitors)
-        self.get_total_resources = ActionProcessor(service.get_total_resources, action_monitors)
-        self.handle_heartbeat = ActionProcessor(
-            service.handle_heartbeat, monitors_without_audit_log
+        self.lookup = group.public_lookup_ops(LookupAgentAction)
+        self.bulk_lookup = group.public_bulk_lookup_ops(BulkLookupAgentsAction)
+        self.bulk_get = group.partial_bulk_get_ops(BulkGetAgentsAction)
+        self.bulk_load_container_counts = group.partial_bulk(
+            BulkLoadContainerCountsAction, service.bulk_load_container_counts
         )
-        self.mark_agent_exit = ActionProcessor(service.mark_agent_exit, action_monitors)
-        self.mark_agent_running = ActionProcessor(service.mark_agent_running, action_monitors)
-        self.remove_agent_from_images_by_canonicals = ActionProcessor(
-            service.remove_agent_from_images_by_canonicals, action_monitors
+        self.bulk_load_permissions = group.partial_bulk(
+            BulkLoadAgentPermissionsAction, service.bulk_load_permissions
         )
-        self.remove_agent_from_images = ActionProcessor(
-            service.remove_agent_from_images, action_monitors
+        resources: LookupFieldGroup[AgentResourceData] = group.field_group(
+            FieldGroupMeta(AgentResourceFieldType()),
+            AgentResourceData,
+            LookupAgentResourceOwnerAction,
+            LookupBulkAgentResourceOwnerAction,
         )
-        self.search_agents = ActionProcessor(service.search_agents, action_monitors)
-        self.load_container_counts = ActionProcessor(service.load_container_counts, action_monitors)
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            SyncAgentRegistryAction.spec(),
-            GetWatcherStatusAction.spec(),
-            WatcherAgentStartAction.spec(),
-            WatcherAgentRestartAction.spec(),
-            WatcherAgentStopAction.spec(),
-            RecalculateUsageAction.spec(),
-            GetTotalResourcesAction.spec(),
-            HandleHeartbeatAction.spec(),
-            RemoveAgentFromImagesAction.spec(),
-            RemoveAgentFromImagesByCanonicalsAction.spec(),
-            SearchAgentsAction.spec(),
-            LoadContainerCountsAction.spec(),
-        ]
+        self.scoped_search_resources = resources.atomic_bulk_scoped_search_ops(
+            ScopedSearchAgentResourcesAction
+        )
+        self.sync_agent_registry = group.global_scope(
+            SyncAgentRegistryAction, service.sync_agent_registry
+        )
+        self.get_watcher_status = group.global_scope(
+            GetWatcherStatusAction, service.get_watcher_status
+        )
+        self.watcher_agent_start = group.global_scope(
+            WatcherAgentStartAction, service.watcher_agent_start
+        )
+        self.watcher_agent_restart = group.global_scope(
+            WatcherAgentRestartAction, service.watcher_agent_restart
+        )
+        self.watcher_agent_stop = group.global_scope(
+            WatcherAgentStopAction, service.watcher_agent_stop
+        )
+        self.recalculate_usage = group.global_scope(
+            RecalculateUsageAction, service.recalculate_usage
+        )
+        self.update_resource_group = group.global_scope(
+            UpdateAgentResourceGroupAction, service.update_resource_group
+        )
+        self.get_total_resources = group.global_scope(
+            GetTotalResourcesAction, service.get_total_resources
+        )
+        self.search_agents = group.global_searcher_ops(SearchAgentsAction)
+        self.load_container_counts = group.global_scope(
+            LoadContainerCountsAction, service.load_container_counts
+        )

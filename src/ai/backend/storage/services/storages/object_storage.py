@@ -1,12 +1,9 @@
-import logging
-
 from ai.backend.common.dto.storage.response import (
     ObjectMetaResponse,
     PresignedDownloadObjectResponse,
     PresignedUploadObjectResponse,
 )
 from ai.backend.common.types import StreamReader
-from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.storage.errors import (
     ObjectStorageBucketNotFoundError,
     StorageNotFoundError,
@@ -14,8 +11,6 @@ from ai.backend.storage.errors import (
 )
 from ai.backend.storage.storages.object_storage import ObjectStorage
 from ai.backend.storage.storages.storage_pool import StoragePool
-
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class ObjectStorageService:

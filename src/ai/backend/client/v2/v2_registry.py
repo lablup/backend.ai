@@ -11,24 +11,32 @@ from functools import cached_property
 from typing import TYPE_CHECKING
 
 from .auth import AuthStrategy
-from .base_client import BackendAIAuthClient
+from .base_client import BackendAIAnonymousClient, BackendAIAuthClient
 from .config import ClientConfig
 
 if TYPE_CHECKING:
     from .domains_v2.agent import V2AgentClient
+    from .domains_v2.app_config import V2AppConfigClient
     from .domains_v2.app_config_allow_list import V2AppConfigAllowListClient
     from .domains_v2.app_config_definition import V2AppConfigDefinitionClient
+    from .domains_v2.app_config_fragment import V2AppConfigFragmentClient
     from .domains_v2.artifact import V2ArtifactClient
     from .domains_v2.artifact_registry import V2ArtifactRegistryClient
     from .domains_v2.audit_log import V2AuditLogClient
+    from .domains_v2.client_ip_masking import V2ClientIPMaskingClient
     from .domains_v2.container_registry import V2ContainerRegistryClient
     from .domains_v2.deployment import V2DeploymentClient
     from .domains_v2.deployment_revision_preset import V2DeploymentRevisionPresetClient
     from .domains_v2.domain import V2DomainClient
+    from .domains_v2.entity_label import V2EntityLabelClient
+    from .domains_v2.entity_share import V2EntityShareClient
+    from .domains_v2.entity_type import V2EntityTypeClient
     from .domains_v2.export import V2ExportClient
     from .domains_v2.fair_share import V2FairShareClient
     from .domains_v2.gql import V2GQLClient
     from .domains_v2.huggingface_registry import V2HuggingFaceRegistryClient
+    from .domains_v2.idle_checker import V2IdleCheckerClient
+    from .domains_v2.idle_checker_assignment import V2IdleCheckerAssignmentClient
     from .domains_v2.image import V2ImageClient
     from .domains_v2.keypair import V2KeypairClient
     from .domains_v2.login_client_type import V2LoginClientTypeClient
@@ -49,16 +57,18 @@ if TYPE_CHECKING:
     from .domains_v2.resource_slot import V2ResourceSlotClient
     from .domains_v2.resource_usage import V2ResourceUsageClient
     from .domains_v2.retention_policy import V2RetentionPolicyClient
-    from .domains_v2.role_invitation import V2RoleInvitationClient
     from .domains_v2.role_preset import V2RolePresetClient
     from .domains_v2.runtime_variant import V2RuntimeVariantClient
     from .domains_v2.runtime_variant_preset import V2RuntimeVariantPresetClient
     from .domains_v2.scheduling_handler import V2SchedulingHandlerClient
     from .domains_v2.scheduling_history import V2SchedulingHistoryClient
+    from .domains_v2.secret import V2SecretClient
     from .domains_v2.service_catalog import V2ServiceCatalogClient
     from .domains_v2.session import V2SessionClient
+    from .domains_v2.session_lifecycle_handler import V2SessionLifecycleHandlerClient
     from .domains_v2.storage_host import V2StorageHostClient
     from .domains_v2.storage_namespace import V2StorageNamespaceClient
+    from .domains_v2.system_session_environ import V2SystemSessionEnvironClient
     from .domains_v2.user import V2UserClient
     from .domains_v2.vfolder import V2VFolderClient
     from .domains_v2.vfs_storage import V2VFSStorageClient
@@ -68,9 +78,11 @@ class V2ClientRegistry:
     """Registry of domain clients targeting ``/v2/`` REST endpoints."""
 
     _client: BackendAIAuthClient
+    _anon_client: BackendAIAnonymousClient
 
-    def __init__(self, client: BackendAIAuthClient) -> None:
+    def __init__(self, client: BackendAIAuthClient, anon_client: BackendAIAnonymousClient) -> None:
         self._client = client
+        self._anon_client = anon_client
 
     @classmethod
     async def create(
@@ -79,10 +91,12 @@ class V2ClientRegistry:
         auth: AuthStrategy,
     ) -> V2ClientRegistry:
         client = await BackendAIAuthClient.create(config, auth)
-        return cls(client)
+        anon_client = await BackendAIAnonymousClient.create(config)
+        return cls(client, anon_client)
 
     async def close(self) -> None:
         await self._client.close()
+        await self._anon_client.close()
 
     # ------------------------------------------------------------------ domains
 
@@ -91,6 +105,12 @@ class V2ClientRegistry:
         from .domains_v2.agent import V2AgentClient
 
         return V2AgentClient(self._client)
+
+    @cached_property
+    def app_config(self) -> V2AppConfigClient:
+        from .domains_v2.app_config import V2AppConfigClient
+
+        return V2AppConfigClient(self._client, self._anon_client)
 
     @cached_property
     def app_config_allow_list(self) -> V2AppConfigAllowListClient:
@@ -103,6 +123,12 @@ class V2ClientRegistry:
         from .domains_v2.app_config_definition import V2AppConfigDefinitionClient
 
         return V2AppConfigDefinitionClient(self._client)
+
+    @cached_property
+    def app_config_fragment(self) -> V2AppConfigFragmentClient:
+        from .domains_v2.app_config_fragment import V2AppConfigFragmentClient
+
+        return V2AppConfigFragmentClient(self._client)
 
     @cached_property
     def artifact(self) -> V2ArtifactClient:
@@ -123,6 +149,18 @@ class V2ClientRegistry:
         return V2AuditLogClient(self._client)
 
     @cached_property
+    def entity_share(self) -> V2EntityShareClient:
+        from .domains_v2.entity_share import V2EntityShareClient
+
+        return V2EntityShareClient(self._client)
+
+    @cached_property
+    def idle_checker_assignment(self) -> V2IdleCheckerAssignmentClient:
+        from .domains_v2.idle_checker_assignment import V2IdleCheckerAssignmentClient
+
+        return V2IdleCheckerAssignmentClient(self._client)
+
+    @cached_property
     def container_registry(self) -> V2ContainerRegistryClient:
         from .domains_v2.container_registry import V2ContainerRegistryClient
 
@@ -139,6 +177,12 @@ class V2ClientRegistry:
         from .domains_v2.domain import V2DomainClient
 
         return V2DomainClient(self._client)
+
+    @cached_property
+    def entity_type(self) -> V2EntityTypeClient:
+        from .domains_v2.entity_type import V2EntityTypeClient
+
+        return V2EntityTypeClient(self._client)
 
     @cached_property
     def export(self) -> V2ExportClient:
@@ -165,6 +209,12 @@ class V2ClientRegistry:
         return V2HuggingFaceRegistryClient(self._client)
 
     @cached_property
+    def idle_checker(self) -> V2IdleCheckerClient:
+        from .domains_v2.idle_checker import V2IdleCheckerClient
+
+        return V2IdleCheckerClient(self._client)
+
+    @cached_property
     def image(self) -> V2ImageClient:
         from .domains_v2.image import V2ImageClient
 
@@ -177,10 +227,28 @@ class V2ClientRegistry:
         return V2KeypairClient(self._client)
 
     @cached_property
+    def entity_label(self) -> V2EntityLabelClient:
+        from .domains_v2.entity_label import V2EntityLabelClient
+
+        return V2EntityLabelClient(self._client)
+
+    @cached_property
     def login_client_type(self) -> V2LoginClientTypeClient:
         from .domains_v2.login_client_type import V2LoginClientTypeClient
 
         return V2LoginClientTypeClient(self._client)
+
+    @cached_property
+    def client_ip_masking(self) -> V2ClientIPMaskingClient:
+        from .domains_v2.client_ip_masking import V2ClientIPMaskingClient
+
+        return V2ClientIPMaskingClient(self._client)
+
+    @cached_property
+    def secret(self) -> V2SecretClient:
+        from .domains_v2.secret import V2SecretClient
+
+        return V2SecretClient(self._client)
 
     @cached_property
     def login_history(self) -> V2LoginHistoryClient:
@@ -217,12 +285,6 @@ class V2ClientRegistry:
         from .domains_v2.project import V2ProjectClient
 
         return V2ProjectClient(self._client)
-
-    @cached_property
-    def role_invitation(self) -> V2RoleInvitationClient:
-        from .domains_v2.role_invitation import V2RoleInvitationClient
-
-        return V2RoleInvitationClient(self._client)
 
     @cached_property
     def role_preset(self) -> V2RolePresetClient:
@@ -341,6 +403,12 @@ class V2ClientRegistry:
         return V2SessionClient(self._client)
 
     @cached_property
+    def session_lifecycle_handler(self) -> V2SessionLifecycleHandlerClient:
+        from .domains_v2.session_lifecycle_handler import V2SessionLifecycleHandlerClient
+
+        return V2SessionLifecycleHandlerClient(self._client)
+
+    @cached_property
     def storage_host(self) -> V2StorageHostClient:
         from .domains_v2.storage_host import V2StorageHostClient
 
@@ -351,6 +419,12 @@ class V2ClientRegistry:
         from .domains_v2.storage_namespace import V2StorageNamespaceClient
 
         return V2StorageNamespaceClient(self._client)
+
+    @cached_property
+    def system_session_environ(self) -> V2SystemSessionEnvironClient:
+        from .domains_v2.system_session_environ import V2SystemSessionEnvironClient
+
+        return V2SystemSessionEnvironClient(self._client)
 
     @cached_property
     def user(self) -> V2UserClient:

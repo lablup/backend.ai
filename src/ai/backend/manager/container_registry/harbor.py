@@ -15,7 +15,7 @@ from ai.backend.common.docker import ImageRef, arch_name_aliases
 from ai.backend.common.docker import login as registry_login
 from ai.backend.common.exception import ErrorDomain, ErrorOperation, PassthroughError
 from ai.backend.common.json import read_json
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.exceptions import (
     ContainerRegistryProjectEmpty,
     ScanImageError,
@@ -28,7 +28,7 @@ from .base import (
     progress_reporter,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class HarborRegistry_v1(BaseContainerRegistry):
@@ -67,7 +67,7 @@ class HarborRegistry_v1(BaseContainerRegistry):
                         next_page_url.query
                     )
         if not project_ids:
-            log.warning("There is no given project.")
+            log.warning("registry project not given", registry_name=self.registry_name)
             return
         repo_list_url: yarl.URL | None
         for project_id in project_ids:
@@ -127,11 +127,11 @@ class HarborRegistry_v1(BaseContainerRegistry):
                         labels = _container_config_labels
 
                     if not labels:
-                        log.warning(
-                            "The image {}:{}/{} has no metadata labels -> treating as vanilla image",
-                            image,
-                            tag,
-                            architecture,
+                        log.trace(
+                            "image has no metadata labels, treating as vanilla image",
+                            image_name=image,
+                            image_tag=tag,
+                            architecture=architecture,
                         )
                         labels = {}
                     manifest = {
@@ -311,8 +311,11 @@ class HarborRegistry_v2(BaseContainerRegistry):
                                             )
                             finally:
                                 if skip_reason:
-                                    log.warning(
-                                        "Skipped image - {}:{} ({})", image, tag, skip_reason
+                                    log.trace(
+                                        "image skipped",
+                                        image_name=image,
+                                        image_tag=tag,
+                                        skip_reason=skip_reason,
                                     )
                         artifact_url = None
                         next_page_link = resp.links.get("next")
@@ -463,10 +466,10 @@ class HarborRegistry_v2(BaseContainerRegistry):
             labels = _container_config_labels
 
         if not labels:
-            log.warning(
-                "The image {}:{} has no metadata labels -> treating as vanilla image",
-                image,
-                tag,
+            log.trace(
+                "image has no metadata labels, treating as vanilla image",
+                image_name=image,
+                image_tag=tag,
             )
             labels = {}
 
@@ -592,11 +595,11 @@ class HarborRegistry_v2(BaseContainerRegistry):
                 labels = _container_config_labels
 
             if not labels:
-                log.warning(
-                    "The image {}:{}/{} has no metadata labels -> treating as vanilla image",
-                    image,
-                    tag,
-                    architecture,
+                log.trace(
+                    "image has no metadata labels, treating as vanilla image",
+                    image_name=image,
+                    image_tag=tag,
+                    architecture=architecture,
                 )
                 labels = {}
 
@@ -645,11 +648,11 @@ class HarborRegistry_v2(BaseContainerRegistry):
                 labels = _container_config_labels
 
             if not labels:
-                log.warning(
-                    "The image {}:{}/{} has no metadata labels -> treating as vanilla image",
-                    image,
-                    tag,
-                    architecture,
+                log.trace(
+                    "image has no metadata labels, treating as vanilla image",
+                    image_name=image,
+                    image_tag=tag,
+                    architecture=architecture,
                 )
                 labels = {}
             manifests[architecture] = {

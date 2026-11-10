@@ -40,6 +40,9 @@ class DomainUsageBucketNode(BaseResponseModel):
     """Node model representing a domain usage bucket."""
 
     id: UUID = Field(description="Usage bucket ID")
+    field_id: UUID = Field(
+        description="UUID of the usage bucket. Added in 26.9.0.",
+    )
     domain_name: str = Field(description="Domain name")
     resource_group_name: str = Field(description="Resource group name")
     metadata: UsageBucketMetadataNode = Field(description="Usage measurement period metadata")
@@ -51,6 +54,9 @@ class ProjectUsageBucketNode(BaseResponseModel):
     """Node model representing a project usage bucket."""
 
     id: UUID = Field(description="Usage bucket ID")
+    field_id: UUID = Field(
+        description="UUID of the usage bucket. Added in 26.9.0.",
+    )
     project_id: UUID = Field(description="Project ID")
     domain_name: str = Field(description="Domain name")
     resource_group_name: str = Field(description="Resource group name")
@@ -63,6 +69,9 @@ class UserUsageBucketNode(BaseResponseModel):
     """Node model representing a user usage bucket."""
 
     id: UUID = Field(description="Usage bucket ID")
+    field_id: UUID = Field(
+        description="UUID of the usage bucket. Added in 26.9.0.",
+    )
     user_uuid: UUID = Field(description="User UUID")
     project_id: UUID = Field(description="Project ID")
     domain_name: str = Field(description="Domain name")

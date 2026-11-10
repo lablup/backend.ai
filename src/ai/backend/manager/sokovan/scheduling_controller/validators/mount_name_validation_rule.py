@@ -5,11 +5,13 @@ from __future__ import annotations
 from typing import override
 
 from ai.backend.manager.data.session.spec import SessionSpec
+from ai.backend.manager.data.vfolder.types import verify_mount_destination
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.models.vfolder import verify_vfolder_name
 from ai.backend.manager.sokovan.scheduling_controller.validators.session_spec_base import (
-    SessionSpecValidationContext,
     SessionSpecValidatorRule,
+)
+from ai.backend.manager.views.sokovan.session_creation import (
+    SessionSpecContext,
 )
 
 
@@ -30,7 +32,7 @@ class MountNameValidationRule(SessionSpecValidatorRule):
     def validate(
         self,
         spec: SessionSpec,
-        _context: SessionSpecValidationContext,
+        _context: SessionSpecContext,
     ) -> None:
         for kernel_idx, kernel in enumerate(spec.resource_spec.kernel_specs):
             seen_paths: set[str] = set()
@@ -44,7 +46,7 @@ class MountNameValidationRule(SessionSpecValidatorRule):
                             "has an empty alias."
                         ),
                     )
-                if not verify_vfolder_name(path_tail):
+                if not verify_mount_destination(path):
                     raise InvalidAPIParameters(
                         extra_msg=(
                             f"kernel_specs[{kernel_idx}].vfolder_mounts[{mount_idx}] "

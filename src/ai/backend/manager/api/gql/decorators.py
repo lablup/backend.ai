@@ -23,7 +23,7 @@ Decorator roles:
 from __future__ import annotations
 
 import enum
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from typing import Any, TypeVar, cast, dataclass_transform, overload
 
 import strawberry
@@ -31,8 +31,10 @@ import strawberry.experimental.pydantic
 import strawberry.federation
 from pydantic import BaseModel
 from strawberry.experimental.pydantic.conversion_types import StrawberryTypeFromPydantic
-from strawberry.relay import Connection
+from strawberry.relay import Connection, Edge
 from strawberry.schema_directives import OneOf
+from strawberry.types.base import get_object_definition
+from strawberry.types.enum import StrawberryEnumDefinition
 from strawberry.types.field import StrawberryField
 from strawberry.types.field import field as strawberry_field
 
@@ -60,7 +62,7 @@ __all__ = (
 )
 
 T = TypeVar("T", bound="PydanticNodeMixin[Any]")
-T_conn = TypeVar("T_conn", bound="Connection[Any]")
+T_conn = TypeVar("T_conn", bound="Connection[Any] | Edge[Any]")
 T_input = TypeVar("T_input", bound="PydanticInputMixin[Any]")
 
 
@@ -110,13 +112,34 @@ def gql_connection_type(
     directives: Sequence[object] = (),
     extend: bool = False,
 ) -> Callable[[type[T_conn]], type[T_conn]]:
-    """Decorator for GQL Connection types (Connection[T] subclasses)."""
+    """Decorator for GQL Connection and Edge types (``Connection[T]`` / ``Edge[T]``
+    subclasses). An edge is a type of its own in the schema, so it carries its own
+    version the same way."""
     return strawberry.type(
         name=name,
         description=_build_description(meta),
         directives=directives,
         extend=extend,
     )
+
+
+def _reject_schema_defaults(cls: type, type_name: str) -> None:
+    """Reject a schema default on a ``@oneOf`` input field.
+
+    GraphQL forbids a default there, and a default puts every key into the coerced
+    input, so the server rejects the request whatever the client sends.
+    """
+    definition = get_object_definition(cls, strict=True)
+    offenders = [
+        f"{field.python_name}={field.default_value!r}"
+        for field in definition.fields
+        if field.default_value is not strawberry.UNSET
+    ]
+    if offenders:
+        raise ValueError(
+            f"{type_name} is a @oneOf input, so every field must default to UNSET: "
+            + ", ".join(offenders)
+        )
 
 
 @dataclass_transform(
@@ -147,15 +170,25 @@ def gql_pydantic_input(
     Always declare fields explicitly in the class body.
 
     When ``one_of=True``, injects the ``@oneOf`` directive so exactly one field
-    must be provided (mirrors ``@strawberry.input(one_of=True)`` behaviour).
+    must be provided (mirrors ``@strawberry.input(one_of=True)`` behaviour), and
+    rejects a field carrying a schema default at declaration time.
     """
     if one_of:
         directives = (*directives, OneOf())
-    return strawberry.input(
+    apply_input = strawberry.input(
         name=name,
         description=_build_description(meta),
         directives=directives,
     )
+    if not one_of:
+        return apply_input
+
+    def decorate(cls: type[T_input]) -> type[T_input]:
+        processed = apply_input(cls)
+        _reject_schema_defaults(processed, name or cls.__name__)
+        return processed
+
+    return decorate
 
 
 @dataclass_transform(
@@ -206,8 +239,14 @@ def gql_pydantic_type[PydanticModel: BaseModel](
     Strawberry auto-generates from_pydantic() and to_pydantic() methods.
     Use all_fields=True for scalar-only types, or declare fields explicitly
     for types with nested GQL node fields.
+
+    Field descriptions declared via ``gql_field``/``gql_added_field`` take
+    precedence over the DTO's ``Field(description=...)``: Strawberry's
+    pydantic integration rebuilds every resolver-less field with the
+    pydantic description, so the declared ones are restored after wrapping
+    (the DTO description remains the fallback).
     """
-    return strawberry.experimental.pydantic.type(
+    strawberry_wrap = strawberry.experimental.pydantic.type(
         model=model,
         name=name,
         description=_build_description(meta),
@@ -215,6 +254,21 @@ def gql_pydantic_type[PydanticModel: BaseModel](
         all_fields=all_fields,
         use_pydantic_alias=use_pydantic_alias,
     )
+
+    def wrap(cls: type) -> type[StrawberryTypeFromPydantic[PydanticModel]]:
+        declared_descriptions = {
+            field_name: value.description
+            for field_name, value in vars(cls).items()
+            if isinstance(value, StrawberryField) and value.description is not None
+        }
+        wrapped = strawberry_wrap(cls)
+        for field in get_object_definition(wrapped, strict=True).fields:
+            declared = declared_descriptions.get(field.python_name)
+            if declared is not None:
+                field.description = declared
+        return wrapped
+
+    return wrap
 
 
 def gql_field(
@@ -242,12 +296,21 @@ def gql_added_field(
     *,
     name: str | None = None,
     default: Any = strawberry.UNSET,
+    default_factory: Callable[[], Any] | None = None,
     deprecation_reason: str | None = None,
 ) -> Any:
     """Field added after the parent type was released (has its own version).
 
     Automatically prefixes the description with "Added in {version}."
+    ``default_factory`` renders the default into the schema SDL (input fields).
     """
+    if default_factory is not None:
+        return strawberry.field(
+            description=_build_description(meta),
+            name=name,
+            default_factory=default_factory,
+            deprecation_reason=deprecation_reason,
+        )
     return strawberry.field(
         description=_build_description(meta),
         name=name,
@@ -276,12 +339,35 @@ def gql_root_field(
     )
 
 
+def _apply_deprecated_values(
+    enum_cls: type[enum.Enum],
+    deprecated_values: Mapping[str, str],
+) -> None:
+    """Attach a deprecation reason to individual members of a processed enum.
+
+    ``strawberry.enum_value`` cannot be used on ``StrEnum`` members, whose values
+    must be strings, so the reasons are written onto the enum definition instead.
+    """
+    definition = cast(StrawberryEnumDefinition, enum_cls.__strawberry_definition__)  # type: ignore[attr-defined]
+    known_names = {value.name for value in definition.values}
+    unknown_names = set(deprecated_values) - known_names
+    if unknown_names:
+        raise ValueError(
+            f"{enum_cls.__name__} has no member(s) {sorted(unknown_names)} to deprecate"
+        )
+    for value in definition.values:
+        reason = deprecated_values.get(value.name)
+        if reason is not None:
+            value.deprecation_reason = reason
+
+
 @overload
 def gql_enum[T_enum: enum.Enum](
     meta: BackendAIGQLMeta,
     enum_cls: type[T_enum],
     *,
     name: str | None = ...,
+    deprecated_values: Mapping[str, str] | None = ...,
 ) -> type[T_enum]: ...
 
 
@@ -291,6 +377,7 @@ def gql_enum[T_enum: enum.Enum](
     enum_cls: None = ...,
     *,
     name: str | None = ...,
+    deprecated_values: Mapping[str, str] | None = ...,
 ) -> Callable[[type[T_enum]], type[T_enum]]: ...
 
 
@@ -299,8 +386,12 @@ def gql_enum(
     enum_cls: type[enum.Enum] | None = None,
     *,
     name: str | None = None,
+    deprecated_values: Mapping[str, str] | None = None,
 ) -> Any:
     """Enum type with version metadata.
+
+    ``deprecated_values`` maps a member name to its deprecation reason, which must
+    carry a version in the ``Deprecated since XX.X.X.`` form.
 
     Can be used as a decorator or as a function call for DTO wrapping::
 
@@ -312,13 +403,19 @@ def gql_enum(
         StatusGQL = gql_enum(BackendAIGQLMeta(...), StatusDTO, name="Status")
     """
     description = _build_description(meta)
-    if enum_cls is not None:
+
+    def process(cls: type[enum.Enum]) -> type[enum.Enum]:
         if name is not None:
-            return strawberry.enum(enum_cls, description=description, name=name)
-        return strawberry.enum(enum_cls, description=description)
-    if name is not None:
-        return strawberry.enum(description=description, name=name)
-    return strawberry.enum(description=description)
+            processed = strawberry.enum(cls, description=description, name=name)
+        else:
+            processed = strawberry.enum(cls, description=description)
+        if deprecated_values:
+            _apply_deprecated_values(processed, deprecated_values)
+        return processed
+
+    if enum_cls is not None:
+        return process(enum_cls)
+    return process
 
 
 _ResolverFn = TypeVar("_ResolverFn", bound=Callable[..., Any])

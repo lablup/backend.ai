@@ -5,9 +5,9 @@ from typing import Any
 
 from ai.backend.common.observer.types import AbstractObserver
 from ai.backend.common.resource.types import AbstractResource
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class Runner:
@@ -51,7 +51,7 @@ class Runner:
         """
         if self._closed_event.is_set():
             raise RuntimeError("Runner is already closed.")
-        log.info("Starting observer: {}", observer.name)
+        log.info("observer starting", observer_name=observer.name)
         self._track(self._run_observer(observer))
 
     async def _run_observer(self, observer: AbstractObserver) -> None:
@@ -61,50 +61,32 @@ class Runner:
                     await observer.observe()
             except TimeoutError:
                 log.warning(
-                    "Observer {} timed out after {} seconds.",
-                    observer.name,
-                    observer.timeout(),
+                    "observer timed out",
+                    observer_name=observer.name,
+                    timeout_sec=observer.timeout(),
                 )
-            except Exception as e:
-                log.exception(
-                    "Error while observing: {}",
-                    e,
-                )
+            except Exception:
+                log.exception("observer failed", observer_name=observer.name)
             await asyncio.sleep(observer.observe_interval())
         await observer.cleanup()
-        log.info(
-            "Observer closed: {}",
-            observer.name,
-        )
+        log.info("observer closed", observer_name=observer.name)
 
     async def _setup(self) -> None:
         for resource in self._resources:
             try:
                 await resource.setup()
-                log.info(
-                    "Resource setup: {}",
-                    resource.name,
-                )
-            except Exception as e:
-                log.exception(
-                    "Error while setting up resource: {}",
-                    e,
-                )
+                log.info("resource set up", resource_name=resource.name)
+            except Exception:
+                log.exception("resource setup failed", resource_name=resource.name)
                 raise
 
     async def _cleanup(self) -> None:
         for resource in self._resources:
             try:
                 await resource.release()
-                log.info(
-                    "Resource released: {}",
-                    resource.name,
-                )
-            except Exception as e:
-                log.exception(
-                    "Error while releasing resource: {}",
-                    e,
-                )
+                log.info("resource released", resource_name=resource.name)
+            except Exception:
+                log.exception("resource release failed", resource_name=resource.name)
 
     async def start(self) -> None:
         """
@@ -114,26 +96,22 @@ class Runner:
         """
         if self._closed_event.is_set():
             raise RuntimeError("Runner is already closed.")
-        log.info("Starting runner.")
+        log.info("runner starting")
         try:
             await self._setup()
-        except Exception as e:
-            log.exception(
-                "Error while starting runner: {}",
-                e,
-            )
+        except Exception:
             await self._cleanup()
             raise
         self._track(self._run())
-        log.info("Runner started.")
+        log.info("runner started")
 
     async def _run(self) -> None:
         try:
             await self._closed_event.wait()
         finally:
-            log.info("cleaning up runner.")
+            log.info("runner cleaning up")
             await self._cleanup()
-            log.info("Runner closed.")
+            log.info("runner closed")
 
     async def close(self) -> None:
         """

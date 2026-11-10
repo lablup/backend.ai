@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from unittest.mock import AsyncMock, MagicMock, patch
+from uuid import uuid4
 
 import pytest
 import sqlalchemy as sa
@@ -9,6 +11,8 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.exceptions import InvalidRequestError, NotFoundError, ServerError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.data.entity.resource_group import ResourceGroupName
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.dto.manager.session.request import (
     CompleteRequest,
     ExecuteRequest,
@@ -20,13 +24,13 @@ from ai.backend.common.dto.manager.session.response import (
     ExecuteResponse,
     StartServiceResponse,
 )
-from ai.backend.common.identifier.resource_group import ResourceGroupName
-from ai.backend.manager.models.kernel import kernels
-from ai.backend.manager.models.scaling_group import scaling_groups
+from ai.backend.manager.models.kernel.row import kernels
+from ai.backend.manager.models.resource_group.row import resource_groups
 
 from .conftest import SessionSeedData
 
 _WSPROXY_ADDR = "http://127.0.0.1:5050"
+_WSPROXY_API_TOKEN = "coordinator-api-token"
 _SERVICE_PORTS_TTYD = [
     {
         "name": "ttyd",
@@ -37,6 +41,13 @@ _SERVICE_PORTS_TTYD = [
         "is_inference": False,
     }
 ]
+
+
+@dataclass(frozen=True)
+class _ResourceGroupApiTokenCase:
+    description: str
+    wsproxy_api_token: str | None
+    expected_conf_request_headers: dict[str, str]
 
 
 def _make_wsproxy_mock(token: str = "test-token-xyz") -> AsyncMock:
@@ -79,7 +90,7 @@ class TestSessionExecuteQuery:
         }
 
         result = await admin_registry.session.execute(
-            session_seed.session_name,
+            session_seed.session_id,
             ExecuteRequest(mode="query", code="print('hello')", run_id="abc"),
         )
 
@@ -106,7 +117,7 @@ class TestSessionExecuteQuery:
         }
 
         result = await admin_registry.session.execute(
-            session_seed.session_name,
+            session_seed.session_id,
             ExecuteRequest(mode="query", code="print('hello')"),
         )
 
@@ -130,7 +141,7 @@ class TestSessionExecuteQuery:
         }
 
         result = await admin_registry.session.execute(
-            session_seed.session_name,
+            session_seed.session_id,
             ExecuteRequest(mode="query", run_id="abc", code=None),
         )
 
@@ -165,7 +176,7 @@ class TestSessionExecuteModes:
         }
 
         result = await admin_registry.session.execute(
-            session_seed.session_name,
+            session_seed.session_id,
             ExecuteRequest(mode="batch", code="x = 1", run_id="batch-run-1"),
         )
 
@@ -186,7 +197,7 @@ class TestSessionExecuteModes:
         agent_registry.get_completions.return_value = mock_completion
 
         result = await admin_registry.session.execute(
-            session_seed.session_name,
+            session_seed.session_id,
             ExecuteRequest(mode="complete", code="os."),
         )
 
@@ -211,7 +222,7 @@ class TestSessionExecuteFailures:
         """F-BIZ-1: mode='continue', run_id=None → error (requires run_id)."""
         with pytest.raises(ServerError):
             await admin_registry.session.execute(
-                session_seed.session_name,
+                session_seed.session_id,
                 ExecuteRequest(mode="continue"),
             )
 
@@ -223,7 +234,7 @@ class TestSessionExecuteFailures:
         """F-BIZ-2: mode='invalid' → error."""
         with pytest.raises(ServerError):
             await admin_registry.session.execute(
-                session_seed.session_name,
+                session_seed.session_id,
                 ExecuteRequest(mode="invalid", run_id="r1"),
             )
 
@@ -235,7 +246,7 @@ class TestSessionExecuteFailures:
         """F-BIZ-3: mode=None in v2 API → error (mode is required)."""
         with pytest.raises(ServerError):
             await admin_registry.session.execute(
-                session_seed.session_name,
+                session_seed.session_id,
                 ExecuteRequest(mode=None),
             )
 
@@ -246,7 +257,7 @@ class TestSessionExecuteFailures:
         """F-BIZ-4: Execute on nonexistent session → NotFoundError."""
         with pytest.raises(NotFoundError):
             await admin_registry.session.execute(
-                "nonexistent-session-xyz-99999",
+                SessionID(uuid4()),
                 ExecuteRequest(mode="query", code="print('hi')", run_id="r1"),
             )
 
@@ -268,7 +279,7 @@ class TestSessionInterrupt:
         """S-8: Interrupt running session → success, agent_registry.interrupt_session called."""
         agent_registry.interrupt_session.return_value = None
 
-        await admin_registry.session.interrupt(session_seed.session_name)
+        await admin_registry.session.interrupt(session_seed.session_id)
 
         agent_registry.interrupt_session.assert_called_once()
 
@@ -278,7 +289,7 @@ class TestSessionInterrupt:
     ) -> None:
         """F-BIZ-5: Interrupt nonexistent session → NotFoundError."""
         with pytest.raises(NotFoundError):
-            await admin_registry.session.interrupt("nonexistent-session-xyz-99999")
+            await admin_registry.session.interrupt(SessionID(uuid4()))
 
 
 # ---------------------------------------------------------------------------
@@ -301,7 +312,7 @@ class TestSessionComplete:
         agent_registry.get_completions.return_value = mock_completion
 
         result = await admin_registry.session.complete(
-            session_seed.session_name,
+            session_seed.session_id,
             CompleteRequest(code="impo"),
         )
 
@@ -315,7 +326,7 @@ class TestSessionComplete:
         """F-BIZ-6: Complete on nonexistent session → NotFoundError."""
         with pytest.raises(NotFoundError):
             await admin_registry.session.complete(
-                "nonexistent-session-xyz-99999",
+                SessionID(uuid4()),
                 CompleteRequest(code="impo"),
             )
 
@@ -328,21 +339,43 @@ class TestSessionComplete:
 class TestSessionStartService:
     """Start service endpoint — app token and wsproxy address scenarios."""
 
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _ResourceGroupApiTokenCase(
+                description="api_token_set",
+                wsproxy_api_token=_WSPROXY_API_TOKEN,
+                expected_conf_request_headers={"X-BackendAI-Token": _WSPROXY_API_TOKEN},
+            ),
+            _ResourceGroupApiTokenCase(
+                description="no_api_token",
+                wsproxy_api_token=None,
+                expected_conf_request_headers={},
+            ),
+            _ResourceGroupApiTokenCase(
+                description="empty_api_token",
+                wsproxy_api_token="",
+                expected_conf_request_headers={},
+            ),
+        ],
+        ids=lambda case: case.description,
+    )
     async def test_start_service_returns_token_and_wsproxy(
         self,
         admin_registry: BackendAIClientRegistry,
         session_seed: SessionSeedData,
         db_engine: SAEngine,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
         agent_registry: AsyncMock,
         appproxy_client_pool: AsyncMock,
+        case: _ResourceGroupApiTokenCase,
     ) -> None:
         """S-1: Start service 'ttyd' → StartServiceResponse with token and wsproxy_addr."""
         async with db_engine.begin() as conn:
             await conn.execute(
-                sa.update(scaling_groups)
-                .where(scaling_groups.c.name == scaling_group_name)
-                .values(wsproxy_addr=_WSPROXY_ADDR)
+                sa.update(resource_groups)
+                .where(resource_groups.c.name == resource_group_name)
+                .values(wsproxy_addr=_WSPROXY_ADDR, wsproxy_api_token=case.wsproxy_api_token)
             )
         async with db_engine.begin() as conn:
             await conn.execute(
@@ -370,20 +403,22 @@ class TestSessionStartService:
             return_value=mock_session_cls,
         ):
             result = await admin_registry.session.start_service(
-                session_seed.session_name,
+                session_seed.session_id,
                 StartServiceRequest(app="ttyd"),
             )
 
         assert isinstance(result, StartServiceResponse)
         assert result.token == "test-token-xyz"
         assert result.wsproxy_addr == _WSPROXY_ADDR
+        post_call_kwargs = mock_session_cls.__aenter__.return_value.post.call_args.kwargs
+        assert post_call_kwargs["headers"] == case.expected_conf_request_headers
 
     async def test_start_service_with_specific_port(
         self,
         admin_registry: BackendAIClientRegistry,
         session_seed: SessionSeedData,
         db_engine: SAEngine,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
         agent_registry: AsyncMock,
         appproxy_client_pool: AsyncMock,
     ) -> None:
@@ -400,8 +435,8 @@ class TestSessionStartService:
         ]
         async with db_engine.begin() as conn:
             await conn.execute(
-                sa.update(scaling_groups)
-                .where(scaling_groups.c.name == scaling_group_name)
+                sa.update(resource_groups)
+                .where(resource_groups.c.name == resource_group_name)
                 .values(wsproxy_addr=_WSPROXY_ADDR)
             )
         async with db_engine.begin() as conn:
@@ -429,7 +464,7 @@ class TestSessionStartService:
             return_value=mock_session_cls,
         ):
             result = await admin_registry.session.start_service(
-                session_seed.session_name,
+                session_seed.session_id,
                 StartServiceRequest(app="ttyd", port=8888),
             )
 
@@ -441,15 +476,15 @@ class TestSessionStartService:
         admin_registry: BackendAIClientRegistry,
         session_seed: SessionSeedData,
         db_engine: SAEngine,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
         agent_registry: AsyncMock,
         appproxy_client_pool: AsyncMock,
     ) -> None:
         """S-3: Start service with arguments/envs → opts contain parsed arguments and envs."""
         async with db_engine.begin() as conn:
             await conn.execute(
-                sa.update(scaling_groups)
-                .where(scaling_groups.c.name == scaling_group_name)
+                sa.update(resource_groups)
+                .where(resource_groups.c.name == resource_group_name)
                 .values(wsproxy_addr=_WSPROXY_ADDR)
             )
         async with db_engine.begin() as conn:
@@ -477,7 +512,7 @@ class TestSessionStartService:
             return_value=mock_session_cls,
         ):
             result = await admin_registry.session.start_service(
-                session_seed.session_name,
+                session_seed.session_id,
                 StartServiceRequest(
                     app="ttyd",
                     arguments=json.dumps(["--port", "8080"]),
@@ -497,15 +532,15 @@ class TestSessionStartService:
         admin_registry: BackendAIClientRegistry,
         session_seed: SessionSeedData,
         db_engine: SAEngine,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
         agent_registry: AsyncMock,
         appproxy_client_pool: AsyncMock,
     ) -> None:
         """S-4: kernel_host=None → kernel_host extracted from agent_addr hostname."""
         async with db_engine.begin() as conn:
             await conn.execute(
-                sa.update(scaling_groups)
-                .where(scaling_groups.c.name == scaling_group_name)
+                sa.update(resource_groups)
+                .where(resource_groups.c.name == resource_group_name)
                 .values(wsproxy_addr=_WSPROXY_ADDR)
             )
         async with db_engine.begin() as conn:
@@ -543,7 +578,7 @@ class TestSessionStartService:
             return_value=mock_session_cls,
         ):
             result = await admin_registry.session.start_service(
-                session_seed.session_name,
+                session_seed.session_id,
                 StartServiceRequest(app="ttyd"),
             )
 
@@ -552,20 +587,72 @@ class TestSessionStartService:
         post_call_kwargs = mock_session_obj.post.call_args[1]
         assert post_call_kwargs["json"]["kernel_host"] == "192.168.1.100"
 
+    async def test_start_service_does_not_forward_the_login_session_token(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        session_seed: SessionSeedData,
+        db_engine: SAEngine,
+        resource_group_name: ResourceGroupName,
+        agent_registry: AsyncMock,
+        appproxy_client_pool: AsyncMock,
+    ) -> None:
+        """A login session token in the request does not reach the app proxy coordinator."""
+        async with db_engine.begin() as conn:
+            await conn.execute(
+                sa.update(resource_groups)
+                .where(resource_groups.c.name == resource_group_name)
+                .values(wsproxy_addr=_WSPROXY_ADDR)
+            )
+            await conn.execute(
+                sa.update(kernels)
+                .where(kernels.c.id == session_seed.kernel_id)
+                .values(service_ports=_SERVICE_PORTS_TTYD, kernel_host="10.0.0.1")
+            )
+
+        mock_status = MagicMock()
+        mock_status.advertise_address = _WSPROXY_ADDR
+        mock_client = AsyncMock()
+        mock_client.fetch_status.return_value = mock_status
+        appproxy_client_pool.load_client.return_value = mock_client
+
+        agent_registry.start_service.return_value = {"status": "started"}
+
+        mock_resp = AsyncMock()
+        mock_resp.json.return_value = {"token": "login-session-test-token"}
+        mock_session_ctx = AsyncMock()
+        mock_session_ctx.__aenter__ = AsyncMock(return_value=mock_resp)
+        mock_session_ctx.__aexit__ = AsyncMock(return_value=False)
+        mock_session_obj = MagicMock()
+        mock_session_obj.post.return_value = mock_session_ctx
+        mock_session_cls = AsyncMock()
+        mock_session_cls.__aenter__ = AsyncMock(return_value=mock_session_obj)
+        mock_session_cls.__aexit__ = AsyncMock(return_value=False)
+
+        with patch(
+            "ai.backend.manager.services.session.service.aiohttp.ClientSession",
+            return_value=mock_session_cls,
+        ):
+            await admin_registry.session.start_service(
+                session_seed.session_id,
+                StartServiceRequest(app="ttyd", login_session_token="login-session-token-value"),
+            )
+
+        assert mock_session_obj.post.call_args[1]["json"]["login_session_token"] == ""
+
     async def test_start_service_wsproxy_advertise_address_fallback(
         self,
         admin_registry: BackendAIClientRegistry,
         session_seed: SessionSeedData,
         db_engine: SAEngine,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
         agent_registry: AsyncMock,
         appproxy_client_pool: AsyncMock,
     ) -> None:
         """S-5: advertise_address=None → fallback to original wsproxy_addr."""
         async with db_engine.begin() as conn:
             await conn.execute(
-                sa.update(scaling_groups)
-                .where(scaling_groups.c.name == scaling_group_name)
+                sa.update(resource_groups)
+                .where(resource_groups.c.name == resource_group_name)
                 .values(wsproxy_addr=_WSPROXY_ADDR)
             )
         async with db_engine.begin() as conn:
@@ -593,7 +680,7 @@ class TestSessionStartService:
             return_value=mock_session_cls,
         ):
             result = await admin_registry.session.start_service(
-                session_seed.session_name,
+                session_seed.session_id,
                 StartServiceRequest(app="ttyd"),
             )
 
@@ -615,14 +702,14 @@ class TestSessionStartServiceFailures:
         admin_registry: BackendAIClientRegistry,
         session_seed: SessionSeedData,
         db_engine: SAEngine,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
         appproxy_client_pool: AsyncMock,
     ) -> None:
         """F-BIZ-1: Service name not in service_ports → NotFoundError (AppNotFound)."""
         async with db_engine.begin() as conn:
             await conn.execute(
-                sa.update(scaling_groups)
-                .where(scaling_groups.c.name == scaling_group_name)
+                sa.update(resource_groups)
+                .where(resource_groups.c.name == resource_group_name)
                 .values(wsproxy_addr=_WSPROXY_ADDR)
             )
         async with db_engine.begin() as conn:
@@ -644,7 +731,7 @@ class TestSessionStartServiceFailures:
 
         with pytest.raises(NotFoundError):
             await admin_registry.session.start_service(
-                session_seed.session_name,
+                session_seed.session_id,
                 StartServiceRequest(app="nonexistent-app"),
             )
 
@@ -653,7 +740,7 @@ class TestSessionStartServiceFailures:
         admin_registry: BackendAIClientRegistry,
         session_seed: SessionSeedData,
         db_engine: SAEngine,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
         appproxy_client_pool: AsyncMock,
     ) -> None:
         """F-BIZ-2: Inference app → InvalidRequestError."""
@@ -669,8 +756,8 @@ class TestSessionStartServiceFailures:
         ]
         async with db_engine.begin() as conn:
             await conn.execute(
-                sa.update(scaling_groups)
-                .where(scaling_groups.c.name == scaling_group_name)
+                sa.update(resource_groups)
+                .where(resource_groups.c.name == resource_group_name)
                 .values(wsproxy_addr=_WSPROXY_ADDR)
             )
         async with db_engine.begin() as conn:
@@ -692,7 +779,7 @@ class TestSessionStartServiceFailures:
 
         with pytest.raises(InvalidRequestError):
             await admin_registry.session.start_service(
-                session_seed.session_name,
+                session_seed.session_id,
                 StartServiceRequest(app="inference-svc"),
             )
 
@@ -701,14 +788,14 @@ class TestSessionStartServiceFailures:
         admin_registry: BackendAIClientRegistry,
         session_seed: SessionSeedData,
         db_engine: SAEngine,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
         appproxy_client_pool: AsyncMock,
     ) -> None:
         """F-BIZ-3: Port not in container_ports → InvalidRequestError."""
         async with db_engine.begin() as conn:
             await conn.execute(
-                sa.update(scaling_groups)
-                .where(scaling_groups.c.name == scaling_group_name)
+                sa.update(resource_groups)
+                .where(resource_groups.c.name == resource_group_name)
                 .values(wsproxy_addr=_WSPROXY_ADDR)
             )
         async with db_engine.begin() as conn:
@@ -730,7 +817,7 @@ class TestSessionStartServiceFailures:
 
         with pytest.raises(InvalidRequestError):
             await admin_registry.session.start_service(
-                session_seed.session_name,
+                session_seed.session_id,
                 StartServiceRequest(app="ttyd", port=9999),
             )
 
@@ -739,20 +826,20 @@ class TestSessionStartServiceFailures:
         admin_registry: BackendAIClientRegistry,
         session_seed: SessionSeedData,
         db_engine: SAEngine,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
     ) -> None:
         """F-BIZ-5: Scaling group has no wsproxy_addr → ServerError (ServiceUnavailable)."""
         # Ensure wsproxy_addr is NULL on the scaling group
         async with db_engine.begin() as conn:
             await conn.execute(
-                sa.update(scaling_groups)
-                .where(scaling_groups.c.name == scaling_group_name)
+                sa.update(resource_groups)
+                .where(resource_groups.c.name == resource_group_name)
                 .values(wsproxy_addr=None)
             )
 
         with pytest.raises(ServerError):
             await admin_registry.session.start_service(
-                session_seed.session_name,
+                session_seed.session_id,
                 StartServiceRequest(app="ttyd"),
             )
 
@@ -761,15 +848,15 @@ class TestSessionStartServiceFailures:
         admin_registry: BackendAIClientRegistry,
         session_seed: SessionSeedData,
         db_engine: SAEngine,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
         agent_registry: AsyncMock,
         appproxy_client_pool: AsyncMock,
     ) -> None:
         """F-BIZ-6: Agent returns status='failed' → ServerError (InternalServerError)."""
         async with db_engine.begin() as conn:
             await conn.execute(
-                sa.update(scaling_groups)
-                .where(scaling_groups.c.name == scaling_group_name)
+                sa.update(resource_groups)
+                .where(resource_groups.c.name == resource_group_name)
                 .values(wsproxy_addr=_WSPROXY_ADDR)
             )
         async with db_engine.begin() as conn:
@@ -796,7 +883,7 @@ class TestSessionStartServiceFailures:
 
         with pytest.raises(ServerError):
             await admin_registry.session.start_service(
-                session_seed.session_name,
+                session_seed.session_id,
                 StartServiceRequest(app="ttyd"),
             )
 
@@ -819,7 +906,7 @@ class TestSessionShutdownService:
         agent_registry.shutdown_service.return_value = None
 
         await admin_registry.session.shutdown_service(
-            session_seed.session_name,
+            session_seed.session_id,
             ShutdownServiceRequest(service_name="ttyd"),
         )
 
@@ -832,6 +919,6 @@ class TestSessionShutdownService:
         """F-BIZ-7: Shutdown service on nonexistent session → NotFoundError."""
         with pytest.raises(NotFoundError):
             await admin_registry.session.shutdown_service(
-                "nonexistent-session-xyz-99999",
+                SessionID(uuid4()),
                 ShutdownServiceRequest(service_name="ttyd"),
             )

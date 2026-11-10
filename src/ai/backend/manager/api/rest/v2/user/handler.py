@@ -10,10 +10,12 @@ from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.dto.manager.v2.user.request import (
     CreateUserInput,
     DeleteUserInput,
+    RestoreUserInput,
+    ScopedSearchUsersInput,
     SearchUsersRequest,
     UpdateUserInput,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.v2.path_params import (
     DomainNamePathParam,
     ProjectIdPathParam,
@@ -24,7 +26,7 @@ from ai.backend.manager.api.rest.v2.path_params import (
 if TYPE_CHECKING:
     from ai.backend.manager.api.adapters.user.adapter import UserAdapter
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class V2UserHandler:
@@ -57,13 +59,13 @@ class V2UserHandler:
         result = await self._adapter.create_user(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=result)
 
-    async def modify_user(
+    async def update_user(
         self,
         path: PathParam[UserIdPathParam],
         body: BodyParam[UpdateUserInput],
     ) -> APIResponse:
         """Update a user by UUID (superadmin only)."""
-        result = await self._adapter.modify_user_by_id(path.parsed.user_id, body.parsed)
+        result = await self._adapter.update_user_by_id(path.parsed.user_id, body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def delete_user(
@@ -72,6 +74,22 @@ class V2UserHandler:
     ) -> APIResponse:
         """Soft-delete a user (superadmin only)."""
         result = await self._adapter.delete_user_by_id(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def restore_user(
+        self,
+        body: BodyParam[RestoreUserInput],
+    ) -> APIResponse:
+        """Restore a soft-deleted user (superadmin only)."""
+        result = await self._adapter.restore_user_by_id(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def scoped_search(
+        self,
+        body: BodyParam[ScopedSearchUsersInput],
+    ) -> APIResponse:
+        """Search the users the named scopes reach, combined with OR."""
+        result = await self._adapter.scoped_search(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def domain_search(

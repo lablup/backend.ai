@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator, Mapping
+from collections.abc import AsyncGenerator
 from dataclasses import dataclass
-from typing import Any, Self, override
+from typing import Self, override
 
+from ai.backend.common.clients.valkey_client.sentinel_monitor.base import AbstractSentinelMonitor
 from ai.backend.common.message_queue.abc import (
     AbstractAnycaster,
     AbstractBroadcaster,
@@ -11,11 +12,11 @@ from ai.backend.common.message_queue.abc import (
     AbstractSubscriber,
 )
 from ai.backend.common.message_queue.abc.queue import AbstractMessageQueue
-from ai.backend.common.message_queue.types import (
-    BroadcastMessage,
-    BroadcastPayload,
-    MessageId,
-    MQMessage,
+from ai.backend.common.message_queue.message import MessageId, MQMessage
+from ai.backend.common.message_queue.payload import (
+    AnycastMessagePayload,
+    BroadcastMessagePayload,
+    CachedBroadcastMessagePayload,
 )
 from ai.backend.common.types import RedisTarget
 
@@ -71,15 +72,24 @@ class RedisQueue(AbstractMessageQueue):
         self._subscriber = subscriber
 
     @classmethod
-    async def create(cls, redis_target: RedisTarget, args: RedisMQArgs) -> Self:
+    async def create(
+        cls,
+        redis_target: RedisTarget,
+        args: RedisMQArgs,
+        sentinel_monitor: AbstractSentinelMonitor | None = None,
+    ) -> Self:
         """
         Create a RedisQueue instance with all four components.
         """
         # Create anycaster
-        anycaster = await RedisAnycaster.create(redis_target, args.anycast_stream_key, args.db)
+        anycaster = await RedisAnycaster.create(
+            redis_target, args.anycast_stream_key, args.db, sentinel_monitor
+        )
 
         # Create broadcaster
-        broadcaster = await RedisBroadcaster.create(redis_target, args.broadcast_channel, args.db)
+        broadcaster = await RedisBroadcaster.create(
+            redis_target, args.broadcast_channel, args.db, sentinel_monitor
+        )
 
         # Create consumer
         consume_stream_keys = args.consume_stream_keys or set()
@@ -93,18 +103,21 @@ class RedisQueue(AbstractMessageQueue):
                 args.autoclaim_idle_timeout,
                 args.autoclaim_start_id,
             ),
+            sentinel_monitor,
         )
 
         # Create subscriber
         subscribe_channels = args.subscribe_channels or set()
-        subscriber = await RedisSubscriber.create(redis_target, subscribe_channels, args.db)
+        subscriber = await RedisSubscriber.create(
+            redis_target, subscribe_channels, args.db, sentinel_monitor
+        )
 
         return cls(anycaster, broadcaster, consumer, subscriber)
 
     # Anycaster methods
 
     @override
-    async def send(self, payload: dict[bytes, bytes]) -> None:
+    async def send(self, payload: AnycastMessagePayload) -> None:
         """
         Send a message to the anycast queue.
         If the queue is full, the oldest message will be removed.
@@ -115,7 +128,7 @@ class RedisQueue(AbstractMessageQueue):
     # Broadcaster methods
 
     @override
-    async def broadcast(self, payload: Mapping[str, Any]) -> None:
+    async def broadcast(self, payload: BroadcastMessagePayload) -> None:
         """
         Broadcast a message to all subscribers.
         The message will be delivered to all subscribers.
@@ -123,7 +136,7 @@ class RedisQueue(AbstractMessageQueue):
         await self._broadcaster.broadcast(payload)
 
     @override
-    async def broadcast_with_cache(self, cache_id: str, payload: Mapping[str, str]) -> None:
+    async def broadcast_with_cache(self, cache_id: str, payload: BroadcastMessagePayload) -> None:
         """
         Broadcast a message to all subscribers with cache.
         The message will be delivered to all subscribers.
@@ -131,7 +144,7 @@ class RedisQueue(AbstractMessageQueue):
         await self._broadcaster.broadcast_with_cache(cache_id, payload)
 
     @override
-    async def fetch_cached_broadcast_message(self, cache_id: str) -> Mapping[str, str] | None:
+    async def fetch_cached_broadcast_message(self, cache_id: str) -> BroadcastMessagePayload | None:
         """
         Fetch a cached broadcast message by cache_id.
         This method retrieves the cached message from the broadcast channel.
@@ -139,7 +152,7 @@ class RedisQueue(AbstractMessageQueue):
         return await self._broadcaster.fetch_cached_broadcast_message(cache_id)
 
     @override
-    async def broadcast_batch(self, events: list[BroadcastPayload]) -> None:
+    async def broadcast_batch(self, events: list[CachedBroadcastMessagePayload]) -> None:
         """
         Broadcast multiple messages in a batch with optional caching.
         This method broadcasts multiple messages to all subscribers.
@@ -174,7 +187,7 @@ class RedisQueue(AbstractMessageQueue):
     # Subscriber methods
 
     @override
-    async def subscribe_queue(self) -> AsyncGenerator[BroadcastMessage, None]:  # type: ignore
+    async def subscribe_queue(self) -> AsyncGenerator[BroadcastMessagePayload, None]:  # type: ignore
         """
         Subscribe to broadcast messages.
         """

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 
-from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.types import (
     AutoScalingMetricComparator,
     AutoScalingMetricSource,

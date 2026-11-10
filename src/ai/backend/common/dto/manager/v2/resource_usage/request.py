@@ -8,6 +8,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import DateFilter, StringFilter, UUIDFilter
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 from .types import OrderDirection, UsageBucketOrderField
 
@@ -99,6 +100,10 @@ class DomainUsageBucketFilter(BaseRequestModel):
     domain_name: StringFilter | None = Field(default=None, description="Filter by domain name")
     period_start: DateFilter | None = Field(default=None, description="Filter by period start date")
     period_end: DateFilter | None = Field(default=None, description="Filter by period end date")
+    field_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by domain usage bucket ID.",
+    )
     AND: list[DomainUsageBucketFilter] | None = Field(
         default=None, description="Combine with AND logic"
     )
@@ -128,6 +133,10 @@ class ProjectUsageBucketFilter(BaseRequestModel):
     domain_name: StringFilter | None = Field(default=None, description="Filter by domain name")
     period_start: DateFilter | None = Field(default=None, description="Filter by period start date")
     period_end: DateFilter | None = Field(default=None, description="Filter by period end date")
+    field_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by project usage bucket ID.",
+    )
     AND: list[ProjectUsageBucketFilter] | None = Field(
         default=None, description="Combine with AND logic"
     )
@@ -158,6 +167,10 @@ class UserUsageBucketFilter(BaseRequestModel):
     domain_name: StringFilter | None = Field(default=None, description="Filter by domain name")
     period_start: DateFilter | None = Field(default=None, description="Filter by period start date")
     period_end: DateFilter | None = Field(default=None, description="Filter by period end date")
+    field_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by user usage bucket ID.",
+    )
     AND: list[UserUsageBucketFilter] | None = Field(
         default=None, description="Combine with AND logic"
     )

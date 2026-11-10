@@ -3,7 +3,12 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from decimal import Decimal
+from typing import override
 
+from ai.backend.common.data.entity.agent_resource import AgentResourceID
+from ai.backend.common.data.entity.resource_allocation import ResourceAllocationID
+from ai.backend.common.data.entity.resource_slot import ResourceSlotTypeUUID
+from ai.backend.common.data.entity.types import EntityData, EntityIdentifier, FieldData
 from ai.backend.common.types import ResourceSlot, SlotQuantity
 
 
@@ -22,6 +27,11 @@ class ResourceAllocationAggregate:
     used: ResourceSlot
     allocated: ResourceSlot
 
+    @classmethod
+    def empty(cls) -> ResourceAllocationAggregate:
+        """The aggregate an owner with no ``resource_allocations`` rows reports."""
+        return cls(requested=ResourceSlot(), used=ResourceSlot(), allocated=ResourceSlot())
+
 
 @dataclass(frozen=True)
 class NumberFormatData:
@@ -30,9 +40,18 @@ class NumberFormatData:
 
 
 @dataclass(frozen=True)
-class ResourceSlotTypeData:
+class ResourceSlotTypeData(EntityData):
+    """One registered resource slot type.
+
+    ``slot_name`` is the primary key and the five referencing tables' FK target;
+    ``uuid`` is the unique alternate key that gives the entity its ``EntityIdentifier``.
+    """
+
+    uuid: ResourceSlotTypeUUID
     slot_name: str
     slot_type: str
+    required: bool
+    enabled: bool
     display_name: str
     description: str
     display_unit: str
@@ -40,46 +59,31 @@ class ResourceSlotTypeData:
     number_format: NumberFormatData
     rank: int
 
-
-@dataclass(frozen=True)
-class ResourceSlotTypeSearchResult:
-    items: list[ResourceSlotTypeData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
+    @override
+    def entity_id(self) -> EntityIdentifier:
+        return self.uuid
 
 
 @dataclass(frozen=True)
-class AgentResourceData:
+class AgentResourceData(FieldData):
+    """One slot's amount on one agent. ``agent_id`` is the agent's name column."""
+
+    id: AgentResourceID
     agent_id: str
     slot_name: str
     capacity: Decimal
     reserved: Decimal
+    prereserved: Decimal
     used: Decimal
 
 
 @dataclass(frozen=True)
-class AgentResourceSearchResult:
-    items: list[AgentResourceData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
-
-
-@dataclass(frozen=True)
-class ResourceAllocationData:
+class ResourceAllocationData(FieldData):
+    id: ResourceAllocationID
     kernel_id: uuid.UUID
     slot_name: str
     requested: Decimal
     used: Decimal | None
-
-
-@dataclass(frozen=True)
-class ResourceAllocationSearchResult:
-    items: list[ResourceAllocationData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
 
 
 @dataclass(frozen=True)

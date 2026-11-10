@@ -6,14 +6,14 @@ from collections.abc import AsyncIterator, Sequence
 from dataclasses import dataclass
 from typing import Any, override
 
-from ai.backend.manager.actions.action.base import BaseActionResult
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.repositories.base.export import StreamingExportQuery
+from ai.backend.manager.services.export.actions.base import ExportAction
 
-from .base import ExportAction
 
-
-@dataclass
+@dataclass(frozen=True)
 class ExportUsersCSVAction(ExportAction):
     """Action to export user data as CSV.
 
@@ -26,16 +26,22 @@ class ExportUsersCSVAction(ExportAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.CREATE
+    def entity_type(cls) -> EntityType:
+        return UserEntityType()
 
     @override
-    def entity_id(self) -> str | None:
-        return "users"
+    @classmethod
+    def action_name(cls) -> str:
+        return "export_users_c_s_v"
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
 
 
-@dataclass
-class ExportUsersCSVActionResult(BaseActionResult):
+@dataclass(frozen=True)
+class ExportUsersCSVActionResult:
     """Result of user CSV export action.
 
     Contains an async iterator that yields row partitions.
@@ -45,7 +51,3 @@ class ExportUsersCSVActionResult(BaseActionResult):
     row_iterator: AsyncIterator[Sequence[Sequence[Any]]]
     encoding: str
     filename: str  # Generated or provided filename
-
-    @override
-    def entity_id(self) -> str | None:
-        return "users"

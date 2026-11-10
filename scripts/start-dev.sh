@@ -17,3 +17,8 @@ tmux send-keys "./backend.ai app-proxy-coordinator start-server --debug" C-m
 
 tmux new-window -t backendai-appproxy-dev -n "worker"
 tmux send-keys "./backend.ai app-proxy-worker start-server --debug" C-m
+
+if [ -f "app-proxy-worker-tcp.toml" ]; then
+    tmux new-window -t backendai-appproxy-dev -n "tcp-worker"
+    tmux send-keys "./backend.ai app-proxy-worker start-server -f app-proxy-worker-tcp.toml --debug" C-m
+fi

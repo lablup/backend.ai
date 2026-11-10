@@ -9,6 +9,8 @@ from ai.backend.common.api_handlers import APIResponse, BaseRequestModel, BodyPa
 from ai.backend.common.dto.manager.v2.runtime_variant.request import (
     CreateRuntimeVariantInput,
     DeleteRuntimeVariantsInput,
+    PartialBulkPurgeRuntimeVariantsInput,
+    PartialBulkUpdateRuntimeVariantsInput,
     SearchRuntimeVariantsInput,
     UpdateRuntimeVariantInput,
 )
@@ -53,16 +55,34 @@ class V2RuntimeVariantHandler:
         result = await self._adapter.update(merged)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
-    async def delete(
+    async def purge(
         self,
         path: PathParam[VariantIdPathParam],
     ) -> APIResponse:
-        result = await self._adapter.delete(path.parsed.variant_id)
+        """Purge a runtime variant with the presets in its catalog."""
+        result = await self._adapter.purge(path.parsed.variant_id)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_update(
+        self,
+        body: BodyParam[PartialBulkUpdateRuntimeVariantsInput],
+    ) -> APIResponse:
+        """Update several runtime variants, answering for each one."""
+        result = await self._adapter.partial_bulk_update(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_purge(
+        self,
+        body: BodyParam[PartialBulkPurgeRuntimeVariantsInput],
+    ) -> APIResponse:
+        """Purge several runtime variants with their presets, answering for each one."""
+        result = await self._adapter.partial_bulk_purge(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def bulk_delete(
         self,
         body: BodyParam[DeleteRuntimeVariantsInput],
     ) -> APIResponse:
+        """Deprecated. Use `POST /v2/runtime-variants/partial-bulk-purge`."""
         result = await self._adapter.bulk_delete(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)

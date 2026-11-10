@@ -28,6 +28,12 @@ def register_v2_session_routes(
     )
     registry.add(
         "POST",
+        "/compute-schedule",
+        handler.compute_schedule,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
         "/search",
         handler.admin_search_sessions,
         middlewares=[superadmin_required],
@@ -70,14 +76,32 @@ def register_v2_session_routes(
     )
     registry.add(
         "POST",
+        "/scoped/search",
+        handler.scoped_search,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
         "/projects/{project_id}/search",
         handler.project_search,
         middlewares=[auth_required],
     )
     registry.add(
         "POST",
-        "/terminate",
-        handler.terminate,
+        "/partial-bulk-terminate",
+        handler.partial_bulk_terminate,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
+        "/exclude-idle-checks",
+        handler.exclude_idle_checks,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
+        "/include-idle-checks",
+        handler.include_idle_checks,
         middlewares=[auth_required],
     )
     registry.add(
@@ -102,6 +126,13 @@ def register_v2_session_routes(
         "PATCH",
         "/{session_id}",
         handler.update,
+        middlewares=[auth_required],
+    )
+    # Deprecated since NEXT_RELEASE_VERSION.
+    registry.add(
+        "POST",
+        "/terminate",
+        handler.terminate,
         middlewares=[auth_required],
     )
 

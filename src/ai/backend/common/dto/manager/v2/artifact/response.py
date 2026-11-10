@@ -44,6 +44,7 @@ __all__ = (
     "CleanupRevisionsPayload",
     "DelegateImportArtifactsGQLPayload",
     "DelegateScanArtifactsGQLPayload",
+    "DeleteArtifactPayload",
     "DeleteArtifactsGQLPayload",
     "DeleteArtifactsPayload",
     "GetRevisionDownloadProgressPayload",
@@ -53,6 +54,7 @@ __all__ = (
     "ImportArtifactsPayload",
     "RejectArtifactGQLPayload",
     "RejectRevisionPayload",
+    "RestoreArtifactPayload",
     "RestoreArtifactsGQLPayload",
     "ScanArtifactsGQLPayload",
     "ScanArtifactModelsGQLPayload",
@@ -66,6 +68,9 @@ class ArtifactRevisionNode(BaseResponseModel):
     """Node model representing an artifact revision entity."""
 
     id: UUID = Field(description="Artifact revision ID")
+    field_id: UUID = Field(
+        description="UUID of the artifact revision. Added in 26.9.0.",
+    )
     artifact_id: UUID = Field(description="Parent artifact ID")
     version: str = Field(description="Revision version string")
     size: str | None = Field(default=None, description="Revision size in bytes")
@@ -84,6 +89,9 @@ class ArtifactNode(BaseResponseModel):
     """Node model representing an artifact entity with optional nested revisions."""
 
     id: UUID = Field(description="Artifact ID")
+    entity_id: UUID = Field(
+        description="UUID of the artifact. Added in 26.9.0.",
+    )
     name: str = Field(description="Artifact name")
     type: ArtifactType = Field(description="Artifact type")
     description: str | None = Field(default=None, description="Artifact description")
@@ -112,6 +120,18 @@ class UpdateArtifactPayload(BaseResponseModel):
     """Payload for artifact update mutation result."""
 
     artifact: ArtifactNode = Field(description="Updated artifact")
+
+
+class DeleteArtifactPayload(BaseResponseModel):
+    """Payload for artifact soft-delete result."""
+
+    artifact: ArtifactNode = Field(description="Soft-deleted artifact")
+
+
+class RestoreArtifactPayload(BaseResponseModel):
+    """Payload for artifact restore result."""
+
+    artifact: ArtifactNode = Field(description="Restored artifact")
 
 
 class ImportArtifactsPayload(BaseResponseModel):
@@ -212,6 +232,9 @@ class ArtifactGQLNode(BaseResponseModel):
     """GQL-layer node DTO with resolved registry and source URLs."""
 
     id: UUID = Field(description="Artifact ID")
+    entity_id: UUID = Field(
+        description="UUID of the artifact. Added in 26.9.0.",
+    )
     name: str = Field(description="Artifact name")
     type: ArtifactType = Field(description="Artifact type")
     description: str | None = Field(default=None, description="Artifact description")

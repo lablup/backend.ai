@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import override
+from typing import Any, override
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
@@ -25,52 +25,105 @@ from ai.backend.common.message_queue.abc.queue import AbstractMessageQueue
 from ai.backend.common.plugin.event import EventDispatcherPluginContext
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
-from ai.backend.manager.actions.monitors.audit_log import AuditLogMonitor
-from ai.backend.manager.actions.monitors.prometheus import PrometheusMonitor
-from ai.backend.manager.actions.monitors.reporter import ReporterMonitor
-from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.actions.validators.rbac import LegacyRBACValidators, RBACValidators
-from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
-from ai.backend.manager.actions.validators.rbac.legacy import (
-    LegacyScopeActionRBACValidator,
-    LegacySingleEntityActionRBACValidator,
+from ai.backend.manager.actions.audit_policy import AuditLogPolicy
+from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.v2.bulk.monitor.audit_log import BulkActionAuditLogMonitor
+from ai.backend.manager.actions.v2.bulk.monitor.prometheus import BulkActionPrometheusMonitor
+from ai.backend.manager.actions.v2.bulk.monitor.reporter import BulkActionReporterMonitor
+from ai.backend.manager.actions.v2.bulk.monitor.tracing import BulkActionTracingMonitor
+from ai.backend.manager.actions.v2.global_scope.monitor.audit_log import (
+    GlobalActionAuditLogMonitor,
 )
-from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
-from ai.backend.manager.actions.validators.rbac.single_entity import (
-    SingleEntityActionRBACValidator,
+from ai.backend.manager.actions.v2.global_scope.monitor.prometheus import (
+    GlobalActionPrometheusMonitor,
 )
+from ai.backend.manager.actions.v2.global_scope.monitor.reporter import (
+    GlobalActionReporterMonitor,
+)
+from ai.backend.manager.actions.v2.global_scope.monitor.tracing import GlobalActionTracingMonitor
+from ai.backend.manager.actions.v2.lookup.bulk_monitor.audit_log import (
+    BulkLookupActionAuditLogMonitor,
+)
+from ai.backend.manager.actions.v2.lookup.bulk_monitor.tracing import BulkLookupActionTracingMonitor
+from ai.backend.manager.actions.v2.lookup.monitor.audit_log import LookupActionAuditLogMonitor
+from ai.backend.manager.actions.v2.lookup.monitor.prometheus import (
+    LookupActionPrometheusMonitor,
+)
+from ai.backend.manager.actions.v2.lookup.monitor.tracing import LookupActionTracingMonitor
+from ai.backend.manager.actions.v2.membership.monitor.audit_log import (
+    MembershipActionAuditLogMonitor,
+)
+from ai.backend.manager.actions.v2.membership.monitor.prometheus import (
+    MembershipActionPrometheusMonitor,
+)
+from ai.backend.manager.actions.v2.membership.monitor.reporter import (
+    MembershipActionReporterMonitor,
+)
+from ai.backend.manager.actions.v2.membership.monitor.tracing import MembershipActionTracingMonitor
+from ai.backend.manager.actions.v2.relation.monitor.audit_log import (
+    RelationActionAuditLogMonitor,
+)
+from ai.backend.manager.actions.v2.relation.monitor.prometheus import (
+    RelationActionPrometheusMonitor,
+)
+from ai.backend.manager.actions.v2.relation.monitor.reporter import (
+    RelationActionReporterMonitor,
+)
+from ai.backend.manager.actions.v2.relation.monitor.tracing import RelationActionTracingMonitor
+from ai.backend.manager.actions.v2.scope.monitor.audit_log import ScopeActionAuditLogMonitor
+from ai.backend.manager.actions.v2.scope.monitor.prometheus import ScopeActionPrometheusMonitor
+from ai.backend.manager.actions.v2.scope.monitor.reporter import ScopeActionReporterMonitor
+from ai.backend.manager.actions.v2.scope.monitor.tracing import ScopeActionTracingMonitor
+from ai.backend.manager.actions.v2.single_entity.monitor.audit_log import (
+    SingleEntityActionAuditLogMonitor,
+)
+from ai.backend.manager.actions.v2.single_entity.monitor.prometheus import (
+    SingleEntityActionPrometheusMonitor,
+)
+from ai.backend.manager.actions.v2.single_entity.monitor.reporter import (
+    SingleEntityActionReporterMonitor,
+)
+from ai.backend.manager.actions.v2.single_entity.monitor.tracing import (
+    SingleEntityActionTracingMonitor,
+)
+from ai.backend.manager.actions.validators.build import build_action_validators
 from ai.backend.manager.agent_cache import AgentRPCCache
 from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
+from ai.backend.manager.clients.container_registry.pool import (
+    ContainerRegistryQuotaClientPool,
+)
 from ai.backend.manager.clients.prometheus.client import PrometheusClient
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.event_dispatcher.dispatch import DispatcherArgs, Dispatchers
 from ai.backend.manager.event_dispatcher.handlers.stream_cleanup import StreamCleanupEventHandler
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.models.keypair.ssh_key_validator import SSHKeyValidator
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.notification import NotificationCenter
+from ai.backend.manager.notification.notification_center import NotificationCenter
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.reporters.base import AbstractReporter
 from ai.backend.manager.reporters.hub import ReporterHub, ReporterHubArgs
 from ai.backend.manager.reporters.smtp import SMTPReporter, SMTPSenderArgs
+from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.repositories import Repositories
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
-from ai.backend.manager.service.container_registry.harbor import (
-    AbstractPerProjectContainerRegistryQuotaService,
-)
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.processors import Processors, ServiceArgs
-from ai.backend.manager.sokovan.deployment import DeploymentController
 from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
+from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 from ai.backend.manager.sokovan.deployment.route.coordinator import RouteCoordinator
 from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
 from ai.backend.manager.sokovan.reconciler.coordinator import ReconcilerCoordinator
 from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
-from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
+    SchedulingController,
+)
 from ai.backend.manager.types import SMTPTriggerPolicy
 
-from .agent_lost_checker import AgentLostCheckerDependency, AgentLostCheckerInput
 from .bgtask_registry import BgtaskRegistryDependency, BgtaskRegistryInput
 from .event_dispatcher import EventDispatcherDependency, EventDispatcherInput
 from .manager_status_watcher import ManagerStatusWatcherDependency, ManagerStatusWatcherInput
@@ -109,6 +162,7 @@ class ProcessingInput:
     repositories: Repositories
     storage_manager: StorageSessionManager
     config_provider: ManagerConfigProvider
+    key_provider_pool: KeyProviderPool
     event_producer: EventProducer
 
     # Processors creation (ServiceArgs additional)
@@ -125,6 +179,7 @@ class ProcessingInput:
     agent_cache: AgentRPCCache
     notification_center: NotificationCenter
     appproxy_client_pool: AppProxyClientPool
+    registry_quota_client_pool: ContainerRegistryQuotaClientPool
     prometheus_client: PrometheusClient
 
     # BgtaskRegistry creation (additional)
@@ -134,9 +189,6 @@ class ProcessingInput:
     stats_monitor: StatsPluginContext
     pidx: int
 
-    # Registry quota service (optional, defaults to None)
-    registry_quota_service: AbstractPerProjectContainerRegistryQuotaService | None = None
-
 
 @dataclass
 class ProcessingResources:
@@ -144,6 +196,7 @@ class ProcessingResources:
 
     event_dispatcher: EventDispatcher
     processors: Processors
+    action_registry: ProcessorRegistry[Any]
     stream_cleanup_handler: StreamCleanupEventHandler
 
 
@@ -221,9 +274,92 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
         registered_reporters = _make_registered_reporters(setup_input.config_provider)
         action_reporters = _make_action_reporters(setup_input.config_provider, registered_reporters)
         reporter_hub = ReporterHub(ReporterHubArgs(reporters=action_reporters))
-        reporter_monitor = ReporterMonitor(reporter_hub)
-        prometheus_monitor = PrometheusMonitor()
-        audit_log_monitor = AuditLogMonitor(setup_input.repositories.audit_log.repository)
+        audit_log_repository: OpsRepository[AuditLogData] = OpsRepository(
+            setup_input.repositories.v2_ops_provider
+        )
+        audit_log_policy = AuditLogPolicy(
+            setup_input.config_provider.config.audit_log.record_read_operations
+        )
+        client_ip_masking_repository = setup_input.repositories.client_ip_masking.repository
+        action_monitors = ActionMonitors(
+            single_entity=[
+                SingleEntityActionTracingMonitor(),
+                SingleEntityActionReporterMonitor(reporter_hub),
+                SingleEntityActionPrometheusMonitor(),
+                SingleEntityActionAuditLogMonitor(
+                    audit_log_repository,
+                    audit_log_policy,
+                    client_ip_masking_repository,
+                ),
+            ],
+            bulk=[
+                BulkActionTracingMonitor(),
+                BulkActionReporterMonitor(reporter_hub),
+                BulkActionPrometheusMonitor(),
+                BulkActionAuditLogMonitor(
+                    audit_log_repository,
+                    audit_log_policy,
+                    client_ip_masking_repository,
+                ),
+            ],
+            scope=[
+                ScopeActionTracingMonitor(),
+                ScopeActionReporterMonitor(reporter_hub),
+                ScopeActionPrometheusMonitor(),
+                ScopeActionAuditLogMonitor(
+                    audit_log_repository,
+                    audit_log_policy,
+                    client_ip_masking_repository,
+                ),
+            ],
+            relation=[
+                RelationActionTracingMonitor(),
+                RelationActionReporterMonitor(reporter_hub),
+                RelationActionPrometheusMonitor(),
+                RelationActionAuditLogMonitor(
+                    audit_log_repository,
+                    audit_log_policy,
+                    client_ip_masking_repository,
+                ),
+            ],
+            membership=[
+                MembershipActionTracingMonitor(),
+                MembershipActionReporterMonitor(reporter_hub),
+                MembershipActionPrometheusMonitor(),
+                MembershipActionAuditLogMonitor(
+                    audit_log_repository,
+                    audit_log_policy,
+                    client_ip_masking_repository,
+                ),
+            ],
+            global_scope=[
+                GlobalActionTracingMonitor(),
+                GlobalActionReporterMonitor(reporter_hub),
+                GlobalActionPrometheusMonitor(),
+                GlobalActionAuditLogMonitor(
+                    audit_log_repository,
+                    audit_log_policy,
+                    client_ip_masking_repository,
+                ),
+            ],
+            lookup=[
+                LookupActionTracingMonitor(),
+                LookupActionPrometheusMonitor(),
+                LookupActionAuditLogMonitor(
+                    audit_log_repository,
+                    audit_log_policy,
+                    client_ip_masking_repository,
+                ),
+            ],
+            bulk_lookup=[
+                BulkLookupActionTracingMonitor(),
+                BulkLookupActionAuditLogMonitor(
+                    audit_log_repository,
+                    audit_log_policy,
+                    client_ip_masking_repository,
+                ),
+            ],
+        )
 
         ssh_key_validator = SSHKeyValidator()
 
@@ -252,38 +388,29 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
             agent_cache=setup_input.agent_cache,
             notification_center=setup_input.notification_center,
             appproxy_client_pool=setup_input.appproxy_client_pool,
+            registry_quota_client_pool=setup_input.registry_quota_client_pool,
             prometheus_client=setup_input.prometheus_client,
             ssh_key_validator=ssh_key_validator,
-            registry_quota_service=setup_input.registry_quota_service,
+            key_provider_pool=setup_input.key_provider_pool,
         )
 
-        permission_controller_repository = setup_input.repositories.permission_controller.repository
-        config_provider = setup_input.config_provider
-        rbac_validators = RBACValidators(
-            scope=ScopeActionRBACValidator(permission_controller_repository, config_provider),
-            single_entity=SingleEntityActionRBACValidator(
-                permission_controller_repository, config_provider
-            ),
-            bulk=BulkActionRBACValidator(permission_controller_repository, config_provider),
-        )
-        legacy_rbac_validators = LegacyRBACValidators(
-            scope=LegacyScopeActionRBACValidator(permission_controller_repository),
-            single_entity=LegacySingleEntityActionRBACValidator(permission_controller_repository),
+        v2_validators = build_action_validators(
+            setup_input.repositories.rbac.permission_check,
+            setup_input.config_provider,
         )
 
-        processors = await stack.enter_dependency(
+        processor_bundle = await stack.enter_dependency(
             ProcessorsDependency(),
             ProcessorsProviderInput(
                 service_args=service_args,
-                action_monitors=[reporter_monitor, prometheus_monitor, audit_log_monitor],
+                action_monitors=action_monitors,
                 event_hub=setup_input.event_hub,
                 event_fetcher=setup_input.event_fetcher,
-                validators=ActionValidators(
-                    rbac=rbac_validators,
-                    legacy_rbac=legacy_rbac_validators,
-                ),
+                v2_validators=v2_validators,
             ),
         )
+        processors = processor_bundle.processors
+        services = processor_bundle.services
 
         # Step 3: Register Dispatchers and start EventDispatcher
         dispatchers = Dispatchers(
@@ -305,7 +432,8 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
                 idle_checker_host=setup_input.idle_checker_host,
                 event_dispatcher_plugin_ctx=setup_input.event_dispatcher_plugin_ctx,
                 repositories=setup_input.repositories,
-                processors_factory=lambda: processors,
+                notification_service=services.notification,
+                artifact_service=services.artifact,
                 storage_manager=setup_input.storage_manager,
                 config_provider=setup_input.config_provider,
                 event_producer=setup_input.event_producer,
@@ -318,7 +446,8 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
         await stack.enter_dependency(
             BgtaskRegistryDependency(),
             BgtaskRegistryInput(
-                processors=processors,
+                container_registry_service=services.container_registry,
+                image_service=services.image,
                 background_task_manager=setup_input.background_task_manager,
                 repositories=setup_input.repositories,
                 agent_client_pool=setup_input.agent_client_pool,
@@ -329,14 +458,6 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
         )
 
         # Step 5: Start lifecycle background tasks
-        await stack.enter_dependency(
-            AgentLostCheckerDependency(),
-            AgentLostCheckerInput(
-                config_provider=setup_input.config_provider,
-                valkey_live=setup_input.valkey_live,
-                event_producer=setup_input.event_producer,
-            ),
-        )
         await stack.enter_dependency(
             StatsReporterDependency(),
             StatsReporterInput(
@@ -358,5 +479,6 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
         yield ProcessingResources(
             event_dispatcher=event_dispatcher,
             processors=processors,
+            action_registry=processor_bundle.registry,
             stream_cleanup_handler=dispatchers.stream_cleanup_handler,
         )

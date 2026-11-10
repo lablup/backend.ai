@@ -37,23 +37,15 @@ def register_v2_runtime_variant_routes(
         handler.get,
         middlewares=[auth_required],
     )
+    registry.add("PATCH", "/{variant_id}", handler.update, middlewares=[auth_required])
+    registry.add("DELETE", "/{variant_id}", handler.purge, middlewares=[auth_required])
     registry.add(
-        "PATCH",
-        "/{variant_id}",
-        handler.update,
-        middlewares=[superadmin_required],
+        "POST", "/partial-bulk-update", handler.partial_bulk_update, middlewares=[auth_required]
     )
     registry.add(
-        "DELETE",
-        "/{variant_id}",
-        handler.delete,
-        middlewares=[superadmin_required],
+        "POST", "/partial-bulk-purge", handler.partial_bulk_purge, middlewares=[auth_required]
     )
-    registry.add(
-        "POST",
-        "/delete",
-        handler.bulk_delete,
-        middlewares=[superadmin_required],
-    )
+    # Deprecated since NEXT_RELEASE_VERSION.
+    registry.add("POST", "/delete", handler.bulk_delete, middlewares=[superadmin_required])
 
     return registry

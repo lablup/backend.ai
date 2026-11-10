@@ -12,14 +12,18 @@ Test Scenarios:
 
 from __future__ import annotations
 
+import logging
+from contextlib import nullcontext
 from datetime import datetime, timedelta
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
 from dateutil.tz import tzutc
 
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import AccessKey, KernelId, SessionId
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.options import HandlerOptions
@@ -29,20 +33,23 @@ from ai.backend.manager.data.session.types import (
     StatusTransitions,
     TransitionStatus,
 )
-from ai.backend.manager.repositories.scheduler.updaters import SessionStatusBatchUpdaterSpec
+from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
+from ai.backend.manager.models.session.updaters import SessionStatusBatchUpdater
 from ai.backend.manager.sokovan.scheduler.coordinator import (
     FailureClassificationResult,
     HookExecutionResult,
     ScheduleCoordinator,
 )
-from ai.backend.manager.sokovan.scheduler.post_processors import PostProcessorContext
-from ai.backend.manager.sokovan.scheduler.recorder import SessionRecorderContext
+from ai.backend.manager.sokovan.scheduler.post_processors.base import PostProcessorContext
+from ai.backend.manager.sokovan.scheduler.recorder.context import SessionRecorderContext
 from ai.backend.manager.sokovan.scheduler.results import (
     KernelExecutionResult,
     KernelTransitionInfo,
     SessionExecutionResult,
     SessionTransitionInfo,
 )
+from ai.backend.manager.sokovan.scheduler.types import ScheduleType
+from ai.backend.manager.views.sokovan.lifecycle import LastPhase
 
 # =============================================================================
 # Test Fixtures
@@ -52,13 +59,25 @@ from ai.backend.manager.sokovan.scheduler.results import (
 _TEST_HANDLER_NAME = "test-handler"
 
 
+def _last_phase(
+    attempts: int,
+    started_at: datetime | None = None,
+    result: SchedulingResult = SchedulingResult.NEED_RETRY,
+) -> LastPhase:
+    """The phase record as the coordinator carries it onto a session."""
+    return LastPhase(
+        attempts=attempts,
+        started_at=started_at if started_at is not None else datetime.now(tzutc()),
+        result=result,
+    )
+
+
 def _create_session_with_kernels(
     session_id: SessionId,
     status: SessionStatus = SessionStatus.PREPARING,
-    phase_attempts: int = 0,
-    phase_started_at: datetime | None = None,
     timeout: int | None = None,
     max_retry_count: int | None = None,
+    last_phase: LastPhase | None = None,
 ) -> MagicMock:
     """Create a mock SessionWithKernels with a stub ``handler_options``.
 
@@ -69,8 +88,7 @@ def _create_session_with_kernels(
     mock = MagicMock()
     mock.session_info.identity.id = session_id
     mock.session_info.lifecycle.status = status
-    mock.phase_attempts = phase_attempts
-    mock.phase_started_at = phase_started_at
+    mock.last_phase = last_phase
     mock.kernel_infos = []
     mock.session_info.handler_options.resolve.return_value = HandlerOptions(
         timeout=timeout,
@@ -79,10 +97,30 @@ def _create_session_with_kernels(
     return mock
 
 
+def _create_history_row(
+    phase: str,
+    result: SchedulingResult,
+    attempts: int,
+) -> SessionSchedulingHistoryRow:
+    """Create a last-history record as the repository hands it to the coordinator."""
+    return SessionSchedulingHistoryRow(
+        session_id=uuid4(),
+        phase=phase,
+        from_status=str(SessionStatus.PENDING),
+        to_status=str(SessionStatus.PENDING),
+        result=str(result),
+        error_code=None,
+        message="",
+        sub_steps=[],
+        attempts=attempts,
+        created_at=datetime.now(tzutc()),
+    )
+
+
 def _create_session_transition_info(
     session_id: SessionId | None = None,
     from_status: SessionStatus = SessionStatus.PREPARING,
-    reason: str | None = "test-reason",
+    reason: KernelLifecycleEventReason | None = KernelLifecycleEventReason.TRIGGERED_BY_SCHEDULER,
 ) -> SessionTransitionInfo:
     """Create a SessionTransitionInfo for testing."""
     return SessionTransitionInfo(
@@ -104,7 +142,7 @@ class TestScheduleCoordinatorFailureClassification:
 
     The coordinator classifies failures into:
     - give_up: per-handler max_retry_count is set AND
-      phase_attempts >= max_retry_count
+      the last phase record's attempts reached it
     - expired: per-handler timeout is set AND elapsed > timeout
     - need_retry: default (can be retried)
 
@@ -121,7 +159,7 @@ class TestScheduleCoordinatorFailureClassification:
         session = _create_session_with_kernels(
             session_id=session_id,
             status=SessionStatus.PREPARING,
-            phase_attempts=5,
+            last_phase=_last_phase(attempts=5),
             max_retry_count=5,  # Limit reached
         )
 
@@ -140,6 +178,40 @@ class TestScheduleCoordinatorFailureClassification:
         assert len(result.need_retry) == 0
         assert result.give_up[0].session_id == session_id
 
+    def test_no_give_up_when_the_attempts_are_skips(self) -> None:
+        """SC-CO-001b: A skipped session is not given up on, however many skips.
+
+        A session queued behind a blocked one accumulates skips without ever
+        being attempted; charging those to the retry budget would deprioritize
+        it for work it never got to do.
+        """
+        # Arrange
+        session_id = SessionId(uuid4())
+        failure = _create_session_transition_info(session_id=session_id)
+
+        session = _create_session_with_kernels(
+            session_id=session_id,
+            status=SessionStatus.PENDING,
+            last_phase=_last_phase(
+                attempts=99, result=SchedulingResult.SKIPPED
+            ),  # all of them skips
+            max_retry_count=5,
+        )
+
+        # Act
+        result = ScheduleCoordinator._classify_failures(
+            None,  # type: ignore[arg-type]
+            failures=[failure],
+            sessions=[session],
+            current_time=datetime.now(tzutc()),
+            handler_name=_TEST_HANDLER_NAME,
+        )
+
+        # Assert
+        assert len(result.give_up) == 0
+        assert len(result.need_retry) == 1
+        assert result.need_retry[0].session_id == session_id
+
     def test_expired_on_timeout_exceeded(self) -> None:
         """SC-CO-002: Expire when timeout is set and exceeded."""
         # Arrange
@@ -153,8 +225,7 @@ class TestScheduleCoordinatorFailureClassification:
         session = _create_session_with_kernels(
             session_id=session_id,
             status=SessionStatus.PREPARING,
-            phase_attempts=0,
-            phase_started_at=past_time,
+            last_phase=_last_phase(attempts=0, started_at=past_time),
             timeout=900,  # 15 minutes — past_time is 20 minutes ago
         )
 
@@ -183,8 +254,7 @@ class TestScheduleCoordinatorFailureClassification:
         session = _create_session_with_kernels(
             session_id=session_id,
             status=SessionStatus.PREPARING,
-            phase_attempts=1,
-            phase_started_at=recent_time,
+            last_phase=_last_phase(attempts=1, started_at=recent_time),
             timeout=900,
             max_retry_count=5,
         )
@@ -214,8 +284,7 @@ class TestScheduleCoordinatorFailureClassification:
         session = _create_session_with_kernels(
             session_id=session_id,
             status=SessionStatus.PREPARING,
-            phase_attempts=5,
-            phase_started_at=past_time,
+            last_phase=_last_phase(attempts=5, started_at=past_time),
             timeout=900,
             max_retry_count=5,
         )
@@ -241,7 +310,7 @@ class TestScheduleCoordinatorFailureClassification:
         failure_1 = _create_session_transition_info(session_id=session_id_1)
         session_1 = _create_session_with_kernels(
             session_id=session_id_1,
-            phase_attempts=5,
+            last_phase=_last_phase(attempts=5),
             max_retry_count=5,
         )
 
@@ -252,8 +321,7 @@ class TestScheduleCoordinatorFailureClassification:
         session_2 = _create_session_with_kernels(
             session_id=session_id_2,
             status=SessionStatus.PREPARING,
-            phase_attempts=1,
-            phase_started_at=past_time,
+            last_phase=_last_phase(attempts=1, started_at=past_time),
             timeout=900,
             max_retry_count=5,
         )
@@ -264,8 +332,7 @@ class TestScheduleCoordinatorFailureClassification:
         recent_time = datetime.now(tzutc()) - timedelta(minutes=1)
         session_3 = _create_session_with_kernels(
             session_id=session_id_3,
-            phase_attempts=1,
-            phase_started_at=recent_time,
+            last_phase=_last_phase(attempts=1, started_at=recent_time),
             timeout=900,
             max_retry_count=5,
         )
@@ -324,7 +391,7 @@ class TestScheduleCoordinatorFailureClassification:
 
         Given: Session whose handler_options.resolve() returns
             ``HandlerOptions(timeout=None, max_retry_count=None)``,
-            even with high phase_attempts and an old phase_started_at.
+            even with a high attempt count and an old phase start.
         Then: Always classified as need_retry.
         """
         # Arrange
@@ -338,8 +405,7 @@ class TestScheduleCoordinatorFailureClassification:
         session = _create_session_with_kernels(
             session_id=session_id,
             status=SessionStatus.PENDING,
-            phase_attempts=999,
-            phase_started_at=past_time,
+            last_phase=_last_phase(attempts=999, started_at=past_time),
             timeout=None,
             max_retry_count=None,
         )
@@ -357,6 +423,96 @@ class TestScheduleCoordinatorFailureClassification:
         assert len(result.give_up) == 0
         assert len(result.expired) == 0
         assert len(result.need_retry) == 1
+
+
+# =============================================================================
+# TestScheduleCoordinatorPhaseHistory Tests (SC-CO-008b)
+# =============================================================================
+
+
+class TestScheduleCoordinatorPhaseHistory:
+    """Tests for carrying the phase's retry pressure onto sessions.
+
+    The record feeds the give-up and timeout classifications, so only the
+    current phase's may be carried over.
+    """
+
+    @pytest.fixture
+    def session_id(self) -> SessionId:
+        return SessionId(uuid4())
+
+    @pytest.fixture
+    def session(self, session_id: SessionId) -> MagicMock:
+        return _create_session_with_kernels(session_id=session_id)
+
+    def test_attempts_carried_from_the_same_phase(
+        self,
+        session_id: SessionId,
+        session: MagicMock,
+    ) -> None:
+        """SC-CO-008b: A failed attempt of this phase carries its counter."""
+        history = _create_history_row(
+            phase=_TEST_HANDLER_NAME, result=SchedulingResult.NEED_RETRY, attempts=3
+        )
+
+        ScheduleCoordinator._populate_phase_history(
+            None,  # type: ignore[arg-type]
+            sessions=[session],
+            history_map={session_id: history},
+            handler_name=_TEST_HANDLER_NAME,
+        )
+
+        assert session.last_phase == LastPhase(
+            attempts=3,
+            started_at=history.created_at,
+            result=SchedulingResult.NEED_RETRY,
+        )
+
+    def test_skips_are_counted_and_marked(
+        self,
+        session_id: SessionId,
+        session: MagicMock,
+    ) -> None:
+        """SC-CO-008c: Skips are counted like any other record.
+
+        ``LastPhase.result`` marks what was counted; excluding skips from
+        give_up is the classifier's job, not this one's.
+        """
+        history = _create_history_row(
+            phase=_TEST_HANDLER_NAME, result=SchedulingResult.SKIPPED, attempts=9
+        )
+
+        ScheduleCoordinator._populate_phase_history(
+            None,  # type: ignore[arg-type]
+            sessions=[session],
+            history_map={session_id: history},
+            handler_name=_TEST_HANDLER_NAME,
+        )
+
+        assert session.last_phase == LastPhase(
+            attempts=9,
+            started_at=history.created_at,
+            result=SchedulingResult.SKIPPED,
+        )
+
+    def test_other_phase_history_carries_no_attempts(
+        self,
+        session_id: SessionId,
+        session: MagicMock,
+    ) -> None:
+        """SC-CO-008d: Another phase's counter does not leak into this one."""
+        history = _create_history_row(
+            phase="other-handler", result=SchedulingResult.NEED_RETRY, attempts=4
+        )
+
+        ScheduleCoordinator._populate_phase_history(
+            None,  # type: ignore[arg-type]
+            sessions=[session],
+            history_map={session_id: history},
+            handler_name=_TEST_HANDLER_NAME,
+        )
+
+        assert session.last_phase is None
 
 
 # =============================================================================
@@ -667,7 +823,7 @@ class TestScheduleCoordinatorStatusTransition:
 
         session = _create_session_with_kernels(
             session_id=session_id,
-            phase_attempts=5,
+            last_phase=_last_phase(attempts=5),
             max_retry_count=5,  # Will be classified as give_up
         )
 
@@ -903,7 +1059,7 @@ class TestScheduleCoordinatorStatusTransition:
 
         Given: Session transitioning to RUNNING
         When: Apply transition is called
-        Then: SessionStatusBatchUpdaterSpec is created with reason="" to clear status_info
+        Then: The built values set status_info to None
         """
         # Arrange
         session_info = _create_session_transition_info(session_id=SessionId(uuid4()))
@@ -914,7 +1070,7 @@ class TestScheduleCoordinatorStatusTransition:
 
         captured_updater = None
 
-        async def capture_update_with_history(updater: Any, history_creator: Any) -> int:
+        async def capture_update_with_history(updater: Any, histories: Any) -> int:
             nonlocal captured_updater
             captured_updater = updater
             return 1
@@ -933,13 +1089,12 @@ class TestScheduleCoordinatorStatusTransition:
             status_changed_at=datetime.now(tzutc()),
         )
 
-        # Assert - spec must have reason="" so status_info is cleared
+        # Assert
         assert captured_updater is not None
-        assert isinstance(captured_updater.spec, SessionStatusBatchUpdaterSpec)
-        assert captured_updater.spec.reason == ""
-        built = captured_updater.spec.build_values()
+        assert isinstance(captured_updater, SessionStatusBatchUpdater)
+        built = captured_updater.build_values()
         assert "status_info" in built
-        assert built["status_info"] == ""
+        assert built["status_info"] is None
 
 
 # =============================================================================
@@ -1110,6 +1265,7 @@ class TestScheduleCoordinatorPostProcessors:
             successes=[
                 KernelTransitionInfo(
                     kernel_id=KernelId(uuid4()),
+                    session_id=SessionId(uuid4()),
                     from_status=KernelStatus.RUNNING,
                 )
             ],
@@ -1224,3 +1380,101 @@ class TestScheduleCoordinatorPromotionRecordOrdering:
         (finalize,) = records[session_id].phases
         assert finalize.name == "finalize_start"
         assert [step.name for step in finalize.steps] == ["trigger_batch_execution"]
+
+
+# =============================================================================
+# TestScheduleCoordinatorFaultLogging
+# =============================================================================
+
+
+class TestScheduleCoordinatorFaultLogging:
+    """Server faults are logged once at error, with the scope fields and the traceback."""
+
+    @pytest.fixture
+    def resource_group_id(self) -> ResourceGroupID:
+        return ResourceGroupID(uuid4())
+
+    @pytest.fixture
+    def repository(self, resource_group_id: ResourceGroupID) -> AsyncMock:
+        repository = AsyncMock()
+        repository.get_all_resource_groups.return_value = [resource_group_id]
+        return repository
+
+    @pytest.fixture
+    def coordinator(self, repository: AsyncMock) -> ScheduleCoordinator:
+        coordinator = ScheduleCoordinator.__new__(ScheduleCoordinator)
+        coordinator._repository = repository
+        coordinator._operation_metrics = MagicMock()
+        coordinator._operation_metrics.measure_operation.return_value = nullcontext()
+        coordinator._post_processors = []
+        return coordinator
+
+    @pytest.fixture
+    def handler(self) -> MagicMock:
+        handler = MagicMock()
+        handler.name.return_value = _TEST_HANDLER_NAME
+        handler.lock_id = None
+        return handler
+
+    def _error_records(self, caplog: pytest.LogCaptureFixture) -> list[logging.LogRecord]:
+        return [r for r in caplog.records if r.levelno >= logging.ERROR]
+
+    async def test_resource_group_failure_logged_with_scope(
+        self,
+        coordinator: ScheduleCoordinator,
+        handler: MagicMock,
+        resource_group_id: ResourceGroupID,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        error = RuntimeError("resource group processing broke")
+        with patch.object(coordinator, "_process_resource_group", AsyncMock(side_effect=error)):
+            await coordinator._process_lifecycle_handler_schedule(ScheduleType.SCHEDULE, handler)
+
+        (record,) = self._error_records(caplog)
+        assert record.__dict__["log_tag_resource_group_id"] == str(resource_group_id)
+        assert record.__dict__["log_tag_schedule_type"] == ScheduleType.SCHEDULE.value
+        assert record.__dict__["log_tag_handler_name"] == _TEST_HANDLER_NAME
+        assert record.exc_info is not None
+        assert record.exc_info[1] is error
+
+    async def test_post_processor_failure_logged_with_scope(
+        self,
+        coordinator: ScheduleCoordinator,
+        handler: MagicMock,
+        resource_group_id: ResourceGroupID,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        error = RuntimeError("post-processor broke")
+        failing_post_processor = AsyncMock()
+        failing_post_processor.execute.side_effect = error
+        coordinator._post_processors = [failing_post_processor]
+
+        async def process_resource_group(*_: Any) -> None:
+            await coordinator._run_post_processors(
+                SessionExecutionResult(successes=[_create_session_transition_info()]),
+                {SessionStatus.SCHEDULED},
+            )
+
+        with patch.object(coordinator, "_process_resource_group", process_resource_group):
+            await coordinator._process_lifecycle_handler_schedule(ScheduleType.SCHEDULE, handler)
+
+        (record,) = self._error_records(caplog)
+        assert record.__dict__["log_tag_handler_name"] == _TEST_HANDLER_NAME
+        assert record.__dict__["log_tag_resource_group_id"] == str(resource_group_id)
+        assert record.exc_info is not None
+        assert record.exc_info[1] is error
+
+    async def test_schedule_failure_propagates_without_log(
+        self,
+        coordinator: ScheduleCoordinator,
+        handler: MagicMock,
+        repository: AsyncMock,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """The event dispatcher logs what propagates, so the coordinator does not."""
+        repository.get_all_resource_groups.side_effect = RuntimeError("db down")
+
+        with pytest.raises(RuntimeError):
+            await coordinator._process_lifecycle_handler_schedule(ScheduleType.SCHEDULE, handler)
+
+        assert self._error_records(caplog) == []

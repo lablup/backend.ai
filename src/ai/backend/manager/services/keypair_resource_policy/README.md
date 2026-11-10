@@ -1,22 +1,22 @@
-# KeyPair Resource Policy Service
+# Keypair Resource Policy Service
 
 ## Service Overview
-The KeyPair Resource Policy service manages resource policies applied to API access keys ("KeyPair") in Backend.AI. Each policy controls compute resource usage, session limits, and storage allocation.
+The keypair resource policy service manages resource policies applied to API access keys (keypair) in Backend.AI. Each policy controls compute resource usage, session limits and storage allocation.
 
 ## Key Features
-1. **Create KeyPair Resource Policy** – Create a new KeyPair resource policy  
+1. **Create Keypair Resource Policy**: Create a new keypair resource policy  
    - Action: `CreateKeyPairResourcePolicyAction`  
    - Result: `CreateKeyPairResourcePolicyActionResult`  
-2. **Modify KeyPair Resource Policy** – Modify an existing policy  
+2. **Modify Keypair Resource Policy**: Modify an existing policy  
    - Action: `ModifyKeyPairResourcePolicyAction`  
    - Result: `ModifyKeyPairResourcePolicyActionResult`  
-3. **Delete KeyPair Resource Policy** – Delete a policy  
-   - Action: `DeleteKeyPairResourcePolicyAction`  
-   - Result: `DeleteKeyPairResourcePolicyActionResult`  
+3. **Delete Keypair Resource Policy**: Delete a policy  
+   - Action: `PurgeKeyPairResourcePolicyAction`  
+   - Result: `PurgeKeyPairResourcePolicyActionResult`  
 
 ## Operation Scenarios
 
-### Creating a KeyPair Resource Policy
+### Creating a Keypair Resource Policy
 
 ```python
 from ai.backend.manager.repositories.keypair_resource_policy.creators import KeyPairResourcePolicyCreatorSpec
@@ -38,7 +38,7 @@ action = CreateKeyPairResourcePolicyAction(creator=creator)
 result = await service.create_keypair_resource_policy(action)
 ```
 
-### Modifying a KeyPair Resource Policy
+### Modifying a Keypair Resource Policy
 
 ```python
 from ai.backend.manager.services.keypair_resource_policy.actions.modify_keypair_resource_policy import ModifyKeyPairResourcePolicyAction
@@ -51,13 +51,13 @@ action = ModifyKeyPairResourcePolicyAction(
 result = await service.modify_keypair_resource_policy(action)
 ```
 
-### Deleting a KeyPair Resource Policy
+### Deleting a Keypair Resource Policy
 
 ```python
-from ai.backend.manager.services.keypair_resource_policy.actions.delete_keypair_resource_policy import DeleteKeyPairResourcePolicyAction
+from ai.backend.manager.services.keypair_resource_policy.actions.purge_keypair_resource_policy import PurgeKeyPairResourcePolicyAction
 
 # Delete a policy
-action = DeleteKeyPairResourcePolicyAction(name="example-policy")
+action = PurgeKeyPairResourcePolicyAction(name="example-policy")
 result = await service.delete_keypair_resource_policy(action)
 ```
 
@@ -65,18 +65,18 @@ result = await service.delete_keypair_resource_policy(action)
 
 ### Repository Layer
 
-The service integrates with `KeypairResourcePolicyRepository` (src/ai/backend/manager/repositories/keypair_resource_policy/repository.py:16) which provides:
+The service integrates with `KeypairResourcePolicyRepository` (src/ai/backend/manager/repositories/keypair_resource_policy/repository.py:16), which provides:
 
-- **create(fields)** - Create new policy from field mapping
-- **get_by_name(name)** - Retrieve policy by name
+- **create(fields)** - Create a new policy from a field mapping
+- **get_by_name(name)** - Get a policy by name
 - **update(name, fields)** - Update existing policy fields  
-- **delete(name)** - Delete policy by name
+- **delete(name)** - Delete a policy by name
 
-The repository uses SQLAlchemy for database operations with proper transaction handling and error management.
+The repository uses SQLAlchemy for database operations with transaction handling and error management.
 
 ### Database Models
 
-Uses `KeyPairResourcePolicyRow` model (src/ai/backend/manager/models/resource_policy.py) with the following key fields:
+Uses the `KeyPairResourcePolicyRow` model (src/ai/backend/manager/models/resource_policy.py) with the following key fields:
 
 - **name** - Unique policy identifier
 - **max_concurrent_sessions** - Maximum simultaneous sessions
@@ -85,13 +85,13 @@ Uses `KeyPairResourcePolicyRow` model (src/ai/backend/manager/models/resource_po
 - **idle_timeout** - Session idle timeout in seconds
 - **max_session_lifetime** - Maximum session duration
 - **max_concurrent_sftp_sessions** - SFTP session limit
-- **allowed_vfolder_hosts** - Permitted virtual folder hosts
+- **allowed_vfolder_hosts** - Permitted vfolder hosts
 - **max_pending_session_count** - Queued session limit
 - **max_pending_session_resource_slots** - Resource allocation for pending sessions
 
 ### Action System
 
-Built on Backend.AI's action framework with three main operations:
+Built on the Backend.AI action framework with three operations:
 
 1. **CreateKeyPairResourcePolicyAction** (src/ai/backend/manager/services/keypair_resource_policy/actions/create_keypair_resource_policy.py:13)
    - Uses `KeyPairResourcePolicyCreatorSpec` for input validation
@@ -101,9 +101,9 @@ Built on Backend.AI's action framework with three main operations:
    - Accepts policy name and modifier object
    - Returns `ModifyKeyPairResourcePolicyActionResult` with updated policy
 
-3. **DeleteKeyPairResourcePolicyAction** (src/ai/backend/manager/services/keypair_resource_policy/actions/delete_keypair_resource_policy.py)
-   - Requires only policy name for deletion
-   - Returns `DeleteKeyPairResourcePolicyActionResult` with deleted policy data
+3. **PurgeKeyPairResourcePolicyAction** (src/ai/backend/manager/services/keypair_resource_policy/actions/delete_keypair_resource_policy.py)
+   - Requires only the policy name for deletion
+   - Returns `PurgeKeyPairResourcePolicyActionResult` with the deleted policy data
 
-All actions inherit from `KeypairResourcePolicyAction` base class and follow the standard action pattern with entity_id() and operation_type() methods.
+All actions inherit from the `KeypairResourcePolicyAction` base class and follow the standard action pattern with `entity_id()` and `operation_type()` methods.
 

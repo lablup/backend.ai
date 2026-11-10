@@ -39,8 +39,3 @@ def example_keypair(defconfig: APIConfig) -> tuple[str, str]:
 @pytest.fixture
 def user_keypair(userconfig: APIConfig) -> tuple[str, str]:
     return (userconfig.access_key, userconfig.secret_key)
-
-
-@pytest.fixture
-def dummy_endpoint(defconfig: APIConfig) -> str:
-    return str(defconfig.endpoint) + "/"

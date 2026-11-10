@@ -2,26 +2,22 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from uuid import UUID
+from typing import override
 
-__all__ = (
-    "LoginClientTypeData",
-    "LoginClientTypeSearchResult",
-)
+from ai.backend.common.data.entity.login_client_type import LoginClientTypeID
+from ai.backend.common.data.entity.types import EntityData, EntityIdentifier
+
+__all__ = ("LoginClientTypeData",)
 
 
 @dataclass(frozen=True)
-class LoginClientTypeData:
-    id: UUID
+class LoginClientTypeData(EntityData):
+    id: LoginClientTypeID
     name: str
     description: str | None
     created_at: datetime
-    modified_at: datetime
+    updated_at: datetime
 
-
-@dataclass(frozen=True)
-class LoginClientTypeSearchResult:
-    items: list[LoginClientTypeData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
+    @override
+    def entity_id(self) -> EntityIdentifier:
+        return self.id

@@ -3,7 +3,9 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
 
-_request_id_var: ContextVar[str] = ContextVar("request_id")
+from ai.backend.logging.structured import with_log_context
+
+_request_id_var: ContextVar[str | None] = ContextVar("request_id", default=None)
 
 
 def current_request_id() -> str | None:
@@ -11,26 +13,17 @@ def current_request_id() -> str | None:
     Get the current request ID from the context.
     Returns None if not set.
     """
-    try:
-        return _request_id_var.get()
-    except LookupError:
-        return None
+    return _request_id_var.get()
 
 
 @contextmanager
-def with_request_id(request_id: str | None = None) -> Iterator[None]:
-    """
-    context manager to set up the request ID.
-    If request_id is not provided, generates a new UUID.
-    This function returns the token that can be used to reset the context later.
-    """
-
+def with_request_context(request_id: str | None = None) -> Iterator[None]:
+    """Set the request ID and its log field to the same value, generating one if absent."""
     if request_id is None:
         request_id = str(uuid.uuid4())
-
     token = _request_id_var.set(request_id)
     try:
-        yield
+        with with_log_context(request_id=request_id):
+            yield
     finally:
-        # Reset the context variable to its previous state
         _request_id_var.reset(token)

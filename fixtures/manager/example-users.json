@@ -1,6 +1,7 @@
 {
-  "domains": [
+    "domains": [
         {
+            "id": "b9e676dc-e23e-54c6-b350-e83fba4127e9",
             "name": "default",
             "description": "The default domain",
             "is_active": true,
@@ -28,32 +29,9 @@
             "max_network_count": 3
         }
     ],
-    "groups": [
-        {
-            "id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "name": "default",
-            "description": "The default user group",
-            "is_active": true,
-            "domain_name": "default",
-            "resource_policy": "default",
-            "total_resource_slots": {},
-            "allowed_vfolder_hosts": {},
-            "type": "general"
-        },
-        {
-            "id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "name": "model-store",
-            "description": "model store project",
-            "is_active": true,
-            "domain_name": "default",
-            "resource_policy": "default",
-            "total_resource_slots": {},
-            "allowed_vfolder_hosts": {},
-            "type": "model-store"
-        }
-    ],
     "scaling_groups": [
         {
+            "id": "4d1e9b32-90c7-5b32-8f0e-6f470b8ed24a",
             "name": "default",
             "description": "The default agent scaling group",
             "is_active": true,
@@ -68,8 +46,8 @@
     ],
     "sgroups_for_domains": [
         {
-            "scaling_group": "default",
-            "domain": "default"
+            "resource_group_id": "4d1e9b32-90c7-5b32-8f0e-6f470b8ed24a",
+            "domain_id": "b9e676dc-e23e-54c6-b350-e83fba4127e9"
         }
     ],
     "users": [
@@ -84,9 +62,9 @@
             "status": "active",
             "status_info": "admin-requested",
             "domain_name": "default",
+            "domain_id": "b9e676dc-e23e-54c6-b350-e83fba4127e9",
             "resource_policy": "default",
-            "role": "superadmin",
-            "main_access_key" : null
+            "role": "superadmin"
         },
         {
             "uuid": "4f13d193-f646-425a-a340-270c4d2b9860",
@@ -99,9 +77,9 @@
             "status": "active",
             "status_info": "admin-requested",
             "domain_name": "default",
+            "domain_id": "b9e676dc-e23e-54c6-b350-e83fba4127e9",
             "resource_policy": "default",
-            "role": "admin",
-            "main_access_key" : null
+            "role": "admin"
         },
         {
             "uuid": "dfa9da54-4b28-432f-be29-c0d680c7a412",
@@ -114,9 +92,9 @@
             "status": "active",
             "status_info": "admin-requested",
             "domain_name": "default",
+            "domain_id": "b9e676dc-e23e-54c6-b350-e83fba4127e9",
             "resource_policy": "default",
-            "role": "user",
-            "main_access_key" : null
+            "role": "user"
         },
         {
             "uuid": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
@@ -129,9 +107,9 @@
             "status": "active",
             "status_info": "admin-requested",
             "domain_name": "default",
+            "domain_id": "b9e676dc-e23e-54c6-b350-e83fba4127e9",
             "resource_policy": "default",
-            "role": "user",
-            "main_access_key" : null
+            "role": "user"
         },
         {
             "uuid": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
@@ -144,9 +122,95 @@
             "status": "active",
             "status_info": "admin-requested",
             "domain_name": "default",
+            "domain_id": "b9e676dc-e23e-54c6-b350-e83fba4127e9",
             "resource_policy": "default",
-            "role": "monitor",
-            "main_access_key" : null
+            "role": "monitor"
+        }
+    ],
+    "groups": [
+        {
+            "id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
+            "name": "default",
+            "description": "The default user group",
+            "is_active": true,
+            "domain_name": "default",
+            "resource_policy": "default",
+            "total_resource_slots": {},
+            "allowed_vfolder_hosts": {},
+            "type": "general",
+            "creator_id": "4f13d193-f646-425a-a340-270c4d2b9860"
+        },
+        {
+            "id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
+            "name": "model-store",
+            "description": "model store project",
+            "is_active": true,
+            "domain_name": "default",
+            "resource_policy": "default",
+            "total_resource_slots": {},
+            "allowed_vfolder_hosts": {},
+            "type": "model-store",
+            "creator_id": "4f13d193-f646-425a-a340-270c4d2b9860"
+        },
+        {
+            "id": "d4e665c0-2199-4ecb-a2b7-3b86792e5a2a",
+            "name": "admin",
+            "description": "Personal Project",
+            "is_active": true,
+            "domain_name": "default",
+            "resource_policy": "default",
+            "total_resource_slots": {},
+            "allowed_vfolder_hosts": {},
+            "type": "personal",
+            "creator_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4"
+        },
+        {
+            "id": "48831b30-333b-4158-8e98-8f34675a1326",
+            "name": "domain-admin",
+            "description": "Personal Project",
+            "is_active": true,
+            "domain_name": "default",
+            "resource_policy": "default",
+            "total_resource_slots": {},
+            "allowed_vfolder_hosts": {},
+            "type": "personal",
+            "creator_id": "4f13d193-f646-425a-a340-270c4d2b9860"
+        },
+        {
+            "id": "e6fc5edc-7f0b-422e-8b4f-a03a17d0cca9",
+            "name": "user",
+            "description": "Personal Project",
+            "is_active": true,
+            "domain_name": "default",
+            "resource_policy": "default",
+            "total_resource_slots": {},
+            "allowed_vfolder_hosts": {},
+            "type": "personal",
+            "creator_id": "dfa9da54-4b28-432f-be29-c0d680c7a412"
+        },
+        {
+            "id": "cc943116-6d3f-4512-b174-707ef725a20e",
+            "name": "user2",
+            "description": "Personal Project",
+            "is_active": true,
+            "domain_name": "default",
+            "resource_policy": "default",
+            "total_resource_slots": {},
+            "allowed_vfolder_hosts": {},
+            "type": "personal",
+            "creator_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040"
+        },
+        {
+            "id": "b64aa998-307b-4696-a888-5d1d740c5894",
+            "name": "monitor",
+            "description": "Personal Project",
+            "is_active": true,
+            "domain_name": "default",
+            "resource_policy": "default",
+            "total_resource_slots": {},
+            "allowed_vfolder_hosts": {},
+            "type": "personal",
+            "creator_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6"
         }
     ],
     "association_groups_users": [
@@ -191,76 +255,523 @@
             "user_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6"
         }
     ],
-    "association_scopes_entities": [
+    "virtual_entities": [
         {
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "user",
-            "entity_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "relation_type": "auto"
+            "id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d",
+            "entity_type": "domain",
+            "entity_id": "b9e676dc-e23e-54c6-b350-e83fba4127e9"
         },
         {
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "user",
-            "entity_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "relation_type": "auto"
+            "id": "12e8b72e-9dc7-598f-953f-55576c104d19",
+            "entity_type": "project",
+            "entity_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831"
         },
         {
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
-            "entity_type": "user",
-            "entity_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "relation_type": "auto"
+            "id": "5843749e-d1be-56bb-a4c9-7327f7ad30c5",
+            "entity_type": "project",
+            "entity_id": "8e32dd28-d319-4e3b-8851-ea37837699a5"
         },
         {
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
+            "id": "8c6dfd8d-1325-5387-ba52-c562efa19c97",
             "entity_type": "user",
-            "entity_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "relation_type": "auto"
+            "entity_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4"
         },
         {
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
+            "id": "19a685b0-dc01-5497-885e-8e9a05109574",
             "entity_type": "user",
-            "entity_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "relation_type": "auto"
+            "entity_id": "4f13d193-f646-425a-a340-270c4d2b9860"
         },
         {
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
+            "id": "1bed1ef5-6c47-53f8-8db1-169dda388d38",
             "entity_type": "user",
-            "entity_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
-            "relation_type": "auto"
+            "entity_id": "dfa9da54-4b28-432f-be29-c0d680c7a412"
         },
         {
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
+            "id": "63a8d662-fd1e-5411-9910-34f18ad43fb3",
             "entity_type": "user",
-            "entity_id": "4f13d193-f646-425a-a340-270c4d2b9860",
-            "relation_type": "auto"
+            "entity_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040"
         },
         {
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
+            "id": "5c97d84e-1599-54f2-82cc-28e6b24e285f",
             "entity_type": "user",
-            "entity_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
-            "relation_type": "auto"
+            "entity_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6"
         },
         {
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "user",
-            "entity_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
-            "relation_type": "auto"
+            "id": "7a0f4c2e-3b91-5d6a-9e84-1c5f2b7d9a63",
+            "entity_type": "resource_group",
+            "entity_id": "4d1e9b32-90c7-5b32-8f0e-6f470b8ed24a"
         },
         {
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
-            "entity_type": "user",
-            "entity_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
-            "relation_type": "auto"
+            "id": "c17a5bef-8fa9-594d-8f92-6420b478e87e",
+            "entity_type": "project",
+            "entity_id": "d4e665c0-2199-4ecb-a2b7-3b86792e5a2a"
+        },
+        {
+            "id": "dc3a324a-4221-5417-b46a-230c2a5e9835",
+            "entity_type": "project",
+            "entity_id": "48831b30-333b-4158-8e98-8f34675a1326"
+        },
+        {
+            "id": "88989f04-6408-5dbc-aa34-62fd5980b355",
+            "entity_type": "project",
+            "entity_id": "e6fc5edc-7f0b-422e-8b4f-a03a17d0cca9"
+        },
+        {
+            "id": "3a573365-14f5-5fb4-a5ab-cd5e71184de2",
+            "entity_type": "project",
+            "entity_id": "cc943116-6d3f-4512-b174-707ef725a20e"
+        },
+        {
+            "id": "fc235202-c59d-5277-afc9-e04f61892a24",
+            "entity_type": "project",
+            "entity_id": "b64aa998-307b-4696-a888-5d1d740c5894"
+        }
+    ],
+    "entity_memberships": [
+        {
+            "id": "0a245d80-4b83-5b53-8333-ffaeee26ec87",
+            "virtual_entity_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d",
+            "member_entity_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d",
+            "capped": false
+        },
+        {
+            "id": "36a435b5-0d61-5d74-b599-611bccc4acf6",
+            "virtual_entity_id": "12e8b72e-9dc7-598f-953f-55576c104d19",
+            "member_entity_id": "12e8b72e-9dc7-598f-953f-55576c104d19",
+            "capped": false
+        },
+        {
+            "id": "1863208b-d38d-559e-bc1f-04cc6088a2ab",
+            "virtual_entity_id": "5843749e-d1be-56bb-a4c9-7327f7ad30c5",
+            "member_entity_id": "5843749e-d1be-56bb-a4c9-7327f7ad30c5",
+            "capped": false
+        },
+        {
+            "id": "a5720f5e-349f-517a-8a24-a601095aaaad",
+            "virtual_entity_id": "8c6dfd8d-1325-5387-ba52-c562efa19c97",
+            "member_entity_id": "8c6dfd8d-1325-5387-ba52-c562efa19c97",
+            "capped": false
+        },
+        {
+            "id": "f2198fd2-403f-5cc4-bd5c-66beccd18e6f",
+            "virtual_entity_id": "19a685b0-dc01-5497-885e-8e9a05109574",
+            "member_entity_id": "19a685b0-dc01-5497-885e-8e9a05109574",
+            "capped": false
+        },
+        {
+            "id": "dd3c7b76-70d9-5a55-9171-1ac34e56cb1b",
+            "virtual_entity_id": "1bed1ef5-6c47-53f8-8db1-169dda388d38",
+            "member_entity_id": "1bed1ef5-6c47-53f8-8db1-169dda388d38",
+            "capped": false
+        },
+        {
+            "id": "50e31113-6d4a-524d-8a11-71a1362c5c0b",
+            "virtual_entity_id": "63a8d662-fd1e-5411-9910-34f18ad43fb3",
+            "member_entity_id": "63a8d662-fd1e-5411-9910-34f18ad43fb3",
+            "capped": false
+        },
+        {
+            "id": "4b728c76-78f5-520e-9569-c06a46a02b71",
+            "virtual_entity_id": "5c97d84e-1599-54f2-82cc-28e6b24e285f",
+            "member_entity_id": "5c97d84e-1599-54f2-82cc-28e6b24e285f",
+            "capped": false
+        },
+        {
+            "id": "809be284-d001-55a5-91fb-c83fb15bb022",
+            "virtual_entity_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d",
+            "member_entity_id": "12e8b72e-9dc7-598f-953f-55576c104d19",
+            "capped": false
+        },
+        {
+            "id": "fabccbf5-27cb-5116-83bc-0b059a655bde",
+            "virtual_entity_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d",
+            "member_entity_id": "5843749e-d1be-56bb-a4c9-7327f7ad30c5",
+            "capped": false
+        },
+        {
+            "id": "f0da59ac-1076-5f63-83c5-c8a0c3bb1089",
+            "virtual_entity_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d",
+            "member_entity_id": "8c6dfd8d-1325-5387-ba52-c562efa19c97",
+            "capped": false
+        },
+        {
+            "id": "65aff099-0ced-5dd7-9575-c0d1bac92d02",
+            "virtual_entity_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d",
+            "member_entity_id": "19a685b0-dc01-5497-885e-8e9a05109574",
+            "capped": false
+        },
+        {
+            "id": "0e1b1877-99d9-5702-8902-4be155708510",
+            "virtual_entity_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d",
+            "member_entity_id": "1bed1ef5-6c47-53f8-8db1-169dda388d38",
+            "capped": false
+        },
+        {
+            "id": "3c898840-93a3-525e-b619-5d80d83bd04e",
+            "virtual_entity_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d",
+            "member_entity_id": "63a8d662-fd1e-5411-9910-34f18ad43fb3",
+            "capped": false
+        },
+        {
+            "id": "9e07ad92-2000-5983-92c1-ed996e728cf4",
+            "virtual_entity_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d",
+            "member_entity_id": "5c97d84e-1599-54f2-82cc-28e6b24e285f",
+            "capped": false
+        },
+        {
+            "id": "9ff9b802-f29e-5529-8b2c-c97515289939",
+            "virtual_entity_id": "12e8b72e-9dc7-598f-953f-55576c104d19",
+            "member_entity_id": "8c6dfd8d-1325-5387-ba52-c562efa19c97",
+            "capped": true
+        },
+        {
+            "id": "e34583b3-2d32-5313-b267-2ebf66caa814",
+            "virtual_entity_id": "12e8b72e-9dc7-598f-953f-55576c104d19",
+            "member_entity_id": "19a685b0-dc01-5497-885e-8e9a05109574",
+            "capped": true
+        },
+        {
+            "id": "3f8adb96-365b-5bb1-8d28-836ac94388aa",
+            "virtual_entity_id": "12e8b72e-9dc7-598f-953f-55576c104d19",
+            "member_entity_id": "1bed1ef5-6c47-53f8-8db1-169dda388d38",
+            "capped": true
+        },
+        {
+            "id": "dfd488cf-d339-5ef8-bced-860473629bfb",
+            "virtual_entity_id": "12e8b72e-9dc7-598f-953f-55576c104d19",
+            "member_entity_id": "63a8d662-fd1e-5411-9910-34f18ad43fb3",
+            "capped": true
+        },
+        {
+            "id": "f6b3e60f-a965-55da-9ba9-4108bc6a09a8",
+            "virtual_entity_id": "12e8b72e-9dc7-598f-953f-55576c104d19",
+            "member_entity_id": "5c97d84e-1599-54f2-82cc-28e6b24e285f",
+            "capped": true
+        },
+        {
+            "id": "5bd56b84-1587-5805-b3bd-21248b919f39",
+            "virtual_entity_id": "5843749e-d1be-56bb-a4c9-7327f7ad30c5",
+            "member_entity_id": "8c6dfd8d-1325-5387-ba52-c562efa19c97",
+            "capped": true
+        },
+        {
+            "id": "ac36e0cb-072c-5c94-9044-69076498ee4e",
+            "virtual_entity_id": "5843749e-d1be-56bb-a4c9-7327f7ad30c5",
+            "member_entity_id": "19a685b0-dc01-5497-885e-8e9a05109574",
+            "capped": true
+        },
+        {
+            "id": "3a8d57e2-6677-55c0-9f33-6ef9a6973d22",
+            "virtual_entity_id": "5843749e-d1be-56bb-a4c9-7327f7ad30c5",
+            "member_entity_id": "1bed1ef5-6c47-53f8-8db1-169dda388d38",
+            "capped": true
+        },
+        {
+            "id": "3337851c-5d4b-582b-9c4f-82250f05edea",
+            "virtual_entity_id": "5843749e-d1be-56bb-a4c9-7327f7ad30c5",
+            "member_entity_id": "63a8d662-fd1e-5411-9910-34f18ad43fb3",
+            "capped": true
+        },
+        {
+            "id": "721fde62-2aae-526a-8e96-2fb3a47c9507",
+            "virtual_entity_id": "5843749e-d1be-56bb-a4c9-7327f7ad30c5",
+            "member_entity_id": "5c97d84e-1599-54f2-82cc-28e6b24e285f",
+            "capped": true
+        },
+        {
+            "id": "ee5fb554-06e2-56c5-bef9-e7773458791f",
+            "virtual_entity_id": "7a0f4c2e-3b91-5d6a-9e84-1c5f2b7d9a63",
+            "member_entity_id": "7a0f4c2e-3b91-5d6a-9e84-1c5f2b7d9a63",
+            "capped": false
+        },
+        {
+            "id": "6ed41c59-8902-5371-8591-ab12ac147a48",
+            "virtual_entity_id": "c17a5bef-8fa9-594d-8f92-6420b478e87e",
+            "member_entity_id": "c17a5bef-8fa9-594d-8f92-6420b478e87e",
+            "capped": false
+        },
+        {
+            "id": "b4a8a343-61f2-5782-8ca1-7818db235d5b",
+            "virtual_entity_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d",
+            "member_entity_id": "c17a5bef-8fa9-594d-8f92-6420b478e87e",
+            "capped": false
+        },
+        {
+            "id": "bdb96b87-7751-594e-9e9d-6f07556e7436",
+            "virtual_entity_id": "c17a5bef-8fa9-594d-8f92-6420b478e87e",
+            "member_entity_id": "8c6dfd8d-1325-5387-ba52-c562efa19c97",
+            "capped": true
+        },
+        {
+            "id": "2b26781d-cc17-5948-9262-b16327131f11",
+            "virtual_entity_id": "dc3a324a-4221-5417-b46a-230c2a5e9835",
+            "member_entity_id": "dc3a324a-4221-5417-b46a-230c2a5e9835",
+            "capped": false
+        },
+        {
+            "id": "614aa99a-0119-5432-acb9-51309a38e3bf",
+            "virtual_entity_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d",
+            "member_entity_id": "dc3a324a-4221-5417-b46a-230c2a5e9835",
+            "capped": false
+        },
+        {
+            "id": "1ebc70ce-f542-5a9f-887c-40fc1fb9aa40",
+            "virtual_entity_id": "dc3a324a-4221-5417-b46a-230c2a5e9835",
+            "member_entity_id": "19a685b0-dc01-5497-885e-8e9a05109574",
+            "capped": true
+        },
+        {
+            "id": "43834456-a4b0-55fe-9b54-2503b999ffc8",
+            "virtual_entity_id": "88989f04-6408-5dbc-aa34-62fd5980b355",
+            "member_entity_id": "88989f04-6408-5dbc-aa34-62fd5980b355",
+            "capped": false
+        },
+        {
+            "id": "07c735a4-a2bd-5216-bcfe-460f55a5b634",
+            "virtual_entity_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d",
+            "member_entity_id": "88989f04-6408-5dbc-aa34-62fd5980b355",
+            "capped": false
+        },
+        {
+            "id": "05caefbb-fc1a-5ebb-ba9c-be71ef3e35f2",
+            "virtual_entity_id": "88989f04-6408-5dbc-aa34-62fd5980b355",
+            "member_entity_id": "1bed1ef5-6c47-53f8-8db1-169dda388d38",
+            "capped": true
+        },
+        {
+            "id": "c4ab8892-b304-587b-b862-6b2a7cc30c14",
+            "virtual_entity_id": "3a573365-14f5-5fb4-a5ab-cd5e71184de2",
+            "member_entity_id": "3a573365-14f5-5fb4-a5ab-cd5e71184de2",
+            "capped": false
+        },
+        {
+            "id": "5ccfb85e-2308-51a1-9a01-c03980ae84ca",
+            "virtual_entity_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d",
+            "member_entity_id": "3a573365-14f5-5fb4-a5ab-cd5e71184de2",
+            "capped": false
+        },
+        {
+            "id": "c95b7ef1-c6ed-5679-8717-f41adcbbe0e2",
+            "virtual_entity_id": "3a573365-14f5-5fb4-a5ab-cd5e71184de2",
+            "member_entity_id": "63a8d662-fd1e-5411-9910-34f18ad43fb3",
+            "capped": true
+        },
+        {
+            "id": "8f621600-8ff4-5478-b0a9-198cbe3807eb",
+            "virtual_entity_id": "fc235202-c59d-5277-afc9-e04f61892a24",
+            "member_entity_id": "fc235202-c59d-5277-afc9-e04f61892a24",
+            "capped": false
+        },
+        {
+            "id": "f0060ce4-593e-5f6d-8780-6344423aae76",
+            "virtual_entity_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d",
+            "member_entity_id": "fc235202-c59d-5277-afc9-e04f61892a24",
+            "capped": false
+        },
+        {
+            "id": "10afd30b-3829-5cdb-a845-07664f580544",
+            "virtual_entity_id": "fc235202-c59d-5277-afc9-e04f61892a24",
+            "member_entity_id": "5c97d84e-1599-54f2-82cc-28e6b24e285f",
+            "capped": true
+        },
+        {
+            "id": "24972a0e-a72e-53f4-8fb4-caebe6c3c4d4",
+            "virtual_entity_id": "7a0f4c2e-3b91-5d6a-9e84-1c5f2b7d9a63",
+            "member_entity_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d",
+            "capped": true
+        }
+    ],
+    "scope_bindings": [
+        {
+            "virtual_entity_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d",
+            "scope_entity_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d"
+        },
+        {
+            "virtual_entity_id": "12e8b72e-9dc7-598f-953f-55576c104d19",
+            "scope_entity_id": "12e8b72e-9dc7-598f-953f-55576c104d19"
+        },
+        {
+            "virtual_entity_id": "5843749e-d1be-56bb-a4c9-7327f7ad30c5",
+            "scope_entity_id": "5843749e-d1be-56bb-a4c9-7327f7ad30c5"
+        },
+        {
+            "virtual_entity_id": "8c6dfd8d-1325-5387-ba52-c562efa19c97",
+            "scope_entity_id": "8c6dfd8d-1325-5387-ba52-c562efa19c97"
+        },
+        {
+            "virtual_entity_id": "19a685b0-dc01-5497-885e-8e9a05109574",
+            "scope_entity_id": "19a685b0-dc01-5497-885e-8e9a05109574"
+        },
+        {
+            "virtual_entity_id": "1bed1ef5-6c47-53f8-8db1-169dda388d38",
+            "scope_entity_id": "1bed1ef5-6c47-53f8-8db1-169dda388d38"
+        },
+        {
+            "virtual_entity_id": "63a8d662-fd1e-5411-9910-34f18ad43fb3",
+            "scope_entity_id": "63a8d662-fd1e-5411-9910-34f18ad43fb3"
+        },
+        {
+            "virtual_entity_id": "5c97d84e-1599-54f2-82cc-28e6b24e285f",
+            "scope_entity_id": "5c97d84e-1599-54f2-82cc-28e6b24e285f"
+        },
+        {
+            "virtual_entity_id": "12e8b72e-9dc7-598f-953f-55576c104d19",
+            "scope_entity_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d"
+        },
+        {
+            "virtual_entity_id": "5843749e-d1be-56bb-a4c9-7327f7ad30c5",
+            "scope_entity_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d"
+        },
+        {
+            "virtual_entity_id": "8c6dfd8d-1325-5387-ba52-c562efa19c97",
+            "scope_entity_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d"
+        },
+        {
+            "virtual_entity_id": "19a685b0-dc01-5497-885e-8e9a05109574",
+            "scope_entity_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d"
+        },
+        {
+            "virtual_entity_id": "1bed1ef5-6c47-53f8-8db1-169dda388d38",
+            "scope_entity_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d"
+        },
+        {
+            "virtual_entity_id": "63a8d662-fd1e-5411-9910-34f18ad43fb3",
+            "scope_entity_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d"
+        },
+        {
+            "virtual_entity_id": "5c97d84e-1599-54f2-82cc-28e6b24e285f",
+            "scope_entity_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d"
+        },
+        {
+            "virtual_entity_id": "7a0f4c2e-3b91-5d6a-9e84-1c5f2b7d9a63",
+            "scope_entity_id": "7a0f4c2e-3b91-5d6a-9e84-1c5f2b7d9a63"
+        },
+        {
+            "virtual_entity_id": "c17a5bef-8fa9-594d-8f92-6420b478e87e",
+            "scope_entity_id": "c17a5bef-8fa9-594d-8f92-6420b478e87e"
+        },
+        {
+            "virtual_entity_id": "c17a5bef-8fa9-594d-8f92-6420b478e87e",
+            "scope_entity_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d"
+        },
+        {
+            "virtual_entity_id": "dc3a324a-4221-5417-b46a-230c2a5e9835",
+            "scope_entity_id": "dc3a324a-4221-5417-b46a-230c2a5e9835"
+        },
+        {
+            "virtual_entity_id": "dc3a324a-4221-5417-b46a-230c2a5e9835",
+            "scope_entity_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d"
+        },
+        {
+            "virtual_entity_id": "88989f04-6408-5dbc-aa34-62fd5980b355",
+            "scope_entity_id": "88989f04-6408-5dbc-aa34-62fd5980b355"
+        },
+        {
+            "virtual_entity_id": "88989f04-6408-5dbc-aa34-62fd5980b355",
+            "scope_entity_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d"
+        },
+        {
+            "virtual_entity_id": "3a573365-14f5-5fb4-a5ab-cd5e71184de2",
+            "scope_entity_id": "3a573365-14f5-5fb4-a5ab-cd5e71184de2"
+        },
+        {
+            "virtual_entity_id": "3a573365-14f5-5fb4-a5ab-cd5e71184de2",
+            "scope_entity_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d"
+        },
+        {
+            "virtual_entity_id": "fc235202-c59d-5277-afc9-e04f61892a24",
+            "scope_entity_id": "fc235202-c59d-5277-afc9-e04f61892a24"
+        },
+        {
+            "virtual_entity_id": "fc235202-c59d-5277-afc9-e04f61892a24",
+            "scope_entity_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d"
+        },
+        {
+            "virtual_entity_id": "7a0f4c2e-3b91-5d6a-9e84-1c5f2b7d9a63",
+            "scope_entity_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d",
+            "permission_cap": 1
+        }
+    ],
+    "entity_membership_caps": [
+        {
+            "membership_id": "24972a0e-a72e-53f4-8fb4-caebe6c3c4d4",
+            "permission": 1,
+            "all_fields": true
+        },
+        {
+            "membership_id": "9ff9b802-f29e-5529-8b2c-c97515289939",
+            "permission": 1,
+            "all_fields": true
+        },
+        {
+            "membership_id": "e34583b3-2d32-5313-b267-2ebf66caa814",
+            "permission": 1,
+            "all_fields": true
+        },
+        {
+            "membership_id": "3f8adb96-365b-5bb1-8d28-836ac94388aa",
+            "permission": 1,
+            "all_fields": true
+        },
+        {
+            "membership_id": "dfd488cf-d339-5ef8-bced-860473629bfb",
+            "permission": 1,
+            "all_fields": true
+        },
+        {
+            "membership_id": "f6b3e60f-a965-55da-9ba9-4108bc6a09a8",
+            "permission": 1,
+            "all_fields": true
+        },
+        {
+            "membership_id": "5bd56b84-1587-5805-b3bd-21248b919f39",
+            "permission": 1,
+            "all_fields": true
+        },
+        {
+            "membership_id": "ac36e0cb-072c-5c94-9044-69076498ee4e",
+            "permission": 1,
+            "all_fields": true
+        },
+        {
+            "membership_id": "3a8d57e2-6677-55c0-9f33-6ef9a6973d22",
+            "permission": 1,
+            "all_fields": true
+        },
+        {
+            "membership_id": "3337851c-5d4b-582b-9c4f-82250f05edea",
+            "permission": 1,
+            "all_fields": true
+        },
+        {
+            "membership_id": "721fde62-2aae-526a-8e96-2fb3a47c9507",
+            "permission": 1,
+            "all_fields": true
+        },
+        {
+            "membership_id": "bdb96b87-7751-594e-9e9d-6f07556e7436",
+            "permission": 1,
+            "all_fields": true
+        },
+        {
+            "membership_id": "1ebc70ce-f542-5a9f-887c-40fc1fb9aa40",
+            "permission": 1,
+            "all_fields": true
+        },
+        {
+            "membership_id": "05caefbb-fc1a-5ebb-ba9c-be71ef3e35f2",
+            "permission": 1,
+            "all_fields": true
+        },
+        {
+            "membership_id": "c95b7ef1-c6ed-5679-8717-f41adcbbe0e2",
+            "permission": 1,
+            "all_fields": true
+        },
+        {
+            "membership_id": "10afd30b-3829-5cdb-a845-07664f580544",
+            "permission": 1,
+            "all_fields": true
         }
     ]
 }

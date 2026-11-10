@@ -31,6 +31,7 @@ __all__ = (
     "EntityTimestamps",
     "PurgeUserPayload",
     "PurgeUsersPayload",
+    "RestoreUserPayload",
     "SearchUsersPayload",
     "UpdateMyAllowedClientIPPayload",
     "UpdateUserPayload",
@@ -94,6 +95,10 @@ class UserOrganizationInfo(BackendAISchema):
         default=None,
         description="Name of the domain this user belongs to.",
     )
+    domain_id: UUID | None = Field(
+        default=None,
+        description="ID of the domain this user belongs to.",
+    )
     role: UserRole | None = Field(
         default=None,
         description="User's role determining access permissions. See UserRole enum.",
@@ -103,7 +108,8 @@ class UserOrganizationInfo(BackendAISchema):
     )
     main_access_key: str | None = Field(
         default=None,
-        description="Primary API access key for this user.",
+        description="Primary API access key for this user. Deprecated since 26.9.0. Use the keypair's is_default field.",
+        deprecated=True,
     )
 
 
@@ -167,6 +173,9 @@ class UserNode(BaseResponseModel):
     id: UUID = Field(
         description="Unique identifier for the user (UUID).",
     )
+    entity_id: UUID = Field(
+        description="UUID of the user. Added in 26.9.0.",
+    )
     basic_info: UserBasicInfo = Field(
         description="Basic profile information including username, email, and display name.",
     )
@@ -211,6 +220,15 @@ class DeleteUserPayload(BaseResponseModel):
 
     success: bool = Field(
         description="Whether the deletion was successful.",
+    )
+    user: UserNode = Field(description="The soft-deleted user. Added in 26.10.0.")
+
+
+class RestoreUserPayload(BaseResponseModel):
+    """Payload for user restore mutation."""
+
+    success: bool = Field(
+        description="Whether the restore was successful.",
     )
 
 
@@ -267,7 +285,20 @@ class BulkPurgeUserV2Error(BaseResponseModel):
 class BulkPurgeUsersPayload(BaseResponseModel):
     """Payload for bulk user permanent deletion mutation."""
 
-    purged_count: int = Field(description="Number of users successfully purged.")
+    successes: list[UUID] = Field(
+        default_factory=list,
+        description=(
+            "UUIDs of the users that were purged, in the order they were requested. "
+            "Together with `failed` this answers for every requested user exactly once."
+        ),
+    )
+    purged_count: int = Field(
+        description=(
+            "Number of users successfully purged. "
+            "Deprecated since 26.9.0. Use the length of successes."
+        ),
+        deprecated=True,
+    )
     failed: list[BulkPurgeUserV2Error] = Field(
         description="List of errors for users that failed to purge.",
     )

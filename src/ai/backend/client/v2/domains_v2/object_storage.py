@@ -5,10 +5,13 @@ from __future__ import annotations
 from uuid import UUID
 
 from ai.backend.client.v2.base_domain import BaseDomainClient
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.object_storage.request import (
     AdminSearchObjectStoragesInput,
     CreateObjectStorageInput,
     DeleteObjectStorageInput,
+    PartialBulkPurgeObjectStoragesInput,
+    PartialBulkUpdateObjectStoragesInput,
     UpdateObjectStorageInput,
 )
 from ai.backend.common.dto.manager.v2.object_storage.response import (
@@ -16,6 +19,7 @@ from ai.backend.common.dto.manager.v2.object_storage.response import (
     CreateObjectStoragePayload,
     DeleteObjectStoragePayload,
     ObjectStorageNode,
+    PurgeObjectStoragePayload,
     UpdateObjectStoragePayload,
 )
 
@@ -73,10 +77,40 @@ class V2ObjectStorageClient(BaseDomainClient):
         self,
         request: DeleteObjectStorageInput,
     ) -> DeleteObjectStoragePayload:
-        """Delete an object storage."""
+        """Deprecated. Use :meth:`purge`."""
         return await self._client.typed_request(
             "POST",
             f"{_PATH}/delete",
             request=request,
             response_model=DeleteObjectStoragePayload,
+        )
+
+    async def purge(self, storage_id: UUID) -> PurgeObjectStoragePayload:
+        """Permanently remove an object storage."""
+        return await self._client.typed_request(
+            "DELETE",
+            f"{_PATH}/{storage_id}",
+            response_model=PurgeObjectStoragePayload,
+        )
+
+    async def partial_bulk_update(
+        self, request: PartialBulkUpdateObjectStoragesInput
+    ) -> PartialBulkPayload[ObjectStorageNode]:
+        """Update several object storages, answering for each one."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/partial-bulk-update",
+            request=request,
+            response_model=PartialBulkPayload[ObjectStorageNode],
+        )
+
+    async def partial_bulk_purge(
+        self, request: PartialBulkPurgeObjectStoragesInput
+    ) -> PartialBulkPayload[ObjectStorageNode]:
+        """Permanently remove several object storages, answering for each one."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/partial-bulk-purge",
+            request=request,
+            response_model=PartialBulkPayload[ObjectStorageNode],
         )

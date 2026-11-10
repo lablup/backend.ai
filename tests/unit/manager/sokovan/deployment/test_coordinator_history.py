@@ -9,8 +9,8 @@ from uuid import uuid4
 import pytest
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.replica_group import ReplicaGroupID
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.manager.data.deployment.types import (
     DeploymentHandlerCategory,
     DeploymentInfo,
@@ -23,7 +23,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentTargetStatuses,
     ReplicaData,
 )
-from ai.backend.manager.repositories.deployment import DeploymentRepository
+from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
 from ai.backend.manager.sokovan.deployment.handlers.base import DeploymentHandler
 from ai.backend.manager.sokovan.deployment.types import (

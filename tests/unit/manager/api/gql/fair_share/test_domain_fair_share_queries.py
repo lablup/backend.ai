@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
@@ -10,7 +11,9 @@ from uuid import UUID
 import pytest
 from aiohttp import web
 
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_user_context
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.dto.manager.v2.fair_share.response import (
     GetDomainFairSharePayload,
@@ -23,7 +26,7 @@ from ai.backend.manager.api.gql.fair_share.types.domain import (
     DomainFairShareConnection,
     DomainFairShareGQL,
 )
-from ai.backend.manager.data.fair_share import (
+from ai.backend.manager.data.fair_share.types import (
     DomainFairShareData,
     FairShareCalculationSnapshot,
     FairShareData,
@@ -45,6 +48,7 @@ def mock_superadmin_user() -> UserData:
         is_superadmin=True,
         role=UserRole.SUPERADMIN,
         domain_name="default",
+        domain_id=DomainID(uuid.uuid4()),
     )
 
 
@@ -58,6 +62,7 @@ def mock_regular_user() -> UserData:
         is_superadmin=False,
         role=UserRole.USER,
         domain_name="default",
+        domain_id=DomainID(uuid.uuid4()),
     )
 
 
@@ -68,6 +73,7 @@ def sample_domain_fair_share_data() -> DomainFairShareData:
     today = now.date()
     return DomainFairShareData(
         resource_group="default",
+        resource_group_id=ResourceGroupID(UUID("880e8400-e29b-41d4-a716-446655440003")),
         domain_name="test-domain",
         data=FairShareData(
             spec=FairShareSpec(
@@ -121,7 +127,7 @@ class TestAdminDomainFairShareSingleQuery:
         )
         info = create_mock_info(context)
 
-        with with_user(mock_superadmin_user):
+        with with_user_context(mock_superadmin_user):
             result = await domain_resolver.admin_domain_fair_share.base_resolver(
                 info=info,
                 resource_group_name="default",
@@ -148,7 +154,7 @@ class TestAdminDomainFairShareSingleQuery:
         )
         info = create_mock_info(context)
 
-        with with_user(mock_superadmin_user):
+        with with_user_context(mock_superadmin_user):
             with pytest.raises(DomainNotFound):
                 await domain_resolver.admin_domain_fair_share.base_resolver(
                     info=info,
@@ -165,7 +171,7 @@ class TestAdminDomainFairShareSingleQuery:
         context.adapters.fair_share.get_domain = AsyncMock()
         info = create_mock_info(context)
 
-        with with_user(mock_regular_user):
+        with with_user_context(mock_regular_user):
             with pytest.raises(web.HTTPForbidden):
                 await domain_resolver.admin_domain_fair_share.base_resolver(
                     info=info,
@@ -188,7 +194,7 @@ class TestAdminDomainFairShareSingleQuery:
         )
         info = create_mock_info(context)
 
-        with with_user(mock_superadmin_user):
+        with with_user_context(mock_superadmin_user):
             result = await domain_resolver.admin_domain_fair_share.base_resolver(
                 info=info,
                 resource_group_name="default",
@@ -216,7 +222,7 @@ class TestAdminDomainFairSharesListQuery:
         )
         info = create_mock_info(context)
 
-        with with_user(mock_superadmin_user):
+        with with_user_context(mock_superadmin_user):
             await domain_resolver.admin_domain_fair_shares.base_resolver(
                 info=info,
                 filter=None,
@@ -245,7 +251,7 @@ class TestAdminDomainFairSharesListQuery:
         )
         info = create_mock_info(context)
 
-        with with_user(mock_superadmin_user):
+        with with_user_context(mock_superadmin_user):
             result = await domain_resolver.admin_domain_fair_shares.base_resolver(
                 info=info,
                 filter=None,
@@ -269,7 +275,7 @@ class TestAdminDomainFairSharesListQuery:
         context.adapters.fair_share.search_domain = AsyncMock()
         info = create_mock_info(context)
 
-        with with_user(mock_regular_user):
+        with with_user_context(mock_regular_user):
             with pytest.raises(web.HTTPForbidden):
                 await domain_resolver.admin_domain_fair_shares.base_resolver(
                     info=info,
@@ -296,7 +302,7 @@ class TestAdminDomainFairSharesListQuery:
         )
         info = create_mock_info(context)
 
-        with with_user(mock_superadmin_user):
+        with with_user_context(mock_superadmin_user):
             result = await domain_resolver.admin_domain_fair_shares.base_resolver(
                 info=info,
                 filter=None,

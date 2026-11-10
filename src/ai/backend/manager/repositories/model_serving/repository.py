@@ -1,93 +1,100 @@
 import asyncio
 import uuid
+from collections import defaultdict
+from collections.abc import Sequence
+from dataclasses import replace
 from decimal import Decimal
+from functools import partial
 from typing import Any, cast
 
 import sqlalchemy as sa
 from pydantic import HttpUrl
-from sqlalchemy.exc import IntegrityError, NoResultFound, StatementError
-from sqlalchemy.ext.asyncio import AsyncConnection
+from sqlalchemy.exc import IntegrityError, StatementError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import selectinload
 
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.contexts.user import current_user
-from ai.backend.common.data.permission.types import RBACElementType
-from ai.backend.common.docker import ImageRef
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.domain import DomainName
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
+from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec, UUIDInMatchSpec
 from ai.backend.common.exception import BackendAIError, VFolderNotFound
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.project import ProjectID
-from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import (
     AccessKey,
+    AutoScalingMetricComparator,
+    AutoScalingMetricSource,
     ResourceSlot,
     SessionTypes,
+    VFolderUsageMode,
 )
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
-from ai.backend.manager.data.deployment.types import RouteHealthStatus
+from ai.backend.manager.data.deployment.types import (
+    ModelDeploymentAccessTokenData,
+    RouteHealthStatus,
+    RouteStatus,
+)
 from ai.backend.manager.data.image.types import ImageData
 from ai.backend.manager.data.model_serving.types import (
     EndpointAccessValidationData,
     EndpointAutoScalingRuleData,
     EndpointData,
-    EndpointTokenData,
+    EndpointLifecycle,
     ModelServiceValidationContext,
     MutationResult,
+    ResourceGroupData,
     RoutingData,
-    ScalingGroupData,
     ServiceSearchItem,
     ServiceSearchResult,
     UserData,
 )
-from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.data.resource_group.types import (
+    ResourceGroupData as ResourceGroupEntityData,
+)
 from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.errors.common import GenericForbidden, ObjectNotFound, ServiceUnavailable
-from ai.backend.manager.errors.resource import DatabaseConnectionUnavailable
+from ai.backend.manager.errors.common import GenericForbidden, ServiceUnavailable
+from ai.backend.manager.errors.image import ImageNotFound
+from ai.backend.manager.errors.resource import DomainNotFound
 from ai.backend.manager.errors.service import EndpointNotFound
-from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
-from ai.backend.manager.models.endpoint import (
-    AutoScalingMetricComparator,
-    AutoScalingMetricSource,
-    EndpointAutoScalingRuleRow,
-    EndpointLifecycle,
-    EndpointRow,
-    EndpointTokenRow,
+from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
+from ai.backend.manager.models.domain.lookups import DomainNameLookup
+from ai.backend.manager.models.endpoint.creators import EndpointTokenCreator
+from ai.backend.manager.models.endpoint.row import EndpointAutoScalingRuleRow, EndpointRow
+from ai.backend.manager.models.endpoint.searchable_fields import DeploymentSearchableFields
+from ai.backend.manager.models.endpoint.searchers import DeploymentInfoSearcher
+from ai.backend.manager.models.endpoint.updaters import (
+    AutoScalingRuleUpdater,
+    LegacyEndpointUpdater,
 )
-from ai.backend.manager.models.group import resolve_group_name_or_id
-from ai.backend.manager.models.image import ImageAlias, ImageIdentifier, ImageRow
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.resource_policy import keypair_resource_policies
-from ai.backend.manager.models.routing import RouteStatus, RoutingRow
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.image.searchable_fields import ImageSearchableFields
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.resource_group.row import resource_groups
+from ai.backend.manager.models.resource_group.searchers import AllowedResourceGroupsSearch
+from ai.backend.manager.models.routing.row import RoutingRow
+from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
+from ai.backend.manager.models.routing.searchers import RoutingDataSearcher
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
-from ai.backend.manager.models.scaling_group import scaling_groups
-from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
-from ai.backend.manager.models.user import UserRole, UserRow
+from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.models.user.row import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_retry
-from ai.backend.manager.models.vfolder import VFolderRow, VFolderUsageMode
-from ai.backend.manager.models.vfolder.row import query_accessible_vfolders, vfolders
+from ai.backend.manager.models.vfolder.row import VFolderRow, vfolders
 from ai.backend.manager.registry import AgentRegistry
-from ai.backend.manager.registry import check_scaling_group as registry_check_scaling_group
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    Creator,
-    Updater,
-    execute_batch_querier,
-    execute_creator,
-    execute_updater,
-)
-from ai.backend.manager.repositories.base.rbac.entity_creator import (
-    RBACEntityCreator,
-    execute_rbac_entity_creator,
-)
-from ai.backend.manager.repositories.deployment.creators import DeploymentPolicyCreatorSpec
+from ai.backend.manager.registry import check_resource_group as registry_check_resource_group
 from ai.backend.manager.repositories.model_serving.mount import check_extra_mounts
-from ai.backend.manager.repositories.model_serving.updaters import EndpointUpdaterSpec
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.rbac.permission_check_repository import (
+    RbacPermissionCheckRepository,
+)
+from ai.backend.manager.repositories.vfolder.mount import query_reachable_vfolders
 from ai.backend.manager.types import MountOptionModel, UserScope
 from ai.backend.manager.utils import query_userinfo
 
@@ -110,49 +117,37 @@ model_serving_repository_resilience = Resilience(
 
 class ModelServingRepository:
     _db: ExtendedAsyncSAEngine
+    _v2_ops: V2DBOpsProvider
+    _permission_check: RbacPermissionCheckRepository
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
-        self._db = db
-
-    async def _check_inference_scaling_group(
+    def __init__(
         self,
-        conn: AsyncConnection,
-        scaling_group: str,
-        owner_access_key: AccessKey,
-        target_domain: str,
-        target_project: str | ProjectID,
+        db: ExtendedAsyncSAEngine,
+        v2_ops_provider: V2DBOpsProvider,
+        permission_check: RbacPermissionCheckRepository,
+    ) -> None:
+        self._db = db
+        self._v2_ops = v2_ops_provider
+        self._permission_check = permission_check
+
+    def _check_inference_resource_group(
+        self,
+        candidates: Sequence[ResourceGroupEntityData],
+        resource_group: str,
     ) -> str:
         """
-        Wrapper of ``registry.check_scaling_group()`` with additional guards flavored for
+        Wrapper of ``registry.check_resource_group()`` with additional guards flavored for
         model service included.
         """
-        checked_scaling_group = await registry_check_scaling_group(
-            conn,
-            scaling_group,
-            SessionTypes.INFERENCE,
-            owner_access_key,
-            target_domain,
-            target_project,
+        checked_resource_group = registry_check_resource_group(
+            candidates, resource_group, SessionTypes.INFERENCE
         )
-
-        query = (
-            sa.select(scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token)
-            .select_from(scaling_groups)
-            .where(scaling_groups.c.name == checked_scaling_group)
-        )
-
-        result = await conn.execute(query)
-        sgroup = result.first()
-        if sgroup is None:
-            raise ServiceUnavailable("Scaling group not found")
-        wsproxy_addr = sgroup.wsproxy_addr
-        if not wsproxy_addr:
+        sgroup = next(rg for rg in candidates if rg.name == checked_resource_group)
+        if not sgroup.network.wsproxy_addr:
             raise ServiceUnavailable("No coordinator configured for this resource group")
-
-        if not sgroup.wsproxy_api_token:
+        if not sgroup.network.wsproxy_api_token:
             raise ServiceUnavailable("Scaling group not ready to start model service")
-
-        return checked_scaling_group
+        return checked_resource_group
 
     @model_serving_repository_resilience.apply()
     async def get_endpoint_by_id(self, endpoint_id: uuid.UUID) -> EndpointData | None:
@@ -183,21 +178,20 @@ class ModelServingRepository:
         """
         async with self._db.begin_readonly_session_read_committed() as session:
             stmt = (
-                sa.select(EndpointRow)
+                sa.select(EndpointRow.session_owner, EndpointRow.domain, UserRow.role)
+                .outerjoin(UserRow, UserRow.uuid == EndpointRow.session_owner)
                 .where(EndpointRow.id == endpoint_id)
-                .options(selectinload(EndpointRow.session_owner_row))
             )
             result = await session.execute(stmt)
-            endpoint_row = result.scalar_one_or_none()
-            if endpoint_row is None:
+            row = result.first()
+            if row is None:
                 return None
+            session_owner_id, domain, session_owner_role = row
 
             return EndpointAccessValidationData(
-                session_owner_id=endpoint_row.session_owner,
-                session_owner_role=(
-                    endpoint_row.session_owner_row.role if endpoint_row.session_owner_row else None
-                ),
-                domain=endpoint_row.domain,
+                session_owner_id=session_owner_id,
+                session_owner_role=session_owner_role,
+                domain=domain,
             )
 
     @model_serving_repository_resilience.apply()
@@ -256,44 +250,6 @@ class ModelServingRepository:
             return existing_endpoint is None
 
     @model_serving_repository_resilience.apply()
-    async def create_endpoint_validated(
-        self, creator: RBACEntityCreator[EndpointRow], registry: AgentRegistry
-    ) -> EndpointData:
-        """
-        Create a new endpoint after validation.
-        """
-        async with self._db.begin_session() as db_sess:
-            result = await execute_rbac_entity_creator(db_sess, creator)
-            endpoint = result.row
-
-            # Create default rolling deployment policy
-            policy_creator_spec = DeploymentPolicyCreatorSpec.build_default(endpoint.id)
-            policy_creator = RBACEntityCreator(
-                spec=policy_creator_spec,
-                element_type=RBACElementType.DEPLOYMENT_POLICY,
-                scope_ref=RBACElementRef(
-                    element_type=RBACElementType.MODEL_DEPLOYMENT,
-                    element_id=str(endpoint.id),
-                ),
-            )
-            await execute_rbac_entity_creator(db_sess, policy_creator)
-            await db_sess.flush()
-
-            endpoint_row = await EndpointRow.get(
-                db_sess,
-                endpoint.id,
-                load_created_user=True,
-                load_session_owner=True,
-                load_revisions=True,
-                load_routes=True,
-            )
-            endpoint_before_assign_url = endpoint_row.to_data()
-            endpoint_row.url = await registry.create_appproxy_endpoint(
-                db_sess, endpoint_before_assign_url
-            )
-            return endpoint_row.to_data()
-
-    @model_serving_repository_resilience.apply()
     async def update_endpoint_lifecycle(
         self,
         endpoint_id: uuid.UUID,
@@ -309,9 +265,7 @@ class ModelServingRepository:
             if not endpoint:
                 return False
 
-            update_values: dict[str, Any] = {"lifecycle_stage": lifecycle_stage}
-            if lifecycle_stage == EndpointLifecycle.DESTROYED:
-                update_values["destroyed_at"] = sa.func.now()
+            update_values: dict[str, Any] = EndpointRow.lifecycle_values(lifecycle_stage)
             if replicas is not None:
                 update_values["replicas"] = replicas
 
@@ -358,12 +312,22 @@ class ModelServingRepository:
         Get route by ID.
         Returns None if route doesn't exist or doesn't belong to service.
         """
-        async with self._db.begin_readonly_session_read_committed() as session:
-            route = await self._get_route_by_id(session, route_id, load_endpoint=True)
-            if not route or route.endpoint != service_id:
-                return None
-
-            return route.to_data()
+        replica_fields = ReplicaSearchableFields.own
+        async with self._v2_ops.read_ops() as r:
+            result = await r.search_in_global(
+                RoutingDataSearcher(
+                    pagination=NoPagination(),
+                    conditions=[
+                        replica_fields.field_id.filter.equals(
+                            UUIDEqualMatchSpec(value=route_id, negated=False)
+                        ),
+                        replica_fields.deployment_id.filter.equals(
+                            UUIDEqualMatchSpec(value=service_id, negated=False)
+                        ),
+                    ],
+                )
+            )
+        return result.items[0] if result.items else None
 
     @model_serving_repository_resilience.apply()
     async def update_route_traffic(
@@ -378,8 +342,14 @@ class ModelServingRepository:
         Returns updated endpoint data if successful, None if not found.
         """
         async with self._db.begin_session() as session:
-            route = await self._get_route_by_id(session, route_id, load_endpoint=True)
-            if not route or route.endpoint != service_id:
+            route = (
+                await session.execute(
+                    sa.select(RoutingRow.endpoint, RoutingRow.session).where(
+                        RoutingRow.id == route_id
+                    )
+                )
+            ).one_or_none()
+            if route is None or route.endpoint != service_id:
                 return None
 
             query = (
@@ -397,7 +367,7 @@ class ModelServingRepository:
                 load_revisions=True,
             )
             if endpoint is None:
-                raise NoResultFound
+                raise EndpointNotFound
 
             await valkey_live.store_live_data(
                 f"endpoint.{service_id}.session.{route.session}.traffic_ratio",
@@ -428,38 +398,38 @@ class ModelServingRepository:
     @model_serving_repository_resilience.apply()
     async def create_endpoint_token(
         self,
-        creator: Creator[EndpointTokenRow],
-    ) -> EndpointTokenData | None:
+        deployment_id: DeploymentID,
+        creator: EndpointTokenCreator,
+    ) -> ModelDeploymentAccessTokenData | None:
         """
         Create endpoint token.
         Returns token data if created, None if endpoint not found.
         """
-        async with self._db.begin_session() as session:
-            endpoint_id = creator.spec.endpoint  # type: ignore[attr-defined]
-            endpoint = await self._get_endpoint_by_id(session, endpoint_id)
+        async with self._db.begin_readonly_session() as session:
+            endpoint = await self._get_endpoint_by_id(session, deployment_id)
             if not endpoint:
                 return None
 
-            result = await execute_creator(session, creator)
-            return result.row.to_dataclass()
+        async with self._v2_ops.write_ops() as w:
+            return await w.create_field(deployment_id, creator)
 
     @model_serving_repository_resilience.apply()
-    async def get_scaling_group_info(self, scaling_group_name: str) -> ScalingGroupData | None:
+    async def get_resource_group_info(self, resource_group_name: str) -> ResourceGroupData | None:
         """
         Get scaling group information (wsproxy details).
         """
         async with self._db.begin_readonly_session_read_committed() as session:
             query = (
-                sa.select(scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token)
-                .select_from(scaling_groups)
-                .where(scaling_groups.c.name == scaling_group_name)
+                sa.select(resource_groups.c.wsproxy_addr, resource_groups.c.wsproxy_api_token)
+                .select_from(resource_groups)
+                .where(resource_groups.c.name == resource_group_name)
             )
             result = await session.execute(query)
             row = result.first()
             if not row:
                 return None
 
-            return ScalingGroupData(
+            return ResourceGroupData(
                 wsproxy_addr=row.wsproxy_addr, wsproxy_api_token=row.wsproxy_api_token
             )
 
@@ -488,33 +458,22 @@ class ModelServingRepository:
         """
         Private method to get endpoint by ID using an existing session.
         """
-        try:
-            return await EndpointRow.get(
-                session,
-                endpoint_id,
-                load_routes=load_routes,
-                load_session_owner=load_session_owner,
-                load_revisions=load_revisions,
+        query = sa.select(EndpointRow).where(EndpointRow.id == endpoint_id)
+        if load_routes:
+            query = query.options(selectinload(EndpointRow.routings))
+        if load_session_owner:
+            query = query.options(selectinload(EndpointRow.session_owner_row))
+        if load_revisions:
+            query = query.options(
+                selectinload(EndpointRow.current_revision_row).selectinload(
+                    DeploymentRevisionRow.image_row
+                ),
+                selectinload(EndpointRow.deploying_revision_row).selectinload(
+                    DeploymentRevisionRow.image_row
+                ),
             )
-        except NoResultFound:
-            return None
-
-    async def _get_route_by_id(
-        self,
-        session: SASession,
-        route_id: uuid.UUID,
-        load_endpoint: bool = False,
-        load_session: bool = False,
-    ) -> RoutingRow | None:
-        """
-        Private method to get route by ID using an existing session.
-        """
-        try:
-            return await RoutingRow.get(
-                session, route_id, load_endpoint=load_endpoint, load_session=load_session
-            )
-        except NoResultFound:
-            return None
+        endpoint: EndpointRow | None = await session.scalar(query)
+        return endpoint
 
     async def _validate_endpoint_access(
         self,
@@ -561,50 +520,21 @@ class ModelServingRepository:
             return vfolder_ownership_type
 
     @model_serving_repository_resilience.apply()
-    async def get_user_with_keypair(self, user_id: uuid.UUID) -> Any | None:
+    async def get_user_with_keypair(self, user_id: uuid.UUID) -> UserRow:
         """
-        Get user with their main access key.
+        Get the user row joined with one of their keypairs.
         """
         async with self._db.begin_readonly_session_read_committed() as session:
             query = (
-                sa.select(UserRow, KeyPairRow)
+                sa.select(UserRow)
                 .select_from(sa.join(UserRow, KeyPairRow, KeyPairRow.user == UserRow.uuid))
                 .where(UserRow.uuid == user_id)
             )
             result = await session.execute(query)
-            return result.fetchone()
-
-    @model_serving_repository_resilience.apply()
-    async def get_keypair_resource_policy(self, policy_name: str) -> Any | None:
-        """
-        Get keypair resource policy by name.
-        """
-        async with self._db.begin_readonly_session_read_committed() as session:
-            query = (
-                sa.select(keypair_resource_policies)
-                .select_from(keypair_resource_policies)
-                .where(keypair_resource_policies.c.name == policy_name)
-            )
-            result = await session.execute(query)
-            return result.first()
-
-    @model_serving_repository_resilience.apply()
-    async def get_endpoint_for_appproxy_update(self, service_id: uuid.UUID) -> EndpointRow | None:
-        """
-        Get endpoint with routes loaded for AppProxy updates.
-        """
-        async with self._db.begin_readonly_session_read_committed() as session:
-            return await self._get_endpoint_by_id(session, service_id, load_routes=True)
-
-    @model_serving_repository_resilience.apply()
-    async def get_route_with_session(self, route_id: uuid.UUID) -> RoutingRow | None:
-        """
-        Get route with endpoint and session data loaded.
-        """
-        async with self._db.begin_readonly_session_read_committed() as session:
-            return await self._get_route_by_id(
-                session, route_id, load_endpoint=True, load_session=True
-            )
+            user = result.scalar()
+            if user is None:
+                raise InvalidAPIParameters("User not found")
+            return user
 
     @model_serving_repository_resilience.apply()
     async def update_endpoint_replicas(
@@ -639,14 +569,10 @@ class ModelServingRepository:
         Returns None if rule doesn't exist.
         """
         async with self._db.begin_readonly_session_read_committed() as session:
-            try:
-                rule = await EndpointAutoScalingRuleRow.get(session, rule_id, load_endpoint=True)
-                if not rule:
-                    return None
-
-                return rule.to_data()
-            except ObjectNotFound:
+            rule = await session.get(EndpointAutoScalingRuleRow, rule_id)
+            if rule is None:
                 return None
+            return rule.to_data()
 
     @model_serving_repository_resilience.apply()
     async def create_auto_scaling_rule(
@@ -683,48 +609,49 @@ class ModelServingRepository:
                 max_threshold_val = Decimal(str(threshold))
             else:
                 min_threshold_val = Decimal(str(threshold))
-            rule = await endpoint.create_auto_scaling_rule(
-                session,
-                metric_source,
-                metric_name,
-                min_threshold_val,
-                max_threshold_val,
-                step_size,
+            rule = EndpointAutoScalingRuleRow(
+                endpoint=endpoint.id,
+                metric_source=metric_source,
+                metric_name=metric_name,
+                min_threshold=min_threshold_val,
+                max_threshold=max_threshold_val,
+                step_size=step_size,
                 cooldown_seconds=cooldown_seconds,
                 min_replicas=min_replicas,
                 max_replicas=max_replicas,
             )
+            session.add(rule)
+            await session.flush()
             return rule.to_data()
 
     @model_serving_repository_resilience.apply()
     async def update_auto_scaling_rule(
         self,
-        updater: Updater[EndpointAutoScalingRuleRow],
+        updater: AutoScalingRuleUpdater,
     ) -> EndpointAutoScalingRuleData | None:
         """
         Update auto scaling rule.
         Returns the updated rule if successful, None if not found or endpoint inactive.
         """
-        rule_id = uuid.UUID(str(updater.pk_value))
+        rule_id = uuid.UUID(str(updater.rule_id))
 
-        async with self._db.begin_session() as session:
-            try:
-                # Validate lifecycle stage before update
-                rule = await EndpointAutoScalingRuleRow.get(session, rule_id, load_endpoint=True)
-                if not rule:
-                    return None
-
-                if rule.endpoint_row.lifecycle_stage in EndpointLifecycle.inactive_states():
-                    return None
-
-                # Use execute_updater to apply changes
-                result = await execute_updater(session, updater)
-                if result is None:
-                    return None
-
-                return result.row.to_data()
-            except ObjectNotFound:
+        async with self._db.begin_readonly_session() as session:
+            # Validate lifecycle stage before update
+            lifecycle_stage = await session.scalar(
+                sa.select(EndpointRow.lifecycle_stage)
+                .join(
+                    EndpointAutoScalingRuleRow,
+                    EndpointAutoScalingRuleRow.endpoint == EndpointRow.id,
+                )
+                .where(EndpointAutoScalingRuleRow.id == rule_id)
+            )
+            if lifecycle_stage is None:
                 return None
+            if lifecycle_stage in EndpointLifecycle.inactive_states():
+                return None
+
+        async with self._v2_ops.write_ops() as w:
+            return await w.update_data(updater)
 
     @model_serving_repository_resilience.apply()
     async def delete_auto_scaling_rule(
@@ -736,55 +663,11 @@ class ModelServingRepository:
         Returns True if deleted, False if not found.
         """
         async with self._db.begin_session() as session:
-            try:
-                rule = await EndpointAutoScalingRuleRow.get(session, rule_id, load_endpoint=True)
-                if not rule:
-                    return False
-
-                await session.delete(rule)
-                return True
-            except NoResultFound:
+            rule = await session.get(EndpointAutoScalingRuleRow, rule_id)
+            if rule is None:
                 return False
-
-    @model_serving_repository_resilience.apply()
-    async def resolve_group_id(
-        self, domain_name: str, group_name_or_id: str | uuid.UUID
-    ) -> uuid.UUID | None:
-        """
-        Resolve group name or ID to group ID.
-        """
-        async with self._db.begin_readonly_session_read_committed() as session:
-            conn = await session.connection()
-            if conn is None:
-                raise DatabaseConnectionUnavailable("Database connection is not available")
-            return await resolve_group_name_or_id(conn, domain_name, group_name_or_id)
-
-    @model_serving_repository_resilience.apply()
-    async def get_session_by_id(
-        self, session_id: uuid.UUID, kernel_loading_strategy: KernelLoadingStrategy
-    ) -> SessionRow | None:
-        """
-        Get session by ID with specified kernel loading strategy.
-        """
-        async with self._db.begin_readonly_session_read_committed() as session:
-            try:
-                return await SessionRow.get_session(
-                    session, session_id, None, kernel_loading_strategy=kernel_loading_strategy
-                )
-            except NoResultFound:
-                return None
-
-    @model_serving_repository_resilience.apply()
-    async def resolve_image_for_endpoint_creation(
-        self, identifiers: list[ImageIdentifier | ImageAlias | ImageRef]
-    ) -> ImageRow:
-        """
-        Resolve image for endpoint creation.
-        This is a special case where we need the actual ImageRow object
-        because EndpointRow constructor requires it.
-        """
-        async with self._db.begin_readonly_session_read_committed() as session:
-            return await ImageRow.resolve(session, identifiers)
+            await session.delete(rule)
+            return True
 
     @model_serving_repository_resilience.apply()
     async def get_image_by_id(self, image_id: uuid.UUID) -> ImageData:
@@ -797,14 +680,14 @@ class ModelServingRepository:
         async with self._db.begin_readonly_session_read_committed() as session:
             image_row = await session.scalar(sa.select(ImageRow).where(ImageRow.id == image_id))
             if image_row is None:
-                raise ObjectNotFound(f"Image {image_id} not found")
-            return image_row.to_dataclass()
+                raise ImageNotFound(f"Image {image_id} not found")
+            return ImageSearchableFields.own.to_data(image_row)
 
     @model_serving_repository_resilience.apply()
     async def modify_endpoint_fields(
         self,
         deployment_id: DeploymentID,
-        updater: Updater[EndpointRow],
+        updater: LegacyEndpointUpdater,
         agent_registry: AgentRegistry,
         legacy_etcd_config_loader: LegacyEtcdLoader,
     ) -> MutationResult:
@@ -817,30 +700,28 @@ class ModelServingRepository:
 
         async def _do_mutate() -> MutationResult:
             async with self._db.begin_session() as db_session:
-                try:
-                    endpoint_row = await EndpointRow.get(
-                        db_session,
-                        deployment_id,
-                        load_session_owner=True,
-                        load_revisions=True,
-                        load_routes=True,
-                    )
-                    user_data = current_user()
-                    if user_data is None:
-                        raise GenericForbidden("User context not available.")
-                    match user_data.role:
-                        case UserRole.SUPERADMIN:
-                            pass
-                        case UserRole.ADMIN:
-                            domain_name = user_data.domain_name
-                            if endpoint_row.domain != domain_name:
-                                raise EndpointNotFound
-                        case _:
-                            user_id = user_data.user_id
-                            if endpoint_row.session_owner != user_id:
-                                raise EndpointNotFound
-                except NoResultFound as e:
-                    raise EndpointNotFound from e
+                endpoint_row = await self._get_endpoint_by_id(
+                    db_session,
+                    deployment_id,
+                    load_revisions=True,
+                    load_routes=True,
+                )
+                if endpoint_row is None:
+                    raise EndpointNotFound
+                user_data = current_user()
+                if user_data is None:
+                    raise GenericForbidden("User context not available.")
+                match user_data.role:
+                    case UserRole.SUPERADMIN:
+                        pass
+                    case UserRole.ADMIN:
+                        domain_name = user_data.domain_name
+                        if endpoint_row.domain != domain_name:
+                            raise EndpointNotFound
+                    case _:
+                        user_id = user_data.user_id
+                        if endpoint_row.session_owner != user_id:
+                            raise EndpointNotFound
 
                 if endpoint_row.lifecycle_stage in (
                     EndpointLifecycle.DESTROYING,
@@ -848,41 +729,51 @@ class ModelServingRepository:
                 ):
                     raise InvalidAPIParameters("Cannot update endpoint marked for removal")
 
-                spec = cast(EndpointUpdaterSpec, updater.spec)
-
                 # Apply endpoint-level changes (replicas, resource_group, etc.)
-                spec.apply_to_row(endpoint_row)
+                for column, value in updater.build_values().items():
+                    setattr(endpoint_row, column, value)
 
-                session_owner = endpoint_row.session_owner_row
+                session_owner = await db_session.get(UserRow, endpoint_row.session_owner)
                 if session_owner is None:
                     raise InvalidAPIParameters("Session owner not found for endpoint")
-                if session_owner.main_access_key is None:
-                    raise InvalidAPIParameters("Session owner has no access key")
                 if session_owner.role is None:
                     raise InvalidAPIParameters("Session owner has no role")
 
-                conn = await db_session.connection()
-                if conn is None:
-                    raise DatabaseConnectionUnavailable("Database connection is not available")
-
-                await self._check_inference_scaling_group(
-                    conn,
-                    endpoint_row.resource_group,
-                    AccessKey(session_owner.main_access_key),
-                    endpoint_row.domain,
-                    ProjectID(endpoint_row.project),
-                )
+                async with self._v2_ops.read_ops() as r:
+                    domain_id = await r.lookup_entity_id(
+                        DomainNameLookup(name=DomainName(endpoint_row.domain))
+                    )
+                    if domain_id is None:
+                        raise DomainNotFound(f"Domain not found (name: {endpoint_row.domain})")
+                    search = AllowedResourceGroupsSearch(
+                        domain_id=domain_id,
+                        project_ids=[ProjectID(endpoint_row.project)],
+                        user_id=UserID(session_owner.uuid),
+                    )
+                    allowed = await r.search_with_scopes(
+                        search.operation_scopes(), search.searcher()
+                    )
+                self._check_inference_resource_group(allowed.items, endpoint_row.resource_group)
 
                 await db_session.commit()
 
                 # Reload with revisions for to_data()
-                endpoint_row = await EndpointRow.get(
-                    db_session,
-                    endpoint_row.id,
-                    load_revisions=True,
-                    load_created_user=True,
-                    load_session_owner=True,
+                endpoint_row = await db_session.scalar(
+                    sa.select(EndpointRow)
+                    .where(EndpointRow.id == endpoint_row.id)
+                    .options(
+                        selectinload(EndpointRow.created_user_row),
+                        selectinload(EndpointRow.session_owner_row),
+                        selectinload(EndpointRow.current_revision_row).selectinload(
+                            DeploymentRevisionRow.image_row
+                        ),
+                        selectinload(EndpointRow.deploying_revision_row).selectinload(
+                            DeploymentRevisionRow.image_row
+                        ),
+                    )
                 )
+                if endpoint_row is None:
+                    raise EndpointNotFound
                 return MutationResult(
                     success=True,
                     message="success",
@@ -905,67 +796,89 @@ class ModelServingRepository:
     async def search_services_paginated(
         self,
         session_owner_id: uuid.UUID,
-        querier: BatchQuerier,
+        searcher: DeploymentInfoSearcher,
     ) -> ServiceSearchResult:
         """
         Search services with pagination.
         Base conditions (session_owner, lifecycle_stage) are applied as security constraints.
-        Additional filter/pagination conditions come from the querier.
+        Additional filter/pagination conditions come from the searcher.
         """
-        async with self._db.begin_readonly_session_read_committed() as session:
-            query = (
-                sa.select(EndpointRow)
-                .where(EndpointRow.session_owner == session_owner_id)
-                .where(EndpointRow.lifecycle_stage == EndpointLifecycle.CREATED)
-                .options(selectinload(EndpointRow.routings))
-                .options(selectinload(EndpointRow.current_revision_row))
-            )
-
-            result = await execute_batch_querier(session, query, querier)
-
-            items: list[ServiceSearchItem] = []
-            for row in result.rows:
-                ep = row.EndpointRow
-                current_rev = ep._find_current_revision()
-                routings_data = [r.to_data() for r in ep.routings] if ep.routings else []
-                active_route_count = (
-                    len([
-                        r
-                        for r in ep.routings
-                        if r.status == RouteStatus.RUNNING
-                        and r.health_status == RouteHealthStatus.HEALTHY
-                    ])
-                    if ep.routings
-                    else 0
-                )
-                items.append(
-                    ServiceSearchItem(
-                        id=ep.id,
-                        name=ep.name,
-                        replicas=ep.replicas,
-                        active_route_count=active_route_count,
-                        service_endpoint=HttpUrl(ep.url) if ep.url else None,
-                        open_to_public=ep.open_to_public or False,
-                        resource_slots=(
-                            current_rev.resource_slots if current_rev else ResourceSlot({})
-                        ),
-                        resource_group=ep.resource_group,
-                        routings=routings_data,
+        deployment_fields = DeploymentSearchableFields.own
+        replica_fields = ReplicaSearchableFields.own
+        bounded = replace(
+            searcher,
+            conditions=[
+                deployment_fields.session_owner.filter.equals(
+                    UUIDEqualMatchSpec(value=session_owner_id, negated=False)
+                ),
+                deployment_fields.lifecycle_stage.filter.in_([EndpointLifecycle.CREATED]),
+                *searcher.conditions,
+            ],
+        )
+        async with self._v2_ops.read_ops() as r:
+            result = await r.search_in_global(bounded)
+            deployments = result.items
+            routes = (
+                (
+                    await r.search_in_global(
+                        RoutingDataSearcher(
+                            pagination=NoPagination(),
+                            conditions=[
+                                replica_fields.deployment_id.filter.in_(
+                                    UUIDInMatchSpec(
+                                        values=[info.id for info in deployments], negated=False
+                                    )
+                                )
+                            ],
+                        )
                     )
-                )
-
-            return ServiceSearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
+                ).items
+                if deployments
+                else []
             )
+        routes_by_deployment: defaultdict[uuid.UUID, list[RoutingData]] = defaultdict(list)
+        for route in routes:
+            routes_by_deployment[route.endpoint].append(route)
+
+        items: list[ServiceSearchItem] = []
+        for info in deployments:
+            deployment_routes = routes_by_deployment[info.id]
+            current_rev = info.current_revision
+            items.append(
+                ServiceSearchItem(
+                    id=info.id,
+                    name=info.metadata.name,
+                    replicas=info.replica.replica_count,
+                    active_route_count=len([
+                        route
+                        for route in deployment_routes
+                        if route.status == RouteStatus.RUNNING
+                        and route.health_status == RouteHealthStatus.HEALTHY
+                    ]),
+                    service_endpoint=HttpUrl(info.network.url) if info.network.url else None,
+                    open_to_public=info.network.open_to_public,
+                    resource_slots=(
+                        current_rev.resource_config.resource_slot
+                        if current_rev
+                        else ResourceSlot({})
+                    ),
+                    resource_group=info.metadata.resource_group,
+                    routings=deployment_routes,
+                )
+            )
+
+        return ServiceSearchResult(
+            items=items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     @model_serving_repository_resilience.apply()
     async def resolve_model_service_validation_context(
         self,
         *,
-        scaling_group: str,
+        resource_group: str,
         owner_access_key: AccessKey,
         domain_name: str,
         group_name: str,
@@ -991,14 +904,6 @@ class ModelServingRepository:
         used by ``SchedulerRepository.prepare_vfolder_mounts``.
         """
         async with self._db.begin_readonly() as conn:
-            checked_scaling_group = await self._check_inference_scaling_group(
-                conn,
-                scaling_group,
-                owner_access_key,
-                domain_name,
-                group_name,
-            )
-
             try:
                 user_info = await query_userinfo(
                     conn,
@@ -1018,37 +923,43 @@ class ModelServingRepository:
             resource_policy = user_info.resource_policy
             owner_role = user_info.owner_role
 
-            allowed_vfolder_types = await legacy_etcd_loader.get_vfolder_types()
-            try:
-                extra_vf_conds = vfolders.c.id == uuid.UUID(model)
-                matched_vfolders = await query_accessible_vfolders(
-                    conn,
-                    owner_uuid,
-                    user_role=owner_role,
-                    domain_name=domain_name,
-                    allowed_vfolder_types=allowed_vfolder_types,
-                    extra_vf_conds=extra_vf_conds,
+            target_domain = domain_name or requester_domain
+            async with self._v2_ops.read_ops() as r:
+                domain_id = await r.lookup_entity_id(
+                    DomainNameLookup(name=DomainName(target_domain))
                 )
-            except Exception as e:
-                if isinstance(e, (ValueError, VFolderNotFound)):
-                    try:
-                        extra_vf_conds = (vfolders.c.name == model) & (
-                            vfolders.c.usage_mode == VFolderUsageMode.MODEL
-                        )
-                        matched_vfolders = await query_accessible_vfolders(
-                            conn,
-                            owner_uuid,
-                            user_role=owner_role,
-                            domain_name=domain_name,
-                            allowed_vfolder_types=allowed_vfolder_types,
-                            extra_vf_conds=extra_vf_conds,
-                        )
-                    except VFolderNotFound as e:
-                        raise VFolderNotFound("Cannot find model folder") from e
-                else:
-                    raise
+                if domain_id is None:
+                    raise DomainNotFound(f"Domain not found (name: {target_domain})")
+                search = AllowedResourceGroupsSearch(
+                    domain_id=domain_id,
+                    project_ids=[ProjectID(group_id)],
+                    user_id=UserID(owner_uuid),
+                )
+                allowed = await r.search_with_scopes(search.operation_scopes(), search.searcher())
+            checked_resource_group = self._check_inference_resource_group(
+                allowed.items, resource_group
+            )
+
+            allowed_vfolder_types = await legacy_etcd_loader.get_vfolder_types()
+            owner_scope = UserScope(
+                domain_name=domain_name,
+                group_id=group_id,
+                user_uuid=owner_uuid,
+                user_role=owner_role,
+            )
+            owner_held = partial(self._permission_check.held_permissions, UserID(owner_uuid))
+            model_condition: sa.ColumnElement[bool]
+            try:
+                model_condition = vfolders.c.id == uuid.UUID(model)
+            except ValueError:
+                model_condition = (vfolders.c.name == model) & (
+                    vfolders.c.usage_mode == VFolderUsageMode.MODEL
+                )
+            matched_vfolders = await query_reachable_vfolders(
+                conn, owner_scope, model_condition, owner_held
+            )
             if len(matched_vfolders) == 0:
-                raise VFolderNotFound
+                raise VFolderNotFound("Cannot find model folder")
             folder_row = matched_vfolders[0]
             if folder_row["usage_mode"] != VFolderUsageMode.MODEL:
                 raise InvalidAPIParameters("Selected VFolder is not a model folder")
@@ -1062,13 +973,9 @@ class ModelServingRepository:
                 model_id,
                 model_mount_destination,
                 extra_mounts,
-                UserScope(
-                    domain_name=domain_name,
-                    group_id=group_id,
-                    user_uuid=owner_uuid,
-                    user_role=owner_role,
-                ),
+                owner_scope,
                 resource_policy,
+                owner_held,
             )
 
             reads_vfolder_config_files = await conn.scalar(
@@ -1090,7 +997,7 @@ class ModelServingRepository:
             owner_role=owner_role,
             group_id=group_id,
             resource_policy=resource_policy,
-            scaling_group=checked_scaling_group,
+            resource_group=checked_resource_group,
             extra_mounts=vfolder_mounts,
             variant_reads_vfolder_config_files=reads_vfolder_config_files,
         )

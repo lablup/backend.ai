@@ -7,7 +7,7 @@ import uuid
 from collections.abc import AsyncIterator, Callable, Coroutine
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 import yarl
@@ -15,37 +15,42 @@ import yarl
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.types import (
     QuotaScopeID,
     QuotaScopeType,
     VFolderHostPermission,
     VFolderHostPermissionMap,
+    VFolderMountPolicy,
     VFolderUsageMode,
 )
-from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.actions.validators.rbac import RBACValidators
-from ai.backend.manager.actions.validators.rbac.single_entity import (
-    SingleEntityActionRBACValidator,
-)
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.api.rest.v2.vfolder.handler import V2VFolderHandler
 from ai.backend.manager.api.rest.v2.vfolder.registry import register_v2_vfolder_routes
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.data.vfolder.types import (
-    VFolderMountPermission,
     VFolderOperationStatus,
     VFolderOwnershipType,
 )
-from ai.backend.manager.models.domain import domains
-from ai.backend.manager.models.resource_policy import keypair_resource_policies
+from ai.backend.manager.models.domain.row import domains
+from ai.backend.manager.models.resource_policy.row import keypair_resource_policies
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import vfolders
+from ai.backend.manager.models.vfolder.row import vfolders
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
+    ResourcePolicyOpsProvider,
+)
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.vfolder.processors.vfolder import VFolderProcessors
 from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
@@ -64,7 +69,7 @@ class VFolderFixtureData:
     domain_name: str
     quota_scope_id: str
     usage_mode: VFolderUsageMode
-    permission: VFolderMountPermission
+    default_mount_permission: VFolderMountPolicy
     ownership_type: VFolderOwnershipType
     user: str
     creator: str
@@ -87,14 +92,21 @@ def rbac_permission_repo(
 def vfolder_processors(
     database_engine: ExtendedAsyncSAEngine,
     rbac_permission_repo: PermissionControllerRepository,
+    processor_registry: ProcessorRegistry[Any],
 ) -> VFolderProcessors:
-    """VFolderProcessors with real SingleEntityActionRBACValidator.
+    """VFolderProcessors with real single-entity RBAC validation.
 
     RBAC checks use check_permission_with_scope_chain() against the real DB.
     Without explicit RBAC permission grants, all access is denied (403).
     """
-    vfolder_repository = VfolderRepository(database_engine)
-    user_repository = UserRepository(database_engine)
+    vfolder_repository = VfolderRepository(database_engine, ShareOpsProvider(database_engine))
+    user_repository = UserRepository(
+        database_engine,
+        V2DBOpsProvider(database_engine),
+        ShareOpsProvider(database_engine),
+        ResourcePolicyOpsProvider(database_engine),
+        KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+    )
     service = VFolderService(
         config_provider=MagicMock(),
         etcd=MagicMock(),
@@ -103,21 +115,9 @@ def vfolder_processors(
         vfolder_repository=vfolder_repository,
         user_repository=user_repository,
         valkey_stat_client=MagicMock(),
+        own_check=MagicMock(),
     )
-    real_single_entity_validator = SingleEntityActionRBACValidator(
-        rbac_permission_repo, MagicMock()
-    )
-    return VFolderProcessors(
-        service=service,
-        action_monitors=[],
-        validators=ActionValidators(
-            rbac=RBACValidators(
-                scope=AsyncMock(),
-                single_entity=real_single_entity_validator,
-                bulk=AsyncMock(),
-            )
-        ),
-    )
+    return VFolderProcessors(processor_registry.group(GroupMeta(VFolderEntityType())), service)
 
 
 @pytest.fixture()
@@ -128,7 +128,7 @@ def server_module_registries(
     """Register v2 vfolder routes for testing."""
     processors = MagicMock(spec=Processors)
     processors.vfolder = vfolder_processors
-    adapter = VFolderAdapter(processors)
+    adapter = VFolderAdapter(processors.vfolder, MagicMock(), MagicMock(), MagicMock(), MagicMock())
     handler = V2VFolderHandler(adapter=adapter)
     v2_reg = RouteRegistry.create("v2", route_deps.cors_options)
     v2_reg.add_subregistry(register_v2_vfolder_routes(handler, route_deps))
@@ -238,7 +238,7 @@ async def vfolder_factory(
             "domain_name": domain_fixture.domain_name,
             "quota_scope_id": str(quota_scope_id),
             "usage_mode": VFolderUsageMode.GENERAL,
-            "permission": VFolderMountPermission.READ_WRITE,
+            "default_mount_permission": VFolderMountPolicy.READ_WRITE,
             "ownership_type": VFolderOwnershipType.USER,
             "user": str(user_uuid),
             "creator": "admin-test@test.local",

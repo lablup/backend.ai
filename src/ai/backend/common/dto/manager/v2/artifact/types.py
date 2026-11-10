@@ -72,7 +72,11 @@ class ArtifactAvailability(StrEnum):
 
 
 class ArtifactOrderField(StrEnum):
-    """Fields available for ordering artifacts."""
+    """Fields available for ordering artifacts.
+
+    ``SIZE`` is deprecated since 26.9.0: a size belongs to a revision rather than the
+    artifact, so the value is not used for ordering. It is removed in the next release.
+    """
 
     NAME = "NAME"
     TYPE = "TYPE"

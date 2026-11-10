@@ -1,52 +1,19 @@
-"""GQL types for role invitations."""
+"""Deprecated GQL types kept from the removed role invitation feature."""
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Annotated, Any, Self
+from typing import TYPE_CHECKING, Annotated, Any, Self, override
 from uuid import UUID
 
 import strawberry
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
-if TYPE_CHECKING:
-    from ai.backend.manager.api.gql.rbac.types.role import RoleGQL
-    from ai.backend.manager.api.gql.user.types.node import UserV2GQL
-
-from ai.backend.common.dto.manager.v2.role_invitation.request import (
-    AcceptRoleInvitationInput as AcceptRoleInvitationInputDTO,
-)
-from ai.backend.common.dto.manager.v2.role_invitation.request import (
-    CancelRoleInvitationInput as CancelRoleInvitationInputDTO,
-)
-from ai.backend.common.dto.manager.v2.role_invitation.request import (
-    CreateRoleInvitationInput as CreateRoleInvitationInputDTO,
-)
-from ai.backend.common.dto.manager.v2.role_invitation.request import (
-    RejectRoleInvitationInput as RejectRoleInvitationInputDTO,
-)
-from ai.backend.common.dto.manager.v2.role_invitation.request import (
-    RoleInvitationFilter as RoleInvitationFilterDTO,
-)
-from ai.backend.common.dto.manager.v2.role_invitation.request import (
-    RoleInvitationOrderBy as RoleInvitationOrderByDTO,
-)
-from ai.backend.common.dto.manager.v2.role_invitation.request import (
-    RoleInvitationStateFilter as RoleInvitationStateFilterDTO,
-)
-from ai.backend.common.dto.manager.v2.role_invitation.request import (
-    RoleNestedFilter as RoleNestedFilterDTO,
-)
-from ai.backend.common.dto.manager.v2.role_invitation.request import (
-    UserNestedFilter as UserNestedFilterDTO,
-)
-from ai.backend.common.dto.manager.v2.role_invitation.response import (
+from ai.backend.common.dto.manager.v2.rbac.response import (
     CreateRoleInvitationPayload as CreateRoleInvitationPayloadDTO,
-)
-from ai.backend.common.dto.manager.v2.role_invitation.response import (
-    RoleInvitationNode as RoleInvitationNodeDTO,
 )
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter
 from ai.backend.manager.api.gql.decorators import (
@@ -63,38 +30,36 @@ from ai.backend.manager.api.gql.pydantic_compat import (
     PydanticNodeMixin,
     PydanticOutputMixin,
 )
-from ai.backend.manager.api.gql.types import GQLOrderBy
+from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
+
+if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.rbac.types.role import RoleGQL
+    from ai.backend.manager.api.gql.user.types.node import UserV2GQL
+
+_HINT = "role assignments"
+
+
+def _meta(description: str) -> BackendAIGQLMeta:
+    return BackendAIGQLMeta(
+        added_version="26.4.4",
+        description=description,
+        deprecated_version="26.9.0",
+        deprecation_hint=_HINT,
+    )
+
 
 # -- Enums --
 
 
-@gql_enum(
-    BackendAIGQLMeta(
-        added_version="26.4.4",
-        description="Role invitation state.",
-    ),
-    name="RoleInvitationState",
-)
+@gql_enum(_meta("Role invitation state."), name="RoleInvitationState")
 class RoleInvitationStateGQL(StrEnum):
-    """GraphQL enum for role invitation state.
-
-    Kept separate from `RoleInvitationStateDTO` with matching values; the Pydantic
-    compatibility layer performs 1:1 conversion via `.value` coercion.
-    """
-
     PENDING = "pending"
     ACCEPTED = "accepted"
     REJECTED = "rejected"
     CANCELED = "canceled"
 
 
-@gql_enum(
-    BackendAIGQLMeta(
-        added_version="26.4.4",
-        description="Role invitation ordering field.",
-    ),
-    name="RoleInvitationOrderField",
-)
+@gql_enum(_meta("Role invitation ordering field."), name="RoleInvitationOrderField")
 class RoleInvitationOrderFieldGQL(StrEnum):
     CREATED_AT = "created_at"
     UPDATED_AT = "updated_at"
@@ -104,14 +69,8 @@ class RoleInvitationOrderFieldGQL(StrEnum):
 # -- Node --
 
 
-@gql_node_type(
-    BackendAIGQLMeta(
-        added_version="26.4.4",
-        description="A role invitation.",
-    ),
-    name="RoleInvitation",
-)
-class RoleInvitationGQL(PydanticNodeMixin[RoleInvitationNodeDTO]):
+@gql_node_type(_meta("A role invitation."), name="RoleInvitation")
+class RoleInvitationGQL(PydanticNodeMixin[Any]):
     id: NodeID[str]
     inviter_user_id: UUID | None = gql_field(description="Inviter user ID.")
     invitee_user_id: UUID = gql_field(description="Invitee user ID.")
@@ -120,10 +79,20 @@ class RoleInvitationGQL(PydanticNodeMixin[RoleInvitationNodeDTO]):
     created_at: datetime = gql_field(description="Creation timestamp.")
     updated_at: datetime | None = gql_field(description="Last update timestamp.")
 
+    @classmethod
+    @override
+    async def resolve_nodes(  # type: ignore[override]
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[Self | None]:
+        return [None for _ in node_ids]
+
     @gql_field(description="The user who sent this invitation. Null for system-issued invitations.")  # type: ignore[misc]
-    async def inviter(
+    def inviter(
         self,
-        info: Info,
     ) -> (
         Annotated[
             UserV2GQL,
@@ -131,19 +100,13 @@ class RoleInvitationGQL(PydanticNodeMixin[RoleInvitationNodeDTO]):
         ]
         | None
     ):
-        if self.inviter_user_id is None:
-            return None
-        inviter: UserV2GQL | None = await info.context.data_loaders.user_loader.load(
-            self.inviter_user_id
-        )
-        return inviter
+        return None
 
     @gql_field(
         description="The user who received this invitation. Null if the user no longer exists."
     )  # type: ignore[misc]
-    async def invitee(
+    def invitee(
         self,
-        info: Info,
     ) -> (
         Annotated[
             UserV2GQL,
@@ -151,17 +114,13 @@ class RoleInvitationGQL(PydanticNodeMixin[RoleInvitationNodeDTO]):
         ]
         | None
     ):
-        invitee: UserV2GQL | None = await info.context.data_loaders.user_loader.load(
-            self.invitee_user_id
-        )
-        return invitee
+        return None
 
     @gql_field(
         description="The role this invitation grants on acceptance. Null if the role no longer exists."
     )  # type: ignore[misc]
-    async def role(
+    def role(
         self,
-        info: Info,
     ) -> (
         Annotated[
             RoleGQL,
@@ -169,8 +128,7 @@ class RoleInvitationGQL(PydanticNodeMixin[RoleInvitationNodeDTO]):
         ]
         | None
     ):
-        role: RoleGQL | None = await info.context.data_loaders.role_loader.load(self.role_id)
-        return role
+        return None
 
 
 # -- Connection --
@@ -178,12 +136,7 @@ class RoleInvitationGQL(PydanticNodeMixin[RoleInvitationNodeDTO]):
 RoleInvitationEdge = Edge[RoleInvitationGQL]
 
 
-@gql_connection_type(
-    BackendAIGQLMeta(
-        added_version="26.4.4",
-        description="Role invitation connection.",
-    )
-)
+@gql_connection_type(_meta("Role invitation connection."))
 class RoleInvitationConnection(Connection[RoleInvitationGQL]):
     count: int
 
@@ -191,18 +144,27 @@ class RoleInvitationConnection(Connection[RoleInvitationGQL]):
         super().__init__(*args, **kwargs)
         self.count = count
 
+    @classmethod
+    def empty(cls) -> Self:
+        return cls(
+            edges=[],
+            page_info=strawberry.relay.PageInfo(
+                has_next_page=False,
+                has_previous_page=False,
+                start_cursor=None,
+                end_cursor=None,
+            ),
+            count=0,
+        )
+
 
 # -- OrderBy --
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(
-        added_version="26.4.4",
-        description="Order by specification for role invitations.",
-    ),
-    name="RoleInvitationOrderBy",
+    _meta("Order by specification for role invitations."), name="RoleInvitationOrderBy"
 )
-class RoleInvitationOrderByGQL(PydanticInputMixin[RoleInvitationOrderByDTO], GQLOrderBy):
+class RoleInvitationOrderByGQL(PydanticInputMixin[Any], GQLOrderBy):
     field: RoleInvitationOrderFieldGQL
     direction: OrderDirection = OrderDirection.DESC
 
@@ -210,14 +172,8 @@ class RoleInvitationOrderByGQL(PydanticInputMixin[RoleInvitationOrderByDTO], GQL
 # -- Filters --
 
 
-@gql_pydantic_input(
-    BackendAIGQLMeta(
-        added_version="26.4.4",
-        description="Filter for role invitation state.",
-    ),
-    name="RoleInvitationStateFilter",
-)
-class RoleInvitationStateFilterGQL(PydanticInputMixin[RoleInvitationStateFilterDTO]):
+@gql_pydantic_input(_meta("Filter for role invitation state."), name="RoleInvitationStateFilter")
+class RoleInvitationStateFilterGQL(PydanticInputMixin[Any]):
     equals: RoleInvitationStateGQL | None = None
     in_: list[RoleInvitationStateGQL] | None = gql_field(
         description="Match any of the provided states.", name="in", default=None
@@ -231,35 +187,23 @@ class RoleInvitationStateFilterGQL(PydanticInputMixin[RoleInvitationStateFilterD
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(
-        added_version="26.4.4",
-        description="Nested filter for the role associated with an invitation.",
-    ),
+    _meta("Nested filter for the role associated with an invitation."),
     name="RoleInvitationRoleNestedFilter",
 )
-class RoleInvitationRoleNestedFilterGQL(PydanticInputMixin[RoleNestedFilterDTO]):
+class RoleInvitationRoleNestedFilterGQL(PydanticInputMixin[Any]):
     name: StringFilter | None = None
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(
-        added_version="26.4.4",
-        description="Nested filter for a user (inviter or invitee) of an invitation.",
-    ),
+    _meta("Nested filter for a user (inviter or invitee) of an invitation."),
     name="RoleInvitationUserNestedFilter",
 )
-class RoleInvitationUserNestedFilterGQL(PydanticInputMixin[UserNestedFilterDTO]):
+class RoleInvitationUserNestedFilterGQL(PydanticInputMixin[Any]):
     email: StringFilter | None = None
 
 
-@gql_pydantic_input(
-    BackendAIGQLMeta(
-        added_version="26.4.4",
-        description="Filter for role invitations.",
-    ),
-    name="RoleInvitationFilter",
-)
-class RoleInvitationFilterGQL(PydanticInputMixin[RoleInvitationFilterDTO]):
+@gql_pydantic_input(_meta("Filter for role invitations."), name="RoleInvitationFilter")
+class RoleInvitationFilterGQL(PydanticInputMixin[Any], GQLFilter):
     state: RoleInvitationStateFilterGQL | None = None
     role_id: UUIDFilter | None = None
     role: RoleInvitationRoleNestedFilterGQL | None = None
@@ -273,48 +217,30 @@ class RoleInvitationFilterGQL(PydanticInputMixin[RoleInvitationFilterDTO]):
 # -- Inputs --
 
 
-@gql_pydantic_input(
-    BackendAIGQLMeta(
-        added_version="26.4.4",
-        description="Input for creating role invitations.",
-    ),
-    name="CreateRoleInvitationInput",
-)
-class CreateRoleInvitationInputGQL(PydanticInputMixin[CreateRoleInvitationInputDTO]):
+@gql_pydantic_input(_meta("Input for creating role invitations."), name="CreateRoleInvitationInput")
+class CreateRoleInvitationInputGQL(PydanticInputMixin[Any]):
     role_id: UUID
     emails: list[str]
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(
-        added_version="26.4.4",
-        description="Input for accepting a role invitation.",
-    ),
-    name="AcceptRoleInvitationInput",
+    _meta("Input for accepting a role invitation."), name="AcceptRoleInvitationInput"
 )
-class AcceptRoleInvitationInputGQL(PydanticInputMixin[AcceptRoleInvitationInputDTO]):
+class AcceptRoleInvitationInputGQL(PydanticInputMixin[Any]):
     invitation_id: UUID
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(
-        added_version="26.4.4",
-        description="Input for rejecting a role invitation.",
-    ),
-    name="RejectRoleInvitationInput",
+    _meta("Input for rejecting a role invitation."), name="RejectRoleInvitationInput"
 )
-class RejectRoleInvitationInputGQL(PydanticInputMixin[RejectRoleInvitationInputDTO]):
+class RejectRoleInvitationInputGQL(PydanticInputMixin[Any]):
     invitation_id: UUID
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(
-        added_version="26.4.4",
-        description="Input for canceling a role invitation.",
-    ),
-    name="CancelRoleInvitationInput",
+    _meta("Input for canceling a role invitation."), name="CancelRoleInvitationInput"
 )
-class CancelRoleInvitationInputGQL(PydanticInputMixin[CancelRoleInvitationInputDTO]):
+class CancelRoleInvitationInputGQL(PydanticInputMixin[Any]):
     invitation_id: UUID
 
 
@@ -322,12 +248,9 @@ class CancelRoleInvitationInputGQL(PydanticInputMixin[CancelRoleInvitationInputD
 
 
 @gql_pydantic_type(
-    BackendAIGQLMeta(
-        added_version="26.4.4",
-        description="Payload for role invitation creation.",
-    ),
+    _meta("Payload for role invitation creation."),
     model=CreateRoleInvitationPayloadDTO,
     name="CreateRoleInvitationPayload",
 )
-class CreateRoleInvitationPayload(PydanticOutputMixin[CreateRoleInvitationPayloadDTO]):
+class CreateRoleInvitationPayloadGQL(PydanticOutputMixin[CreateRoleInvitationPayloadDTO]):
     items: list[RoleInvitationGQL] = gql_field(description="List of created role invitations.")

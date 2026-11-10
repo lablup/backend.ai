@@ -7,9 +7,9 @@ from aiohttp import web
 
 from ai.backend.agent.types import WebMiddleware
 from ai.backend.common.plugin import AbstractPlugin
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class NewMetadataPluginResponse(NamedTuple):

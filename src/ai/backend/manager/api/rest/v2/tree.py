@@ -28,16 +28,25 @@ def build_v2_routes(
     # Lazy imports to avoid circular dependencies at module level
     from .agent.handler import V2AgentHandler
     from .agent.registry import register_v2_agent_routes
+    from .app_config.handler import V2AppConfigHandler
+    from .app_config.registry import register_v2_app_config_routes
     from .app_config_allow_list.handler import V2AppConfigAllowListHandler
-    from .app_config_allow_list.registry import register_v2_app_config_allow_list_routes
+    from .app_config_allow_list.registry import (
+        register_v2_app_config_allow_list_routes,
+        register_v2_app_config_allow_lists_routes,
+    )
     from .app_config_definition.handler import V2AppConfigDefinitionHandler
     from .app_config_definition.registry import register_v2_app_config_definition_routes
+    from .app_config_fragment.handler import V2AppConfigFragmentHandler
+    from .app_config_fragment.registry import register_v2_app_config_fragment_routes
     from .artifact.handler import V2ArtifactHandler
     from .artifact.registry import register_v2_artifact_routes
     from .artifact_registry.handler import V2ArtifactRegistryHandler
     from .artifact_registry.registry import register_v2_artifact_registry_routes
     from .audit_log.handler import V2AuditLogHandler
     from .audit_log.registry import register_v2_audit_log_routes
+    from .client_ip_masking.handler import V2ClientIPMaskingHandler
+    from .client_ip_masking.registry import register_v2_client_ip_masking_routes
     from .container_registry.handler import V2ContainerRegistryHandler
     from .container_registry.registry import register_v2_container_registry_routes
     from .deployment.handler import V2DeploymentHandler
@@ -48,10 +57,20 @@ def build_v2_routes(
     )
     from .domain.handler import V2DomainHandler
     from .domain.registry import register_v2_domain_routes
+    from .entity_label.handler import V2EntityLabelHandler
+    from .entity_label.registry import register_v2_entity_label_routes
+    from .entity_share.handler import V2EntityShareHandler
+    from .entity_share.registry import register_v2_entity_share_routes
+    from .entity_type.handler import V2EntityTypeHandler
+    from .entity_type.registry import register_v2_entity_type_routes
     from .fair_share.handler import V2FairShareHandler
     from .fair_share.registry import register_v2_fair_share_routes
     from .huggingface_registry.handler import V2HuggingFaceRegistryHandler
     from .huggingface_registry.registry import register_v2_huggingface_registry_routes
+    from .idle_checker.handler import V2IdleCheckerHandler
+    from .idle_checker.registry import register_v2_idle_checker_routes
+    from .idle_checker_assignment.handler import V2IdleCheckerAssignmentHandler
+    from .idle_checker_assignment.registry import register_v2_idle_checker_assignment_routes
     from .image.handler import V2ImageHandler
     from .image.registry import register_v2_image_routes
     from .keypair.handler import V2KeypairHandler
@@ -94,8 +113,6 @@ def build_v2_routes(
     from .resource_usage.registry import register_v2_resource_usage_routes
     from .retention_policy.handler import V2RetentionPolicyHandler
     from .retention_policy.registry import register_v2_retention_policy_routes
-    from .role_invitation.handler import V2RoleInvitationHandler
-    from .role_invitation.registry import register_v2_role_invitation_routes
     from .role_preset.handler import V2RolePresetHandler
     from .role_preset.registry import register_v2_role_preset_routes
     from .runtime_variant.handler import V2RuntimeVariantHandler
@@ -106,23 +123,35 @@ def build_v2_routes(
     from .scheduling_handler.registry import register_v2_scheduling_handler_routes
     from .scheduling_history.handler import V2SchedulingHistoryHandler
     from .scheduling_history.registry import register_v2_scheduling_history_routes
+    from .secret.handler import V2SecretHandler
+    from .secret.registry import register_v2_secret_routes
     from .service_catalog.handler import V2ServiceCatalogHandler
     from .service_catalog.registry import register_v2_service_catalog_routes
     from .session.handler import V2SessionHandler
     from .session.registry import register_v2_session_routes
+    from .session_group.handler import V2SessionGroupHandler
+    from .session_group.registry import register_v2_session_group_routes
+    from .session_lifecycle_handler.handler import V2SessionLifecycleHandlerHandler
+    from .session_lifecycle_handler.registry import register_v2_session_lifecycle_handler_routes
     from .storage_host.handler import V2StorageHostHandler
     from .storage_host.registry import register_v2_storage_host_routes
     from .storage_namespace.handler import V2StorageNamespaceHandler
     from .storage_namespace.registry import register_v2_storage_namespace_routes
+    from .system_session_environ.handler import V2SystemSessionEnvironHandler
+    from .system_session_environ.registry import register_v2_system_session_environ_routes
     from .user.handler import V2UserHandler
     from .user.registry import register_v2_user_routes
     from .vfolder.handler import V2VFolderHandler
     from .vfolder.registry import register_v2_vfolder_routes
+    from .vfolder_auto_mount.handler import V2VFolderAutoMountHandler
+    from .vfolder_auto_mount.registry import register_v2_vfolder_auto_mount_routes
     from .vfs_storage.handler import V2VFSStorageHandler
     from .vfs_storage.registry import register_v2_vfs_storage_routes
 
     # Build all handlers (each takes its individual adapter)
     agent_handler = V2AgentHandler(adapter=adapters.agent)
+    app_config_handler = V2AppConfigHandler(adapter=adapters.app_config)
+    app_config_fragment_handler = V2AppConfigFragmentHandler(adapter=adapters.app_config_fragment)
     app_config_allow_list_handler = V2AppConfigAllowListHandler(
         adapter=adapters.app_config_allow_list
     )
@@ -132,22 +161,30 @@ def build_v2_routes(
     artifact_handler = V2ArtifactHandler(adapter=adapters.artifact)
     artifact_registry_handler = V2ArtifactRegistryHandler(adapter=adapters.artifact_registry)
     audit_log_handler = V2AuditLogHandler(adapter=adapters.audit_log)
+    entity_label_handler = V2EntityLabelHandler(adapter=adapters.entity_label)
     container_registry_handler = V2ContainerRegistryHandler(adapter=adapters.container_registry)
     deployment_handler = V2DeploymentHandler(adapter=adapters.deployment)
     domain_handler = V2DomainHandler(adapter=adapters.domain)
+    entity_type_handler = V2EntityTypeHandler(adapter=adapters.entity)
     fair_share_handler = V2FairShareHandler(adapter=adapters.fair_share)
     huggingface_registry_handler = V2HuggingFaceRegistryHandler(
         adapter=adapters.huggingface_registry
     )
+    idle_checker_handler = V2IdleCheckerHandler(adapter=adapters.idle_checker)
+    idle_checker_assignment_handler = V2IdleCheckerAssignmentHandler(
+        adapter=adapters.idle_checker_assignment
+    )
     image_handler = V2ImageHandler(adapter=adapters.image)
     keypair_handler = V2KeypairHandler(adapter=adapters.user)
     login_client_type_handler = V2LoginClientTypeHandler(adapter=adapters.login_client_type)
+    client_ip_masking_handler = V2ClientIPMaskingHandler(adapter=adapters.client_ip_masking)
+    secret_handler = V2SecretHandler(adapter=adapters.secret)
     login_history_handler = V2LoginHistoryHandler(adapter=adapters.login_history)
     login_session_handler = V2LoginSessionHandler(adapter=adapters.login_session)
     notification_handler = V2NotificationHandler(adapter=adapters.notification)
     object_storage_handler = V2ObjectStorageHandler(adapter=adapters.object_storage)
     project_handler = V2ProjectHandler(adapter=adapters.project)
-    role_invitation_handler = V2RoleInvitationHandler(adapter=adapters.rbac)
+    entity_share_handler = V2EntityShareHandler(adapter=adapters.entity_share)
     role_preset_handler = V2RolePresetHandler(adapter=adapters.role_preset)
     prometheus_query_preset_handler = V2PrometheusQueryPresetHandler(
         adapter=adapters.prometheus_query_preset
@@ -176,10 +213,18 @@ def build_v2_routes(
     scheduling_history_handler = V2SchedulingHistoryHandler(adapter=adapters.scheduling_history)
     service_catalog_handler = V2ServiceCatalogHandler(adapter=adapters.service_catalog)
     session_handler = V2SessionHandler(adapter=adapters.session)
+    session_group_handler = V2SessionGroupHandler(adapter=adapters.session_group)
+    session_lifecycle_handler_handler = V2SessionLifecycleHandlerHandler(
+        adapter=adapters.session_lifecycle_handler
+    )
     storage_host_handler = V2StorageHostHandler(adapter=adapters.storage_host)
     storage_namespace_handler = V2StorageNamespaceHandler(adapter=adapters.storage_namespace)
+    system_session_environ_handler = V2SystemSessionEnvironHandler(
+        adapter=adapters.system_session_environ
+    )
     user_handler = V2UserHandler(adapter=adapters.user)
     vfolder_handler = V2VFolderHandler(adapter=adapters.vfolder)
+    vfolder_auto_mount_handler = V2VFolderAutoMountHandler(adapter=adapters.vfolder_auto_mount)
     vfs_storage_handler = V2VFSStorageHandler(adapter=adapters.vfs_storage)
 
     # Build the v2 parent registry
@@ -187,8 +232,15 @@ def build_v2_routes(
 
     # Add all domain sub-registries
     v2_reg.add_subregistry(register_v2_agent_routes(agent_handler, route_deps))
+    v2_reg.add_subregistry(register_v2_app_config_routes(app_config_handler, route_deps))
+    v2_reg.add_subregistry(
+        register_v2_app_config_fragment_routes(app_config_fragment_handler, route_deps)
+    )
     v2_reg.add_subregistry(
         register_v2_app_config_allow_list_routes(app_config_allow_list_handler, route_deps)
+    )
+    v2_reg.add_subregistry(
+        register_v2_app_config_allow_lists_routes(app_config_allow_list_handler, route_deps)
     )
     v2_reg.add_subregistry(
         register_v2_app_config_definition_routes(app_config_definition_handler, route_deps)
@@ -198,6 +250,7 @@ def build_v2_routes(
         register_v2_artifact_registry_routes(artifact_registry_handler, route_deps)
     )
     v2_reg.add_subregistry(register_v2_audit_log_routes(audit_log_handler, route_deps))
+    v2_reg.add_subregistry(register_v2_entity_label_routes(entity_label_handler, route_deps))
     v2_reg.add_subregistry(
         register_v2_container_registry_routes(container_registry_handler, route_deps)
     )
@@ -208,21 +261,30 @@ def build_v2_routes(
         )
     )
     v2_reg.add_subregistry(register_v2_domain_routes(domain_handler, route_deps))
+    v2_reg.add_subregistry(register_v2_entity_type_routes(entity_type_handler, route_deps))
     v2_reg.add_subregistry(register_v2_fair_share_routes(fair_share_handler, route_deps))
     v2_reg.add_subregistry(
         register_v2_huggingface_registry_routes(huggingface_registry_handler, route_deps)
+    )
+    v2_reg.add_subregistry(register_v2_idle_checker_routes(idle_checker_handler, route_deps))
+    v2_reg.add_subregistry(
+        register_v2_idle_checker_assignment_routes(idle_checker_assignment_handler, route_deps)
     )
     v2_reg.add_subregistry(register_v2_image_routes(image_handler, route_deps))
     v2_reg.add_subregistry(register_v2_keypair_routes(keypair_handler, route_deps))
     v2_reg.add_subregistry(
         register_v2_login_client_type_routes(login_client_type_handler, route_deps)
     )
+    v2_reg.add_subregistry(
+        register_v2_client_ip_masking_routes(client_ip_masking_handler, route_deps)
+    )
+    v2_reg.add_subregistry(register_v2_secret_routes(secret_handler, route_deps))
     v2_reg.add_subregistry(register_v2_login_history_routes(login_history_handler, route_deps))
     v2_reg.add_subregistry(register_v2_login_session_routes(login_session_handler, route_deps))
     v2_reg.add_subregistry(register_v2_notification_routes(notification_handler, route_deps))
     v2_reg.add_subregistry(register_v2_object_storage_routes(object_storage_handler, route_deps))
     v2_reg.add_subregistry(register_v2_project_routes(project_handler, route_deps))
-    v2_reg.add_subregistry(register_v2_role_invitation_routes(role_invitation_handler, route_deps))
+    v2_reg.add_subregistry(register_v2_entity_share_routes(entity_share_handler, route_deps))
     v2_reg.add_subregistry(register_v2_role_preset_routes(role_preset_handler, route_deps))
     v2_reg.add_subregistry(
         register_v2_prometheus_query_preset_routes(prometheus_query_preset_handler, route_deps)
@@ -260,12 +322,22 @@ def build_v2_routes(
     )
     v2_reg.add_subregistry(register_v2_service_catalog_routes(service_catalog_handler, route_deps))
     v2_reg.add_subregistry(register_v2_session_routes(session_handler, route_deps))
+    v2_reg.add_subregistry(register_v2_session_group_routes(session_group_handler, route_deps))
+    v2_reg.add_subregistry(
+        register_v2_session_lifecycle_handler_routes(session_lifecycle_handler_handler, route_deps)
+    )
     v2_reg.add_subregistry(register_v2_storage_host_routes(storage_host_handler, route_deps))
     v2_reg.add_subregistry(
         register_v2_storage_namespace_routes(storage_namespace_handler, route_deps)
     )
+    v2_reg.add_subregistry(
+        register_v2_system_session_environ_routes(system_session_environ_handler, route_deps)
+    )
     v2_reg.add_subregistry(register_v2_user_routes(user_handler, route_deps))
     v2_reg.add_subregistry(register_v2_vfolder_routes(vfolder_handler, route_deps))
+    v2_reg.add_subregistry(
+        register_v2_vfolder_auto_mount_routes(vfolder_auto_mount_handler, route_deps)
+    )
     v2_reg.add_subregistry(register_v2_vfs_storage_routes(vfs_storage_handler, route_deps))
 
     # Export (reuses v1 handler directly, no adapter)

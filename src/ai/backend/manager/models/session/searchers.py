@@ -1,0 +1,62 @@
+"""List-read specs for sessions."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Any, override
+
+import sqlalchemy as sa
+
+from ai.backend.common.types import SessionId, VFolderID
+from ai.backend.manager.data.session.types import SessionEntityData, SessionInfo, SessionStatus
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
+from ai.backend.manager.models.specs.searcher import Searcher
+
+
+@dataclass
+class SessionSearcher(Searcher[SessionRow, SessionEntityData]):
+    """The session rows a scoped read returns.
+
+    Loads no relationship: what a caller needs from the kernels or the owner is
+    asked for separately.
+    """
+
+    @override
+    def build_select(self) -> sa.sql.Select[Any]:
+        return sa.select(SessionRow)
+
+    @override
+    def to_data(self, row: SessionRow) -> SessionEntityData:
+        return SessionSearchableFields.own.to_data(row)
+
+
+@dataclass
+class SessionInfoSearcher(Searcher[SessionRow, SessionInfo]):
+    """The session rows the scheduler handlers read, without their kernels."""
+
+    @override
+    def build_select(self) -> sa.sql.Select[Any]:
+        return sa.select(SessionRow)
+
+    @override
+    def to_data(self, row: SessionRow) -> SessionInfo:
+        return row.to_session_info()
+
+
+@dataclass
+class LiveSessionsMountingVFolderSearcher(Searcher[SessionRow, SessionId]):
+    """The live sessions carrying the vfolder among their mounts."""
+
+    vfolder_id: VFolderID = field(kw_only=True)
+
+    @override
+    def build_select(self) -> sa.sql.Select[Any]:
+        return sa.select(SessionRow).where(
+            SessionRow.status.not_in(SessionStatus.terminal_statuses())
+            & SessionRow.vfolder_mounts.contains([{"vfid": str(self.vfolder_id)}])
+        )
+
+    @override
+    def to_data(self, row: SessionRow) -> SessionId:
+        return SessionId(row.id)

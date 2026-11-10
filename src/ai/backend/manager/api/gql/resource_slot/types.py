@@ -13,15 +13,27 @@ from collections.abc import Iterable
 from decimal import Decimal
 from enum import StrEnum
 from typing import Any, Self, override
+from uuid import UUID
 
+import strawberry
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.resource_slot.request import (
     AgentResourceFilter as AgentResourceFilterDTO,
 )
 from ai.backend.common.dto.manager.v2.resource_slot.request import (
     AgentResourceOrder as AgentResourceOrderDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_slot.request import (
+    CreateResourceSlotTypeInput as CreateResourceSlotTypeInputDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_slot.request import (
+    PartialBulkPurgeResourceSlotTypesInput as PartialBulkPurgeResourceSlotTypesInputDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_slot.request import (
+    PurgeResourceSlotTypeInput as PurgeResourceSlotTypeInputDTO,
 )
 from ai.backend.common.dto.manager.v2.resource_slot.request import (
     ResourceAllocationFilter as ResourceAllocationFilterDTO,
@@ -35,8 +47,17 @@ from ai.backend.common.dto.manager.v2.resource_slot.request import (
 from ai.backend.common.dto.manager.v2.resource_slot.request import (
     ResourceSlotTypeOrder as ResourceSlotTypeOrderDTO,
 )
+from ai.backend.common.dto.manager.v2.resource_slot.request import (
+    UpdateResourceSlotTypeInput as UpdateResourceSlotTypeInputDTO,
+)
 from ai.backend.common.dto.manager.v2.resource_slot.response import (
     AgentResourceNode as AgentResourceNodeDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_slot.response import (
+    CreateResourceSlotTypePayload as CreateResourceSlotTypePayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_slot.response import (
+    PurgeResourceSlotTypePayload as PurgeResourceSlotTypePayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.resource_slot.response import (
     ResourceAllocationNode as ResourceAllocationNodeDTO,
@@ -44,12 +65,26 @@ from ai.backend.common.dto.manager.v2.resource_slot.response import (
 from ai.backend.common.dto.manager.v2.resource_slot.response import (
     ResourceSlotTypeNode as ResourceSlotTypeNodeDTO,
 )
+from ai.backend.common.dto.manager.v2.resource_slot.response import (
+    UpdateResourceSlotTypePayload as UpdateResourceSlotTypePayloadDTO,
+)
 from ai.backend.common.dto.manager.v2.resource_slot.types import (
     NumberFormatInfo as NumberFormatInfoDTO,
 )
-from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
+from ai.backend.common.dto.manager.v2.resource_slot.types import (
+    NumberFormatInput as NumberFormatInputDTO,
+)
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.base import (
+    DecimalFilter,
+    OrderDirection,
+    StringFilter,
+    UUIDFilter,
+)
+from ai.backend.manager.api.gql.common_types import PartialBulkFailureGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_added_field,
     gql_connection_type,
     gql_enum,
     gql_field,
@@ -57,7 +92,11 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_input,
     gql_pydantic_type,
 )
-from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticNodeMixin
+from ai.backend.manager.api.gql.pydantic_compat import (
+    PydanticInputMixin,
+    PydanticNodeMixin,
+    PydanticOutputMixin,
+)
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
 
@@ -131,13 +170,34 @@ class NumberFormatGQL:
     ),
     name="ResourceSlotType",
 )
-class ResourceSlotTypeGQL(PydanticNodeMixin[Any]):
+class ResourceSlotTypeGQL(PydanticNodeMixin[ResourceSlotTypeNodeDTO]):
     id: NodeID[str]
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="UUID of the resource slot type.",
+        ),
+    )
     slot_name: str = gql_field(
         description="Unique identifier for the resource slot (e.g., 'cpu', 'mem', 'cuda.device')."
     )
     slot_type: str = gql_field(
-        description="Category of the slot type (e.g., 'count', 'bytes', 'unique-count')."
+        description="Category of the slot type: one of 'count', 'bytes', 'unique', 'unified'."
+    )
+    required: bool = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="Whether a session request must name this slot.",
+        ),
+    )
+    enabled: bool = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description=(
+                "Whether the scheduler considers this slot when placing sessions. "
+                "A disabled slot is ignored by the image slot-type rule."
+            ),
+        ),
     )
     display_name: str = gql_field(description="Human-readable name for display in UIs.")
     description: str = gql_field(
@@ -163,13 +223,13 @@ class ResourceSlotTypeGQL(PydanticNodeMixin[Any]):
         node_ids: Iterable[str],
         required: bool = False,
     ) -> Iterable[Self | None]:
-        from ai.backend.manager.errors.resource_slot import ResourceSlotTypeNotFound
+        from ai.backend.manager.errors.base.not_found import NotFoundError
 
         results: list[Self | None] = []
         for slot_name in node_ids:
             try:
                 node = await load_resource_slot_type_node(info, slot_name)
-            except ResourceSlotTypeNotFound:
+            except NotFoundError:
                 if required:
                     raise
                 results.append(None)
@@ -222,6 +282,12 @@ class ResourceSlotTypeFilterGQL(PydanticInputMixin[ResourceSlotTypeFilterDTO]):
     slot_name: StringFilter | None = None
     slot_type: StringFilter | None = None
     display_name: StringFilter | None = None
+    entity_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by resource slot type ID."
+        ),
+        default=None,
+    )
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None
@@ -237,6 +303,185 @@ class ResourceSlotTypeFilterGQL(PydanticInputMixin[ResourceSlotTypeFilterDTO]):
 class ResourceSlotTypeOrderByGQL(PydanticInputMixin[ResourceSlotTypeOrderDTO]):
     field: ResourceSlotTypeOrderFieldGQL
     direction: OrderDirection = OrderDirection.ASC
+
+
+# ========== ResourceSlotType mutation inputs / payloads ==========
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version="26.9.0",
+        description="Number format configuration written with a resource slot type.",
+    ),
+    name="NumberFormatInput",
+)
+class NumberFormatInputGQL(PydanticInputMixin[NumberFormatInputDTO]):
+    binary: bool = gql_field(
+        description="Whether to use binary (1024-based) or decimal (1000-based) prefixes.",
+        default=False,
+    )
+    round_length: int = gql_field(
+        description="Number of decimal places to round to when displaying values.", default=0
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version="26.9.0",
+        description="Input for registering a new resource slot type.",
+    ),
+    name="CreateResourceSlotTypeInput",
+)
+class CreateResourceSlotTypeInputGQL(PydanticInputMixin[CreateResourceSlotTypeInputDTO]):
+    slot_name: str = gql_field(description="Unique slot name to register.")
+    slot_type: str = gql_field(
+        description="Category of the slot type: one of 'count', 'bytes', 'unique', 'unified'."
+    )
+    required: bool = gql_field(
+        description="Whether a session request must name this slot.", default=False
+    )
+    enabled: bool = gql_field(
+        description="Whether the scheduler considers this slot when placing sessions.",
+        default=True,
+    )
+    display_name: str = gql_field(description="Human-readable name.", default="")
+    description: str = gql_field(description="Longer description.", default="")
+    display_unit: str = gql_field(description="Unit label (e.g., 'GiB').", default="")
+    display_icon: str = gql_field(description="Icon identifier for UIs.", default="")
+    number_format: NumberFormatInputGQL | None = gql_field(
+        description="Number formatting rules. Defaults to decimal with no rounding.", default=None
+    )
+    rank: int = gql_field(
+        description="Display ordering rank. Lower values appear first.", default=0
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.9.0",
+        description="Payload for resource slot type registration.",
+    ),
+    model=CreateResourceSlotTypePayloadDTO,
+    name="CreateResourceSlotTypePayload",
+)
+class CreateResourceSlotTypePayloadGQL:
+    resource_slot_type: ResourceSlotTypeGQL = gql_field(
+        description="The registered resource slot type."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version="26.9.0",
+        description=(
+            "Input for updating a resource slot type. The slot name and slot type are "
+            "immutable; omitted fields stay unchanged."
+        ),
+    ),
+    name="UpdateResourceSlotTypeInput",
+)
+class UpdateResourceSlotTypeInputGQL(PydanticInputMixin[UpdateResourceSlotTypeInputDTO]):
+    slot_name: str = gql_field(description="Slot name identifying the slot type to update.")
+    required: bool | None = gql_field(
+        description="Whether a session request must name this slot.", default=None
+    )
+    enabled: bool | None = gql_field(
+        description="Whether the scheduler considers this slot when placing sessions.",
+        default=None,
+    )
+    display_name: str | None = gql_field(description="Human-readable name.", default=None)
+    description: str | None = gql_field(description="Longer description.", default=None)
+    display_unit: str | None = gql_field(description="Unit label (e.g., 'GiB').", default=None)
+    display_icon: str | None = gql_field(description="Icon identifier for UIs.", default=None)
+    number_format: NumberFormatInputGQL | None = gql_field(
+        description="Number formatting rules.", default=None
+    )
+    rank: int | None = gql_field(description="Display ordering rank.", default=None)
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.9.0",
+        description="Payload for resource slot type update.",
+    ),
+    model=UpdateResourceSlotTypePayloadDTO,
+    name="UpdateResourceSlotTypePayload",
+)
+class UpdateResourceSlotTypePayloadGQL:
+    resource_slot_type: ResourceSlotTypeGQL = gql_field(
+        description="The updated resource slot type."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version="26.9.0",
+        description="Input for removing a resource slot type.",
+    ),
+    name="PurgeResourceSlotTypeInput",
+)
+class PurgeResourceSlotTypeInputGQL(PydanticInputMixin[PurgeResourceSlotTypeInputDTO]):
+    slot_name: str = gql_field(description="Slot name identifying the slot type to remove.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.9.0",
+        description="Payload for resource slot type removal.",
+    ),
+    model=PurgeResourceSlotTypePayloadDTO,
+    name="PurgeResourceSlotTypePayload",
+)
+class PurgeResourceSlotTypePayloadGQL:
+    slot_name: str = gql_field(description="Slot name of the removed resource slot type.")
+    purged_id: strawberry.ID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Global ID of the purged resource slot type.",
+        ),
+    )
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="UUID of the purged resource slot type."
+        ),
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for purging several resource slot types, each answered for separately.",
+    ),
+    name="PartialBulkPurgeResourceSlotTypesInput",
+)
+class PartialBulkPurgeResourceSlotTypesInputGQL(
+    PydanticInputMixin[PartialBulkPurgeResourceSlotTypesInputDTO]
+):
+    ids: list[UUID] = gql_field(description="IDs of the resource slot types to purge.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Result of a partial bulk resource slot type operation: the slot types processed "
+            "and the ones that failed."
+        ),
+    ),
+    model=PartialBulkPayload[ResourceSlotTypeNodeDTO],
+    name="PartialBulkResourceSlotTypesPayload",
+)
+class PartialBulkResourceSlotTypesPayloadGQL(
+    PydanticOutputMixin[PartialBulkPayload[ResourceSlotTypeNodeDTO]]
+):
+    """Payload for partial bulk resource slot type mutations."""
+
+    successes: list[ResourceSlotTypeGQL] = gql_field(
+        description="The resource slot types processed, as they stood."
+    )
+    failed: list[PartialBulkFailureGQL] = gql_field(
+        description="The resource slot types not processed, each with the reason."
+    )
 
 
 # ========== AgentResourceSlotGQL (Node) ==========
@@ -256,11 +501,29 @@ class AgentResourceSlotGQL(PydanticNodeMixin[AgentResourceNodeDTO]):
     """Per-agent, per-slot resource capacity and usage."""
 
     id: NodeID[str]
+    field_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="UUID of the agent resource.",
+        ),
+    )
     slot_name: str = gql_field(
         description="Resource slot identifier (e.g., 'cpu', 'mem', 'cuda.device')."
     )
     capacity: Decimal = gql_field(
         description="Total hardware resource capacity for this slot on the agent."
+    )
+    reserved: Decimal = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Amount reserved by scheduling for this slot.",
+        ),
+    )
+    prereserved: Decimal = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Amount reserved in advance by preemption plans.",
+        ),
     )
     used: Decimal = gql_field(
         description="Amount of this slot currently consumed by running and scheduled sessions."
@@ -323,6 +586,8 @@ class AgentResourceConnectionGQL(Connection[AgentResourceSlotGQL]):
 class AgentResourceSlotOrderFieldGQL(StrEnum):
     SLOT_NAME = "slot_name"
     CAPACITY = "capacity"
+    RESERVED = "reserved"
+    PRERESERVED = "prereserved"
     USED = "used"
 
 
@@ -335,6 +600,24 @@ class AgentResourceSlotOrderFieldGQL(StrEnum):
 class AgentResourceSlotFilterGQL(PydanticInputMixin[AgentResourceFilterDTO]):
     slot_name: StringFilter | None = None
     agent_id: StringFilter | None = None
+    reserved: DecimalFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by reserved amount."
+        ),
+        default=None,
+    )
+    prereserved: DecimalFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by pre-reserved amount."
+        ),
+        default=None,
+    )
+    field_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by agent resource slot ID."
+        ),
+        default=None,
+    )
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None
@@ -369,6 +652,12 @@ class KernelResourceAllocationGQL(PydanticNodeMixin[Any]):
     """Per-kernel, per-slot resource allocation."""
 
     id: NodeID[str]
+    field_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="UUID of the resource allocation.",
+        ),
+    )
     slot_name: str = gql_field(
         description="Resource slot identifier (e.g., 'cpu', 'mem', 'cuda.device')."
     )
@@ -430,6 +719,12 @@ class KernelResourceAllocationOrderFieldGQL(StrEnum):
 )
 class KernelResourceAllocationFilterGQL(PydanticInputMixin[ResourceAllocationFilterDTO]):
     slot_name: StringFilter | None = None
+    field_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by resource allocation ID."
+        ),
+        default=None,
+    )
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None

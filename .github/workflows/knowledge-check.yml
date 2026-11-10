@@ -1,0 +1,27 @@
+name: knowledge-check
+
+on:
+  pull_request:
+    paths:
+      - "**/*.md"
+      - "scripts/knowledge/**"
+      - ".github/workflows/knowledge-check.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  check-knowledge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the revision
+        uses: actions/checkout@v6
+        with:
+          lfs: false
+          fetch-depth: 0
+      - name: Check KNOWLEDGE.md conformance
+        run: python3 scripts/knowledge/check.py
+      - name: Check English and Korean document pairs
+        run: python3 scripts/knowledge/check_bilingual.py --base "origin/${{ github.base_ref }}"
+      - name: Check words the glossary rejects
+        run: python3 scripts/knowledge/check_words.py --base "origin/${{ github.base_ref }}"

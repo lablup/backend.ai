@@ -64,10 +64,9 @@ class ConfigProviderDependency(
         # Create loader chain following server.py pattern
         loaders: list[Any] = []
 
-        # Add file loader if config path is provided
-        if setup_input.config_path:
-            toml_loader = TomlConfigLoader(setup_input.config_path, "manager")
-            loaders.append(toml_loader)
+        # Add file loader
+        toml_loader = TomlConfigLoader(setup_input.config_path, "manager")
+        loaders.append(toml_loader)
 
         # Add legacy etcd loader
         legacy_etcd_loader = LegacyEtcdLoader(setup_input.etcd)

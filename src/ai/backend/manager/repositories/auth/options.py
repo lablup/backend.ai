@@ -33,6 +33,26 @@ class LoginSessionConditions:
 
         return inner
 
+    @staticmethod
+    def by_id_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = LoginSessionRow.id == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_id_in(spec: UUIDInMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = LoginSessionRow.id.in_(spec.values)
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
     # --- user_id UUID filters ---
 
     @staticmethod
@@ -180,32 +200,6 @@ class LoginSessionConditions:
 
         return inner
 
-    # --- cursor pagination conditions ---
-
-    @staticmethod
-    def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(LoginSessionRow.created_at)
-                .where(LoginSessionRow.id == cursor_id)
-                .scalar_subquery()
-            )
-            return LoginSessionRow.created_at < subquery
-
-        return inner
-
-    @staticmethod
-    def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(LoginSessionRow.created_at)
-                .where(LoginSessionRow.id == cursor_id)
-                .scalar_subquery()
-            )
-            return LoginSessionRow.created_at > subquery
-
-        return inner
-
 
 class LoginSessionOrders:
     """Query orders for login sessions."""
@@ -236,6 +230,26 @@ class LoginHistoryConditions:
     def by_ids(history_ids: Collection[uuid.UUID]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return LoginHistoryRow.id.in_(history_ids)
+
+        return inner
+
+    @staticmethod
+    def by_id_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = LoginHistoryRow.id == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_id_in(spec: UUIDInMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = LoginHistoryRow.id.in_(spec.values)
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
@@ -338,32 +352,6 @@ class LoginHistoryConditions:
     def by_created_at_equals(dt: datetime) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return LoginHistoryRow.created_at == dt
-
-        return inner
-
-    # --- cursor pagination conditions ---
-
-    @staticmethod
-    def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(LoginHistoryRow.created_at)
-                .where(LoginHistoryRow.id == cursor_id)
-                .scalar_subquery()
-            )
-            return LoginHistoryRow.created_at < subquery
-
-        return inner
-
-    @staticmethod
-    def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(LoginHistoryRow.created_at)
-                .where(LoginHistoryRow.id == cursor_id)
-                .scalar_subquery()
-            )
-            return LoginHistoryRow.created_at > subquery
 
         return inner
 

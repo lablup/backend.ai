@@ -1,0 +1,123 @@
+/**
+ @license
+ Copyright (c) 2015-2026 Lablup Inc. All rights reserved.
+
+ Signature visual effects for theme families that cannot be expressed as Ant
+ Design tokens (frosted-glass blur, stained-glass gradient header). Values are
+ ported from the backend.ai-go reference themes.
+
+ Keyed on:
+   - the `data-theme-family` attribute that `useCustomThemeConfig` writes on <body>
+     (and the FOUC bootstrap in index.html sets before first paint), and
+   - the `dark-theme` body class that `useThemeMode` toggles.
+
+ The webui header is a BAIFlex div carrying the stable `bai-webui-header` class
+ (added in WebUIHeader.tsx) and an inline `background-color` from
+ `Layout.headerBg`. External CSS can only beat that inline style with
+ `!important`, so the header backgrounds below use it. Multiple-background
+ layers always paint behind element content, so no pseudo-elements are needed.
+*/
+
+/* ============================================================
+   Stained: multi-layer stained-glass gradient header.
+   Layers, front to back: diagonal pattern, diagonal pattern,
+   three cloud ellipses, the rainbow base gradient.
+   The gradient is vivid in both light and dark mode.
+   ============================================================ */
+body[data-theme-family="stained"] .bai-webui-header {
+  background:
+    repeating-linear-gradient(
+      45deg,
+      transparent,
+      transparent 10px,
+      rgba(255, 255, 255, 0.05) 10px,
+      rgba(255, 255, 255, 0.05) 11px
+    ),
+    repeating-linear-gradient(
+      -45deg,
+      transparent,
+      transparent 15px,
+      rgba(255, 255, 255, 0.03) 15px,
+      rgba(255, 255, 255, 0.03) 16px
+    ),
+    radial-gradient(
+      ellipse 300px 100px at 25% 40%,
+      rgba(255, 255, 255, 0.4) 0%,
+      transparent 70%
+    ),
+    radial-gradient(
+      ellipse 200px 80px at 75% 30%,
+      rgba(255, 255, 255, 0.3) 0%,
+      transparent 70%
+    ),
+    radial-gradient(
+      ellipse 250px 90px at 50% 70%,
+      rgba(255, 255, 255, 0.2) 0%,
+      transparent 70%
+    ),
+    linear-gradient(
+      90deg,
+      rgba(147, 197, 253, 0.8) 0%,
+      rgba(59, 130, 246, 0.9) 20%,
+      rgba(99, 102, 241, 0.85) 40%,
+      rgba(168, 85, 247, 0.8) 55%,
+      rgba(236, 72, 153, 0.85) 70%,
+      rgba(234, 88, 12, 0.9) 80%,
+      rgba(234, 88, 12, 0.7) 85%,
+      rgba(234, 88, 12, 0.5) 100%
+    ) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+/* ============================================================
+   Glass: frosted blur header. The sticky header blurs whatever
+   content scrolls beneath it.
+   ============================================================ */
+body[data-theme-family="glass"] .bai-webui-header {
+  backdrop-filter: blur(12px) saturate(180%);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+}
+body.dark-theme[data-theme-family="glass"] .bai-webui-header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Fallback: no backdrop-filter support -> near-opaque so text stays legible. */
+@supports not (
+  (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))
+) {
+  body[data-theme-family="glass"] .bai-webui-header {
+    background: rgba(255, 255, 255, 0.95) !important;
+  }
+  body.dark-theme[data-theme-family="glass"] .bai-webui-header {
+    background: rgba(28, 28, 30, 0.95) !important;
+  }
+}
+
+/* Respect users who prefer reduced transparency. */
+@media (prefers-reduced-transparency: reduce) {
+  body[data-theme-family="glass"] .bai-webui-header {
+    background: rgba(255, 255, 255, 0.95) !important;
+    backdrop-filter: blur(4px) saturate(120%);
+    -webkit-backdrop-filter: blur(4px) saturate(120%);
+  }
+  body.dark-theme[data-theme-family="glass"] .bai-webui-header {
+    background: rgba(28, 28, 30, 0.95) !important;
+  }
+}
+
+/* ============================================================
+   Smooth fade when switching family or light/dark mode.
+   Disabled for users who prefer reduced motion.
+   ============================================================ */
+.bai-webui-header {
+  transition:
+    background-color 0.25s ease-in-out,
+    color 0.25s ease-in-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bai-webui-header {
+    transition: none;
+  }
+}

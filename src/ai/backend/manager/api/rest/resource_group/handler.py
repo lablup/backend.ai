@@ -1,0 +1,143 @@
+"""Scaling group handler class using constructor dependency injection."""
+
+from __future__ import annotations
+
+import logging
+from http import HTTPStatus
+from typing import Final
+from uuid import UUID
+
+from ai.backend.common.api_handlers import APIResponse, PathParam, QueryParam
+from ai.backend.common.data.entity.domain import DomainName
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.dto.manager.scaling_group.request import (
+    ListScalingGroupsRequest,
+    WsproxyVersionPathParam,
+    WsproxyVersionQueryParam,
+)
+from ai.backend.common.dto.manager.scaling_group.response import (
+    ListScalingGroupsResponse,
+    ScalingGroupItem,
+    WsproxyVersionResponse,
+)
+from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.dto.context import UserContext
+from ai.backend.manager.models.resource_group.scopes import (
+    DomainResourceGroupTarget,
+    ProjectResourceGroupTarget,
+    ResourceGroupTarget,
+    UserResourceGroupTarget,
+)
+from ai.backend.manager.models.resource_group.searchable_fields import (
+    ResourceGroupSearchableFields,
+)
+from ai.backend.manager.models.resource_group.searchers import ResourceGroupSearcher
+from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.models.specs.searcher import ScopedSearcher
+from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
+from ai.backend.manager.services.domain.processors import DomainProcessors
+from ai.backend.manager.services.project.actions.lookup import LookupProjectAction
+from ai.backend.manager.services.project.processors import ProjectProcessors
+from ai.backend.manager.services.resource_group.actions.get_wsproxy_version import (
+    GetWsproxyVersionAction,
+)
+from ai.backend.manager.services.resource_group.actions.scoped_search import (
+    ScopedSearchResourceGroupsAction,
+)
+from ai.backend.manager.services.resource_group.processors import ResourceGroupProcessors
+
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
+
+
+class ResourceGroupHandler:
+    """Resource group API handler with constructor-injected dependencies."""
+
+    def __init__(
+        self,
+        *,
+        resource_group: ResourceGroupProcessors,
+        domain: DomainProcessors,
+        project: ProjectProcessors,
+    ) -> None:
+        self._resource_group = resource_group
+        self._domain = domain
+        self._project = project
+
+    async def _resolve_project_id(self, domain_name: str, group: str) -> ProjectID:
+        """Resolve the group query parameter, which carries either a project id or a
+        name, into the project it names."""
+        try:
+            return ProjectID(UUID(group))
+        except ValueError:
+            result = await self._project.lookup.run(
+                LookupProjectAction(domain_name=DomainName(domain_name), project_name=group)
+            )
+            return result.resolved_entity_id
+
+    async def list_available_sgroups(
+        self,
+        query: QueryParam[ListScalingGroupsRequest],
+        ctx: UserContext,
+    ) -> APIResponse:
+        params = query.parsed
+        domain_lookup = await self._domain.lookup_name.run(
+            LookupDomainAction(name=DomainName(ctx.user_domain))
+        )
+        targets: list[ResourceGroupTarget] = [
+            DomainResourceGroupTarget(domain_id=domain_lookup.resolved_entity_id),
+            ProjectResourceGroupTarget(
+                project_id=await self._resolve_project_id(ctx.user_domain, params.group)
+            ),
+            UserResourceGroupTarget(user_id=UserID(ctx.user_uuid)),
+        ]
+        fields = ResourceGroupSearchableFields.own
+        conditions = [fields.is_active.filter.equals(True)]
+        if not ctx.is_admin:
+            conditions.append(fields.is_public.filter.equals(True))
+        result = await self._resource_group.scoped_search_resource_groups.run(
+            ScopedSearchResourceGroupsAction(
+                searcher=ScopedSearcher(
+                    scopes=targets,
+                    used_by=(),
+                    searcher=ResourceGroupSearcher(
+                        pagination=NoPagination(),
+                        conditions=conditions,
+                        orders=[fields.name.order.apply(ascending=True)],
+                    ),
+                )
+            )
+        )
+        resp = ListScalingGroupsResponse(
+            scaling_groups=[ScalingGroupItem(name=data.name) for data in result.items],
+        )
+        return APIResponse.build(HTTPStatus.OK, resp)
+
+    async def get_wsproxy_version(
+        self,
+        path: PathParam[WsproxyVersionPathParam],
+        query: QueryParam[WsproxyVersionQueryParam],
+        ctx: UserContext,
+    ) -> APIResponse:
+        path_params = path.parsed
+        query_params = query.parsed
+        domain_lookup = await self._domain.lookup_name.run(
+            LookupDomainAction(name=DomainName(ctx.user_domain))
+        )
+        targets: list[ResourceGroupTarget] = [
+            DomainResourceGroupTarget(domain_id=domain_lookup.resolved_entity_id),
+            UserResourceGroupTarget(user_id=UserID(ctx.user_uuid)),
+        ]
+        if query_params.group:
+            targets.append(
+                ProjectResourceGroupTarget(
+                    project_id=await self._resolve_project_id(ctx.user_domain, query_params.group)
+                )
+            )
+        action = GetWsproxyVersionAction(
+            resource_group_name=path_params.scaling_group,
+            targets=targets,
+        )
+        result = await self._resource_group.get_wsproxy_version.run(action)
+        resp = WsproxyVersionResponse(wsproxy_version=result.wsproxy_version)
+        return APIResponse.build(HTTPStatus.OK, resp)

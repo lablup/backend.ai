@@ -10,21 +10,13 @@ from uuid import UUID
 
 from ai.backend.common.types import (
     AccessKey,
-    BinarySize,
-    ResourceSlot,
+    SessionTypes,
     SlotName,
     SlotQuantity,
     SlotTypes,
 )
-from ai.backend.common.types import (
-    LegacyResourceSlotState as ResourceSlotState,
-)
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
-from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.repositories.resource_slot.types import (
-    quantities_from_json,
-    quantities_to_json,
-)
+from ai.backend.manager.models.kernel.row import KernelRow
 
 
 @dataclass
@@ -46,30 +38,15 @@ class KeypairResourceData:
     group_limits: list[SlotQuantity]
     group_occupied: list[SlotQuantity]
     group_remaining: list[SlotQuantity]
-    scaling_group_remaining: list[SlotQuantity]
+    resource_group_remaining: list[SlotQuantity]
 
 
 @dataclass
-class PerScalingGroupResourceData:
+class PerResourceGroupResourceData:
     """Resource data per scaling group."""
 
     using: list[SlotQuantity]
     remaining: list[SlotQuantity]
-
-    def to_cache(self) -> dict[str, Any]:
-        """Serialize to cache-friendly format."""
-        return {
-            str(ResourceSlotState.OCCUPIED): quantities_to_json(self.using),
-            str(ResourceSlotState.AVAILABLE): quantities_to_json(self.remaining),
-        }
-
-    @classmethod
-    def from_cache(cls, data: dict[str, Any]) -> PerScalingGroupResourceData:
-        """Deserialize from cache format."""
-        return cls(
-            using=quantities_from_json(data[ResourceSlotState.OCCUPIED]),
-            remaining=quantities_from_json(data[ResourceSlotState.AVAILABLE]),
-        )
 
 
 @dataclass
@@ -79,37 +56,6 @@ class PresetAllocatabilityData:
     preset: ResourcePresetData
     allocatable: bool
 
-    def to_cache(self) -> dict[str, Any]:
-        """Serialize to cache-friendly format."""
-        return {
-            "preset": {
-                "id": str(self.preset.id),
-                "name": self.preset.name,
-                "resource_slots": self.preset.resource_slots.to_json(),
-                "shared_memory": str(self.preset.shared_memory)
-                if self.preset.shared_memory is not None
-                else None,
-                "scaling_group_name": self.preset.scaling_group_name,
-            },
-            "allocatable": self.allocatable,
-        }
-
-    @classmethod
-    def from_cache(cls, data: dict[str, Any]) -> PresetAllocatabilityData:
-        """Deserialize from cache format."""
-        return cls(
-            preset=ResourcePresetData(
-                id=UUID(data["preset"]["id"]),
-                name=data["preset"]["name"],
-                resource_slots=ResourceSlot.from_json(data["preset"]["resource_slots"]),
-                shared_memory=int(BinarySize.from_str(data["preset"]["shared_memory"]))
-                if data["preset"]["shared_memory"] is not None
-                else None,
-                scaling_group_name=data["preset"]["scaling_group_name"],
-            ),
-            allocatable=data["allocatable"],
-        )
-
 
 @dataclass
 class CheckPresetsDBData:
@@ -117,7 +63,7 @@ class CheckPresetsDBData:
 
     known_slot_types: Mapping[SlotName, SlotTypes]
     keypair_data: KeypairResourceData
-    per_sgroup_data: dict[str, PerScalingGroupResourceData]
+    per_sgroup_data: dict[str, PerResourceGroupResourceData]
     presets: list[PresetAllocatabilityData]
 
 
@@ -139,6 +85,27 @@ class AccessKeyFilter(ResourceOccupancyFilter):
     @override
     def get_condition(self) -> Any:
         return KernelRow.access_key == self.access_key
+
+
+class UserIdFilter(ResourceOccupancyFilter):
+    """Filter for the kernel owner."""
+
+    user_id: UUID
+
+    def __init__(self, user_id: UUID) -> None:
+        self.user_id = user_id
+
+    @override
+    def get_condition(self) -> Any:
+        return KernelRow.user_uuid == self.user_id
+
+
+class NonPrivateSessionFilter(ResourceOccupancyFilter):
+    """Exclude private (SFTP) sessions, as the scheduler does."""
+
+    @override
+    def get_condition(self) -> Any:
+        return KernelRow.session_type.not_in(SessionTypes.private_types())
 
 
 class GroupIdFilter(ResourceOccupancyFilter):

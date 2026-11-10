@@ -5,6 +5,8 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 
+from ai.backend.common.data.entity.types import FieldData
+
 
 class LoginSessionStatus(enum.StrEnum):
     ACTIVE = "active"
@@ -28,7 +30,7 @@ class LoginAttemptResult(enum.StrEnum):
 
 
 @dataclass(frozen=True)
-class LoginSessionData:
+class LoginSessionData(FieldData):
     id: uuid.UUID
     session_token: str
     user_id: uuid.UUID
@@ -40,10 +42,11 @@ class LoginSessionData:
 
 
 @dataclass(frozen=True)
-class LoginHistoryData:
+class LoginHistoryData(FieldData):
     id: uuid.UUID
     user_id: uuid.UUID
     domain_name: str
     result: LoginAttemptResult
     fail_reason: str | None
+    client_ip: str | None
     created_at: datetime

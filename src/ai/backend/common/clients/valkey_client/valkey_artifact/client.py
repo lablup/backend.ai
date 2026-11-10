@@ -11,6 +11,7 @@ from ai.backend.common.clients.valkey_client.client import (
     AbstractValkeyClient,
     create_valkey_client,
 )
+from ai.backend.common.clients.valkey_client.sentinel_monitor.base import AbstractSentinelMonitor
 from ai.backend.common.data.artifact.types import (
     ArtifactDownloadTrackingData,
     DownloadProgressData,
@@ -27,9 +28,9 @@ from ai.backend.common.resilience import (
     RetryPolicy,
 )
 from ai.backend.common.types import ValkeyTarget
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 # Resilience instance for valkey_artifact layer
 valkey_artifact_resilience = Resilience(
@@ -69,6 +70,7 @@ class ValkeyArtifactDownloadTrackingClient:
         *,
         db_id: int,
         human_readable_name: str,
+        sentinel_monitor: AbstractSentinelMonitor | None = None,
     ) -> Self:
         """
         Create a ValkeyArtifactDownloadTrackingClient instance.
@@ -82,6 +84,7 @@ class ValkeyArtifactDownloadTrackingClient:
             valkey_target=valkey_target,
             db_id=db_id,
             human_readable_name=human_readable_name,
+            sentinel_monitor=sentinel_monitor,
         )
         await client.connect()
         return cls(client=client)
@@ -92,7 +95,7 @@ class ValkeyArtifactDownloadTrackingClient:
         Close the ValkeyArtifactDownloadTrackingClient connection.
         """
         if self._closed:
-            log.debug("ValkeyArtifactDownloadTrackingClient is already closed.")
+            log.debug("valkey artifact download tracking client already closed")
             return
         self._closed = True
         await self._client.disconnect()
@@ -211,11 +214,11 @@ class ValkeyArtifactDownloadTrackingClient:
         async with self._client.client() as conn:
             await conn.exec(batch, raise_on_error=True)
         log.debug(
-            "Initialized artifact download tracking: model_id={}, revision={}, total_files={}, total_bytes={}",
-            model_id,
-            revision,
-            total_files,
-            total_bytes,
+            "artifact download tracking initialized",
+            model_id=model_id,
+            revision=revision,
+            file_count=total_files,
+            total_bytes=total_bytes,
         )
 
     @valkey_artifact_resilience.apply()
@@ -254,7 +257,7 @@ class ValkeyArtifactDownloadTrackingClient:
                     )
                     previous_current_bytes = previous_data.current_bytes
                 except (BackendAISchemaValidationFailed, UnicodeDecodeError):
-                    log.warning("Failed to parse previous file data for progress update")
+                    log.warning("previous file progress data parse failed")
 
             # Calculate bytes delta for artifact aggregation
             bytes_delta = current_bytes - previous_current_bytes
@@ -293,11 +296,11 @@ class ValkeyArtifactDownloadTrackingClient:
                 await conn.hset(artifact_key, {"last_updated": current_time_str})
 
         log.trace(
-            "Updated file progress: file_path={}, current={}, total={}, success={}",
-            file_path,
-            current_bytes,
-            total_bytes,
-            success,
+            "file progress updated",
+            file_path=file_path,
+            current_bytes=current_bytes,
+            total_bytes=total_bytes,
+            success=success,
         )
 
     @valkey_artifact_resilience.apply()
@@ -333,7 +336,7 @@ class ValkeyArtifactDownloadTrackingClient:
                 downloaded_bytes=int(hash_data[b"downloaded_bytes"].decode()),
             )
         except (KeyError, ValueError, UnicodeDecodeError) as e:
-            log.warning("Failed to parse artifact progress data from hash: {}", str(e))
+            log.warning("artifact progress data parse failed", exc_info=e)
             return None
 
     @valkey_artifact_resilience.apply()
@@ -361,7 +364,7 @@ class ValkeyArtifactDownloadTrackingClient:
         try:
             return FileDownloadProgressData.model_validate_json(data_bytes)
         except (BackendAISchemaValidationFailed, UnicodeDecodeError):
-            log.warning("Failed to parse file progress data")
+            log.warning("file progress data parse failed")
             return None
 
     @valkey_artifact_resilience.apply()
@@ -399,7 +402,8 @@ class ValkeyArtifactDownloadTrackingClient:
                                 file_progress_list.append(file_progress)
                             except (BackendAISchemaValidationFailed, UnicodeDecodeError):
                                 log.warning(
-                                    "Failed to parse file progress data for key: {}", key_bytes
+                                    "file progress data parse failed",
+                                    valkey_key=key_bytes.decode(errors="replace"),
                                 )
 
                 if cursor == b"0":
@@ -466,7 +470,7 @@ class ValkeyArtifactDownloadTrackingClient:
                     break
 
         log.debug(
-            "Cleaned up artifact download tracking: model_id={}, revision={}",
-            model_id,
-            revision,
+            "artifact download tracking cleaned up",
+            model_id=model_id,
+            revision=revision,
         )

@@ -1,6 +1,14 @@
 import asyncio
 
+from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.exception import UnreachableError
+from ai.backend.common.types import VFolderHostPermission
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.vfolder.types import (
+    VFolderInvitationState,
+    VFolderOwnershipType,
+)
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.common import Forbidden, InternalServerError
 from ai.backend.manager.errors.storage import (
@@ -11,12 +19,7 @@ from ai.backend.manager.errors.storage import (
     VFolderNotFound,
 )
 from ai.backend.manager.errors.user import UserNotFound
-from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.models.vfolder import (
-    VFolderInvitationState,
-    VFolderOwnershipType,
-)
-from ai.backend.manager.models.vfolder import VFolderPermission as VFolderMountPermission
+from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.services.vfolder.actions.invite import (
@@ -63,54 +66,45 @@ class VFolderInviteService:
         self._user_repository = user_repository
 
     async def invite(self, action: InviteVFolderAction) -> InviteVFolderActionResult:
-        # Get VFolder data
-        user = await self._user_repository.get_user_by_uuid(action.user_uuid)
-        vfolder_data = await self._vfolder_repository.get_by_id_validated(
-            action.vfolder_uuid, action.user_uuid, user.domain_name
-        )
-        if not vfolder_data:
-            raise VFolderNotFound()
+        vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_uuid)
 
         if vfolder_data.name.startswith("."):
             raise Forbidden("Cannot share private dot-prefixed vfolders.")
 
-        # Get inviter email
-        inviter_email = await self._vfolder_repository.get_user_email_by_id(action.user_uuid)
-        if inviter_email is None:
-            raise UserNotFound()
-
-        # Resolve invitee emails to user info
-        invitee_users = await self._vfolder_repository.get_users_by_emails(action.invitee_emails)
-        if not invitee_users:
-            raise VFolderNotFound("No users found with the provided emails.")
-        invitee_user_uuids = [user_id for user_id, _ in invitee_users]
-
-        # Check if users already have permission
-        has_permission = await self._vfolder_repository.check_user_has_vfolder_permission(
-            action.vfolder_uuid, invitee_user_uuids
+        allowed_vfolder_types = (
+            await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
         )
-        if has_permission:
+        await self._vfolder_repository.ensure_host_permission_allowed(
+            vfolder_data.host,
+            permission=VFolderHostPermission.INVITE_OTHERS,
+            allowed_vfolder_types=allowed_vfolder_types,
+            user_uuid=action.user_uuid,
+            resource_policy=action.keypair_resource_policy,
+            domain_name=vfolder_data.domain_name,
+        )
+
+        # An address with an account gets a mount level with the offer; one without
+        # gets the offer alone and mounts at the folder's default once it has one.
+        invitee_users = await self._vfolder_repository.get_users_by_emails(action.invitee_emails)
+        account_of = {email: UserID(user_id) for user_id, email in invitee_users}
+
+        if account_of and await self._vfolder_repository.check_user_has_vfolder_permission(
+            action.vfolder_uuid, list(account_of.values())
+        ):
             raise VFolderGrantAlreadyExists(
                 "Invitation to this VFolder already sent out to target user"
             )
 
-        # Create invitations
+        # Create invitations; an offer already open to an address is restated instead
         invited_ids: list[str] = []
 
-        for _, user_email in invitee_users:
-            # Check if invitation already exists
-            invitation_exists = await self._vfolder_repository.check_pending_invitation_exists(
-                action.vfolder_uuid, inviter_email, user_email
-            )
-            if invitation_exists:
-                continue
-
-            # Create invitation
+        for email in action.invitee_emails:
             result = await self._vfolder_repository.create_vfolder_invitation(
                 action.vfolder_uuid,
-                inviter_email,
-                user_email,
+                UserID(action.user_uuid),
+                email,
                 action.mount_permission,
+                invitee_id=account_of.get(email),
             )
             if result:
                 invited_ids.append(result)
@@ -127,11 +121,15 @@ class VFolderInviteService:
         if not invitation_data:
             raise VFolderInvitationNotFound
 
-        # Get target user by email
-        user_info = await self._vfolder_repository.get_user_by_email(invitation_data.invitee)
-        if not user_info:
-            raise VFolderNotFound
-        user_id, _ = user_info
+        # Only the invitee answers the offer
+        requester_email = await self._vfolder_repository.get_user_email_by_id(
+            action.requester_user_uuid
+        )
+        if requester_email is None:
+            raise UserNotFound
+        if requester_email != invitation_data.invitee:
+            raise Forbidden("Cannot accept other user's invitation")
+        user_id = action.requester_user_uuid
 
         # Get target vfolder
         vfolder_data = await self._vfolder_repository.get_by_id(invitation_data.vfolder)
@@ -143,17 +141,8 @@ class VFolderInviteService:
         if count > 0:
             raise VFolderAlreadyExists
 
-        # Create permission relation between the vfolder and the invitee
-        await self._vfolder_repository.create_vfolder_permission(
-            invitation_data.vfolder,
-            user_id,
-            VFolderMountPermission(invitation_data.permission),
-        )
-
-        # Mark invitation as accepted
-        await self._vfolder_repository.update_invitation_state(
-            action.invitation_id, VFolderInvitationState.ACCEPTED
-        )
+        # Settle the invitation and share the folder to the invitee
+        await self._vfolder_repository.accept_invitation(action.invitation_id, UserID(user_id))
 
         return AcceptInvitationActionResult(action.invitation_id)
 
@@ -176,16 +165,15 @@ class VFolderInviteService:
             if requester_email is None:
                 raise UserNotFound
 
-            # Determine new state based on who is rejecting
+            # The inviter withdraws the offer; the invitee turns it down
             if requester_email == invitation_data.inviter:
-                state = VFolderInvitationState.CANCELED
+                await self._vfolder_repository.cancel_invitation(action.invitation_id)
             elif requester_email == invitation_data.invitee:
-                state = VFolderInvitationState.REJECTED
+                await self._vfolder_repository.reject_invitation(
+                    action.invitation_id, UserID(action.requester_user_uuid)
+                )
             else:
                 raise Forbidden("Cannot change other user's invitation")
-
-            # Update invitation state
-            await self._vfolder_repository.update_invitation_state(action.invitation_id, state)
 
         except (TimeoutError, asyncio.CancelledError):
             raise
@@ -198,31 +186,22 @@ class VFolderInviteService:
     async def update_invitation(
         self, action: UpdateInvitationAction
     ) -> UpdateInvitationActionResult:
-        # Get requester email
-        requester_email = await self._vfolder_repository.get_user_email_by_id(
-            action.requester_user_uuid
-        )
-        if requester_email is None:
-            raise UserNotFound()
-
         # Update invitation permission (only by inviter)
         await self._vfolder_repository.update_invitation_permission(
-            action.invitation_id, requester_email, action.mount_permission
+            action.invitation_id, UserID(action.requester_user_uuid), action.mount_permission
         )
 
         return UpdateInvitationActionResult(action.invitation_id)
 
     async def list_invitation(self, action: ListInvitationAction) -> ListInvitationActionResult:
         # Get requester email
-        requester_email = await self._vfolder_repository.get_user_email_by_id(
-            action.requester_user_uuid
-        )
+        requester_email = await self._vfolder_repository.get_user_email_by_id(action.user_uuid)
         if requester_email is None:
             raise UserNotFound()
 
         # Get pending invitations with vfolder info
         invitation_vfolder_pairs = await self._vfolder_repository.get_pending_invitations_for_user(
-            requester_email
+            UserID(action.user_uuid), requester_email
         )
 
         invs_info: list[VFolderInvitationInfo] = []
@@ -241,20 +220,12 @@ class VFolderInviteService:
             )
             invs_info.append(info)
 
-        return ListInvitationActionResult(
-            requester_user_uuid=action.requester_user_uuid, info=invs_info
-        )
+        return ListInvitationActionResult(requester_user_uuid=action.user_uuid, info=invs_info)
 
     async def leave_invited_vfolder(
         self, action: LeaveInvitedVFolderAction
     ) -> LeaveInvitedVFolderActionResult:
-        # Get vfolder info
-        user = await self._user_repository.get_user_by_uuid(action.requester_user_uuid)
-        vfolder_data = await self._vfolder_repository.get_by_id_validated(
-            action.vfolder_uuid, user.id, user.domain_name
-        )
-        if not vfolder_data:
-            raise VFolderNotFound()
+        vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_uuid)
 
         if vfolder_data.ownership_type == VFolderOwnershipType.GROUP:
             raise VFolderInvalidParameter("Cannot leave a group vfolder.")
@@ -275,40 +246,42 @@ class VFolderInviteService:
         else:
             user_uuid = action.requester_user_uuid
 
-        # Delete vfolder permission
-        await self._vfolder_repository.delete_vfolder_permission(action.vfolder_uuid, user_uuid)
+        # Give back the share the user holds
+        await self._vfolder_repository.leave_shared_vfolder(action.vfolder_uuid, user_uuid)
 
         return LeaveInvitedVFolderActionResult(vfolder_data.id)
 
     async def revoke_invited_vfolder(
         self, action: RevokeInvitedVFolderAction
     ) -> RevokeInvitedVFolderActionResult:
-        await self._vfolder_repository.delete_vfolder_permission(
-            action.vfolder_id, action.shared_user_id
+        await self._vfolder_repository.revoke_shared_vfolder(
+            action.vfolder_uuid, action.shared_user_id
         )
-        return RevokeInvitedVFolderActionResult(action.vfolder_id, action.shared_user_id)
+        return RevokeInvitedVFolderActionResult(action.vfolder_uuid, action.shared_user_id)
 
     async def update_invited_vfolder_mount_permission(
         self, action: UpdateInvitedVFolderMountPermissionAction
     ) -> UpdateInvitedVFolderMountPermissionActionResult:
+        requester = current_user()
+        if requester is None:
+            raise UnreachableError("User context is not available")
+        if action.user_id == requester.user_id:
+            raise Forbidden("Cannot change your own mount permission")
         await self._vfolder_repository.update_invited_vfolder_mount_permission(
-            action.vfolder_id, action.user_id, action.permission
+            action.vfolder_uuid,
+            action.user_id,
+            action.permission,
+            sharer_id=UserID(requester.user_id),
         )
         return UpdateInvitedVFolderMountPermissionActionResult(
-            action.vfolder_id, action.user_id, action.permission
+            action.vfolder_uuid, action.user_id, action.permission
         )
 
     async def list_sent_invitations(
         self, action: ListSentInvitationsAction
     ) -> ListSentInvitationsActionResult:
-        requester_email = await self._vfolder_repository.get_user_email_by_id(
-            action.requester_user_uuid
-        )
-        if requester_email is None:
-            raise UserNotFound()
-
         invitation_pairs = await self._vfolder_repository.get_sent_invitations_for_user(
-            requester_email
+            UserID(action.user_uuid)
         )
         invs_info: list[VFolderInvitationInfo] = []
         for invitation_data, vfolder_data in invitation_pairs:

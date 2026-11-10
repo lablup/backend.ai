@@ -10,6 +10,11 @@ from ai.backend.common.clients.valkey_client.valkey_schedule import (
     ReplicaProbeTarget,
     ValkeyScheduleClient,
 )
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
+from ai.backend.common.data.entity.replica import ReplicaID
+from ai.backend.common.data.entity.session_group import SessionGroupID
+from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.request import (
     BulkRegisterRoutesRequest,
     BulkUnregisterRoutesRequest,
@@ -22,18 +27,17 @@ from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.types import (
     UpdateRoutesItem,
 )
 from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.exception import BackendAIError
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
-from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.service_discovery import ServiceDiscovery
 from ai.backend.common.service_discovery.service_discovery import ModelServiceMetadata
 from ai.backend.common.types import SessionId
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger, with_log_context
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
+    RouteData,
     RouteHealthStatus,
     RouteStatus,
     RouteTrafficStatus,
@@ -44,11 +48,11 @@ from ai.backend.manager.errors.deployment import (
     RouteSessionNotFound,
     RouteSessionTerminated,
 )
-from ai.backend.manager.models.routing.conditions import RouteConditions
-from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
-from ai.backend.manager.repositories.deployment import DeploymentRepository
-from ai.backend.manager.repositories.deployment.types import (
-    RouteData,
+from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
+from ai.backend.manager.models.routing.searchers import RouteInfoSearcher
+from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
+from ai.backend.manager.repositories.deployment.types.endpoint import (
     RouteSessionInfo,
     RouteSessionKernelInfo,
 )
@@ -60,11 +64,12 @@ from ai.backend.manager.sokovan.deployment.route.types import (
     RouteExecutionError,
     RouteExecutionResult,
 )
+from ai.backend.manager.sokovan.scheduler.exceptions import SchedulingError
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
     SchedulingController,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 
 def _extract_error_code(exception: BaseException) -> str | None:
@@ -119,6 +124,10 @@ class RouteExecutor:
                 deployment_ids = {route.deployment_id for route in routes}
                 deployments = await self._deployment_repo.get_deployments_by_ids(deployment_ids)
                 deployment_map = {dep.id: dep for dep in deployments}
+            with RouteRecorderContext.shared_step("load_session_groups"):
+                session_group_map = await self._deployment_repo.fetch_route_session_group_ids({
+                    route.route_id for route in routes
+                })
 
         route_session_ids: dict[UUID, SessionId] = {}
         successes: list[RouteData] = []
@@ -126,21 +135,27 @@ class RouteExecutor:
 
         # Phase 2: Create sessions (per-route)
         for route in routes:
-            try:
-                session_id = await self._provision_route(route, deployment_map)
-                if session_id is not None:
-                    route_session_ids[route.route_id] = session_id
-                successes.append(route)
-            except Exception as e:
-                log.warning("Failed to provision route {}: {}", route.route_id, e)
-                errors.append(
-                    RouteExecutionError(
-                        route_info=route,
-                        reason="Failed to provision",
-                        error_detail=str(e),
-                        error_code=_extract_error_code(e),
+            with with_log_context(route_id=route.route_id, deployment_id=route.deployment_id):
+                try:
+                    session_id = await self._provision_route(
+                        route, deployment_map, session_group_map
                     )
-                )
+                    if session_id is not None:
+                        route_session_ids[route.route_id] = session_id
+                    successes.append(route)
+                except Exception as e:
+                    if self._is_rejection(e):
+                        log.trace("route provisioning failed: {}", e)
+                    else:
+                        log.exception("route provisioning failed")
+                    errors.append(
+                        RouteExecutionError(
+                            route_info=route,
+                            reason="Failed to provision",
+                            error_detail=str(e),
+                            error_code=_extract_error_code(e),
+                        )
+                    )
 
         # Phase 3: Link sessions to routes (only for successful routes)
         if route_session_ids:
@@ -178,27 +193,20 @@ class RouteExecutor:
             try:
                 unregister_result = await self.unregister_routes_now(routes)
             except Exception:
-                log.exception(
-                    "Synchronous AppProxy unregister failed for {} draining routes",
-                    len(routes),
+                log.warning(
+                    "AppProxy route unregistration failed", route_count=len(routes), exc_info=True
                 )
             else:
-                if unregister_result.errors:
+                log.debug(
+                    "AppProxy routes unregistered",
+                    success_count=len(unregister_result.successes),
+                    failure_count=len(unregister_result.errors),
+                )
+                for error in unregister_result.errors:
                     log.warning(
-                        "AppProxy unregister: {} succeeded, {} failed (proceeding to cooling down)",
-                        len(unregister_result.successes),
-                        len(unregister_result.errors),
-                    )
-                    for error in unregister_result.errors:
-                        log.warning(
-                            "Failed to unregister route {} from AppProxy: {}",
-                            error.route_info.route_id,
-                            error.reason,
-                        )
-                else:
-                    log.debug(
-                        "Unregistered {} routes from AppProxy",
-                        len(unregister_result.successes),
+                        "route AppProxy unregistration failed",
+                        route_id=error.route_info.route_id,
+                        failure_reason=error.reason,
                     )
 
         return RouteExecutionResult(
@@ -239,7 +247,7 @@ class RouteExecutor:
         target_session_ids: list[SessionId] = []
         for route in ready_routes:
             if not route.session_id:
-                log.debug("Route {} has no session, skipping termination", route.route_id)
+                log.trace("route has no session, termination skipped", route_id=route.route_id)
                 continue
             target_session_ids.append(route.session_id)
 
@@ -247,7 +255,7 @@ class RouteExecutor:
         with RouteRecorderContext.shared_phase("terminate_sessions"):
             with RouteRecorderContext.shared_step("mark_sessions_terminating"):
                 await self._scheduling_controller.mark_sessions_for_termination(
-                    target_session_ids, reason="ROUTE_TERMINATION"
+                    target_session_ids, reason=KernelLifecycleEventReason.ROUTE_TERMINATION
                 )
 
         return RouteExecutionResult(
@@ -333,13 +341,13 @@ class RouteExecutor:
         )
 
     async def check_running_routes(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
-        """Check health status of running routes.
+        """Check that each route's bound session is still alive.
 
         Args:
-            routes: Routes to check (should be HEALTHY or UNHEALTHY status)
+            routes: PROVISIONING or RUNNING routes to check
 
         Returns:
-            Result containing routes with updated health status
+            Result whose errors are the routes whose session is gone or terminal
         """
         # Phase 1: Load status
         with RouteRecorderContext.shared_phase("load_status"):
@@ -358,7 +366,7 @@ class RouteExecutor:
                 self._verify_route_session_status(route, session_statuses)
                 successes.append(route)
             except (RouteSessionNotFound, RouteSessionTerminated) as e:
-                log.debug("Route {} session status check failed: {}", route.route_id, e)
+                log.trace("route session status check failed: {}", e, route_id=route.route_id)
                 errors.append(
                     RouteExecutionError(
                         route_info=route,
@@ -405,7 +413,7 @@ class RouteExecutor:
 
         if targets:
             await self._valkey_schedule.register_route_probe_targets_batch(targets)
-            log.debug("Registered {} ReplicaProbeTargets in Valkey", len(targets))
+            log.debug("probe targets registered", target_count=len(targets))
 
     async def sync_route_probe_targets(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
         """Sync ReplicaProbeTargets to Valkey for routes with known replica info.
@@ -425,7 +433,7 @@ class RouteExecutor:
             ):
                 with RouteRecorderContext.shared_step("write_probe_targets"):
                     await self._valkey_schedule.register_route_probe_targets_batch(targets)
-            log.debug("Synced {} ReplicaProbeTargets to Valkey", len(targets))
+            log.debug("probe targets synced", target_count=len(targets))
 
         return RouteExecutionResult(successes=[], errors=[])
 
@@ -552,28 +560,22 @@ class RouteExecutor:
                 try:
                     register_result = await self.register_routes_now(newly_healthy)
                 except Exception:
-                    log.exception(
-                        "Synchronous AppProxy register failed for {} newly-healthy routes",
-                        len(newly_healthy),
+                    log.warning(
+                        "AppProxy route registration failed",
+                        route_count=len(newly_healthy),
+                        exc_info=True,
                     )
                 else:
-                    if register_result.errors:
+                    log.debug(
+                        "AppProxy routes registered",
+                        success_count=len(register_result.successes),
+                        failure_count=len(register_result.errors),
+                    )
+                    for error in register_result.errors:
                         log.warning(
-                            "AppProxy register: {} succeeded, {} failed "
-                            "(will be retried by long cycle)",
-                            len(register_result.successes),
-                            len(register_result.errors),
-                        )
-                        for error in register_result.errors:
-                            log.warning(
-                                "Failed to register route {} with AppProxy: {}",
-                                error.route_info.route_id,
-                                error.reason,
-                            )
-                    else:
-                        log.debug(
-                            "Registered {} newly-healthy routes with AppProxy",
-                            len(register_result.successes),
+                            "route AppProxy registration failed",
+                            route_id=error.route_info.route_id,
+                            failure_reason=error.reason,
                         )
 
         return RouteExecutionResult(
@@ -601,7 +603,7 @@ class RouteExecutor:
         }
 
         if not route_ids_with_session:
-            log.debug("No routes with sessions to sync")
+            log.debug("no routes with sessions to sync")
             return RouteExecutionResult(successes=[], errors=[])
 
         # Phase 1: Load service metadata
@@ -640,9 +642,9 @@ class RouteExecutor:
             ):
                 with RouteRecorderContext.shared_step("register_for_monitoring"):
                     await self._service_discovery.sync_model_service_routes(metadata_list)
-            log.debug("Synced {} routes to service discovery", len(metadata_list))
+            log.debug("service discovery routes synced", route_count=len(metadata_list))
         else:
-            log.debug("No valid routes to sync to service discovery")
+            log.debug("no valid routes to sync to service discovery")
 
         return RouteExecutionResult(successes=[], errors=[])
 
@@ -687,23 +689,26 @@ class RouteExecutor:
 
         deployments = await self._deployment_repo.get_deployments_by_ids(set(endpoint_ids))
         deployment_by_id = {dep.id: dep for dep in deployments}
-        scaling_groups = {dep.metadata.resource_group for dep in deployments}
-        proxy_targets = await self._deployment_repo.fetch_scaling_group_proxy_targets(
-            scaling_groups
+        resource_groups = {dep.metadata.resource_group for dep in deployments}
+        proxy_targets = await self._deployment_repo.fetch_resource_group_proxy_targets(
+            resource_groups
         )
 
         # Caller composes the filter so the conditions stay explicit at
         # the call site instead of hiding behind a flag-laden helper.
-        route_querier = BatchQuerier(
+        replica_fields = ReplicaSearchableFields.own
+        route_searcher = RouteInfoSearcher(
             pagination=NoPagination(),
             conditions=[
-                RouteConditions.by_endpoint_ids(endpoint_ids),
-                RouteConditions.by_lifecycle_statuses([RouteStatus.RUNNING]),
-                RouteConditions.by_traffic_status_equals(RouteTrafficStatus.ACTIVE),
+                replica_fields.deployment_id.filter.in_(
+                    UUIDInMatchSpec(values=endpoint_ids, negated=False)
+                ),
+                replica_fields.status.filter.in_([RouteStatus.RUNNING]),
+                replica_fields.traffic_status.filter.equals(RouteTrafficStatus.ACTIVE),
             ],
         )
         connection_infos = await self._deployment_repo.fetch_route_connection_infos(
-            route_querier=route_querier,
+            route_searcher=route_searcher,
         )
 
         items_by_target: dict[tuple[str, str], list[UpdateRoutesItem]] = {}
@@ -753,7 +758,7 @@ class RouteExecutor:
             try:
                 response = await client.bulk_update_routes(BulkUpdateRoutesRequest(endpoints=items))
             except Exception as exc:
-                log.exception("AppProxy bulk routes-sync request failed for target {}", addr)
+                log.warning("AppProxy bulk route sync failed", proxy_address=addr, exc_info=True)
                 error_code = _extract_error_code(exc)
                 for item in items:
                     ep_id = DeploymentID(item.deployment_id)
@@ -820,9 +825,9 @@ class RouteExecutor:
 
         deployments = await self._deployment_repo.get_deployments_by_ids(set(endpoint_ids))
         deployment_by_id = {dep.id: dep for dep in deployments}
-        scaling_groups = {dep.metadata.resource_group for dep in deployments}
-        proxy_targets = await self._deployment_repo.fetch_scaling_group_proxy_targets(
-            scaling_groups
+        resource_groups = {dep.metadata.resource_group for dep in deployments}
+        proxy_targets = await self._deployment_repo.fetch_resource_group_proxy_targets(
+            resource_groups
         )
 
         # Routes that actually make it onto the wire per endpoint;
@@ -900,7 +905,9 @@ class RouteExecutor:
                     BulkRegisterRoutesRequest(endpoints=items)
                 )
             except Exception as exc:
-                log.exception("AppProxy bulk routes-register request failed for target {}", addr)
+                log.warning(
+                    "AppProxy bulk route registration failed", proxy_address=addr, exc_info=True
+                )
                 error_code = _extract_error_code(exc)
                 for item in items:
                     ep_id = DeploymentID(item.deployment_id)
@@ -964,9 +971,9 @@ class RouteExecutor:
 
         deployments = await self._deployment_repo.get_deployments_by_ids(set(endpoint_ids))
         deployment_by_id = {dep.id: dep for dep in deployments}
-        scaling_groups = {dep.metadata.resource_group for dep in deployments}
-        proxy_targets = await self._deployment_repo.fetch_scaling_group_proxy_targets(
-            scaling_groups
+        resource_groups = {dep.metadata.resource_group for dep in deployments}
+        proxy_targets = await self._deployment_repo.fetch_resource_group_proxy_targets(
+            resource_groups
         )
 
         items_by_target: dict[tuple[str, str], list[UnregisterRoutesItem]] = {}
@@ -1013,7 +1020,9 @@ class RouteExecutor:
                     BulkUnregisterRoutesRequest(endpoints=items)
                 )
             except Exception as exc:
-                log.exception("AppProxy bulk routes-unregister request failed for target {}", addr)
+                log.warning(
+                    "AppProxy bulk route unregistration failed", proxy_address=addr, exc_info=True
+                )
                 error_code = _extract_error_code(exc)
                 for item in items:
                     ep_id = DeploymentID(item.deployment_id)
@@ -1074,11 +1083,11 @@ class RouteExecutor:
                 deployments = await self._deployment_repo.get_deployments_by_ids(deployment_ids)
 
             with RouteRecorderContext.shared_step("load_cleanup_policy"):
-                scaling_group_names = list({
+                resource_group_names = list({
                     deployment.metadata.resource_group for deployment in deployments
                 })
-                cleanup_configs = await self._deployment_repo.get_scaling_group_cleanup_configs(
-                    scaling_group_names
+                cleanup_configs = await self._deployment_repo.get_resource_group_cleanup_configs(
+                    resource_group_names
                 )
 
         # Create mapping of deployment_id -> cleanup config (no phase - transformation only)
@@ -1106,17 +1115,11 @@ class RouteExecutor:
             )
             if should_cleanup:
                 successes.append(route)
-                log.info(
-                    "Route {} marked for cleanup (status: {})",
-                    route.route_id,
-                    route.status.value,
+                log.trace(
+                    "route marked for cleanup", route_id=route.route_id, route_status=route.status
                 )
             else:
-                log.trace(
-                    "Route {} kept (status {} not in cleanup targets)",
-                    route.route_id,
-                    route.status.value,
-                )
+                log.trace("route kept", route_id=route.route_id, route_status=route.status)
 
         return RouteExecutionResult(
             successes=successes,
@@ -1124,12 +1127,22 @@ class RouteExecutor:
 
     # Private helper methods
 
+    def _is_rejection(self, error: Exception) -> bool:
+        if isinstance(error, SchedulingError):
+            return True
+        return isinstance(error, BackendAIError) and error.is_client_error()
+
     async def _provision_route(
         self,
         route: RouteData,
         deployment_map: Mapping[DeploymentID, DeploymentInfo],
+        session_group_map: Mapping[ReplicaID, SessionGroupID],
     ) -> SessionId | None:
         """Provision a single route by creating a session.
+
+        The session inherits the SessionGroup of the route's replica group
+        (BEP-1064) so the group's placement policy governs every replica
+        of that group.
 
         Returns:
             SessionId: newly created session ID
@@ -1141,7 +1154,7 @@ class RouteExecutor:
         with recorder.phase("create_session"):
             if route.session_id is not None:
                 with recorder.step("skip_existing_session"):
-                    log.debug("Route {} already has a session, skipping", route.route_id)
+                    log.trace("route already has a session", route_id=route.route_id)
                 return None
 
             with recorder.step("enqueue_session"):
@@ -1162,6 +1175,7 @@ class RouteExecutor:
                     context=deployment_context,
                     route_id=route.route_id,
                     target_revision=target_revision,
+                    session_group_id=session_group_map.get(route.route_id),
                 )
                 return await self._scheduling_controller.enqueue_session_from_draft(draft)
 
@@ -1170,12 +1184,18 @@ class RouteExecutor:
         route: RouteData,
         session_statuses: Mapping[ReplicaID, SessionStatus | None],
     ) -> None:
-        """Verify that route's session is in a valid state."""
+        """Verify that route's session is in a valid state.
+
+        A route with no bound session yet passes; the status map cannot tell that
+        case apart from a missing session row.
+        """
         pool = RouteRecorderContext.current_pool()
         recorder = pool.recorder(route.route_id)
 
         with recorder.phase("verify_session"):
             with recorder.step("check_session_exists"):
+                if route.session_id is None:
+                    return
                 session_status = session_statuses.get(route.route_id)
                 if session_status is None:
                     raise RouteSessionNotFound("No session associated with route")

@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import (
     Annotated,
     Any,
+    Final,
     Self,
     cast,
 )
@@ -44,7 +45,15 @@ from ai.backend.common.configs import (
     ServiceDiscoveryConfig,
 )
 from ai.backend.common.configs.redis import RedisConfig
-from ai.backend.common.meta import BackendAIConfigMeta, CompositeType, ConfigExample
+from ai.backend.common.configs.storage_status_report import StorageStatusReportConfig
+from ai.backend.common.configs.volume_status_check import VolumeStatusCheckConfig
+from ai.backend.common.configs.wheelhouse import WheelhouseConfig
+from ai.backend.common.meta import (
+    NEXT_RELEASE_VERSION,
+    BackendAIConfigMeta,
+    CompositeType,
+    ConfigExample,
+)
 from ai.backend.common.typed_validators import (
     AutoDirectoryPath,
     GroupID,
@@ -58,11 +67,14 @@ from ai.backend.common.types import (
     SlotName,
     SlotNameField,
 )
-from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.config import LoggingConfig
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.logging.validation_context import BaseConfigValidationContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
+
+# Default of the removed `scaling-group` key, kept for the legacy `sgroup/<name>` etcd scope.
+LEGACY_SGROUP_NAME_FALLBACK: Final = "default"
 
 
 class EventLoopType(enum.StrEnum):
@@ -73,6 +85,11 @@ class EventLoopType(enum.StrEnum):
 class ContainerSandboxType(enum.StrEnum):
     DOCKER = "docker"
     JAIL = "jail"
+
+
+class ContainerLogDriver(enum.StrEnum):
+    LOCAL = "local"
+    JSON_FILE = "json-file"
 
 
 class ScratchType(enum.StrEnum):
@@ -120,6 +137,209 @@ class SyncContainerLifecyclesConfig(BaseConfigSchema):
             example=ConfigExample(local="10.0", prod="30.0"),
         ),
     ]
+
+
+class SocketRelayHealthCheckConfig(BaseConfigSchema):
+    enable: Annotated[
+        bool,
+        Field(default=True),
+        BackendAIConfigMeta(
+            description=(
+                "Add a healthcheck to the socket relay container that reports it unhealthy "
+                "when the agent socket file in the container is missing or not a socket. "
+                "The healthcheck only reports the status and does not restart the container."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="true", prod="true"),
+        ),
+    ]
+    interval: Annotated[
+        float,
+        Field(default=30.0, ge=0.001),
+        BackendAIConfigMeta(
+            description="Seconds between healthcheck runs.",
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="30.0", prod="30.0"),
+        ),
+    ]
+    timeout: Annotated[
+        float,
+        Field(default=30.0, ge=0.001),
+        BackendAIConfigMeta(
+            description="Seconds a healthcheck run may take before it counts as a failure.",
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="30.0", prod="30.0"),
+        ),
+    ]
+    retries: Annotated[
+        int,
+        Field(default=3, ge=1),
+        BackendAIConfigMeta(
+            description=(
+                "Number of consecutive failed healthcheck runs before the container is "
+                "reported unhealthy."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="3", prod="3"),
+        ),
+    ]
+
+
+class SocketRelayConfig(BaseConfigSchema):
+    run_as_non_root: Annotated[
+        bool,
+        Field(
+            default=False,
+            validation_alias=AliasChoices("run-as-non-root", "run_as_non_root"),
+            serialization_alias="run-as-non-root",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Run socat in the socket relay container as a non-root user. A root agent "
+                "changes the owner of the socket directory to uid/gid 65534 and runs the relay "
+                "as that user; a non-root agent runs the relay as its own user. The setting "
+                "applies when the relay container is created, so remove the "
+                "backendai-socket-relay.<agent id> container before restarting the agent "
+                "after changing it."
+            ),
+            added_version="26.10.0",
+            example=ConfigExample(local="false", prod="false"),
+        ),
+    ]
+    no_new_privileges: Annotated[
+        bool,
+        Field(
+            default=False,
+            validation_alias=AliasChoices("no-new-privileges", "no_new_privileges"),
+            serialization_alias="no-new-privileges",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Create the socket relay container with the no-new-privileges security option, "
+                "so its processes cannot gain privileges through setuid binaries."
+            ),
+            added_version="26.10.0",
+            example=ConfigExample(local="false", prod="false"),
+        ),
+    ]
+    drop_all_capabilities: Annotated[
+        bool,
+        Field(
+            default=False,
+            validation_alias=AliasChoices("drop-all-capabilities", "drop_all_capabilities"),
+            serialization_alias="drop-all-capabilities",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Drop all Linux capabilities from the socket relay container. Without "
+                "run-as-non-root, the relay then runs as root that cannot write to a socket "
+                "directory owned by another user, such as the directory of a non-root agent."
+            ),
+            added_version="26.10.0",
+            example=ConfigExample(local="false", prod="false"),
+        ),
+    ]
+    read_only_rootfs: Annotated[
+        bool,
+        Field(
+            default=False,
+            validation_alias=AliasChoices("read-only-rootfs", "read_only_rootfs"),
+            serialization_alias="read-only-rootfs",
+        ),
+        BackendAIConfigMeta(
+            description="Mount the root filesystem of the socket relay container read-only.",
+            added_version="26.10.0",
+            example=ConfigExample(local="false", prod="false"),
+        ),
+    ]
+    pids_limit: Annotated[
+        int | None,
+        Field(
+            default=None,
+            ge=2,
+            validation_alias=AliasChoices("pids-limit", "pids_limit"),
+            serialization_alias="pids-limit",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Maximum number of processes in the socket relay container. Unlimited if not set."
+            ),
+            added_version="26.10.0",
+            example=ConfigExample(local="64", prod="64"),
+        ),
+    ]
+    max_children: Annotated[
+        int | None,
+        Field(
+            default=None,
+            ge=1,
+            validation_alias=AliasChoices("max-children", "max_children"),
+            serialization_alias="max-children",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Maximum number of connections that socat serves at once, each in its own "
+                "child process. Must be smaller than pids-limit when both are set. "
+                "Unlimited if not set."
+            ),
+            added_version="26.10.0",
+            example=ConfigExample(local="32", prod="32"),
+        ),
+    ]
+    memory: Annotated[
+        BinarySizeField | None,
+        Field(default=None),
+        BackendAIConfigMeta(
+            description="Memory limit of the socket relay container. Unlimited if not set.",
+            added_version="26.10.0",
+            example=ConfigExample(local="64M", prod="64M"),
+        ),
+    ]
+    cpus: Annotated[
+        float | None,
+        Field(default=None, gt=0),
+        BackendAIConfigMeta(
+            description=(
+                "CPU limit of the socket relay container, in cores. Unlimited if not set."
+            ),
+            added_version="26.10.0",
+            example=ConfigExample(local="1.0", prod="1.0"),
+        ),
+    ]
+    health_check: Annotated[
+        SocketRelayHealthCheckConfig,
+        Field(
+            default_factory=SocketRelayHealthCheckConfig,
+            validation_alias=AliasChoices("health-check", "health_check"),
+            serialization_alias="health-check",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Healthcheck of the socket relay container. The settings apply when the "
+                "relay container is created, so remove the backendai-socket-relay.<agent id> "
+                "container before restarting the agent after changing them."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            composite=CompositeType.FIELD,
+        ),
+    ]
+
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+    )
+
+    @model_validator(mode="after")
+    def _validate_max_children(self) -> Self:
+        if (
+            self.max_children is not None
+            and self.pids_limit is not None
+            and self.max_children >= self.pids_limit
+        ):
+            raise ValueError(
+                f"max-children ({self.max_children}) must be smaller than "
+                f"pids-limit ({self.pids_limit})."
+            )
+        return self
 
 
 class NodeMetricConfig(BaseConfigSchema):
@@ -705,9 +925,8 @@ class CommonAgentConfig(BaseConfigSchema):
         ),
     ]
     rpc_auth_manager_public_key: Annotated[
-        FilePath | None,
+        FilePath,
         Field(
-            default=None,
             validation_alias=AliasChoices(
                 "rpc-auth-manager-public-key", "rpc_auth_manager_public_key"
             ),
@@ -717,7 +936,8 @@ class CommonAgentConfig(BaseConfigSchema):
             description=(
                 "Path to the manager's public key file for authenticating RPC messages. "
                 "Used with ZeroMQ CURVE authentication to verify messages from the manager. "
-                "Part of the RPC security mechanism for preventing unauthorized access."
+                "Part of the RPC security mechanism for preventing unauthorized access. "
+                f"Required since {NEXT_RELEASE_VERSION}."
             ),
             added_version="25.12.0",
             secret=True,
@@ -727,9 +947,8 @@ class CommonAgentConfig(BaseConfigSchema):
         ),
     ]
     rpc_auth_agent_keypair: Annotated[
-        FilePath | None,
+        FilePath,
         Field(
-            default=None,
             validation_alias=AliasChoices("rpc-auth-agent-keypair", "rpc_auth_agent_keypair"),
             serialization_alias="rpc-auth-agent-keypair",
         ),
@@ -737,7 +956,8 @@ class CommonAgentConfig(BaseConfigSchema):
             description=(
                 "Path to the agent's keypair file for RPC authentication. "
                 "Contains both public and private keys used for ZeroMQ CURVE authentication. "
-                "The private key must be kept secure as it proves the agent's identity."
+                "The private key must be kept secure as it proves the agent's identity. "
+                f"Required since {NEXT_RELEASE_VERSION}."
             ),
             added_version="25.12.0",
             secret=True,
@@ -761,6 +981,22 @@ class CommonAgentConfig(BaseConfigSchema):
             ),
             added_version="25.12.0",
             example=ConfigExample(local="/tmp/backend.ai/ipc", prod="/var/run/backend.ai/ipc"),
+        ),
+    ]
+    socket_relay: Annotated[
+        SocketRelayConfig,
+        Field(
+            default_factory=SocketRelayConfig,
+            validation_alias=AliasChoices("socket-relay", "socket_relay"),
+            serialization_alias="socket-relay",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "User, privilege, resource limits, and healthcheck of the socket relay "
+                "container that connects kernel containers to the agent socket."
+            ),
+            added_version="26.10.0",
+            composite=CompositeType.FIELD,
         ),
     ]
     var_base_path: Annotated[
@@ -1094,25 +1330,6 @@ class CommonAgentConfig(BaseConfigSchema):
             example=ConfigExample(local="", prod="/var/log/backend.ai/abuse"),
         ),
     ]
-    use_experimental_redis_event_dispatcher: Annotated[
-        bool,
-        Field(
-            default=False,
-            validation_alias=AliasChoices(
-                "use-experimental-redis-event-dispatcher", "use_experimental_redis_event_dispatcher"
-            ),
-            serialization_alias="use-experimental-redis-event-dispatcher",
-        ),
-        BackendAIConfigMeta(
-            description=(
-                "Enables the experimental Redis-based event dispatcher for agent-manager communication. "
-                "Provides improved event delivery reliability and scalability. "
-                "Requires Redis to be configured. Still in experimental phase."
-            ),
-            added_version="25.12.0",
-            example=ConfigExample(local="false", prod="false"),
-        ),
-    ]
     docker_mode: Annotated[
         str | None,
         Field(
@@ -1180,11 +1397,16 @@ class OverridableAgentConfig(BaseConfigSchema):
         BackendAIConfigMeta(
             description=(
                 "Unique identifier for this agent instance. "
-                "If not specified, a random UUID is generated. In multi-agent mode, "
-                "each agent must have a unique ID. Used for tracking, logging, and management."
+                "If not specified, it is detected automatically on startup: the cloud "
+                "instance ID on AWS, Azure and GCP, or 'i-<hostname>' otherwise. "
+                "Because that value follows the host identity, renaming the host changes "
+                "the agent ID and the manager registers it as a separate new agent; "
+                "set this field explicitly to pin the ID. "
+                "In multi-agent mode, each agent must have a unique ID. "
+                "Used for tracking, logging, and management."
             ),
             added_version="25.12.0",
-            example=ConfigExample(local="agent-local-1", prod="agent-prod-001"),
+            example=ConfigExample(local="i-local-agent-01", prod="i-node01"),
         ),
     ]
     agent_sock_port: Annotated[
@@ -1206,20 +1428,21 @@ class OverridableAgentConfig(BaseConfigSchema):
             example=ConfigExample(local="6007", prod="6007"),
         ),
     ]
-    scaling_group: Annotated[
-        str,
+    initial_resource_group_name: Annotated[
+        str | None,
         Field(
-            default="default",
-            validation_alias=AliasChoices("scaling-group", "scaling_group"),
-            serialization_alias="scaling-group",
+            default=None,
+            validation_alias=AliasChoices(
+                "initial-resource-group-name", "initial_resource_group_name"
+            ),
+            serialization_alias="initial-resource-group-name",
         ),
         BackendAIConfigMeta(
             description=(
-                "Name of the scaling group this agent belongs to. "
-                "Scaling groups organize agents into logical clusters for resource allocation. "
-                "Users can target specific scaling groups when creating sessions."
+                "Name of the resource group used as the seed only at the agent's first "
+                "registration. When unset, the default resource group is used."
             ),
-            added_version="25.12.0",
+            added_version="26.8.0",
             example=ConfigExample(local="default", prod="gpu-cluster"),
         ),
     ]
@@ -1318,11 +1541,27 @@ class OverridableAgentConfig(BaseConfigSchema):
         extra="allow",
     )
 
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_removed_scaling_group_key(cls, data: Any) -> Any:
+        if isinstance(data, Mapping):
+            for removed_key in ("scaling-group", "scaling_group"):
+                if removed_key in data:
+                    raise ValueError(
+                        f"The '{removed_key}' agent config key is deprecated. "
+                        "Use 'initial-resource-group-name' instead."
+                    )
+        return data
+
     @property
     def defaulted_id(self) -> str:
         if self.id is None:
             self.id = f"agent-{uuid4()}"
         return self.id
+
+    def legacy_sgroup_name(self) -> str:
+        """Name used in the legacy `sgroup/<name>` etcd config scope."""
+        return self.initial_resource_group_name or LEGACY_SGROUP_NAME_FALLBACK
 
 
 class AgentConfig(CommonAgentConfig, OverridableAgentConfig):
@@ -1434,6 +1673,25 @@ class OverridableContainerConfig(BaseConfigSchema):
             ),
             added_version="25.12.0",
             example=ConfigExample(local="-1", prod="1000"),
+        ),
+    ]
+    entrypoint_user: Annotated[
+        str | None,
+        Field(
+            default=None,
+            validation_alias=AliasChoices("entrypoint-user", "entrypoint_user"),
+            serialization_alias="entrypoint-user",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "User the kernel container entrypoint starts as, as the container runtime's "
+                'User field ("uid", "uid:gid" or a name). '
+                "None lets the container runtime decide. "
+                "Agent-wide: it does not follow the per-user container_uid, "
+                "so the two can conflict."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="", prod="0:0"),
         ),
     ]
     port_range: Annotated[
@@ -1922,6 +2180,23 @@ class ResourceConfig(BaseConfigSchema):
 
 
 class ContainerLogsConfig(BaseConfigSchema):
+    driver: Annotated[
+        ContainerLogDriver,
+        Field(
+            default=ContainerLogDriver.LOCAL,
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Log driver used for kernel containers. "
+                "'local' is Docker-only and stores logs in an efficient binary format. "
+                "'json-file' is accepted by both Docker and Podman, but Podman keeps a "
+                "single size-capped log per container, so only 'max-length' takes effect "
+                "there while file count and compression have no equivalent."
+            ),
+            added_version="26.4.10",
+            example=ConfigExample(local="local", prod="local"),
+        ),
+    ]
     max_length: Annotated[
         BinarySizeField,
         Field(
@@ -2078,6 +2353,8 @@ class DockerExtraConfig(BaseConfigSchema):
     For checking additional Docker configurations
     """
 
+    model_config = ConfigDict(extra="ignore")
+
     swarm_enabled: Annotated[
         bool,
         Field(
@@ -2113,6 +2390,18 @@ class AgentGlobalConfig(BaseConfigSchema):
                 "and memory issues in the agent process."
             ),
             added_version="25.12.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
+    wheelhouse: Annotated[
+        WheelhouseConfig,
+        Field(default_factory=WheelhouseConfig),
+        BackendAIConfigMeta(
+            description=(
+                "Plugin wheels loaded when the agent starts. Wheels run without "
+                "verification, so keep the path writable only by trusted operators."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
             composite=CompositeType.FIELD,
         ),
     ]
@@ -2244,6 +2533,32 @@ class AgentGlobalConfig(BaseConfigSchema):
                 "Plugin settings are managed centrally in etcd and distributed to agents automatically."
             ),
             added_version="25.12.0",
+        ),
+    ]
+    volume_status_check: Annotated[
+        VolumeStatusCheckConfig,
+        Field(
+            default_factory=VolumeStatusCheckConfig,
+            validation_alias=AliasChoices("volume-status-check", "volume_status_check"),
+            serialization_alias="volume-status-check",
+        ),
+        BackendAIConfigMeta(
+            description="Configuration for the periodic status checks of the volumes.",
+            added_version=NEXT_RELEASE_VERSION,
+            composite=CompositeType.FIELD,
+        ),
+    ]
+    storage_status_report: Annotated[
+        StorageStatusReportConfig,
+        Field(
+            default_factory=StorageStatusReportConfig,
+            validation_alias=AliasChoices("storage-status-report", "storage_status_report"),
+            serialization_alias="storage-status-report",
+        ),
+        BackendAIConfigMeta(
+            description="Configuration for the periodic storage status report to the manager.",
+            added_version=NEXT_RELEASE_VERSION,
+            composite=CompositeType.FIELD,
         ),
     ]
     redis: Annotated[

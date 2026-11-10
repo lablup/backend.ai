@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-from ai.backend.manager.models.vfolder import VFolderPermission
+from ai.backend.manager.data.vfolder.types import VFolderMountPermission as VFolderPermission
 
 # revision identifiers, used by Alembic.
 revision = "a1fd4e7b7782"

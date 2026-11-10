@@ -19,7 +19,7 @@ from ai.backend.common.types import (
     SlotQuantity,
     SlotTypes,
 )
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.resource_allocation.types import (
@@ -28,20 +28,24 @@ from ai.backend.manager.data.resource_allocation.types import (
     ResourceGroupUsageData,
     ScopeUsageData,
 )
-from ai.backend.manager.errors.resource import DomainNotFound, ProjectNotFound, ScalingGroupNotFound
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.domain import domains
-from ai.backend.manager.models.group import groups
-from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
-from ai.backend.manager.models.resource_slot import (
+from ai.backend.manager.errors.resource import (
+    DomainNotFound,
+    ProjectNotFound,
+    ResourceGroupNotFound,
+)
+from ai.backend.manager.errors.user import KeyPairNotFound
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.domain.row import domains
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.project.row import groups
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
+from ai.backend.manager.models.resource_slot.row import (
     AgentResourceRow,
     ResourceAllocationRow,
     ResourceSlotTypeRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
-from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.resource_preset.db_source.types import (
     AccessKeyFilter,
@@ -57,7 +61,7 @@ from ai.backend.manager.repositories.resource_slot.types import (
     subtract_quantities,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ResourceAllocationDBSource:
@@ -69,10 +73,10 @@ class ResourceAllocationDBSource:
         self._db = db
 
     async def get_keypair_context(self, user_id: UUID) -> KeypairContextData:
-        """Resolve a user's main keypair access_key and resource_policy from DB.
+        """Resolve a user's default keypair access_key and resource_policy from DB.
 
-        Joins users -> keypairs -> keypair_resource_policies to fetch the
-        access_key and policy fields needed for resource allocation queries.
+        Joins keypairs -> keypair_resource_policies to fetch the access_key and
+        policy fields needed for resource allocation queries.
         """
         async with self._db.begin_readonly_session() as session:
             query = (
@@ -81,22 +85,17 @@ class ResourceAllocationDBSource:
                     KeyPairResourcePolicyRow.total_resource_slots,
                     KeyPairResourcePolicyRow.default_for_unspecified,
                 )
-                .select_from(
-                    sa.join(
-                        UserRow,
-                        KeyPairRow,
-                        UserRow.main_access_key == KeyPairRow.access_key,
-                    ).join(
-                        KeyPairResourcePolicyRow,
-                        KeyPairRow.resource_policy == KeyPairResourcePolicyRow.name,
-                    )
+                .select_from(KeyPairRow)
+                .join(
+                    KeyPairResourcePolicyRow,
+                    KeyPairRow.resource_policy == KeyPairResourcePolicyRow.name,
                 )
-                .where(UserRow.uuid == user_id)
+                .where((KeyPairRow.user == user_id) & KeyPairRow.is_default)
             )
             result = await session.execute(query)
             row = result.first()
             if row is None:
-                raise PermissionError(f"No main keypair found for user (id: {user_id})")
+                raise KeyPairNotFound(f"No default keypair found for user (id: {user_id})")
             return KeypairContextData(
                 access_key=AccessKey(row.access_key),
                 resource_policy={
@@ -191,10 +190,10 @@ class ResourceAllocationDBSource:
         async with self._db.begin_readonly_session() as session:
             # Verify scaling group exists
             sg_exists = await session.scalar(
-                sa.select(sa.exists().where(ScalingGroupRow.name == rg_name))
+                sa.select(sa.exists().where(ResourceGroupRow.name == rg_name))
             )
             if not sg_exists:
-                raise ScalingGroupNotFound(rg_name)
+                raise ResourceGroupNotFound(rg_name)
 
             rst = ResourceSlotTypeRow.__table__
             j = sa.join(AgentResourceRow, AgentRow, AgentResourceRow.agent_id == AgentRow.id).join(

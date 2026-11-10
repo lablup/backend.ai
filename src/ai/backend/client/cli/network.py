@@ -1,7 +1,7 @@
 import sys
 import uuid
-from collections.abc import Iterable
-from typing import Any
+from collections.abc import Iterable, Sequence
+from typing import Any, cast
 
 import click
 
@@ -43,11 +43,11 @@ def create(ctx: CLIContext, project: str, name: str, driver: str | None) -> None
         except ValueError:
             pass
         else:
-            if session.Group.detail(project):
+            if cast(dict[str, Any] | None, session.Group.detail(project)):
                 proj_id = project
 
         if not proj_id:
-            projects = session.Group.from_name(project)
+            projects = cast(Sequence[dict[str, Any]], session.Group.from_name(project))
             if not projects:
                 ctx.output.print_fail(f"Project '{project}' not found.")
                 sys.exit(ExitCode.FAILURE)

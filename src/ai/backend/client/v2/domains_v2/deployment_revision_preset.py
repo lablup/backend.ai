@@ -3,8 +3,11 @@ from __future__ import annotations
 from uuid import UUID
 
 from ai.backend.client.v2.base_domain import BaseDomainClient
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
     CreateDeploymentRevisionPresetInput,
+    PartialBulkPurgeDeploymentRevisionPresetsInput,
+    PartialBulkUpdateDeploymentRevisionPresetsInput,
     SearchDeploymentRevisionPresetsInput,
     UpdateDeploymentRevisionPresetInput,
 )
@@ -57,9 +60,36 @@ class V2DeploymentRevisionPresetClient(BaseDomainClient):
             response_model=UpdateDeploymentRevisionPresetPayload,
         )
 
-    async def delete(self, preset_id: UUID) -> DeleteDeploymentRevisionPresetPayload:
+    async def purge(self, preset_id: UUID) -> DeleteDeploymentRevisionPresetPayload:
+        """Permanently remove a preset."""
         return await self._client.typed_request(
             "DELETE",
             f"{_PATH}/{preset_id}",
             response_model=DeleteDeploymentRevisionPresetPayload,
+        )
+
+    async def delete(self, preset_id: UUID) -> DeleteDeploymentRevisionPresetPayload:
+        """Deprecated. Use :meth:`purge`."""
+        return await self.purge(preset_id)
+
+    async def partial_bulk_update(
+        self, request: PartialBulkUpdateDeploymentRevisionPresetsInput
+    ) -> PartialBulkPayload[DeploymentRevisionPresetNode]:
+        """Update several presets, answering for each one."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/partial-bulk-update",
+            request=request,
+            response_model=PartialBulkPayload[DeploymentRevisionPresetNode],
+        )
+
+    async def partial_bulk_purge(
+        self, request: PartialBulkPurgeDeploymentRevisionPresetsInput
+    ) -> PartialBulkPayload[DeploymentRevisionPresetNode]:
+        """Permanently remove several presets, answering for each one."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/partial-bulk-purge",
+            request=request,
+            response_model=PartialBulkPayload[DeploymentRevisionPresetNode],
         )

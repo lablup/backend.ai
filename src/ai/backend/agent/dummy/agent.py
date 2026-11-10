@@ -17,7 +17,6 @@ from ai.backend.agent.agent import (
 from ai.backend.agent.config.unified import AgentUnifiedConfig
 from ai.backend.agent.errors import UnsupportedResource
 from ai.backend.agent.kernel import AbstractKernel
-from ai.backend.agent.kernel_registry.writer.types import KernelRegistrySaveMetadata
 from ai.backend.agent.resources import (
     AbstractComputePlugin,
     ComputerContext,
@@ -26,6 +25,7 @@ from ai.backend.agent.resources import (
     known_slot_types,
 )
 from ai.backend.agent.types import Container, KernelOwnershipData, MountInfo
+from ai.backend.common.cgroup import CgroupController
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
@@ -49,6 +49,7 @@ from ai.backend.common.types import (
     ServicePort,
     SessionId,
     SlotName,
+    VFolderMount,
     current_resource_slots,
 )
 
@@ -236,6 +237,25 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         delay = self.creation_ctx_config["delay"]["mount-krunner"]
         await asyncio.sleep(delay)
 
+    @override
+    async def mount_vfolders(
+        self,
+        vfolders: Sequence[VFolderMount],
+        resource_spec: KernelResourceSpec,
+    ) -> None:
+        for vfolder in vfolders:
+            if self.internal_data.get("prevent_vfolder_mounts", False):
+                if vfolder.name != ".logs":
+                    continue
+            resource_spec.mounts.append(
+                Mount(
+                    MountTypes.BIND,
+                    Path(vfolder.host_path),
+                    Path(vfolder.kernel_path),
+                    vfolder.mount_perm,
+                )
+            )
+
 
 class DummyAgent(
     AbstractAgent[DummyKernel, DummyKernelCreationContext],
@@ -271,11 +291,7 @@ class DummyAgent(
         return {}
 
     @override
-    async def _write_kernel_registry_to_recovery(
-        self,
-        kernel_registry: Mapping[KernelId, AbstractKernel],
-        metadata: KernelRegistrySaveMetadata,
-    ) -> None:
+    async def _write_kernel_to_recovery(self, kernel: AbstractKernel) -> None:
         pass
 
     @override
@@ -298,7 +314,9 @@ class DummyAgent(
         return "ubuntu16.04"
 
     @override
-    def get_cgroup_path(self, controller: str, container_id: str) -> Path:
+    async def get_cgroup_path(
+        self, controller: CgroupController, container_id: ContainerId
+    ) -> Path:
         #  Dummy agent does not use cgroups, so we return an empty path.
         return Path()
 

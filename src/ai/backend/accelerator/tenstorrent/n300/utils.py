@@ -1,8 +1,9 @@
-import asyncio
 import functools
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Any, TypeVar
+
+from ai.backend.common.asyncio import run_in_executor_with_context
 
 
 async def host_pid_to_container_pid(container_id: str, host_pid: int) -> int:
@@ -36,7 +37,7 @@ T = TypeVar("T")
 async def run_sync[T](
     closure: Callable[..., T], *args: Sequence[Any], **kwargs: Mapping[Any, Any]
 ) -> T:
-    return await asyncio.get_running_loop().run_in_executor(
+    return await run_in_executor_with_context(
         None,
         functools.partial(closure, *args, **kwargs),
     )

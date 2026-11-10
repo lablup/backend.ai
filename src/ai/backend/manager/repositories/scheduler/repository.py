@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Mapping, Sequence
+from collections import defaultdict
+from collections.abc import Sequence
 from datetime import datetime
-from typing import TYPE_CHECKING
+from functools import partial
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 if TYPE_CHECKING:
@@ -13,12 +15,19 @@ if TYPE_CHECKING:
     from ai.backend.manager.data.session.draft import SessionSpecDraft
     from ai.backend.manager.data.session.spec import SessionSpec
 
+from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.network import NetworkID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.events.event_types.kernel.types import (
+    KernelCreationInfo,
+    KernelLifecycleEventReason,
+)
 from ai.backend.common.exception import BackendAIError
-from ai.backend.common.identifier.domain import DomainID, DomainName
-from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.identifier.project import ProjectID
-from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
@@ -27,50 +36,66 @@ from ai.backend.common.resource.types import TotalResourceData
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
+    KernelId,
+    PreemptionMode,
+    ResourceSlot,
     SessionId,
-    SlotName,
-    SlotTypes,
     VFolderMount,
+    VFolderMountOptions,
     VFolderMountRequest,
 )
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.dotfile.types import DotfileBundle
 from ai.backend.manager.data.kernel.types import KernelListResult, KernelStatus
+from ai.backend.manager.data.network.types import NetworkData
+from ai.backend.manager.data.resource.types import UserEnqueuePolicy
+from ai.backend.manager.data.resource_group.types import ResourceGroupData
+from ai.backend.manager.data.session.creation import ContainerUserInfo
 from ai.backend.manager.data.session.types import SessionInfo, SessionStatus
-from ai.backend.manager.data.sokovan import (
-    AllocationBatch,
-    KernelCreationInfo,
-    SessionRunningData,
+from ai.backend.manager.data.session_group.types import SessionGroupData
+from ai.backend.manager.exceptions import ErrorStatusInfo
+from ai.backend.manager.models.kernel.searchers import KernelSearcher
+from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
+from ai.backend.manager.models.session.searchers import SessionInfoSearcher, SessionSearcher
+from ai.backend.manager.models.session.updaters import SessionStatusBatchUpdater
+from ai.backend.manager.models.session_group.searchers import SessionGroupSearcher
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
+from ai.backend.manager.repositories.rbac.permission_check_repository import (
+    RbacPermissionCheckRepository,
+)
+from ai.backend.manager.repositories.scheduler.types.session import SessionHistoryToCreate
+from ai.backend.manager.repositories.vfolder.mount import prepare_vfolder_mounts
+from ai.backend.manager.types import UserScope
+from ai.backend.manager.views.sokovan.agent import AgentLimit, ResourceGroupResource
+from ai.backend.manager.views.sokovan.allocation import SessionAllocation
+from ai.backend.manager.views.sokovan.lifecycle import (
     SessionsForPullWithImages,
-    SessionsForStartWithImages,
     SessionWithKernels,
 )
-from ai.backend.manager.exceptions import ErrorStatusInfo
-from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
-from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.base.creator import BulkCreator
-from ai.backend.manager.repositories.base.updater import BatchUpdater
-from ai.backend.manager.types import UserScope
-
-from .cache_source.cache_source import ScheduleCacheSource
-from .db_source.db_source import ScheduleDBSource
-from .types.base import SchedulingSpec
-from .types.scheduling import SchedulingData
-from .types.search import (
+from ai.backend.manager.views.sokovan.scheduling import ComputeScheduleData, SchedulingData
+from ai.backend.manager.views.sokovan.search import (
     SessionWithKernelsAndUserSearchResult,
     SessionWithKernelsSearchResult,
 )
-from .types.session import (
+from ai.backend.manager.views.sokovan.session import (
     MarkTerminatingResult,
     SweptSessionInfo,
-    TerminatingKernelWithAgentData,
     TerminatingSessionData,
 )
-from .types.session_creation import SessionSpecContextFetch
+from ai.backend.manager.views.sokovan.session_creation import SessionSpecContext, UserEnqueueInfo
+from ai.backend.manager.views.sokovan.snapshot import (
+    GlobalScopeSnapshot,
+    ResourceGroupScopeSnapshot,
+    SystemSnapshot,
+)
+from ai.backend.manager.views.sokovan.workload import SessionWorkload
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+from .cache_source.cache_source import ScheduleCacheSource
+from .db_source.db_source import ScheduleDBSource
+
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 scheduler_repository_resilience = Resilience(
     policies=[
@@ -94,44 +119,134 @@ class SchedulerRepository:
     Repository that orchestrates between DB and cache sources for scheduling operations.
     """
 
+    _db: ExtendedAsyncSAEngine
     _db_source: ScheduleDBSource
     _cache_source: ScheduleCacheSource
+    _valkey_schedule: ValkeyScheduleClient
     _config_provider: ManagerConfigProvider
+    _storage_manager: StorageSessionManager
+    _permission_check: RbacPermissionCheckRepository
 
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
+        reconcile_ops_provider: ReconcileOpsProvider,
         valkey_stat: ValkeyStatClient,
+        valkey_schedule: ValkeyScheduleClient,
         config_provider: ManagerConfigProvider,
+        storage_manager: StorageSessionManager,
+        permission_check: RbacPermissionCheckRepository,
     ) -> None:
-        self._db_source = ScheduleDBSource(db)
+        self._db = db
+        self._db_source = ScheduleDBSource(db, reconcile_ops_provider)
         self._cache_source = ScheduleCacheSource(valkey_stat)
+        self._valkey_schedule = valkey_schedule
         self._config_provider = config_provider
+        self._storage_manager = storage_manager
+        self._permission_check = permission_check
 
     @scheduler_repository_resilience.apply()
-    async def get_scheduling_data(self, resource_group_id: ResourceGroupID) -> SchedulingData:
+    async def get_scheduling_data(
+        self, resource_group_id: ResourceGroupID
+    ) -> SchedulingData | None:
+        """Assemble the complete read state of one scheduling run.
+
+        Composes the DB-side fetch with the per-agent retry hints (Valkey)
+        and the configured agent limit, so the returned snapshot is always
+        fully populated; ``None`` when there is nothing to schedule.
+        Raises ScalingGroupNotFound if the resource group doesn't exist.
         """
-        Get scheduling data from database.
-        Raises ScalingGroupNotFound if scaling group doesn't exist.
-        """
-        known_slot_types = await self._get_known_slot_types()
-        max_container_count = await self._get_max_container_count()
-        spec = SchedulingSpec(
-            known_slot_types=known_slot_types,
-            max_container_count=max_container_count,
+        fetch = await self._db_source.fetch_scheduling_fetch(resource_group_id)
+        if fetch is None:
+            return None
+        failed_sessions_by_agent = await self._fetch_failed_sessions_by_agent(fetch.workloads)
+        agent_limit = AgentLimit(max_container_count=await self._get_max_container_count())
+        system_snapshot = SystemSnapshot(
+            resource_group=ResourceGroupScopeSnapshot(
+                resources=ResourceGroupResource(
+                    agents=fetch.agents,
+                    failed_sessions_by_agent=failed_sessions_by_agent,
+                    group_members_by_agent=fetch.session_group_members,
+                ),
+                session_dependencies=fetch.session_dependencies,
+                policy=fetch.policy,
+                preemption_candidates=fetch.preemption_candidates,
+            ),
+            global_scope=GlobalScopeSnapshot(
+                occupancy=fetch.occupancy,
+                resource_policy=fetch.resource_policy,
+                agent_limit=agent_limit,
+            ),
+            observed_at=fetch.observed_at,
+        )
+        return SchedulingData(
+            resource_group=fetch.resource_group,
+            workloads=fetch.workloads,
+            system_snapshot=system_snapshot,
         )
 
-        return await self._db_source.get_scheduling_data(resource_group_id, spec)
+    async def _fetch_failed_sessions_by_agent(
+        self, workloads: Sequence[SessionWorkload]
+    ) -> dict[AgentId, frozenset[SessionId]]:
+        """Invert the per-session failed-agent hints (Valkey) into the
+        per-agent view the selection trackers consume.
+
+        Uses a single pipelined batch request instead of N round-trips.
+        """
+        failed_agents_list = await self._valkey_schedule.get_multiple_session_failed_agents([
+            workload.meta.session_id for workload in workloads
+        ])
+        failed_sessions_by_agent: dict[AgentId, set[SessionId]] = defaultdict(set)
+        for workload, failed_agents in zip(workloads, failed_agents_list, strict=True):
+            for agent_id in failed_agents:
+                failed_sessions_by_agent[agent_id].add(workload.meta.session_id)
+        return {
+            agent_id: frozenset(session_ids)
+            for agent_id, session_ids in failed_sessions_by_agent.items()
+        }
 
     @scheduler_repository_resilience.apply()
-    async def allocate_sessions(self, allocation_batch: AllocationBatch) -> list[SessionId]:
+    async def fetch_compute_schedule_data(
+        self,
+        resource_group_id: ResourceGroupID,
+        image_ids: Sequence[ImageID],
+    ) -> ComputeScheduleData:
+        """Assemble the read bundle of the fitting check: the spec context
+        (mounts unresolved), the group's agents, and the same configured
+        agent limit the real scheduling pass enforces.
+        """
+        fetch = await self._db_source.fetch_compute_schedule_fetch(resource_group_id, image_ids)
+        return ComputeScheduleData(
+            # Resource-only assembly: the fitting check runs no validators
+            # and no user-scoped rules, so the user part carries the
+            # scope-less baseline instead of DB reads.
+            spec_context=SessionSpecContext(
+                resource_group=fetch.resource_group,
+                user=UserEnqueueInfo(
+                    policy=None,
+                    container_user=ContainerUserInfo(),
+                    dotfiles=DotfileBundle(),
+                    default_bootstrap_script=None,
+                    pending_session_count=0,
+                    pending_session_resource_slots={},
+                    vfolder_mounts_by_role={},
+                ),
+                global_info=fetch.global_info,
+            ),
+            resources=ResourceGroupResource(agents=fetch.agents),
+            limit=AgentLimit(max_container_count=await self._get_max_container_count()),
+            agent_selection_strategy=fetch.agent_selection_strategy,
+        )
+
+    @scheduler_repository_resilience.apply()
+    async def allocate_sessions(self, allocations: list[SessionAllocation]) -> list[SessionId]:
         """
         Allocate sessions by reserving and assigning their kernels to agents.
 
         Returns:
             The ids of the sessions that were actually allocated.
         """
-        return await self._db_source.allocate_sessions(allocation_batch)
+        return await self._db_source.allocate_sessions(allocations)
 
     @scheduler_repository_resilience.apply()
     async def get_pending_timeout_sessions_by_ids(
@@ -140,7 +255,7 @@ class SchedulerRepository:
     ) -> list[SweptSessionInfo]:
         """
         Get sessions that have exceeded their pending timeout from given session IDs.
-        Used by SweepSessionsLifecycleHandler for scaling group based processing.
+        Used by SweepSessionsLifecycleHandler for resource group based processing.
         """
         return await self._db_source.get_pending_timeout_sessions_by_ids(session_ids)
 
@@ -148,20 +263,59 @@ class SchedulerRepository:
     async def mark_sessions_terminating(
         self,
         session_ids: list[SessionId],
-        reason: str = "USER_REQUESTED",
+        reason: KernelLifecycleEventReason = KernelLifecycleEventReason.USER_REQUESTED,
         *,
         forced: bool = False,
+        message: str = "mark_terminating success",
     ) -> MarkTerminatingResult:
         """
         Mark sessions for termination.
         """
         # Delegate to DB source
-        return await self._db_source.mark_sessions_terminating(session_ids, reason, forced=forced)
+        return await self._db_source.mark_sessions_terminating(
+            session_ids,
+            reason,
+            forced=forced,
+            message=message,
+        )
 
     @scheduler_repository_resilience.apply()
-    async def get_all_scaling_groups(self) -> list[ResourceGroupID]:
-        """Get ids of all defined scaling groups."""
-        return await self._db_source.get_all_scaling_groups()
+    async def mark_sessions_status(
+        self,
+        session_ids: list[SessionId],
+        to_status: SessionStatus,
+        reason: KernelLifecycleEventReason,
+    ) -> list[SessionId]:
+        """
+        Move sessions to ``to_status``, skipping the sessions whose current
+        status cannot enter it. A move to PENDING re-enqueues the sessions'
+        kernels in the same transaction.
+
+        Returns the IDs of the sessions actually transitioned.
+        """
+        return await self._db_source.mark_sessions_status(session_ids, to_status, reason)
+
+    @scheduler_repository_resilience.apply()
+    async def get_resource_group_preemption_mode(
+        self, resource_group_id: ResourceGroupID
+    ) -> PreemptionMode:
+        """Return the preemption mode configured on a resource group."""
+        return await self._db_source.get_resource_group_preemption_mode(resource_group_id)
+
+    @scheduler_repository_resilience.apply()
+    async def reserve_sessions(self, allocations: list[SessionAllocation]) -> list[SessionId]:
+        """Prereserve the sessions backed by a preemption plan."""
+        return await self._db_source.reserve_sessions(allocations)
+
+    @scheduler_repository_resilience.apply()
+    async def admit_prereserved_kernels(self, session_ids: Sequence[SessionId]) -> list[KernelId]:
+        """Admit prereserved kernels that fit now, first reserved first."""
+        return await self._db_source.admit_prereserved_kernels(session_ids)
+
+    @scheduler_repository_resilience.apply()
+    async def get_all_resource_groups(self) -> list[ResourceGroupID]:
+        """Get ids of all defined resource groups."""
+        return await self._db_source.get_all_resource_groups()
 
     @scheduler_repository_resilience.apply()
     async def get_terminating_sessions_by_ids(
@@ -178,24 +332,6 @@ class SchedulerRepository:
         :return: List of TerminatingSessionData objects with kernel details
         """
         return await self._db_source.get_terminating_sessions_by_ids(session_ids)
-
-    @scheduler_repository_resilience.apply()
-    async def get_terminating_kernels_with_lost_agents_by_ids(
-        self,
-        session_ids: list[SessionId],
-    ) -> list[TerminatingKernelWithAgentData]:
-        """
-        Get kernels in TERMINATING sessions that have lost or missing agents
-        from given session IDs.
-        Used by SweepLostAgentKernelsLifecycleHandler for scaling group based processing.
-        """
-        return await self._db_source.get_terminating_kernels_with_lost_agents_by_ids(session_ids)
-
-    async def _get_known_slot_types(self) -> Mapping[SlotName, SlotTypes]:
-        """
-        Get known slot types from configuration.
-        """
-        return await self._config_provider.legacy_etcd_config_loader.get_resource_slots()
 
     async def _get_max_container_count(self) -> int | None:
         """
@@ -222,62 +358,120 @@ class SchedulerRepository:
         return await self._db_source.enqueue_session_from_spec(spec)
 
     @scheduler_repository_resilience.apply()
-    async def fetch_session_spec_contexts(
-        self,
-        draft: SessionSpecDraft,
-    ) -> SessionSpecContextFetch:
-        """Batch-fetch raw data needed to assemble the draft-path
-        preparation / validation contexts.
-
-        Thin passthrough to :meth:`ScheduleDBSource.fetch_session_spec_contexts`.
-        The scheduling controller converts the returned bundle into the
-        typed ``SessionSpecPreparationContext`` /
-        ``SessionSpecValidationContext`` pair — this split keeps the
-        repository layer free of sokovan internals.
-        """
-        return await self._db_source.fetch_session_spec_contexts(draft)
-
-    @scheduler_repository_resilience.apply()
-    async def resolve_vfolder_mounts_by_role(
+    async def fetch_session_spec_context(
         self,
         draft: SessionSpecDraft,
         *,
-        storage_manager: StorageSessionManager,
-        allowed_vfolder_types: list[str],
+        resolve_mounts: bool = True,
+    ) -> SessionSpecContext:
+        """Assemble the complete enqueue context of one draft.
+
+        Composes the DB-side batch fetch with the storage-manager vfolder
+        mount resolution, so callers never observe a partially built
+        context. Resource-only callers pass ``resolve_mounts=False``.
+        """
+        fetch = await self._db_source.fetch_session_spec_fetch(draft)
+        vfolder_mounts_by_role: dict[str, tuple[VFolderMount, ...]] = {}
+        if resolve_mounts:
+            vfolder_mounts_by_role = await self._resolve_vfolder_mounts_by_role(
+                draft, fetch.user.policy
+            )
+        return SessionSpecContext(
+            resource_group=fetch.resource_group,
+            user=fetch.user.to_info(vfolder_mounts_by_role),
+            global_info=fetch.global_info,
+        )
+
+    async def _resolve_vfolder_mounts_by_role(
+        self,
+        draft: SessionSpecDraft,
+        user_enqueue_policy: UserEnqueuePolicy | None,
     ) -> dict[str, tuple[VFolderMount, ...]]:
         """Resolve each kernel group's vfolder mounts, keyed by ``role``.
 
-        Separated from :meth:`fetch_session_spec_contexts` so callers that only
-        need kernel resource resolution can skip the storage-manager RPC.
+        Lives at the repository level because it composes a DB read with
+        the storage-manager RPC. Each group's request list resolves to a
+        single ``VFolderMount`` tuple that every replica sharing the role
+        copies verbatim.
         """
-        return await self._db_source.resolve_vfolder_mounts_by_role(
-            draft,
-            storage_manager=storage_manager,
-            allowed_vfolder_types=allowed_vfolder_types,
+        user_uuid = draft.resource_spec.identity.user_uuid
+        domain_name = str(draft.scope.domain_name) if draft.scope.domain_name else None
+        project_id = draft.scope.project_id
+        kernel_specs = tuple(draft.resource_spec.resource.options.kernel_groups or ())
+
+        vfolder_mounts_by_role: dict[str, tuple[VFolderMount, ...]] = {}
+        if domain_name is None or user_uuid is None:
+            return vfolder_mounts_by_role
+
+        allowed_vfolder_types = list(
+            await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
         )
+        # Only the allowed vfolder hosts of the already-fetched policy matter here.
+        resource_policy_dict: dict[str, Any] = {}
+        if user_enqueue_policy is not None:
+            resource_policy_dict = {
+                "allowed_vfolder_hosts": user_enqueue_policy.allowed_vfolder_hosts,
+            }
+
+        user_scope_for_mounts = UserScope(
+            domain_name=domain_name,
+            group_id=project_id if project_id is not None else UUID(int=0),
+            user_uuid=user_uuid,
+            user_role="user",
+        )
+        async with self._db.begin_readonly_read_committed() as conn:
+            for group in kernel_specs:
+                per_group_requests: list[VFolderMountRequest] = []
+                for entry in group.execution_spec.mounts:
+                    per_group_requests.append(
+                        VFolderMountRequest(
+                            ref=UUID(str(entry.vfolder_id)),
+                            dst_path=entry.mount_destination,
+                            options=VFolderMountOptions(
+                                permission=entry.mount_perm,
+                                subpath=entry.subpath,
+                            ),
+                        )
+                    )
+                # Always resolve mounts even when the request list is empty:
+                # ``prepare_vfolder_mounts`` injects dot-prefixed auto-mount
+                # vfolders regardless of explicit requests, so skipping here
+                # would silently drop them.
+                vfolder_mounts_by_role[group.role] = tuple(
+                    await prepare_vfolder_mounts(
+                        conn,
+                        self._storage_manager,
+                        allowed_vfolder_types,
+                        user_scope_for_mounts,
+                        resource_policy_dict,
+                        per_group_requests,
+                        partial(self._permission_check.held_permissions, UserID(user_uuid)),
+                    )
+                )
+        return vfolder_mounts_by_role
 
     @scheduler_repository_resilience.apply()
     async def pick_default_resource_group(
         self,
         *,
-        access_key: AccessKey,
-        domain_name: str,
+        domain_id: DomainID,
         project_id: ProjectID,
+        user_id: UserID,
     ) -> ResourceGroupID:
-        """Return the first resource group from the owner's allowlist."""
+        """Return the first resource group, by name, the owner may schedule on."""
         return await self._db_source.pick_default_resource_group(
-            access_key=access_key,
-            domain_name=domain_name,
+            domain_id=domain_id,
             project_id=project_id,
+            user_id=user_id,
         )
 
     @scheduler_repository_resilience.apply()
     async def query_accessible_resource_group_ids(
         self,
         *,
-        domain_name: str,
+        domain_id: DomainID,
         project_id: ProjectID,
-        access_key: AccessKey,
+        user_id: UserID,
     ) -> frozenset[ResourceGroupID]:
         """Return the resource-group ids accessible to the given single-project scope.
 
@@ -286,9 +480,24 @@ class SchedulerRepository:
         performs the accessibility rejection.
         """
         return await self._db_source.query_accessible_resource_group_ids(
-            domain_name=domain_name,
+            domain_id=domain_id,
             project_id=project_id,
-            access_key=access_key,
+            user_id=user_id,
+        )
+
+    @scheduler_repository_resilience.apply()
+    async def query_allowed_resource_groups(
+        self,
+        *,
+        domain_id: DomainID,
+        project_ids: Sequence[ProjectID],
+        user_id: UserID,
+    ) -> list[ResourceGroupData]:
+        """Return the active resource groups the user may schedule on, in name order."""
+        return await self._db_source.query_allowed_resource_groups(
+            domain_id=domain_id,
+            project_ids=project_ids,
+            user_id=user_id,
         )
 
     @scheduler_repository_resilience.apply()
@@ -302,28 +511,12 @@ class SchedulerRepository:
         return await self._db_source.get_resource_group_name_by_id(resource_group_id)
 
     @scheduler_repository_resilience.apply()
-    async def get_domain_id_by_name(self, name: DomainName) -> DomainID:
-        return await self._db_source.get_domain_id_by_name(name)
+    async def search_session_groups(self, searcher: SessionGroupSearcher) -> list[SessionGroupData]:
+        return await self._db_source.search_session_groups(searcher)
 
     @scheduler_repository_resilience.apply()
-    async def prepare_vfolder_mounts(
-        self,
-        storage_manager: StorageSessionManager,
-        allowed_vfolder_types: Sequence[str],
-        user_scope: UserScope,
-        resource_policy: Mapping[str, object],
-        mount_requests: Sequence[VFolderMountRequest],
-    ) -> Sequence[VFolderMount]:
-        """
-        Prepare vfolder mounts for the session.
-        """
-        return await self._db_source.prepare_vfolder_mounts(
-            storage_manager,
-            list(allowed_vfolder_types),
-            user_scope,
-            dict(resource_policy),
-            list(mount_requests),
-        )
+    async def get_domain_id_by_name(self, name: DomainName) -> DomainID:
+        return await self._db_source.get_domain_id_by_name(name)
 
     @scheduler_repository_resilience.apply()
     async def check_available_image(self, image_id: ImageID, domain: str, user_uuid: UUID) -> None:
@@ -332,13 +525,6 @@ class SchedulerRepository:
         Raises ImageNotFound if the image does not exist.
         """
         await self._db_source.check_available_image(image_id, domain, user_uuid)
-
-    @scheduler_repository_resilience.apply()
-    async def update_sessions_to_running(self, sessions_data: list[SessionRunningData]) -> None:
-        """
-        Update sessions from CREATING to RUNNING state with occupying_slots.
-        """
-        await self._db_source.update_sessions_to_running(sessions_data)
 
     @scheduler_repository_resilience.apply()
     async def update_kernels_to_pulling_for_image(
@@ -468,7 +654,7 @@ class SchedulerRepository:
     async def reset_kernels_to_pending_for_sessions(
         self, session_ids: list[SessionId], reason: str
     ) -> int:
-        """Reset kernels to PENDING for the given sessions when max retries exceeded."""
+        """Reset kernels to PENDING for the given sessions going back to the queue."""
         return await self._db_source.reset_kernels_to_pending_for_sessions(session_ids, reason)
 
     @scheduler_repository_resilience.apply()
@@ -517,39 +703,6 @@ class SchedulerRepository:
         return await self._db_source.get_sessions_for_pull_by_ids(session_ids)
 
     @scheduler_repository_resilience.apply()
-    async def get_sessions_for_start(
-        self,
-        session_statuses: list[SessionStatus],
-        kernel_statuses: list[KernelStatus],
-    ) -> SessionsForStartWithImages:
-        """
-        Get sessions for starting with specified statuses.
-        Returns SessionsForStartWithImages dataclass.
-
-        :param statuses: Session statuses to filter by (typically PREPARED, CREATING)
-        :param kernel_statuses: Kernel statuses to filter by (typically PREPARED)
-        :return: SessionsForStartWithImages object
-        """
-        return await self._db_source.get_sessions_for_start(session_statuses, kernel_statuses)
-
-    @scheduler_repository_resilience.apply()
-    async def get_sessions_for_start_by_ids(
-        self,
-        session_ids: list[SessionId],
-    ) -> SessionsForStartWithImages:
-        """
-        Get sessions for starting by session IDs.
-
-        This method is used by handlers that need additional session data
-        (SessionDataForStart and ImageConfigData) beyond what the coordinator
-        provides (HandlerSessionData).
-
-        :param session_ids: List of session IDs to fetch
-        :return: SessionsForStartWithImages object with sessions and image configs
-        """
-        return await self._db_source.get_sessions_for_start_by_ids(session_ids)
-
-    @scheduler_repository_resilience.apply()
     async def mark_session_cancelled(
         self, session_id: SessionId, error_info: ErrorStatusInfo, reason: str = "FAILED_TO_START"
     ) -> None:
@@ -557,13 +710,6 @@ class SchedulerRepository:
         Mark a session as cancelled with error information.
         """
         await self._db_source.mark_session_cancelled(session_id, error_info, reason)
-
-    @scheduler_repository_resilience.apply()
-    async def get_container_info_for_kernels(self, session_id: SessionId) -> dict[UUID, str | None]:
-        """
-        Get container IDs for kernels in a session.
-        """
-        return await self._db_source.get_container_info_for_kernels(session_id)
 
     @scheduler_repository_resilience.apply()
     async def update_session_error_info(
@@ -579,46 +725,9 @@ class SchedulerRepository:
         await self._db_source.update_session_error_info(session_id, error_info)
 
     @scheduler_repository_resilience.apply()
-    async def get_keypair_concurrency(self, access_key: AccessKey, is_sftp: bool = False) -> int:
-        """
-        Get keypair concurrency with cache-through pattern.
-        First checks cache, falls back to DB if not cached, and updates cache.
-
-        :param access_key: The access key to query
-        :param is_sftp: Whether to get SFTP concurrency (True) or regular concurrency (False)
-        :return: Current concurrency count
-        """
-        # Try to get from cache first
-        try:
-            cached_value = await self._cache_source.get_keypair_concurrency(access_key, is_sftp)
-            if cached_value is not None:
-                return cached_value
-        except Exception as e:
-            log.warning(
-                "Failed to get keypair concurrency from cache for {}: {}",
-                access_key,
-                e,
-            )
-
-        # Cache miss - refresh both values from DB
-        concurrency_data = await self._db_source.get_keypair_concurrencies_from_db(access_key)
-
-        # Update cache with both values at once
-        try:
-            await self._cache_source.set_keypair_concurrencies(
-                access_key,
-                concurrency_data.regular_count,
-                concurrency_data.sftp_count,
-            )
-        except Exception as e:
-            log.warning(
-                "Failed to update keypair concurrency cache for {}: {}",
-                access_key,
-                e,
-            )
-
-        # Return the requested value
-        return concurrency_data.sftp_count if is_sftp else concurrency_data.regular_count
+    async def get_user_concurrency(self, user_id: UserID) -> int:
+        """The user's active session count that the scheduler checks against the concurrency limit."""
+        return await self._db_source.count_user_active_sessions(user_id)
 
     @scheduler_repository_resilience.apply()
     async def invalidate_kernel_related_cache(self, access_keys: list[AccessKey]) -> None:
@@ -628,6 +737,16 @@ class SchedulerRepository:
         :param access_keys: List of access keys whose related caches should be invalidated
         """
         await self._cache_source.invalidate_kernel_related_cache(access_keys)
+
+    @scheduler_repository_resilience.apply()
+    async def get_attached_network(self, network_id: NetworkID) -> NetworkData:
+        """
+        Fetch the network a session attaches to.
+
+        :param network_id: The ``networks.id`` held by ``sessions.network_id``
+        :return: The network, whose ``ref_name`` is the container network name
+        """
+        return await self._db_source.get_attached_network(network_id)
 
     @scheduler_repository_resilience.apply()
     async def update_session_network_id(
@@ -660,7 +779,7 @@ class SchedulerRepository:
             if cached_data is not None:
                 return cached_data
         except Exception as e:
-            log.warning("Failed to get total resource slots from cache: {}", e)
+            log.warning("total resource slots cache read failed", exc_info=e)
 
         # Cache miss - calculate from DB
         total_resource_data = await self._db_source.calculate_total_resource_slots()
@@ -669,7 +788,7 @@ class SchedulerRepository:
         try:
             await self._cache_source.set_total_resource_slots(total_resource_data)
         except Exception as e:
-            log.warning("Failed to update total resource slots cache: {}", e)
+            log.warning("total resource slots cache update failed", exc_info=e)
 
         return total_resource_data
 
@@ -695,7 +814,7 @@ class SchedulerRepository:
         Uses SessionInfo and KernelInfo types for unified data representation.
 
         Args:
-            resource_group_id: The scaling group id to filter by (first parameter for consistency)
+            resource_group_id: The resource group id to filter by (first parameter for consistency)
             session_statuses: Session statuses to include
             kernel_statuses: Kernel statuses to filter by. If non-None, includes sessions
                            that have at least one kernel in these statuses (simple filtering).
@@ -709,61 +828,44 @@ class SchedulerRepository:
         )
 
     @scheduler_repository_resilience.apply()
+    async def get_kernel_allocated_slots(
+        self,
+        kernel_ids: Sequence[KernelId],
+    ) -> dict[KernelId, ResourceSlot]:
+        """Read from ``resource_allocations`` what each kernel was ever allocated."""
+        return await self._db_source.get_kernel_allocated_slots(kernel_ids)
+
+    @scheduler_repository_resilience.apply()
     async def search_kernels_for_handler(
         self,
-        querier: BatchQuerier,
+        searcher: KernelSearcher,
     ) -> KernelListResult:
         """Search kernels for kernel handler execution.
 
         This method is used by KernelLifecycleHandler implementations.
-        The coordinator calls this to query kernels using BatchQuerier.
-
-        Args:
-            querier: BatchQuerier containing conditions, orders, and pagination.
-                     Use KernelConditions for filtering by status, scaling_group, etc.
-
-        Returns:
-            KernelListResult containing KernelInfo objects with pagination info.
         """
-        return await self._db_source.search_kernels_for_handler(querier)
+        return await self._db_source.search_kernels_for_handler(searcher)
 
     @scheduler_repository_resilience.apply()
     async def update_with_history(
         self,
-        updater: BatchUpdater[SessionRow],
-        bulk_creator: BulkCreator[SessionSchedulingHistoryRow],
+        updater: SessionStatusBatchUpdater,
+        histories: Sequence[SessionHistoryToCreate],
     ) -> int:
-        """Update session statuses and record history in same transaction.
+        """Move the sessions the updater selects and record each transition, in one
+        transaction.
 
-        This method combines batch status update with history recording,
-        ensuring both operations are atomic within a single transaction.
-
-        Args:
-            updater: BatchUpdater containing spec and conditions for session update
-            bulk_creator: BulkCreator containing specs for history records
-
-        Returns:
-            Number of sessions updated
+        Returns the number of sessions updated.
         """
-        return await self._db_source.update_with_history(updater, bulk_creator)
+        return await self._db_source.update_with_history(updater, histories)
 
     @scheduler_repository_resilience.apply()
     async def create_scheduling_history(
         self,
-        bulk_creator: BulkCreator[SessionSchedulingHistoryRow],
-    ) -> int:
-        """Create scheduling history records without status update.
-
-        Used for recording skipped sessions where no status change occurs
-        but the scheduling attempt should be recorded in history.
-
-        Args:
-            bulk_creator: BulkCreator containing specs for history records
-
-        Returns:
-            Number of history records created
-        """
-        return await self._db_source.create_scheduling_history(bulk_creator)
+        histories: Sequence[SessionHistoryToCreate],
+    ) -> None:
+        """Record scheduling history for sessions that stay in their current status."""
+        await self._db_source.create_scheduling_history(histories)
 
     # ========================================================================
     # Search methods (BatchQuerier pattern)
@@ -772,7 +874,7 @@ class SchedulerRepository:
     @scheduler_repository_resilience.apply()
     async def search_sessions_with_kernels(
         self,
-        querier: BatchQuerier,
+        searcher: SessionSearcher,
     ) -> SessionWithKernelsSearchResult:
         """Search sessions with kernel data and image configs.
 
@@ -786,12 +888,12 @@ class SchedulerRepository:
         Returns:
             SessionWithKernelsSearchResult with sessions, image_configs, and pagination info
         """
-        return await self._db_source.search_sessions_with_kernels(querier)
+        return await self._db_source.search_sessions_with_kernels(searcher)
 
     @scheduler_repository_resilience.apply()
     async def search_sessions_with_kernels_and_user(
         self,
-        querier: BatchQuerier,
+        searcher: SessionSearcher,
     ) -> SessionWithKernelsAndUserSearchResult:
         """Search sessions with kernel data, user info, and image configs.
 
@@ -805,12 +907,12 @@ class SchedulerRepository:
         Returns:
             SessionWithKernelsAndUserSearchResult with sessions, image_configs, and pagination info
         """
-        return await self._db_source.search_sessions_with_kernels_and_user(querier)
+        return await self._db_source.search_sessions_with_kernels_and_user(searcher)
 
     @scheduler_repository_resilience.apply()
     async def search_sessions_with_kernels_for_handler(
         self,
-        querier: BatchQuerier,
+        searcher: SessionInfoSearcher,
     ) -> list[SessionWithKernels]:
         """Search sessions with their kernels using SessionInfo/KernelInfo for handlers.
 
@@ -824,28 +926,18 @@ class SchedulerRepository:
         Returns:
             List of SessionWithKernels containing SessionInfo and KernelInfo objects.
         """
-        return await self._db_source.search_sessions_with_kernels_for_handler(querier)
+        return await self._db_source.search_sessions_with_kernels_for_handler(searcher)
 
     @scheduler_repository_resilience.apply()
     async def search_sessions_for_handler(
         self,
-        querier: BatchQuerier,
+        searcher: SessionInfoSearcher,
     ) -> list[SessionInfo]:
         """Search sessions without kernel data for handlers.
 
-        This method returns only session data without loading kernels,
-        optimized for handlers that don't need kernel information.
-
-        Args:
-            querier: BatchQuerier containing conditions, orders, and pagination.
-                     Conditions should target SessionRow columns.
-                     Use kernel EXISTS subquery conditions for filtering
-                     (e.g., SessionConditions.all_kernels_in_statuses).
-
-        Returns:
-            List of SessionInfo objects.
+        Kernel conditions ride as EXISTS subqueries, so no kernel row is loaded.
         """
-        return await self._db_source.search_sessions_for_handler(querier)
+        return await self._db_source.search_sessions_for_handler(searcher)
 
     @scheduler_repository_resilience.apply()
     async def get_last_session_histories(
@@ -884,24 +976,6 @@ class SchedulerRepository:
             min_priority: Minimum priority floor (priority will not go below this)
         """
         await self._db_source.lower_session_priority(session_ids, amount, min_priority)
-
-    async def update_kernels_last_observed_at(
-        self,
-        kernel_observation_times: Mapping[UUID, datetime],
-    ) -> int:
-        """Update the last_observed_at timestamp for multiple kernels.
-
-        Used by fair share observer to record when kernels were last observed
-        for resource usage tracking. Each kernel can have a different observation
-        time (e.g., terminated kernels use terminated_at, running kernels use now).
-
-        Args:
-            kernel_observation_times: Mapping of kernel ID to observation timestamp
-
-        Returns:
-            Number of kernels updated
-        """
-        return await self._db_source.update_kernels_last_observed_at(kernel_observation_times)
 
     async def get_db_now(self) -> datetime:
         """Get the current timestamp from the database.

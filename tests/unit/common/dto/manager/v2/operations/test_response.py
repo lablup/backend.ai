@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 
 from ai.backend.common.dto.manager.v2.operations.response import (
-    AnnouncementNode,
     AppendErrorLogPayload,
     ClearErrorLogPayload,
     ErrorLogNode,
@@ -397,41 +396,3 @@ class TestManagerStatusPayload:
         assert restored.nodes[0].id == "manager-01"
         assert restored.status == "running"
         assert restored.active_sessions == 3
-
-
-class TestAnnouncementNode:
-    """Tests for AnnouncementNode model."""
-
-    def test_creation_with_enabled_true(self) -> None:
-        node = AnnouncementNode(enabled=True, message="System maintenance tonight")
-        assert node.enabled is True
-        assert node.message == "System maintenance tonight"
-
-    def test_creation_with_enabled_false(self) -> None:
-        node = AnnouncementNode(enabled=False, message="")
-        assert node.enabled is False
-        assert node.message == ""
-
-    def test_creation_with_empty_message(self) -> None:
-        node = AnnouncementNode(enabled=False, message="")
-        assert node.message == ""
-
-    def test_round_trip_serialization(self) -> None:
-        node = AnnouncementNode(enabled=True, message="Important announcement")
-        json_str = node.model_dump_json()
-        restored = AnnouncementNode.model_validate_json(json_str)
-        assert restored.enabled is True
-        assert restored.message == "Important announcement"
-
-    def test_round_trip_disabled_announcement(self) -> None:
-        node = AnnouncementNode(enabled=False, message="")
-        json_str = node.model_dump_json()
-        restored = AnnouncementNode.model_validate_json(json_str)
-        assert restored.enabled is False
-        assert restored.message == ""
-
-    def test_model_dump(self) -> None:
-        node = AnnouncementNode(enabled=True, message="Hello")
-        data = node.model_dump()
-        assert data["enabled"] is True
-        assert data["message"] == "Hello"

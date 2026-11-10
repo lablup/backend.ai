@@ -6,7 +6,7 @@ This guide covers the Backend.AI CSV export system CLI commands for exporting da
 
 The export system allows administrators to export Backend.AI data to CSV files with flexible filtering and ordering options. Supported report types:
 - **Users**: User account information
-- **Sessions**: Compute session data
+- **Sessions**: Session data
 - **Projects**: Project (group) information
 - **Audit Logs**: System audit log records
 
@@ -101,7 +101,7 @@ Options:
 
 ### Sessions Export
 
-Export compute session data.
+Export session data.
 
 **Available fields:** id, name, session_type, domain_name, access_key, status, status_info, scaling_group_name, cluster_size, occupying_slots, created_at, terminated_at
 
@@ -439,7 +439,7 @@ By default, CSV files are exported with UTF-8 encoding. For systems requiring le
 - Check server logs for timeout errors
 
 **Empty output:**
-- Verify filter conditions match existing data
+- Check that filter conditions match existing data
 - Check if the date format is correct (YYYY-MM-DD or "YYYY-MM-DD HH:MM:SS")
 - Remove filters to test if data exists
 
@@ -450,7 +450,7 @@ By default, CSV files are exported with UTF-8 encoding. For systems requiring le
 
 **Permission denied:**
 - Only superadmin users can access export functionality
-- Verify your access credentials
+- Check your access credentials
 
 **Field not found:**
 - Use `./backend.ai admin export list-reports` to check available fields

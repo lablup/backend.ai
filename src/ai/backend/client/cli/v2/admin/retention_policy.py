@@ -171,10 +171,10 @@ def update(
     enabled: bool | None,
 ) -> None:
     """Update a retention policy by ID (superadmin only)."""
+    from ai.backend.common.data.entity.retention_policy import RetentionPolicyID
     from ai.backend.common.dto.manager.v2.retention_policy.request import (
         UpdateRetentionPolicyInput,
     )
-    from ai.backend.common.identifier.retention_policy import RetentionPolicyID
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())

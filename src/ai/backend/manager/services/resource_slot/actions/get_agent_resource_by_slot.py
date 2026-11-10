@@ -3,23 +3,27 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import EntityType
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.common.data.entity.agent import AgentUUID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 from ai.backend.manager.data.resource_slot.types import AgentResourceData
 
-from .base import ResourceSlotAction
 
+@dataclass(frozen=True)
+class GetAgentResourceBySlotAction(BaseSingleEntityAction):
+    """Read one slot's amount on one agent.
 
-@dataclass
-class GetAgentResourceBySlotAction(ResourceSlotAction):
+    The row belongs to the agent, so the agent answers for the read.
+    """
+
+    agent_uuid: AgentUUID
     agent_id: str
     slot_name: str
 
     @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
-        return EntityType.AGENT_RESOURCE
+    def entity_id(self) -> EntityIdentifier:
+        return self.agent_uuid
 
     @override
     @classmethod
@@ -27,14 +31,11 @@ class GetAgentResourceBySlotAction(ResourceSlotAction):
         return ActionOperationType.GET
 
     @override
-    def entity_id(self) -> str | None:
-        return f"{self.agent_id}:{self.slot_name}"
+    @classmethod
+    def action_name(cls) -> str:
+        return "get_agent_resource_by_slot"
 
 
-@dataclass
-class GetAgentResourceBySlotResult(BaseActionResult):
+@dataclass(frozen=True)
+class GetAgentResourceBySlotResult:
     item: AgentResourceData
-
-    @override
-    def entity_id(self) -> str | None:
-        return None

@@ -14,7 +14,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.repositories.vfolder.mount import prepare_vfolder_mounts
+from ai.backend.manager.repositories.vfolder.mount import HeldPermissions, prepare_vfolder_mounts
 from ai.backend.manager.types import MountOptionModel, UserScope
 
 __all__: Sequence[str] = ("check_extra_mounts",)
@@ -29,6 +29,7 @@ async def check_extra_mounts(
     extra_mounts: dict[UUID, MountOptionModel],
     user_scope: UserScope,
     resource_policy: dict[str, Any],
+    held_permissions: HeldPermissions,
 ) -> Sequence[VFolderMount]:
     """
     check if user is allowed to access every folders eagering to mount (other than model VFolder)
@@ -59,6 +60,7 @@ async def check_extra_mounts(
         user_scope,
         resource_policy,
         mount_requests,
+        held_permissions,
     )
 
     for vfolder in vfolder_mounts:

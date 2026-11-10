@@ -23,11 +23,15 @@ class VFolderUsageModeGQL(StrEnum):
 @gql_enum(
     BackendAIGQLMeta(
         added_version="26.4.2",
-        description="Mount permission level for a virtual folder.",
+        description=(
+            "Mount permission level for a virtual folder. "
+            "NONE (added in 26.9.0) mounts to nobody; RW_DELETE mounts as READ_WRITE."
+        ),
     ),
     name="VFolderMountPermission",
 )
 class VFolderMountPermissionGQL(StrEnum):
+    NONE = "none"
     READ_ONLY = "ro"
     READ_WRITE = "rw"
     RW_DELETE = "wd"
@@ -54,6 +58,7 @@ class VFolderOwnershipTypeGQL(StrEnum):
 )
 class VFolderOperationStatusGQL(StrEnum):
     READY = "ready"
+    CREATING = "creating"
     CLONING = "cloning"
     DELETE_PENDING = "delete-pending"
     DELETE_ONGOING = "delete-ongoing"

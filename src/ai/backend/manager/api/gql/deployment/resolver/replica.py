@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
-from uuid import UUID
 
 from strawberry import ID, Info
 from strawberry.relay import PageInfo
 
+from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.dto.manager.v2.deployment.request import SearchReplicasInput
-from ai.backend.manager.api.gql.base import resolve_global_id
+from ai.backend.manager.api.gql.base import encode_cursor, resolve_field_id
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_root_field,
@@ -24,6 +24,7 @@ from ai.backend.manager.api.gql.deployment.types.replica import (
     ReplicaStatusChangedPayload,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.errors.api import NotImplementedAPI
 
 # Query resolvers
 
@@ -61,7 +62,7 @@ async def replicas(
         )
     )
     nodes = [ModelReplica.from_pydantic(item) for item in payload.items]
-    edges = [ModelReplicaEdge(node=node, cursor=str(node.id)) for node in nodes]
+    edges = [ModelReplicaEdge(node=node, cursor=encode_cursor(node.id)) for node in nodes]
     return ModelReplicaConnection(
         count=payload.total_count,
         edges=edges,
@@ -79,8 +80,8 @@ async def replicas(
 )  # type: ignore[misc]
 async def replica(id: ID, info: Info[StrawberryGQLContext]) -> ModelReplica | None:
     """Get a specific replica by ID."""
-    _, replica_id = resolve_global_id(id)
-    node = await info.context.adapters.deployment.get_replica(UUID(replica_id))
+    replica_id = resolve_field_id(id, ReplicaID)
+    node = await info.context.adapters.deployment.get_replica(replica_id)
     if node is None:
         return None
     return ModelReplica.from_pydantic(node)
@@ -97,5 +98,5 @@ async def replica_status_changed(
 ) -> AsyncGenerator[ReplicaStatusChangedPayload, None]:
     """Subscribe to replica status changes."""
     # TODO: Implement actual subscription logic using pub/sub system
-    raise NotImplementedError("Subscription not implemented")
+    raise NotImplementedAPI("Subscription not implemented")
     yield  # type: ignore[unreachable]  # Makes this an async generator

@@ -4,7 +4,7 @@ import logging
 from collections.abc import Sequence
 from typing import override
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.deployment.types import (
     DeploymentHandlerCategory,
     DeploymentLifecycleStatus,
@@ -24,7 +24,7 @@ from ai.backend.manager.sokovan.deployment.types import (
 
 from .base import DeploymentHandler
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 
 class DestroyingDeploymentHandler(DeploymentHandler):
@@ -83,15 +83,13 @@ class DestroyingDeploymentHandler(DeploymentHandler):
         self, deployments: Sequence[DeploymentWithHistory]
     ) -> DeploymentExecutionResult:
         """Process deployments marked for destruction."""
-        log.debug("Processing deployments marked for destruction")
-
         # Execute destruction logic via executor
         return await self._deployment_executor.destroy_deployment(deployments)
 
     @override
     async def post_process(self, result: DeploymentExecutionResult) -> None:
         """Handle post-processing after destroying deployments."""
-        log.info("Destroyed {} deployments", len(result.successes))
+        log.debug("deployments destroyed", deployment_count=len(result.successes))
         if result.successes:
             # Clean up routes associated with destroyed deployments
             # (draining is the first stage of the termination pipeline)

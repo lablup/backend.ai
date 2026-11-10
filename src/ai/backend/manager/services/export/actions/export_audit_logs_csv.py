@@ -6,14 +6,13 @@ from collections.abc import AsyncIterator, Sequence
 from dataclasses import dataclass
 from typing import Any, override
 
-from ai.backend.manager.actions.action.base import BaseActionResult
+from ai.backend.common.data.entity.types import EntityType, GlobalEntityType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.repositories.base.export import StreamingExportQuery
+from ai.backend.manager.services.export.actions.base import ExportAction
 
-from .base import ExportAction
 
-
-@dataclass
+@dataclass(frozen=True)
 class ExportAuditLogsCSVAction(ExportAction):
     """Action to export audit log data as CSV.
 
@@ -26,16 +25,22 @@ class ExportAuditLogsCSVAction(ExportAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.CREATE
+    def entity_type(cls) -> EntityType:
+        return GlobalEntityType()
 
     @override
-    def entity_id(self) -> str | None:
-        return "audit-logs"
+    @classmethod
+    def action_name(cls) -> str:
+        return "export_audit_logs_c_s_v"
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
 
 
-@dataclass
-class ExportAuditLogsCSVActionResult(BaseActionResult):
+@dataclass(frozen=True)
+class ExportAuditLogsCSVActionResult:
     """Result of audit log CSV export action.
 
     Contains an async iterator that yields row partitions.
@@ -45,7 +50,3 @@ class ExportAuditLogsCSVActionResult(BaseActionResult):
     row_iterator: AsyncIterator[Sequence[Sequence[Any]]]
     encoding: str
     filename: str  # Generated or provided filename
-
-    @override
-    def entity_id(self) -> str | None:
-        return "audit-logs"

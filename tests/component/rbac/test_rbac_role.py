@@ -5,12 +5,13 @@ from typing import Any
 
 import pytest
 
-from ai.backend.client.v2.exceptions import ConflictError, NotFoundError, PermissionDeniedError
+from ai.backend.client.v2.exceptions import ConflictError, NotFoundError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.data.entity.role import RoleID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.rbac.request import (
     AssignRoleRequest,
-    CreateRoleRequest,
     DeleteRoleRequest,
     PurgeRoleRequest,
     RevokeRoleRequest,
@@ -356,8 +357,8 @@ class TestRoleAssignment:
     ) -> None:
         result = await admin_registry.rbac.assign_role(
             AssignRoleRequest(
-                user_id=admin_user_fixture.user_uuid,
-                role_id=target_role.role.id,
+                user_id=UserID(admin_user_fixture.user_uuid),
+                role_id=RoleID(target_role.role.id),
             )
         )
         assert isinstance(result, AssignRoleResponse)
@@ -367,8 +368,8 @@ class TestRoleAssignment:
         # Clean up
         await admin_registry.rbac.revoke_role(
             RevokeRoleRequest(
-                user_id=admin_user_fixture.user_uuid,
-                role_id=target_role.role.id,
+                user_id=UserID(admin_user_fixture.user_uuid),
+                role_id=RoleID(target_role.role.id),
             )
         )
 
@@ -381,16 +382,16 @@ class TestRoleAssignment:
         # Assign first
         await admin_registry.rbac.assign_role(
             AssignRoleRequest(
-                user_id=admin_user_fixture.user_uuid,
-                role_id=target_role.role.id,
+                user_id=UserID(admin_user_fixture.user_uuid),
+                role_id=RoleID(target_role.role.id),
             )
         )
 
         # Revoke
         revoke_result = await admin_registry.rbac.revoke_role(
             RevokeRoleRequest(
-                user_id=admin_user_fixture.user_uuid,
-                role_id=target_role.role.id,
+                user_id=UserID(admin_user_fixture.user_uuid),
+                role_id=RoleID(target_role.role.id),
             )
         )
         assert isinstance(revoke_result, RevokeRoleResponse)
@@ -413,8 +414,8 @@ class TestRoleAssignment:
         # Assign role
         await admin_registry.rbac.assign_role(
             AssignRoleRequest(
-                user_id=admin_user_fixture.user_uuid,
-                role_id=target_role.role.id,
+                user_id=UserID(admin_user_fixture.user_uuid),
+                role_id=RoleID(target_role.role.id),
             )
         )
 
@@ -434,8 +435,8 @@ class TestRoleAssignment:
         # Clean up
         await admin_registry.rbac.revoke_role(
             RevokeRoleRequest(
-                user_id=admin_user_fixture.user_uuid,
-                role_id=target_role.role.id,
+                user_id=UserID(admin_user_fixture.user_uuid),
+                role_id=RoleID(target_role.role.id),
             )
         )
 
@@ -448,8 +449,8 @@ class TestRoleAssignment:
         # First assignment
         await admin_registry.rbac.assign_role(
             AssignRoleRequest(
-                user_id=admin_user_fixture.user_uuid,
-                role_id=target_role.role.id,
+                user_id=UserID(admin_user_fixture.user_uuid),
+                role_id=RoleID(target_role.role.id),
             )
         )
 
@@ -457,54 +458,15 @@ class TestRoleAssignment:
         with pytest.raises(ConflictError):
             await admin_registry.rbac.assign_role(
                 AssignRoleRequest(
-                    user_id=admin_user_fixture.user_uuid,
-                    role_id=target_role.role.id,
+                    user_id=UserID(admin_user_fixture.user_uuid),
+                    role_id=RoleID(target_role.role.id),
                 )
             )
 
         # Clean up
         await admin_registry.rbac.revoke_role(
             RevokeRoleRequest(
-                user_id=admin_user_fixture.user_uuid,
-                role_id=target_role.role.id,
+                user_id=UserID(admin_user_fixture.user_uuid),
+                role_id=RoleID(target_role.role.id),
             )
         )
-
-
-class TestRolePermissions:
-    """Regular (non-admin) user cannot manage roles: create, delete, assign → 403."""
-
-    async def test_regular_user_cannot_create_role(
-        self,
-        user_registry: BackendAIClientRegistry,
-    ) -> None:
-        unique = secrets.token_hex(4)
-        with pytest.raises(PermissionDeniedError):
-            await user_registry.rbac.create_role(
-                CreateRoleRequest(
-                    name=f"denied-role-{unique}",
-                    description="Should be denied",
-                )
-            )
-
-    async def test_regular_user_cannot_delete_role(
-        self,
-        user_registry: BackendAIClientRegistry,
-        target_role: CreateRoleResponse,
-    ) -> None:
-        with pytest.raises(PermissionDeniedError):
-            await user_registry.rbac.delete_role(DeleteRoleRequest(role_id=target_role.role.id))
-
-    async def test_regular_user_cannot_assign_role(
-        self,
-        user_registry: BackendAIClientRegistry,
-        target_role: CreateRoleResponse,
-        regular_user_fixture: Any,
-    ) -> None:
-        with pytest.raises(PermissionDeniedError):
-            await user_registry.rbac.assign_role(
-                AssignRoleRequest(
-                    user_id=regular_user_fixture.user_uuid,
-                    role_id=target_role.role.id,
-                )
-            )

@@ -1,12 +1,9 @@
-import uuid
 from typing import Self, override
 
 from pydantic import model_validator
 from pydantic.dataclasses import dataclass
 
-from ai.backend.common.data.permission.types import EntityType
 from ai.backend.common.exception import InvalidAPIParameters
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.services.model_serving.actions.base import (
     ModelServiceAction,
@@ -16,13 +13,7 @@ from ai.backend.manager.services.model_serving.actions.base import (
 @dataclass
 class ScaleServiceReplicasAction(ModelServiceAction):
     max_session_count_per_model_session: int
-    service_id: uuid.UUID
     to: int
-
-    @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
-        return EntityType.DEPLOYMENT_REPLICA
 
     @model_validator(mode="after")
     def validate_replica_count(self) -> Self:
@@ -36,21 +27,18 @@ class ScaleServiceReplicasAction(ModelServiceAction):
             )
         return self
 
-    @override
-    def entity_id(self) -> str | None:
-        return None
-
     @classmethod
     @override
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.UPDATE
 
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "scale_service_replicas"
+
 
 @dataclass
-class ScaleServiceReplicasActionResult(BaseActionResult):
+class ScaleServiceReplicasActionResult:
     current_route_count: int
     target_count: int
-
-    @override
-    def entity_id(self) -> str | None:
-        return None

@@ -7,8 +7,10 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
-from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
-from ai.backend.manager.data.app_config_fragment.types import (
+from ai.backend.common.data.entity.app_config import AppConfigScopeID
+from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentID
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.manager.data.app_config.types import (
     AppConfigFragmentData,
 )
 from ai.backend.manager.models.base import GUID, Base, StrEnumType
@@ -17,7 +19,7 @@ from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 __all__ = ("AppConfigFragmentRow",)
 
 
-class AppConfigFragmentRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+class AppConfigFragmentRow(LifecycleTimestampsMixin, Base):
     """One scoped app config fragment — a single JSON document at ``(config_name, scope_type, scope_id)``.
 
     A fragment's merge priority is its allow-list entry's ``rank`` — the fragment
@@ -26,11 +28,17 @@ class AppConfigFragmentRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc
 
     __tablename__ = "app_config_fragments"
     __table_args__ = (
+        # NULLS NOT DISTINCT so a public row, whose scope_id is NULL, is keyed like any other.
         sa.UniqueConstraint(
             "config_name",
             "scope_type",
             "scope_id",
             name="uq_app_config_fragments_config_name_scope_type_scope_id",
+            postgresql_nulls_not_distinct=True,
+        ),
+        sa.CheckConstraint(
+            "(scope_type = 'public') = (scope_id IS NULL)",
+            name="scope_id_matches_scope_type",
         ),
         sa.ForeignKeyConstraint(
             ["config_name", "scope_type"],
@@ -44,7 +52,7 @@ class AppConfigFragmentRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc
         "id",
         GUID(AppConfigFragmentID),
         primary_key=True,
-        server_default=sa.text("uuid_generate_v4()"),
+        server_default=sa.text("uuid_generate_v7()"),
     )
     config_name: Mapped[str] = mapped_column(
         "config_name",
@@ -56,10 +64,11 @@ class AppConfigFragmentRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc
         StrEnumType(AppConfigScopeType),
         nullable=False,
     )
-    scope_id: Mapped[str] = mapped_column(
+    # NULL is public, which has no owner; domain and user carry their owner's id.
+    scope_id: Mapped[AppConfigScopeID | None] = mapped_column(
         "scope_id",
-        sa.String(length=255),
-        nullable=False,
+        GUID(AppConfigScopeID),
+        nullable=True,
     )
     config: Mapped[dict[str, Any]] = mapped_column(
         "config",
@@ -67,12 +76,15 @@ class AppConfigFragmentRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc
         nullable=False,
     )
 
+    def scope_owner(self) -> EntityIdentifier | None:
+        """The entity this fragment belongs to; ``None`` for ``public``, which has no owner."""
+        return self.scope_type.to_owner(self.scope_id)
+
     def to_data(self) -> AppConfigFragmentData:
         return AppConfigFragmentData(
             id=self.id,
             config_name=self.config_name,
-            scope_type=self.scope_type,
-            scope_id=self.scope_id,
+            scope_id=self.scope_owner(),
             config=self.config,
             created_at=self.created_at,
             updated_at=self.updated_at,

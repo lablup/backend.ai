@@ -9,15 +9,14 @@ import pytest
 from pydantic import HttpUrl
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_user_context
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.events.dispatcher import EventDispatcher
 from ai.backend.common.events.hub import EventHub
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
-from ai.backend.common.identifier.vfolder import VFolderUUID
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.model_serving.types import ServiceInfo
@@ -28,12 +27,11 @@ from ai.backend.manager.services.model_serving.actions.get_model_service_info im
     GetModelServiceInfoAction,
     GetModelServiceInfoActionResult,
 )
-from ai.backend.manager.services.model_serving.processors.model_serving import (
-    ModelServingProcessors,
-)
 from ai.backend.manager.services.model_serving.services.model_serving import ModelServingService
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
-from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
+    SchedulingController,
+)
 from ai.backend.testutils.scenario import ScenarioBase
 
 
@@ -47,20 +45,17 @@ class TestGetModelServiceInfo:
             is_superadmin=False,
             role=UserRole.USER,
             domain_name="default",
+            domain_id=DomainID(uuid.uuid4()),
         )
 
     @pytest.fixture(autouse=True)
     def set_user_context(self, user_data: UserData) -> Iterator[None]:
-        with with_user(user_data):
+        with with_user_context(user_data):
             yield
 
     @pytest.fixture
     def mock_storage_manager(self) -> MagicMock:
         return MagicMock(spec=StorageSessionManager)
-
-    @pytest.fixture
-    def mock_action_monitor(self) -> MagicMock:
-        return MagicMock(spec=ActionMonitor)
 
     @pytest.fixture
     def mock_event_dispatcher(self) -> MagicMock:
@@ -103,7 +98,7 @@ class TestGetModelServiceInfo:
     @pytest.fixture
     def mock_deployment_repository(self) -> MagicMock:
         mock = MagicMock()
-        mock.get_default_architecture_from_scaling_group = AsyncMock(return_value=None)
+        mock.get_default_architecture_from_resource_group = AsyncMock(return_value=None)
         return mock
 
     @pytest.fixture
@@ -165,19 +160,6 @@ class TestGetModelServiceInfo:
         )
 
     @pytest.fixture
-    def model_serving_processors(
-        self,
-        mock_action_monitor: MagicMock,
-        model_serving_service: ModelServingService,
-        mock_action_validators: ActionValidators,
-    ) -> ModelServingProcessors:
-        return ModelServingProcessors(
-            service=model_serving_service,
-            action_monitors=[mock_action_monitor],
-            validators=mock_action_validators,
-        )
-
-    @pytest.fixture
     def mock_check_user_access_get_info(self, mocker: Any, model_serving_service: Any) -> AsyncMock:
         mock = cast(
             AsyncMock,
@@ -220,7 +202,7 @@ class TestGetModelServiceInfo:
             ScenarioBase.success(
                 "get model service info",
                 GetModelServiceInfoAction(
-                    service_id=uuid.UUID("33333333-4444-5555-6666-777777777777"),
+                    deployment_id=DeploymentID(uuid.UUID("33333333-4444-5555-6666-777777777777")),
                 ),
                 GetModelServiceInfoActionResult(
                     data=ServiceInfo(
@@ -248,9 +230,9 @@ class TestGetModelServiceInfo:
     )
     async def test_get_model_service_info(
         self,
+        model_serving_service: ModelServingService,
         scenario: ScenarioBase[GetModelServiceInfoAction, GetModelServiceInfoActionResult],
         user_data: UserData,
-        model_serving_processors: ModelServingProcessors,
         mock_check_user_access_get_info: AsyncMock,
         mock_get_endpoint_by_id_get_info: AsyncMock,
         mock_get_endpoint_access_validation_data_get_info: AsyncMock,
@@ -296,6 +278,6 @@ class TestGetModelServiceInfo:
         async def get_model_service_info(
             action: GetModelServiceInfoAction,
         ) -> GetModelServiceInfoActionResult:
-            return await model_serving_processors.get_model_service_info.wait_for_complete(action)
+            return await model_serving_service.get_model_service_info(action)
 
         await scenario.test(get_model_service_info)

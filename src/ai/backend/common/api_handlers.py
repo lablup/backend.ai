@@ -26,7 +26,7 @@ from pydantic.fields import FieldInfo
 from pydantic_core._pydantic_core import ValidationError
 
 from ai.backend.common.types import BackendAISchema, StreamReader
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .exception import (
     BackendAISchemaValidationFailed,
@@ -37,7 +37,7 @@ from .exception import (
     ParameterNotParsedError,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class Sentinel(enum.Enum):
@@ -353,11 +353,6 @@ async def _parse_and_execute_handler(
 
         value = await extract_param_value(request=request, input_param_type=param.annotation)
 
-        if not value:
-            raise InvalidAPIParameters(
-                f"Type hint or Annotated must be added in API handler signature: {param.name}"
-            )
-
         handler_params.add(name, value)
 
     response = await handler(**handler_params.get_all())
@@ -568,23 +563,28 @@ def stream_api_handler(handler: StreamBaseHandler) -> ParsedRequestHandler:
 
         body_iter = body_stream.read()
 
-        # Send first chunk, and check if it raises an exception
+        # Pull the first chunk before sending headers so that a failing source
+        # can still be reported with an error status code.
         try:
-            first_chunk = await body_iter.__anext__()
-            await resp.prepare(request)
-            await resp.write(first_chunk)
+            first_chunk = await anext(body_iter, None)
         except Exception as e:
             raise web.HTTPInternalServerError(
-                reason=f"Failed to send first chunk from stream: {e!r}"
+                reason=f"Failed to read first chunk from stream: {e!r}"
             ) from e
 
+        if first_chunk is None:
+            resp.content_length = 0
+
         try:
-            async for chunk in body_iter:
-                await resp.write(chunk)
+            await resp.prepare(request)
+            if first_chunk is not None:
+                await resp.write(first_chunk)
+                async for chunk in body_iter:
+                    await resp.write(chunk)
             # Normal completion - send chunked transfer encoding terminator
             await resp.write_eof()
         except Exception:
-            log.exception("Error during streaming response body iteration")
+            log.exception("streaming response body iteration failed")
             resp.force_close()
 
         return resp

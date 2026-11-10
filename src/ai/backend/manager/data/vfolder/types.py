@@ -1,28 +1,60 @@
 from __future__ import annotations
 
 import enum
+import posixpath
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
-from functools import lru_cache
-from typing import Any, override
+from pathlib import PurePosixPath
+from typing import Any, Final, override
 
-from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.data.entity.types import EntityData, EntityIdentifier, FieldData
+from ai.backend.common.data.entity.vfolder import VFolderUUID
+from ai.backend.common.data.entity.vfolder_mount_policy import VFolderMountPolicyID
+from ai.backend.common.defs import RESERVED_VFOLDER_PATTERNS, RESERVED_VFOLDERS
 from ai.backend.common.dto.manager.field import (
     VFolderOperationStatusField,
     VFolderOwnershipTypeField,
     VFolderPermissionField,
 )
-from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
     CIStrEnum,
     QuotaScopeID,
-    VFolderHostPermissionMap,
     VFolderID,
+    VFolderMountPolicy,
     VFolderUsageMode,
 )
-from ai.backend.manager.data.permission.types import OperationType
 from ai.backend.manager.errors.resource import DataTransformationFailed
+
+
+def verify_vfolder_name(folder: str) -> bool:
+    if folder in RESERVED_VFOLDERS:
+        return False
+    for pattern in RESERVED_VFOLDER_PATTERNS:
+        if pattern.match(folder):
+            return False
+    return True
+
+
+_MOUNT_BASE: Final = PurePosixPath("/home/work")
+
+
+def verify_mount_destination(destination: str) -> bool:
+    """Return False when the mount destination is a reserved path, under one, or above one.
+
+    A relative destination is resolved under ``/home/work`` and ``..`` is normalized first.
+    """
+    joined = posixpath.normpath(posixpath.join(str(_MOUNT_BASE), destination))
+    path = PurePosixPath("/" + joined.lstrip("/"))
+    if path != _MOUNT_BASE and path.is_relative_to(_MOUNT_BASE):
+        return verify_vfolder_name(path.relative_to(_MOUNT_BASE).parts[0])
+    for reserved in RESERVED_VFOLDERS:
+        reserved_path = PurePosixPath(reserved)
+        if not reserved_path.is_absolute():
+            continue
+        if path.is_relative_to(reserved_path) or reserved_path.is_relative_to(path):
+            return False
+    return True
 
 
 class VFolderOwnershipType(CIStrEnum):
@@ -71,15 +103,6 @@ class VFolderMountPermission(enum.StrEnum):
                 return cls.OWNER_PERM
         return None
 
-    def to_rbac_operation(self) -> set[OperationType]:
-        match self:
-            case VFolderMountPermission.READ_ONLY:
-                return {OperationType.READ}
-            case VFolderMountPermission.READ_WRITE:
-                return {OperationType.READ, OperationType.UPDATE, OperationType.SOFT_DELETE}
-            case VFolderMountPermission.RW_DELETE | VFolderMountPermission.OWNER_PERM:
-                return {OperationType.READ, OperationType.UPDATE, OperationType.SOFT_DELETE}
-
 
 class VFolderInvitationState(enum.StrEnum):
     """
@@ -91,16 +114,6 @@ class VFolderInvitationState(enum.StrEnum):
     ACCEPTED = "accepted"
     REJECTED = "rejected"  # rejected by invitee
 
-    @classmethod
-    @lru_cache(maxsize=1)
-    def declined_states(cls) -> frozenset[VFolderInvitationState]:
-        """Terminal states that did not grant access (rejected / canceled).
-
-        ACCEPTED is excluded: acceptance writes a durable ``vfolder_permissions``
-        row, but the invitation record is kept rather than purged as history.
-        """
-        return frozenset((cls.REJECTED, cls.CANCELED))
-
 
 class VFolderOperationStatus(enum.StrEnum):
     """
@@ -108,6 +121,7 @@ class VFolderOperationStatus(enum.StrEnum):
     """
 
     READY = "ready"
+    CREATING = "creating"
     PERFORMING = "performing"
     CLONING = "cloning"
     MOUNTED = "mounted"
@@ -117,6 +131,30 @@ class VFolderOperationStatus(enum.StrEnum):
     DELETE_ONGOING = "delete-ongoing"  # vfolder is being deleted in storage
     DELETE_COMPLETE = "delete-complete"  # vfolder is deleted permanently, only DB row remains
     DELETE_ERROR = "delete-error"
+
+    @classmethod
+    def purge_in_progress(cls) -> frozenset[VFolderOperationStatus]:
+        """Statuses a purge is working through. Writes are refused while in one.
+
+        ``DELETE_ONGOING`` and ``DELETE_ERROR`` name the two points the other entities
+        call ``purging`` and ``purge-error``.
+        """
+        return frozenset({cls.DELETE_ONGOING, cls.DELETE_ERROR})
+
+    @classmethod
+    def hard_deleted(cls) -> frozenset[VFolderOperationStatus]:
+        """Statuses of a folder whose storage is gone or failed to go; only its row remains."""
+        return frozenset({cls.DELETE_COMPLETE, cls.DELETE_ERROR})
+
+    @classmethod
+    def dead(cls) -> frozenset[VFolderOperationStatus]:
+        """Statuses of a folder in the trash or past it, which no session may mount."""
+        return frozenset({
+            cls.DELETE_PENDING,
+            cls.DELETE_ONGOING,
+            cls.DELETE_COMPLETE,
+            cls.DELETE_ERROR,
+        })
 
     @override
     @classmethod
@@ -128,6 +166,8 @@ class VFolderOperationStatus(enum.StrEnum):
         match value.upper():
             case "READY":
                 return cls.READY
+            case "CREATING":
+                return cls.CREATING
             case "PERFORMING":
                 return cls.PERFORMING
             case "CLONING":
@@ -160,21 +200,109 @@ class VFolderOperationStatus(enum.StrEnum):
         return VFolderOperationStatusField(self)
 
 
-@dataclass(frozen=True)
-class UserWithVFolderHostPermissions:
+class VFolderStatusSet(enum.StrEnum):
     """
-    Minimal user fields paired with the union of ``allowed_vfolder_hosts``
-    across the user's active keypair resource policies. The host permission
-    map is the merged set used for vfolder host-permission validation.
+    Acts as an alias to represent set of VFolder statuses. Use this value as a key of
+    `vfolder_status_map` dictionary to retrieve actual `VFolderOperationStatus` values.
     """
 
-    email: str
-    role: UserRole
-    allowed_vfolder_hosts: VFolderHostPermissionMap
+    ALL = "all"
+    """Represents VFolder in all state"""
+
+    READABLE = "readable"
+    """Represents VFolder in a normal (readable, mountable and clonable) state"""
+
+    MOUNTABLE = "mountable"
+    """Represents VFolder in a mountable state"""
+
+    UPDATABLE = "updatable"
+    """Represents VFolder in idle (not performing active clone or removal) state"""
+
+    DELETABLE = "deletable"
+    """Simillar with UPDATABLE but does not allow VFolder in MOUNTED state"""
+
+    PURGABLE = "purgable"
+    """Represents VFolder located in trash bin. The meaning of `purge` here is
+    completely different between our VFolder `/purge` API so be sure not to confuse.
+    That API will be renamed any soon in a more self-representitive way."""
+
+    RECOVERABLE = "recoverable"
+    """alias of VFolderStatusSet.PURGABLE"""
+
+    INACCESSIBLE = "inaccessible"
+    """Represents VFolder which is now completely removed from storage and only its record is being kept"""
+
+    OWNER_PURGABLE = "owner-purgable"
+    """Represents VFolder whose storage payload must be reclaimed when its owning
+    user or group is purged. Unlike DELETABLE, this includes folders in the trash
+    bin and folders whose previous deletion stalled or failed, since the owner row
+    is removed right after and any skipped folder becomes a permanent orphan."""
+
+
+vfolder_status_map: Final[dict[VFolderStatusSet, set[VFolderOperationStatus]]] = {
+    VFolderStatusSet.ALL: {
+        VFolderOperationStatus.READY,
+        VFolderOperationStatus.CREATING,
+        VFolderOperationStatus.PERFORMING,
+        VFolderOperationStatus.CLONING,
+        VFolderOperationStatus.MOUNTED,
+        VFolderOperationStatus.ERROR,
+        VFolderOperationStatus.DELETE_PENDING,
+        VFolderOperationStatus.DELETE_ONGOING,
+        VFolderOperationStatus.DELETE_COMPLETE,
+        VFolderOperationStatus.DELETE_ERROR,
+    },
+    VFolderStatusSet.READABLE: {
+        VFolderOperationStatus.READY,
+        VFolderOperationStatus.PERFORMING,
+        VFolderOperationStatus.CLONING,
+        VFolderOperationStatus.MOUNTED,
+        VFolderOperationStatus.ERROR,
+        VFolderOperationStatus.DELETE_PENDING,
+    },
+    VFolderStatusSet.MOUNTABLE: {
+        VFolderOperationStatus.READY,
+        VFolderOperationStatus.PERFORMING,
+        VFolderOperationStatus.CLONING,
+        VFolderOperationStatus.MOUNTED,
+    },
+    # if UPDATABLE access status is requested, READY and MOUNTED operation statuses are accepted.
+    VFolderStatusSet.UPDATABLE: {
+        VFolderOperationStatus.READY,
+        VFolderOperationStatus.MOUNTED,
+    },
+    # if DELETABLE access status is requested, only READY operation status is accepted.
+    VFolderStatusSet.DELETABLE: {
+        VFolderOperationStatus.READY,
+    },
+    # if DELETABLE access status is requested, DELETE_PENDING, DELETE_COMPLETE operation status is accepted.
+    # CREATING is purgable: the row is there but its storage folder may not be, and
+    # nobody can have used it — a readable or mountable state it never was.
+    VFolderStatusSet.PURGABLE: {
+        VFolderOperationStatus.CREATING,
+        VFolderOperationStatus.DELETE_PENDING,
+        VFolderOperationStatus.DELETE_COMPLETE,
+    },
+    VFolderStatusSet.RECOVERABLE: {
+        VFolderOperationStatus.DELETE_PENDING,
+    },
+    VFolderStatusSet.INACCESSIBLE: {
+        VFolderOperationStatus.DELETE_COMPLETE,
+    },
+    # DELETE_COMPLETE is excluded: its storage payload is already gone, so there
+    # is nothing left to reclaim on owner purge.
+    VFolderStatusSet.OWNER_PURGABLE: {
+        VFolderOperationStatus.READY,
+        VFolderOperationStatus.CREATING,
+        VFolderOperationStatus.DELETE_PENDING,
+        VFolderOperationStatus.DELETE_ONGOING,
+        VFolderOperationStatus.DELETE_ERROR,
+    },
+}
 
 
 @dataclass
-class VFolderData:
+class VFolderData(EntityData):
     """
     Complete VFolder data representing all VFolder properties.
     Used by repository layer for returning full VFolder information.
@@ -186,11 +314,7 @@ class VFolderData:
     domain_name: str
     quota_scope_id: QuotaScopeID | None
     usage_mode: VFolderUsageMode
-    permission: VFolderMountPermission | None
-    max_files: int
-    max_size: int | None
-    num_files: int
-    cur_size: int
+    default_mount_permission: VFolderMountPolicy
     created_at: datetime
     last_used: datetime | None
     updated_at: datetime
@@ -202,6 +326,10 @@ class VFolderData:
     group: uuid.UUID | None
     cloneable: bool
     status: VFolderOperationStatus
+
+    @override
+    def entity_id(self) -> EntityIdentifier:
+        return self.id
 
 
 @dataclass
@@ -215,15 +343,15 @@ class VFolderUsageData:
 
 
 @dataclass
-class VFolderPermissionData:
-    """
-    VFolder permission data representing user-specific permissions on a VFolder.
-    """
+class VFolderMountPolicyData(FieldData):
+    """The mount level one user gets on a vfolder."""
 
-    id: uuid.UUID
-    vfolder: uuid.UUID
-    user: uuid.UUID
-    permission: VFolderMountPermission
+    id: VFolderMountPolicyID
+    vfolder_id: VFolderUUID
+    user_id: uuid.UUID
+    permission: VFolderMountPolicy
+    created_at: datetime
+    updated_at: datetime
 
 
 @dataclass
@@ -237,97 +365,23 @@ class VFolderInvitationData:
     inviter: str  # email
     inviter_username: str | None
     invitee: str  # email
-    permission: VFolderMountPermission
+    permission: VFolderMountPolicy
     created_at: datetime
     modified_at: datetime | None
 
 
 @dataclass
-class VFolderCreateParams:
-    """
-    Parameters needed to create a new VFolder.
-    """
+class VFolderCreation:
+    """A vfolder row that landed, and what making its storage folder needs.
 
-    id: uuid.UUID
-    name: str
-    domain_name: str
-    quota_scope_id: str
-    usage_mode: VFolderUsageMode
-    permission: VFolderMountPermission
-    host: str
-    creator: str
-    creator_id: uuid.UUID
-    ownership_type: VFolderOwnershipType
-    user: uuid.UUID | None
-    group: uuid.UUID | None
-    unmanaged_path: str | None
-    cloneable: bool
-    status: VFolderOperationStatus
-
-
-@dataclass
-class VFolderAccessInfo:
-    """
-    Information about VFolder access for query results.
+    The quota the folder is made with and the uid its files take belong to the owner's
+    resource policy, which the row does not carry; they are read where the row is
+    written so the storage step needs nothing more.
     """
 
-    vfolder_data: VFolderData
-    is_owner: bool
-    effective_permission: VFolderMountPermission | None
-
-
-@dataclass
-class VFolderListResult:
-    """
-    Result of VFolder list operations with pagination support.
-    """
-
-    vfolders: list[VFolderAccessInfo]
-    total_count: int | None = None
-
-
-@dataclass
-class VFolderSearchResult:
-    """Search result with total count and pagination info for vfolders."""
-
-    items: list[VFolderData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
-
-
-@dataclass
-class VFolderDeleteParams:
-    vfolder_id: VFolderID
-    host: str
-    unmanaged_path: str | None = None
-
-
-class DeleteStatus(enum.StrEnum):
-    DELETE_ONGOING = "delete_ongoing"
-    ALREADY_DELETED = "already_deleted"
-    ERROR = "error"
-
-
-@dataclass
-class VFolderDeleteResult:
-    """
-    Result of a VFolder delete operation.
-    """
-
-    vfolder_id: VFolderID
-    status: DeleteStatus
-
-
-@dataclass
-class ValidatedVFolderInfo:
-    """
-    VFolder info returned after access validation and host permission checks.
-    """
-
-    vfolder_id: VFolderID
-    host: str
-    unmanaged_path: str | None
+    vfolder: VFolderData
+    max_quota_scope_size: int
+    container_uid: int | None
 
 
 @dataclass
@@ -342,3 +396,30 @@ class VFolderLocation:
     host: str
     ownership_type: VFolderOwnershipType
     usage_mode: VFolderUsageMode = VFolderUsageMode.GENERAL
+
+
+@dataclass(frozen=True)
+class VFolderStorageTarget:
+    """Where a vfolder lives in storage: its id, its host and an unmanaged path if it has one."""
+
+    vfolder_id: VFolderID
+    host: str
+    unmanaged_path: str | None
+
+
+@dataclass(frozen=True)
+class VFolderCloneInfo:
+    source_vfolder_id: VFolderID
+    source_host: str
+    unmanaged_path: str | None
+    domain_name: str
+
+    # Target Vfolder infos
+    target_quota_scope_id: QuotaScopeID
+    target_vfolder_name: str
+    target_host: str
+    usage_mode: VFolderUsageMode
+    permission: VFolderMountPolicy | None
+    email: str
+    user_id: uuid.UUID
+    cloneable: bool

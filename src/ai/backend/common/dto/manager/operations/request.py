@@ -20,7 +20,6 @@ __all__ = (
     "PerformSchedulerOpsRequest",
     "PushBackgroundTaskEventsRequest",
     "PushSessionEventsRequest",
-    "UpdateAnnouncementRequest",
     "UpdateManagerStatusRequest",
 )
 
@@ -141,19 +140,6 @@ class UpdateManagerStatusRequest(BaseRequestModel):
     force_kill: bool = Field(
         default=False,
         description="Whether to force-kill all running sessions during status transition",
-    )
-
-
-class UpdateAnnouncementRequest(BaseRequestModel):
-    """Request to update the system announcement."""
-
-    enabled: bool = Field(
-        default=False,
-        description="Whether the announcement is enabled",
-    )
-    message: str | None = Field(
-        default=None,
-        description="Announcement message text; required when enabled is true",
     )
 
 

@@ -1,4 +1,3 @@
-import asyncio
 import glob
 import logging
 import re
@@ -9,8 +8,10 @@ from pprint import pformat
 from typing import Any
 
 import aiodocker
+import trafaret as t
 
 from ai.backend.accelerator.furiosa import __version__
+from ai.backend.common.asyncio import run_in_executor_with_context
 
 from .rngd_api import LibraryError, RngdAPI
 
@@ -45,13 +46,13 @@ from ai.backend.common.types import (
     SlotName,
     SlotTypes,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 PREFIX = "rngd"
 _NPU_INDEX_RE = re.compile(r"/dev/rngd/npu(\d+)")
 
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.accelerator.rngd"))
+log = StructuredLogger(logging.getLogger("ai.backend.accelerator.rngd"))
 
 
 class RngdDevice(AbstractComputeDevice):
@@ -83,8 +84,14 @@ class RngdPlugin(AbstractComputePlugin):
 
     _rbln_stat_path: str
     _all_devices: list[RngdDevice] | None
+    _host_ipc: bool
+    _seccomp_unconfined: bool
 
     async def init(self, context: Any = None) -> None:
+        self._host_ipc = t.ToBool().check(self.plugin_config.get("host_ipc", True))
+        self._seccomp_unconfined = t.ToBool().check(
+            self.plugin_config.get("seccomp_unconfined", True)
+        )
         self._all_devices = None
 
         raw_device_mask = self.plugin_config.get("device_mask")
@@ -95,10 +102,12 @@ class RngdPlugin(AbstractComputePlugin):
 
         try:
             detected_devices = await self.list_devices()
-            log.info("detected devices:\n" + pformat(detected_devices))
-            log.info("RNGD acceleration is enabled.")
+            log.debug("detected devices:\n{}", pformat(detected_devices))
+            log.info(
+                "accelerator enabled", plugin_name=self.key, device_count=len(detected_devices)
+            )
         except ImportError:
-            log.warning("could not find Furiosa devices.")
+            log.warning("accelerator disabled: no devices found", plugin_name=self.key)
             self.enabled = False
 
     async def list_devices(self) -> list[RngdDevice]:
@@ -164,7 +173,7 @@ class RngdPlugin(AbstractComputePlugin):
                     util_total += avg_util
                     util_stats[device.device_id] = Measurement(Decimal(avg_util), Decimal(100))
             except (LibraryError, OSError) as e:
-                log.warning("failed to gather RNGD node measures: {}", e)
+                log.warning("RNGD node measure failed", exc_info=e)
         return [
             NodeMeasurement(
                 MetricKey("rngd_mem"),
@@ -214,7 +223,7 @@ class RngdPlugin(AbstractComputePlugin):
                     avg_util,
                 )
         except (LibraryError, OSError) as e:
-            log.warning("failed to gather RNGD device metrics: {}", e)
+            log.warning("RNGD device metric collection failed", exc_info=e)
             return []
 
         # Step 2: For each container, find allocated devices via Docker inspection
@@ -244,7 +253,7 @@ class RngdPlugin(AbstractComputePlugin):
                         util_stats[cid] += Decimal(str(avg_util))
                         num_devices_per_container[cid] += 1
                 except Exception:
-                    log.warning("failed to inspect container {} for RNGD measures", cid)
+                    log.warning("RNGD container inspection failed", container_id=cid, exc_info=True)
 
         return [
             ContainerMeasurement(
@@ -298,7 +307,7 @@ class RngdPlugin(AbstractComputePlugin):
         ]
         devices: dict[str, str] = {}
         for alloc_idx, device_id in enumerate(device_ids):
-            source_paths = await asyncio.get_running_loop().run_in_executor(
+            source_paths = await run_in_executor_with_context(
                 None, glob.glob, f"/dev/rngd/npu{device_id}*"
             )
             for source_path in source_paths:
@@ -309,8 +318,8 @@ class RngdPlugin(AbstractComputePlugin):
         return {
             "HostConfig": {
                 "CapAdd": ["IPC_LOCK"],
-                "SecurityOpt": ["seccomp=unconfined"],
-                "IpcMode": "host",
+                **({"SecurityOpt": ["seccomp=unconfined"]} if self._seccomp_unconfined else {}),
+                **({"IpcMode": "host"} if self._host_ipc else {}),
                 "Ulimits": [{"Name": "memlock", "Hard": -1, "Soft": -1}],
                 "Sysctls": {"net.ipv6.conf.all.disable_ipv6": "0"},
                 "Devices": [

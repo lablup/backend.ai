@@ -10,13 +10,13 @@ from typing import TYPE_CHECKING, Literal
 import click
 from tabulate import tabulate
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.cli.context import redis_ctx
 
 if TYPE_CHECKING:
     from .context import CLIContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @click.group()
@@ -52,9 +52,9 @@ def last_execution_time(
                 # Scan for all manager scheduler keys
                 keys = await redis_conn_set.live.scan_keys(f"manager.{_manager_id}.*")
                 if len(keys) == 0:
-                    log.warn(
-                        "Failed to fetch scheduler information manager {}. Please check if you have mentioned manager ID correctly and the specified manager is up and running.",
-                        manager_id,
+                    log.warning(
+                        "no scheduler information found; check the manager ID and that the manager is running",
+                        manager_id=_manager_id,
                     )
                     return
 
@@ -68,10 +68,10 @@ def last_execution_time(
                 redis_key = f"manager.{_manager_id}.{scheduler_name}"
                 exists = await redis_conn_set.live.exists([redis_key])
                 if exists == 0:
-                    log.warn(
-                        "Failed to fetch scheduler information of {} on manager {}. Please check if you have mentioned both manager ID and scheduler name correctly.",
-                        scheduler_name,
-                        manager_id,
+                    log.warning(
+                        "no scheduler information found; check the manager ID and the scheduler name",
+                        scheduler_name=scheduler_name,
+                        manager_id=_manager_id,
                     )
                     return
                 schedulers = [scheduler_name]

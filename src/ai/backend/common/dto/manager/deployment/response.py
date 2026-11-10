@@ -1,6 +1,9 @@
 """
 Response DTOs for deployment system.
 Shared between Client SDK and Manager API.
+
+Deprecated: they back the deprecated REST v1 deployment API.
+Use ``ai.backend.common.dto.manager.v2.deployment``.
 """
 
 from __future__ import annotations
@@ -12,6 +15,8 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.model_deployment.types import (
     DeploymentStrategy,
     ModelDeploymentStatus,
@@ -19,8 +24,6 @@ from ai.backend.common.data.model_deployment.types import (
     RouteTrafficStatus,
 )
 from ai.backend.common.dto.manager.pagination import PaginationInfo
-from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import BackendAISchema, ClusterMode, RuntimeVariant
 
 __all__ = (

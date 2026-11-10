@@ -10,44 +10,47 @@ import sqlalchemy as sa
 from dateutil.tz import tzutc
 from sqlalchemy.engine import Row
 
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.defs import DEFAULT_ROLE
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
-from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
-from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
-from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.kernel import KernelRow, kernels
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
-from ai.backend.manager.models.replica_group import ReplicaGroupRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.deployment_auto_scaling_policy.row import (
+    DeploymentAutoScalingPolicyRow,
+)
+from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
+from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.endpoint.row import EndpointRow
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.kernel.row import KernelRow, kernels
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
+from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.resource_preset import ResourcePresetRow
-from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
-from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
+from ai.backend.manager.models.routing.row import RoutingRow
+from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
     agg_to_array,
     agg_to_str,
     sql_json_merge,
 )
-from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.testutils.db import with_tables
 
 
@@ -71,7 +74,7 @@ async def db_with_cleanup(
         [
             # FK dependency order: parents before children
             DomainRow,
-            ScalingGroupRow,
+            ResourceGroupRow,
             UserResourcePolicyRow,
             ProjectResourcePolicyRow,
             KeyPairResourcePolicyRow,
@@ -79,7 +82,7 @@ async def db_with_cleanup(
             UserRoleRow,
             UserRow,
             KeyPairRow,
-            GroupRow,
+            ProjectRow,
             ContainerRegistryRow,
             ImageRow,
             VFolderRow,
@@ -118,14 +121,14 @@ async def session_info(
     domain_id = DomainID(uuid.uuid4())
 
     async with db_with_cleanup.begin_session() as db_sess:
-        scaling_group = ScalingGroupRow(
+        resource_group = ResourceGroupRow(
             id=resource_group_id,
             name=sgroup_name,
             driver="test",
             scheduler="test",
-            scheduler_opts=ScalingGroupOpts(),
+            scheduler_opts=ResourceGroupOpts(),
         )
-        db_sess.add(scaling_group)
+        db_sess.add(resource_group)
 
         domain = DomainRow(id=domain_id, name=domain_name, total_resource_slots=ResourceSlot())
         db_sess.add(domain)
@@ -147,7 +150,7 @@ async def session_info(
         )
         db_sess.add(project_resource_policy)
 
-        group = GroupRow(
+        group = ProjectRow(
             id=group_id,
             name=group_name,
             domain_name=domain_name,
@@ -163,6 +166,7 @@ async def session_info(
             password=create_test_password_info("test_password"),
             domain_name=domain_name,
             resource_policy=resource_policy_name,
+            domain_id=domain_id,
         )
         db_sess.add(user)
 
@@ -176,8 +180,6 @@ async def session_info(
             scaling_group_name=sgroup_name,
             group_id=group_id,
             user_uuid=user_uuid,
-            occupying_slots=ResourceSlot(),
-            requested_slots=ResourceSlot(),
             vfolder_mounts={},
         )
         db_sess.add(sess)
@@ -190,8 +192,6 @@ async def session_info(
             scaling_group=sgroup_name,
             resource_group_id=resource_group_id,
             cluster_role=DEFAULT_ROLE,
-            occupied_slots=ResourceSlot(),
-            requested_slots=ResourceSlot(),
             repl_in_port=0,
             repl_out_port=0,
             stdin_port=0,
@@ -437,8 +437,6 @@ async def test_agg_to_str(session_info: tuple[str, Any]) -> None:
         "scaling_group": orig_mapping["scaling_group"],
         "resource_group_id": orig_mapping["resource_group_id"],
         "cluster_role": "sub",
-        "occupied_slots": ResourceSlot(),
-        "requested_slots": ResourceSlot(),
         "repl_in_port": 0,
         "repl_out_port": 0,
         "stdin_port": 0,
@@ -463,7 +461,7 @@ async def test_agg_to_str(session_info: tuple[str, Any]) -> None:
         sa.select(SessionRow, agg_to_str(KernelRow.tag).label("kernels_tag"))
         .select_from(sa.join(SessionRow, KernelRow))
         .where(SessionRow.id == session_id)
-        .group_by(SessionRow)
+        .group_by(*SessionRow.__table__.c)
     )
     result = await conn.execute(query)
     session = result.first()
@@ -501,8 +499,6 @@ async def test_agg_to_array(session_info: tuple[str, Any]) -> None:
         "scaling_group": orig_mapping["scaling_group"],
         "resource_group_id": orig_mapping["resource_group_id"],
         "cluster_role": "sub",
-        "occupied_slots": ResourceSlot(),
-        "requested_slots": ResourceSlot(),
         "repl_in_port": 0,
         "repl_out_port": 0,
         "stdin_port": 0,
@@ -527,7 +523,7 @@ async def test_agg_to_array(session_info: tuple[str, Any]) -> None:
         sa.select(SessionRow, agg_to_array(KernelRow.tag).label("kernels_tag"))
         .select_from(sa.join(SessionRow, KernelRow))
         .where(SessionRow.id == session_id)
-        .group_by(SessionRow)
+        .group_by(*SessionRow.__table__.c)
     )
     result = await conn.execute(query)
     session = result.first()

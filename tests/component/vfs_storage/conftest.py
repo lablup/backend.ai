@@ -3,13 +3,14 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncIterator, Callable, Coroutine
 from typing import Any
-from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
-from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.common.data.entity.vfs_storage import VFSStorageEntityType, VFSStorageID
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.api.rest.middleware import auth as _auth_api
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
@@ -18,6 +19,7 @@ from ai.backend.manager.api.rest.vfs_storage.registry import register_vfs_storag
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfs_storage.row import VFSStorageRow
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.vfs_storage.repository import VFSStorageRepository
 from ai.backend.manager.services.vfs_storage.processors import VFSStorageProcessors
 from ai.backend.manager.services.vfs_storage.service import VFSStorageService
@@ -33,14 +35,15 @@ VFSStorageFactory = Callable[..., Coroutine[Any, Any, VFSStorageFixtureData]]
 def vfs_storage_processors(
     database_engine: ExtendedAsyncSAEngine,
     storage_manager: StorageSessionManager,
+    processor_registry: ProcessorRegistry[Any],
 ) -> VFSStorageProcessors:
-    vfs_storage_repository = VFSStorageRepository(database_engine)
+    vfs_storage_repository = VFSStorageRepository(database_engine, V2DBOpsProvider(database_engine))
     service = VFSStorageService(
         vfs_storage_repository=vfs_storage_repository,
         storage_manager=storage_manager,
     )
     return VFSStorageProcessors(
-        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+        processor_registry.group(GroupMeta(VFSStorageEntityType())), service
     )
 
 
@@ -65,10 +68,10 @@ async def vfs_storage_factory(
 
     Yields a factory callable and cleans up all created storages on teardown.
     """
-    created_ids: list[uuid.UUID] = []
+    created_ids: list[VFSStorageID] = []
 
     async def _create(**overrides: Any) -> VFSStorageFixtureData:
-        storage_id = uuid.uuid4()
+        storage_id = VFSStorageID(uuid.uuid4())
         defaults: dict[str, Any] = {
             "id": storage_id,
             "name": f"test-vfs-{storage_id.hex[:8]}",
@@ -96,3 +99,8 @@ async def target_vfs_storage(
 ) -> VFSStorageFixtureData:
     """Pre-created VFS storage for tests that need an existing storage."""
     return await vfs_storage_factory()
+
+
+@pytest.fixture(autouse=True)
+def _act_as_superadmin(acting_superadmin: None) -> None:
+    """These tests drive processors directly, so they supply the caller the gates read."""

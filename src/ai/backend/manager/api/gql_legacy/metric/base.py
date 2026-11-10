@@ -3,8 +3,8 @@ from typing import TYPE_CHECKING, Self, cast
 
 import graphene
 
-from ai.backend.manager.services.metric.actions.container import (
-    ContainerMetricMetadataAction,
+from ai.backend.manager.services.metric.actions.search_container_metric_metadata import (
+    PublicSearchContainerMetricMetadataAction,
 )
 
 if TYPE_CHECKING:
@@ -31,10 +31,8 @@ class ContainerUtilizationMetricMetadata(graphene.ObjectType):  # type: ignore[m
         info: graphene.ResolveInfo,
     ) -> Self:
         graph_ctx: GraphQueryContext = info.context
-        action_result = (
-            await graph_ctx.processors.metric.query_container_metadata.wait_for_complete(
-                ContainerMetricMetadataAction()
-            )
+        action_result = await graph_ctx.processors.metric.metadata_public_search.run(
+            PublicSearchContainerMetricMetadataAction()
         )
         return cls(
             metric_names=action_result.metric_names,
@@ -46,7 +44,7 @@ class ContainerUtilizationMetric(graphene.ObjectType):  # type: ignore[misc]
         description = "Added in 25.6.0."
 
     metric_name = graphene.String()
-    value_type = graphene.String(description="One of 'current', 'capacity'.")
+    value_type = graphene.String(description="One of 'current', 'capacity', 'pct'.")
     values = graphene.List(MetricResultValue)
 
     max_value = graphene.String(

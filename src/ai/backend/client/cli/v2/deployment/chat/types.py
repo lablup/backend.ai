@@ -16,8 +16,8 @@ from ai.backend.client.cli.v2.deployment.chat.utils import (
     read_json_file,
     write_json_file,
 )
+from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.exception import BackendAISchemaValidationFailed
-from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.types import BackendAISchema
 
 CACHE_ENTRY_TTL = timedelta(hours=24)

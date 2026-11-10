@@ -1,0 +1,369 @@
+"""여러 ID로 설정 정의 조회 — 원소마다 응답한다.
+
+슈퍼관리자가 아니면 요청 전체가 막히는 것이 아니라 원소마다 거부된다. 없는 ID도 마찬가지로
+거부 원소이고, 빈 항목으로 반환되는 것은 검사를 통과하는 슈퍼관리자에게뿐이다.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import override
+from uuid import uuid4
+
+import pytest
+
+from ai.backend.common.data.entity.app_config_definition import AppConfigDefinitionID
+from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.dto.manager.v2.app_config_definition.response import (
+    AppConfigDefinitionNode,
+)
+from ai.backend.manager.api.adapters.app_config_definition.adapter import (
+    AppConfigDefinitionAdapter,
+)
+from ai.backend.manager.errors.permission import NotEnoughPermission
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.testutils.scenario_steps import (
+    Answered,
+    Given,
+    Held,
+    Refused,
+    Same,
+    SameAs,
+    Says,
+    Scenario,
+    Then,
+    Verdict,
+    When,
+)
+from bai_scenario.components.app_config_definition import (
+    TwoDefinitionsAndACaller,
+    TwoDefinitionsAndSomeone,
+)
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import TestSeedingSession
+from bai_scenario.runner.steps import run_scenario
+
+type Loaded = list[AppConfigDefinitionNode | Exception | None]
+type LoadingStep = Scenario[
+    TestSeedingSession, TwoDefinitionsAndACaller, AppConfigDefinitionAdapter, Loaded
+]
+
+
+@dataclass(frozen=True)
+class LoadingByIds(When[TwoDefinitionsAndACaller, AppConfigDefinitionAdapter, Loaded]):
+    """여러 ID를 한 번에 조회한다."""
+
+    nothing: bool = False
+    duplicate_first: bool = False
+
+    @override
+    def operation(self) -> str:
+        return "batch_load_by_ids"
+
+    @override
+    def describe(self, laid: TwoDefinitionsAndACaller) -> str:
+        if self.nothing:
+            return Says(
+                f"{laid.caller.username} 이 빈 ID 목록으로 조회합니다",
+                english=f"{laid.caller.username} reads with an empty id list",
+            )
+        if self.duplicate_first:
+            return Says(
+                f"{laid.caller.username} 이 첫 번째 설정 정의의 ID 를 두 번 조회합니다",
+                english=(
+                    f"{laid.caller.username} reads the id of the first config definition twice"
+                ),
+            )
+        return Says(
+            f"{laid.caller.username} 이 {laid.first.config_name}, {laid.second.config_name}, "
+            "존재하지 않는 ID 를 한 번에 조회합니다",
+            english=(
+                f"{laid.caller.username} reads {laid.first.config_name}, "
+                f"{laid.second.config_name} and a missing id at once"
+            ),
+        )
+
+    @override
+    async def call(
+        self, adapter: AppConfigDefinitionAdapter, laid: TwoDefinitionsAndACaller
+    ) -> Loaded:
+        if self.nothing:
+            asked = []
+        elif self.duplicate_first:
+            asked = [laid.first.id, laid.first.id]
+        else:
+            asked = [laid.first.id, laid.second.id, AppConfigDefinitionID(uuid4())]
+        with ActingAs(laid.caller):
+            return await adapter.batch_load_by_ids(asked)
+
+
+@dataclass(frozen=True)
+class EveryIdIsRefused(Then[TwoDefinitionsAndACaller, Loaded]):
+    """세 항목 모두 그 항목만 거부된다."""
+
+    @override
+    def says(self) -> str:
+        return Says(
+            "있는 둘도 없는 ID 도 그 항목만 거부됩니다",
+            english=("both existing items and the missing id are rejected for that item alone"),
+        )
+
+    @override
+    def look(self, laid: TwoDefinitionsAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
+        items = answered.response
+        if items is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        seen: list[Verdict] = [Same("items", len(items), 3)]
+        if len(items) != 3:
+            return seen
+        return [
+            *seen,
+            *(
+                Refused(NotEnoughPermission, one if isinstance(one, BaseException) else None)
+                for one in items
+            ),
+        ]
+
+
+@dataclass(frozen=True)
+class TwoNodesOneMissing(Then[TwoDefinitionsAndACaller, Loaded]):
+    """둘은 노드, 셋째는 빈 항목."""
+
+    @override
+    def says(self) -> str:
+        return Says(
+            "있는 둘은 노드로 반환되고, 없는 ID 에 해당하는 항목은 비어 있습니다",
+            english=(
+                "the two existing items come back as nodes and the item for the missing id is empty"
+            ),
+        )
+
+    @override
+    def look(self, laid: TwoDefinitionsAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
+        items = answered.response
+        if items is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        seen: list[Verdict] = [Same("items", len(items), 3)]
+        if len(items) != 3:
+            return seen
+        return [
+            *seen,
+            Held[object](
+                "items[0].ID",
+                getattr(items[0], "id", items[0]),
+                SameAs[object](
+                    laid.first.id,
+                    Says(
+                        "미리 저장한 첫째 설정 정의",
+                        english="the first config definition made in advance",
+                    ),
+                ),
+            ),
+            Held[object](
+                "items[1].ID",
+                getattr(items[1], "id", items[1]),
+                SameAs[object](
+                    laid.second.id,
+                    Says(
+                        "미리 저장한 둘째 설정 정의",
+                        english="the second config definition made in advance",
+                    ),
+                ),
+            ),
+            Same("items[2]", items[2], None),
+        ]
+
+
+@dataclass(frozen=True)
+class NothingIsAnswered(Then[TwoDefinitionsAndACaller, Loaded]):
+    """빈 응답."""
+
+    @override
+    def says(self) -> str:
+        return Says("빈 응답이 반환됩니다", english="an empty answer comes back")
+
+    @override
+    def look(self, laid: TwoDefinitionsAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
+        items = answered.response
+        if items is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        return [Same("items", list(items), [])]
+
+
+@dataclass(frozen=True)
+class TheDuplicateIdKeepsBothPositions(Then[TwoDefinitionsAndACaller, Loaded]):
+    """같은 ID를 두 번 요청하면 두 항목에 같은 노드가 반환된다."""
+
+    @override
+    def says(self) -> str:
+        return Says(
+            "중복 ID 의 두 항목에 같은 설정 정의가 반환됩니다",
+            english="the same config definition comes back for both items of the duplicate id",
+        )
+
+    @override
+    def look(self, laid: TwoDefinitionsAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
+        items = answered.response
+        if items is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        seen: list[Verdict] = [Same("items", len(items), 2)]
+        if len(items) != 2:
+            return seen
+        repeated = Says(
+            "미리 저장한 첫 번째 설정 정의",
+            english="the first config definition made in advance",
+        )
+        return [
+            *seen,
+            Held[object](
+                "items[0].ID",
+                getattr(items[0], "id", items[0]),
+                SameAs[object](laid.first.id, repeated),
+            ),
+            Held[object](
+                "items[1].ID",
+                getattr(items[1], "id", items[1]),
+                SameAs[object](laid.first.id, repeated),
+            ),
+        ]
+
+
+@dataclass(frozen=True)
+class APlainUserIsRefusedPerId(
+    Scenario[TestSeedingSession, TwoDefinitionsAndACaller, AppConfigDefinitionAdapter, Loaded]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-who-is-not-the-superadmin-is-refused-per-id"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "superadmin 이 아닌 사용자가 설정 정의 둘과 없는 ID 하나를 한 번에 조회하면, 요청 전체가 "
+            "막히는 것이 아니라 세 항목 모두 그 항목만 권한 부족으로 거부됩니다",
+            english=(
+                "when a user who is not the superadmin reads two config definitions and one "
+                "missing id at once, the whole request is not blocked; all three items are "
+                "rejected for that item alone for lack of permission"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, TwoDefinitionsAndACaller]:
+        return TwoDefinitionsAndSomeone()
+
+    @override
+    def when(self) -> When[TwoDefinitionsAndACaller, AppConfigDefinitionAdapter, Loaded]:
+        return LoadingByIds()
+
+    @override
+    def then(self) -> Then[TwoDefinitionsAndACaller, Loaded]:
+        return EveryIdIsRefused()
+
+
+@dataclass(frozen=True)
+class TheSuperadminSeesBoth(
+    Scenario[TestSeedingSession, TwoDefinitionsAndACaller, AppConfigDefinitionAdapter, Loaded]
+):
+    @override
+    def summary(self) -> str:
+        return "the-superadmin-reads-both-and-a-missing-id-comes-back-empty"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "superadmin 이 설정 정의 둘과 없는 ID 하나를 한 번에 조회하면, 둘은 노드로 반환되고 "
+            "없는 ID 에 해당하는 항목은 비어 있습니다. 권한 검사를 통과하는 사용자만 빈 항목을 봅니다",
+            english=(
+                "when the superadmin reads two config definitions and one missing id at once, "
+                "the two come back as nodes and the item for the missing id is empty. Only a "
+                "user who passes the permission check sees an empty item"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, TwoDefinitionsAndACaller]:
+        return TwoDefinitionsAndSomeone(role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[TwoDefinitionsAndACaller, AppConfigDefinitionAdapter, Loaded]:
+        return LoadingByIds()
+
+    @override
+    def then(self) -> Then[TwoDefinitionsAndACaller, Loaded]:
+        return TwoNodesOneMissing()
+
+
+@dataclass(frozen=True)
+class DuplicateIdsKeepTheirPositions(
+    Scenario[TestSeedingSession, TwoDefinitionsAndACaller, AppConfigDefinitionAdapter, Loaded]
+):
+    @override
+    def summary(self) -> str:
+        return "duplicate-ids-keep-their-input-positions"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "superadmin 이 같은 설정 정의 ID 를 두 번 조회하면, 입력 순서를 보존해 같은 노드가 "
+            "두 번 반환됩니다",
+            english=(
+                "when the superadmin reads the same config definition id twice, the same node "
+                "comes back twice, keeping the input order"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, TwoDefinitionsAndACaller]:
+        return TwoDefinitionsAndSomeone(role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[TwoDefinitionsAndACaller, AppConfigDefinitionAdapter, Loaded]:
+        return LoadingByIds(duplicate_first=True)
+
+    @override
+    def then(self) -> Then[TwoDefinitionsAndACaller, Loaded]:
+        return TheDuplicateIdKeepsBothPositions()
+
+
+@dataclass(frozen=True)
+class AnEmptyListAnswersEmpty(
+    Scenario[TestSeedingSession, TwoDefinitionsAndACaller, AppConfigDefinitionAdapter, Loaded]
+):
+    @override
+    def summary(self) -> str:
+        return "an-empty-id-list-answers-empty"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "빈 ID 목록을 주면 빈 응답이 반환됩니다",
+            english="an empty id list answers empty",
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, TwoDefinitionsAndACaller]:
+        return TwoDefinitionsAndSomeone()
+
+    @override
+    def when(self) -> When[TwoDefinitionsAndACaller, AppConfigDefinitionAdapter, Loaded]:
+        return LoadingByIds(nothing=True)
+
+    @override
+    def then(self) -> Then[TwoDefinitionsAndACaller, Loaded]:
+        return NothingIsAnswered()
+
+
+SCENARIOS: list[LoadingStep] = [
+    TheSuperadminSeesBoth(),
+    DuplicateIdsKeepTheirPositions(),
+    APlainUserIsRefusedPerId(),
+    AnEmptyListAnswersEmpty(),
+]
+
+
+@pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
+async def test_reading_many(
+    scenario: LoadingStep, adapter: AppConfigDefinitionAdapter, engine: ExtendedAsyncSAEngine
+) -> None:
+    await run_scenario(scenario, adapter, engine)

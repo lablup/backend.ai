@@ -4,13 +4,24 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from decimal import Decimal
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
 import pytest
 
-from ai.backend.common.dto.manager.v2.common import ResourceSlotEntryInput
+from ai.backend.common.data.entity.kernel import KernelFieldType, KernelID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
+from ai.backend.common.dto.manager.v2.common import (
+    ResourceSlotEntryInfo,
+    ResourceSlotEntryInput,
+    ResourceSlotInfo,
+)
+from ai.backend.common.dto.manager.v2.kernel.response import ResourceAllocationGQLDTO
 from ai.backend.common.dto.manager.v2.session.request import (
+    AdminSearchSessionsInput,
     BatchConfigInput,
     EnqueueSessionInput,
     TerminateSessionsInput,
@@ -18,10 +29,56 @@ from ai.backend.common.dto.manager.v2.session.request import (
 from ai.backend.common.dto.manager.v2.session.types import (
     ClusterModeEnum,
     CreateSessionTypeEnum,
+    SessionUsage,
+    SessionUses,
 )
-from ai.backend.common.types import ClusterMode, SessionResult, SessionTypes
+from ai.backend.common.dto.manager.v2.session_options.types import AgentSelectionPolicyEnum
+from ai.backend.common.types import (
+    AgentId,
+    ClusterMode,
+    KernelId,
+    ResourceSlot,
+    SessionId,
+    SessionResult,
+    SessionTypes,
+)
+from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.actions.v2.bulk.result import (
+    PartialBulkEntityResult,
+    PartialBulkResult,
+)
+from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
 from ai.backend.manager.api.adapters.session.adapter import SessionAdapter
-from ai.backend.manager.data.session.types import SessionData, SessionStatus
+from ai.backend.manager.data.kernel.types import (
+    ClusterConfig,
+    ImageInfo,
+    KernelInfo,
+    KernelStatus,
+    LifecycleStatus,
+    Metadata,
+    Metrics,
+    NetworkConfig,
+    RelatedSessionInfo,
+    ResourceInfo,
+    RuntimeConfig,
+    UserPermission,
+)
+from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
+from ai.backend.manager.data.session.options import AgentSelectionPolicy
+from ai.backend.manager.data.session.types import (
+    SessionData,
+    SessionEntityData,
+    SessionStatus,
+    SessionTerminationStatus,
+)
+from ai.backend.manager.errors.base.field import FieldNotFoundError
+from ai.backend.manager.errors.common import GenericForbidden
+from ai.backend.manager.services.session.actions.batch_get_session_resource_allocation import (
+    BatchGetSessionResourceAllocationAction,
+)
+from ai.backend.manager.services.session.actions.bulk_get_session_designated_agent_ids import (
+    BulkGetSessionDesignatedAgentIdsAction,
+)
 
 
 def _create_session_data(
@@ -34,14 +91,13 @@ def _create_session_data(
         id=session_id or uuid4(),
         session_type=SessionTypes.INTERACTIVE,
         priority=10,
+        job_priority=0,
         is_preemptible=True,
         cluster_mode=ClusterMode.SINGLE_NODE,
         cluster_size=1,
         domain_name="default",
         group_id=uuid4(),
         user_uuid=uuid4(),
-        occupying_slots={},
-        requested_slots={"cpu": Decimal("1"), "mem": Decimal("1073741824")},
         use_host_network=False,
         created_at=datetime.now(tz=UTC),
         status=status,
@@ -50,7 +106,7 @@ def _create_session_data(
         creation_id="test-creation-id",
         name=name,
         access_key=None,
-        scaling_group_name="default",
+        resource_group_name="default",
         target_sgroup_names=None,
         agent_ids=None,
         images=None,
@@ -76,13 +132,33 @@ def _create_session_data(
     )
 
 
+def _create_allocation(
+    requested: dict[str, Decimal] | None = None,
+    used: dict[str, Decimal] | None = None,
+) -> ResourceAllocationGQLDTO:
+    """Build the slot allocation the adapter receives from resource_allocations."""
+
+    def _entries(slots: dict[str, Decimal] | None) -> ResourceSlotInfo:
+        return ResourceSlotInfo(
+            entries=[
+                ResourceSlotEntryInfo(resource_type=k, quantity=v) for k, v in (slots or {}).items()
+            ]
+        )
+
+    return ResourceAllocationGQLDTO(
+        requested=_entries(requested),
+        used=_entries(used),
+        allocated=_entries(used),
+    )
+
+
 class TestSessionDataToNode:
     """Tests for _session_data_to_node conversion."""
 
     def test_basic_conversion(self) -> None:
         """SessionData should convert to SessionNode with correct fields."""
         data = _create_session_data(name="my-session")
-        node = SessionAdapter._session_data_to_node(data)
+        node = SessionAdapter._session_data_to_node(data, _create_allocation(), [])
 
         assert node.metadata.name == "my-session"
         assert node.metadata.session_type == "interactive"
@@ -90,10 +166,32 @@ class TestSessionDataToNode:
         assert node.metadata.cluster_size == 1
         assert node.metadata.priority == 10
 
+    def test_the_designated_agents_reach_the_node(self) -> None:
+        node = SessionAdapter._session_data_to_node(
+            _create_session_data(),
+            _create_allocation(),
+            [AgentId("i-agent-1"), AgentId("i-agent-2")],
+        )
+
+        assert node.resource.designated_agent_ids == ["i-agent-1", "i-agent-2"]
+
+    def test_a_session_designating_no_agent_answers_null(self) -> None:
+        node = SessionAdapter._session_data_to_node(
+            _create_session_data(), _create_allocation(), []
+        )
+
+        assert node.resource.designated_agent_ids is None
+
     def test_resource_allocation_conversion(self) -> None:
         """Resource slots should be converted to ResourceSlotInfo entries."""
         data = _create_session_data()
-        node = SessionAdapter._session_data_to_node(data)
+        node = SessionAdapter._session_data_to_node(
+            data,
+            _create_allocation(
+                requested={"cpu": Decimal("1"), "mem": Decimal("1073741824")},
+            ),
+            [],
+        )
 
         requested = node.resource.allocation.requested
         assert len(requested.entries) == 2
@@ -104,25 +202,25 @@ class TestSessionDataToNode:
     def test_lifecycle_running_status(self) -> None:
         """RUNNING status should be preserved as RUNNING."""
         data = _create_session_data(status=SessionStatus.RUNNING)
-        node = SessionAdapter._session_data_to_node(data)
+        node = SessionAdapter._session_data_to_node(data, _create_allocation(), [])
         assert node.lifecycle.status == "RUNNING"
 
     def test_lifecycle_pending_status(self) -> None:
         """PENDING status should be preserved as PENDING."""
         data = _create_session_data(status=SessionStatus.PENDING)
-        node = SessionAdapter._session_data_to_node(data)
+        node = SessionAdapter._session_data_to_node(data, _create_allocation(), [])
         assert node.lifecycle.status == "PENDING"
 
     def test_lifecycle_result(self) -> None:
         """Result should be passed through as string value."""
         data = _create_session_data()
-        node = SessionAdapter._session_data_to_node(data)
+        node = SessionAdapter._session_data_to_node(data, _create_allocation(), [])
         assert node.lifecycle.result == "undefined"
 
     def test_domain_and_user_fields(self) -> None:
         """Domain name and user/project IDs should be mapped."""
         data = _create_session_data()
-        node = SessionAdapter._session_data_to_node(data)
+        node = SessionAdapter._session_data_to_node(data, _create_allocation(), [])
         assert node.domain_name == "default"
         assert node.user_id == data.user_uuid
         assert node.project_id == data.group_id
@@ -130,14 +228,466 @@ class TestSessionDataToNode:
     def test_network_host_network_false(self) -> None:
         """Network info should reflect use_host_network."""
         data = _create_session_data()
-        node = SessionAdapter._session_data_to_node(data)
+        node = SessionAdapter._session_data_to_node(data, _create_allocation(), [])
         assert node.network.use_host_network is False
 
     def test_empty_occupying_slots(self) -> None:
         """Empty occupying slots should produce empty entries list."""
         data = _create_session_data()
-        node = SessionAdapter._session_data_to_node(data)
+        node = SessionAdapter._session_data_to_node(data, _create_allocation(), [])
         assert len(node.resource.allocation.used.entries) == 0
+
+
+async def _no_allocations(
+    action: BatchGetSessionResourceAllocationAction,
+) -> PartialBulkResult[ResourceAllocationAggregate]:
+    """The read answers for every session named, each holding nothing."""
+    return PartialBulkResult(
+        items=[
+            PartialBulkEntityResult[ResourceAllocationAggregate].nothing(SessionID(sid))
+            for sid in action.session_ids
+        ]
+    )
+
+
+async def _no_designations(
+    action: BulkGetSessionDesignatedAgentIdsAction,
+) -> PartialBulkResult[list[AgentId]]:
+    """The read answers for every session named, each designating no agent."""
+    return PartialBulkResult(
+        items=[
+            PartialBulkEntityResult[list[AgentId]].succeeded(sid, []) for sid in action.session_ids
+        ]
+    )
+
+
+def _create_kernel_info(kernel_id: KernelId) -> KernelInfo:
+    return KernelInfo(
+        id=kernel_id,
+        session=RelatedSessionInfo(
+            session_id=str(uuid4()),
+            creation_id="test-creation-id",
+            name="test-session",
+            session_type=SessionTypes.INTERACTIVE,
+        ),
+        user_permission=UserPermission(
+            user_uuid=uuid4(),
+            access_key="TESTKEY",
+            domain_name="default",
+            group_id=uuid4(),
+            uid=None,
+            main_gid=None,
+            gids=None,
+        ),
+        image=ImageInfo(image_id=None, identifier=None, registry=None, tag=None, architecture=None),
+        network=NetworkConfig(
+            kernel_host=None,
+            repl_in_port=0,
+            repl_out_port=0,
+            stdin_port=0,
+            stdout_port=0,
+            service_ports=None,
+            preopen_ports=None,
+            use_host_network=False,
+        ),
+        cluster=ClusterConfig(
+            cluster_mode=ClusterMode.SINGLE_NODE,
+            cluster_size=1,
+            cluster_role="main",
+            cluster_idx=0,
+            local_rank=0,
+            cluster_hostname="main",
+        ),
+        resource=ResourceInfo(
+            resource_group="default",
+            resource_group_id=ResourceGroupID(uuid4()),
+            agent="agent-001",
+            agent_addr=None,
+            container_id=None,
+            occupied_shares={},
+            attached_devices={},
+            resource_opts={},
+        ),
+        runtime=RuntimeConfig(
+            environ=None,
+            mounts=None,
+            mount_map=None,
+            vfolder_mounts=None,
+            bootstrap_script=None,
+            startup_command=None,
+        ),
+        lifecycle=LifecycleStatus(
+            status=KernelStatus.RUNNING,
+            result=SessionResult.UNDEFINED,
+            created_at=datetime(2026, 1, 1, tzinfo=UTC),
+            terminated_at=None,
+            starts_at=None,
+            status_changed=None,
+            status_info=None,
+            status_data=None,
+            status_history=None,
+            last_seen=None,
+            last_observed_at=None,
+        ),
+        metrics=Metrics(num_queries=0, last_stat=None, container_log=None),
+        metadata=Metadata(callback_url=None, internal_data=None),
+        kernel_group_id=None,
+    )
+
+
+class TestSearchUsage:
+    @pytest.fixture
+    def processors(self) -> MagicMock:
+        processors = MagicMock()
+        processors.global_search.run = AsyncMock(
+            return_value=SimpleNamespace(
+                items=[], total_count=0, has_next_page=False, has_previous_page=False
+            )
+        )
+        processors.batch_get_session_resource_allocation.run = AsyncMock(
+            side_effect=_no_allocations
+        )
+        processors.bulk_get_session_designated_agent_ids.run = AsyncMock(
+            side_effect=_no_designations
+        )
+        return processors
+
+    @pytest.fixture
+    def adapter(self, processors: MagicMock) -> SessionAdapter:
+        return SessionAdapter(processors, MagicMock())
+
+    async def test_uses_vfolder_is_a_use_the_search_carries(
+        self,
+        adapter: SessionAdapter,
+        processors: MagicMock,
+    ) -> None:
+        vfolder_id = uuid4()
+
+        await adapter.admin_search(
+            AdminSearchSessionsInput(usage=SessionUsage(uses=SessionUses(vfolder=[vfolder_id])))
+        )
+
+        action = processors.global_search.run.call_args[0][0]
+        assert [used.target for used in action.searcher.used_by] == [VFolderUUID(vfolder_id)]
+
+
+class TestBatchLoadSessions:
+    """The session DataLoader path: each session is answered for."""
+
+    @pytest.fixture
+    def readable(self) -> SessionData:
+        return _create_session_data()
+
+    @pytest.fixture
+    def denied_id(self) -> SessionID:
+        return SessionID(uuid4())
+
+    @pytest.fixture
+    def missing_id(self) -> SessionID:
+        return SessionID(uuid4())
+
+    @pytest.fixture
+    def denial(self) -> GenericForbidden:
+        return GenericForbidden("no read on this session")
+
+    @pytest.fixture
+    def processors(
+        self,
+        readable: SessionData,
+        denied_id: SessionID,
+        missing_id: SessionID,
+        denial: GenericForbidden,
+    ) -> MagicMock:
+        entity = MagicMock(spec=SessionEntityData)
+        entity.to_session_data.return_value = readable
+        processors = MagicMock()
+        processors.bulk_get.run = AsyncMock(
+            return_value=PartialBulkResult(
+                items=[
+                    PartialBulkEntityResult[SessionEntityData].succeeded(
+                        SessionID(readable.id), entity
+                    ),
+                    PartialBulkEntityResult[SessionEntityData].denied(denied_id, denial),
+                    PartialBulkEntityResult[SessionEntityData].nothing(missing_id),
+                ]
+            )
+        )
+        processors.batch_get_session_resource_allocation.run = AsyncMock(
+            side_effect=_no_allocations
+        )
+        processors.bulk_get_session_designated_agent_ids.run = AsyncMock(
+            side_effect=_no_designations
+        )
+        return processors
+
+    @pytest.fixture
+    def adapter(self, processors: MagicMock) -> SessionAdapter:
+        return SessionAdapter(processors, MagicMock())
+
+    async def test_answers_per_id(
+        self,
+        adapter: SessionAdapter,
+        readable: SessionData,
+        denied_id: SessionID,
+        missing_id: SessionID,
+        denial: GenericForbidden,
+    ) -> None:
+        node, refused, missing = await adapter.batch_load_by_ids([
+            SessionID(readable.id),
+            denied_id,
+            missing_id,
+        ])
+
+        assert node is not None and not isinstance(node, Exception)
+        assert node.id == readable.id
+        assert refused is denial
+        assert missing is None
+
+    async def test_no_ids_read_nothing(
+        self, adapter: SessionAdapter, processors: MagicMock
+    ) -> None:
+        assert await adapter.batch_load_by_ids([]) == []
+        processors.bulk_get.run.assert_not_awaited()
+
+
+class TestSessionFailingToLoadItsAgents:
+    """A session whose designated agents fail to load: the DataLoader answers with the
+    error for that session alone, and a payload read fails."""
+
+    @pytest.fixture
+    def loaded(self) -> SessionData:
+        return _create_session_data()
+
+    @pytest.fixture
+    def failing(self) -> SessionData:
+        return _create_session_data()
+
+    @pytest.fixture
+    def denial(self) -> GenericForbidden:
+        return GenericForbidden("no read on this session's agents")
+
+    @pytest.fixture
+    def processors(
+        self, loaded: SessionData, failing: SessionData, denial: GenericForbidden
+    ) -> MagicMock:
+        loaded_entity = MagicMock(spec=SessionEntityData)
+        loaded_entity.to_session_data.return_value = loaded
+        failing_entity = MagicMock(spec=SessionEntityData)
+        failing_entity.to_session_data.return_value = failing
+        processors = MagicMock()
+        processors.bulk_get.run = AsyncMock(
+            return_value=PartialBulkResult(
+                items=[
+                    PartialBulkEntityResult[SessionEntityData].succeeded(
+                        SessionID(loaded.id), loaded_entity
+                    ),
+                    PartialBulkEntityResult[SessionEntityData].succeeded(
+                        SessionID(failing.id), failing_entity
+                    ),
+                ]
+            )
+        )
+        processors.get_session.run = AsyncMock(return_value=MagicMock(session_data=failing))
+        processors.batch_get_session_resource_allocation.run = AsyncMock(
+            side_effect=_no_allocations
+        )
+
+        async def _designations(
+            action: BulkGetSessionDesignatedAgentIdsAction,
+        ) -> PartialBulkResult[list[AgentId]]:
+            return PartialBulkResult(
+                items=[
+                    PartialBulkEntityResult[list[AgentId]].denied(sid, denial)
+                    if sid == SessionID(failing.id)
+                    else PartialBulkEntityResult[list[AgentId]].succeeded(sid, [])
+                    for sid in action.session_ids
+                ]
+            )
+
+        processors.bulk_get_session_designated_agent_ids.run = AsyncMock(side_effect=_designations)
+        return processors
+
+    @pytest.fixture
+    def adapter(self, processors: MagicMock) -> SessionAdapter:
+        return SessionAdapter(processors, MagicMock())
+
+    async def test_the_data_loader_answers_that_session_with_its_error(
+        self,
+        adapter: SessionAdapter,
+        loaded: SessionData,
+        failing: SessionData,
+        denial: GenericForbidden,
+    ) -> None:
+        node, refused = await adapter.batch_load_by_ids([
+            SessionID(loaded.id),
+            SessionID(failing.id),
+        ])
+
+        assert node is not None and not isinstance(node, Exception)
+        assert node.id == loaded.id
+        assert refused is denial
+
+    async def test_a_payload_read_raises_the_error(
+        self, adapter: SessionAdapter, failing: SessionData, denial: GenericForbidden
+    ) -> None:
+        with pytest.raises(GenericForbidden) as raised:
+            await adapter.get(SessionId(failing.id))
+
+        assert raised.value is denial
+
+
+class TestBatchResourceAllocationBySession:
+    """The allocation DataLoader path: a denied session answers with its denial."""
+
+    @pytest.fixture
+    def readable_id(self) -> SessionID:
+        return SessionID(uuid4())
+
+    @pytest.fixture
+    def denied_id(self) -> SessionID:
+        return SessionID(uuid4())
+
+    @pytest.fixture
+    def empty_id(self) -> SessionID:
+        return SessionID(uuid4())
+
+    @pytest.fixture
+    def denial(self) -> GenericForbidden:
+        return GenericForbidden("no read on this session")
+
+    @pytest.fixture
+    def processors(
+        self,
+        readable_id: SessionID,
+        denied_id: SessionID,
+        empty_id: SessionID,
+        denial: GenericForbidden,
+    ) -> MagicMock:
+        processors = MagicMock()
+        processors.batch_get_session_resource_allocation.run = AsyncMock(
+            return_value=PartialBulkResult(
+                items=[
+                    PartialBulkEntityResult[ResourceAllocationAggregate].succeeded(
+                        readable_id,
+                        ResourceAllocationAggregate(
+                            requested=ResourceSlot({"cpu": Decimal("2")}),
+                            used=ResourceSlot({"cpu": Decimal("1")}),
+                            allocated=ResourceSlot({"cpu": Decimal("1")}),
+                        ),
+                    ),
+                    PartialBulkEntityResult[ResourceAllocationAggregate].denied(denied_id, denial),
+                    PartialBulkEntityResult[ResourceAllocationAggregate].nothing(empty_id),
+                ]
+            )
+        )
+        return processors
+
+    @pytest.fixture
+    def adapter(self, processors: MagicMock) -> SessionAdapter:
+        return SessionAdapter(processors, MagicMock())
+
+    async def test_answers_per_id(
+        self,
+        adapter: SessionAdapter,
+        readable_id: SessionID,
+        denied_id: SessionID,
+        empty_id: SessionID,
+        denial: GenericForbidden,
+    ) -> None:
+        allocated, refused, empty = await adapter.batch_resource_allocation_by_session([
+            readable_id,
+            denied_id,
+            empty_id,
+        ])
+
+        assert allocated == _create_allocation(
+            requested={"cpu": Decimal("2")}, used={"cpu": Decimal("1")}
+        )
+        assert refused is denial
+        assert empty == _create_allocation()
+
+
+class TestBatchLoadKernels:
+    """The kernel DataLoader path: each kernel is answered for by its session."""
+
+    @pytest.fixture
+    def readable(self) -> KernelInfo:
+        return _create_kernel_info(KernelId(uuid4()))
+
+    @pytest.fixture
+    def denied_id(self) -> KernelID:
+        return KernelID(uuid4())
+
+    @pytest.fixture
+    def missing_id(self) -> KernelID:
+        return KernelID(uuid4())
+
+    @pytest.fixture
+    def denial(self) -> GenericForbidden:
+        return GenericForbidden("no read on the session this kernel runs under")
+
+    @pytest.fixture
+    def processors(
+        self,
+        readable: KernelInfo,
+        denied_id: KernelID,
+        missing_id: KernelID,
+        denial: GenericForbidden,
+    ) -> MagicMock:
+        processors = MagicMock()
+        processors.bulk_get_kernels.run = AsyncMock(
+            return_value=BulkFieldOpsResult(
+                successes={KernelID(readable.id): readable},
+                errors={
+                    denied_id: denial,
+                    missing_id: FieldNotFoundError(
+                        field_type=KernelFieldType(), operation=ActionOperationType.GET
+                    ),
+                },
+            )
+        )
+        processors.batch_get_kernel_resource_allocation.run = AsyncMock(
+            return_value=MagicMock(data={})
+        )
+        return processors
+
+    @pytest.fixture
+    def adapter(self, processors: MagicMock) -> SessionAdapter:
+        return SessionAdapter(processors, MagicMock())
+
+    async def test_answers_per_id(
+        self,
+        adapter: SessionAdapter,
+        readable: KernelInfo,
+        denied_id: KernelID,
+        missing_id: KernelID,
+        denial: GenericForbidden,
+    ) -> None:
+        node, refused, missing = await adapter.batch_load_kernels_by_ids([
+            KernelID(readable.id),
+            denied_id,
+            missing_id,
+        ])
+
+        assert node is not None and not isinstance(node, Exception)
+        assert node.id == readable.id
+        assert refused is denial
+        assert missing is None
+
+    async def test_no_kernel_found_is_every_id_missing(
+        self, adapter: SessionAdapter, processors: MagicMock, missing_id: KernelID
+    ) -> None:
+        processors.bulk_get_kernels.run.side_effect = FieldNotFoundError(
+            field_type=KernelFieldType(), operation=ActionOperationType.GET
+        )
+
+        assert await adapter.batch_load_kernels_by_ids([missing_id]) == [None]
+
+    async def test_no_ids_read_nothing(
+        self, adapter: SessionAdapter, processors: MagicMock
+    ) -> None:
+        assert await adapter.batch_load_kernels_by_ids([]) == []
+        processors.bulk_get_kernels.run.assert_not_awaited()
 
 
 class TestEnqueueActionBuilding:
@@ -148,12 +698,18 @@ class TestEnqueueActionBuilding:
         processors = MagicMock()
         result = MagicMock()
         result.session_data = _create_session_data()
-        processors.session.enqueue_session.wait_for_complete = AsyncMock(return_value=result)
+        processors.session.enqueue_session.run = AsyncMock(return_value=result)
+        processors.session.batch_get_session_resource_allocation.run = AsyncMock(
+            side_effect=_no_allocations
+        )
+        processors.session.bulk_get_session_designated_agent_ids.run = AsyncMock(
+            side_effect=_no_designations
+        )
         return processors
 
     @pytest.fixture
     def adapter(self, mock_processors: MagicMock) -> SessionAdapter:
-        return SessionAdapter(mock_processors)
+        return SessionAdapter(mock_processors.session, mock_processors.idle_checker)
 
     async def test_enqueue_interactive(
         self,
@@ -182,8 +738,8 @@ class TestEnqueueActionBuilding:
             group_id=project_id,
         )
         assert result.session is not None
-        mock_processors.session.enqueue_session.wait_for_complete.assert_called_once()
-        action = mock_processors.session.enqueue_session.wait_for_complete.call_args[0][0]
+        mock_processors.session.enqueue_session.run.assert_called_once()
+        action = mock_processors.session.enqueue_session.run.call_args[0][0]
         assert action.session_type == SessionTypes.INTERACTIVE
         assert action.resource.cluster_mode == ClusterMode.SINGLE_NODE
 
@@ -209,7 +765,7 @@ class TestEnqueueActionBuilding:
             domain_name="default",
             group_id=dto.project_id,
         )
-        action = mock_processors.session.enqueue_session.wait_for_complete.call_args[0][0]
+        action = mock_processors.session.enqueue_session.run.call_args[0][0]
         assert action.session_type == SessionTypes.BATCH
         assert action.batch is not None
         assert action.batch.startup_command == "python train.py"
@@ -237,9 +793,86 @@ class TestEnqueueActionBuilding:
             domain_name="default",
             group_id=dto.project_id,
         )
-        action = mock_processors.session.enqueue_session.wait_for_complete.call_args[0][0]
+        action = mock_processors.session.enqueue_session.run.call_args[0][0]
         assert action.resource.cluster_mode == ClusterMode.MULTI_NODE
         assert action.resource.cluster_size == 4
+
+    async def test_enqueue_with_session_group(
+        self,
+        adapter: SessionAdapter,
+        mock_processors: MagicMock,
+    ) -> None:
+        """The named session group should be carried on the action."""
+        session_group_id = uuid4()
+        dto = EnqueueSessionInput(
+            session_name="grouped-session",
+            session_type=CreateSessionTypeEnum.INTERACTIVE,
+            image_id=uuid4(),
+            resource_entries=[ResourceSlotEntryInput(resource_type="cpu", quantity="1")],
+            project_id=uuid4(),
+            session_group_id=session_group_id,
+        )
+        await adapter.enqueue(
+            dto,
+            user_id=uuid4(),
+            user_role="user",
+            access_key="TESTKEY",
+            domain_name="default",
+            group_id=dto.project_id,
+        )
+        action = mock_processors.session.enqueue_session.run.call_args[0][0]
+        assert action.session_group_id == session_group_id
+
+    async def test_enqueue_with_agent_selection_policy(
+        self,
+        adapter: SessionAdapter,
+        mock_processors: MagicMock,
+    ) -> None:
+        """A request-level policy should be converted to the domain enum."""
+        dto = EnqueueSessionInput(
+            session_name="strict-session",
+            session_type=CreateSessionTypeEnum.INTERACTIVE,
+            image_id=uuid4(),
+            resource_entries=[ResourceSlotEntryInput(resource_type="cpu", quantity="1")],
+            project_id=uuid4(),
+            agent_list=["agent-1"],
+            agent_selection_policy=AgentSelectionPolicyEnum.STRICT,
+        )
+        await adapter.enqueue(
+            dto,
+            user_id=uuid4(),
+            user_role="user",
+            access_key="TESTKEY",
+            domain_name="default",
+            group_id=dto.project_id,
+        )
+        action = mock_processors.session.enqueue_session.run.call_args[0][0]
+        assert action.scheduling.agent_list == ["agent-1"]
+        assert action.scheduling.agent_selection_policy == AgentSelectionPolicy.STRICT
+
+    async def test_enqueue_without_agent_selection_policy(
+        self,
+        adapter: SessionAdapter,
+        mock_processors: MagicMock,
+    ) -> None:
+        """An omitted policy should stay None so the RG default applies."""
+        dto = EnqueueSessionInput(
+            session_name="default-policy-session",
+            session_type=CreateSessionTypeEnum.INTERACTIVE,
+            image_id=uuid4(),
+            resource_entries=[ResourceSlotEntryInput(resource_type="cpu", quantity="1")],
+            project_id=uuid4(),
+        )
+        await adapter.enqueue(
+            dto,
+            user_id=uuid4(),
+            user_role="user",
+            access_key="TESTKEY",
+            domain_name="default",
+            group_id=dto.project_id,
+        )
+        action = mock_processors.session.enqueue_session.run.call_args[0][0]
+        assert action.scheduling.agent_selection_policy is None
 
 
 class TestTerminateActionBuilding:
@@ -248,17 +881,19 @@ class TestTerminateActionBuilding:
     @pytest.fixture
     def mock_processors(self) -> MagicMock:
         processors = MagicMock()
-        result = MagicMock()
-        result.cancelled = []
-        result.terminating = [uuid4()]
-        result.force_terminated = []
-        result.skipped = []
-        processors.session.terminate_sessions.wait_for_complete = AsyncMock(return_value=result)
+        result = PartialBulkResult(
+            items=[
+                PartialBulkEntityResult[SessionTerminationStatus].succeeded(
+                    SessionID(uuid4()), SessionTerminationStatus.TERMINATING
+                )
+            ]
+        )
+        processors.session.terminate_sessions.run = AsyncMock(return_value=result)
         return processors
 
     @pytest.fixture
     def adapter(self, mock_processors: MagicMock) -> SessionAdapter:
-        return SessionAdapter(mock_processors)
+        return SessionAdapter(mock_processors.session, mock_processors.idle_checker)
 
     async def test_terminate_single(
         self,
@@ -270,7 +905,7 @@ class TestTerminateActionBuilding:
         dto = TerminateSessionsInput(session_ids=[sid])
         result = await adapter.terminate(dto)
         assert len(result.terminating) == 1
-        mock_processors.session.terminate_sessions.wait_for_complete.assert_called_once()
+        mock_processors.session.terminate_sessions.run.assert_called_once()
 
     async def test_terminate_forced(
         self,
@@ -280,7 +915,7 @@ class TestTerminateActionBuilding:
         """Force terminate should pass forced=True to action."""
         dto = TerminateSessionsInput(session_ids=[uuid4()], forced=True)
         await adapter.terminate(dto)
-        action = mock_processors.session.terminate_sessions.wait_for_complete.call_args[0][0]
+        action = mock_processors.session.terminate_sessions.run.call_args[0][0]
         assert action.forced is True
 
     async def test_terminate_multiple(
@@ -292,5 +927,42 @@ class TestTerminateActionBuilding:
         ids = [uuid4(), uuid4(), uuid4()]
         dto = TerminateSessionsInput(session_ids=ids)
         await adapter.terminate(dto)
-        action = mock_processors.session.terminate_sessions.wait_for_complete.call_args[0][0]
+        action = mock_processors.session.terminate_sessions.run.call_args[0][0]
         assert len(action.session_ids) == 3
+
+
+class TestTerminateDenial:
+    """A session the caller may not terminate refuses the call, not just its own item."""
+
+    @pytest.fixture
+    def denial(self) -> GenericForbidden:
+        return GenericForbidden("no terminate on this session")
+
+    @pytest.fixture
+    def processors(self, denial: GenericForbidden) -> MagicMock:
+        processors = MagicMock()
+        processors.terminate_sessions.run = AsyncMock(
+            return_value=PartialBulkResult(
+                items=[
+                    PartialBulkEntityResult[SessionTerminationStatus].succeeded(
+                        SessionID(uuid4()), SessionTerminationStatus.TERMINATING
+                    ),
+                    PartialBulkEntityResult[SessionTerminationStatus].denied(
+                        SessionID(uuid4()), denial
+                    ),
+                ]
+            )
+        )
+        return processors
+
+    @pytest.fixture
+    def adapter(self, processors: MagicMock) -> SessionAdapter:
+        return SessionAdapter(processors, MagicMock())
+
+    async def test_the_denial_is_raised(
+        self, adapter: SessionAdapter, denial: GenericForbidden
+    ) -> None:
+        with pytest.raises(GenericForbidden) as raised:
+            await adapter.terminate(TerminateSessionsInput(session_ids=[uuid4(), uuid4()]))
+
+        assert raised.value is denial

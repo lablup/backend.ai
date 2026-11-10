@@ -12,7 +12,7 @@ from ai.backend.manager.models.base import (
 from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 
 
-class EntityFieldRow(CreatedAtMixin, Base):  # type: ignore[misc]
+class EntityFieldRow(CreatedAtMixin, Base):
     """Deprecated: No longer actively used. The field-scoped entity concept
     (RBACFieldCreator/RBACFieldPurger) was removed by BEP-1048.
     Kept only for the existing database table; will be dropped in a future migration.
@@ -32,7 +32,7 @@ class EntityFieldRow(CreatedAtMixin, Base):  # type: ignore[misc]
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
 
     entity_type: Mapped[str] = mapped_column(

@@ -1,16 +1,16 @@
-# Plugin Loading
+# Plugin Loading: Guardrails
 
-This package is the **entry-point scanner / CLI** (`entrypoint.py`, `cli.py`). Plugin base classes and the loader context live in `ai.backend.common.plugin` — write new plugins against those.
+This package is the **entry-point scanner / CLI** (`entrypoint.py`, `cli.py`). Plugin base classes and the loader context live in `ai.backend.common.plugin`; write new plugins against those.
 
 ## How plugins load
 
-- Discovered via Python entry points, group `backendai_{domain}_v{N}` (e.g. `backendai_hook_v20`, `backendai_accelerator_v21`, `backendai_webapp_v20`).
+- Discovered via Python entry points, group `backendai_{domain}_v{N}` (for example `backendai_hook_v20`, `backendai_accelerator_v21`, `backendai_webapp_v20`).
 - `scan_entrypoints(group)` chains three sources: Pants BUILD files, plugin checkouts, installed package metadata.
 - Inspect with `./bai plugin scan <group>`.
 
 ## Write / register a plugin
 
-- Subclass `AbstractPlugin` (`common/plugin/__init__.py`) — implement async `init()`, `cleanup()`, `update_plugin_config()` — or a typed interface (`HookPlugin`, `AbstractEventDispatcherPlugin`, `WebappPlugin`, `AbstractComputePlugin`, monitor plugins).
+- Subclass `AbstractPlugin` (`common/plugin/__init__.py`) and implement async `init()`, `cleanup()`, `update_plugin_config()`, or use a typed interface (`HookPlugin`, `AbstractEventDispatcherPlugin`, `WebappPlugin`, `AbstractComputePlugin`, monitor plugins).
 - Register by declaring `entry_points` under the right group in the distribution's BUILD file.
 
 ## Pitfalls
@@ -18,3 +18,6 @@ This package is the **entry-point scanner / CLI** (`entrypoint.py`, `cli.py`). P
 - Duplicate plugin name across sources raises at load; a name in both allowlist and blocklist is a `ConfigurationError`.
 - A class not inheriting `AbstractPlugin` is skipped with a warning.
 - Plugin etcd config path is `config/plugins/{group_key}/{plugin_name}/`.
+- Scanning does not load wheels. `start-server` of the manager, agent and storage-proxy loads them only with `allow = true` under `[wheelhouse]` in its config file, from `wheelhouse.path` (default: `./wheelhouse`), so CLI commands do not see them.
+- `plugin scan` lists the entry points of the wheels in `wheelhouse.path` of each config file with `allow = true`, without loading them. `-f` names the config file; by default it reads the manager, agent and storage-proxy config files. A config file it cannot read or parse is skipped with a warning on stderr.
+- The manager reads `[wheelhouse]` from `BootstrapConfig` so that etcd cannot turn it on.

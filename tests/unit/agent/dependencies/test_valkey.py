@@ -4,7 +4,11 @@ from typing import Any
 
 import pytest
 
-from ai.backend.agent.dependencies.infrastructure.redis import AgentValkeyDependency
+from ai.backend.agent.dependencies.infrastructure.redis import (
+    AgentValkeyDependency,
+    AgentValkeyInput,
+)
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.typed_validators import HostPortPair
 
@@ -23,7 +27,9 @@ class TestValkeyDependency:
         """Test that valkey dependency creates all 4 clients."""
         dependency = AgentValkeyDependency()
 
-        async with dependency.provide(redis_config) as clients:
+        async with dependency.provide(
+            AgentValkeyInput(redis_config=redis_config, sentinel_monitors=SentinelMonitorSet([]))
+        ) as clients:
             # Verify all 4 clients are created
             assert clients.stat is not None
             assert clients.stream is not None

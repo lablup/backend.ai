@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.login_session import LoginSessionID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.login_session.request import (
     AdminRevokeLoginSessionInput,
     AdminSearchLoginSessionsInput,
@@ -30,31 +34,42 @@ from ai.backend.manager.api.adapter_options.pagination.pagination import Paginat
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.auth.login_session_types import LoginSessionData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.models.login_session.row import LoginSessionRow
+from ai.backend.manager.models.login_session.searchers import LoginSessionSearcher
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.repositories.auth.options import LoginSessionConditions, LoginSessionOrders
-from ai.backend.manager.repositories.auth.types import MyLoginSessionSearchScope
-from ai.backend.manager.repositories.base import combine_conditions_or, negate_conditions
+from ai.backend.manager.services.auth.actions.bulk_get_login_sessions import (
+    BulkGetLoginSessionsAction,
+)
 from ai.backend.manager.services.auth.actions.revoke_login_session import (
-    AdminRevokeLoginSessionAction,
-    MyRevokeLoginSessionAction,
+    GlobalRevokeLoginSessionAction,
+    RevokeLoginSessionAction,
 )
 from ai.backend.manager.services.auth.actions.search_login_sessions import (
-    AdminSearchLoginSessionsAction,
+    GlobalSearchLoginSessionsAction,
     SearchLoginSessionsAction,
 )
-from ai.backend.manager.services.auth.actions.unblock_user import AdminUnblockUserAction
+from ai.backend.manager.services.auth.actions.unblock_user import GlobalUnblockUserAction
+from ai.backend.manager.services.auth.processors import AuthProcessors
 
 _LOGIN_SESSION_PAGINATION_SPEC = PaginationSpec(
     forward_order=LoginSessionOrders.created_at(ascending=False),
-    backward_order=LoginSessionOrders.created_at(ascending=True),
-    forward_condition_factory=LoginSessionConditions.by_cursor_forward,
-    backward_condition_factory=LoginSessionConditions.by_cursor_backward,
-    tiebreaker_order=LoginSessionRow.id.asc(),
+    cursor_column=LoginSessionRow.id,
 )
 
 
 class LoginSessionAdapter(BaseAdapter):
     """Adapter for login session domain operations."""
+
+    _auth: AuthProcessors
+
+    def __init__(self, auth: AuthProcessors) -> None:
+        self._auth = auth
 
     async def admin_search(
         self, input: AdminSearchLoginSessionsInput
@@ -62,7 +77,8 @@ class LoginSessionAdapter(BaseAdapter):
         """Search login sessions with admin scope (no scope restriction)."""
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
-        querier = self._build_querier(
+        searcher = self._build_searcher(
+            LoginSessionSearcher,
             conditions=conditions,
             orders=orders,
             pagination_spec=_LOGIN_SESSION_PAGINATION_SPEC,
@@ -73,14 +89,14 @@ class LoginSessionAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.auth.admin_search_login_sessions.wait_for_complete(
-            AdminSearchLoginSessionsAction(querier=querier)
+        action_result = await self._auth.global_search_login_sessions.run(
+            GlobalSearchLoginSessionsAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
         )
         return AdminSearchLoginSessionsPayload(
-            items=[self._data_to_node(item) for item in action_result.result.items],
-            total_count=action_result.result.total_count,
-            has_next_page=action_result.result.has_next_page,
-            has_previous_page=action_result.result.has_previous_page,
+            items=[self._data_to_node(item) for item in action_result.items],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
         )
 
     async def my_search(self, input: MySearchLoginSessionsInput) -> MySearchLoginSessionsPayload:
@@ -91,10 +107,10 @@ class LoginSessionAdapter(BaseAdapter):
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
-        scope = MyLoginSessionSearchScope(user_id=me.user_id)
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
-        querier = self._build_querier(
+        searcher = self._build_searcher(
+            LoginSessionSearcher,
             conditions=conditions,
             orders=orders,
             pagination_spec=_LOGIN_SESSION_PAGINATION_SPEC,
@@ -105,33 +121,27 @@ class LoginSessionAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.auth.search_login_sessions.wait_for_complete(
-            SearchLoginSessionsAction(scope=scope, querier=querier)
+        action_result = await self._auth.search_login_sessions.run(
+            SearchLoginSessionsAction(user_ids=[UserID(me.user_id)], searcher=searcher)
         )
         return MySearchLoginSessionsPayload(
-            items=[self._data_to_node(item) for item in action_result.result.items],
-            total_count=action_result.result.total_count,
-            has_next_page=action_result.result.has_next_page,
-            has_previous_page=action_result.result.has_previous_page,
+            items=[self._data_to_node(item) for item in action_result.items],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
         )
 
     async def my_revoke(self, input: MyRevokeLoginSessionInput) -> RevokeLoginSessionPayload:
         """Revoke a login session owned by the current user."""
-        me = current_user()
-        if me is None:
-            raise UnreachableError("User context is not available")
-        action_result = await self._processors.auth.my_revoke_login_session.wait_for_complete(
-            MyRevokeLoginSessionAction(
-                session_id=input.session_id,
-                user_id=me.user_id,
-            )
+        action_result = await self._auth.revoke_login_session.run(
+            RevokeLoginSessionAction(session_id=LoginSessionID(input.session_id))
         )
         return RevokeLoginSessionPayload(success=action_result.success)
 
     async def admin_revoke(self, input: AdminRevokeLoginSessionInput) -> RevokeLoginSessionPayload:
         """Revoke any login session (admin, no ownership check)."""
-        action_result = await self._processors.auth.admin_revoke_login_session.wait_for_complete(
-            AdminRevokeLoginSessionAction(
+        action_result = await self._auth.global_revoke_login_session.run(
+            GlobalRevokeLoginSessionAction(
                 session_id=input.session_id,
             )
         )
@@ -139,13 +149,33 @@ class LoginSessionAdapter(BaseAdapter):
 
     async def admin_unblock_user(self, input: AdminUnblockUserInput) -> UnblockUserPayload:
         """Clear the failed-login rate limit block for a user (admin only)."""
-        action_result = await self._processors.auth.admin_unblock_user.wait_for_complete(
-            AdminUnblockUserAction(username=input.username)
+        action_result = await self._auth.global_unblock_user.run(
+            GlobalUnblockUserAction(username=input.username)
         )
         return UnblockUserPayload(success=action_result.success)
 
+    async def batch_load_by_ids(
+        self, ids: Sequence[LoginSessionID]
+    ) -> list[LoginSessionNode | Exception | None]:
+        """Batch load login sessions by id for DataLoader use, checked per owning user."""
+        if not ids:
+            return []
+        return await self.batch_load_fields(
+            self._auth.bulk_get_login_sessions,
+            BulkGetLoginSessionsAction(ids=ids),
+            ids,
+            self._data_to_node,
+        )
+
     def _convert_filter(self, f: LoginSessionFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
+        if f.field_id is not None:
+            condition = f.field_id.build_query_condition(
+                equals_factory=LoginSessionConditions.by_id_equals,
+                in_factory=LoginSessionConditions.by_id_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
         if f.user_id is not None:
             condition = f.user_id.build_query_condition(
                 equals_factory=LoginSessionConditions.by_user_id_equals,
@@ -188,15 +218,16 @@ class LoginSessionAdapter(BaseAdapter):
         if f.OR:
             or_conditions: list[QueryCondition] = []
             for sub_filter in f.OR:
-                or_conditions.extend(self._convert_filter(sub_filter))
+                sub_conditions = self._convert_filter(sub_filter)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub_filter in f.NOT:
-                not_conditions.extend(self._convert_filter(sub_filter))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_filter(sub_filter)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     @staticmethod
@@ -228,6 +259,7 @@ class LoginSessionAdapter(BaseAdapter):
     def _data_to_node(data: LoginSessionData) -> LoginSessionNode:
         return LoginSessionNode(
             id=data.id,
+            field_id=data.id,
             user_id=data.user_id,
             access_key=data.access_key,
             status=LoginSessionStatus(data.status.value),

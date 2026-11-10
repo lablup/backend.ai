@@ -1,0 +1,3 @@
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/TOTPActivateModal-C3ETJAsY.js","assets/index-CwWAznqi.js","assets/icons-BgdBQS0N.js","assets/lodash-RhKGq0BF.js","assets/index-Br3zDXFp.css"])))=>i.map(i=>d[i]);
+import{_ as i,c as l,n}from"./index-CwWAznqi.js";import{b as c,r as o}from"./icons-BgdBQS0N.js";const u=c.lazy(()=>i(()=>import("./TOTPActivateModal-C3ETJAsY.js"),__vite__mapDeps([0,1,2,3,4]))),d=e=>{"use memo";const t=l.c(2),[s,r]=o.useState(!!e.open);if(e.open&&!s&&r(!0),!s)return null;let a;return t[0]!==e?(a=n.jsx(o.Suspense,{fallback:null,children:n.jsx(u,{...e})}),t[0]=e,t[1]=a):a=t[1],a};export{d as T};
+//# sourceMappingURL=TOTPActivateModalLazy-DCxey2h3.js.map

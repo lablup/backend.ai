@@ -1,74 +1,116 @@
 import logging
 
-from ai.backend.common.exception import PrometheusQueryPresetInvalidLabel
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.exception import (
+    InvalidMetricPresetTemplate,
+    PrometheusQueryPresetInvalidLabel,
+)
+from ai.backend.common.metrics.types import CONTAINER_UTILIZATION_METRIC_LABEL_NAME
+from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, PartialBulkResult
+from ai.backend.manager.actions.v2.ops.result import CreatedEntityOpsResult
 from ai.backend.manager.clients.prometheus.client import PrometheusClient
-from ai.backend.manager.data.prometheus_query_preset import (
+from ai.backend.manager.clients.prometheus.metric_types import ensure_container_metric_name
+from ai.backend.manager.clients.prometheus.preset import (
+    LabelMatcher,
+    MetricPreset,
+    PromQLTemplateRenderer,
+)
+from ai.backend.manager.data.prometheus_query_preset.types import (
     ExecutePresetOptions,
     PrometheusQueryPresetData,
 )
-from ai.backend.manager.repositories.prometheus_query_preset import (
+from ai.backend.manager.models.prometheus_query_preset.updaters import (
+    PrometheusQueryPresetUpdater,
+)
+from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.prometheus_query_preset.repository import (
     PrometheusQueryPresetRepository,
 )
-from ai.backend.manager.services.prometheus_query_preset.actions import (
-    CreatePresetAction,
-    CreatePresetActionResult,
-    DeletePresetAction,
-    DeletePresetActionResult,
+from ai.backend.manager.services.prometheus_query_preset.actions.create import CreatePresetAction
+from ai.backend.manager.services.prometheus_query_preset.actions.execute_preset import (
     ExecutePresetAction,
     ExecutePresetActionResult,
-    GetPresetAction,
-    GetPresetActionResult,
-    ModifyPresetAction,
-    ModifyPresetActionResult,
+)
+from ai.backend.manager.services.prometheus_query_preset.actions.partial_bulk_update import (
+    PartialBulkUpdatePresetsAction,
+)
+from ai.backend.manager.services.prometheus_query_preset.actions.preview import (
     PreviewPresetAction,
     PreviewPresetActionResult,
-    SearchPresetsAction,
-    SearchPresetsActionResult,
+)
+from ai.backend.manager.services.prometheus_query_preset.actions.update import (
+    UpdatePresetAction,
+    UpdatePresetActionResult,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class PrometheusQueryPresetService:
     _repository: PrometheusQueryPresetRepository
     _prometheus_client: PrometheusClient
     _default_timewindow: str
+    _template_renderer: PromQLTemplateRenderer
+    _ops_repository: OpsRepository[PrometheusQueryPresetData]
 
     def __init__(
         self,
         repository: PrometheusQueryPresetRepository,
         prometheus_client: PrometheusClient,
         default_timewindow: str,
+        template_renderer: PromQLTemplateRenderer,
+        ops_repository: OpsRepository[PrometheusQueryPresetData],
     ) -> None:
         self._repository = repository
         self._prometheus_client = prometheus_client
         self._default_timewindow = default_timewindow
+        self._template_renderer = template_renderer
+        self._ops_repository = ops_repository
 
-    async def create_preset(self, action: CreatePresetAction) -> CreatePresetActionResult:
-        preset_data = await self._repository.create(action.creator)
-        return CreatePresetActionResult(preset=preset_data)
-
-    async def get_preset(self, action: GetPresetAction) -> GetPresetActionResult:
-        preset_data = await self._repository.get_by_id(action.preset_id)
-        return GetPresetActionResult(preset=preset_data)
-
-    async def search_presets(self, action: SearchPresetsAction) -> SearchPresetsActionResult:
-        result = await self._repository.search(action.querier)
-        return SearchPresetsActionResult(
-            items=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
+    async def create_preset(
+        self, action: CreatePresetAction
+    ) -> CreatedEntityOpsResult[PrometheusQueryPresetData]:
+        self._template_renderer.validate(action.creator.query_template)
+        return CreatedEntityOpsResult(
+            data=await self._ops_repository.create_entity(action.to_creator())
         )
 
-    async def modify_preset(self, action: ModifyPresetAction) -> ModifyPresetActionResult:
-        preset_data = await self._repository.update(action.updater)
-        return ModifyPresetActionResult(preset=preset_data)
+    async def update_preset(self, action: UpdatePresetAction) -> UpdatePresetActionResult:
+        template = action.updater.query_template.optional_value()
+        if template is not None:
+            self._template_renderer.validate(template)
+        preset_data = await self._ops_repository.update(action.updater)
+        return UpdatePresetActionResult(preset=preset_data)
 
-    async def delete_preset(self, action: DeletePresetAction) -> DeletePresetActionResult:
-        await self._repository.delete(action.preset_id)
-        return DeletePresetActionResult(preset_id=action.preset_id)
+    async def partial_bulk_update_presets(
+        self, action: PartialBulkUpdatePresetsAction
+    ) -> PartialBulkResult[PrometheusQueryPresetData]:
+        rejected: list[PartialBulkEntityResult[PrometheusQueryPresetData]] = []
+        updaters: dict[EntityIdentifier, PrometheusQueryPresetUpdater] = {}
+        for updater in action.updaters:
+            template = updater.query_template.optional_value()
+            try:
+                if template is not None:
+                    self._template_renderer.validate(template)
+            except InvalidMetricPresetTemplate as e:
+                rejected.append(PartialBulkEntityResult.failed(updater.preset_id, e))
+                continue
+            updaters[updater.preset_id] = updater
+        result = await self._ops_repository.partial_bulk_update(updaters)
+        return PartialBulkResult(
+            items=[
+                *rejected,
+                *(
+                    PartialBulkEntityResult.succeeded(entity_id, data)
+                    for entity_id, data in result.successes.items()
+                ),
+                *(
+                    PartialBulkEntityResult.failed(entity_id, error)
+                    for entity_id, error in result.errors.items()
+                ),
+            ]
+        )
 
     def _validate_labels(
         self,
@@ -91,6 +133,7 @@ class PrometheusQueryPresetService:
                 )
 
     async def preview_preset(self, action: PreviewPresetAction) -> PreviewPresetActionResult:
+        self._template_renderer.validate(action.query_template)
         response = await self._repository.preview_template(
             query_template=action.query_template,
             default_window=self._default_timewindow,
@@ -100,14 +143,22 @@ class PrometheusQueryPresetService:
     async def execute_preset(self, action: ExecutePresetAction) -> ExecutePresetActionResult:
         preset_data = await self._repository.get_by_id(action.preset_id)
         self._validate_labels(action.options, preset_data)
+        metric_name = action.options.filter_labels.get(CONTAINER_UTILIZATION_METRIC_LABEL_NAME)
+        if metric_name is not None:
+            ensure_container_metric_name(metric_name)
         # Window fallback: request → preset → server default
         time_window = action.time_window or preset_data.time_window or self._default_timewindow
 
         response = await self._prometheus_client.execute_preset(
-            query_template=preset_data.query_template,
-            filter_labels=action.options.filter_labels,
-            group_labels=action.options.group_labels,
-            time_window=time_window,
+            MetricPreset(
+                template=preset_data.query_template,
+                labels={
+                    name: LabelMatcher.exact(value)
+                    for name, value in action.options.filter_labels.items()
+                },
+                group_by=set(action.options.group_labels),
+                window=time_window,
+            ),
             time_range=action.time_range,
         )
         return ExecutePresetActionResult(response=response)

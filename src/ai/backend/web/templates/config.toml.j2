@@ -1,36 +1,33 @@
 [general]
 {% toml_field "apiEndpoint" endpoint_url %}
-{% toml_field "apiEndpointText" config["api"]["text"] %}
-{% toml_field "defaultSessionEnvironment" config["ui"]["default-environment"] %}
-{% toml_field "defaultImportEnvironment" config["ui"]["default-import-environment"] %}
-{% toml_field "enableModelFolders" config["ui"]["enable-model-folders"] %}
+{% toml_field "apiDomainName" config["api"]["domain"] %}
 connectionMode = "SESSION"
 {% toml_field "signupSupport" config["service"]["enable-signup"] %}
 {% toml_field "allowChangeSigninMode" config["service"]["allow-change-signin-mode"] %}
 {% toml_field "allowAnonymousChangePassword" config["service"]["allow-anonymous-change-password"] %}
-{% toml_field "allowProjectResourceMonitor" config["service"]["allow-project-resource-monitor"] %}
-{% toml_field "allowManualImageNameForSession" config["service"]["allow-manual-image-name-for-session"] %}
 {% toml_field "allowSignupWithoutConfirmation" config["service"]["allow-signup-without-confirmation"] %}
-{% toml_field "alwaysEnqueueComputeSession" config["service"]["always-enqueue-compute-session"] %}
+{% toml_strlist_field "singleSignOnVendors" config["service"]["single-sign-on-vendors"] %}
+{% toml_field "ssoRealmName" config["service"]["sso-realm-name"] %}
+{% toml_field "enableInteractiveLoginAccountSwitch" config["service"]["enable-interactive-login-account-switch"] %}
+{% if authenticated %}
+{% toml_field "defaultSessionEnvironment" config["ui"]["default-environment"] %}
+{% toml_field "defaultImportEnvironment" config["ui"]["default-import-environment"] %}
+{% toml_field "enableModelFolders" config["ui"]["enable-model-folders"] %}
+{% toml_field "allowManualImageNameForSession" config["service"]["allow-manual-image-name-for-session"] %}
 {% toml_field "autoLogout" config["session"]["auto-logout"] %}
 {% toml_field "debug" config["service"]["webui-debug"] %}
 {% toml_field "maskUserInfo" config["service"]["mask-user-info"] %}
-{% toml_strlist_field "singleSignOnVendors" config["service"]["single-sign-on-vendors"] %}
-{% toml_field "ssoRealmName" config["service"]["sso-realm-name"] %}
 {% toml_field "enableContainerCommit" config["service"]["enable-container-commit"] %}
 {% toml_field "hideAgents" config["service"]["hide-agents"] %}
 {% toml_field "appDownloadUrl" config["service"]["app-download-url"] %}
 {% toml_field "allowAppDownloadPanel" config["service"]["allow-app-download-panel"] %}
-{% toml_field "force2FA" config["service"]["force-2FA"] %}
 {% toml_field "systemSSHImage" config["service"]["system-SSH-image"] %}
-{% toml_field "directoryBasedUsage" config["service"]["directory-based-usage"] %}
 {% toml_field "maxCountForPreopenPorts" config["session"]["max-count-for-preopen-ports"] %}
 {% toml_field "allowCustomResourceAllocation" config["service"]["allow-custom-resource-allocation"] %}
 {% toml_field "allowThemeMode" config["service"]["allow-theme-mode"] %}
 {% toml_field "isDirectorySizeVisible" config["service"]["is-directory-size-visible"] %}
 {% toml_field "eduAppNamePrefix" config["service"]["edu-appname-prefix"] %}
 {% toml_field "enableExtendLoginSession" config["service"]["enable-extend-login-session"] %}
-{% toml_field "enableInteractiveLoginAccountSwitch" config["service"]["enable-interactive-login-account-switch"] %}
 {% toml_field "defaultFileBrowserImage" config["service"]["default-file-browser-image"] %}
 {% toml_field "enableReservoir" config["service"]["enable-reservoir"] %}
 
@@ -53,7 +50,6 @@ connectionMode = "SESSION"
 {% toml_field "maxFileUploadSize" config["resources"]["max-file-upload-size"] %}
 
 [environments]
-{% toml_strlist_field "allowlist" config["environments"]["allowlist"] %}
 {% toml_field "showNonInstalledImages" config["environments"]["show-non-installed-images"] %}
 
 [menu]
@@ -65,9 +61,7 @@ connectionMode = "SESSION"
 
 [wsproxy]
 {% toml_field "proxyURL" config["service"]["wsproxy"]["url"] %}
-# proxyBaseURL =
-# proxyListenIP =
 
 [pipeline]
-{% toml_field "endpoint" config["pipeline"]["endpoint"]|string %}
 {% toml_field "frontendEndpoint" config["pipeline"]["frontend-endpoint"]|string %}
+{% endif %}

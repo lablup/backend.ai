@@ -1,0 +1,155 @@
+"""여러 id로 조회 — 원소마다 응답한다.
+
+인증만 확인하므로 거부 원소는 생기지 않고, 없는 id만 빈 항목으로 반환된다.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import override
+from uuid import uuid4
+
+import pytest
+
+from ai.backend.common.data.entity.prometheus_query_preset_category import (
+    PrometheusQueryPresetCategoryID,
+)
+from ai.backend.manager.api.adapters.prometheus_query_preset_category.adapter import (
+    PrometheusQueryPresetCategoryAdapter,
+)
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
+from bai_scenario.components.prometheus_query_preset_category import (
+    LoadedCategory,
+    ManyCategoriesAndACaller,
+    ManyCategoriesAndSomeone,
+    NothingIsAnswered,
+    TheBatchAnswersInOrder,
+)
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import TestSeedingSession
+from bai_scenario.runner.steps import run_scenario
+
+type Adapter = PrometheusQueryPresetCategoryAdapter
+type Loaded = list[LoadedCategory]
+type LoadingStep = Scenario[TestSeedingSession, ManyCategoriesAndACaller, Adapter, Loaded]
+
+
+@dataclass(frozen=True)
+class LoadingTheLaidAndOneUnknown(When[ManyCategoriesAndACaller, Adapter, Loaded]):
+    """미리 만들어 둔 카테고리들의 id 뒤에 존재하지 않는 id 하나를 붙여 한 번에 조회한다."""
+
+    @override
+    def operation(self) -> str:
+        return "batch_load_by_ids"
+
+    @override
+    def describe(self, laid: ManyCategoriesAndACaller) -> str:
+        return Says(
+            f"{laid.caller.username}이 미리 저장한 카테고리 {len(laid.laid)}개의 id 와 없는 id "
+            "하나를 한 번에 조회합니다",
+            english=(
+                f"{laid.caller.username} loads the ids of the {len(laid.laid)} categories "
+                "seeded in advance and one missing id in one call"
+            ),
+        )
+
+    @override
+    async def call(self, adapter: Adapter, laid: ManyCategoriesAndACaller) -> Loaded:
+        ids = [one.id for one in laid.laid] + [PrometheusQueryPresetCategoryID(uuid4())]
+        with ActingAs(laid.caller):
+            return await adapter.batch_load_by_ids(ids)
+
+
+@dataclass(frozen=True)
+class LoadingNothing(When[ManyCategoriesAndACaller, Adapter, Loaded]):
+    """빈 id 목록으로 조회한다."""
+
+    @override
+    def operation(self) -> str:
+        return "batch_load_by_ids"
+
+    @override
+    def describe(self, laid: ManyCategoriesAndACaller) -> str:
+        return Says(
+            f"{laid.caller.username}이 빈 id 목록으로 조회합니다",
+            english=f"{laid.caller.username} loads with an empty id list",
+        )
+
+    @override
+    async def call(self, adapter: Adapter, laid: ManyCategoriesAndACaller) -> Loaded:
+        with ActingAs(laid.caller):
+            return await adapter.batch_load_by_ids([])
+
+
+@dataclass(frozen=True)
+class TheLaidAndTheUnknownComeBackInOrder(
+    Scenario[TestSeedingSession, ManyCategoriesAndACaller, Adapter, Loaded]
+):
+    @override
+    def summary(self) -> str:
+        return "loading-laid-ids-and-an-unknown-one-answers-in-order-with-a-rejection"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "카테고리 둘과 없는 id 하나를 섞어 한 번에 조회하면, 있는 둘은 노드로 없는 하나는 "
+            "거부로 반환되고 순서가 요청한 순서와 같습니다",
+            english=(
+                "when two categories and one missing id are loaded in one call, the two that "
+                "exist come back as nodes and the missing one as a rejection, in the order "
+                "requested"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ManyCategoriesAndACaller]:
+        return ManyCategoriesAndSomeone(besides=1)
+
+    @override
+    def when(self) -> When[ManyCategoriesAndACaller, Adapter, Loaded]:
+        return LoadingTheLaidAndOneUnknown()
+
+    @override
+    def then(self) -> Then[ManyCategoriesAndACaller, Loaded]:
+        return TheBatchAnswersInOrder()
+
+
+@dataclass(frozen=True)
+class AnEmptyListAnswersNothing(
+    Scenario[TestSeedingSession, ManyCategoriesAndACaller, Adapter, Loaded]
+):
+    @override
+    def summary(self) -> str:
+        return "loading-an-empty-id-list-answers-an-empty-list"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "카테고리가 있어도 빈 id 목록으로 조회하면, 빈 응답이 반환됩니다",
+            english=(
+                "even when categories exist, loading with an empty id list answers an empty list"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ManyCategoriesAndACaller]:
+        return ManyCategoriesAndSomeone(besides=0)
+
+    @override
+    def when(self) -> When[ManyCategoriesAndACaller, Adapter, Loaded]:
+        return LoadingNothing()
+
+    @override
+    def then(self) -> Then[ManyCategoriesAndACaller, Loaded]:
+        return NothingIsAnswered()
+
+
+SCENARIOS: list[LoadingStep] = [TheLaidAndTheUnknownComeBackInOrder(), AnEmptyListAnswersNothing()]
+
+
+@pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
+async def test_loading(
+    scenario: LoadingStep, adapter: Adapter, engine: ExtendedAsyncSAEngine
+) -> None:
+    await run_scenario(scenario, adapter, engine)

@@ -3,16 +3,18 @@ from __future__ import annotations
 import enum
 import secrets
 from collections.abc import AsyncGenerator
-from typing import Any
+from typing import Any, cast
 
 import pytest
 import sqlalchemy as sa
+from graphql import GraphQLError
 from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlalchemy.ext.declarative import declarative_base
 
+from ai.backend.manager.api.gql_legacy.schema import GQLExceptionMiddleware
+from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.models.minilang import ArrayFieldItem, JSONFieldItem
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
-from ai.backend.testutils.bootstrap import postgres_container  # noqa
 
 
 class UserTypes(enum.Enum):
@@ -21,15 +23,9 @@ class UserTypes(enum.Enum):
 
 
 @pytest.fixture
-async def virtual_user_db(postgres_container: Any) -> AsyncGenerator[tuple[Any, Any], None]:  # noqa
-    pgsql_addr = postgres_container[1]
-    host = pgsql_addr.host
-    port = pgsql_addr.port
-
+async def virtual_user_db(test_database_url: str) -> AsyncGenerator[tuple[Any, Any], None]:
     db_id = secrets.token_hex(16)
-    engine = sa.engine.create_engine(
-        f"postgresql+asyncpg://postgres:develove@{host}:{port}/testing", echo=False
-    )
+    engine = sa.engine.create_engine(test_database_url, echo=False)
     async_engine = AsyncEngine(engine)
     base = declarative_base()
     metadata = base.metadata
@@ -225,27 +221,27 @@ async def test_select_queries(virtual_user_db: tuple[Any, Any]) -> None:
     assert test_ret == actual_ret
 
     # invalid syntax
-    with pytest.raises(ValueError):
+    with pytest.raises(InvalidAPIParameters):
         parser.append_filter(
             sa.select(users.c.name, users.c.age).select_from(users),
             "",
         )
-    with pytest.raises(ValueError):
+    with pytest.raises(InvalidAPIParameters):
         parser.append_filter(
             sa.select(users.c.name, users.c.age).select_from(users),
             "!!!",
         )
-    with pytest.raises(ValueError):
+    with pytest.raises(InvalidAPIParameters):
         parser.append_filter(
             sa.select(users.c.name, users.c.age).select_from(users),
             "123",
         )
-    with pytest.raises(ValueError):
+    with pytest.raises(InvalidAPIParameters):
         parser.append_filter(
             sa.select(users.c.name, users.c.age).select_from(users),
             '"abc"',
         )
-    with pytest.raises(ValueError):
+    with pytest.raises(InvalidAPIParameters):
         parser.append_filter(
             sa.select(users.c.name, users.c.age).select_from(users),
             "name =",
@@ -262,7 +258,7 @@ async def test_select_queries(virtual_user_db: tuple[Any, Any]) -> None:
     #     )
 
     # non-existent column
-    with pytest.raises(ValueError):
+    with pytest.raises(InvalidAPIParameters):
         parser.append_filter(
             sa.select(users.c.name, users.c.age).select_from(users),
             "xyz == 123",
@@ -355,15 +351,37 @@ async def test_fieldspec(virtual_user_db: tuple[Any, Any]) -> None:
     assert test_ret == actual_ret
 
     # non-existent column in fieldspec
-    with pytest.raises(ValueError):
+    with pytest.raises(InvalidAPIParameters):
         parser.append_filter(
             sa.select(users.c.name, users.c.age).select_from(users),
             'full_name == "TESTER1"',
         )
 
     # non-existent enum value
-    with pytest.raises(ValueError):
+    with pytest.raises(InvalidAPIParameters):
         parser.append_filter(
             sa.select(users.c.name, users.c.age).select_from(users),
             't1 == "XYZ"',
         )
+
+
+@pytest.mark.parametrize(
+    "filter_expr",
+    [
+        pytest.param("name =", id="syntax-error"),
+        pytest.param("xyz == 123", id="unknown-field"),
+    ],
+)
+def test_filter_parse_failure_is_returned_as_an_invalid_request(filter_expr: str) -> None:
+    table = sa.Table("users", sa.MetaData(), sa.Column("name", sa.String))
+    parser = QueryFilterParser({"name": ("name", None)})
+    middleware = GQLExceptionMiddleware()
+
+    def resolver(root: Any, info: Any) -> None:
+        parser.parse_filter(table, filter_expr)
+
+    with pytest.raises(GraphQLError) as exc_info:
+        middleware.resolve(resolver, None, cast(Any, None))
+
+    assert exc_info.value.extensions == {"code": "api_generic_invalid-parameters"}
+    assert "Query filter parsing error" in exc_info.value.message

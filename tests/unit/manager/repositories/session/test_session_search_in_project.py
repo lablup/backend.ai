@@ -1,5 +1,5 @@
 """
-Tests for SessionRepository.search_in_project() functionality.
+Tests for the project scope over sessions.
 Verifies that project-scoped session search returns only sessions belonging to the target project.
 """
 
@@ -10,47 +10,66 @@ from collections.abc import AsyncGenerator
 from datetime import datetime
 
 import pytest
+import sqlalchemy as sa
 from dateutil.tz import tzutc
 
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.agent import AgentUUID
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.kernel_group import KernelGroupRole
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.session import SessionEntityType, SessionID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.types import (
     AccessKey,
+    AgentId,
     ClusterMode,
     DefaultForUnspecified,
     KernelId,
+    MountPermission,
     ResourceSlot,
     SessionId,
     SessionResult,
     SessionTypes,
 )
-from ai.backend.manager.data.group.types import ProjectType
+from ai.backend.manager.data.agent.types import AgentStatus
+from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models.agent.row import AgentRow
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.kernel import KernelRow, KernelStatus
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.kernel_group.row import KernelGroupRow
+from ai.backend.manager.models.kernel_group_vfolder_mount.row import KernelGroupVFolderMountRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.resource_slot import ResourceAllocationRow, ResourceSlotTypeRow
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
-from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
+from ai.backend.manager.models.resource_slot.row import ResourceAllocationRow, ResourceSlotTypeRow
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.session.scopes import ProjectSessionTarget
+from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
+from ai.backend.manager.models.specs.search.usage import UsedBy
+from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
-from ai.backend.manager.repositories.session.repository import SessionRepository
-from ai.backend.manager.repositories.session.types import ProjectSessionSearchScope
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
 
 class TestSessionSearchInProject:
-    """Tests for SessionRepository.search_in_project()"""
+    """Tests for ProjectSessionTarget."""
 
     @pytest.fixture
     def test_domain_id(self) -> DomainID:
@@ -69,30 +88,28 @@ class TestSessionSearchInProject:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 AgentRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
                 UserRow,
-                GroupRow,
+                ProjectRow,
                 KeyPairRow,
                 ContainerRegistryRow,
                 ImageRow,
                 SessionRow,
+                KernelGroupRow,
                 KernelRow,
+                KernelGroupVFolderMountRow,
                 ResourceSlotTypeRow,
                 ResourceAllocationRow,
+                VirtualEntityRow,
+                EntityMembershipRow,
+                ScopeBindingRow,
             ],
         ):
             yield database_connection
-
-    @pytest.fixture
-    def session_repository(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> SessionRepository:
-        return SessionRepository(db_with_cleanup)
 
     @pytest.fixture
     async def test_data(
@@ -125,7 +142,7 @@ class TestSessionSearchInProject:
                 )
             )
             db_sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     id=test_scaling_group_id,
                     name="default",
                     is_active=True,
@@ -133,7 +150,7 @@ class TestSessionSearchInProject:
                     driver="static",
                     driver_opts={},
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(),
+                    scheduler_opts=ResourceGroupOpts(),
                 )
             )
             db_sess.add(
@@ -183,17 +200,16 @@ class TestSessionSearchInProject:
                     resource_policy="default",
                     allowed_client_ip=None,
                     totp_key=None,
-                    main_access_key=None,
+                    domain_id=test_domain_id,
                 )
             )
             await db_sess.flush()
 
             db_sess.add(
                 KeyPairRow(
-                    user_id="test@example.com",
                     user=user_id,
                     access_key=access_key,
-                    secret_key="test-secret",
+                    secret_key=SecretValue("test-secret"),
                     is_active=True,
                     is_admin=False,
                     resource_policy="default",
@@ -207,7 +223,7 @@ class TestSessionSearchInProject:
                 (project_b_id, "project-b"),
             ]:
                 db_sess.add(
-                    GroupRow(
+                    ProjectRow(
                         id=gid,
                         name=gname,
                         domain_name=domain_name,
@@ -220,6 +236,25 @@ class TestSessionSearchInProject:
                     )
                 )
             await db_sess.flush()
+
+            agent_id = AgentId("test-agent-1")
+            agent = AgentRow(
+                id=agent_id,
+                status=AgentStatus.ALIVE,
+                scaling_group="default",
+                resource_group_id=test_scaling_group_id,
+                schedulable=True,
+                addr="tcp://127.0.0.1:6001",
+                region="local",
+                first_contact=datetime.now(tzutc()),
+                lost_at=None,
+                version="1.0.0",
+                architecture="x86_64",
+                compute_plugins={},
+            )
+            db_sess.add(agent)
+            await db_sess.flush()
+            agent_uuid = agent.uuid
 
             now = datetime.now(tzutc())
             for sid, group_id, name in [
@@ -251,8 +286,6 @@ class TestSessionSearchInProject:
                         starts_at=None,
                         startup_command=None,
                         callback_url=None,
-                        occupying_slots=ResourceSlot({"cpu": "1", "mem": "1073741824"}),
-                        requested_slots=ResourceSlot({"cpu": "1", "mem": "1073741824"}),
                         vfolder_mounts=[],
                         environ=None,
                         bootstrap_script=None,
@@ -282,7 +315,7 @@ class TestSessionSearchInProject:
                         image="cr.backend.ai/stable/python:latest",
                         architecture="x86_64",
                         registry="cr.backend.ai",
-                        agent=None,
+                        agent=agent_id if sid == session_a1_id else None,
                         agent_addr=None,
                         container_id=None,
                         repl_in_port=2000,
@@ -299,8 +332,6 @@ class TestSessionSearchInProject:
                         created_at=now,
                         terminated_at=None,
                         starts_at=None,
-                        occupied_slots=ResourceSlot({"cpu": "1", "mem": "1073741824"}),
-                        requested_slots=ResourceSlot({"cpu": "1", "mem": "1073741824"}),
                         occupied_shares={},
                         environ=None,
                         vfolder_mounts=[],
@@ -313,7 +344,18 @@ class TestSessionSearchInProject:
                 )
             await db_sess.flush()
 
+            seeder = VirtualEntitySeeder()
+            for sid, project_id in [
+                (session_a1_id, project_a_id),
+                (session_a2_id, project_a_id),
+                (session_b1_id, project_b_id),
+            ]:
+                await seeder.create_in(
+                    db_sess, SessionEntityType(), sid, [(ProjectEntityType(), project_id)]
+                )
+
         yield {
+            "agent_uuid": agent_uuid,
             "project_a_id": project_a_id,
             "project_b_id": project_b_id,
             "session_a1_id": session_a1_id,
@@ -321,59 +363,142 @@ class TestSessionSearchInProject:
             "session_b1_id": session_b1_id,
         }
 
+    async def _scoped_ids(self, db: ExtendedAsyncSAEngine, project_id: uuid.UUID) -> set[uuid.UUID]:
+        scope = ProjectSessionTarget(project_id=project_id)
+        async with db.begin_readonly_session() as sess:
+            rows = await sess.scalars(sa.select(SessionRow.id).where(scope.to_condition()()))
+            return set(rows)
+
     async def test_returns_only_sessions_in_target_project(
         self,
-        session_repository: SessionRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         test_data: dict[str, uuid.UUID],
     ) -> None:
-        """search_in_project returns only sessions belonging to the specified project."""
-        scope = ProjectSessionSearchScope(project_id=test_data["project_a_id"])
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[],
-            orders=[],
-        )
-
-        result = await session_repository.search_in_project(querier, scope)
-
-        assert result.total_count == 2
-        assert len(result.items) == 2
-        returned_ids = {item.id for item in result.items}
-        assert returned_ids == {test_data["session_a1_id"], test_data["session_a2_id"]}
+        """The project scope narrows to the sessions that project holds."""
+        assert await self._scoped_ids(db_with_cleanup, test_data["project_a_id"]) == {
+            test_data["session_a1_id"],
+            test_data["session_a2_id"],
+        }
 
     async def test_does_not_return_sessions_from_other_project(
         self,
-        session_repository: SessionRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         test_data: dict[str, uuid.UUID],
     ) -> None:
-        """search_in_project for project_b returns only its session, not project_a's."""
-        scope = ProjectSessionSearchScope(project_id=test_data["project_b_id"])
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[],
-            orders=[],
-        )
+        """A sibling project reaches its own session and no other."""
+        assert await self._scoped_ids(db_with_cleanup, test_data["project_b_id"]) == {
+            test_data["session_b1_id"]
+        }
 
-        result = await session_repository.search_in_project(querier, scope)
+    async def _used_by_ids(self, db: ExtendedAsyncSAEngine, used_by: UsedBy) -> set[uuid.UUID]:
+        async with db.begin_readonly_session() as sess:
+            rows = await sess.scalars(sa.select(SessionRow.id).where(used_by.condition()))
+            return set(rows)
 
-        assert result.total_count == 1
-        assert len(result.items) == 1
-        assert result.items[0].id == test_data["session_b1_id"]
-
-    async def test_pagination_fields(
+    async def test_uses_agent_narrows_to_the_sessions_it_runs(
         self,
-        session_repository: SessionRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         test_data: dict[str, uuid.UUID],
     ) -> None:
-        """search_in_project returns correct pagination fields."""
-        scope = ProjectSessionSearchScope(project_id=test_data["project_a_id"])
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[],
-            orders=[],
+        """Only the session whose kernel sits on the agent comes back."""
+        used_by = SessionSearchableFields.linked.usage.agents.uses(
+            AgentUUID(test_data["agent_uuid"])
         )
+        assert await self._used_by_ids(db_with_cleanup, used_by) == {test_data["session_a1_id"]}
 
-        result = await session_repository.search_in_project(querier, scope)
+    async def test_uses_another_agent_returns_none(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_data: dict[str, uuid.UUID],
+    ) -> None:
+        used_by = SessionSearchableFields.linked.usage.agents.uses(AgentUUID(uuid.uuid4()))
+        assert await self._used_by_ids(db_with_cleanup, used_by) == set()
 
-        assert result.has_next_page is False
-        assert result.has_previous_page is False
+    async def test_uses_resource_group_narrows_to_the_sessions_it_runs(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_data: dict[str, uuid.UUID],
+        test_scaling_group_id: ResourceGroupID,
+    ) -> None:
+        used_by = SessionSearchableFields.linked.usage.resource_groups.uses(test_scaling_group_id)
+        assert await self._used_by_ids(db_with_cleanup, used_by) == {
+            test_data["session_a1_id"],
+            test_data["session_a2_id"],
+            test_data["session_b1_id"],
+        }
+
+    async def test_uses_another_resource_group_returns_none(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_data: dict[str, uuid.UUID],
+    ) -> None:
+        used_by = SessionSearchableFields.linked.usage.resource_groups.uses(
+            ResourceGroupID(uuid.uuid4())
+        )
+        assert await self._used_by_ids(db_with_cleanup, used_by) == set()
+
+    @pytest.fixture
+    async def mounted_vfolder_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_data: dict[str, uuid.UUID],
+    ) -> VFolderUUID:
+        """A vfolder mounted by running session_a1 and terminated session_b1."""
+        vfolder_id = VFolderUUID(uuid.uuid4())
+        async with db_with_cleanup.begin_session() as db_sess:
+            await db_sess.execute(
+                sa.update(SessionRow)
+                .where(SessionRow.id == test_data["session_b1_id"])
+                .values(status=SessionStatus.TERMINATED)
+            )
+            for session_id in (test_data["session_a1_id"], test_data["session_b1_id"]):
+                group = KernelGroupRow(
+                    session_id=SessionID(session_id), role=KernelGroupRole(DEFAULT_ROLE)
+                )
+                db_sess.add(group)
+                await db_sess.flush()
+                db_sess.add(
+                    KernelGroupVFolderMountRow(
+                        kernel_group_id=group.id,
+                        vfolder_id=vfolder_id,
+                        vfsubpath=".",
+                        mount_destination="/home/work/mnt",
+                        mount_perm=MountPermission.READ_WRITE,
+                    )
+                )
+        return vfolder_id
+
+    async def test_uses_vfolder_narrows_to_the_sessions_mounting_it(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_data: dict[str, uuid.UUID],
+        mounted_vfolder_id: VFolderUUID,
+    ) -> None:
+        """A terminated session keeps its mount and comes back with the running one."""
+        used_by = SessionSearchableFields.linked.usage.vfolders.uses(mounted_vfolder_id)
+        assert await self._used_by_ids(db_with_cleanup, used_by) == {
+            test_data["session_a1_id"],
+            test_data["session_b1_id"],
+        }
+
+    async def test_uses_another_vfolder_returns_none(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        mounted_vfolder_id: VFolderUUID,
+    ) -> None:
+        used_by = SessionSearchableFields.linked.usage.vfolders.uses(VFolderUUID(uuid.uuid4()))
+        assert await self._used_by_ids(db_with_cleanup, used_by) == set()
+
+    async def test_uses_vfolder_leaves_out_a_session_outside_the_scope(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_data: dict[str, uuid.UUID],
+        mounted_vfolder_id: VFolderUUID,
+    ) -> None:
+        scope = ProjectSessionTarget(project_id=test_data["project_a_id"])
+        used_by = SessionSearchableFields.linked.usage.vfolders.uses(mounted_vfolder_id)
+        async with db_with_cleanup.begin_readonly_session() as sess:
+            rows = await sess.scalars(
+                sa.select(SessionRow.id).where(scope.to_condition()(), used_by.condition())
+            )
+            assert set(rows) == {test_data["session_a1_id"]}

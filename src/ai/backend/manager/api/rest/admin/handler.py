@@ -19,7 +19,7 @@ from graphql.execution import ExecutionResult
 from ai.backend.common.api_handlers import APIResponse, BodyParam
 from ai.backend.common.dto.manager.admin.request import GraphQLRequest
 from ai.backend.common.dto.manager.admin.response import GraphQLResponse
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.gql.data_loader.data_loaders import DataLoaders
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql_legacy.base import DataLoaderManager
@@ -39,7 +39,7 @@ from ai.backend.manager.errors.common import ServerFrozen
 if TYPE_CHECKING:
     from strawberry import Schema as StrawberrySchema
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class GQLMutationUnfrozenRequiredMiddleware:
@@ -51,20 +51,6 @@ class GQLMutationUnfrozenRequiredMiddleware:
     def resolve(self, next: Any, root: Any, info: graphene.ResolveInfo, **args: Any) -> Any:
         if info.operation.operation == "mutation" and self._manager_status == ManagerStatus.FROZEN:
             raise ServerFrozen
-        return next(root, info, **args)
-
-
-class GQLLoggingMiddleware:
-    def resolve(self, next: Any, root: Any, info: graphene.ResolveInfo, **args: Any) -> Any:
-        if info.path.prev is None:
-            graph_ctx = info.context
-            log.info(
-                "ADMIN.GQL (ak:{}, {}:{}, op:{})",
-                graph_ctx.access_key,
-                info.operation.operation,
-                info.field_name,
-                info.operation.name,
-            )
         return next(root, info, **args)
 
 
@@ -113,6 +99,7 @@ class AdminHandler:
             schema=self._gql_schema,
             dataloader_manager=DataLoaderManager(),
             config_provider=gql_deps.config_provider,
+            key_provider_pool=gql_deps.key_provider_pool,
             etcd=gql_deps.etcd,
             user=request["user"],
             access_key=request["keypair"]["access_key"],
@@ -121,11 +108,11 @@ class AdminHandler:
             valkey_image=gql_deps.valkey_image,
             valkey_live=gql_deps.valkey_live,
             valkey_schedule=gql_deps.valkey_schedule,
+            sentinel_monitors=gql_deps.sentinel_monitors,
             network_plugin_ctx=gql_deps.network_plugin_ctx,
             manager_status=manager_status,
             known_slot_types=known_slot_types,
             background_task_manager=gql_deps.background_task_manager,
-            services_ctx=gql_deps.services_ctx,
             storage_manager=gql_deps.storage_manager,
             registry=gql_deps.registry,
             idle_checker_host=gql_deps.idle_checker_host,
@@ -134,6 +121,7 @@ class AdminHandler:
             scheduler_repository=gql_deps.scheduler_repository,
             user_repository=gql_deps.user_repository,
             agent_repository=gql_deps.agent_repository,
+            network_repository=gql_deps.network_repository,
         )
         result = cast(
             ExecutionResult,
@@ -148,14 +136,19 @@ class AdminHandler:
                     GQLMutationUnfrozenRequiredMiddleware(manager_status),
                     GQLMetricMiddleware(),
                     GQLExceptionMiddleware(),
-                    GQLLoggingMiddleware(),
                 ],
             ),
         )
         if result.errors:
+            # Severity-classified logging is done by GQLExceptionMiddleware;
+            # keep a trace log here for errors that bypass resolvers
+            # (e.g. query parse/validation errors).
             for e in result.errors:
-                log.error("ADMIN.GQL Exception: {}", e.formatted)
-                log.debug("{}", "".join(traceback.format_exception(e)))
+                log.trace(
+                    "admin graphql error",
+                    error_message=str(e.formatted),
+                    error_traceback="".join(traceback.format_exception(e)),
+                )
         return result
 
     # ------------------------------------------------------------------
@@ -189,10 +182,7 @@ class AdminHandler:
         params = body.parsed
         result = await self._handle_gql_common(request_ctx, params)
         if result.errors:
-            errors = []
-            for e in result.errors:
-                errors.append(e.formatted)
-                log.error("ADMIN.GQL Exception: {}", e.formatted)
+            errors = [e.formatted for e in result.errors]
             raise BackendGQLError(extra_data=errors)
         resp = GraphQLResponse(data=result.data)
         return APIResponse.build(HTTPStatus.OK, resp)
@@ -207,8 +197,8 @@ class AdminHandler:
         gql_deps = self._gql_deps
         gql_ctx = StrawberryGQLContext(
             config_provider=gql_deps.config_provider,
-            event_hub=gql_deps.processors.events.event_hub,
-            event_fetcher=gql_deps.processors.events.event_fetcher,
+            event_hub=gql_deps.processors.event_hub,
+            event_fetcher=gql_deps.processors.event_fetcher,
             gql_adapter=gql_deps.strawberry_gql_adapter,
             data_loaders=DataLoaders(gql_deps.adapters),
             metric_observer=gql_deps.metric_observer,
@@ -220,10 +210,6 @@ class AdminHandler:
             operation_name=params.operation_name,
             context_value=gql_ctx,
         )
-        if result.errors:
-            for e in result.errors:
-                log.error("ADMIN.GQL.V2 Exception: {}", e.formatted)
-                log.debug("{}", repr(e))
         resp = GraphQLResponse(
             data=result.data,
             errors=[dict(e.formatted) for e in result.errors] if result.errors else None,
@@ -246,11 +232,10 @@ class AdminHandler:
         self,
         body: BodyParam[GraphQLRequest],
     ) -> APIResponse:
-        """Anonymous (unauthenticated) GraphQL endpoint.
+        """Execute a GraphQL query without credentials.
 
-        Registered without ``auth_required`` so unauthenticated callers reach it. It serves a
-        separate ``PublicQueries`` schema that contains only public fields, so private fields are
-        physically absent and cannot be queried (no runtime gate needed). Authenticated routes are
-        unaffected.
+        Serves the public schema, which holds only the fields that are safe to read anonymously;
+        every other field is absent from it and cannot be queried here. The full schema is at
+        ``POST /admin/gql/strawberry`` and requires authentication.
         """
         return await self._execute_strawberry(body.parsed, schema=self._public_strawberry_schema)

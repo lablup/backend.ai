@@ -1,15 +1,11 @@
-"""Base action class for deployment policy operations."""
+from dataclasses import dataclass
 
-from typing import override
-
-from ai.backend.common.data.permission.types import EntityType
-from ai.backend.manager.actions.action import BaseAction
+from ai.backend.manager.services.deployment.actions.base import DeploymentSingleEntityAction
 
 
-class DeploymentPolicyBaseAction(BaseAction):
-    """Base action for deployment policy operations."""
+@dataclass
+class DeploymentPolicyBaseAction(DeploymentSingleEntityAction):
+    """Base for an operation on a deployment's policy.
 
-    @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
-        return EntityType.DEPLOYMENT_POLICY
+    Answered for by the deployment: what is touched lives under it.
+    """

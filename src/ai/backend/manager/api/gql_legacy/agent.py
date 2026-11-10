@@ -17,38 +17,43 @@ from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
-from ai.backend.common.identifier.project import ProjectID
+from ai.backend.common.data.entity.domain import DomainName
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
     HardwareMetadata,
 )
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.bgtask.tasks.rescan_gpu_alloc_maps import RescanGPUAllocMapsManifest
 from ai.backend.manager.bgtask.types import ManagerBgtaskName
-from ai.backend.manager.data.agent.types import AgentData
+from ai.backend.manager.data.agent.types import AgentDetailData, AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.permission.permission_defs import AgentPermission
-from ai.backend.manager.models.agent import (
-    ADMIN_PERMISSIONS,
-    AgentRow,
-    AgentStatus,
-    agents,
-    get_permission_ctx,
-)
-from ai.backend.manager.models.group import AssocGroupUserRow
-from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.agent.row import AgentRow, agents
+from ai.backend.manager.models.agent.searchable_fields import AgentSearchableFields
+from ai.backend.manager.models.keypair.row import keypairs
 from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
+from ai.backend.manager.models.project.row import groups
 from ai.backend.manager.models.rbac import (
     ScopeType,
 )
-from ai.backend.manager.models.rbac.context import ClientContext
-from ai.backend.manager.models.resource_slot import AgentResourceRow
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
-from ai.backend.manager.models.user import UserRole, users
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_slot.row import AgentResourceRow
+from ai.backend.manager.models.user.row import UserRole, users
+from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_query
 from ai.backend.manager.repositories.agent.query import QueryConditions, QueryOrders
+from ai.backend.manager.services.agent.actions.bulk_load_permissions import (
+    BulkLoadAgentPermissionsAction,
+)
+from ai.backend.manager.services.agent.actions.update_resource_group import (
+    UpdateAgentResourceGroupAction,
+)
+from ai.backend.manager.services.agent.types import ConflictingSessionCleanupPolicy
 
 from .base import (
     FilterExprArg,
@@ -69,7 +74,7 @@ from .kernel import ComputeContainer, KernelConnection, KernelNode
 if TYPE_CHECKING:
     from .schema import GraphQueryContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 __all__ = (
     "Agent",
@@ -105,8 +110,6 @@ _queryorder_colmap: Mapping[str, OrderSpecItem] = {
     "first_contact": ("first_contact", None),
     "lost_at": ("lost_at", None),
     "version": ("version", None),
-    "available_slots": ("available_slots", None),
-    "occupied_slots": ("occupied_slots", None),
 }
 
 
@@ -169,6 +172,8 @@ class AgentNode(graphene.ObjectType):  # type: ignore[misc]
     @classmethod
     async def get_node(cls, info: graphene.ResolveInfo, id: str) -> Self | None:
         graphene_ctx: GraphQueryContext = info.context
+        if graphene_ctx.user["role"] != UserRole.SUPERADMIN:
+            return None
         _, raw_agent_id = AsyncNode.resolve_global_id(info, id)
         condition = [QueryConditions.by_ids([AgentId(raw_agent_id)])]
         agent_list = await graphene_ctx.agent_repository.list_data(condition)
@@ -177,17 +182,18 @@ class AgentNode(graphene.ObjectType):  # type: ignore[misc]
         return cls.from_data(agent_list[0])
 
     @classmethod
-    def from_data(cls, data: AgentData) -> Self:
+    def from_data(cls, detail: AgentDetailData) -> Self:
+        data = detail.agent
         return cls(
             id=data.id,
             row_id=data.id,
             status=data.status.name,
             status_changed=data.status_changed,
             region=data.region,
-            scaling_group=data.scaling_group,
+            scaling_group=data.resource_group,
             schedulable=data.schedulable,
-            available_slots=data.available_slots.to_json(),
-            occupied_slots=data.actual_occupied_slots.to_json(),
+            available_slots=detail.available_slots().to_json(),
+            occupied_slots=detail.occupied_slots().to_json(),
             addr=data.addr,
             architecture=data.architecture,
             first_contact=data.first_contact,
@@ -304,43 +310,26 @@ class AgentNode(graphene.ObjectType):  # type: ignore[misc]
             before=before,
             last=last,
         )
-        async with graph_ctx.db.connect() as db_conn:
-            user = graph_ctx.user
-            if user["role"] != UserRole.SUPERADMIN:
-                client_ctx = ClientContext(
-                    graph_ctx.db, user["domain_name"], user["uuid"], user["role"]
-                )
-                permission_ctx = await get_permission_ctx(db_conn, client_ctx, scope, permission)
-                cond = permission_ctx.query_condition
-                if cond is None:
-                    return ConnectionResolverResult([], cursor, pagination_order, page_size, 0)
-                permission_getter = permission_ctx.calculate_final_permission
-                query = query.where(cond)
-                cnt_query = cnt_query.where(cond)
-            else:
-
-                async def all_permissions(row: AgentRow) -> frozenset[AgentPermission]:
-                    return ADMIN_PERMISSIONS
-
-                permission_getter = all_permissions  # type: ignore[assignment]
-            async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
-                agent_rows = (await db_session.scalars(query)).all()
-                total_cnt = await db_session.scalar(cnt_query)
-        agent_ids: list[AgentId] = []
-
-        agent_permissions: dict[AgentId, list[AgentPermission]] = {}
-        for row in agent_rows:
-            agent_ids.append(row.id)
-            permissions = await permission_getter(row)
-            agent_permissions[row.id] = list(permissions)
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            agent_rows = (await db_session.scalars(query)).all()
+            total_cnt = await db_session.scalar(cnt_query)
+        # What the caller holds on each agent is the service's to answer.
+        resolved = await graph_ctx.processors.agent.bulk_load_permissions.run(
+            BulkLoadAgentPermissionsAction(agent_uuids=[row.uuid for row in agent_rows])
+        )
+        held = resolved.values()
+        agent_ids: list[AgentId] = [row.id for row in agent_rows]
+        agent_permissions: dict[AgentId, list[AgentPermission]] = {
+            row.id: held.get(row.uuid, []) for row in agent_rows
+        }
         list_order = {agent_id: idx for idx, agent_id in enumerate(agent_ids)}
         condition = [QueryConditions.by_ids(agent_ids)]
         agent_list = await graph_ctx.agent_repository.list_data(condition)
 
         result: list[AgentNode] = []
-        for agent in sorted(agent_list, key=lambda obj: list_order[obj.id]):
+        for agent in sorted(agent_list, key=lambda obj: list_order[obj.agent.id]):
             agent_node = cls.from_data(agent)
-            agent_node.permissions = agent_permissions.get(agent.id, [])
+            agent_node.permissions = agent_permissions.get(agent.agent.id, [])
             result.append(agent_node)
 
         return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
@@ -394,17 +383,20 @@ class Agent(graphene.ObjectType):  # type: ignore[misc]
     compute_containers = graphene.List(ComputeContainer, status=graphene.String())
 
     @classmethod
-    def from_data(cls, data: AgentData) -> Self:
+    def from_data(cls, detail: AgentDetailData) -> Self:
         mega = 2**20
+        data = detail.agent
+        available_slots = detail.available_slots()
+        occupied_slots = detail.occupied_slots()
         return cls(
             id=data.id,
             status=data.status.name,
             status_changed=data.status_changed,
             region=data.region,
-            scaling_group=data.scaling_group,
+            scaling_group=data.resource_group,
             schedulable=data.schedulable,
-            available_slots=data.available_slots.to_json(),
-            occupied_slots=data.actual_occupied_slots.to_json(),
+            available_slots=detail.available_slots().to_json(),
+            occupied_slots=detail.occupied_slots().to_json(),
             addr=data.addr,
             architecture=data.architecture,
             first_contact=data.first_contact,
@@ -413,14 +405,14 @@ class Agent(graphene.ObjectType):  # type: ignore[misc]
             compute_plugins=data.compute_plugins,
             auto_terminate_abusing_kernel=False,  # legacy field
             # legacy fields
-            mem_slots=data.available_slots.get("mem", 0) // mega,
-            cpu_slots=data.available_slots.get("cpu", 0),
-            gpu_slots=data.available_slots.get("cuda.device", 0),
-            tpu_slots=data.available_slots.get("tpu.device", 0),
-            used_mem_slots=data.actual_occupied_slots.get("mem", 0) // mega,
-            used_cpu_slots=float(data.actual_occupied_slots.get("cpu", 0)),
-            used_gpu_slots=float(data.actual_occupied_slots.get("cuda.device", 0)),
-            used_tpu_slots=float(data.actual_occupied_slots.get("tpu.device", 0)),
+            mem_slots=available_slots.get("mem", 0) // mega,
+            cpu_slots=available_slots.get("cpu", 0),
+            gpu_slots=available_slots.get("cuda.device", 0),
+            tpu_slots=available_slots.get("tpu.device", 0),
+            used_mem_slots=occupied_slots.get("mem", 0) // mega,
+            used_cpu_slots=float(occupied_slots.get("cpu", 0)),
+            used_gpu_slots=float(occupied_slots.get("cuda.device", 0)),
+            used_tpu_slots=float(occupied_slots.get("tpu.device", 0)),
         )
 
     async def resolve_compute_containers(
@@ -509,8 +501,6 @@ class Agent(graphene.ObjectType):  # type: ignore[misc]
         "first_contact": ("first_contact", None),
         "lost_at": ("lost_at", None),
         "version": ("version", None),
-        "available_slots": ("available_slots", None),
-        "occupied_slots": ("occupied_slots", None),
     }
 
     @classmethod
@@ -581,7 +571,8 @@ class Agent(graphene.ObjectType):  # type: ignore[misc]
         condition = [QueryConditions.by_ids(agent_ids)]
         agent_list = await graph_ctx.agent_repository.list_data(condition)
         return [
-            cls.from_data(agent) for agent in sorted(agent_list, key=lambda obj: list_order[obj.id])
+            cls.from_data(agent)
+            for agent in sorted(agent_list, key=lambda obj: list_order[obj.agent.id])
         ]
 
     @classmethod
@@ -665,33 +656,25 @@ async def _query_domain_groups_by_ak(
     db_conn: SAConnection,
     access_key: str,
     domain_name: str | None,
-) -> tuple[str, list[ProjectID]]:
-    kp_user_join = sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
-    group_join: sa.FromClause
-    if domain_name is None:
-        domain_query = (
-            sa.select(users.c.uuid, users.c.domain_name)
-            .select_from(kp_user_join)
-            .where(keypairs.c.access_key == access_key)
-        )
-        row = (await db_conn.execute(domain_query)).first()
-        if row is None:
-            raise ValueError(f"No user found for access_key: {access_key}")
-        user_domain = row.domain_name
-        user_id = row.uuid
-        group_join = AssocGroupUserRow.__table__
-        group_cond = AssocGroupUserRow.user_id == user_id
-    else:
-        user_domain = domain_name
-        group_join = kp_user_join.join(
-            AssocGroupUserRow,
-            AssocGroupUserRow.user_id == users.c.uuid,
-        )
-        group_cond = keypairs.c.access_key == access_key
-    query = sa.select(AssocGroupUserRow.group_id).select_from(group_join).where(group_cond)
+) -> tuple[str, UserID, list[ProjectID]]:
+    user_query = (
+        sa.select(users.c.uuid, users.c.domain_name)
+        .select_from(sa.join(keypairs, users, keypairs.c.user == users.c.uuid))
+        .where(keypairs.c.access_key == access_key)
+    )
+    row = (await db_conn.execute(user_query)).first()
+    if row is None:
+        raise ValueError(f"No user found for access_key: {access_key}")
+    user_domain = domain_name if domain_name is not None else row.domain_name
+    membership = user_scope_membership_query(ProjectEntityType(), row.uuid).subquery()
+    query = (
+        sa.select(membership.c.scope_id)
+        .select_from(sa.join(membership, groups, membership.c.scope_id == groups.c.id))
+        .where(groups.c.domain_name == user_domain)
+    )
     rows = (await db_conn.execute(query)).fetchall()
-    group_ids = [ProjectID(row.group_id) for row in rows]
-    return user_domain, group_ids
+    group_ids = [ProjectID(group_row.scope_id) for group_row in rows]
+    return user_domain, UserID(row.uuid), group_ids
 
 
 async def _append_sgroup_from_clause(
@@ -701,16 +684,20 @@ async def _append_sgroup_from_clause(
     domain_name: str | None,
     scaling_group: str | None = None,
 ) -> sa.sql.Select[Any]:
-    from ai.backend.manager.models.scaling_group import query_allowed_sgroups
-
     if scaling_group is not None:
         query = query.where(AgentRow.scaling_group == scaling_group)
     else:
         async with graph_ctx.db.begin_readonly() as conn:
-            domain_name, group_ids = await _query_domain_groups_by_ak(conn, access_key, domain_name)
-            sgroups = await query_allowed_sgroups(conn, domain_name, group_ids, access_key)
-            names = [sgroup.name for sgroup in sgroups]
-        query = query.where(AgentRow.scaling_group.in_(names))
+            domain_name, user_id, group_ids = await _query_domain_groups_by_ak(
+                conn, access_key, domain_name
+            )
+        domain_id = await graph_ctx.scheduler_repository.get_domain_id_by_name(
+            DomainName(domain_name)
+        )
+        allowed = await graph_ctx.scheduler_repository.query_allowed_resource_groups(
+            domain_id=domain_id, project_ids=group_ids, user_id=user_id
+        )
+        query = query.where(AgentRow.scaling_group.in_([rg.name for rg in allowed]))
     return query
 
 
@@ -737,14 +724,15 @@ class AgentSummary(graphene.ObjectType):  # type: ignore[misc]
     architecture = graphene.String()
 
     @classmethod
-    def from_data(cls, data: AgentData) -> Self:
+    def from_data(cls, detail: AgentDetailData) -> Self:
+        data = detail.agent
         return cls(
             id=data.id,
             status=data.status.name,
-            scaling_group=data.scaling_group,
+            scaling_group=data.resource_group,
             schedulable=data.schedulable,
-            available_slots=data.available_slots.to_json(),
-            occupied_slots=data.actual_occupied_slots.to_json(),
+            available_slots=detail.available_slots().to_json(),
+            occupied_slots=detail.occupied_slots().to_json(),
             architecture=data.architecture,
         )
 
@@ -760,8 +748,6 @@ class AgentSummary(graphene.ObjectType):  # type: ignore[misc]
         "status": ("status", None),
         "scaling_group": ("scaling_group", None),
         "schedulable": ("schedulable", None),
-        "available_slots": ("available_slots", None),
-        "occupied_slots": ("occupied_slots", None),
     }
 
     @classmethod
@@ -795,7 +781,16 @@ class AgentSummary(graphene.ObjectType):  # type: ignore[misc]
         async with graph_ctx.db.begin_readonly_session() as session:
             result = await session.scalars(query)
             agent_list = result.unique().all()
-            return [cls.from_data(agent.to_data()) for agent in agent_list]
+            return [
+                cls.from_data(
+                    AgentDetailData(
+                        agent=AgentSearchableFields.own.to_data(agent),
+                        resources=agent.resources_by_rank(),
+                        permissions=[],
+                    )
+                )
+                for agent in agent_list
+            ]
 
     @classmethod
     async def load_count(
@@ -872,7 +867,8 @@ class AgentSummary(graphene.ObjectType):  # type: ignore[misc]
         condition = [QueryConditions.by_ids(agent_ids)]
         agent_list = await graph_ctx.agent_repository.list_data(condition)
         return [
-            cls.from_data(agent) for agent in sorted(agent_list, key=lambda obj: list_order[obj.id])
+            cls.from_data(agent)
+            for agent in sorted(agent_list, key=lambda obj: list_order[obj.agent.id])
         ]
 
 
@@ -914,17 +910,26 @@ class ModifyAgent(graphene.Mutation):  # type: ignore[misc]
         data: dict[str, Any] = {}
         set_if_set(props, data, "schedulable")
         set_if_set(props, data, "scaling_group")
-        # TODO: Need to skip the following RPC call if the agent is not alive, or timeout.
-        scaling_group = data.get("scaling_group")
+        scaling_group = data.pop("scaling_group", None)
         if scaling_group is not None:
             async with graph_ctx.db.begin_readonly_read_committed() as conn:
                 resource_group_id = await conn.scalar(
-                    sa.select(ScalingGroupRow.id).where(ScalingGroupRow.name == scaling_group)
+                    sa.select(ResourceGroupRow.id).where(ResourceGroupRow.name == scaling_group)
                 )
             if resource_group_id is None:
                 return cls(False, f"no such scaling group: {scaling_group}")
-            data["resource_group_id"] = resource_group_id
-            await graph_ctx.registry.update_scaling_group(AgentId(id), scaling_group)
+            # The v1 mutation refuses to move an agent that still has sessions
+            # under the old group; drain them first.
+            await graph_ctx.processors.agent.update_resource_group.run(
+                UpdateAgentResourceGroupAction(
+                    agent_id=AgentId(id),
+                    resource_group_id=ResourceGroupID(resource_group_id),
+                    policy=ConflictingSessionCleanupPolicy.TERMINATE,
+                    force=False,
+                )
+            )
+            if not data:
+                return cls(True, "success")
 
         update_query = sa.update(agents).values(data).where(agents.c.id == id)
         return await simple_db_mutate(cls, graph_ctx, update_query)
@@ -955,7 +960,7 @@ class RescanGPUAllocMaps(graphene.Mutation):  # type: ignore[misc]
         info: graphene.ResolveInfo,
         agent_id: str,
     ) -> RescanGPUAllocMaps:
-        log.info("rescanning GPU alloc maps for agent {}", agent_id)
+        log.trace("gpu alloc map rescan requested", agent_id=agent_id)
         graph_ctx: GraphQueryContext = info.context
 
         manifest = RescanGPUAllocMapsManifest(agent_id=AgentId(agent_id))

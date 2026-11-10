@@ -25,19 +25,22 @@ from sqlalchemy.ext.asyncio.engine import create_async_engine
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.configs.pyroscope import PyroscopeConfig
+from ai.backend.common.data.entity.resource_group import ResourceGroupName
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dependencies import DependencyBuilderStack
-from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot, VFolderHostPermissionMap
 from ai.backend.logging import LocalLogger, LogLevel
 from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat
 from ai.backend.manager.api.rest.app import build_root_app
-from ai.backend.manager.api.rest.middleware import build_auth_middleware, build_exception_middleware
+from ai.backend.manager.api.rest.middleware.auth import build_auth_middleware
+from ai.backend.manager.api.rest.middleware.exception import build_exception_middleware
 from ai.backend.manager.api.rest.setup import setup_api
+from ai.backend.manager.api.rest.shutdown import ServerDrainNotifier
 from ai.backend.manager.cli.context import CLIContext
 from ai.backend.manager.cli.dbschema import oneshot as cli_schema_oneshot
 from ai.backend.manager.cli.etcd import delete as cli_etcd_delete
@@ -48,28 +51,37 @@ from ai.backend.manager.config.unified import (
     DebugConfig,
     ManagerConfig,
 )
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.dependencies.composer import DependencyInput, ManagerDependencyComposer
 from ai.backend.manager.models.base import pgsql_connect_opts
-from ai.backend.manager.models.domain import domains
-from ai.backend.manager.models.group import GroupRow, association_groups_users
-from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.image import ImageAliasRow, ImageRow
-from ai.backend.manager.models.kernel import kernels
-from ai.backend.manager.models.keypair import keypairs
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.domain.row import DomainRow, domains
+from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
+from ai.backend.manager.models.kernel.row import kernels
+from ai.backend.manager.models.keypair.row import keypairs
+from ai.backend.manager.models.project.row import ProjectRow, association_groups_users
+from ai.backend.manager.models.resource_group.row import (
+    resource_groups,
+    sgroups_for_domains,
+)
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
+from ai.backend.manager.models.resource_policy.row import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
     keypair_resource_policies,
 )
-from ai.backend.manager.models.scaling_group import scaling_groups, sgroups_for_domains
-from ai.backend.manager.models.scaling_group.row import ScalingGroupOpts
-from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.session_template import session_templates
-from ai.backend.manager.models.user import users
-from ai.backend.manager.models.vfolder import vfolders
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.session_template.row import SessionTemplateRow
+from ai.backend.manager.models.user.row import users
+from ai.backend.manager.models.vfolder.row import vfolders
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.server import webapp_plugin_ctx
+from ai.backend.testutils.bootstrap import (
+    ETCD_PASSWORD,
+    ETCD_USER,
+    POSTGRES_MAINTENANCE_DB,
+    POSTGRES_PASSWORD,
+    POSTGRES_USER,
+)
 from ai.backend.testutils.pants import get_parallel_slot
 
 # Import testcontainer fixtures (etcd_container, redis_container, postgres_container)
@@ -214,12 +226,14 @@ def bootstrap_config(
         etcd=EtcdConfig.model_validate({
             "namespace": test_id,
             "addr": HostPortPairModel(host=etcd_addr.host, port=etcd_addr.port),
+            "user": ETCD_USER,
+            "password": ETCD_PASSWORD,
         }),
         db=DatabaseConfig.model_validate({
             "addr": postgres_addr,
             "name": test_db,
-            "user": "postgres",
-            "password": "develove",
+            "user": POSTGRES_USER,
+            "password": POSTGRES_PASSWORD,
             "pool_size": 8,
             "pool_recycle": -1,
             "pool_pre_ping": False,
@@ -346,8 +360,10 @@ def database(
     request: pytest.FixtureRequest, bootstrap_config: BootstrapConfig, test_db: str
 ) -> None:
     db_url = (
-        yarl.URL(f"postgresql+asyncpg://{bootstrap_config.db.addr.host}/testing")
-        .with_port(bootstrap_config.db.addr.port)
+        yarl.URL(
+            f"postgresql+asyncpg://{bootstrap_config.db.addrs[0].host}/{POSTGRES_MAINTENANCE_DB}"
+        )
+        .with_port(bootstrap_config.db.addrs[0].port)
         .with_user(bootstrap_config.db.user)
     )
     if bootstrap_config.db.password is not None:
@@ -383,7 +399,7 @@ def database(
             await conn.execute(
                 sa.text(
                     "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
-                    "WHERE pid <> pg_backend_pid();"
+                    f"WHERE datname = '{test_db}' AND pid <> pg_backend_pid();"
                 )
             )
             await conn.execute(sa.text(f'DROP DATABASE "{test_db}";'))
@@ -451,8 +467,8 @@ async def db_engine(
 ) -> AsyncIterator[SAEngine]:
     """Provide a function-scoped SQLAlchemy async engine connected to the test database."""
     db_url = (
-        yarl.URL(f"postgresql+asyncpg://{bootstrap_config.db.addr.host}/{test_db}")
-        .with_port(bootstrap_config.db.addr.port)
+        yarl.URL(f"postgresql+asyncpg://{bootstrap_config.db.addrs[0].host}/{test_db}")
+        .with_port(bootstrap_config.db.addrs[0].port)
         .with_user(bootstrap_config.db.user)
     )
     if bootstrap_config.db.password is not None:
@@ -513,6 +529,7 @@ async def resource_policy_fixture(
         await conn.execute(
             sa.insert(keypair_resource_policies).values(
                 name=policy_name,
+                is_default=True,
                 default_for_unspecified=DefaultForUnspecified.UNLIMITED,
                 total_resource_slots=ResourceSlot(),
                 max_session_lifetime=0,
@@ -542,36 +559,41 @@ async def resource_policy_fixture(
 
 
 @pytest.fixture()
-async def scaling_group_fixture(
+async def resource_group_fixture(
     db_engine: SAEngine,
     domain_fixture: str,
 ) -> AsyncIterator[ResourceGroupName]:
     """Insert a scaling group and its domain association; yield the name."""
     sgroup_name = ResourceGroupName(f"sgroup-{secrets.token_hex(6)}")
+    sgroup_id = uuid.uuid4()
     async with db_engine.begin() as conn:
+        domain_id = (
+            await conn.execute(sa.select(domains.c.id).where(domains.c.name == domain_fixture))
+        ).scalar_one()
         await conn.execute(
-            sa.insert(scaling_groups).values(
+            sa.insert(resource_groups).values(
+                id=sgroup_id,
                 name=sgroup_name,
                 description=f"Test scaling group {sgroup_name}",
                 is_active=True,
                 driver="static",
                 driver_opts={},
                 scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(),
+                scheduler_opts=ResourceGroupOpts(),
             )
         )
         await conn.execute(
             sa.insert(sgroups_for_domains).values(
-                scaling_group=sgroup_name,
-                domain=domain_fixture,
+                resource_group_id=sgroup_id,
+                domain_id=domain_id,
             )
         )
     yield sgroup_name
     async with db_engine.begin() as conn:
         await conn.execute(
-            sgroups_for_domains.delete().where(sgroups_for_domains.c.scaling_group == sgroup_name)
+            sgroups_for_domains.delete().where(sgroups_for_domains.c.resource_group_id == sgroup_id)
         )
-        await conn.execute(scaling_groups.delete().where(scaling_groups.c.name == sgroup_name))
+        await conn.execute(resource_groups.delete().where(resource_groups.c.name == sgroup_name))
 
 
 @pytest.fixture()
@@ -585,7 +607,7 @@ async def group_fixture(
     group_name = f"group-{secrets.token_hex(6)}"
     async with db_engine.begin() as conn:
         await conn.execute(
-            sa.insert(GroupRow.__table__).values(
+            sa.insert(ProjectRow.__table__).values(
                 id=group_id,
                 name=group_name,
                 description=f"Test group {group_name}",
@@ -596,7 +618,9 @@ async def group_fixture(
         )
     yield group_id
     async with db_engine.begin() as conn:
-        await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == group_id))
+        await conn.execute(
+            ProjectRow.__table__.delete().where(ProjectRow.__table__.c.id == group_id)
+        )
 
 
 @pytest.fixture()
@@ -636,13 +660,15 @@ async def admin_user_fixture(
                 domain_name=domain_fixture,
                 resource_policy=resource_policy_fixture,
                 role=UserRole.SUPERADMIN,
+                domain_id=sa.select(DomainRow.id)
+                .where(DomainRow.name == domain_fixture)
+                .scalar_subquery(),
             )
         )
         await conn.execute(
             sa.insert(keypairs).values(
-                user_id=email,
                 access_key=data.keypair.access_key,
-                secret_key=data.keypair.secret_key,
+                secret_key=SecretValue(data.keypair.secret_key),
                 is_active=True,
                 resource_policy=resource_policy_fixture,
                 rate_limit=30000,
@@ -663,7 +689,7 @@ async def admin_user_fixture(
         await conn.execute(vfolders.delete())
         await conn.execute(kernels.delete())
         await conn.execute(SessionRow.__table__.delete())
-        await conn.execute(session_templates.delete())
+        await conn.execute(sa.delete(SessionTemplateRow))
         await conn.execute(ImageAliasRow.__table__.delete())
         await conn.execute(ImageRow.__table__.delete())
         # Clean fixture data
@@ -715,13 +741,15 @@ async def regular_user_fixture(
                 domain_name=domain_fixture,
                 resource_policy=resource_policy_fixture,
                 role=UserRole.USER,
+                domain_id=sa.select(DomainRow.id)
+                .where(DomainRow.name == domain_fixture)
+                .scalar_subquery(),
             )
         )
         await conn.execute(
             sa.insert(keypairs).values(
-                user_id=email,
                 access_key=data.keypair.access_key,
-                secret_key=data.keypair.secret_key,
+                secret_key=SecretValue(data.keypair.secret_key),
                 is_active=True,
                 resource_policy=resource_policy_fixture,
                 rate_limit=30000,
@@ -753,7 +781,7 @@ async def regular_user_fixture(
 async def database_fixture(
     admin_user_fixture: UserFixtureData,
     regular_user_fixture: UserFixtureData,
-    scaling_group_fixture: str,
+    resource_group_fixture: str,
 ) -> AsyncIterator[None]:
     """Backward-compatible aggregate: requests all seed data fixtures."""
     yield
@@ -794,9 +822,10 @@ async def server_factory(
             dep_input,
         )
 
-        # Insert DI-based middlewares
+        # Insert DI-based middlewares.
+        # Same order as server_main(): request_id(0) → client_ip(1) → exception(2) → auth(3)
         root_app.middlewares.insert(
-            1,
+            2,
             build_exception_middleware(
                 error_monitor=r.monitoring.error_monitor,
                 stats_monitor=r.monitoring.stats_monitor,
@@ -804,9 +833,10 @@ async def server_factory(
             ),
         )
         root_app.middlewares.insert(
-            2,
+            3,
             build_auth_middleware(
                 db=r.infrastructure.db,
+                key_provider_pool=r.bootstrap.key_provider_pool,
                 jwt_validator=r.system.jwt_validator,
                 valkey_stat=r.infrastructure.valkey.stat,
                 hook_plugin_ctx=r.plugins.hook_plugin_ctx,
@@ -814,7 +844,7 @@ async def server_factory(
         )
 
         # Build and mount the API module tree
-        setup_api(root_app, r, 0)
+        setup_api(root_app, r, 0, drain_notifier=ServerDrainNotifier())
 
         # Plugin webapps
         await init_stack.enter_async_context(webapp_plugin_ctx(root_app, dep_resources=r, pidx=0))

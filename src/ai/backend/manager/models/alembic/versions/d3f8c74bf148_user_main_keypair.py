@@ -13,9 +13,10 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.orm import registry, relationship, selectinload, sessionmaker
 
+from ai.backend.common.auth.keypair import generate_keypair
+from ai.backend.common.auth.ssh import generate_ssh_keypair
 from ai.backend.manager.defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
 from ai.backend.manager.models.base import GUID, EnumValueType, convention
-from ai.backend.manager.models.keypair import generate_keypair, generate_ssh_keypair
 
 # revision identifiers, used by Alembic.
 revision = "d3f8c74bf148"
@@ -119,13 +120,13 @@ def upgrade() -> None:
         user_id: Any,
         user_role: UserRole,
     ) -> dict[str, Any]:
-        ak, sk = generate_keypair()
+        keypair = generate_keypair()
         pubkey, privkey = generate_ssh_keypair()
         return {
             "user_id": user_email,
             "user": user_id,
-            "access_key": ak,
-            "secret_key": sk,
+            "access_key": keypair.access_key,
+            "secret_key": keypair.secret_key,
             "is_active": True,
             "is_admin": user_role in (UserRole.SUPERADMIN, UserRole.ADMIN),
             "resource_policy": DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME,

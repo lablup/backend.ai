@@ -1,12 +1,14 @@
 [etcd]
 namespace = "local"
 addr = { host = "127.0.0.1", port = 2379 }
-user = ""
-password = ""
+user = "root"
+password = "develove"
 
 
 [agent]
 rpc-listen-addr = { host = "127.0.0.1", port = 6001 }
+rpc-auth-manager-public-key = "fixtures/manager/manager.key"
+rpc-auth-agent-keypair = "fixtures/agent/agent.key_secret"
 # metric API service address
 service-addr = { host = "0.0.0.0", port = 6003 }
 ssl-enabled = false
@@ -14,7 +16,7 @@ ssl-enabled = false
 #ssl-key = ""
 agent-sock-port = 6007
 id = "i-travis"
-scaling-group = "default"
+initial-resource-group-name = "default"
 pid-file = "./agent.pid"
 event-loop = "asyncio"
 

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from collections.abc import MutableMapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Protocol
+from typing import Protocol
 from unittest.mock import AsyncMock, PropertyMock
 from uuid import uuid4
 
@@ -23,9 +23,6 @@ from ai.backend.common.clients.valkey_client.valkey_schedule.client import (
 )
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import AgentId, KernelId, SessionId
-
-if TYPE_CHECKING:
-    pass
 
 
 @dataclass

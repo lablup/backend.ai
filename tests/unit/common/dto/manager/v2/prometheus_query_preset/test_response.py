@@ -46,6 +46,7 @@ def _make_query_definition_node(
 ) -> QueryDefinitionNode:
     return QueryDefinitionNode(
         id=node_id,
+        entity_id=node_id,
         name=name,
         metric_name="node_cpu_seconds_total",
         query_template="rate({metric}[{time_window}])",
@@ -73,6 +74,7 @@ class TestQueryDefinitionNode:
     def test_default_time_window_is_none(self) -> None:
         node = QueryDefinitionNode(
             id=_UUID1,
+            entity_id=_UUID1,
             name="test",
             metric_name="metric",
             query_template="query",
@@ -179,7 +181,7 @@ class TestDeleteQueryDefinitionPayload:
     """Tests for DeleteQueryDefinitionPayload model."""
 
     def test_creation_with_id(self) -> None:
-        payload = DeleteQueryDefinitionPayload(id=_UUID1)
+        payload = DeleteQueryDefinitionPayload(id=_UUID1, entity_id=_UUID1)
         assert payload.id == _UUID1
 
     def test_missing_id_raises_validation_error(self) -> None:
@@ -187,7 +189,7 @@ class TestDeleteQueryDefinitionPayload:
             DeleteQueryDefinitionPayload.model_validate({})
 
     def test_round_trip_serialization(self) -> None:
-        payload = DeleteQueryDefinitionPayload(id=_UUID2)
+        payload = DeleteQueryDefinitionPayload(id=_UUID2, entity_id=_UUID2)
         json_str = payload.model_dump_json()
         restored = DeleteQueryDefinitionPayload.model_validate_json(json_str)
         assert restored.id == _UUID2

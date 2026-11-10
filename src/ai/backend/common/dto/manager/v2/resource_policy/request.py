@@ -5,10 +5,11 @@ Request DTOs for resource policy DTO v2.
 from __future__ import annotations
 
 from typing import Self
+from uuid import UUID
 
 from pydantic import Field, field_validator
 
-from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import (
     DateTimeFilter,
     IntFilter,
@@ -17,10 +18,13 @@ from ai.backend.common.dto.manager.query import (
 )
 from ai.backend.common.dto.manager.v2.common import (
     BinarySizeInput,
+    NonEmptyList,
     OrderDirection,
     ResourceSlotEntryInput,
     VFolderHostPermissionEntryInput,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 from .types import (
     DefaultForUnspecified,
@@ -48,6 +52,15 @@ __all__ = (
     "UpdateKeypairResourcePolicyInput",
     "UpdateProjectResourcePolicyInput",
     "UpdateUserResourcePolicyInput",
+    "PartialBulkPurgeKeypairResourcePoliciesInput",
+    "PartialBulkPurgeProjectResourcePoliciesInput",
+    "PartialBulkPurgeUserResourcePoliciesInput",
+    "PartialBulkUpdateKeypairResourcePoliciesInput",
+    "PartialBulkUpdateKeypairResourcePolicyItemInput",
+    "PartialBulkUpdateProjectResourcePoliciesInput",
+    "PartialBulkUpdateProjectResourcePolicyItemInput",
+    "PartialBulkUpdateUserResourcePoliciesInput",
+    "PartialBulkUpdateUserResourcePolicyItemInput",
 )
 
 
@@ -74,6 +87,10 @@ class CreateKeypairResourcePolicyInput(BaseRequestModel):
     max_pending_session_count: int | None = Field(
         default=None,
         description="Maximum number of sessions in pending state. Null means unlimited.",
+    )
+    max_priority: int | None = Field(
+        default=None,
+        description="Highest scheduling priority a session may declare. Null means uncapped.",
     )
     max_pending_session_resource_slots: list[ResourceSlotEntryInput] | None = Field(
         default=None,
@@ -105,45 +122,51 @@ class CreateKeypairResourcePolicyInput(BaseRequestModel):
 class UpdateKeypairResourcePolicyInput(BaseRequestModel):
     """Input for updating a keypair resource policy. All fields optional for partial update."""
 
-    default_for_unspecified: DefaultForUnspecified | None = Field(
-        default=None,
-        description="Updated default resource allocation. Leave null to keep existing value.",
+    default_for_unspecified: DefaultForUnspecified | None | Unset = Field(
+        default=UNSET,
+        description="Updated default resource allocation. Omit to leave unchanged.",
     )
-    total_resource_slots: list[ResourceSlotEntryInput] | Sentinel | None = Field(
-        default=SENTINEL,
-        description="Updated resource slot limits. Set to null to clear.",
+    total_resource_slots: list[ResourceSlotEntryInput] | None | Unset = Field(
+        default=UNSET,
+        description="Updated resource slot limits. Omit to leave unchanged.",
     )
-    max_session_lifetime: int | None = Field(
-        default=None,
-        description="Updated maximum session lifetime in seconds. Leave null to keep existing.",
+    max_session_lifetime: int | None | Unset = Field(
+        default=UNSET,
+        description="Updated maximum session lifetime in seconds. Omit to leave unchanged.",
     )
-    max_concurrent_sessions: int | None = Field(
-        default=None,
-        description="Updated maximum concurrent sessions. Leave null to keep existing.",
+    max_concurrent_sessions: int | None | Unset = Field(
+        default=UNSET,
+        description="Updated maximum concurrent sessions. Omit to leave unchanged.",
     )
-    max_pending_session_count: int | Sentinel | None = Field(
-        default=SENTINEL,
-        description="Updated max pending sessions. Set to null to clear.",
+    max_pending_session_count: int | None | Unset = Field(
+        default=UNSET,
+        description="Updated max pending sessions. Omit to leave unchanged; null clears.",
     )
-    max_pending_session_resource_slots: list[ResourceSlotEntryInput] | Sentinel | None = Field(
-        default=SENTINEL,
-        description="Updated max pending session resource slots. Set to null to clear.",
+    max_priority: int | None | Unset = Field(
+        default=UNSET,
+        description="Updated max priority. Omit to leave unchanged; null clears.",
     )
-    max_concurrent_sftp_sessions: int | None = Field(
-        default=None,
-        description="Updated max concurrent SFTP sessions. Leave null to keep existing.",
+    max_pending_session_resource_slots: list[ResourceSlotEntryInput] | None | Unset = Field(
+        default=UNSET,
+        description=(
+            "Updated max pending session resource slots. Omit to leave unchanged; null clears."
+        ),
     )
-    max_containers_per_session: int | None = Field(
-        default=None,
-        description="Updated max containers per session. Leave null to keep existing.",
+    max_concurrent_sftp_sessions: int | None | Unset = Field(
+        default=UNSET,
+        description="Updated max concurrent SFTP sessions. Omit to leave unchanged.",
     )
-    idle_timeout: int | None = Field(
-        default=None,
-        description="Updated idle timeout in seconds. Leave null to keep existing.",
+    max_containers_per_session: int | None | Unset = Field(
+        default=UNSET,
+        description="Updated max containers per session. Omit to leave unchanged.",
     )
-    allowed_vfolder_hosts: list[VFolderHostPermissionEntryInput] | Sentinel | None = Field(
-        default=SENTINEL,
-        description="Updated vfolder host permissions. Set to null to clear.",
+    idle_timeout: int | None | Unset = Field(
+        default=UNSET,
+        description="Updated idle timeout in seconds. Omit to leave unchanged.",
+    )
+    allowed_vfolder_hosts: list[VFolderHostPermissionEntryInput] | None | Unset = Field(
+        default=UNSET,
+        description="Updated vfolder host permissions. Omit to leave unchanged.",
     )
 
 
@@ -151,6 +174,27 @@ class DeleteKeypairResourcePolicyInput(BaseRequestModel):
     """Input for deleting a keypair resource policy."""
 
     name: str = Field(description="Name of the keypair resource policy to delete.")
+
+
+class PartialBulkUpdateKeypairResourcePolicyItemInput(BaseRequestModel):
+    """One keypair resource policy of a partial bulk update and the fields to update on it."""
+
+    id: UUID = Field(description="ID of the keypair resource policy to update.")
+    input: UpdateKeypairResourcePolicyInput = Field(description="Fields to update on the policy.")
+
+
+class PartialBulkUpdateKeypairResourcePoliciesInput(BaseRequestModel):
+    """Input for updating several keypair resource policies, each answered for separately."""
+
+    items: NonEmptyList[PartialBulkUpdateKeypairResourcePolicyItemInput] = Field(
+        description="The keypair resource policies to update, each with its fields."
+    )
+
+
+class PartialBulkPurgeKeypairResourcePoliciesInput(BaseRequestModel):
+    """Input for purging several keypair resource policies, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the keypair resource policies to purge.")
 
 
 class CreateUserResourcePolicyInput(BaseRequestModel):
@@ -196,30 +240,30 @@ class CreateUserResourcePolicyInput(BaseRequestModel):
 class UpdateUserResourcePolicyInput(BaseRequestModel):
     """Input for updating a user resource policy. All fields optional for partial update."""
 
-    max_vfolder_count: int | Sentinel | None = Field(
-        default=SENTINEL,
-        description="Updated max vfolder count. Use SENTINEL to clear, null to keep existing.",
+    max_vfolder_count: int | None | Unset = Field(
+        default=UNSET,
+        description="Updated max vfolder count. Omit to leave unchanged.",
     )
-    max_concurrent_logins: int | Sentinel | None = Field(
-        default=SENTINEL,
+    max_concurrent_logins: int | None | Unset = Field(
+        default=UNSET,
         ge=1,
         description=(
             "Updated maximum number of concurrent authenticated login sessions per user."
-            " Set to null to clear (unlimited). Must be >= 1 when set."
+            " Omit to leave unchanged; null clears (unlimited). Must be >= 1 when set."
             " Distinct from keypair_resource_policies.max_concurrent_sessions which caps compute sessions."
         ),
     )
-    max_quota_scope_size: BinarySizeInput | Sentinel | None = Field(
-        default=SENTINEL,
-        description="Updated max quota scope size. Use SENTINEL to clear, null to keep existing.",
+    max_quota_scope_size: BinarySizeInput | None | Unset = Field(
+        default=UNSET,
+        description="Updated max quota scope size. Omit to leave unchanged.",
     )
-    max_session_count_per_model_session: int | None = Field(
-        default=None,
-        description="Updated max sessions per model session. Leave null to keep existing.",
+    max_session_count_per_model_session: int | None | Unset = Field(
+        default=UNSET,
+        description="Updated max sessions per model session. Omit to leave unchanged.",
     )
-    max_customized_image_count: int | None = Field(
-        default=None,
-        description="Updated max customized image count. Leave null to keep existing.",
+    max_customized_image_count: int | None | Unset = Field(
+        default=UNSET,
+        description="Updated max customized image count. Omit to leave unchanged.",
     )
 
 
@@ -227,6 +271,27 @@ class DeleteUserResourcePolicyInput(BaseRequestModel):
     """Input for deleting a user resource policy."""
 
     name: str = Field(description="Name of the user resource policy to delete.")
+
+
+class PartialBulkUpdateUserResourcePolicyItemInput(BaseRequestModel):
+    """One user resource policy of a partial bulk update and the fields to update on it."""
+
+    id: UUID = Field(description="ID of the user resource policy to update.")
+    input: UpdateUserResourcePolicyInput = Field(description="Fields to update on the policy.")
+
+
+class PartialBulkUpdateUserResourcePoliciesInput(BaseRequestModel):
+    """Input for updating several user resource policies, each answered for separately."""
+
+    items: NonEmptyList[PartialBulkUpdateUserResourcePolicyItemInput] = Field(
+        description="The user resource policies to update, each with its fields."
+    )
+
+
+class PartialBulkPurgeUserResourcePoliciesInput(BaseRequestModel):
+    """Input for purging several user resource policies, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the user resource policies to purge.")
 
 
 class CreateProjectResourcePolicyInput(BaseRequestModel):
@@ -260,17 +325,17 @@ class CreateProjectResourcePolicyInput(BaseRequestModel):
 class UpdateProjectResourcePolicyInput(BaseRequestModel):
     """Input for updating a project resource policy. All fields optional for partial update."""
 
-    max_vfolder_count: int | Sentinel | None = Field(
-        default=SENTINEL,
-        description="Updated max vfolder count. Use SENTINEL to clear, null to keep existing.",
+    max_vfolder_count: int | None | Unset = Field(
+        default=UNSET,
+        description="Updated max vfolder count. Omit to leave unchanged.",
     )
-    max_quota_scope_size: BinarySizeInput | Sentinel | None = Field(
-        default=SENTINEL,
-        description="Updated max quota scope size. Use SENTINEL to clear, null to keep existing.",
+    max_quota_scope_size: BinarySizeInput | None | Unset = Field(
+        default=UNSET,
+        description="Updated max quota scope size. Omit to leave unchanged.",
     )
-    max_network_count: int | None = Field(
-        default=None,
-        description="Updated max network count. Leave null to keep existing.",
+    max_network_count: int | None | Unset = Field(
+        default=UNSET,
+        description="Updated max network count. Omit to leave unchanged.",
     )
 
 
@@ -278,6 +343,27 @@ class DeleteProjectResourcePolicyInput(BaseRequestModel):
     """Input for deleting a project resource policy."""
 
     name: str = Field(description="Name of the project resource policy to delete.")
+
+
+class PartialBulkUpdateProjectResourcePolicyItemInput(BaseRequestModel):
+    """One project resource policy of a partial bulk update and the fields to update on it."""
+
+    id: UUID = Field(description="ID of the project resource policy to update.")
+    input: UpdateProjectResourcePolicyInput = Field(description="Fields to update on the policy.")
+
+
+class PartialBulkUpdateProjectResourcePoliciesInput(BaseRequestModel):
+    """Input for updating several project resource policies, each answered for separately."""
+
+    items: NonEmptyList[PartialBulkUpdateProjectResourcePolicyItemInput] = Field(
+        description="The project resource policies to update, each with its fields."
+    )
+
+
+class PartialBulkPurgeProjectResourcePoliciesInput(BaseRequestModel):
+    """Input for purging several project resource policies, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the project resource policies to purge.")
 
 
 # ── Filter & Order DTOs ──
@@ -323,6 +409,13 @@ class KeypairResourcePolicyFilter(BaseRequestModel):
     max_pending_session_count: IntFilter | None = Field(
         default=None, description="Filter by max pending session count."
     )
+    max_priority: IntFilter | None = Field(
+        default=None, description="Filter by max scheduling priority."
+    )
+    entity_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by keypair resource policy ID.",
+    )
     AND: list[Self] | None = Field(default=None, description="Match all of the given sub-filters.")
     OR: list[Self] | None = Field(default=None, description="Match any of the given sub-filters.")
     NOT: list[Self] | None = Field(default=None, description="Negate the given sub-filters.")
@@ -348,6 +441,10 @@ class UserResourcePolicyFilter(BaseRequestModel):
     max_customized_image_count: IntFilter | None = Field(
         default=None, description="Filter by max customized image count."
     )
+    entity_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by user resource policy ID.",
+    )
     AND: list[Self] | None = Field(default=None, description="Match all of the given sub-filters.")
     OR: list[Self] | None = Field(default=None, description="Match any of the given sub-filters.")
     NOT: list[Self] | None = Field(default=None, description="Negate the given sub-filters.")
@@ -366,6 +463,10 @@ class ProjectResourcePolicyFilter(BaseRequestModel):
     )
     max_network_count: IntFilter | None = Field(
         default=None, description="Filter by max network count."
+    )
+    entity_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by project resource policy ID.",
     )
     AND: list[Self] | None = Field(default=None, description="Match all of the given sub-filters.")
     OR: list[Self] | None = Field(default=None, description="Match any of the given sub-filters.")

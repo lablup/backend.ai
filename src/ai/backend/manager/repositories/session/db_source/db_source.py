@@ -2,79 +2,86 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
+from dataclasses import replace
 from datetime import datetime
 from typing import Any, cast
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, load_only, noload, selectinload
+from sqlalchemy.orm import noload, selectinload
 from sqlalchemy.orm.strategy_options import _AbstractLoad
 
-from ai.backend.common.docker import ImageRef
-from ai.backend.common.identifier.session import SessionID
+from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
-    ImageAlias,
     KernelId,
     ResourceSlot,
     SessionId,
 )
-from ai.backend.manager.data.image.types import ImageIdentifier, ImageStatus
-from ai.backend.manager.data.kernel.types import KernelListResult
+from ai.backend.manager.data.image.types import ImageData, ImageStatus
+from ai.backend.manager.data.resource.types import ResourceGroupProxyConnectionInfo
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.data.session.types import (
     SessionData,
-    SessionListResult,
+    SessionEntityData,
     SessionRoutingInfo,
+    SessionStatus,
 )
 from ai.backend.manager.data.user.types import SessionOwnerContext, UserData
 from ai.backend.manager.defs import DEFAULT_ROLE
+from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.errors.kernel import (
+    MainKernelNotFound,
     SessionAlreadyExists,
     SessionNotFound,
+    TooManyKernelsFound,
     TooManySessionsMatched,
 )
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.group import groups
-from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
-from ai.backend.manager.models.resource_slot import ResourceAllocationRow
-from ai.backend.manager.models.scaling_group import scaling_groups
-from ai.backend.manager.models.session import (
-    DEAD_SESSION_STATUSES,
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.image.searchers import (
+    CanonicalImageSearcher,
+    ReferenceImageSearcher,
+)
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.kernel.searchable_fields import KernelSearchableFields
+from ai.backend.manager.models.kernel.searchers import KernelSearcher
+from ai.backend.manager.models.kernel.updaters import KernelSessionNameBatchUpdater
+from ai.backend.manager.models.project.row import groups
+from ai.backend.manager.models.resource_group.row import resource_groups
+from ai.backend.manager.models.resource_slot.row import ResourceAllocationRow
+from ai.backend.manager.models.session.row import (
     TERMINAL_SESSION_STATUSES,
     KernelLoadingStrategy,
     SessionDependencyRow,
     SessionRow,
-    batch_populate_session_occupied_slots,
 )
-from ai.backend.manager.models.session_template import session_templates
-from ai.backend.manager.models.user import UserRole, UserRow
+from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
+from ai.backend.manager.models.session.searchers import SessionSearcher
+from ai.backend.manager.models.session.updaters import SessionUpdater
+from ai.backend.manager.models.session_designated_agent.row import SessionDesignatedAgentRow
+from ai.backend.manager.models.session_template.row import SessionTemplateRow
+from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
+from ai.backend.manager.models.user.row import UserRole, UserRow
+from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    NoPagination,
-    execute_batch_querier,
-)
-from ai.backend.manager.repositories.base.updater import Updater, execute_updater
-from ai.backend.manager.repositories.ops import DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.read import V2ReadOps
 from ai.backend.manager.repositories.session.dependency_graph import find_dependency_sessions
-from ai.backend.manager.repositories.session.types import ProjectSessionSearchScope
 from ai.backend.manager.utils import query_userinfo
 
 
 class SessionDBSource:
     _db: ExtendedAsyncSAEngine
-    _ops: DBOpsProvider
+    _ops_provider: V2DBOpsProvider
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+    def __init__(self, db: ExtendedAsyncSAEngine, ops_provider: V2DBOpsProvider) -> None:
         self._db = db
-        self._ops = DBOpsProvider(db)
+        self._ops_provider = ops_provider
 
     async def resolve_session_id(
         self,
@@ -94,33 +101,42 @@ class SessionDBSource:
         except (ValueError, TypeError):
             pass
         session_name = session_name_or_id
-        query = sa.select(SessionRow).where(
-            (SessionRow.name == session_name)
-            & (SessionRow.user_uuid == user_id)
-            & (~SessionRow.status.in_(TERMINAL_SESSION_STATUSES))
-        )
-        async with self._ops.read_ops() as r:
-            result = await r.batch_query_in_global(query, BatchQuerier(pagination=NoPagination()))
-        rows: list[SessionRow] = [row.SessionRow for row in result.rows]
-        if not rows:
+        fields = SessionSearchableFields.own
+        async with self._ops_provider.read_ops() as r:
+            result = await r.search_in_global(
+                SessionSearcher(
+                    pagination=NoPagination(),
+                    conditions=[
+                        fields.name.filter.equals(
+                            StringMatchSpec(session_name, case_insensitive=False, negated=False)
+                        ),
+                        fields.user_uuid.filter.equals(
+                            UUIDEqualMatchSpec(value=user_id, negated=False)
+                        ),
+                        fields.status.filter.not_in(list(TERMINAL_SESSION_STATUSES)),
+                    ],
+                )
+            )
+        sessions = result.items
+        if not sessions:
             raise SessionNotFound(f"Session (name={session_name}) does not exist for the user.")
-        if len(rows) > 1:
+        if len(sessions) > 1:
             # Defensive: the partial unique index should prevent this for non-terminal
             # sessions, but guard against any data that escaped the constraint.
             raise TooManySessionsMatched(
                 extra_data={
                     "matches": [
                         {
-                            "session_id": row.id,
-                            "session_name": row.name,
-                            "status": row.status,
-                            "created_at": row.created_at,
+                            "session_id": session.id,
+                            "session_name": session.name,
+                            "status": session.status,
+                            "created_at": session.created_at,
                         }
-                        for row in rows
+                        for session in sessions
                     ]
                 }
             )
-        return rows[0].id
+        return SessionId(sessions[0].id)
 
     async def get_session_name(self, session_id: SessionId) -> str:
         """Return the canonical session name for a session id.
@@ -145,38 +161,118 @@ class SessionDBSource:
             user = await db_sess.scalar(query)
             if user is None:
                 raise SessionNotFound(f"Session with id {session_id} not found")
-            return UserData.from_row(user)
+            return UserSearchableFields.own.to_data(user)
 
     async def get_session_validated(
         self,
-        session_name_or_id: str | SessionId,
-        owner_access_key: AccessKey,
+        session_id: SessionId,
         kernel_loading_strategy: KernelLoadingStrategy = KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         allow_stale: bool = False,
         eager_loading_op: Sequence[_AbstractLoad] | None = None,
     ) -> SessionRow:
-        """Look up a session by name or ID."""
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            return await SessionRow.get_session(
+            return await self._session_by_id(
                 db_sess,
-                session_name_or_id,
-                owner_access_key,
+                session_id,
                 kernel_loading_strategy=kernel_loading_strategy,
                 allow_stale=allow_stale,
-                eager_loading_op=list(eager_loading_op) if eager_loading_op else None,
+                eager_loading_op=eager_loading_op or (),
             )
+
+    async def _session_by_id(
+        self,
+        db_sess: AsyncSession,
+        session_id: SessionId,
+        *,
+        kernel_loading_strategy: KernelLoadingStrategy,
+        allow_stale: bool,
+        eager_loading_op: Sequence[_AbstractLoad] = (),
+    ) -> SessionRow:
+        options: list[_AbstractLoad] = [*eager_loading_op]
+        if kernel_loading_strategy != KernelLoadingStrategy.NONE:
+            # MAIN_KERNEL_ONLY loads every kernel as well, the same as SessionRow.get_session.
+            options.extend([
+                noload("*"),
+                selectinload(SessionRow.kernels).options(
+                    noload("*"),
+                    selectinload(KernelRow.agent_row).noload("*"),
+                ),
+            ])
+        cond = SessionRow.id == session_id
+        if not allow_stale:
+            cond = cond & ~SessionRow.status.in_(SessionStatus.terminal_statuses())
+        query = (
+            sa.select(SessionRow)
+            .where(cond)
+            .options(*options)
+            .execution_options(populate_existing=True)
+        )
+        session_row = await db_sess.scalar(query)
+        if session_row is None:
+            raise SessionNotFound(f"Session (id={session_id}) does not exist.")
+        return session_row
 
     async def match_sessions(
         self,
         id_or_name_prefix: str,
         owner_access_key: AccessKey,
-    ) -> list[SessionRow]:
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            return await SessionRow.match_sessions(
-                db_sess,
-                id_or_name_prefix,
-                owner_access_key,
+    ) -> list[SessionEntityData]:
+        async with self._ops_provider.read_ops() as r:
+            return await self._match_sessions(
+                r, id_or_name_prefix, owner_access_key, allow_stale=True
             )
+
+    @staticmethod
+    async def _match_sessions(
+        r: V2ReadOps,
+        id_or_name: str,
+        access_key: AccessKey,
+        *,
+        allow_stale: bool,
+    ) -> list[SessionEntityData]:
+        """The sessions of ``access_key`` whose id or name equals ``id_or_name``.
+
+        An id match shuts out the name matches; up to 10 name matches come newest first.
+        """
+        fields = SessionSearchableFields.own
+        owned = [
+            fields.access_key.filter.equals(
+                StringMatchSpec(access_key, case_insensitive=False, negated=False)
+            )
+        ]
+        if not allow_stale:
+            owned.append(fields.status.filter.not_in(list(SessionStatus.terminal_statuses())))
+        try:
+            session_id = uuid.UUID(id_or_name)
+        except ValueError:
+            pass
+        else:
+            by_id = await r.search_in_global(
+                SessionSearcher(
+                    pagination=NoPagination(),
+                    conditions=[
+                        *owned,
+                        fields.id.filter.equals(
+                            UUIDEqualMatchSpec(value=session_id, negated=False)
+                        ),
+                    ],
+                )
+            )
+            if by_id.items:
+                return list(by_id.items)
+        by_name = await r.search_in_global(
+            SessionSearcher(
+                pagination=OffsetPagination(limit=10),
+                conditions=[
+                    *owned,
+                    fields.name.filter.equals(
+                        StringMatchSpec(id_or_name, case_insensitive=False, negated=False)
+                    ),
+                ],
+                orders=[fields.created_at.order.apply(ascending=False)],
+            )
+        )
+        return list(by_name.items)
 
     async def get_template_by_id(
         self,
@@ -184,10 +280,10 @@ class SessionDBSource:
     ) -> dict[str, Any] | None:
         async with self._db.begin_readonly() as conn:
             query = (
-                sa.select(session_templates.c.template)
-                .select_from(session_templates)
+                sa.select(SessionTemplateRow.template)
+                .select_from(SessionTemplateRow)
                 .where(
-                    (session_templates.c.id == template_id) & session_templates.c.is_active,
+                    (SessionTemplateRow.id == template_id) & SessionTemplateRow.is_active,
                 )
             )
             return await conn.scalar(query)
@@ -198,10 +294,10 @@ class SessionDBSource:
     ) -> dict[str, Any] | None:
         async with self._db.begin_readonly() as conn:
             query = (
-                sa.select(session_templates)
-                .select_from(session_templates)
+                sa.select(SessionTemplateRow.__table__)
+                .select_from(SessionTemplateRow)
                 .where(
-                    (session_templates.c.id == template_id) & session_templates.c.is_active,
+                    (SessionTemplateRow.id == template_id) & SessionTemplateRow.is_active,
                 )
             )
             result = await conn.execute(query)
@@ -210,102 +306,67 @@ class SessionDBSource:
 
     async def update_session_name(
         self,
-        session_name_or_id: str | SessionId,
+        session_id: SessionId,
         new_name: str,
-        owner_access_key: AccessKey,
     ) -> SessionRow:
-        async def _update(db_session: AsyncSession) -> SessionRow:
-            # Check if new name already exists for this owner
-            try:
-                await SessionRow.get_session(
-                    db_session,
-                    new_name,
-                    owner_access_key,
-                    kernel_loading_strategy=KernelLoadingStrategy.NONE,
-                )
-                raise SessionAlreadyExists(f"Session with name '{new_name}' already exists")
-            except SessionNotFound:
-                pass  # Session not found, which is good
-
-            # Get the target session
-            session_row = await SessionRow.get_session(
-                db_session,
-                session_name_or_id,
-                owner_access_key,
+        async with self._db.begin_session() as db_sess:
+            session_row = await self._session_by_id(
+                db_sess,
+                session_id,
                 kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS,
+                allow_stale=False,
             )
+            if session_row.status != SessionStatus.RUNNING:
+                raise InvalidAPIParameters("Can't change name of not running session")
+            # The name is unique among the live sessions of the target session's owner.
+            duplicate = await db_sess.scalar(
+                sa.select(SessionRow.id)
+                .where(
+                    (SessionRow.name == new_name)
+                    & (SessionRow.user_uuid == session_row.user_uuid)
+                    & (~SessionRow.status.in_(TERMINAL_SESSION_STATUSES))
+                )
+                .limit(1)
+            )
+            if duplicate is not None:
+                raise SessionAlreadyExists(f"Session with name '{new_name}' already exists")
 
-            # Update session name
             session_row.name = new_name
             for kernel in session_row.kernels:
                 kernel.session_name = new_name
-
             return session_row
 
-        async with self._db.begin_session() as db_sess:
-            return await _update(db_sess)
-
-    async def get_container_registry(
-        self,
-        registry_hostname: str,
-        registry_project: str,
-    ) -> ContainerRegistryRow | None:
-        async with self._db.begin_readonly_session_read_committed() as db_session:
-            query = (
-                sa.select(ContainerRegistryRow)
-                .where(
-                    (ContainerRegistryRow.registry_name == registry_hostname)
-                    & (ContainerRegistryRow.project == registry_project)
-                )
-                .options(
-                    load_only(
-                        ContainerRegistryRow.url,
-                        ContainerRegistryRow.username,
-                        ContainerRegistryRow.password,
-                        ContainerRegistryRow.project,
-                    )
-                )
+    async def resolve_image(self, reference: str, architecture: str) -> ImageData:
+        async with self._ops_provider.read_ops() as r:
+            result = await r.search_in_global(
+                ReferenceImageSearcher(reference, architecture, [ImageStatus.ALIVE])
             )
-            return cast(ContainerRegistryRow | None, await db_session.scalar(query))
+        if not result.items:
+            raise ImageNotFound(f"Unknown image reference: {reference} ({architecture})")
+        return result.items[0]
 
-    async def resolve_image(
-        self,
-        image_identifiers: list[ImageAlias | ImageRef | ImageIdentifier],
-        alive_only: bool = True,
-    ) -> ImageRow:
-        """Resolve an image from the given identifiers.
-
-        When ``alive_only`` is True (default), only images with the ALIVE status
-        are considered.  Set it to False to also include DELETED images, which is
-        useful when the caller needs to reference images that are no longer active
-        (e.g., committing a session whose base image has been deleted).
-        """
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            if alive_only:
-                return await ImageRow.resolve(db_sess, image_identifiers)
-            return await ImageRow.resolve(
-                db_sess,
-                image_identifiers,
-                filter_by_statuses=[
-                    ImageStatus.ALIVE,
-                    ImageStatus.DELETED,
-                ],
+    async def resolve_image_by_canonical(
+        self, canonical: str, architecture: str, alive_only: bool = True
+    ) -> ImageData:
+        statuses = [ImageStatus.ALIVE] if alive_only else [ImageStatus.ALIVE, ImageStatus.DELETED]
+        async with self._ops_provider.read_ops() as r:
+            result = await r.search_in_global(
+                CanonicalImageSearcher(canonical, architecture, statuses)
             )
+        if not result.items:
+            raise ImageNotFound(f"Unknown image: {canonical} ({architecture})")
+        return result.items[0]
 
-    async def get_customized_image_count(
-        self,
-        image_visibility: str,
-        image_owner_id: str,
-    ) -> int:
+    async def get_customized_image_count(self, user_id: uuid.UUID) -> int:
+        """How many live customized images were committed for the user."""
         async with self._db.begin_readonly_session_read_committed() as sess:
             query = (
                 sa.select(sa.func.count())
                 .select_from(ImageRow)
                 .where(
-                    ImageRow.labels["ai.backend.customized-image.owner"].as_string()
-                    == f"{image_visibility}:{image_owner_id}"
+                    self._committed_for(user_id),
+                    ImageRow.status == ImageStatus.ALIVE,
                 )
-                .where(ImageRow.status == ImageStatus.ALIVE)
             )
             result = await sess.scalar(query)
             return result or 0
@@ -313,21 +374,23 @@ class SessionDBSource:
     async def get_existing_customized_image(
         self,
         new_canonical: str,
-        image_visibility: str,
-        image_owner_id: str,
+        user_id: uuid.UUID,
         image_name: str,
     ) -> ImageRow | None:
         async with self._db.begin_readonly_session_read_committed() as sess:
             query = sa.select(ImageRow).where(
                 sa.and_(
                     ImageRow.name.like(f"{new_canonical}%"),
-                    ImageRow.labels["ai.backend.customized-image.owner"].as_string()
-                    == f"{image_visibility}:{image_owner_id}",
+                    self._committed_for(user_id),
                     ImageRow.labels["ai.backend.customized-image.name"].as_string() == image_name,
                     ImageRow.status == ImageStatus.ALIVE,
                 )
             )
             return cast(ImageRow | None, await sess.scalar(query))
+
+    def _committed_for(self, user_id: uuid.UUID) -> sa.ColumnElement[bool]:
+        """The image is customized and was committed for this user."""
+        return sa.and_(ImageRow.customized.is_(True), ImageRow.creator_id == user_id)
 
     async def get_group_name_by_domain_and_id(
         self,
@@ -344,19 +407,26 @@ class SessionDBSource:
             )
             return await conn.scalar(query)
 
-    async def get_scaling_group_wsproxy_addr(
+    async def resource_group_proxy_connection_info(
         self,
-        scaling_group_name: str,
-    ) -> str | None:
+        resource_group_name: str,
+    ) -> ResourceGroupProxyConnectionInfo | None:
         async with self._db.begin_readonly() as conn:
             query = (
-                sa.select(scaling_groups.c.wsproxy_addr)
-                .select_from(scaling_groups)
-                .where(scaling_groups.c.name == scaling_group_name)
+                sa.select(resource_groups.c.wsproxy_addr, resource_groups.c.wsproxy_api_token)
+                .select_from(resource_groups)
+                .where(resource_groups.c.name == resource_group_name)
             )
             result = await conn.execute(query)
-            sgroup = result.first()
-            return sgroup.wsproxy_addr if sgroup else None
+            resource_group = result.first()
+            if resource_group is None:
+                return None
+            if not resource_group.wsproxy_addr:
+                return None
+            return ResourceGroupProxyConnectionInfo(
+                addr=resource_group.wsproxy_addr,
+                api_token=resource_group.wsproxy_api_token,
+            )
 
     async def get_session_by_id(
         self,
@@ -372,54 +442,85 @@ class SessionDBSource:
             )
             return cast(SessionRow | None, await db_session.scalar(stmt))
 
-    async def modify_session(
+    async def update_session(
         self,
-        updater: Updater[SessionRow],
+        updater: SessionUpdater,
         session_name: str | None = None,
-    ) -> SessionRow | None:
-        session_id = updater.pk_value
-
-        async with self._db.begin_session() as db_session:
-            query_stmt = sa.select(SessionRow).where(SessionRow.id == session_id)
-            session_row = await db_session.scalar(query_stmt)
-            if session_row is None:
+    ) -> SessionData:
+        session_id = updater.session_id
+        session_fields = SessionSearchableFields.own
+        kernel_fields = KernelSearchableFields.own
+        async with self._ops_provider.write_ops() as w:
+            found = await w.search_in_global(
+                SessionSearcher(
+                    pagination=NoPagination(),
+                    conditions=[
+                        session_fields.id.filter.equals(
+                            UUIDEqualMatchSpec(value=session_id, negated=False)
+                        )
+                    ],
+                )
+            )
+            if not found.items:
                 raise SessionNotFound(f"Session not found (id:{session_id})")
+            access_key = found.items[0].access_key
 
-            if session_name and session_row.access_key is not None:
+            if session_name and access_key is not None:
                 # Check the owner of the target session has any session with the same name
-                try:
-                    sess = await SessionRow.get_session(
-                        db_session,
-                        session_name,
-                        AccessKey(session_row.access_key),
+                matches = await self._match_sessions(
+                    w,
+                    session_name,
+                    access_key,
+                    allow_stale=False,
+                )
+                if len(matches) > 1:
+                    raise TooManySessionsMatched(
+                        extra_data={
+                            "matches": [
+                                {
+                                    "session_id": sess.id,
+                                    "session_name": sess.name,
+                                    "status": sess.status,
+                                    "created_at": sess.created_at,
+                                }
+                                for sess in matches
+                            ]
+                        }
                     )
-                except SessionNotFound:
-                    pass
-                else:
+                if matches:
                     raise SessionAlreadyExists(
-                        f"Duplicate session name. Session(id:{sess.id}) already has the name"
+                        f"Duplicate session name. Session(id:{matches[0].id}) already has the name"
                     )
 
-            # Use execute_updater to apply changes
-            result = await execute_updater(db_session, updater)
-            if result is None:
+            updated = await w.update_data(updater)
+            if updated is None:
                 raise SessionNotFound(f"Session not found (id:{session_id})")
 
             if session_name:
-                await db_session.execute(
-                    sa.update(KernelRow)
-                    .values(session_name=session_name)
-                    .where(KernelRow.session_id == session_id)
+                await w.batch_update_in_global(
+                    KernelSessionNameBatchUpdater(session_id=session_id, session_name=session_name)
                 )
 
-            # Re-fetch with kernels loaded for the return value
-            select_stmt = (
-                sa.select(SessionRow)
-                .options(selectinload(SessionRow.kernels))
-                .execution_options(populate_existing=True)
-                .where(SessionRow.id == session_id)
-            )
-            return cast(SessionRow | None, await db_session.scalar(select_stmt))
+            main_kernels = (
+                await w.search_in_global(
+                    KernelSearcher(
+                        pagination=NoPagination(),
+                        conditions=[
+                            kernel_fields.session_id.filter.equals(
+                                UUIDEqualMatchSpec(value=session_id, negated=False)
+                            ),
+                            kernel_fields.cluster_role.filter.equals(
+                                StringMatchSpec(DEFAULT_ROLE, case_insensitive=False, negated=False)
+                            ),
+                        ],
+                    )
+                )
+            ).items
+        service_ports = main_kernels[0].network.service_ports if main_kernels else None
+        return replace(
+            updated.to_session_data(),
+            service_ports=str(service_ports) if service_ports else None,
+        )
 
     async def query_userinfo(
         self,
@@ -450,16 +551,14 @@ class SessionDBSource:
     async def _find_dependent_sessions(
         self,
         db_sess: AsyncSession,
-        root_session_name_or_id: str | uuid.UUID,
-        access_key: AccessKey,
+        root_session_id: SessionId,
         allow_stale: bool = False,
     ) -> tuple[uuid.UUID, set[uuid.UUID]]:
         """
         Find the root session and all sessions that depend on it (recursively).
 
         :param db_sess: Database session
-        :param root_session_name_or_id: Root session name or ID
-        :param access_key: Access key of the session owner
+        :param root_session_id: Root session ID
         :param allow_stale: Whether to allow stale sessions
         :return: Tuple of (root_session_id, set of dependent session IDs)
         """
@@ -478,87 +577,70 @@ class SessionDBSource:
             return dependent_sessions
 
         # Get the root session first
-        root_session = await SessionRow.get_session(
+        root_session = await self._session_by_id(
             db_sess,
-            root_session_name_or_id,
-            access_key=access_key,
+            root_session_id,
+            kernel_loading_strategy=KernelLoadingStrategy.NONE,
             allow_stale=allow_stale,
         )
-        root_session_id = cast(uuid.UUID, root_session.id)
-        dependent_ids = await _find_recursive_dependencies(root_session_id)
+        dependent_ids = await _find_recursive_dependencies(root_session.id)
 
-        return root_session_id, dependent_ids
+        return root_session.id, dependent_ids
 
     async def get_target_session_ids(
         self,
-        session_name_or_id: str | uuid.UUID,
-        access_key: AccessKey,
+        session_id: SessionId,
         recursive: bool = False,
     ) -> list[SessionId]:
         """
         Get list of session IDs including dependent sessions if recursive.
 
-        :param session_name_or_id: Name or ID of the primary session
-        :param access_key: Access key of the session owner
+        :param session_id: ID of the primary session
         :param recursive: If True, include dependent sessions
         :return: List of session IDs
         """
         async with self._db.begin_readonly_session() as db_sess:
-            try:
-                if recursive:
-                    # Get root session and dependent sessions
-                    root_id, dependent_ids = await self._find_dependent_sessions(
-                        db_sess,
-                        session_name_or_id,
-                        access_key,
-                        allow_stale=True,
-                    )
-                    # Return dependent sessions first, then root session
-                    session_ids = [cast(SessionId, sid) for sid in dependent_ids]
-                    session_ids.append(cast(SessionId, root_id))
-                else:
-                    # Get only the main session
-                    session = await SessionRow.get_session(
-                        db_sess,
-                        session_name_or_id,
-                        access_key,
-                        kernel_loading_strategy=KernelLoadingStrategy.NONE,
-                        allow_stale=True,
-                    )
-                    session_ids = [session.id]
+            if recursive:
+                # Get root session and dependent sessions
+                root_id, dependent_ids = await self._find_dependent_sessions(
+                    db_sess,
+                    session_id,
+                    allow_stale=True,
+                )
+                # Return dependent sessions first, then root session
+                session_ids = [cast(SessionId, sid) for sid in dependent_ids]
+                session_ids.append(cast(SessionId, root_id))
+            else:
+                # Get only the main session
+                session = await self._session_by_id(
+                    db_sess,
+                    session_id,
+                    kernel_loading_strategy=KernelLoadingStrategy.NONE,
+                    allow_stale=True,
+                )
+                session_ids = [session.id]
 
-                return session_ids
-            except SessionNotFound:
-                raise
+            return session_ids
 
     async def find_dependency_sessions(
         self,
-        session_name_or_id: uuid.UUID | str,
-        access_key: AccessKey,
+        session_id: SessionId,
     ) -> dict[str, list[Any] | str]:
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            return await find_dependency_sessions(
-                session_name_or_id,
-                db_sess,
-                access_key,
-            )
+            return await find_dependency_sessions(session_id, db_sess)
 
     async def get_session_with_group(
         self,
-        session_name_or_id: str | SessionId,
-        owner_access_key: AccessKey,
+        session_id: SessionId,
         kernel_loading_strategy: KernelLoadingStrategy = KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         allow_stale: bool = False,
     ) -> SessionRow:
-        """Get session with group information eagerly loaded"""
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            return await SessionRow.get_session(
+            return await self._session_by_id(
                 db_sess,
-                session_name_or_id,
-                owner_access_key,
+                session_id,
                 kernel_loading_strategy=kernel_loading_strategy,
                 allow_stale=allow_stale,
-                eager_loading_op=[selectinload(SessionRow.group)],
             )
 
     async def get_session_with_routing_minimal(
@@ -568,135 +650,60 @@ class SessionDBSource:
         """Resolve a live session by ``session_id`` into its routing info.
 
         This is a pure lookup; session access authorization is the caller's
-        responsibility. Dead (terminated/cancelled) sessions are excluded. Returns a
-        data type rather than a SessionRow so the repository never exposes an ORM row.
+        responsibility. Errored, terminated and cancelled sessions are excluded. The main
+        kernel's routing fields are read separately: a searcher answers with one
+        entity's own columns.
         """
-        query = (
-            sa.select(SessionRow)
-            .where((SessionRow.id == session_id) & (~SessionRow.status.in_(DEAD_SESSION_STATUSES)))
-            .options(
-                noload("*"),
-                selectinload(
-                    SessionRow.kernels.and_(KernelRow.cluster_role == DEFAULT_ROLE)
-                ).options(
-                    noload("*"),
-                    selectinload(KernelRow.agent_row).noload("*"),
-                ),
-                joinedload(SessionRow.user),
-            )
-        )
-        async with self._ops.read_ops() as r:
-            result = await r.batch_query_in_global(query, BatchQuerier(pagination=NoPagination()))
-        rows: list[SessionRow] = [row.SessionRow for row in result.rows]
-        if not rows:
-            raise SessionNotFound(f"Session (id={session_id}) does not exist.")
-        session_row = rows[0]
-        main_kernel = session_row.main_kernel
+        session_fields = SessionSearchableFields.own
+        kernel_fields = KernelSearchableFields.own
+        async with self._ops_provider.read_ops() as r:
+            sessions = (
+                await r.search_in_global(
+                    SessionSearcher(
+                        pagination=NoPagination(),
+                        conditions=[
+                            session_fields.id.filter.equals(
+                                UUIDEqualMatchSpec(value=session_id, negated=False)
+                            ),
+                            session_fields.status.filter.not_in(
+                                list(SessionStatus.terminal_statuses())
+                            ),
+                        ],
+                    )
+                )
+            ).items
+            if not sessions:
+                raise SessionNotFound(f"Session (id={session_id}) does not exist.")
+            session = sessions[0]
+            kernels = (
+                await r.search_in_global(
+                    KernelSearcher(
+                        pagination=NoPagination(),
+                        conditions=[
+                            kernel_fields.session_id.filter.equals(
+                                UUIDEqualMatchSpec(value=session.id, negated=False)
+                            ),
+                            kernel_fields.cluster_role.filter.equals(
+                                StringMatchSpec(DEFAULT_ROLE, case_insensitive=False, negated=False)
+                            ),
+                        ],
+                    )
+                )
+            ).items
+        if len(kernels) > 1:
+            raise TooManyKernelsFound(f"Session (id: {session.id}) has more than 1 main kernel.")
+        if not kernels:
+            raise MainKernelNotFound(f"Session (id: {session.id}) has no main kernel.")
+        main_kernel = kernels[0]
+        agent = main_kernel.resource.agent
         return SessionRoutingInfo(
-            session=session_row.to_dataclass(),
+            session=session.to_session_data(),
             main_kernel_id=main_kernel.id,
-            agent_id=AgentId(main_kernel.agent) if main_kernel.agent is not None else None,
-            kernel_host=main_kernel.kernel_host,
-            agent_addr=main_kernel.agent_addr,
-            service_ports=main_kernel.service_ports or [],
+            agent_id=AgentId(agent) if agent is not None else None,
+            kernel_host=main_kernel.network.kernel_host,
+            agent_addr=main_kernel.resource.agent_addr,
+            service_ports=main_kernel.network.service_ports or [],
         )
-
-    async def search(
-        self,
-        querier: BatchQuerier,
-    ) -> SessionListResult:
-        """Search sessions with querier pattern.
-
-        Args:
-            querier: BatchQuerier for filtering, ordering, and pagination
-
-        Returns:
-            SessionListResult with items, total count, and pagination info
-        """
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(SessionRow).options(selectinload(SessionRow.kernels))
-
-            result = await execute_batch_querier(
-                db_sess,
-                query,
-                querier,
-            )
-
-            session_rows = [row.SessionRow for row in result.rows]
-            await batch_populate_session_occupied_slots(db_sess, session_rows)
-            items = [row.to_dataclass() for row in session_rows]
-
-            return SessionListResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
-    async def search_in_project(
-        self,
-        querier: BatchQuerier,
-        scope: ProjectSessionSearchScope,
-    ) -> SessionListResult:
-        """Search sessions scoped to a project.
-
-        Args:
-            querier: BatchQuerier for filtering, ordering, and pagination
-            scope: ProjectSessionSearchScope that filters by project and validates existence
-
-        Returns:
-            SessionListResult with items, total count, and pagination info
-        """
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(SessionRow).options(selectinload(SessionRow.kernels))
-
-            result = await execute_batch_querier(
-                db_sess,
-                query,
-                querier,
-                scopes=[scope],
-            )
-
-            session_rows = [row.SessionRow for row in result.rows]
-            await batch_populate_session_occupied_slots(db_sess, session_rows)
-            items = [row.to_dataclass() for row in session_rows]
-
-            return SessionListResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
-    async def search_kernels(
-        self,
-        querier: BatchQuerier,
-    ) -> KernelListResult:
-        """Search kernels with querier pattern.
-
-        Args:
-            querier: BatchQuerier for filtering, ordering, and pagination
-
-        Returns:
-            KernelListResult with items, total count, and pagination info
-        """
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(KernelRow)
-
-            result = await execute_batch_querier(
-                db_sess,
-                query,
-                querier,
-            )
-
-            items = [row.KernelRow.to_kernel_info() for row in result.rows]
-
-            return KernelListResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
 
     @staticmethod
     def _resource_allocation_aggregates() -> tuple[Any, Any, Any]:
@@ -740,6 +747,25 @@ class SessionDBSource:
             )
             for key in keys
         }
+
+    async def bulk_get_designated_agent_ids_by_session(
+        self,
+        session_ids: Sequence[SessionID],
+    ) -> dict[SessionID, list[AgentId]]:
+        """Read the agent ids each session designates; one with none is absent."""
+        if not session_ids:
+            return {}
+        stmt = (
+            sa.select(SessionDesignatedAgentRow.session_id, AgentRow.id)
+            .join(AgentRow, AgentRow.uuid == SessionDesignatedAgentRow.agent_uuid)
+            .where(SessionDesignatedAgentRow.session_id.in_(session_ids))
+            .order_by(AgentRow.id)
+        )
+        designated: dict[SessionID, list[AgentId]] = {}
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            for session_id, agent_id in await db_sess.execute(stmt):
+                designated.setdefault(SessionID(session_id), []).append(AgentId(agent_id))
+        return designated
 
     async def batch_get_resource_allocation_by_session(
         self,
@@ -812,27 +838,6 @@ class SessionDBSource:
             if row is None:
                 raise ImageNotFound(f"Image not found: {image_id}")
             return row
-
-    async def get_keypair_resource_policy(
-        self,
-        access_key: AccessKey,
-    ) -> dict[str, Any]:
-        """Fetch the keypair resource policy dict for the given access key."""
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            query = (
-                sa.select(KeyPairResourcePolicyRow)
-                .join(
-                    KeyPairRow,
-                    KeyPairRow.resource_policy == KeyPairResourcePolicyRow.name,
-                )
-                .where(KeyPairRow.access_key == access_key)
-            )
-            row = await db_sess.scalar(query)
-            if row is None:
-                return {}
-            return {
-                "allowed_vfolder_hosts": row.allowed_vfolder_hosts,
-            }
 
     async def get_session_data_by_id(
         self,

@@ -9,9 +9,10 @@ import shutil
 import tempfile
 import textwrap
 import uuid
-from collections.abc import AsyncIterator, Callable, Iterator
+from collections.abc import AsyncIterator, Callable, Coroutine, Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -21,11 +22,14 @@ import sqlalchemy as sa
 import yarl
 from aiohttp import web
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.ext.asyncio import AsyncConnection
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.client.v2.v2_registry import V2ClientRegistry
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, BackgroundTaskManagerArgs
 from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
     ValkeyArtifactDownloadTrackingClient,
@@ -43,8 +47,15 @@ from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeySta
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.configs.pyroscope import PyroscopeConfig
-from ai.backend.common.data.permission.types import EntityType, ScopeType
-from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.contexts.user import with_user_context
+from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
+from ai.backend.common.data.entity.role import RoleEntityType
+from ai.backend.common.data.entity.types import EntityType, GlobalEntityType
+from ai.backend.common.data.entity.user import UserEntityType, UserID
+from ai.backend.common.data.permission.types import Permission
+from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.defs import (
     REDIS_BGTASK_DB,
     REDIS_CONTAINER_LOG,
@@ -57,12 +68,12 @@ from ai.backend.common.defs import (
 )
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.message_queue.redis_queue.queue import RedisMQArgs, RedisQueue
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import (
+    AccessKey,
     AgentId,
     DefaultForUnspecified,
     HostPortPair,
@@ -71,19 +82,38 @@ from ai.backend.common.types import (
     SlotName,
     SlotTypes,
     VFolderHostPermissionMap,
-    current_resource_slots,
 )
 from ai.backend.logging import LocalLogger, LogLevel
 from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat
-from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.actions.validators.rbac import RBACValidators
-from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
-from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
-from ai.backend.manager.actions.validators.rbac.single_entity import SingleEntityActionRBACValidator
+from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import GroupMeta, ProcessorDependencies
+from ai.backend.manager.actions.v2.bulk.validator.rbac import (
+    VirtualEntityAtomicBulkActionRBACValidator,
+    VirtualEntityPartialBulkActionRBACValidator,
+)
+from ai.backend.manager.actions.v2.global_scope.validator.rbac import (
+    VirtualEntityGlobalActionRBACValidator,
+)
+from ai.backend.manager.actions.v2.membership.validator.rbac import (
+    VirtualEntityMembershipActionRBACValidator,
+)
+from ai.backend.manager.actions.v2.relation.validator.rbac import (
+    VirtualEntityRelationActionRBACValidator,
+)
+from ai.backend.manager.actions.v2.scope.validator.rbac import (
+    VirtualEntityScopeActionRBACValidator,
+)
+from ai.backend.manager.actions.v2.single_entity.validator.rbac import (
+    VirtualEntitySingleEntityActionRBACValidator,
+)
+from ai.backend.manager.actions.v2.validators import ActionValidators as V2ActionValidators
+from ai.backend.manager.actions.validators.rbac import VirtualEntityRBACValidators
 from ai.backend.manager.agent_cache import AgentRPCCache
 from ai.backend.manager.api.rest.app import build_root_app, mount_registries
-from ai.backend.manager.api.rest.middleware import build_auth_middleware, build_exception_middleware
+from ai.backend.manager.api.rest.middleware.auth import build_auth_middleware
+from ai.backend.manager.api.rest.middleware.exception import build_exception_middleware
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.server_status import (
     ALL_ALLOWED,
@@ -105,49 +135,104 @@ from ai.backend.manager.config.unified import (
     ManagerConfig,
     ManagerUnifiedConfig,
 )
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.keypair.types import KeyPairSecrets
 from ai.backend.manager.data.manager_status.types import ManagerStatus
+from ai.backend.manager.data.permission.global_entity import GlobalEntityIDCache
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
+from ai.backend.manager.models.auto_generated_file.row import AutoGeneratedFileRow
 from ai.backend.manager.models.base import pgsql_connect_opts
-from ai.backend.manager.models.domain import domains
-from ai.backend.manager.models.group import GroupRow, association_groups_users
-from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.image import ImageAliasRow, ImageRow
-from ai.backend.manager.models.kernel import kernels
-from ai.backend.manager.models.keypair import keypairs
-from ai.backend.manager.models.keypair.ssh_key_validator import SSHKeyValidator
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
+from ai.backend.manager.models.domain.row import domains
+from ai.backend.manager.models.entity_label.row import EntityLabelRow
+from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
+from ai.backend.manager.models.kernel.row import kernels
+
+# ``kernels.kernel_group_id`` references ``kernel_groups``; nothing under src imports the
+# kernel group rows yet, so name them for the sandbox to resolve the foreign key.
+from ai.backend.manager.models.kernel_group.row import KernelGroupRow  # noqa: F401
+from ai.backend.manager.models.kernel_group_environ.row import KernelGroupEnvironRow  # noqa: F401
+from ai.backend.manager.models.kernel_group_resource_slot.row import (  # noqa: F401
+    KernelGroupResourceSlotRow,
 )
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.keypair.row import keypairs
+from ai.backend.manager.models.keypair.ssh_key_validator import SSHKeyValidator
+from ai.backend.manager.models.project.row import (
+    ProjectRow,
+    ProjectType,
+    association_groups_users,
+)
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
+    RolePermissionPresetRow,
+)
+from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
+from ai.backend.manager.models.resource_group.row import (
+    resource_groups,
+    sgroups_for_domains,
+)
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
+from ai.backend.manager.models.resource_policy.row import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
     keypair_resource_policies,
 )
-from ai.backend.manager.models.scaling_group import scaling_groups, sgroups_for_domains
-from ai.backend.manager.models.scaling_group.row import ScalingGroupOpts
-from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.session_template import session_templates
-from ai.backend.manager.models.user import users
+from ai.backend.manager.models.resource_slot.row import ResourceSlotTypeRow
+from ai.backend.manager.models.resource_slot.types import NumberFormat
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.session_template.row import SessionTemplateRow
+
+# Nothing under src imports the storage rows yet; name them so the sandbox holds their
+# tables when `schema oneshot` builds the full schema.
+from ai.backend.manager.models.storage_backend.row import StorageBackendRow  # noqa: F401
+from ai.backend.manager.models.storage_volume.row import StorageVolumeRow  # noqa: F401
+from ai.backend.manager.models.user.creators import UserCreator
+from ai.backend.manager.models.user.row import users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import vfolders
+from ai.backend.manager.models.vfolder.row import vfolders
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.notification.notification_center import NotificationCenter
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.auth.repository import AuthRepository
+from ai.backend.manager.repositories.client_ip_masking.repository import (
+    ClientIPMaskingRepository,
+)
 from ai.backend.manager.repositories.db.engine import (
     connect_database,
     create_async_engine,
 )
-from ai.backend.manager.repositories.group.repository import GroupRepository
+from ai.backend.manager.repositories.global_entity.loader import GlobalEntityIDLoader
+from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
+    ResourcePolicyOpsProvider,
+)
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
+from ai.backend.manager.repositories.ops.v2.user.provider import UserOpsProvider
+from ai.backend.manager.repositories.ops.v2.user.write import FullUserCreator
+from ai.backend.manager.repositories.project.repository import ProjectRepository
+from ai.backend.manager.repositories.rbac.permission_check_repository import (
+    RbacPermissionCheckRepository,
+)
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.user_resource_policy.repository import (
     UserResourcePolicyRepository,
 )
+from ai.backend.manager.secret.pool import KeyProviderPool
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.auth.service import AuthService
+from ai.backend.testutils.action_validators import build_global_gate
 from ai.backend.testutils.bootstrap import (  # noqa: F401
+    ETCD_PASSWORD,
+    ETCD_USER,
+    POSTGRES_MAINTENANCE_DB,
+    POSTGRES_PASSWORD,
+    POSTGRES_USER,
     etcd_container,
     postgres_container,
     redis_container,
@@ -156,6 +241,11 @@ from ai.backend.testutils.fixtures import DomainFixtureData
 from ai.backend.testutils.pants import get_parallel_slot
 
 log = logging.getLogger("tests.component.conftest")
+
+_ROLE_PRESET_FIXTURE = (
+    Path(__file__).resolve().parents[2] / "fixtures/manager/example-role-presets.json"
+)
+_USER_AND_PROJECT_PRESETS = frozenset({"user_owner", "project_member", "project_admin"})
 
 
 @dataclass
@@ -176,9 +266,16 @@ class KeypairFixtureData:
 
 @dataclass
 class UserFixtureData:
-    user_uuid: uuid.UUID
+    user_uuid: UserID
     keypair: KeypairFixtureData
     email: str = ""
+
+
+@dataclass
+class ProvisionedUserData:
+    user_id: UserID
+    personal_project_id: ProjectID
+    keypair: KeypairFixtureData
 
 
 # ---------------------------------------------------------------------------
@@ -288,12 +385,14 @@ def bootstrap_config(
         etcd=EtcdConfig.model_validate({
             "namespace": test_id,
             "addr": {"host": etcd_addr.host, "port": etcd_addr.port},
+            "user": ETCD_USER,
+            "password": ETCD_PASSWORD,
         }),
         db=DatabaseConfig.model_validate({
             "addr": postgres_addr,
             "name": test_db,
-            "user": "postgres",
-            "password": "develove",
+            "user": POSTGRES_USER,
+            "password": POSTGRES_PASSWORD,
             "pool_size": 8,
             "pool_recycle": -1,
             "pool_pre_ping": False,
@@ -413,8 +512,10 @@ def database(
     and install the table schema using alembic.
     """
     db_url = (
-        yarl.URL(f"postgresql+asyncpg://{bootstrap_config.db.addr.host}/testing")
-        .with_port(bootstrap_config.db.addr.port)
+        yarl.URL(
+            f"postgresql+asyncpg://{bootstrap_config.db.addrs[0].host}/{POSTGRES_MAINTENANCE_DB}"
+        )
+        .with_port(bootstrap_config.db.addrs[0].port)
         .with_user(bootstrap_config.db.user)
     )
     if bootstrap_config.db.password is not None:
@@ -450,7 +551,7 @@ def database(
             await conn.execute(
                 sa.text(
                     "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
-                    "WHERE pid <> pg_backend_pid();"
+                    f"WHERE datname = '{test_db}' AND pid <> pg_backend_pid();"
                 )
             )
             await conn.execute(sa.text(f'DROP DATABASE "{test_db}";'))
@@ -504,6 +605,29 @@ def database(
         )
         cli_schema_oneshot.invoke(click_ctx)
 
+    # `schema oneshot` creates the tables but applies no migration, so the seed
+    # rows the migrations carry are missing. Installs load them from the fixture
+    # files; do the same for the registry the manager reads at runtime.
+    async def seed_resource_slot_types() -> None:
+        fixture_path = (
+            Path(os.environ["BACKEND_BUILD_ROOT"])
+            / "fixtures"
+            / "manager"
+            / "example-resource-slot-types.json"
+        )
+        rows = [
+            {**row, "number_format": NumberFormat(**row["number_format"])}
+            for row in json.loads(fixture_path.read_text())["resource_slot_types"]
+        ]
+        engine = create_async_engine(str(test_db_url), connect_args=pgsql_connect_opts)
+        async with engine.begin() as conn:
+            await conn.execute(
+                pg_insert(ResourceSlotTypeRow.__table__).values(rows).on_conflict_do_nothing()
+            )
+        await engine.dispose()
+
+    asyncio.run(seed_resource_slot_types())
+
 
 # ---------------------------------------------------------------------------
 # Function-scoped per-test fixtures
@@ -518,8 +642,8 @@ async def db_engine(
 ) -> AsyncIterator[SAEngine]:
     """Provide a function-scoped SQLAlchemy async engine connected to the test database."""
     db_url = (
-        yarl.URL(f"postgresql+asyncpg://{bootstrap_config.db.addr.host}/{test_db}")
-        .with_port(bootstrap_config.db.addr.port)
+        yarl.URL(f"postgresql+asyncpg://{bootstrap_config.db.addrs[0].host}/{test_db}")
+        .with_port(bootstrap_config.db.addrs[0].port)
         .with_user(bootstrap_config.db.user)
     )
     if bootstrap_config.db.password is not None:
@@ -539,14 +663,18 @@ async def database_engine(
 ) -> AsyncIterator[ExtendedAsyncSAEngine]:
     """Provide a function-scoped ExtendedAsyncSAEngine for repository/service fixtures."""
     async with connect_database(bootstrap_config.db) as db:
-        yield db
+        await GlobalEntityIDLoader(db).load()
+        try:
+            yield db
+        finally:
+            GlobalEntityIDCache.clear()
 
 
 @pytest.fixture()
 async def domain_fixture(
     db_engine: SAEngine,
 ) -> AsyncIterator[DomainFixtureData]:
-    """Insert a test domain and yield its identifiers."""
+    """Insert a test domain with its virtual entity and yield its identifiers."""
     domain_name = f"domain-{secrets.token_hex(6)}"
     async with db_engine.begin() as conn:
         result = await conn.execute(
@@ -561,8 +689,36 @@ async def domain_fixture(
             .returning(domains.c.id, domains.c.name)
         )
         row = result.one()
+        virtual_entity_id = uuid.uuid4()
+        await conn.execute(
+            sa.insert(VirtualEntityRow.__table__).values(
+                id=virtual_entity_id,
+                entity_type=DomainEntityType(),
+                entity_id=row.id,
+            )
+        )
+        await conn.execute(
+            sa.insert(EntityMembershipRow.__table__).values(
+                virtual_entity_id=virtual_entity_id,
+                member_entity_id=virtual_entity_id,
+                capped=False,
+            )
+        )
+        await conn.execute(
+            sa.insert(ScopeBindingRow.__table__).values(
+                virtual_entity_id=virtual_entity_id,
+                scope_entity_id=virtual_entity_id,
+                permission_cap=None,
+            )
+        )
     yield DomainFixtureData(domain_name=row.name, domain_id=row.id)
     async with db_engine.begin() as conn:
+        await conn.execute(
+            VirtualEntityRow.__table__.delete().where(
+                VirtualEntityRow.__table__.c.entity_type == DomainEntityType(),
+                VirtualEntityRow.__table__.c.entity_id == row.id,
+            )
+        )
         await conn.execute(domains.delete().where(domains.c.name == domain_name))
 
 
@@ -576,6 +732,7 @@ async def resource_policy_fixture(
     by the user-creation flow:
     - "default" keypair resource policy: always assigned to new keypairs
     - "default" user resource policy: always assigned to new users (e.g. signup)
+    - "default" project resource policy: assigned to the personal project
     Teardown removes both the named policies and the "default" policies.
     The "default" policies are safe to delete here because user_factory
     (which depends on this fixture) runs its teardown first, purging all
@@ -613,14 +770,14 @@ async def resource_policy_fixture(
                 allowed_vfolder_hosts=VFolderHostPermissionMap(),
             )
         )
-        # The user-creation flow always assigns new keypairs to the "default"
-        # keypair resource policy (DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME).
+        # A new keypair falls back to the policy marked as the default.
         # Uses on_conflict_do_nothing() for idempotency in case alembic
         # migrations already seeded the row.
         await conn.execute(
             pg_insert(keypair_resource_policies)
             .values(
                 name=default_policy_name,
+                is_default=True,
                 default_for_unspecified=DefaultForUnspecified.UNLIMITED,
                 total_resource_slots=ResourceSlot(),
                 max_session_lifetime=0,
@@ -643,8 +800,38 @@ async def resource_policy_fixture(
             )
             .on_conflict_do_nothing()
         )
+        # The personal project created with every user takes "default" too.
+        await conn.execute(
+            pg_insert(ProjectResourcePolicyRow.__table__)
+            .values(
+                name=default_policy_name,
+                max_vfolder_count=0,
+                max_quota_scope_size=-1,
+                max_network_count=3,
+            )
+            .on_conflict_do_nothing()
+        )
     yield policy_name
     async with db_engine.begin() as conn:
+        # A personal project outlives the user it was created for, so purging the
+        # users does not release the policy it holds. The fixture owning the policy
+        # clears them.
+        personal = (
+            await conn.scalars(
+                sa.select(ProjectRow.id).where(
+                    ProjectRow.type == ProjectType.PERSONAL,
+                    ProjectRow.resource_policy.in_([policy_name, default_policy_name]),
+                )
+            )
+        ).all()
+        if personal:
+            await conn.execute(
+                VirtualEntityRow.__table__.delete().where(
+                    VirtualEntityRow.__table__.c.entity_type == ProjectEntityType(),
+                    VirtualEntityRow.__table__.c.entity_id.in_(personal),
+                )
+            )
+            await conn.execute(ProjectRow.__table__.delete().where(ProjectRow.id.in_(personal)))
         await conn.execute(
             keypair_resource_policies.delete().where(
                 keypair_resource_policies.c.name == default_policy_name
@@ -667,53 +854,55 @@ async def resource_policy_fixture(
         )
         await conn.execute(
             ProjectResourcePolicyRow.__table__.delete().where(
-                ProjectResourcePolicyRow.__table__.c.name == policy_name
+                ProjectResourcePolicyRow.__table__.c.name.in_([policy_name, default_policy_name])
             )
         )
 
 
 @pytest.fixture()
-async def scaling_group_name(
+async def resource_group_name(
     db_engine: SAEngine,
     domain_fixture: DomainFixtureData,
 ) -> AsyncIterator[ResourceGroupName]:
     """Insert a scaling group and its domain association; yield its name."""
     sgroup_name = ResourceGroupName(f"sgroup-{secrets.token_hex(6)}")
+    sgroup_id = uuid.uuid4()
     async with db_engine.begin() as conn:
         await conn.execute(
-            sa.insert(scaling_groups).values(
+            sa.insert(resource_groups).values(
+                id=sgroup_id,
                 name=sgroup_name,
                 description=f"Test scaling group {sgroup_name}",
                 is_active=True,
                 driver="static",
                 driver_opts={},
                 scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(),
+                scheduler_opts=ResourceGroupOpts(),
             )
         )
         await conn.execute(
             sa.insert(sgroups_for_domains).values(
-                scaling_group=sgroup_name,
-                domain=domain_fixture.domain_name,
+                resource_group_id=sgroup_id,
+                domain_id=domain_fixture.domain_id,
             )
         )
     yield sgroup_name
     async with db_engine.begin() as conn:
         await conn.execute(
-            sgroups_for_domains.delete().where(sgroups_for_domains.c.scaling_group == sgroup_name)
+            sgroups_for_domains.delete().where(sgroups_for_domains.c.resource_group_id == sgroup_id)
         )
-        await conn.execute(scaling_groups.delete().where(scaling_groups.c.name == sgroup_name))
+        await conn.execute(resource_groups.delete().where(resource_groups.c.name == sgroup_name))
 
 
 @pytest.fixture()
-async def scaling_group_id(
+async def resource_group_id(
     db_engine: SAEngine,
-    scaling_group_name: ResourceGroupName,
+    resource_group_name: ResourceGroupName,
 ) -> ResourceGroupID:
     """Return the inserted scaling group's ID."""
     async with db_engine.begin() as conn:
         result = await conn.execute(
-            sa.select(scaling_groups.c.id).where(scaling_groups.c.name == scaling_group_name)
+            sa.select(resource_groups.c.id).where(resource_groups.c.name == resource_group_name)
         )
         return ResourceGroupID(result.scalar_one())
 
@@ -729,7 +918,7 @@ async def group_fixture(
     group_name = f"group-{secrets.token_hex(6)}"
     async with db_engine.begin() as conn:
         await conn.execute(
-            sa.insert(GroupRow.__table__).values(
+            sa.insert(ProjectRow.__table__).values(
                 id=group_id,
                 name=group_name,
                 description=f"Test group {group_name}",
@@ -738,9 +927,347 @@ async def group_fixture(
                 resource_policy=resource_policy_fixture,
             )
         )
+        virtual_entity_id = uuid.uuid4()
+        await conn.execute(
+            sa.insert(VirtualEntityRow.__table__).values(
+                id=virtual_entity_id,
+                entity_type=ProjectEntityType(),
+                entity_id=group_id,
+            )
+        )
+        await conn.execute(
+            sa.insert(EntityMembershipRow.__table__).values(
+                virtual_entity_id=virtual_entity_id,
+                member_entity_id=virtual_entity_id,
+                capped=False,
+            )
+        )
+        await conn.execute(
+            sa.insert(ScopeBindingRow.__table__).values(
+                virtual_entity_id=virtual_entity_id,
+                scope_entity_id=virtual_entity_id,
+                permission_cap=None,
+            )
+        )
     yield group_id
     async with db_engine.begin() as conn:
-        await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == group_id))
+        await conn.execute(
+            VirtualEntityRow.__table__.delete().where(
+                VirtualEntityRow.__table__.c.entity_type == ProjectEntityType(),
+                VirtualEntityRow.__table__.c.entity_id == group_id,
+            )
+        )
+        await conn.execute(
+            ProjectRow.__table__.delete().where(ProjectRow.__table__.c.id == group_id)
+        )
+
+
+class VirtualEntitySeeder:
+    """Seeds the RBAC virtual-entity chain rows for directly-inserted users,
+    mirroring the row shape the enrollment path and the backfill migration produce.
+
+    Exposed as the ``virtual_entity_seeder`` fixture so subdirectory conftests can
+    use it without importing this module.
+    """
+
+    async def insert_user_scope(self, conn: AsyncConnection, user_uuid: UserID) -> None:
+        """Give a directly-inserted user the RBAC rows ``create_user`` would
+        have made. Without them the member-binding paths cannot resolve the user's
+        virtual entity."""
+        virtual_entity_id = uuid.uuid4()
+        await conn.execute(
+            sa.insert(VirtualEntityRow.__table__).values(
+                id=virtual_entity_id,
+                entity_type=UserEntityType(),
+                entity_id=str(user_uuid),
+            )
+        )
+        await conn.execute(
+            sa.insert(EntityMembershipRow.__table__).values(
+                virtual_entity_id=virtual_entity_id,
+                member_entity_id=virtual_entity_id,
+                capped=False,
+            )
+        )
+        await conn.execute(
+            sa.insert(ScopeBindingRow.__table__).values(
+                virtual_entity_id=virtual_entity_id,
+                scope_entity_id=virtual_entity_id,
+                permission_cap=None,
+            )
+        )
+
+    async def insert_personal_project(
+        self, conn: AsyncConnection, user_uuid: UserID, domain_name: str
+    ) -> uuid.UUID:
+        """Give a directly-inserted user the personal project every user is created
+        with. Their own folders are created in it, so the paths that resolve an owner
+        cannot run without it."""
+        project_id = uuid.uuid4()
+        await conn.execute(
+            sa.insert(ProjectRow.__table__).values(
+                id=project_id,
+                name=f"personal-{project_id.hex[:8]}",
+                description="Personal Project",
+                is_active=True,
+                domain_name=domain_name,
+                total_resource_slots=ResourceSlot(),
+                allowed_vfolder_hosts=VFolderHostPermissionMap(),
+                integration_id=None,
+                resource_policy="default",
+                type=ProjectType.PERSONAL,
+                creator_id=str(user_uuid),
+            )
+        )
+        virtual_entity_id = uuid.uuid4()
+        await conn.execute(
+            sa.insert(VirtualEntityRow.__table__).values(
+                id=virtual_entity_id,
+                entity_type=ProjectEntityType(),
+                entity_id=str(project_id),
+            )
+        )
+        await conn.execute(
+            sa.insert(EntityMembershipRow.__table__).values(
+                virtual_entity_id=virtual_entity_id,
+                member_entity_id=virtual_entity_id,
+                capped=False,
+            )
+        )
+        await conn.execute(
+            sa.insert(ScopeBindingRow.__table__).values(
+                virtual_entity_id=virtual_entity_id,
+                scope_entity_id=virtual_entity_id,
+                permission_cap=None,
+            )
+        )
+        await self.enroll_user_in_project(conn, project_id, user_uuid)
+        return project_id
+
+    async def enroll_user_in_project(
+        self, conn: AsyncConnection, group_id: uuid.UUID, user_uuid: UserID
+    ) -> None:
+        """Write the virtual-entity chain rows the enrollment path creates for a
+        user-project membership: the user joins the project's virtual entity. The project
+        is not bound into the user's own virtual entity — a member does not hand the
+        project its personal entities."""
+        project_scope_id = (
+            await conn.execute(
+                sa.select(VirtualEntityRow.__table__.c.id).where(
+                    VirtualEntityRow.__table__.c.entity_type == ProjectEntityType(),
+                    VirtualEntityRow.__table__.c.entity_id == group_id,
+                )
+            )
+        ).scalar_one()
+        user_scope_id = (
+            await conn.execute(
+                sa.select(VirtualEntityRow.__table__.c.id).where(
+                    VirtualEntityRow.__table__.c.entity_type == UserEntityType(),
+                    VirtualEntityRow.__table__.c.entity_id == str(user_uuid),
+                )
+            )
+        ).scalar_one()
+        await conn.execute(
+            sa.insert(EntityMembershipRow.__table__).values(
+                virtual_entity_id=project_scope_id,
+                member_entity_id=user_scope_id,
+                capped=False,
+            )
+        )
+
+    async def place_entity(
+        self,
+        conn: AsyncConnection,
+        entity_type: EntityType,
+        entity_id: uuid.UUID,
+        scopes: Sequence[tuple[EntityType, uuid.UUID]],
+    ) -> None:
+        """Write the graph rows creating an entity writes: it holds itself, and each
+        scope owns and governs it."""
+        ve = VirtualEntityRow.__table__
+        node_id = uuid.uuid4()
+        await conn.execute(
+            sa.insert(ve).values(id=node_id, entity_type=entity_type, entity_id=entity_id)
+        )
+        scope_nodes = [
+            (
+                await conn.execute(
+                    sa.select(ve.c.id).where(
+                        ve.c.entity_type == scope_type, ve.c.entity_id == scope_id
+                    )
+                )
+            ).scalar_one()
+            for scope_type, scope_id in scopes
+        ]
+        await conn.execute(
+            sa.insert(EntityMembershipRow.__table__).values([
+                {"virtual_entity_id": node, "member_entity_id": node_id, "capped": False}
+                for node in (node_id, *scope_nodes)
+            ])
+        )
+        await conn.execute(
+            sa.insert(ScopeBindingRow.__table__).values([
+                {"virtual_entity_id": node_id, "scope_entity_id": node, "permission_cap": None}
+                for node in (node_id, *scope_nodes)
+            ])
+        )
+
+
+@pytest.fixture()
+def virtual_entity_seeder() -> VirtualEntitySeeder:
+    return VirtualEntitySeeder()
+
+
+@pytest.fixture()
+async def declared_role_presets(db_engine: SAEngine) -> AsyncIterator[list[uuid.UUID]]:
+    """The user and project presets as the seed role files state them, through the
+    fixture rendered from those files."""
+    fixture = json.loads(_ROLE_PRESET_FIXTURE.read_text(encoding="utf-8"))
+    presets = [row for row in fixture["role_presets"] if row["name"] in _USER_AND_PROJECT_PRESETS]
+    preset_ids = {row["id"] for row in presets}
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sa.insert(RolePresetRow.__table__).values([
+                {
+                    "id": uuid.UUID(row["id"]),
+                    "name": row["name"],
+                    "scope_type": row["scope_type"],
+                    "auto_assign": row["auto_assign"],
+                    "auto_assign_to_owner": row["auto_assign_to_owner"],
+                }
+                for row in presets
+            ])
+        )
+        await conn.execute(
+            sa.insert(RolePermissionPresetRow.__table__).values([
+                {
+                    "role_preset_id": uuid.UUID(row["role_preset_id"]),
+                    "entity_type": row["entity_type"],
+                    "permission": Permission(row["permission"]),
+                }
+                for row in fixture["role_permission_presets"]
+                if row["role_preset_id"] in preset_ids
+            ])
+        )
+    ids = [uuid.UUID(preset_id) for preset_id in preset_ids]
+    yield ids
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            RolePermissionPresetRow.__table__.delete().where(
+                RolePermissionPresetRow.__table__.c.role_preset_id.in_(ids)
+            )
+        )
+        await conn.execute(
+            RolePresetRow.__table__.delete().where(RolePresetRow.__table__.c.id.in_(ids))
+        )
+
+
+@pytest.fixture()
+async def provision_user(
+    database_engine: ExtendedAsyncSAEngine,
+    db_engine: SAEngine,
+    domain_fixture: DomainFixtureData,
+    resource_policy_fixture: str,
+    declared_role_presets: list[uuid.UUID],
+) -> AsyncIterator[Callable[[], Coroutine[Any, Any, ProvisionedUserData]]]:
+    """Create regular users the way every user is, under the declared presets."""
+    provisioned: list[ProvisionedUserData] = []
+
+    async def provision() -> ProvisionedUserData:
+        unique = secrets.token_hex(4)
+        keypair = KeypairFixtureData(
+            access_key=f"AKTEST{secrets.token_hex(7).upper()}",
+            secret_key=secrets.token_hex(20),
+        )
+        async with UserOpsProvider(database_engine).write_ops() as w:
+            result = await w.create_user(
+                FullUserCreator(
+                    user=UserCreator(
+                        email=f"provisioned-{unique}@test.local",
+                        username=f"provisioned-{unique}",
+                        password=PasswordInfo(
+                            password=secrets.token_urlsafe(8),
+                            algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+                            rounds=1_000,
+                            salt_size=32,
+                        ),
+                        need_password_change=False,
+                        domain_id=DomainID(domain_fixture.domain_id),
+                        status=UserStatus.ACTIVE,
+                        role=UserRole.USER,
+                        resource_policy=resource_policy_fixture,
+                    ),
+                    keypair_secrets=KeyPairSecrets(
+                        access_key=AccessKey(keypair.access_key),
+                        secret_key=SecretValue(keypair.secret_key),
+                        ssh_public_key="ssh-rsa test",
+                        ssh_private_key="test-private-key",
+                    ),
+                    keypair_resource_policy=resource_policy_fixture,
+                )
+            )
+        user = ProvisionedUserData(
+            user_id=UserID(result.user.id),
+            personal_project_id=ProjectID(result.personal_project.id),
+            keypair=keypair,
+        )
+        provisioned.append(user)
+        return user
+
+    yield provision
+    user_ids = [user.user_id for user in provisioned]
+    project_ids = [user.personal_project_id for user in provisioned]
+    roles = RoleRow.__table__
+    ve = VirtualEntityRow.__table__
+    async with db_engine.begin() as conn:
+        role_ids = (
+            (
+                await conn.execute(
+                    sa.select(roles.c.id).where(
+                        sa.or_(
+                            sa.and_(
+                                roles.c.scope_type == UserEntityType(),
+                                roles.c.scope_id.in_(user_ids),
+                            ),
+                            sa.and_(
+                                roles.c.scope_type == ProjectEntityType(),
+                                roles.c.scope_id.in_(project_ids),
+                            ),
+                        )
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        await conn.execute(
+            association_groups_users.delete().where(
+                association_groups_users.c.user_id.in_(user_ids)
+            )
+        )
+        await conn.execute(keypairs.delete().where(keypairs.c.user.in_(user_ids)))
+        await conn.execute(
+            EntityLabelRow.__table__.delete().where(
+                EntityLabelRow.__table__.c.entity_id.in_([*user_ids, *project_ids])
+            )
+        )
+        # Roles, their permissions and assignments, and every edge go with the nodes.
+        await conn.execute(
+            ve.delete().where(
+                sa.or_(
+                    sa.and_(ve.c.entity_type == RoleEntityType(), ve.c.entity_id.in_(role_ids)),
+                    sa.and_(
+                        ve.c.entity_type == ProjectEntityType(), ve.c.entity_id.in_(project_ids)
+                    ),
+                    sa.and_(ve.c.entity_type == UserEntityType(), ve.c.entity_id.in_(user_ids)),
+                )
+            )
+        )
+        await conn.execute(roles.delete().where(roles.c.id.in_(role_ids)))
+        await conn.execute(
+            ProjectRow.__table__.delete().where(ProjectRow.__table__.c.id.in_(project_ids))
+        )
+        await conn.execute(users.delete().where(users.c.uuid.in_(user_ids)))
 
 
 @pytest.fixture()
@@ -749,12 +1276,13 @@ async def admin_user_fixture(
     group_fixture: uuid.UUID,
     domain_fixture: DomainFixtureData,
     resource_policy_fixture: str,
+    virtual_entity_seeder: VirtualEntitySeeder,
 ) -> AsyncIterator[UserFixtureData]:
     """Insert admin user, keypair, and group membership; yield identifiers."""
     unique_id = secrets.token_hex(4)
     email = f"admin-{unique_id}@test.local"
     data = UserFixtureData(
-        user_uuid=uuid.uuid4(),
+        user_uuid=UserID(uuid.uuid4()),
         keypair=KeypairFixtureData(
             access_key=f"AKTEST{secrets.token_hex(7).upper()}",
             secret_key=secrets.token_hex(20),
@@ -779,27 +1307,27 @@ async def admin_user_fixture(
                 status=UserStatus.ACTIVE,
                 status_info="admin-requested",
                 domain_name=domain_fixture.domain_name,
+                domain_id=domain_fixture.domain_id,
                 resource_policy=resource_policy_fixture,
                 role=UserRole.SUPERADMIN,
             )
         )
         await conn.execute(
             sa.insert(keypairs).values(
-                user_id=email,
                 access_key=data.keypair.access_key,
-                secret_key=data.keypair.secret_key,
+                secret_key=SecretValue(data.keypair.secret_key),
                 is_active=True,
                 resource_policy=resource_policy_fixture,
                 rate_limit=30000,
                 num_queries=0,
                 is_admin=True,
+                is_default=True,
                 user=str(data.user_uuid),
             )
         )
-        await conn.execute(
-            users.update()
-            .where(users.c.uuid == str(data.user_uuid))
-            .values(main_access_key=data.keypair.access_key)
+        await virtual_entity_seeder.insert_user_scope(conn, data.user_uuid)
+        await virtual_entity_seeder.insert_personal_project(
+            conn, data.user_uuid, domain_fixture.domain_name
         )
         await conn.execute(
             sa.insert(association_groups_users).values(
@@ -807,21 +1335,20 @@ async def admin_user_fixture(
                 user_id=str(data.user_uuid),
             )
         )
-        await conn.execute(
-            sa.insert(AssociationScopesEntitiesRow.__table__).values(
-                scope_type=ScopeType.PROJECT,
-                scope_id=str(group_fixture),
-                entity_type=EntityType.USER,
-                entity_id=str(data.user_uuid),
-            )
-        )
+        await virtual_entity_seeder.enroll_user_in_project(conn, group_fixture, data.user_uuid)
     yield data
     async with db_engine.begin() as conn:
         # Clean side-effect tables that tests may populate via the running server
+        await conn.execute(
+            sa.delete(AutoGeneratedFileRow).where(
+                AutoGeneratedFileRow.entity_type == "user",
+                AutoGeneratedFileRow.entity_id == data.user_uuid,
+            )
+        )
         await conn.execute(vfolders.delete())
         await conn.execute(kernels.delete())
         await conn.execute(SessionRow.__table__.delete())
-        await conn.execute(session_templates.delete())
+        await conn.execute(sa.delete(SessionTemplateRow))
         await conn.execute(ImageAliasRow.__table__.delete())
         await conn.execute(ImageRow.__table__.delete())
         # Clean fixture data
@@ -831,15 +1358,14 @@ async def admin_user_fixture(
             )
         )
         await conn.execute(
-            AssociationScopesEntitiesRow.__table__.delete().where(
-                AssociationScopesEntitiesRow.__table__.c.entity_id == str(data.user_uuid)
-            )
-        )
-        await conn.execute(
-            users.update().where(users.c.uuid == str(data.user_uuid)).values(main_access_key=None)
-        )
-        await conn.execute(
             keypairs.delete().where(keypairs.c.access_key == data.keypair.access_key)
+        )
+        # The entity-membership and scope-binding rows cascade from the virtual entity.
+        await conn.execute(
+            VirtualEntityRow.__table__.delete().where(
+                VirtualEntityRow.__table__.c.entity_type == UserEntityType(),
+                VirtualEntityRow.__table__.c.entity_id == str(data.user_uuid),
+            )
         )
         await conn.execute(users.delete().where(users.c.uuid == str(data.user_uuid)))
 
@@ -850,12 +1376,13 @@ async def regular_user_fixture(
     group_fixture: uuid.UUID,
     domain_fixture: DomainFixtureData,
     resource_policy_fixture: str,
+    virtual_entity_seeder: VirtualEntitySeeder,
 ) -> AsyncIterator[UserFixtureData]:
     """Insert regular user, keypair, and group membership; yield identifiers."""
     unique_id = secrets.token_hex(4)
     email = f"user-{unique_id}@test.local"
     data = UserFixtureData(
-        user_uuid=uuid.uuid4(),
+        user_uuid=UserID(uuid.uuid4()),
         keypair=KeypairFixtureData(
             access_key=f"AKTEST{secrets.token_hex(7).upper()}",
             secret_key=secrets.token_hex(20),
@@ -880,27 +1407,27 @@ async def regular_user_fixture(
                 status=UserStatus.ACTIVE,
                 status_info="admin-requested",
                 domain_name=domain_fixture.domain_name,
+                domain_id=domain_fixture.domain_id,
                 resource_policy=resource_policy_fixture,
                 role=UserRole.USER,
             )
         )
         await conn.execute(
             sa.insert(keypairs).values(
-                user_id=email,
                 access_key=data.keypair.access_key,
-                secret_key=data.keypair.secret_key,
+                secret_key=SecretValue(data.keypair.secret_key),
                 is_active=True,
                 resource_policy=resource_policy_fixture,
                 rate_limit=30000,
                 num_queries=0,
                 is_admin=False,
+                is_default=True,
                 user=str(data.user_uuid),
             )
         )
-        await conn.execute(
-            users.update()
-            .where(users.c.uuid == str(data.user_uuid))
-            .values(main_access_key=data.keypair.access_key)
+        await virtual_entity_seeder.insert_user_scope(conn, data.user_uuid)
+        await virtual_entity_seeder.insert_personal_project(
+            conn, data.user_uuid, domain_fixture.domain_name
         )
         await conn.execute(
             sa.insert(association_groups_users).values(
@@ -908,19 +1435,18 @@ async def regular_user_fixture(
                 user_id=str(data.user_uuid),
             )
         )
-        await conn.execute(
-            sa.insert(AssociationScopesEntitiesRow.__table__).values(
-                scope_type=ScopeType.PROJECT,
-                scope_id=str(group_fixture),
-                entity_type=EntityType.USER,
-                entity_id=str(data.user_uuid),
-            )
-        )
+        await virtual_entity_seeder.enroll_user_in_project(conn, group_fixture, data.user_uuid)
     yield data
     async with db_engine.begin() as conn:
         # Clean side-effect tables that tests may populate via the running server
         await conn.execute(
-            session_templates.delete().where(session_templates.c.user_uuid == str(data.user_uuid))
+            sa.delete(AutoGeneratedFileRow).where(
+                AutoGeneratedFileRow.entity_type == "user",
+                AutoGeneratedFileRow.entity_id == data.user_uuid,
+            )
+        )
+        await conn.execute(
+            sa.delete(SessionTemplateRow).where(SessionTemplateRow.user_uuid == str(data.user_uuid))
         )
         # Clean fixture data
         await conn.execute(
@@ -929,15 +1455,14 @@ async def regular_user_fixture(
             )
         )
         await conn.execute(
-            AssociationScopesEntitiesRow.__table__.delete().where(
-                AssociationScopesEntitiesRow.__table__.c.entity_id == str(data.user_uuid)
-            )
-        )
-        await conn.execute(
-            users.update().where(users.c.uuid == str(data.user_uuid)).values(main_access_key=None)
-        )
-        await conn.execute(
             keypairs.delete().where(keypairs.c.access_key == data.keypair.access_key)
+        )
+        # The entity-membership and scope-binding rows cascade from the virtual entity.
+        await conn.execute(
+            VirtualEntityRow.__table__.delete().where(
+                VirtualEntityRow.__table__.c.entity_type == UserEntityType(),
+                VirtualEntityRow.__table__.c.entity_id == str(data.user_uuid),
+            )
         )
         await conn.execute(users.delete().where(users.c.uuid == str(data.user_uuid)))
 
@@ -946,7 +1471,7 @@ async def regular_user_fixture(
 async def database_fixture(
     admin_user_fixture: UserFixtureData,
     regular_user_fixture: UserFixtureData,
-    scaling_group_name: ResourceGroupName,
+    resource_group_name: ResourceGroupName,
 ) -> AsyncIterator[None]:
     """Backward-compatible aggregate: requests all seed data fixtures."""
     yield
@@ -982,13 +1507,6 @@ class _TestConfigProvider(ManagerConfigProvider):
         mock_etcd_loader.register_myself = AsyncMock()
         mock_etcd_loader.deregister_myself = AsyncMock()
         self._legacy_etcd_config_loader = mock_etcd_loader
-        # Set the current_resource_slots ContextVar so that ResourceSlot
-        # operations (e.g. normalize_slots) work without hitting etcd.
-        _slots = {
-            SlotName("cpu"): SlotTypes("count"),
-            SlotName("mem"): SlotTypes("bytes"),
-        }
-        current_resource_slots.set(_slots)
 
 
 @pytest.fixture()
@@ -1158,16 +1676,9 @@ async def background_task_manager(
 def _make_async_etcd(bootstrap_config: BootstrapConfig) -> AsyncEtcd:
     """Create an AsyncEtcd instance from bootstrap config."""
     etcd_config = bootstrap_config.etcd
-    etcd_addr = etcd_config.addr
-    addrs: HostPortPair | list[HostPortPair]
-    if isinstance(etcd_addr, list):
-        addrs = [HostPortPair(host=a.host, port=a.port) for a in etcd_addr]
-    else:
-        addrs = HostPortPair(host=etcd_addr.host, port=etcd_addr.port)
-    return AsyncEtcd(
-        addrs=addrs,
-        namespace=etcd_config.namespace,
-        scope_prefix_map={
+    return AsyncEtcd.create_from_config(
+        etcd_config.to_dataclass(),
+        {
             ConfigScopes.GLOBAL: "global",
             ConfigScopes.SGROUP: "sgroup/default",
             ConfigScopes.NODE: "node/test",
@@ -1265,17 +1776,30 @@ def appproxy_client_pool() -> AppProxyClientPool:
 @pytest.fixture()
 def auth_processors(
     database_engine: ExtendedAsyncSAEngine,
+    processor_registry: ProcessorRegistry[Any],
     config_provider: ManagerConfigProvider,
     hook_plugin_ctx: HookPluginContext,
     valkey_clients: ValkeyClients,
     storage_manager: StorageSessionManager,
 ) -> AuthProcessors:
     """Real AuthProcessors wired with real AuthService and AuthRepository."""
-    repo = AuthRepository(database_engine)
-    user_resource_policy_repository = UserResourcePolicyRepository(database_engine)
-    user_repository = UserRepository(database_engine)
-    group_repository = GroupRepository(
+    repo = AuthRepository(
         database_engine,
+        V2DBOpsProvider(database_engine),
+        KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+    )
+    user_resource_policy_repository = UserResourcePolicyRepository(database_engine)
+    user_repository = UserRepository(
+        database_engine,
+        V2DBOpsProvider(database_engine),
+        ShareOpsProvider(database_engine),
+        ResourcePolicyOpsProvider(database_engine),
+        KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+    )
+    group_repository = ProjectRepository(
+        database_engine,
+        V2DBOpsProvider(database_engine),
+        ResourcePolicyOpsProvider(database_engine),
         config_provider,
         valkey_clients.stat,
         storage_manager,
@@ -1289,17 +1813,64 @@ def auth_processors(
         user_repository=user_repository,
         group_repository=group_repository,
         ssh_key_validator=SSHKeyValidator(),
+        client_ip_masking_repository=ClientIPMaskingRepository(database_engine),
+        key_provider_pool=KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )
     return AuthProcessors(
-        service=service,
-        action_monitors=[],
-        validators=ActionValidators(
-            rbac=RBACValidators(
-                scope=MagicMock(spec=ScopeActionRBACValidator),
-                single_entity=MagicMock(spec=SingleEntityActionRBACValidator),
-                bulk=MagicMock(spec=BulkActionRBACValidator),
-            ),
+        processor_registry.group(GroupMeta(GlobalEntityType())),
+        processor_registry.group(GroupMeta(UserEntityType())),
+        service,
+    )
+
+
+@pytest.fixture()
+def rbac_processor_registry(
+    database_engine: ExtendedAsyncSAEngine,
+    config_provider: ManagerConfigProvider,
+) -> ProcessorRegistry[Any]:
+    """A registry with every RBAC gate real. A test reading through them overrides
+    ``processor_registry`` with this."""
+    permission_repo = RbacPermissionCheckRepository(
+        PermissionOpsProvider(database_engine), config_provider
+    )
+    validators = VirtualEntityRBACValidators(
+        scope=VirtualEntityScopeActionRBACValidator(permission_repo, config_provider),
+        single_entity=VirtualEntitySingleEntityActionRBACValidator(
+            permission_repo, config_provider
         ),
+        partial_bulk=VirtualEntityPartialBulkActionRBACValidator(permission_repo),
+        atomic_bulk=VirtualEntityAtomicBulkActionRBACValidator(permission_repo),
+        relation=VirtualEntityRelationActionRBACValidator(permission_repo, config_provider),
+        membership=VirtualEntityMembershipActionRBACValidator(permission_repo, config_provider),
+        global_scope=VirtualEntityGlobalActionRBACValidator(permission_repo, config_provider),
+    )
+    return ProcessorRegistry(
+        ProcessorDependencies(
+            monitors=ActionMonitors(),
+            validators=validators.to_action_validators(),
+            repository=OpsRepository(V2DBOpsProvider(database_engine)),
+        )
+    )
+
+
+@pytest.fixture()
+def processor_registry(
+    database_engine: ExtendedAsyncSAEngine,
+    config_provider: ManagerConfigProvider,
+) -> ProcessorRegistry[Any]:
+    """The registry every v2-wired processor group is built from.
+
+    Only the global gate is real here: these tests run global actions as the caller they
+    set, and the other shapes are gated by the domain conftest that needs them.
+    """
+    return ProcessorRegistry(
+        ProcessorDependencies(
+            monitors=ActionMonitors(),
+            validators=V2ActionValidators(
+                global_scope=[build_global_gate(database_engine, config_provider)]
+            ),
+            repository=OpsRepository(V2DBOpsProvider(database_engine)),
+        )
     )
 
 
@@ -1333,9 +1904,10 @@ async def server(
         # JWT validator mock — HMAC auth only, JWT not called in tests
         jwt_validator = MagicMock()
 
-        # Insert DI-based middlewares with real plugin contexts
+        # Insert DI-based middlewares with real plugin contexts.
+        # Same order as server_main(): request_id(0) → client_ip(1) → exception(2) → auth(3)
         app.middlewares.insert(
-            1,
+            2,
             build_exception_middleware(
                 error_monitor=error_monitor,
                 stats_monitor=stats_monitor,
@@ -1343,9 +1915,12 @@ async def server(
             ),
         )
         app.middlewares.insert(
-            2,
+            3,
             build_auth_middleware(
                 db=db,
+                key_provider_pool=KeyProviderPool(
+                    providers=[], write_provider_type=KeyProviderType.PLAIN
+                ),
                 jwt_validator=jwt_validator,
                 valkey_stat=valkey_clients.stat,
                 hook_plugin_ctx=hook_plugin_ctx,
@@ -1369,6 +1944,26 @@ async def server(
         yield ServerInfo(host=str(service_addr.host), port=service_addr.port)
 
         await runner.cleanup()
+
+
+@pytest.fixture()
+async def v2_registry_for(
+    server: ServerInfo,
+) -> AsyncIterator[Callable[[KeypairFixtureData], Coroutine[Any, Any, V2ClientRegistry]]]:
+    """Open a V2 client registry authenticated with a keypair."""
+    opened: list[V2ClientRegistry] = []
+
+    async def open_registry(keypair: KeypairFixtureData) -> V2ClientRegistry:
+        registry = await V2ClientRegistry.create(
+            ClientConfig(endpoint=yarl.URL(server.url)),
+            HMACAuth(access_key=keypair.access_key, secret_key=keypair.secret_key),
+        )
+        opened.append(registry)
+        return registry
+
+    yield open_registry
+    for registry in opened:
+        await registry.close()
 
 
 @pytest.fixture()
@@ -1407,3 +2002,26 @@ async def user_registry(
         yield registry
     finally:
         await registry.close()
+
+
+@pytest.fixture()
+def acting_superadmin() -> Iterator[None]:
+    """Run the test body as a superadmin.
+
+    A test that drives processors directly skips the HTTP layer, so nothing has set
+    the caller — and the gates the action layer imposes read it. Production always has
+    one; this supplies the equivalent so the test exercises the gate rather than
+    tripping over its absence.
+    """
+    with with_user_context(
+        UserData(
+            user_id=uuid.uuid4(),
+            is_authorized=True,
+            is_admin=True,
+            is_superadmin=True,
+            role=UserRole.SUPERADMIN,
+            domain_name="default",
+            domain_id=DomainID(uuid.uuid4()),
+        )
+    ):
+        yield

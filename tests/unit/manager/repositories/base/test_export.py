@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 # =============================================================================
 
 
-class ExportTestRow(Base):  # type: ignore[misc]
+class ExportTestRow(Base):
     """ORM model for export testing."""
 
     __tablename__ = "test_export"
@@ -41,7 +41,7 @@ class ExportTestRow(Base):  # type: ignore[misc]
     status: Mapped[str] = mapped_column(sa.String(20), nullable=False, default="active")
 
 
-class ExportTestChildRow(Base):  # type: ignore[misc]
+class ExportTestChildRow(Base):
     """Child ORM model for JOIN testing."""
 
     __tablename__ = "test_export_child"

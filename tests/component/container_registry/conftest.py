@@ -10,30 +10,82 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.container_registry import ContainerRegistryType
-from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
+from ai.backend.common.data.entity.user import UserEntityType
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import Concern, ConcernMeta, GroupMeta
+from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
 from ai.backend.manager.api.rest.container_registry.handler import ContainerRegistryHandler
 from ai.backend.manager.api.rest.container_registry.registry import (
     register_container_registry_routes,
 )
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.clients.container_registry.pool import (
+    ContainerRegistryQuotaClientPool,
+)
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
 )
+from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
+from ai.backend.manager.repositories.ops.v2.roster.provider import RosterOpsProvider
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
+from ai.backend.manager.repositories.permission_controller.repository import (
+    PermissionControllerRepository,
+)
+from ai.backend.manager.repositories.rbac.relation_repository import RbacRelationRepository
+from ai.backend.manager.repositories.rbac.roster_repository import RbacRosterRepository
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
 from ai.backend.manager.services.container_registry.service import ContainerRegistryService
+from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.rbac.processors import RbacProcessors
+from ai.backend.manager.services.rbac.service import (
+    RbacRelationService,
+    RbacRoleService,
+    RbacRosterService,
+)
+
+
+@pytest.fixture()
+def registry_quota_client_pool() -> ContainerRegistryQuotaClientPool:
+    return ContainerRegistryQuotaClientPool()
 
 
 @pytest.fixture()
 def container_registry_processors(
     database_engine: ExtendedAsyncSAEngine,
+    processor_registry: ProcessorRegistry[Any],
+    registry_quota_client_pool: ContainerRegistryQuotaClientPool,
 ) -> ContainerRegistryProcessors:
-    repo = ContainerRegistryRepository(database_engine)
-    service = ContainerRegistryService(database_engine, repo)
+    repo = ContainerRegistryRepository(database_engine, ShareOpsProvider(database_engine))
+    service = ContainerRegistryService(
+        database_engine,
+        repo,
+        registry_quota_client_pool,
+    )
     return ContainerRegistryProcessors(
-        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+        processor_registry.group(GroupMeta(ContainerRegistryEntityType())), service
+    )
+
+
+@pytest.fixture()
+def rbac_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    processor_registry: ProcessorRegistry[Any],
+) -> RbacProcessors:
+    """Real RbacProcessors for the registry's allowed-project links."""
+    rbac_groups = processor_registry.concern(ConcernMeta(Concern.RBAC))
+    return RbacProcessors(
+        rbac_groups.relation_group(),
+        rbac_groups.group(GroupMeta(UserEntityType())),
+        RbacRelationService(RbacRelationRepository(RelationOpsProvider(database_engine))),
+        RbacRosterService(RbacRosterRepository(RosterOpsProvider(database_engine))),
+        RbacRoleService(
+            PermissionControllerRepository(database_engine),
+            RbacRosterRepository(RosterOpsProvider(database_engine)),
+        ),
     )
 
 
@@ -41,11 +93,18 @@ def container_registry_processors(
 def server_module_registries(
     route_deps: RouteDeps,
     container_registry_processors: ContainerRegistryProcessors,
+    rbac_processors: RbacProcessors,
 ) -> list[RouteRegistry]:
     """Load only the modules required for container-registry-domain tests."""
+    processors = MagicMock(spec=Processors)
+    processors.container_registry = container_registry_processors
+    processors.rbac = rbac_processors
     return [
         register_container_registry_routes(
-            ContainerRegistryHandler(container_registry=container_registry_processors),
+            ContainerRegistryHandler(
+                container_registry=container_registry_processors,
+                adapter=ContainerRegistryAdapter(processors.container_registry, processors.rbac),
+            ),
             route_deps,
         ),
     ]

@@ -10,7 +10,7 @@ from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.manager.agent_cache import AgentRPCCache
-from ai.backend.manager.clients.agent import AgentClientPool
+from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -20,10 +20,11 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVariantRepository
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
-from ai.backend.manager.sokovan.deployment.revision_draft import RevisionDraftReader
+from ai.backend.manager.sokovan.deployment.revision_draft.reader import RevisionDraftReader
 from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import AgentSelector
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
@@ -32,7 +33,7 @@ from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller impo
 
 if TYPE_CHECKING:
     from ai.backend.manager.repositories.deployment_revision_preset.repository import (
-        DeploymentRevisionPresetRepository,
+        DeploymentPresetRepository,
     )
 
 from .agent_client_pool import AgentClientPoolDependency, AgentClientPoolInput
@@ -63,9 +64,10 @@ class AgentsInput:
     network_plugin_ctx: NetworkPluginContext
     scheduler_repository: SchedulerRepository
     deployment_repository: DeploymentRepository
-    deployment_revision_preset_repository: DeploymentRevisionPresetRepository | None
+    deployment_revision_preset_repository: DeploymentPresetRepository | None
     runtime_variant_repository: RuntimeVariantRepository
     agent_selector: AgentSelector
+    ops_provider: V2DBOpsProvider
 
 
 @dataclass
@@ -176,6 +178,7 @@ class AgentsComposer(DependencyComposer[AgentsInput, AgentsResources]):
                 network_plugin_ctx=setup_input.network_plugin_ctx,
                 scheduling_controller=scheduling_controller,
                 scheduler_repository=setup_input.scheduler_repository,
+                ops_provider=setup_input.ops_provider,
                 debug=setup_input.config_provider.config.debug.enabled,
                 manager_public_key=setup_input.agent_cache.manager_public_key,
                 manager_secret_key=setup_input.agent_cache.manager_secret_key,

@@ -11,9 +11,9 @@ Only the nullable DB columns (``min_threshold``, ``max_threshold``,
 ``TriState`` and therefore support NULLIFY. The non-nullable columns keep the
 narrower ``OptionalState`` (NOP/UPDATE) semantics.
 
-``apply_model_deployment_modifier`` is a trivial ``for k, v: setattr(self, k, v)``
-over this dict, so validating ``fields_to_update()`` fully covers the behaviour
-observable at the Row level.
+The deployment db_source applies this dict with a plain ``setattr`` per key, so
+validating ``fields_to_update()`` fully covers the behaviour observable at the Row
+level.
 """
 
 from __future__ import annotations

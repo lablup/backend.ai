@@ -4,10 +4,15 @@ from uuid import UUID
 
 from pydantic import Field
 
-from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
-from ai.backend.common.dto.manager.query import StringFilter
-from ai.backend.common.dto.manager.v2.common import OrderDirection
-from ai.backend.common.dto.manager.v2.runtime_variant.types import RuntimeVariantOrderField
+from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.v2.common import NonEmptyList, OrderDirection, String128
+from ai.backend.common.dto.manager.v2.runtime_variant.types import (
+    RuntimeVariantOrderField,
+    RuntimeVariantUsage,
+)
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 
 class CreateRuntimeVariantInput(BaseRequestModel):
@@ -19,8 +24,27 @@ class CreateRuntimeVariantInput(BaseRequestModel):
 
 class UpdateRuntimeVariantInput(BaseRequestModel):
     id: UUID = Field(description="ID of the runtime variant to update.")
-    name: str | None = Field(default=None, min_length=1, max_length=128, description="New name.")
-    description: str | Sentinel | None = Field(default=SENTINEL, description="New description.")
+    name: String128 | None | Unset = Field(
+        default=UNSET,
+        description="New name. Omit to leave unchanged.",
+    )
+    description: str | None | Unset = Field(
+        default=UNSET, description="Updated description. Omit to leave unchanged; null clears."
+    )
+
+
+class PartialBulkUpdateRuntimeVariantsInput(BaseRequestModel):
+    """Input for updating several runtime variants, each answered for separately."""
+
+    items: NonEmptyList[UpdateRuntimeVariantInput] = Field(
+        description="The runtime variants to update, each with its fields."
+    )
+
+
+class PartialBulkPurgeRuntimeVariantsInput(BaseRequestModel):
+    """Input for purging several runtime variants, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the runtime variants to purge.")
 
 
 class DeleteRuntimeVariantsInput(BaseRequestModel):
@@ -31,6 +55,9 @@ class DeleteRuntimeVariantsInput(BaseRequestModel):
 
 class RuntimeVariantFilter(BaseRequestModel):
     name: StringFilter | None = Field(default=None)
+    entity_id: UUIDFilter | None = Field(
+        default=None, description=f"Added in {NEXT_RELEASE_VERSION}. Filter by runtime variant ID."
+    )
     AND: list[RuntimeVariantFilter] | None = Field(default=None)
     OR: list[RuntimeVariantFilter] | None = Field(default=None)
     NOT: list[RuntimeVariantFilter] | None = Field(default=None)
@@ -45,6 +72,12 @@ class RuntimeVariantOrder(BaseRequestModel):
 
 
 class SearchRuntimeVariantsInput(BaseRequestModel):
+    usage: RuntimeVariantUsage | None = Field(
+        default=None,
+        description=(
+            "Uses narrowing the result. Each listed entity must be readable by the caller."
+        ),
+    )
     filter: RuntimeVariantFilter | None = Field(default=None)
     order: list[RuntimeVariantOrder] | None = Field(default=None)
     first: int | None = Field(default=None, ge=1)

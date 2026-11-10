@@ -54,7 +54,7 @@ async def detect_snap_docker():
         async with sess.get("http://localhost/v2/snaps?names=docker") as r:
             try:
                 r.raise_for_status()
-            except:
+            except aiohttp.ClientResponseError:
                 raise RuntimeError("Failed to query Snapd package information")
             response_data = await r.json()
             for pkg_data in response_data["result"]:
@@ -80,8 +80,8 @@ async def detect_system_docker():
         async with sess.get("http://localhost/version") as r:
             try:
                 r.raise_for_status()
-            except:
-                raise RuntimeError("Failed to query Snapd package information")
+            except aiohttp.ClientResponseError:
+                raise RuntimeError("Failed to query Docker daemon version")
             response_data = await r.json()
             return response_data["Version"]
 

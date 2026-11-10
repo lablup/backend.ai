@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from ai.backend.common.health_checker.probe import HealthProbe
     from ai.backend.common.plugin.monitor import ErrorPluginContext
     from ai.backend.manager.api.adapters.registry import Adapters
+    from ai.backend.manager.api.rest.shutdown import ServerDrainNotifier
     from ai.backend.manager.config.provider import ManagerConfigProvider
     from ai.backend.manager.event_dispatcher.handlers.stream_cleanup import (
         StreamCleanupEventHandler,
@@ -43,6 +44,7 @@ def build_api_routes(
     root_app: web.Application,
     stream_cleanup_handler: StreamCleanupEventHandler,
     health_probe: HealthProbe,
+    drain_notifier: ServerDrainNotifier,
     pidx: int = 0,
 ) -> list[RouteRegistry]:
     """Build the full API module tree and return all root-level registries.
@@ -54,6 +56,9 @@ def build_api_routes(
     from ai.backend.manager.api.gql.schema import public_schema as public_strawberry_schema
     from ai.backend.manager.api.gql.schema import schema as strawberry_schema
     from ai.backend.manager.api.gql_legacy.schema import graphene_schema
+    from ai.backend.manager.api.rest.prometheus_query_preset.handler import (
+        PrometheusQueryPresetHandler,
+    )
 
     from .acl.handler import AclHandler
     from .acl.registry import register_acl_routes
@@ -106,7 +111,6 @@ def build_api_routes(
     from .notification.registry import register_notification_routes
     from .object_storage.handler import ObjectStorageHandler
     from .object_storage.registry import register_object_storage_routes
-    from .prometheus_query_preset import PrometheusQueryPresetHandler
     from .prometheus_query_preset.registry import register_prometheus_query_preset_routes
     from .quota_scope.handler import QuotaScopeHandler
     from .quota_scope.registry import register_quota_scope_routes
@@ -115,10 +119,10 @@ def build_api_routes(
     from .rbac.registry import register_rbac_routes
     from .resource.handler import ResourceHandler
     from .resource.registry import register_resource_routes
+    from .resource_group.handler import ResourceGroupHandler
+    from .resource_group.registry import register_resource_group_routes
     from .resource_slot.handler import ResourceSlotHandler
     from .resource_slot.registry import register_resource_slot_routes
-    from .scaling_group.handler import ScalingGroupHandler
-    from .scaling_group.registry import register_scaling_group_routes
     from .scheduling_history.handler import SchedulingHistoryHandler
     from .scheduling_history.registry import register_scheduling_history_routes
     from .service.handler import ServiceHandler
@@ -157,37 +161,39 @@ def build_api_routes(
     resource_slot_handler = ResourceSlotHandler(resource_slot=processors.resource_slot)
     artifact_handler = ArtifactHandler(
         artifact=processors.artifact,
-        artifact_revision=processors.artifact_revision,
+        artifact_revision=processors.artifact.revision,
     )
     artifact_registry_handler = ArtifactRegistryHandler(
         artifact=processors.artifact,
-        artifact_revision=processors.artifact_revision,
+        artifact_revision=processors.artifact.revision,
     )
     compute_sessions_handler = ComputeSessionsHandler(session=processors.session)
     container_registry_handler = ContainerRegistryHandler(
-        container_registry=processors.container_registry
+        container_registry=processors.container_registry,
+        adapter=adapters.container_registry,
     )
     deployment_handler = DeploymentAPIHandler(
         deployment=processors.deployment,
         runtime_variant_adapter=adapters.runtime_variant,
     )
-    domainconfig_handler = DomainConfigHandler(dotfile=processors.dotfile)
-    error_log_handler = ErrorLogHandler(error_log=processors.error_log)
+    domainconfig_handler = DomainConfigHandler(domain=processors.domain)
+    error_log_handler = ErrorLogHandler(error_log=processors.user.error_log)
     etcd_handler = EtcdHandler(
         container_registry=processors.container_registry,
         etcd_config=processors.etcd_config,
     )
     export_handler = ExportHandler(
         export=processors.export,
+        domain=processors.domain,
         export_config=config_provider.config.export,
     )
     fair_share_handler = FairShareAPIHandler(
         fair_share=processors.fair_share,
         resource_usage=processors.resource_usage,
-        scaling_group=processors.scaling_group,
+        resource_group=processors.resource_group,
     )
     group_handler = GroupHandler(container_registry=processors.container_registry)
-    groupconfig_handler = GroupConfigHandler(dotfile=processors.dotfile)
+    groupconfig_handler = GroupConfigHandler(project=processors.project)
     manager_handler = ManagerHandler(manager_admin=processors.manager_admin)
     notification_handler = NotificationHandler(notification=processors.notification)
     object_storage_handler = ObjectStorageHandler(
@@ -196,12 +202,17 @@ def build_api_routes(
     )
     resource_handler = ResourceHandler(
         resource_preset=processors.resource_preset,
+        resource_group=processors.resource_group,
         agent=processors.agent,
-        group=processors.group,
+        project=processors.project,
         user=processors.user,
         container_registry=processors.container_registry,
     )
-    scaling_group_handler = ScalingGroupHandler(scaling_group=processors.scaling_group)
+    resource_group_handler = ResourceGroupHandler(
+        resource_group=processors.resource_group,
+        domain=processors.domain,
+        project=processors.project,
+    )
     scheduling_history_handler = SchedulingHistoryHandler(
         scheduling_history=processors.scheduling_history
     )
@@ -215,16 +226,20 @@ def build_api_routes(
     session_handler = SessionHandler(
         auth=processors.auth,
         session=processors.session,
+        project=processors.project,
+        user=processors.user,
         agent=processors.agent,
         vfolder=processors.vfolder,
         config_provider=config_provider,
     )
     userconfig_handler = UserConfigHandler(
         auth=processors.auth,
-        dotfile=processors.dotfile,
+        user=processors.user,
+        user_config=adapters.user_config,
     )
     vfolder_handler = VFolderHandler(
         auth=processors.auth,
+        user=processors.user,
         vfolder=processors.vfolder,
         vfolder_file=processors.vfolder_file,
         vfolder_invite=processors.vfolder_invite,
@@ -234,9 +249,13 @@ def build_api_routes(
 
     # Admin sub-registries
     domain_handler = DomainHandler(domain=processors.domain)
-    user_handler = UserHandler(user=processors.user, config_provider=config_provider)
+    user_handler = UserHandler(
+        user=processors.user, domain=processors.domain, config_provider=config_provider
+    )
     image_handler = ImageHandler(image=processors.image)
-    rbac_handler = RBACHandler(permission_controller=processors.permission_controller)
+    rbac_handler = RBACHandler(
+        permission_controller=processors.permission_controller, rbac=processors.rbac
+    )
     quota_scope_handler = QuotaScopeHandler(vfs_storage=processors.vfs_storage)
     auto_scaling_rule_handler = AutoScalingRuleHandler(deployment=processors.deployment)
 
@@ -250,7 +269,7 @@ def build_api_routes(
     if gql_context_deps is None:
         raise RuntimeError("GQLContextDeps required for admin routes")
 
-    from ai.backend.manager.api.gql.graphql_ws import GraphQLTransportWSHandler
+    from ai.backend.manager.api.gql.graphql_ws.handler import GraphQLTransportWSHandler
 
     gql_ws_handler = GraphQLTransportWSHandler(
         schema=strawberry_schema,
@@ -266,28 +285,29 @@ def build_api_routes(
 
     # Template sub-registries
     cluster_template_handler = ClusterTemplateHandler(
-        template=processors.template, group=processors.group
+        template=processors.template, project=processors.project
     )
     session_template_handler = SessionTemplateHandler(
-        template=processors.template, group=processors.group
+        template=processors.template, project=processors.project
     )
     cluster_template_reg = register_cluster_template_routes(cluster_template_handler, route_deps)
     session_template_reg = register_session_template_routes(session_template_handler, route_deps)
 
     # Health handler
-    health_handler = HealthHandler(health_probe=health_probe)
+    health_handler = HealthHandler(health_probe=health_probe, drain_notifier=drain_notifier)
 
     # Spec handler
     spec_handler = SpecHandler(config_provider=config_provider, root_app=root_app)
 
     # Events handler
-    events_processors = processors.events
-    event_hub = events_processors.event_hub
-    event_fetcher = events_processors.event_fetcher
+    event_hub = processors.event_hub
+    event_fetcher = processors.event_fetcher
     events_ctx = EventsPrivateContext()
     events_handler = EventsHandler(
         private_ctx=events_ctx,
-        events_processors=events_processors,
+        events_service=processors.events_service,
+        session_processors=processors.session,
+        project_processors=processors.project,
         event_hub=event_hub,
         event_fetcher=event_fetcher,
     )
@@ -336,7 +356,7 @@ def build_api_routes(
             route_deps,
             sub_registries=[cluster_template_reg, session_template_reg],
         ),
-        register_scaling_group_routes(scaling_group_handler, route_deps),
+        register_resource_group_routes(resource_group_handler, route_deps),
         register_error_log_routes(error_log_handler, route_deps),
         register_health_routes(health_handler, route_deps),
         register_ratelimit_routes(route_deps, valkey_rate_limit=valkey_rate_limit),

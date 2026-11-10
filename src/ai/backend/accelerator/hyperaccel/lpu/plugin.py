@@ -8,6 +8,7 @@ from typing import (
 )
 
 import aiodocker
+import trafaret as t
 
 from . import __version__, lpu_api
 from .types import LPUDevice
@@ -40,13 +41,13 @@ from ai.backend.common.types import (
     SlotName,
     SlotTypes,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 PREFIX = "hyperaccel-lpu"
 SLOT_NAME = "hyperaccel-lpu.device"
 
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class LPUPlugin(AbstractComputePlugin):
@@ -58,8 +59,10 @@ class LPUPlugin(AbstractComputePlugin):
     enabled: bool = True
 
     _all_devices: list[LPUDevice] | None
+    _host_ipc: bool
 
     async def init(self, context: Any = None) -> None:
+        self._host_ipc = t.ToBool().check(self.plugin_config.get("host_ipc", True))
         self._all_devices = None
 
         raw_device_mask = self.plugin_config.get("device_mask")
@@ -70,10 +73,12 @@ class LPUPlugin(AbstractComputePlugin):
 
         try:
             detected_devices = await self.list_devices()
-            log.info("detected devices:\n" + pformat(detected_devices))
-            log.info("LPU acceleration is enabled.")
+            log.debug("detected devices:\n{}", pformat(detected_devices))
+            log.info(
+                "accelerator enabled", plugin_name=self.key, device_count=len(detected_devices)
+            )
         except ImportError:
-            log.warning("could not find LPU.")
+            log.warning("accelerator disabled: no devices found", plugin_name=self.key)
             self.enabled = False
 
     async def list_devices(self) -> list[LPUDevice]:
@@ -84,7 +89,7 @@ class LPUPlugin(AbstractComputePlugin):
 
     async def available_slots(self) -> Mapping[SlotName, Decimal]:
         devices = await self.list_devices()
-        log.debug("available devices: {}", Decimal(len(devices)))
+        log.debug("available devices: {}", len(devices))
         return {
             SlotName(SLOT_NAME): Decimal(len(devices)),
         }
@@ -192,7 +197,7 @@ class LPUPlugin(AbstractComputePlugin):
         return {
             "HostConfig": {
                 "CapAdd": ["IPC_LOCK"],
-                "IpcMode": "host",
+                **({"IpcMode": "host"} if self._host_ipc else {}),
                 "Ulimits": [
                     {
                         "Name": "memlock",

@@ -1,97 +1,107 @@
-from typing import override
-
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
-from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.services.domain.actions.create_domain import (
-    CreateDomainAction,
-    CreateDomainActionResult,
+from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.lookup.bulk_processor import BulkLookupActionProcessor
+from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
+from ai.backend.manager.actions.v2.ops.result import (
+    BatchOpsResult,
+    BulkLookupOpsResult,
+    CreatedEntityOpsResult,
+    EntityOpsResult,
+    LookupOpsResult,
+    ScopedBatchOpsResult,
 )
-from ai.backend.manager.services.domain.actions.create_domain_node import (
-    CreateDomainNodeAction,
-    CreateDomainNodeActionResult,
+from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
+from ai.backend.manager.actions.v2.single_entity.processor import (
+    SingleEntityActionProcessor,
 )
-from ai.backend.manager.services.domain.actions.delete_domain import (
-    DeleteDomainAction,
-    DeleteDomainActionResult,
+from ai.backend.manager.data.domain.types import DomainData
+from ai.backend.manager.services.domain.actions.bulk_get import BulkGetDomainsAction
+from ai.backend.manager.services.domain.actions.bulk_lookup import BulkLookupDomainsAction
+from ai.backend.manager.services.domain.actions.create_domain import CreateDomainAction
+from ai.backend.manager.services.domain.actions.create_domain_dotfile import (
+    CreateDomainDotfileAction,
+    CreateDomainDotfileActionResult,
 )
-from ai.backend.manager.services.domain.actions.get_domain import (
-    GetDomainAction,
-    GetDomainActionResult,
+from ai.backend.manager.services.domain.actions.delete_domain import DeleteDomainAction
+from ai.backend.manager.services.domain.actions.delete_domain_dotfile import (
+    DeleteDomainDotfileAction,
+    DeleteDomainDotfileActionResult,
 )
-from ai.backend.manager.services.domain.actions.modify_domain import (
-    ModifyDomainAction,
-    ModifyDomainActionResult,
+from ai.backend.manager.services.domain.actions.get import GetDomainAction
+from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
+from ai.backend.manager.services.domain.actions.partial_bulk_delete_domains import (
+    PartialBulkDeleteDomainsAction,
 )
-from ai.backend.manager.services.domain.actions.modify_domain_node import (
-    ModifyDomainNodeAction,
-    ModifyDomainNodeActionResult,
+from ai.backend.manager.services.domain.actions.partial_bulk_restore_domains import (
+    PartialBulkRestoreDomainsAction,
+)
+from ai.backend.manager.services.domain.actions.partial_bulk_update_domains import (
+    PartialBulkUpdateDomainsAction,
 )
 from ai.backend.manager.services.domain.actions.purge_domain import (
     PurgeDomainAction,
     PurgeDomainActionResult,
 )
-from ai.backend.manager.services.domain.actions.resolve_domain_id_by_name import (
-    ResolveDomainIDByNameAction,
-    ResolveDomainIDByNameActionResult,
+from ai.backend.manager.services.domain.actions.restore_domain import RestoreDomainAction
+from ai.backend.manager.services.domain.actions.scoped_search import ScopedSearchDomainsAction
+from ai.backend.manager.services.domain.actions.search_domains import GlobalSearchDomainsAction
+from ai.backend.manager.services.domain.actions.update_domain import UpdateDomainAction
+from ai.backend.manager.services.domain.actions.update_domain_dotfile import (
+    UpdateDomainDotfileAction,
+    UpdateDomainDotfileActionResult,
 )
-from ai.backend.manager.services.domain.actions.search_domains import (
-    SearchDomainsAction,
-    SearchDomainsActionResult,
-)
-from ai.backend.manager.services.domain.actions.search_rg_domains import (
-    SearchRGDomainsAction,
-    SearchRGDomainsActionResult,
-)
-
-from .service import DomainService
+from ai.backend.manager.services.domain.service import DomainService
 
 
-class DomainProcessors(AbstractProcessorPackage):
-    create_domain_node: ActionProcessor[CreateDomainNodeAction, CreateDomainNodeActionResult]
-    modify_domain_node: ActionProcessor[ModifyDomainNodeAction, ModifyDomainNodeActionResult]
-    create_domain: ActionProcessor[CreateDomainAction, CreateDomainActionResult]
-    modify_domain: ActionProcessor[ModifyDomainAction, ModifyDomainActionResult]
-    delete_domain: ActionProcessor[DeleteDomainAction, DeleteDomainActionResult]
-    purge_domain: ActionProcessor[PurgeDomainAction, PurgeDomainActionResult]
-    get_domain: ActionProcessor[GetDomainAction, GetDomainActionResult]
-    search_domains: ActionProcessor[SearchDomainsAction, SearchDomainsActionResult]
-    search_rg_domains: ActionProcessor[SearchRGDomainsAction, SearchRGDomainsActionResult]
-    resolve_domain_id_by_name: ActionProcessor[
-        ResolveDomainIDByNameAction, ResolveDomainIDByNameActionResult
+class DomainProcessors:
+    get: SingleEntityActionProcessor[GetDomainAction, EntityOpsResult[DomainData]]
+    lookup_name: LookupActionProcessor[LookupDomainAction, LookupOpsResult[DomainID]]
+    bulk_lookup_names: BulkLookupActionProcessor[
+        BulkLookupDomainsAction, BulkLookupOpsResult[DomainName, DomainID]
+    ]
+    # What the DataLoaders read: one READ check per domain named.
+    bulk_get_ids: PartialBulkActionProcessor[BulkGetDomainsAction, DomainData]
+    global_search: GlobalActionProcessor[GlobalSearchDomainsAction, BatchOpsResult[DomainData]]
+    scoped_search: ScopeActionProcessor[ScopedSearchDomainsAction, ScopedBatchOpsResult[DomainData]]
+    create: GlobalActionProcessor[CreateDomainAction, CreatedEntityOpsResult[DomainData]]
+    update: SingleEntityActionProcessor[UpdateDomainAction, EntityOpsResult[DomainData]]
+    delete: SingleEntityActionProcessor[DeleteDomainAction, EntityOpsResult[DomainData]]
+    restore: SingleEntityActionProcessor[RestoreDomainAction, EntityOpsResult[DomainData]]
+    purge: SingleEntityActionProcessor[PurgeDomainAction, PurgeDomainActionResult]
+    partial_bulk_update: PartialBulkActionProcessor[PartialBulkUpdateDomainsAction, DomainData]
+    partial_bulk_delete: PartialBulkActionProcessor[PartialBulkDeleteDomainsAction, DomainData]
+    partial_bulk_restore: PartialBulkActionProcessor[PartialBulkRestoreDomainsAction, DomainData]
+    create_dotfile: SingleEntityActionProcessor[
+        CreateDomainDotfileAction, CreateDomainDotfileActionResult
+    ]
+    update_dotfile: SingleEntityActionProcessor[
+        UpdateDomainDotfileAction, UpdateDomainDotfileActionResult
+    ]
+    delete_dotfile: SingleEntityActionProcessor[
+        DeleteDomainDotfileAction, DeleteDomainDotfileActionResult
     ]
 
     def __init__(
         self,
+        group: ProcessorGroup[DomainData],
         service: DomainService,
-        action_monitors: list[ActionMonitor],
-        validators: ActionValidators,
     ) -> None:
-        self.create_domain_node = ActionProcessor(service.create_domain_node, action_monitors)
-        self.modify_domain_node = ActionProcessor(service.modify_domain_node, action_monitors)
-        self.create_domain = ActionProcessor(service.create_domain, action_monitors)
-        self.modify_domain = ActionProcessor(service.modify_domain, action_monitors)
-        self.delete_domain = ActionProcessor(service.delete_domain, action_monitors)
-        self.purge_domain = ActionProcessor(service.purge_domain, action_monitors)
-        self.get_domain = ActionProcessor(service.get_domain, action_monitors)
-        self.search_domains = ActionProcessor(service.search_domains, action_monitors)
-        self.search_rg_domains = ActionProcessor(service.search_rg_domains, action_monitors)
-        self.resolve_domain_id_by_name = ActionProcessor(
-            service.resolve_domain_id_by_name, action_monitors
-        )
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            CreateDomainNodeAction.spec(),
-            ModifyDomainNodeAction.spec(),
-            CreateDomainAction.spec(),
-            ModifyDomainAction.spec(),
-            DeleteDomainAction.spec(),
-            PurgeDomainAction.spec(),
-            GetDomainAction.spec(),
-            SearchDomainsAction.spec(),
-            SearchRGDomainsAction.spec(),
-            ResolveDomainIDByNameAction.spec(),
-        ]
+        self.get = group.single_get_ops(GetDomainAction)
+        self.lookup_name = group.public_lookup_ops(LookupDomainAction)
+        self.bulk_lookup_names = group.public_bulk_lookup_ops(BulkLookupDomainsAction)
+        self.bulk_get_ids = group.partial_bulk_get_ops(BulkGetDomainsAction)
+        self.global_search = group.global_searcher_ops(GlobalSearchDomainsAction)
+        self.scoped_search = group.scoped_search_ops(ScopedSearchDomainsAction)
+        self.create = group.global_scope(CreateDomainAction, service.create)
+        self.update = group.single_update_ops(UpdateDomainAction)
+        self.delete = group.single_delete_ops(DeleteDomainAction)
+        self.restore = group.single_restore_ops(RestoreDomainAction)
+        self.purge = group.single_entity(PurgeDomainAction, service.purge)
+        self.partial_bulk_update = group.partial_bulk_update_ops(PartialBulkUpdateDomainsAction)
+        self.partial_bulk_delete = group.partial_bulk_delete_ops(PartialBulkDeleteDomainsAction)
+        self.partial_bulk_restore = group.partial_bulk_restore_ops(PartialBulkRestoreDomainsAction)
+        self.create_dotfile = group.single_entity(CreateDomainDotfileAction, service.create_dotfile)
+        self.update_dotfile = group.single_entity(UpdateDomainDotfileAction, service.update_dotfile)
+        self.delete_dotfile = group.single_entity(DeleteDomainDotfileAction, service.delete_dotfile)

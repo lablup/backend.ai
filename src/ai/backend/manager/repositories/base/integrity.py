@@ -16,8 +16,7 @@ from ai.backend.manager.errors.repository import (
     RepositoryIntegrityError,
     UniqueConstraintViolationError,
 )
-
-from .types import IntegrityErrorCheck
+from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
 _SQLSTATE_TO_ERROR: dict[str, type[RepositoryIntegrityError]] = {
     "23505": UniqueConstraintViolationError,

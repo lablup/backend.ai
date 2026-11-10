@@ -16,18 +16,28 @@ from ai.backend.common.dto.manager.scheduling_history import (
     SearchRouteHistoryRequest,
     SearchSessionHistoryRequest,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.dto.context import UserContext
-from ai.backend.manager.services.scheduling_history.actions import (
+from ai.backend.manager.models.scheduling_history.searchers import (
+    DeploymentHistorySearcher,
+    RouteHistorySearcher,
+    SessionSchedulingHistorySearcher,
+)
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
+from ai.backend.manager.services.scheduling_history.actions.search_deployment_history import (
     SearchDeploymentHistoryAction,
+)
+from ai.backend.manager.services.scheduling_history.actions.search_route_history import (
     SearchRouteHistoryAction,
+)
+from ai.backend.manager.services.scheduling_history.actions.search_session_history import (
     SearchSessionHistoryAction,
 )
 from ai.backend.manager.services.scheduling_history.processors import SchedulingHistoryProcessors
 
 from .adapter import SchedulingHistoryAdapter
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class SchedulingHistoryHandler:
@@ -43,18 +53,24 @@ class SchedulingHistoryHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Search session scheduling history."""
-        log.info("SEARCH_SESSION_HISTORY (ak:{})", ctx.access_key)
 
         querier = self._adapter.build_session_history_querier(body.parsed)
 
-        action_result = await self._scheduling_history.search_session_history.wait_for_complete(
-            SearchSessionHistoryAction(querier=querier)
+        action_result = await self._scheduling_history.search_session_history.run(
+            SearchSessionHistoryAction(
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=SessionSchedulingHistorySearcher(
+                        pagination=querier.pagination,
+                        conditions=querier.conditions,
+                        orders=querier.orders,
+                    ),
+                )
+            )
         )
 
         resp = ListSessionHistoryResponse(
-            items=[
-                self._adapter.convert_session_history_to_dto(h) for h in action_result.histories
-            ],
+            items=[self._adapter.convert_session_history_to_dto(h) for h in action_result.items],
             pagination=PaginationInfo(
                 total=action_result.total_count,
                 offset=body.parsed.offset,
@@ -69,18 +85,24 @@ class SchedulingHistoryHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Search deployment history."""
-        log.info("SEARCH_DEPLOYMENT_HISTORY (ak:{})", ctx.access_key)
 
         querier = self._adapter.build_deployment_history_querier(body.parsed)
 
-        action_result = await self._scheduling_history.search_deployment_history.wait_for_complete(
-            SearchDeploymentHistoryAction(querier=querier)
+        action_result = await self._scheduling_history.search_deployment_history.run(
+            SearchDeploymentHistoryAction(
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=DeploymentHistorySearcher(
+                        pagination=querier.pagination,
+                        conditions=querier.conditions,
+                        orders=querier.orders,
+                    ),
+                )
+            )
         )
 
         resp = ListDeploymentHistoryResponse(
-            items=[
-                self._adapter.convert_deployment_history_to_dto(h) for h in action_result.histories
-            ],
+            items=[self._adapter.convert_deployment_history_to_dto(h) for h in action_result.items],
             pagination=PaginationInfo(
                 total=action_result.total_count,
                 offset=body.parsed.offset,
@@ -95,16 +117,24 @@ class SchedulingHistoryHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Search route history."""
-        log.info("SEARCH_ROUTE_HISTORY (ak:{})", ctx.access_key)
 
         querier = self._adapter.build_route_history_querier(body.parsed)
 
-        action_result = await self._scheduling_history.search_route_history.wait_for_complete(
-            SearchRouteHistoryAction(querier=querier)
+        action_result = await self._scheduling_history.search_route_history.run(
+            SearchRouteHistoryAction(
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=RouteHistorySearcher(
+                        pagination=querier.pagination,
+                        conditions=querier.conditions,
+                        orders=querier.orders,
+                    ),
+                )
+            )
         )
 
         resp = ListRouteHistoryResponse(
-            items=[self._adapter.convert_route_history_to_dto(h) for h in action_result.histories],
+            items=[self._adapter.convert_route_history_to_dto(h) for h in action_result.items],
             pagination=PaginationInfo(
                 total=action_result.total_count,
                 offset=body.parsed.offset,

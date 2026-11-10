@@ -41,6 +41,7 @@ def _make_client(mock_session: MagicMock) -> V2AppConfigDefinitionClient:
 def _node_payload(definition_id: str, config_name: str) -> dict[str, str]:
     return {
         "id": definition_id,
+        "entity_id": definition_id,
         "config_name": config_name,
         "created_at": "2026-01-01T00:00:00+00:00",
         "updated_at": "2026-01-02T00:00:00+00:00",
@@ -116,7 +117,9 @@ class TestAdminPurge:
         definition_id = uuid4()
         mock_resp = AsyncMock()
         mock_resp.status = 200
-        mock_resp.json = AsyncMock(return_value={"id": str(definition_id)})
+        mock_resp.json = AsyncMock(
+            return_value={"id": str(definition_id), "entity_id": str(definition_id)}
+        )
         mock_session = _make_request_session(mock_resp)
         client = _make_client(mock_session)
 

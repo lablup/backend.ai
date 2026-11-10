@@ -2,20 +2,23 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
-from typing import Any
+from typing import Any, override
 from uuid import UUID
 
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID, PageInfo
 
+from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.dto.manager.v2.role_permission_preset.request import (
     RolePermissionPresetFilter,
     RolePermissionPresetOrder,
     SearchRolePermissionPresetsInput,
 )
 from ai.backend.common.dto.manager.v2.role_preset.response import RolePresetNode
-from ai.backend.common.identifier.role_preset import RolePresetID
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -24,7 +27,6 @@ from ai.backend.manager.api.gql.decorators import (
     gql_node_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
-from ai.backend.manager.api.gql.rbac.types import RBACElementTypeGQL
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 from .permission import (
@@ -33,6 +35,7 @@ from .permission import (
     RolePermissionPresetFilterGQL,
     RolePermissionPresetGQL,
     RolePermissionPresetOrderByGQL,
+    RolePermissionPresetOrderFieldGQL,
 )
 
 
@@ -45,9 +48,28 @@ from .permission import (
 )
 class RolePresetGQL(PydanticNodeMixin[RolePresetNode]):
     id: NodeID[str] = gql_field(description="Role preset UUID (primary key).")
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="UUID of the role preset.",
+        ),
+    )
     name: str = gql_field(description="Role preset name.")
-    scope_type: RBACElementTypeGQL = gql_field(
-        description="Scope type this preset targets (e.g., domain, project)."
+    scope_type: str = gql_field(
+        description=(
+            "Scope type this preset targets (e.g., domain, project). A preset of the "
+            "`global` type reads as the global entity its role is created in: `global` or "
+            "`public`."
+        )
+    )
+    role_name_template: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Jinja template rendering the name of each role instantiated from this preset."
+            ),
+        ),
+        default=None,
     )
     auto_assign: bool = gql_field(
         description=(
@@ -55,11 +77,30 @@ class RolePresetGQL(PydanticNodeMixin[RolePresetNode]):
             "from this preset."
         )
     )
+    auto_assign_to_owner: bool = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Whether a personal project's owner is mapped to the role made from this preset. "
+                "Allowed only on a project preset."
+            ),
+        ),
+    )
     deleted: bool = gql_field(
         description=(
             "Soft-delete flag. Set by the delete mutation and cleared by the restore "
             "mutation; archived rows are excluded from default searches."
-        )
+        ),
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `deletedAt`.",
+    )
+    deleted_at: datetime | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Soft-delete time. Set by the delete mutation and cleared by the restore "
+                "mutation; null while the preset is in use."
+            ),
+        ),
     )
     created_at: datetime = gql_field(description="Creation timestamp.")
     updated_at: datetime = gql_field(description="Last modification timestamp.")
@@ -83,9 +124,11 @@ class RolePresetGQL(PydanticNodeMixin[RolePresetNode]):
         offset: int | None = None,
     ) -> RolePermissionPresetConnection | None:
         filter_dto: RolePermissionPresetFilter | None = filter.to_pydantic() if filter else None
-        orders_dto: list[RolePermissionPresetOrder] | None = (
-            [o.to_pydantic() for o in order_by] if order_by else None
-        )
+        orders_dto: list[RolePermissionPresetOrder] | None = [
+            o.to_pydantic()
+            for o in order_by or []
+            if o.field is not RolePermissionPresetOrderFieldGQL.OPERATION
+        ] or None
         search_input = SearchRolePermissionPresetsInput(
             filter=filter_dto,
             order=orders_dto,
@@ -102,7 +145,7 @@ class RolePresetGQL(PydanticNodeMixin[RolePresetNode]):
         edges = [
             RolePermissionPresetEdge(
                 node=RolePermissionPresetGQL.from_pydantic(item),
-                cursor=str(item.id),
+                cursor=encode_cursor(item.id),
             )
             for item in result.items
         ]
@@ -116,6 +159,19 @@ class RolePresetGQL(PydanticNodeMixin[RolePresetNode]):
             ),
             count=result.total_count,
         )
+
+    @classmethod
+    @override
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[RolePresetGQL | None]:
+        return await info.context.data_loaders.role_preset_loader.load_many([
+            RolePresetID(UUID(nid)) for nid in node_ids
+        ])
 
 
 RolePresetEdge = Edge[RolePresetGQL]

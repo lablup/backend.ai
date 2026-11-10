@@ -1,4 +1,4 @@
-# Client SDK v2 — Guardrails
+# Client SDK v2: Guardrails
 
 ## Architecture
 
@@ -12,16 +12,15 @@ Each client class inherits from `BaseDomainClient` and uses `self._client.typed_
 ## Naming conventions
 
 - admin methods: `admin_search()`, `admin_create()`, `admin_update()`, `admin_delete()`, `admin_purge()`
-- scoped search methods: currently `{scope}_search()` — e.g. `project_search(project_id, request)`, `domain_search(domain_name, request)`.
-  **Forward direction (under consideration):** unify to `scoped_search(request)` following the server `scopedFoosV2` convention, and take the scope
-  as a field of the request DTO. (The URL pattern and CLI surface must be decided together.)
-- self-service methods: `my_search()`, `my_issue()` — mapped to `/v2/{entity}/my/{operation}`
+- scoped search methods: currently `{scope}_search()`, for example `project_search(project_id, request)`, `domain_search(domain_name, request)`.
+  The unification direction under consideration lives in `KNOWLEDGE.md`.
+- self-service methods: `my_search()`, `my_issue()`, mapped to `/v2/{entity}/my/{operation}`
 - user-facing methods: `get()`, `enqueue()`
 
 **scoped search URL pattern:**
 - The SDK method calls `POST /v2/{entity}/{scope_type}/{scope_id}/search`.
-- e.g. `f"{_PATH}/projects/{project_id}/search"` (not `f"{_PATH}/search-by-project/{id}"`)
-- Do NOT use the `search-by-{scope}` URL pattern.
+- For example, `f"{_PATH}/projects/{project_id}/search"` (not `f"{_PATH}/search-by-project/{id}"`)
+- Do not use the `search-by-{scope}` URL pattern.
 
 ## typed_request pattern
 

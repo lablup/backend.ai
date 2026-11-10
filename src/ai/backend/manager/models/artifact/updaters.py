@@ -1,0 +1,218 @@
+"""Update specs for the artifacts table."""
+
+from __future__ import annotations
+
+from collections.abc import Collection, Sequence
+from dataclasses import dataclass, field
+from typing import Any, override
+from uuid import UUID
+
+import sqlalchemy as sa
+from sqlalchemy.orm import InstrumentedAttribute
+
+from ai.backend.common.data.entity.artifact import ArtifactID
+from ai.backend.common.data.filter_specs import UUIDInMatchSpec
+from ai.backend.manager.data.artifact.types import ArtifactAvailability, ArtifactData
+from ai.backend.manager.errors.artifact import ArtifactNotFoundError
+from ai.backend.manager.models.artifact.row import ArtifactRow
+from ai.backend.manager.models.artifact.searchable_fields import (
+    ArtifactSearchableFields,
+)
+from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.specs.types import GuardCheck, IntegrityErrorCheck
+from ai.backend.manager.models.specs.updater import (
+    DataBatchUpdater,
+    DataUpdater,
+    GuardedDataUpdater,
+)
+from ai.backend.manager.types import OptionalState, TriState
+
+
+@dataclass
+class ArtifactUpdater(GuardedDataUpdater[ArtifactRow, ArtifactData]):
+    """Edit one artifact's readonly flag and description.
+
+    Guarded on availability: a deleted artifact is left alone and answers as not found.
+    """
+
+    artifact_id: ArtifactID
+    readonly: OptionalState[bool] = field(default_factory=OptionalState[bool].nop)
+    description: TriState[str] = field(default_factory=TriState[str].nop)
+
+    @property
+    @override
+    def row_class(self) -> type[ArtifactRow]:
+        return ArtifactRow
+
+    @override
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return ArtifactRow.id
+
+    @override
+    def target_id_value(self) -> ArtifactID:
+        return self.artifact_id
+
+    @property
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return ()
+
+    @override
+    def guard_checks(self) -> Sequence[GuardCheck]:
+        return (
+            GuardCheck(
+                condition=lambda: ArtifactRow.availability != ArtifactAvailability.DELETED,
+                error=ArtifactNotFoundError(f"Artifact with ID {self.artifact_id} is deleted"),
+            ),
+        )
+
+    @override
+    def build_values(self) -> dict[str, Any]:
+        to_update: dict[str, Any] = {}
+        self.readonly.update_dict(to_update, "readonly")
+        self.description.update_dict(to_update, "description")
+        return to_update
+
+    @override
+    def to_data(self, row: ArtifactRow) -> ArtifactData:
+        return ArtifactSearchableFields.own.to_data(row)
+
+
+@dataclass
+class ArtifactScanUpdater(DataUpdater[ArtifactRow, ArtifactData]):
+    """Write back what a scan found about an artifact already registered.
+
+    Separate from :class:`ArtifactUpdater` because the columns differ: a scan carries
+    the registry's own description and extra, and stamps the row as touched.
+    """
+
+    artifact_id: ArtifactID
+    extra: Any | None
+    description: TriState[str] = field(default_factory=TriState[str].nop)
+
+    @property
+    @override
+    def row_class(self) -> type[ArtifactRow]:
+        return ArtifactRow
+
+    @override
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return ArtifactRow.id
+
+    @override
+    def target_id_value(self) -> ArtifactID:
+        return self.artifact_id
+
+    @property
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return ()
+
+    @override
+    def build_values(self) -> dict[str, Any]:
+        to_update: dict[str, Any] = {"extra": self.extra, "updated_at": sa.func.now()}
+        self.description.update_dict(to_update, "description")
+        return to_update
+
+    @override
+    def to_data(self, row: ArtifactRow) -> ArtifactData:
+        return ArtifactSearchableFields.own.to_data(row)
+
+
+@dataclass
+class ArtifactTouchUpdater(DataBatchUpdater[ArtifactRow, ArtifactData]):
+    """Stamp the artifacts a scan wrote revisions under as touched."""
+
+    artifact_ids: Collection[UUID]
+
+    @property
+    @override
+    def row_class(self) -> type[ArtifactRow]:
+        return ArtifactRow
+
+    @override
+    def conditions(self) -> list[QueryCondition]:
+        return [
+            ArtifactSearchableFields.own.id.filter.in_(
+                UUIDInMatchSpec(values=list(self.artifact_ids), negated=False)
+            )
+        ]
+
+    @override
+    def build_values(self) -> dict[str, Any]:
+        return {"updated_at": sa.func.now()}
+
+    @property
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return ()
+
+    @override
+    def to_data(self, row: ArtifactRow) -> ArtifactData:
+        return ArtifactSearchableFields.own.to_data(row)
+
+
+@dataclass
+class ArtifactSoftDeleteUpdater(DataUpdater[ArtifactRow, ArtifactData]):
+    """Mark one artifact deleted."""
+
+    artifact_id: ArtifactID
+
+    @property
+    @override
+    def row_class(self) -> type[ArtifactRow]:
+        return ArtifactRow
+
+    @override
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return ArtifactRow.id
+
+    @override
+    def target_id_value(self) -> ArtifactID:
+        return self.artifact_id
+
+    @property
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return ()
+
+    @override
+    def build_values(self) -> dict[str, Any]:
+        return {"availability": ArtifactAvailability.DELETED.value}
+
+    @override
+    def to_data(self, row: ArtifactRow) -> ArtifactData:
+        return ArtifactSearchableFields.own.to_data(row)
+
+
+@dataclass
+class ArtifactRestoreUpdater(DataUpdater[ArtifactRow, ArtifactData]):
+    """Mark one deleted artifact alive again."""
+
+    artifact_id: ArtifactID
+
+    @property
+    @override
+    def row_class(self) -> type[ArtifactRow]:
+        return ArtifactRow
+
+    @override
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return ArtifactRow.id
+
+    @override
+    def target_id_value(self) -> ArtifactID:
+        return self.artifact_id
+
+    @property
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return ()
+
+    @override
+    def build_values(self) -> dict[str, Any]:
+        return {"availability": ArtifactAvailability.ALIVE.value}
+
+    @override
+    def to_data(self, row: ArtifactRow) -> ArtifactData:
+        return ArtifactSearchableFields.own.to_data(row)

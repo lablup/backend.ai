@@ -6,6 +6,7 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
+from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.dto.manager.v2.vfolder.request import (
     BulkDeleteVFoldersInput,
     BulkPurgeVFoldersInput,
@@ -19,10 +20,23 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     ListFilesInput,
     MkdirInput,
     MoveFileInput,
+    PartialBulkDeleteVFoldersInput,
+    PartialBulkRestoreVFoldersInput,
+    PartialBulkUpdateVFoldersInput,
     PurgeVFolderInput,
+    ScopedSearchVFoldersInput,
     SearchVFoldersInput,
+    SetVFolderMountPolicyInput,
+    UnsetVFolderMountPolicyInput,
+    UpdateVFolderInput,
 )
-from ai.backend.manager.api.rest.v2.path_params import ProjectIdPathParam, VFolderIdPathParam
+from ai.backend.common.dto.manager.v2.vfolder.types import VFolderScope
+from ai.backend.manager.api.rest.v2.path_params import (
+    ProjectIdPathParam,
+    VFolderIdPathParam,
+    VFolderUserPathParam,
+)
+from ai.backend.manager.dto.context import UserContext
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
@@ -36,10 +50,32 @@ class V2VFolderHandler:
 
     async def my_search(
         self,
+        user_ctx: UserContext,
         body: BodyParam[SearchVFoldersInput],
     ) -> APIResponse:
         """Search vfolders owned by the current user."""
-        result = await self._adapter.my_search(body.parsed)
+        result = await self._adapter.scoped_search(
+            ScopedSearchVFoldersInput(
+                scope=VFolderScope(user=[UUIDScope(value=user_ctx.user_uuid)]),
+                usage=body.parsed.usage,
+                filter=body.parsed.filter,
+                order=body.parsed.order,
+                first=body.parsed.first,
+                after=body.parsed.after,
+                last=body.parsed.last,
+                before=body.parsed.before,
+                limit=body.parsed.limit,
+                offset=body.parsed.offset,
+            )
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def scoped_search(
+        self,
+        body: BodyParam[ScopedSearchVFoldersInput],
+    ) -> APIResponse:
+        """Search the vfolders the named scopes reach, combined with OR."""
+        result = await self._adapter.scoped_search(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def project_search(
@@ -84,12 +120,80 @@ class V2VFolderHandler:
         result = await self._adapter.get(path.parsed.vfolder_id)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
+    async def set_mount_policy(
+        self,
+        path: PathParam[VFolderIdPathParam],
+        body: BodyParam[SetVFolderMountPolicyInput],
+    ) -> APIResponse:
+        """Set the mount level one user gets on the vfolder."""
+        result = await self._adapter.set_mount_policy(path.parsed.vfolder_id, body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def unset_mount_policy(
+        self,
+        path: PathParam[VFolderUserPathParam],
+    ) -> APIResponse:
+        """Take back the mount level one user was given on the vfolder."""
+        result = await self._adapter.unset_mount_policy(
+            path.parsed.vfolder_id, UnsetVFolderMountPolicyInput(user_id=path.parsed.user_id)
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def list_mount_policies(
+        self,
+        path: PathParam[VFolderIdPathParam],
+    ) -> APIResponse:
+        """The mount levels set on the vfolder, one row per user."""
+        result = await self._adapter.list_mount_policies(path.parsed.vfolder_id)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def update(
+        self,
+        path: PathParam[VFolderIdPathParam],
+        body: BodyParam[UpdateVFolderInput],
+    ) -> APIResponse:
+        """Update a vfolder's name and options."""
+        result = await self._adapter.update(path.parsed.vfolder_id, body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
     async def delete(
         self,
         path: PathParam[VFolderIdPathParam],
     ) -> APIResponse:
         """Soft-delete a vfolder."""
         result = await self._adapter.delete(path.parsed.vfolder_id)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def deprecated_delete(
+        self,
+        path: PathParam[VFolderIdPathParam],
+    ) -> APIResponse:
+        """Deprecated. Use `POST /v2/vfolders/{vfolder_id}/delete`."""
+        result = await self._adapter.delete(path.parsed.vfolder_id)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_update(
+        self,
+        body: BodyParam[PartialBulkUpdateVFoldersInput],
+    ) -> APIResponse:
+        """Update several vfolders, answering for each one."""
+        result = await self._adapter.partial_bulk_update(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_delete(
+        self,
+        body: BodyParam[PartialBulkDeleteVFoldersInput],
+    ) -> APIResponse:
+        """Soft-delete several vfolders, answering for each one."""
+        result = await self._adapter.partial_bulk_delete(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_restore(
+        self,
+        body: BodyParam[PartialBulkRestoreVFoldersInput],
+    ) -> APIResponse:
+        """Restore several soft-deleted vfolders, answering for each one."""
+        result = await self._adapter.partial_bulk_restore(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def purge(
@@ -185,7 +289,7 @@ class V2VFolderHandler:
         self,
         body: BodyParam[BulkDeleteVFoldersInput],
     ) -> APIResponse:
-        """Soft-delete multiple vfolders."""
+        """Deprecated. Use `POST /v2/vfolders/partial-bulk-delete`."""
         result = await self._adapter.bulk_delete(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 

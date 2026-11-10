@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from typing import override
 
 import aiohttp
+import yarl
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import (
     ReplicaHealthResult,
@@ -21,14 +22,14 @@ from ai.backend.common.clients.valkey_client.valkey_schedule import (
     ValkeyScheduleClient,
 )
 from ai.backend.common.config import ModelHealthCheck
-from ai.backend.common.identifier.replica import ReplicaID
-from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.repositories.deployment import DeploymentRepository
-from ai.backend.manager.repositories.deployment.types import RouteData
+from ai.backend.common.data.entity.replica import ReplicaID
+from ai.backend.logging.structured import StructuredLogger, with_log_context
+from ai.backend.manager.data.deployment.types import RouteData
+from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 
 from .base import RouteObservationResult, RouteObserver
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 
 @dataclass
@@ -110,6 +111,7 @@ class RouteHealthObserver(RouteObserver):
         # Perform HTTP health checks in parallel using per-route policy.
         results = await asyncio.gather(*[
             self._http_health_check(
+                plan.route_id,
                 plan.target.replica_host,
                 plan.target.inference_port,
                 plan.target.health_path,
@@ -131,11 +133,12 @@ class RouteHealthObserver(RouteObserver):
         ]
         await self._valkey_schedule.record_route_health_statuses_batch(health_results)
 
-        log.debug("Health observer: checked {} routes", len(plans))
+        log.debug("route health observed", route_count=len(plans))
         return RouteObservationResult(observed_count=len(plans))
 
-    @staticmethod
     async def _http_health_check(
+        self,
+        route_id: ReplicaID,
         host: str,
         port: int,
         path: str,
@@ -143,13 +146,35 @@ class RouteHealthObserver(RouteObserver):
         expected_status_code: int,
     ) -> bool:
         """Perform HTTP GET health check."""
-        url = f"http://{host}:{port}{path}"
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    url, timeout=aiohttp.ClientTimeout(total=max_wait_time)
-                ) as resp:
-                    return resp.status == expected_status_code
-        except Exception:
-            log.debug("Health check failed for {}", url)
-            return False
+        with with_log_context(route_id=route_id):
+            # Build from parts so the path cannot replace the host (e.g. ``@other.host/``).
+            path_part, _, query = path.partition("?")
+            try:
+                url = yarl.URL.build(
+                    scheme="http", host=host, port=port, path=path_part, query_string=query
+                )
+            except ValueError as e:
+                log.trace("route health check path is invalid: {}", path, reason=repr(e))
+                return False
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(
+                        url,
+                        timeout=aiohttp.ClientTimeout(total=max_wait_time),
+                        allow_redirects=False,
+                    ) as resp:
+                        if resp.status != expected_status_code:
+                            log.trace(
+                                "route health check failed: {}",
+                                url,
+                                status_code=resp.status,
+                                expected_status_code=expected_status_code,
+                            )
+                            return False
+                        return True
+            except (aiohttp.ClientError, TimeoutError) as e:
+                log.trace("route health check failed: {}", url, reason=repr(e))
+                return False
+            except Exception:
+                log.exception("route health check errored")
+                return False

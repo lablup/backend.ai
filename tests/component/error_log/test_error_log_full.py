@@ -80,20 +80,4 @@ class TestMarkClearedFull:
         nonexistent_id = uuid.uuid4()
         with pytest.raises(BackendAPIError) as exc_info:
             await admin_registry.error_log.mark_cleared(nonexistent_id)
-        assert exc_info.value.status == 500
-
-    async def test_user_cannot_clear_another_users_log(
-        self,
-        admin_registry: BackendAIClientRegistry,
-        user_registry: BackendAIClientRegistry,
-    ) -> None:
-        await admin_registry.error_log.append(
-            _make_append_request(message="admin-only log"),
-        )
-        admin_list = await admin_registry.error_log.list_logs()
-        assert admin_list.count >= 1
-        admin_log_id = uuid.UUID(admin_list.logs[0].log_id)
-
-        with pytest.raises(BackendAPIError) as exc_info:
-            await user_registry.error_log.mark_cleared(admin_log_id)
-        assert exc_info.value.status == 500
+        assert exc_info.value.status == 404

@@ -1,0 +1,241 @@
+"""컨테이너 레지스트리 생성 권한과 거부 조건."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import override
+
+import pytest
+
+from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.dto.manager.v2.container_registry.request import (
+    CreateContainerRegistryInput,
+)
+from ai.backend.common.dto.manager.v2.container_registry.response import ContainerRegistryNode
+from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
+from ai.backend.manager.errors.auth import InsufficientPrivilege
+from ai.backend.manager.errors.resource import ProjectNotFound
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.testutils.scenario_steps import (
+    Given,
+    Language,
+    Says,
+    Scenario,
+    Then,
+    When,
+    in_language,
+)
+from bai_scenario.components.answers import TheCallIsRefused
+from bai_scenario.components.container_registry import (
+    AllowedProjects,
+    AProjectAndACaller,
+    MissingProject,
+    NoProjects,
+    NoRegistryYet,
+    TestSeededProject,
+    TheNewRegistryNode,
+    allowed_project_count,
+)
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import TestSeedingSession
+from bai_scenario.runner.steps import run_scenario
+
+type CreationScenario = Scenario[
+    TestSeedingSession, AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode
+]
+
+
+@dataclass(frozen=True)
+class Creating(When[AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]):
+    url: str = "https://made.scenario.local"
+    registry_name: str = "made-registry"
+    allowed_projects: AllowedProjects = field(default_factory=NoProjects)
+
+    @override
+    def operation(self) -> str:
+        return "admin_create"
+
+    @override
+    def describe(self, laid: AProjectAndACaller) -> str:
+        allowed = self.allowed_projects.says()
+        return Says(
+            f"{laid.caller.username}이 {allowed} {self.url}로 생성합니다",
+            english=(
+                f"{laid.caller.username} creates a container registry at {self.url} "
+                f"{in_language(allowed, Language.ENGLISH)}"
+            ),
+        )
+
+    @override
+    async def call(
+        self, adapter: ContainerRegistryAdapter, laid: AProjectAndACaller
+    ) -> ContainerRegistryNode:
+        with ActingAs(laid.caller):
+            payload = await adapter.admin_create(
+                CreateContainerRegistryInput(
+                    url=self.url,
+                    registry_name=self.registry_name,
+                    type=ContainerRegistryType.DOCKER,
+                    allowed_groups=self.allowed_projects.of(laid),
+                )
+            )
+        return payload.registry
+
+
+@dataclass(frozen=True)
+class CreatingWithOnlyTheRequiredValues(
+    Scenario[
+        TestSeedingSession, AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode
+    ]
+):
+    @override
+    def summary(self) -> str:
+        return "creating-a-registry-with-only-the-required-values-leaves-the-rest-empty"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "superadmin 이 주소, 이름, 종류만 지정해 컨테이너 레지스트리를 생성하면 "
+            "나머지 필드가 모두 비어 있는 노드가 응답으로 옵니다",
+            english=(
+                "when the superadmin creates a container registry with only an address, "
+                "a name, and a type, the node comes back with every other field empty"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, AProjectAndACaller]:
+        return NoRegistryYet(role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> Creating:
+        return Creating()
+
+    @override
+    def then(self) -> Then[AProjectAndACaller, ContainerRegistryNode]:
+        sent = self.when()
+        return TheNewRegistryNode(url=sent.url, registry_name=sent.registry_name)
+
+
+@dataclass(frozen=True)
+class AllowingAProjectWhileCreating(
+    Scenario[
+        TestSeedingSession, AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode
+    ]
+):
+    @override
+    def summary(self) -> str:
+        return "a-project-named-while-creating-is-allowed-on-the-new-registry"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "superadmin 이 허용 프로젝트를 함께 지정해 컨테이너 레지스트리를 생성하면 "
+            "그 관계도 함께 생성됩니다",
+            english=(
+                "when the superadmin creates a container registry with an allowed "
+                "project named, that relation is created too"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, AProjectAndACaller]:
+        return NoRegistryYet(role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> Creating:
+        return Creating(allowed_projects=TestSeededProject())
+
+    @override
+    def then(self) -> Then[AProjectAndACaller, ContainerRegistryNode]:
+        sent = self.when()
+        return TheNewRegistryNode(url=sent.url, registry_name=sent.registry_name)
+
+
+@dataclass(frozen=True)
+class AProjectThatIsNotThereIsRefused(
+    Scenario[
+        TestSeedingSession, AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode
+    ]
+):
+    @override
+    def summary(self) -> str:
+        return "a-project-that-does-not-exist-is-refused-while-creating"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "존재하지 않는 프로젝트를 허용 목록에 넣고 컨테이너 레지스트리를 생성하려 하면 "
+            "그 프로젝트를 찾을 수 없어 거부됩니다",
+            english=(
+                "when a container registry is created with a project that does not exist "
+                "in the allow list, it is rejected because the project cannot be found"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, AProjectAndACaller]:
+        return NoRegistryYet(role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]:
+        return Creating(allowed_projects=MissingProject())
+
+    @override
+    def then(self) -> Then[AProjectAndACaller, ContainerRegistryNode]:
+        return TheCallIsRefused(ProjectNotFound)
+
+
+@dataclass(frozen=True)
+class APlainUserMayNotCreate(
+    Scenario[
+        TestSeedingSession, AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode
+    ]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-who-is-not-the-superadmin-may-not-create-a-registry"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "superadmin 이 아닌 사용자가 컨테이너 레지스트리를 생성하려 하면 권한 부족으로 "
+            "거부됩니다. 이 호출은 호출자가 superadmin 인지만 검사하고 부여된 권한은 보지 않습니다",
+            english=(
+                "when a user who is not the superadmin tries to create a container registry, "
+                "it is rejected for lack of permission. This call checks only whether the "
+                "caller is the superadmin and does not look at the permissions granted"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, AProjectAndACaller]:
+        return NoRegistryYet()
+
+    @override
+    def when(self) -> When[AProjectAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]:
+        return Creating()
+
+    @override
+    def then(self) -> Then[AProjectAndACaller, ContainerRegistryNode]:
+        return TheCallIsRefused(InsufficientPrivilege)
+
+
+SCENARIOS: list[CreationScenario] = [
+    CreatingWithOnlyTheRequiredValues(),
+    AllowingAProjectWhileCreating(),
+    AProjectThatIsNotThereIsRefused(),
+    APlainUserMayNotCreate(),
+]
+
+
+@pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
+async def test_creating(
+    scenario: CreationScenario,
+    adapter: ContainerRegistryAdapter,
+    engine: ExtendedAsyncSAEngine,
+) -> None:
+    await run_scenario(scenario, adapter, engine)
+    expected_count = 1 if isinstance(scenario, AllowingAProjectWhileCreating) else 0
+    assert await allowed_project_count(engine) == expected_count

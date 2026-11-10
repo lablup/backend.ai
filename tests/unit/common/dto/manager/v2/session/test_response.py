@@ -32,13 +32,16 @@ def _make_metadata(
     cluster_mode: str = "single-node",
     cluster_size: int = 1,
     priority: int = 0,
+    job_priority: int = 0,
     is_preemptible: bool = False,
 ) -> SessionMetadataInfo:
     return SessionMetadataInfo(
         session_type=session_type,
         cluster_mode=cluster_mode,
         cluster_size=cluster_size,
+        tier=priority,
         priority=priority,
+        job_priority=job_priority,
         is_preemptible=is_preemptible,
     )
 
@@ -48,13 +51,16 @@ def _make_metadata_gql_dto(
     cluster_mode: str = "single-node",
     cluster_size: int = 1,
     priority: int = 0,
+    job_priority: int = 0,
     is_preemptible: bool = False,
 ) -> SessionMetadataInfoGQLDTO:
     return SessionMetadataInfoGQLDTO(
         session_type=session_type,
         cluster_mode=cluster_mode,
         cluster_size=cluster_size,
+        tier=priority,
         priority=priority,
+        job_priority=job_priority,
         is_preemptible=is_preemptible,
     )
 
@@ -92,6 +98,7 @@ def _make_network(use_host_network: bool = False) -> SessionNetworkInfo:
 def _make_session_node() -> SessionNode:
     return SessionNode(
         id=uuid.uuid4(),
+        entity_id=uuid.uuid4(),
         domain_name="default",
         user_id=uuid.uuid4(),
         project_id=uuid.uuid4(),
@@ -111,13 +118,16 @@ class TestSessionMetadataInfo:
             session_type="interactive",
             cluster_mode="single-node",
             cluster_size=1,
+            tier=0,
             priority=0,
+            job_priority=0,
             is_preemptible=False,
         )
         assert info.session_type == "interactive"
         assert info.cluster_mode == "single-node"
         assert info.cluster_size == 1
         assert info.priority == 0
+        assert info.job_priority == 0
         assert info.is_preemptible is False
 
     def test_optional_fields_default_none(self) -> None:
@@ -135,7 +145,9 @@ class TestSessionMetadataInfo:
             access_key="AKIAIOSFODNN7EXAMPLE",
             cluster_mode="multi-node",
             cluster_size=4,
+            tier=5,
             priority=5,
+            job_priority=-3,
             is_preemptible=True,
             tag="experiment-1",
         )
@@ -145,6 +157,7 @@ class TestSessionMetadataInfo:
         assert info.access_key == "AKIAIOSFODNN7EXAMPLE"
         assert info.cluster_size == 4
         assert info.priority == 5
+        assert info.job_priority == -3
         assert info.is_preemptible is True
         assert info.tag == "experiment-1"
 
@@ -303,6 +316,7 @@ class TestSessionNode:
         session_id = uuid.uuid4()
         node = SessionNode(
             id=session_id,
+            entity_id=session_id,
             domain_name="default",
             user_id=uuid.uuid4(),
             project_id=uuid.uuid4(),
@@ -361,6 +375,7 @@ class TestSessionNode:
         replica_id = uuid.uuid4()
         node = SessionNode(
             id=uuid.uuid4(),
+            entity_id=uuid.uuid4(),
             domain_name="default",
             user_id=uuid.uuid4(),
             project_id=uuid.uuid4(),

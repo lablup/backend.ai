@@ -19,6 +19,9 @@ class PresetTargetSpec(BaseResponseModel):
 
 class RuntimeVariantPresetNode(BaseResponseModel):
     id: UUID = Field(description="Preset ID.")
+    entity_id: UUID = Field(
+        description="UUID of the runtime variant preset. Added in 26.9.0.",
+    )
     runtime_variant_id: UUID = Field(description="Runtime variant ID.")
     name: str = Field(description="Preset name.")
     description: str | None = Field(default=None, description="Description.")
@@ -26,6 +29,12 @@ class RuntimeVariantPresetNode(BaseResponseModel):
     target_spec: PresetTargetSpec = Field(description="Preset target specification.")
     required: bool = Field(
         description="Whether this preset param must be supplied on a deployment revision.",
+    )
+    added_version: str | None = Field(
+        default=None, description="Runtime version this preset became available in."
+    )
+    deprecated_version: str | None = Field(
+        default=None, description="Runtime version this preset was removed in, exclusive."
     )
     category: str | None = Field(default=None, description="UI category group.")
     ui_type: str | None = Field(
@@ -47,6 +56,7 @@ class UpdateRuntimeVariantPresetPayload(BaseResponseModel):
 
 class DeleteRuntimeVariantPresetPayload(BaseResponseModel):
     id: UUID = Field(description="ID of the deleted preset.")
+    entity_id: UUID = Field(description="UUID of the deleted preset. Added in 26.10.0.")
 
 
 class SearchRuntimeVariantPresetsPayload(BaseResponseModel):

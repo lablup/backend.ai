@@ -6,8 +6,8 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.dto.manager.v2.model_card.types import ModelCardAccessLevel
-from ai.backend.common.identifier.vfolder import VFolderUUID
 
 
 class ResourceSlotEntryInfo(BaseResponseModel):
@@ -30,6 +30,9 @@ class ModelCardMetadata(BaseResponseModel):
 
 class ModelCardNode(BaseResponseModel):
     id: UUID = Field(description="Model card ID.")
+    entity_id: UUID = Field(
+        description="UUID of the model card. Added in 26.9.0.",
+    )
     name: str = Field(description="Model card name.")
     vfolder_id: VFolderUUID = Field(description="VFolder ID.")
     domain_name: str = Field(description="Domain name.")
@@ -53,6 +56,7 @@ class UpdateModelCardPayload(BaseResponseModel):
 
 class DeleteModelCardPayload(BaseResponseModel):
     id: UUID = Field(description="ID of the deleted model card.")
+    entity_id: UUID = Field(description="UUID of the deleted model card. Added in 26.10.0.")
 
 
 class SearchModelCardsPayload(BaseResponseModel):

@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import logging
+import warnings
 from collections.abc import Iterable, Iterator, Mapping, MutableMapping
 from contextlib import contextmanager
 from contextvars import ContextVar
 from types import MappingProxyType, TracebackType
 from typing import Any, LiteralString, TypedDict, cast, override
 
-from ai.backend.logging.otel import OpenTelemetrySpec
+from ai.backend.logging.otel import LegacyOtelLogging, OpenTelemetrySpec, apply_otel_tracer
 
 _EMPTY_MAPPING: Mapping[str, Any] = MappingProxyType({})
 _log_context_fields: ContextVar[Mapping[str, Any]] = ContextVar(
@@ -58,11 +59,16 @@ class BraceMessage:
 
 
 class BraceStyleAdapter(logging.LoggerAdapter[logging.Logger]):
-    _loggers: set[logging.Logger] = set()
+    """Deprecated. Use `ai.backend.logging.structured.StructuredLogger`."""
 
     def __init__(self, logger: logging.Logger) -> None:
+        warnings.warn(
+            "BraceStyleAdapter is deprecated; use ai.backend.logging.structured.StructuredLogger",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         super().__init__(logger)
-        self._loggers.add(logger)
+        LegacyOtelLogging.register(logger)
 
     @override
     def log(
@@ -125,9 +131,8 @@ class BraceStyleAdapter(logging.LoggerAdapter[logging.Logger]):
 
     @classmethod
     def apply_otel(cls, spec: OpenTelemetrySpec) -> None:
-        from .otel import apply_otel_loggers, apply_otel_tracer
-
-        apply_otel_loggers(cls._loggers, spec)
+        """Deprecated. Use `LegacyOtelLogging(spec).attach()` and `apply_otel_tracer(spec)`."""
+        LegacyOtelLogging(spec).attach()
         apply_otel_tracer(spec)
 
 
@@ -147,6 +152,12 @@ def enforce_debug_logging(loggers: Iterable[str]) -> None:
 
 @contextmanager
 def with_log_context_fields(fields: Mapping[str, Any]) -> Iterator[Mapping[str, Any]]:
+    """Deprecated. Use `ai.backend.logging.structured.with_log_context`."""
+    warnings.warn(
+        "with_log_context_fields is deprecated; use ai.backend.logging.structured.with_log_context",
+        DeprecationWarning,
+        stacklevel=3,
+    )
     current_fields = _log_context_fields.get()
     new_fields = {**current_fields, **fields}
     token = _log_context_fields.set(new_fields)

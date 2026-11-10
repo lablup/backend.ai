@@ -5,11 +5,17 @@ from __future__ import annotations
 from uuid import UUID
 
 from ai.backend.client.v2.base_domain import BaseDomainClient
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.kernel.request import AdminSearchKernelsInput
 from ai.backend.common.dto.manager.v2.kernel.response import AdminSearchKernelsPayload
+from ai.backend.common.dto.manager.v2.scheduler.request import ComputeScheduleInput
+from ai.backend.common.dto.manager.v2.scheduler.response import ComputeSchedulePayload
 from ai.backend.common.dto.manager.v2.session.request import (
     AdminSearchSessionsInput,
     EnqueueSessionInput,
+    ExcludeSessionIdleChecksInput,
+    IncludeSessionIdleChecksInput,
+    PartialBulkTerminateSessionsInput,
     ShutdownSessionServiceInput,
     StartSessionServiceInput,
     TerminateSessionsInput,
@@ -18,8 +24,11 @@ from ai.backend.common.dto.manager.v2.session.request import (
 from ai.backend.common.dto.manager.v2.session.response import (
     AdminSearchSessionsPayload,
     EnqueueSessionPayload,
+    ExcludeSessionIdleChecksPayload,
+    IncludeSessionIdleChecksPayload,
     SessionLogsPayload,
     SessionNode,
+    SessionTerminationInfo,
     StartSessionServicePayload,
     TerminateSessionsPayload,
     UpdateSessionPayload,
@@ -41,6 +50,18 @@ class V2SessionClient(BaseDomainClient):
             f"{_PATH}/enqueue",
             request=request,
             response_model=EnqueueSessionPayload,
+        )
+
+    async def compute_schedule(
+        self,
+        request: ComputeScheduleInput,
+    ) -> ComputeSchedulePayload:
+        """Probe whether each kernel of a would-be session fits the resource group."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/compute-schedule",
+            request=request,
+            response_model=ComputeSchedulePayload,
         )
 
     async def admin_search(
@@ -134,16 +155,51 @@ class V2SessionClient(BaseDomainClient):
             response_model=AdminSearchSessionsPayload,
         )
 
+    async def partial_bulk_terminate(
+        self, request: PartialBulkTerminateSessionsInput
+    ) -> PartialBulkPayload[SessionTerminationInfo]:
+        """Terminate several sessions, answering for each one."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/partial-bulk-terminate",
+            request=request,
+            response_model=PartialBulkPayload[SessionTerminationInfo],
+        )
+
     async def terminate(
         self,
         request: TerminateSessionsInput,
     ) -> TerminateSessionsPayload:
-        """Terminate one or more sessions."""
+        """Deprecated. Use :meth:`partial_bulk_terminate`."""
         return await self._client.typed_request(
             "POST",
             f"{_PATH}/terminate",
             request=request,
             response_model=TerminateSessionsPayload,
+        )
+
+    async def exclude_idle_checks(
+        self,
+        request: ExcludeSessionIdleChecksInput,
+    ) -> ExcludeSessionIdleChecksPayload:
+        """Exclude checker-session pairs from idle checks."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/exclude-idle-checks",
+            request=request,
+            response_model=ExcludeSessionIdleChecksPayload,
+        )
+
+    async def include_idle_checks(
+        self,
+        request: IncludeSessionIdleChecksInput,
+    ) -> IncludeSessionIdleChecksPayload:
+        """Include checker-session pairs into idle checks."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/include-idle-checks",
+            request=request,
+            response_model=IncludeSessionIdleChecksPayload,
         )
 
     async def start_service(

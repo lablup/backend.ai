@@ -1,7 +1,7 @@
-"""Component tests for v2 VFolder RBAC-enforced delete, restore, and purge mutations via SDK.
+"""Component tests for v2 VFolder RBAC-enforced update, delete, restore, and purge mutations via SDK.
 
-Exercises delete, restore, and purge mutations through the real HTTP server +
-V2ClientRegistry SDK.
+Exercises update, delete, restore, and purge mutations, single and partial bulk, through the
+real HTTP server + V2ClientRegistry SDK.
 """
 
 from __future__ import annotations
@@ -10,7 +10,7 @@ import secrets
 import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -19,60 +19,78 @@ import yarl
 
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
-from ai.backend.client.v2.exceptions import PermissionDeniedError
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.dto.manager.field import VFolderPermissionField
-from ai.backend.common.dto.manager.v2.vfolder.request import CreateVFolderInScopeInput
+from ai.backend.common.dto.manager.v2.vfolder.request import (
+    BulkDeleteVFoldersInput,
+    CreateVFolderInScopeInput,
+    PartialBulkDeleteVFoldersInput,
+    PartialBulkRestoreVFoldersInput,
+    PartialBulkUpdateVFolderItemInput,
+    PartialBulkUpdateVFoldersInput,
+    SetVFolderMountPolicyInput,
+    UnsetVFolderMountPolicyInput,
+    UpdateVFolderInput,
+)
 from ai.backend.common.types import (
     QuotaScopeID,
     QuotaScopeType,
     VFolderHostPermission,
     VFolderHostPermissionMap,
+    VFolderMountPolicy,
     VFolderUsageMode,
 )
-from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.actions.validators.rbac import RBACValidators
-from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
-from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
-from ai.backend.manager.actions.validators.rbac.single_entity import (
-    SingleEntityActionRBACValidator,
-)
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.api.rest.v2.vfolder.handler import V2VFolderHandler
 from ai.backend.manager.api.rest.v2.vfolder.registry import register_v2_vfolder_routes
 from ai.backend.manager.data.permission.status import RoleStatus
-from ai.backend.manager.data.permission.types import (
-    EntityType,
-    OperationType,
-    Permission,
-    ScopeType,
-)
+from ai.backend.manager.data.permission.types import Permission
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.data.vfolder.types import (
-    VFolderMountPermission,
     VFolderOperationStatus,
     VFolderOwnershipType,
 )
-from ai.backend.manager.models.group import groups
+from ai.backend.manager.models.project.row import groups
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import vfolders
+from ai.backend.manager.models.vfolder.row import vfolders
+from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
+    ResourcePolicyOpsProvider,
+)
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
+from ai.backend.manager.repositories.rbac.permission_check_repository import (
+    RbacPermissionCheckRepository,
+)
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.vfolder.processors.mount_policy import (
+    VFolderMountPolicyProcessors,
+)
 from ai.backend.manager.services.vfolder.processors.vfolder import VFolderProcessors
+from ai.backend.manager.services.vfolder.services.mount_policy import VFolderMountPolicyService
 from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
     from tests.component.conftest import ServerInfo, UserFixtureData
+
+    from ai.backend.manager.config.provider import ManagerConfigProvider
 
 
 @dataclass(frozen=True)
@@ -95,6 +113,7 @@ def rbac_permission_repo(
 def vfolder_processors(
     database_engine: ExtendedAsyncSAEngine,
     rbac_permission_repo: PermissionControllerRepository,
+    processor_registry: ProcessorRegistry[Any],
 ) -> VFolderProcessors:
     """Override: real scope + single-entity RBAC validators.
 
@@ -102,8 +121,14 @@ def vfolder_processors(
     the etcd-backed allowed-vfolder-types lookup are stubbed so that
     service-layer create paths can complete without external dependencies.
     """
-    vfolder_repository = VfolderRepository(database_engine)
-    user_repository = UserRepository(database_engine)
+    vfolder_repository = VfolderRepository(database_engine, ShareOpsProvider(database_engine))
+    user_repository = UserRepository(
+        database_engine,
+        V2DBOpsProvider(database_engine),
+        ShareOpsProvider(database_engine),
+        ResourcePolicyOpsProvider(database_engine),
+        KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+    )
     config_provider = MagicMock()
     config_provider.legacy_etcd_config_loader.get_vfolder_types = AsyncMock(
         return_value=["user", "group"]
@@ -121,17 +146,24 @@ def vfolder_processors(
         vfolder_repository=vfolder_repository,
         user_repository=user_repository,
         valkey_stat_client=MagicMock(),
+        own_check=MagicMock(),
     )
-    return VFolderProcessors(
-        service=service,
-        action_monitors=[],
-        validators=ActionValidators(
-            rbac=RBACValidators(
-                scope=ScopeActionRBACValidator(rbac_permission_repo, MagicMock()),
-                single_entity=SingleEntityActionRBACValidator(rbac_permission_repo, MagicMock()),
-                bulk=BulkActionRBACValidator(rbac_permission_repo, MagicMock()),
-            )
-        ),
+    return VFolderProcessors(processor_registry.group(GroupMeta(VFolderEntityType())), service)
+
+
+@pytest.fixture()
+def mount_policy_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    processor_registry: ProcessorRegistry[Any],
+    config_provider: ManagerConfigProvider,
+) -> VFolderMountPolicyProcessors:
+    """Mount policy operations over the real repository and permission checks."""
+    service = VFolderMountPolicyService(
+        VfolderRepository(database_engine, ShareOpsProvider(database_engine)),
+        RbacPermissionCheckRepository(PermissionOpsProvider(database_engine), config_provider),
+    )
+    return VFolderMountPolicyProcessors(
+        processor_registry.group(GroupMeta(VFolderEntityType())), service
     )
 
 
@@ -139,11 +171,14 @@ def vfolder_processors(
 def server_module_registries(
     route_deps: RouteDeps,
     vfolder_processors: VFolderProcessors,
+    mount_policy_processors: VFolderMountPolicyProcessors,
 ) -> list[RouteRegistry]:
     """Register v2 vfolder REST routes with real RBAC."""
     processors = MagicMock(spec=Processors)
     processors.vfolder = vfolder_processors
-    adapter = VFolderAdapter(processors)
+    adapter = VFolderAdapter(
+        processors.vfolder, MagicMock(), MagicMock(), MagicMock(), mount_policy_processors
+    )
     handler = V2VFolderHandler(adapter=adapter)
     v2_reg = RouteRegistry.create("v2", route_deps.cors_options)
     v2_reg.add_subregistry(register_v2_vfolder_routes(handler, route_deps))
@@ -228,6 +263,8 @@ async def regular_user_vfolder_create_permission(
                 id=role_id,
                 name=f"test-vfolder-creator-{secrets.token_hex(4)}",
                 status=RoleStatus.ACTIVE,
+                scope_type=ProjectEntityType(),
+                scope_id=group_fixture,
             )
         )
         await conn.execute(
@@ -239,10 +276,7 @@ async def regular_user_vfolder_create_permission(
         await conn.execute(
             sa.insert(PermissionRow.__table__).values(
                 role_id=role_id,
-                scope_type=ScopeType.PROJECT,
-                scope_id=str(group_fixture),
-                entity_type=EntityType.VFOLDER,
-                operation=OperationType.CREATE,
+                entity_type=VFolderEntityType(),
                 permission=Permission.CREATE,
             )
         )
@@ -289,7 +323,7 @@ async def project_vfolder(
                 domain_name=domain_fixture.domain_name,
                 quota_scope_id=str(quota_scope_id),
                 usage_mode=VFolderUsageMode.GENERAL,
-                permission=VFolderMountPermission.READ_WRITE,
+                default_mount_permission=VFolderMountPolicy.READ_WRITE,
                 ownership_type=VFolderOwnershipType.GROUP,
                 user=None,
                 group=group_fixture,
@@ -307,15 +341,7 @@ async def project_vfolder(
 
 
 class TestDeleteVFolderRBAC:
-    """DELETE /v2/vfolders/{id} -- SingleEntityActionProcessor RBAC."""
-
-    async def test_regular_user_denied(
-        self,
-        user_v2_registry: V2ClientRegistry,
-        project_vfolder: ProjectVFolderFixtureData,
-    ) -> None:
-        with pytest.raises(PermissionDeniedError):
-            await user_v2_registry.vfolder.delete(project_vfolder.id)
+    """POST /v2/vfolders/{id}/delete -- SingleEntityActionProcessor RBAC."""
 
     async def test_superadmin_succeeds(
         self,
@@ -329,14 +355,6 @@ class TestDeleteVFolderRBAC:
 class TestRestoreVFolderRBAC:
     """POST /v2/vfolders/{id}/restore -- SingleEntityActionProcessor RBAC."""
 
-    async def test_regular_user_denied(
-        self,
-        user_v2_registry: V2ClientRegistry,
-        project_vfolder: ProjectVFolderFixtureData,
-    ) -> None:
-        with pytest.raises(PermissionDeniedError):
-            await user_v2_registry.vfolder.restore(project_vfolder.id)
-
     async def test_superadmin_trash_then_restore(
         self,
         admin_v2_registry: V2ClientRegistry,
@@ -347,37 +365,133 @@ class TestRestoreVFolderRBAC:
         assert payload.id == project_vfolder.id
 
 
+class TestUpdateVFolder:
+    """PATCH /v2/vfolders/{id} -- SingleEntityActionProcessor RBAC."""
+
+    async def test_superadmin_renames_and_sets_cloneable(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        project_vfolder: ProjectVFolderFixtureData,
+    ) -> None:
+        name = f"renamed-{secrets.token_hex(4)}"
+        payload = await admin_v2_registry.vfolder.update(
+            project_vfolder.id, UpdateVFolderInput(name=name, cloneable=True)
+        )
+        assert payload.vfolder.id == project_vfolder.id
+        assert payload.vfolder.metadata.name == name
+        assert payload.vfolder.metadata.cloneable is True
+
+
+class TestPartialBulkVFolders:
+    """POST /v2/vfolders/partial-bulk-{update,delete,restore} -- PartialBulkActionProcessor."""
+
+    async def test_update_answers_for_each_vfolder(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        project_vfolder: ProjectVFolderFixtureData,
+    ) -> None:
+        missing = uuid.uuid4()
+        payload = await admin_v2_registry.vfolder.partial_bulk_update(
+            PartialBulkUpdateVFoldersInput(
+                items=[
+                    PartialBulkUpdateVFolderItemInput(
+                        id=vfolder_id, input=UpdateVFolderInput(cloneable=True)
+                    )
+                    for vfolder_id in (project_vfolder.id, missing)
+                ]
+            )
+        )
+        assert [node.id for node in payload.successes] == [project_vfolder.id]
+        assert payload.successes[0].metadata.cloneable is True
+        assert [failure.id for failure in payload.failed] == [missing]
+
+    async def test_delete_then_restore(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        project_vfolder: ProjectVFolderFixtureData,
+    ) -> None:
+        missing = uuid.uuid4()
+        deleted = await admin_v2_registry.vfolder.partial_bulk_delete(
+            PartialBulkDeleteVFoldersInput(ids=[project_vfolder.id, missing])
+        )
+        assert [node.id for node in deleted.successes] == [project_vfolder.id]
+        assert deleted.successes[0].status == "delete-pending"
+        assert [failure.id for failure in deleted.failed] == [missing]
+
+        restored = await admin_v2_registry.vfolder.partial_bulk_restore(
+            PartialBulkRestoreVFoldersInput(ids=[project_vfolder.id])
+        )
+        assert [node.id for node in restored.successes] == [project_vfolder.id]
+        assert restored.successes[0].status == "ready"
+        assert restored.failed == []
+
+    async def test_deprecated_bulk_delete_matches_partial_bulk_delete(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        project_vfolder: ProjectVFolderFixtureData,
+    ) -> None:
+        missing = uuid.uuid4()
+        payload = await admin_v2_registry.vfolder.bulk_delete(
+            BulkDeleteVFoldersInput(ids=[project_vfolder.id, missing])
+        )
+        assert [node.id for node in payload.items] == [project_vfolder.id]
+        assert payload.deleted_count == 1
+        assert [failure.vfolder_id for failure in payload.failed] == [missing]
+
+
 class TestPurgeVFolderRBAC:
     """POST /v2/vfolders/{id}/purge -- SingleEntityActionProcessor RBAC."""
 
-    async def test_regular_user_denied(
+
+class TestVFolderMountPolicy:
+    """/v2/vfolders/{id}/mount-policies -- set, list and unset one user's mount level."""
+
+    async def test_superadmin_sets_lists_and_unsets(
         self,
-        user_v2_registry: V2ClientRegistry,
+        admin_v2_registry: V2ClientRegistry,
+        regular_user_fixture: UserFixtureData,
         project_vfolder: ProjectVFolderFixtureData,
     ) -> None:
-        with pytest.raises(PermissionDeniedError):
-            await user_v2_registry.vfolder.purge(project_vfolder.id)
+        target = regular_user_fixture.user_uuid
+        payload = await admin_v2_registry.vfolder.set_mount_policy(
+            project_vfolder.id,
+            SetVFolderMountPolicyInput(user_id=target, permission=VFolderPermissionField.READ_ONLY),
+        )
+        assert payload.policy.user_id == target
+        assert payload.policy.permission == VFolderPermissionField.READ_ONLY
+
+        listed = await admin_v2_registry.vfolder.list_mount_policies(project_vfolder.id)
+        assert [(p.user_id, p.permission) for p in listed.items] == [
+            (target, VFolderPermissionField.READ_ONLY)
+        ]
+
+        removed = await admin_v2_registry.vfolder.unset_mount_policy(
+            project_vfolder.id, UnsetVFolderMountPolicyInput(user_id=target)
+        )
+        assert removed.removed is True
+        again = await admin_v2_registry.vfolder.unset_mount_policy(
+            project_vfolder.id, UnsetVFolderMountPolicyInput(user_id=target)
+        )
+        assert again.removed is False
+
+    async def test_wd_is_stored_as_rw(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        regular_user_fixture: UserFixtureData,
+        project_vfolder: ProjectVFolderFixtureData,
+    ) -> None:
+        payload = await admin_v2_registry.vfolder.set_mount_policy(
+            project_vfolder.id,
+            SetVFolderMountPolicyInput(
+                user_id=regular_user_fixture.user_uuid,
+                permission=VFolderPermissionField.RW_DELETE,
+            ),
+        )
+        assert payload.policy.permission == VFolderPermissionField.READ_WRITE
 
 
 class TestCreateVFolderInProjectRBAC:
     """POST /v2/vfolders/projects/{project_id}/create -- ScopeActionProcessor RBAC."""
-
-    async def test_regular_user_denied(
-        self,
-        user_v2_registry: V2ClientRegistry,
-        group_fixture: uuid.UUID,
-        vfolder_host_permission_fixture: None,
-    ) -> None:
-        """Regular user without project CREATE permission is denied before service runs."""
-        request = CreateVFolderInScopeInput(
-            name=f"rbac-denied-{secrets.token_hex(4)}",
-            host="local",
-            usage_mode=VFolderUsageMode.GENERAL,
-            permission=VFolderPermissionField.READ_WRITE,
-            cloneable=False,
-        )
-        with pytest.raises(PermissionDeniedError):
-            await user_v2_registry.vfolder.create_in_project(group_fixture, request)
 
     async def test_superadmin_succeeds(
         self,

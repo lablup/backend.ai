@@ -1,0 +1,550 @@
+"""리소스 그룹 수정 — 수정과 설정 수정은 같은 검사를 거치고, 바꿀 수 있는 필드의 범위만 다르다."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Any, override
+
+import pytest
+
+from ai.backend.common.data.permission.types import Permission
+from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.dto.manager.v2.resource_group.request import (
+    PreemptionConfigInputDTO,
+    UpdateResourceGroupConfigInput,
+    UpdateResourceGroupInput,
+)
+from ai.backend.common.dto.manager.v2.resource_group.response import ResourceGroupDetailNode
+from ai.backend.common.dto.manager.v2.resource_group.types import (
+    PreemptionModeDTO,
+    SchedulerTypeDTO,
+)
+from ai.backend.common.types import PreemptionOrder, PreemptionVictimScope
+from ai.backend.manager.api.adapters.resource_group.adapter import ResourceGroupAdapter
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.errors.permission import NotEnoughPermission
+from ai.backend.manager.errors.resource import DefaultResourceGroupAlreadyExists
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
+from bai_scenario.components.answers import TheCallIsRefused
+from bai_scenario.components.resource_group import (
+    AGroupAndACaller,
+    AGroupAndSomeone,
+    AGroupBesideTheDefaultAndSomeone,
+    GroupLook,
+    TheGroupNode,
+)
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import TestSeedingSession
+from bai_scenario.runner.steps import run_scenario
+
+type EditingStep = Scenario[
+    TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode
+]
+
+UNKNOWN = "no-such-group"
+DESCRIBED = "moved to the second rack"
+PROXY = "https://proxy.example.test"
+
+
+@dataclass(frozen=True)
+class Editing(When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]):
+    """지정한 필드만 바꾼다. ``unknown``이면 어느 행에도 없는 이름을 쓴다."""
+
+    described: str | None = None
+    is_active: bool | None = None
+    is_default: bool | None = None
+    unknown: bool = False
+
+    @override
+    def operation(self) -> str:
+        return "update"
+
+    @override
+    def describe(self, laid: AGroupAndACaller) -> str:
+        target_ko = "존재하지 않는 이름" if self.unknown else laid.group.name
+        target_en = "a name that does not exist" if self.unknown else laid.group.name
+        changes_ko: list[str] = []
+        changes_en: list[str] = []
+        if self.described is not None:
+            changes_ko.append("설명을 새것으로")
+            changes_en.append("changing the description to a new value")
+        if self.is_active is not None:
+            changes_ko.append(f"활성을 {self.is_active}로")
+            changes_en.append(f"setting active to {self.is_active}")
+        if self.is_default is not None:
+            changes_ko.append(f"기본을 {self.is_default}로")
+            changes_en.append(f"setting default to {self.is_default}")
+        if changes_ko:
+            what_ko = ", ".join(changes_ko)
+            what_en = ", " + ", ".join(changes_en)
+        else:
+            what_ko = "아무것도 지정하지 않고"
+            what_en = " naming no field"
+        return Says(
+            f"{laid.caller.username}이 {target_ko}을 {what_ko} 수정합니다",
+            english=f"{laid.caller.username} updates {target_en}{what_en}",
+        )
+
+    @override
+    async def call(
+        self, adapter: ResourceGroupAdapter, laid: AGroupAndACaller
+    ) -> ResourceGroupDetailNode:
+        fields: dict[str, Any] = {}
+        if self.described is not None:
+            fields["description"] = self.described
+        if self.is_active is not None:
+            fields["is_active"] = self.is_active
+        if self.is_default is not None:
+            fields["is_default"] = self.is_default
+        with ActingAs(laid.caller):
+            payload = await adapter.update(
+                await adapter.lookup_name(UNKNOWN if self.unknown else laid.group.name),
+                UpdateResourceGroupInput(**fields),
+            )
+        return payload.resource_group
+
+
+@dataclass(frozen=True)
+class EditingTheConfig(When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]):
+    """설정을 바꾼다. ``preemption``이면 선점 설정을, 아니면 스케줄러·공개·네트워크를 바꾼다."""
+
+    preemption: bool = False
+
+    @override
+    def operation(self) -> str:
+        return "update_config"
+
+    @override
+    def describe(self, laid: AGroupAndACaller) -> str:
+        if self.preemption:
+            what_ko = "선점 설정을"
+            what_en = "the preemption config"
+        else:
+            what_ko = "스케줄러, 공개, 네트워크 설정을"
+            what_en = "the scheduler, visibility and network config"
+        return Says(
+            f"{laid.caller.username}이 {laid.group.name}의 {what_ko} 수정합니다",
+            english=f"{laid.caller.username} updates {what_en} of {laid.group.name}",
+        )
+
+    @override
+    async def call(
+        self, adapter: ResourceGroupAdapter, laid: AGroupAndACaller
+    ) -> ResourceGroupDetailNode:
+        if self.preemption:
+            asked = UpdateResourceGroupConfigInput(
+                resource_group_name=laid.group.name,
+                preemption=PreemptionConfigInputDTO(
+                    enabled=True,
+                    preemptible_priority=3,
+                    order=PreemptionOrder.NEWEST.value,
+                    mode=PreemptionModeDTO.RESCHEDULE.value,
+                    preemption_min_runtime=60,
+                    victim_scope=PreemptionVictimScope.PROJECT,
+                ),
+            )
+        else:
+            asked = UpdateResourceGroupConfigInput(
+                resource_group_name=laid.group.name,
+                scheduler_type=SchedulerTypeDTO.LIFO,
+                is_public=False,
+                use_host_network=True,
+                app_proxy_addr=PROXY,
+            )
+        with ActingAs(laid.caller):
+            payload = await adapter.update_config(asked)
+        return payload.resource_group
+
+
+@dataclass(frozen=True)
+class TheSuperadminChangesTheDescription(
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "the-superadmin-changing-the-description-leaves-the-rest"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "superadmin 이 설명만 바꾸면 설명은 새 값이고 나머지는 그대로인 그룹 전체가 반환됩니다",
+            english=(
+                "when the superadmin changes only the description, the whole group comes back "
+                "with the new description and the rest unchanged"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
+        return AGroupAndSomeone(role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]:
+        return Editing(described=DESCRIBED)
+
+    @override
+    def then(self) -> Then[AGroupAndACaller, ResourceGroupDetailNode]:
+        return TheGroupNode(GroupLook(started=self.started, described=DESCRIBED))
+
+
+@dataclass(frozen=True)
+class DeactivatingAGroup(
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "deactivating-a-resource-group-answers-it-inactive"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "활성 그룹을 비활성으로 바꾸면 비활성인 그룹이 반환됩니다",
+            english="deactivating an active group answers the group as inactive",
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
+        return AGroupAndSomeone(role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]:
+        return Editing(is_active=False)
+
+    @override
+    def then(self) -> Then[AGroupAndACaller, ResourceGroupDetailNode]:
+        return TheGroupNode(GroupLook(started=self.started, is_active=False))
+
+
+@dataclass(frozen=True)
+class MakingAGroupTheDefault(
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "making-a-resource-group-the-default-answers-it-default"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "기본 그룹이 없을 때 그룹을 기본으로 바꾸면 기본인 그룹이 반환됩니다",
+            english=(
+                "when no default group exists, making a group the default answers it as the default"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
+        return AGroupAndSomeone(role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]:
+        return Editing(is_default=True)
+
+    @override
+    def then(self) -> Then[AGroupAndACaller, ResourceGroupDetailNode]:
+        return TheGroupNode(GroupLook(started=self.started, is_default=True))
+
+
+@dataclass(frozen=True)
+class ASecondDefaultIsRefused(
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+):
+    @override
+    def summary(self) -> str:
+        return "making-a-second-resource-group-the-default-is-refused"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "기본 그룹이 따로 있을 때 다른 그룹을 기본으로 바꾸려 하면 기본 그룹이 이미 있다는 "
+            "이유로 거부됩니다",
+            english=(
+                "when another default group exists, making a different group the default is "
+                "rejected because a default group already exists"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
+        return AGroupBesideTheDefaultAndSomeone(role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]:
+        return Editing(is_default=True)
+
+    @override
+    def then(self) -> Then[AGroupAndACaller, ResourceGroupDetailNode]:
+        return TheCallIsRefused(DefaultResourceGroupAlreadyExists)
+
+
+@dataclass(frozen=True)
+class AnEmptyEditChangesNothing(
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "an-edit-naming-no-field-changes-nothing"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "아무 필드도 지정하지 않고 수정하면 아무것도 바뀌지 않은 그룹이 반환됩니다",
+            english="an edit naming no field answers the group with nothing changed",
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
+        return AGroupAndSomeone(role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]:
+        return Editing()
+
+    @override
+    def then(self) -> Then[AGroupAndACaller, ResourceGroupDetailNode]:
+        return TheGroupNode(GroupLook(started=self.started))
+
+
+@dataclass(frozen=True)
+class AUserGrantedUpdateOnTheGroupEditsIt(
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "a-user-granted-update-on-the-group-changes-its-description"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "그 자원 그룹에 부여된 역할로 수정 권한을 받은 사용자가 설명을 바꾸면 설명이 새 "
+            "값인 그룹이 반환됩니다",
+            english=(
+                "a user granted update through the role granted on the resource group changing "
+                "the description gets the group with the new description"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
+        return AGroupAndSomeone(granted=Permission.UPDATE)
+
+    @override
+    def when(self) -> When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]:
+        return Editing(described=DESCRIBED)
+
+    @override
+    def then(self) -> Then[AGroupAndACaller, ResourceGroupDetailNode]:
+        return TheGroupNode(GroupLook(started=self.started, described=DESCRIBED))
+
+
+@dataclass(frozen=True)
+class AUserGrantedNothingMayNotEdit(
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-granted-nothing-may-not-edit-a-resource-group"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "아무 권한도 없는 사용자가 설명을 바꾸려 하면 권한 부족으로 거부됩니다",
+            english=(
+                "a user granted nothing trying to change the description is rejected for not "
+                "enough permission"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
+        return AGroupAndSomeone()
+
+    @override
+    def when(self) -> When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]:
+        return Editing(described=DESCRIBED)
+
+    @override
+    def then(self) -> Then[AGroupAndACaller, ResourceGroupDetailNode]:
+        return TheCallIsRefused(NotEnoughPermission)
+
+
+@dataclass(frozen=True)
+class TheSuperadminEditingAnUnknownNameIsNotFound(
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+):
+    @override
+    def summary(self) -> str:
+        return "the-superadmin-editing-a-name-nothing-answers-to-is-not-found"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "superadmin 이 존재하지 않는 이름을 수정하면 대상을 찾을 수 없다는 이유로 거부됩니다",
+            english=(
+                "when the superadmin edits a name nothing answers to, the call is rejected "
+                "because no target answers to it"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
+        return AGroupAndSomeone(role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]:
+        return Editing(described=DESCRIBED, unknown=True)
+
+    @override
+    def then(self) -> Then[AGroupAndACaller, ResourceGroupDetailNode]:
+        return TheCallIsRefused(EntityNotFoundError)
+
+
+@dataclass(frozen=True)
+class TheSuperadminChangesTheConfig(
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "the-superadmin-changes-the-scheduler-visibility-and-network-config"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "superadmin 이 스케줄러를 후입선출로, 비공개로, 호스트 네트워크로, 프록시 주소를 "
+            "지정해 설정을 바꾸면 그 값들이 새 값인 그룹 전체가 반환됩니다",
+            english=(
+                "when the superadmin changes the config to a last-in-first-out scheduler, "
+                "private visibility, host network and a given proxy address, the whole group "
+                "comes back with those values"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
+        return AGroupAndSomeone(role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]:
+        return EditingTheConfig()
+
+    @override
+    def then(self) -> Then[AGroupAndACaller, ResourceGroupDetailNode]:
+        return TheGroupNode(
+            GroupLook(
+                started=self.started,
+                scheduler_type=SchedulerTypeDTO.LIFO,
+                is_public=False,
+                use_host_network=True,
+                wsproxy_addr=PROXY,
+            )
+        )
+
+
+@dataclass(frozen=True)
+class TheSuperadminChangesThePreemptionConfig(
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "the-superadmin-changes-the-preemption-config"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "superadmin 이 선점 설정을 바꾸면 선점 설정이 새 값인 그룹 전체가 반환됩니다",
+            english=(
+                "when the superadmin changes the preemption config, the whole group comes back "
+                "with the new preemption values"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
+        return AGroupAndSomeone(role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]:
+        return EditingTheConfig(preemption=True)
+
+    @override
+    def then(self) -> Then[AGroupAndACaller, ResourceGroupDetailNode]:
+        return TheGroupNode(
+            GroupLook(
+                started=self.started,
+                preemption_enabled=True,
+                preemptible_priority=3,
+                preemption_order=PreemptionOrder.NEWEST,
+                preemption_mode=PreemptionModeDTO.RESCHEDULE,
+                preemption_min_runtime=60.0,
+                victim_scope=PreemptionVictimScope.PROJECT,
+            )
+        )
+
+
+@dataclass(frozen=True)
+class AUserGrantedNothingMayNotEditTheConfig(
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-granted-nothing-may-not-edit-the-config"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "아무 권한도 없는 사용자가 설정을 바꾸려 하면 권한 부족으로 거부됩니다",
+            english=(
+                "a user granted nothing trying to change the config is rejected for not enough "
+                "permission"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
+        return AGroupAndSomeone()
+
+    @override
+    def when(self) -> When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]:
+        return EditingTheConfig()
+
+    @override
+    def then(self) -> Then[AGroupAndACaller, ResourceGroupDetailNode]:
+        return TheCallIsRefused(NotEnoughPermission)
+
+
+SCENARIOS: list[EditingStep] = [
+    TheSuperadminChangesTheDescription(started=datetime.now(UTC)),
+    DeactivatingAGroup(started=datetime.now(UTC)),
+    MakingAGroupTheDefault(started=datetime.now(UTC)),
+    ASecondDefaultIsRefused(),
+    AnEmptyEditChangesNothing(started=datetime.now(UTC)),
+    AUserGrantedUpdateOnTheGroupEditsIt(started=datetime.now(UTC)),
+    AUserGrantedNothingMayNotEdit(),
+    TheSuperadminEditingAnUnknownNameIsNotFound(),
+    TheSuperadminChangesTheConfig(started=datetime.now(UTC)),
+    TheSuperadminChangesThePreemptionConfig(started=datetime.now(UTC)),
+    AUserGrantedNothingMayNotEditTheConfig(),
+]
+
+
+@pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
+async def test_editing(
+    scenario: EditingStep, adapter: ResourceGroupAdapter, engine: ExtendedAsyncSAEngine
+) -> None:
+    await run_scenario(scenario, adapter, engine)

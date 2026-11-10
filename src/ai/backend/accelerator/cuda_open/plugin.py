@@ -1,18 +1,25 @@
 import logging
 import re
 import uuid
+from abc import ABC, abstractmethod
 from collections.abc import Collection, Mapping, MutableMapping, Sequence
 from decimal import Decimal
 from pathlib import Path
 from pprint import pformat
 from typing import (
     Any,
+    Final,
+    override,
 )
 
 import aiodocker
+import yaml
 from aiodocker.exceptions import DockerError
 from aiotools import closing_async
+from pydantic import BaseModel, Field
 
+from ai.backend.agent.data.device import DeviceAllocation
+from ai.backend.agent.errors.resources import InvalidResourceArgument
 from ai.backend.agent.resources import (
     AbstractAllocMap,
     AbstractComputeDevice,
@@ -20,8 +27,7 @@ from ai.backend.agent.resources import (
     DeviceSlotInfo,
     DiscretePropertyAllocMap,
 )
-from ai.backend.agent.utils import update_nested_dict
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 try:
     from ai.backend.agent.resources import get_resource_spec_from_container  # type: ignore
@@ -49,7 +55,7 @@ from ai.backend.common.types import (
 )
 
 from . import __version__
-from .nvidia import LibraryError, libcudart, libnvml
+from .nvidia import LibraryError, libcuda, libnvml
 
 __all__ = (
     "PREFIX",
@@ -59,7 +65,45 @@ __all__ = (
 
 PREFIX = "cuda"
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.accelerator.cuda"))
+log = StructuredLogger(logging.getLogger("ai.backend.accelerator.cuda"))
+
+rx_triple_version = re.compile(r"(\d+\.\d+\.\d+)")
+
+# Engines that attach devices only through CDI, mapped to the version from which their
+# Docker-compatible API honours a CDI device request. Earlier releases drop it silently.
+# These engines report their own version as a component, apart from the Docker server
+# version they advertise for compatibility.
+CDI_ONLY_ENGINE_COMPONENTS: Final[Mapping[str, tuple[int, ...]]] = {
+    "Podman Engine": (5, 4, 0),
+}
+MIN_DOCKER_DEVICE_REQUEST_VERSION: Final[tuple[int, ...]] = (19, 3, 0)
+CDI_KIND: Final[str] = "nvidia.com/gpu"
+CDI_SPEC_DIRS: Final[tuple[Path, ...]] = (Path("/etc/cdi"), Path("/var/run/cdi"))
+CDI_SPEC_SUFFIXES: Final[frozenset[str]] = frozenset({".json", ".yaml", ".yml"})
+
+
+class EngineComponent(BaseModel):
+    """A component entry of the container engine version API response."""
+
+    name: str = Field(validation_alias="Name")
+    version: str = Field(validation_alias="Version")
+
+
+class EngineVersion(BaseModel):
+    """The part of the container engine version API response the plugin reads."""
+
+    components: list[EngineComponent] = Field(
+        validation_alias="Components",
+        default_factory=list,
+    )
+
+
+def _find_cdi_only_engine(version_info: EngineVersion) -> EngineComponent | None:
+    """The engine that can attach devices only through CDI, if this is one of them."""
+    for component in version_info.components:
+        if component.name in CDI_ONLY_ENGINE_COMPONENTS:
+            return component
+    return None
 
 
 class CUDADevice(AbstractComputeDevice):
@@ -84,6 +128,152 @@ class CUDADevice(AbstractComputeDevice):
         return str(self)
 
 
+class DeviceRequest(BaseModel):
+    """
+    One entry of the container creation API's device request list.
+
+    Keyed in PascalCase as the API expects, so that dumping by alias is the whole of
+    the rendering.
+    """
+
+    driver: str = Field(serialization_alias="Driver")
+    device_ids: Sequence[str] = Field(serialization_alias="DeviceIDs")
+    # The nvidia driver rejects "all" here, so the capabilities are always spelled out.
+    capabilities: Sequence[Sequence[str]] | None = Field(
+        default=None,
+        serialization_alias="Capabilities",
+    )
+
+
+class HostConfig(BaseModel):
+    """The `HostConfig` fields an injector sets, mirroring where the API nests them."""
+
+    device_requests: Sequence[DeviceRequest] | None = Field(
+        default=None,
+        serialization_alias="DeviceRequests",
+    )
+    runtime: str | None = Field(default=None, serialization_alias="Runtime")
+
+
+class DeviceConfig(BaseModel):
+    """
+    What an injector adds to a container creation request.
+
+    Every field defaults to null and is dropped when it stays that way, so an injector
+    that attaches nothing renders to an empty payload.
+    """
+
+    host_config: HostConfig | None = Field(default=None, serialization_alias="HostConfig")
+    environ: Sequence[str] | None = Field(default=None, serialization_alias="Env")
+
+
+class DeviceInjector(ABC):
+    """How the container engine is told to attach GPUs to a container."""
+
+    @property
+    @abstractmethod
+    def name(self) -> str:
+        raise NotImplementedError
+
+    @abstractmethod
+    def build_device_config(
+        self,
+        allocation: DeviceAllocation,
+        devices: Collection[CUDADevice],
+    ) -> DeviceConfig:
+        """What to add to the container creation request to attach the allocated devices."""
+        raise NotImplementedError
+
+
+class LegacyRuntimeInjector(DeviceInjector):
+    """Selects the nvidia runtime shim, which takes the device list from the environment."""
+
+    @property
+    @override
+    def name(self) -> str:
+        return "legacy-runtime"
+
+    @override
+    def build_device_config(
+        self,
+        allocation: DeviceAllocation,
+        devices: Collection[CUDADevice],
+    ) -> DeviceConfig:
+        device_ids = allocation.attached_device_ids
+        return DeviceConfig(
+            host_config=HostConfig(runtime="nvidia"),
+            environ=[
+                "NVIDIA_DRIVER_CAPABILITIES=all",
+                "NVIDIA_VISIBLE_DEVICES={}".format(",".join(device_ids)),
+            ],
+        )
+
+
+class NvidiaDriverInjector(DeviceInjector):
+    """Delegates to the nvidia device driver registered with the Docker daemon."""
+
+    @property
+    @override
+    def name(self) -> str:
+        return "nvidia-driver"
+
+    @override
+    def build_device_config(
+        self,
+        allocation: DeviceAllocation,
+        devices: Collection[CUDADevice],
+    ) -> DeviceConfig:
+        device_ids = allocation.attached_device_ids
+        if not device_ids:
+            return DeviceConfig()
+        return DeviceConfig(
+            host_config=HostConfig(
+                device_requests=[
+                    DeviceRequest(
+                        driver="nvidia",
+                        device_ids=device_ids,
+                        capabilities=[["utility", "compute", "video", "graphics", "display"]],
+                    ),
+                ],
+            ),
+        )
+
+
+class CDIInjector(DeviceInjector):
+    """
+    Names the devices of a CDI kind and lets the engine apply the spec, hooks included.
+    CDI identifies a GPU by its UUID while the alloc map keys it by the CUDA runtime index,
+    and the two enumeration orders are not guaranteed to agree.
+    """
+
+    @property
+    @override
+    def name(self) -> str:
+        return "cdi"
+
+    @override
+    def build_device_config(
+        self,
+        allocation: DeviceAllocation,
+        devices: Collection[CUDADevice],
+    ) -> DeviceConfig:
+        device_ids = allocation.attached_device_ids
+        if not device_ids:
+            return DeviceConfig()
+        device_uuids = {dev.device_id: dev.uuid for dev in devices}
+        cdi_device_ids = []
+        for device_id in device_ids:
+            device_uuid = device_uuids.get(device_id)
+            if device_uuid is None:
+                raise InvalidResourceArgument(f"no CUDA device with the ID {device_id}")
+            cdi_device_ids.append(f"{CDI_KIND}=GPU-{device_uuid}")
+        return DeviceConfig(
+            host_config=HostConfig(
+                device_requests=[DeviceRequest(driver="cdi", device_ids=cdi_device_ids)],
+            ),
+        )
+
+
 class CUDAPlugin(AbstractComputePlugin):
     config_watch_enabled = False
 
@@ -92,54 +282,114 @@ class CUDAPlugin(AbstractComputePlugin):
         (SlotName("cuda.device"), SlotTypes("count")),
     )
 
-    docker_version: tuple[int, ...] = (0, 0, 0)
-
+    _device_injector: DeviceInjector = LegacyRuntimeInjector()
     device_mask: Sequence[str] = []
     enabled: bool = True
 
     async def init(self, context: Any | None = None) -> None:
-        rx_triple_version = re.compile(r"(\d+\.\d+\.\d+)")
-
-        # Basic docker version & nvidia container runtime check
+        # Basic container engine & device access mechanism check
         try:
             async with closing_async(aiodocker.Docker()) as docker:
                 docker_info = await docker.system.info()
-        except DockerError:
-            log.info("CUDA acceleration is disabled.")
+                version_info = EngineVersion.model_validate(await docker.version())
+        except DockerError as e:
+            log.warning(
+                "accelerator disabled: docker engine query failed",
+                plugin_name=self.key,
+                exc_info=e,
+            )
             self.enabled = False
             return
 
-        if "nvidia" not in docker_info["Runtimes"]:
-            log.error("could not detect valid NVIDIA Container Runtime!")
-            log.info("CUDA acceleration is disabled.")
+        device_injector = self._detect_device_injector(docker_info, version_info)
+        if device_injector is None:
+            log.warning("accelerator disabled: no device injector", plugin_name=self.key)
             self.enabled = False
             return
-
-        rx_triple_version = re.compile(r"(\d+\.\d+\.\d+)")
-        m = rx_triple_version.search(docker_info["ServerVersion"])
-        if m:
-            self.docker_version = tuple(map(int, m.group(1).split(".")))
-        else:
-            log.error("could not detect docker version!")
-            log.info("CUDA acceleration is disabled.")
-            self.enabled = False
-            return
+        self._device_injector = device_injector
+        log.info("device injector selected", device_injector_name=device_injector.name)
 
         raw_device_mask = self.plugin_config.get("device_mask")
         if raw_device_mask is not None:
             self.device_mask = [*raw_device_mask.split(",")]
         try:
             detected_devices = await self.list_devices()
-            log.info("detected devices:\n" + pformat(detected_devices))
-            log.info("CUDA acceleration is enabled.")
+            log.debug("detected devices:\n{}", pformat(detected_devices))
+            log.info(
+                "accelerator enabled", plugin_name=self.key, device_count=len(detected_devices)
+            )
         except ImportError:
-            log.warning("could not load the CUDA runtime library.")
-            log.info("CUDA acceleration is disabled.")
+            log.warning(
+                "accelerator disabled: CUDA driver library not loaded", plugin_name=self.key
+            )
             self.enabled = False
         except RuntimeError as e:
-            log.warning("CUDA init error: {}", e)
-            log.info("CUDA acceleration is disabled.")
+            log.warning(
+                "accelerator disabled: initialization failed", plugin_name=self.key, exc_info=e
+            )
             self.enabled = False
+
+    def _detect_device_injector(
+        self,
+        docker_info: Mapping[str, Any],
+        version_info: EngineVersion,
+    ) -> DeviceInjector | None:
+        cdi_only_engine = _find_cdi_only_engine(version_info)
+        if cdi_only_engine is not None:
+            engine_version = self._parse_version(cdi_only_engine.version)
+            if engine_version is None:
+                log.error("container engine version not detected", engine_name=cdi_only_engine.name)
+                return None
+            min_version = CDI_ONLY_ENGINE_COMPONENTS[cdi_only_engine.name]
+            if engine_version < min_version:
+                log.error(
+                    "container engine too old for CDI device requests",
+                    engine_name=cdi_only_engine.name,
+                    engine_version=self._format_version(engine_version),
+                    min_engine_version=self._format_version(min_version),
+                )
+                return None
+            if not self._has_cdi_spec():
+                log.error("CDI spec not found", cdi_kind=CDI_KIND)
+                return None
+            return CDIInjector()
+
+        if "nvidia" not in docker_info["Runtimes"]:
+            log.error("NVIDIA container runtime not detected")
+            return None
+        docker_version = self._parse_version(docker_info["ServerVersion"])
+        if docker_version is None:
+            log.error("docker version not detected")
+            return None
+        if docker_version >= MIN_DOCKER_DEVICE_REQUEST_VERSION:
+            return NvidiaDriverInjector()
+        return LegacyRuntimeInjector()
+
+    def _parse_version(self, raw_version: str) -> tuple[int, ...] | None:
+        m = rx_triple_version.search(raw_version)
+        if m is None:
+            return None
+        return tuple(map(int, m.group(1).split(".")))
+
+    def _format_version(self, version: tuple[int, ...]) -> str:
+        return ".".join(map(str, version))
+
+    def _has_cdi_spec(self) -> bool:
+        for spec_dir in CDI_SPEC_DIRS:
+            try:
+                spec_paths = sorted(spec_dir.iterdir())
+            except OSError:
+                continue
+            for spec_path in spec_paths:
+                if spec_path.suffix not in CDI_SPEC_SUFFIXES:
+                    continue
+                try:
+                    spec = yaml.safe_load(spec_path.read_text())
+                except (OSError, yaml.YAMLError):
+                    continue
+                if isinstance(spec, Mapping) and spec.get("kind") == CDI_KIND:
+                    return True
+        return False
 
     async def cleanup(self) -> None:
         pass
@@ -154,29 +404,28 @@ class CUDAPlugin(AbstractComputePlugin):
         if not self.enabled:
             return []
         all_devices = []
-        num_devices = libcudart.get_device_count()
+        num_devices = libcuda.get_device_count()
         for dev_id in map(lambda idx: DeviceId(str(idx)), range(num_devices)):
-            raw_info = libcudart.get_device_props(int(dev_id))
-            sysfs_node_path = f"/sys/bus/pci/devices/{raw_info['pciBusID_str'].lower()}/numa_node"
+            raw_info = libcuda.get_device_props(int(dev_id))
+            sysfs_node_path = f"/sys/bus/pci/devices/{raw_info.pci_bus_id.lower()}/numa_node"
             node: int | None
             try:
                 node = int(Path(sysfs_node_path).read_text().strip())
             except OSError:
                 node = None
-            dev_uuid, raw_dev_uuid = None, raw_info.get("uuid", None)
-            if raw_dev_uuid is not None:
-                dev_uuid = str(uuid.UUID(bytes=raw_dev_uuid))
+            if raw_info.uuid is not None:
+                dev_uuid = str(uuid.UUID(bytes=raw_info.uuid))
             else:
                 dev_uuid = "00000000-0000-0000-0000-000000000000"
             if dev_uuid in self.device_mask:
                 continue
             dev_info = CUDADevice(
                 device_id=DeviceId(dev_id),
-                hw_location=raw_info["pciBusID_str"],
+                hw_location=raw_info.pci_bus_id,
                 numa_node=node,
-                memory_size=raw_info["totalGlobalMem"],
-                processing_units=raw_info["multiProcessorCount"],
-                model_name=raw_info["name"],
+                memory_size=raw_info.total_global_mem,
+                processing_units=raw_info.multiprocessor_count,
+                model_name=raw_info.name,
                 uuid=dev_uuid,
             )
             all_devices.append(dev_info)
@@ -197,12 +446,12 @@ class CUDAPlugin(AbstractComputePlugin):
                 return {
                     "cuda_support": True,
                     "nvidia_version": libnvml.get_driver_version(),
-                    "cuda_version": "{0[0]}.{0[1]}".format(libcudart.get_version()),
+                    "cuda_version": "{0[0]}.{0[1]}".format(libcuda.get_version()),
                 }
             except ImportError:
-                log.warning("extra_info(): NVML/CUDA runtime library is not found")
+                log.warning("CUDA extra info unavailable: NVML/CUDA driver library not found")
             except LibraryError as e:
-                log.warning("extra_info(): {!r}", e)
+                log.warning("CUDA extra info unavailable", exc_info=e)
         return {
             "cuda_support": False,
         }
@@ -232,9 +481,9 @@ class CUDAPlugin(AbstractComputePlugin):
                     util_total += dev_stat.gpu_util
                     util_stats[dev_id] = Measurement(Decimal(dev_stat.gpu_util), Decimal(100))
             except ImportError:
-                log.warning("gather_node_measures(): NVML library is not found")
+                log.warning("CUDA node measure skipped: NVML library not found")
             except LibraryError as e:
-                log.warning("gather_node_measures(): {!r}", e)
+                log.warning("CUDA node measure failed", exc_info=e)
         return [
             NodeMeasurement(
                 MetricKey("cuda_mem"),
@@ -287,9 +536,9 @@ class CUDAPlugin(AbstractComputePlugin):
                             container_info = await container.show()
                         except DockerError as e:
                             log.warning(
-                                "gather_container_measures(): container {} skipped: {!r}",
-                                cid,
-                                e,
+                                "CUDA container measure skipped",
+                                container_id=cid,
+                                exc_info=e,
                             )
                             continue
                         nvidia_device_reqs = [
@@ -314,9 +563,9 @@ class CUDAPlugin(AbstractComputePlugin):
                             util_stats[cid] += Decimal(util_stat.value)
                             number_of_devices_per_container[cid] += 1
             except ImportError:
-                log.warning("gather_container_measures(): NVML library is not found")
+                log.warning("CUDA container measure skipped: NVML library not found")
             except LibraryError as e:
-                log.warning("gather_container_measures(): {!r}", e)
+                log.warning("CUDA container measure failed", exc_info=e)
 
         return [
             ContainerMeasurement(
@@ -371,60 +620,19 @@ class CUDAPlugin(AbstractComputePlugin):
     ) -> Mapping[str, Any]:
         if not self.enabled:
             return {}
-        assigned_device_ids = []
-        for slot_type, per_device_alloc in device_alloc.items():
-            for device_id, alloc in per_device_alloc.items():
-                if alloc > 0:
-                    assigned_device_ids.append(device_id)
-        docker_config: dict[str, Any] = {}
-        if self.docker_version >= (19, 3, 0):
-            # NOTE: You may put additional Docker container creation API params here.
-            if assigned_device_ids:
-                update_nested_dict(
-                    docker_config,
-                    {
-                        "HostConfig": {
-                            "DeviceRequests": [
-                                {
-                                    "Driver": "nvidia",
-                                    "DeviceIDs": assigned_device_ids,
-                                    # "all" does not work here
-                                    "Capabilities": [
-                                        [
-                                            "utility",
-                                            "compute",
-                                            "video",
-                                            "graphics",
-                                            "display",
-                                        ],
-                                    ],
-                                },
-                            ],
-                        },
-                    },
-                )
-        else:
-            update_nested_dict(
-                docker_config,
-                {
-                    "HostConfig": {
-                        "Runtime": "nvidia",
-                    },
-                    "Env": [
-                        "NVIDIA_DRIVER_CAPABILITIES=all",
-                        "NVIDIA_VISIBLE_DEVICES={}".format(",".join(assigned_device_ids)),
-                    ],
-                },
-            )
-        return docker_config
+        device_config = self._device_injector.build_device_config(
+            DeviceAllocation.from_device_alloc(device_alloc),
+            await self.list_devices(),
+        )
+        return device_config.model_dump(by_alias=True, exclude_none=True)
 
     async def get_attached_devices(
         self,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
     ) -> Sequence[DeviceModelInfo]:
         device_ids: list[DeviceId] = []
-        if SlotName("cuda.devices") in device_alloc:
-            device_ids.extend(device_alloc[SlotName("cuda.devices")].keys())
+        if SlotName("cuda.device") in device_alloc:
+            device_ids.extend(device_alloc[SlotName("cuda.device")].keys())
         available_devices = await self.list_devices()
         attached_devices: list[DeviceModelInfo] = []
         for device in available_devices:

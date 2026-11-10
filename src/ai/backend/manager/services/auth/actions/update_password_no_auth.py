@@ -5,13 +5,13 @@ from typing import override
 
 from aiohttp import web
 
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.common.data.entity.types import EntityType, GlobalEntityType
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.services.auth.actions.base import AuthAction
+from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 
 
-@dataclass
-class UpdatePasswordNoAuthAction(AuthAction):
+@dataclass(frozen=True)
+class UpdatePasswordNoAuthAction(BaseGlobalAction):
     request: web.Request
     domain_name: str
     email: str
@@ -19,13 +19,19 @@ class UpdatePasswordNoAuthAction(AuthAction):
     new_password: str
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return GlobalEntityType()
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.UPDATE
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "update_password_no_auth"
 
     @property
     def hook_params(self) -> dict[str, str]:
@@ -37,11 +43,7 @@ class UpdatePasswordNoAuthAction(AuthAction):
         }
 
 
-@dataclass
-class UpdatePasswordNoAuthActionResult(BaseActionResult):
+@dataclass(frozen=True)
+class UpdatePasswordNoAuthActionResult:
     user_id: uuid.UUID
     password_changed_at: datetime
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.user_id)

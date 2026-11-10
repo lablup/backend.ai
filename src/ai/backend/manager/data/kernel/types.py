@@ -8,12 +8,13 @@ from functools import lru_cache
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
-from ai.backend.common.identifier.kernel_scheduling_history import KernelSchedulingHistoryID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.kernel_group import KernelGroupID
+from ai.backend.common.data.entity.kernel_scheduling_history import KernelSchedulingHistoryID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.types import FieldData
 from ai.backend.common.types import (
     CIStrEnum,
     KernelId,
-    ResourceSlot,
     SessionId,
     SessionResult,
     SessionTypes,
@@ -27,6 +28,8 @@ if TYPE_CHECKING:
 class KernelStatus(CIStrEnum):
     # values are only meaningful inside the manager
     PENDING = "PENDING"
+    # holds a resource reservation on its bound agent (preemption plan)
+    RESERVED = "RESERVED"
     # ---
     SCHEDULED = "SCHEDULED"
     PREPARING = "PREPARING"
@@ -78,12 +81,20 @@ class KernelStatus(CIStrEnum):
         Returns a set of kernel statuses that are considered as resource-occupying.
         """
         return frozenset((
+            cls.RESERVED,
             cls.SCHEDULED,
             cls.PREPARING,
             cls.PULLING,
             cls.PREPARED,
             cls.CREATING,
         ))
+
+    @classmethod
+    @lru_cache(maxsize=1)
+    def resource_holding_statuses(cls) -> frozenset[KernelStatus]:
+        """Return statuses in which the kernel holds agent resources —
+        usage already reported (occupied) or still reserved (requested)."""
+        return cls.resource_occupied_statuses() | cls.resource_requested_statuses()
 
     @classmethod
     @lru_cache(maxsize=1)
@@ -139,6 +150,7 @@ class KernelStatus(CIStrEnum):
         """
         return frozenset((
             cls.PENDING,
+            cls.RESERVED,
             cls.SCHEDULED,
             cls.PREPARING,
             cls.BUILDING,
@@ -154,6 +166,7 @@ class KernelStatus(CIStrEnum):
         """
         return frozenset((
             cls.PENDING,
+            cls.RESERVED,
             cls.SCHEDULED,
             cls.PREPARING,
             cls.BUILDING,
@@ -209,7 +222,7 @@ class ClusterConfig:
 
 @dataclass
 class UserPermission:
-    user_uuid: UUID
+    user_uuid: UUID | None
     access_key: str
     domain_name: str
     group_id: UUID
@@ -220,13 +233,11 @@ class UserPermission:
 
 @dataclass
 class ResourceInfo:
-    scaling_group: str
+    resource_group: str
     resource_group_id: ResourceGroupID
     agent: str | None
     agent_addr: str | None
     container_id: str | None
-    occupied_slots: ResourceSlot
-    requested_slots: ResourceSlot
     occupied_shares: dict[str, Any]
     attached_devices: dict[str, Any]
     resource_opts: dict[str, Any]
@@ -292,7 +303,7 @@ class Metadata:
 
 
 @dataclass
-class KernelInfo:
+class KernelInfo(FieldData):
     id: KernelId
     session: RelatedSessionInfo
     user_permission: UserPermission
@@ -304,6 +315,7 @@ class KernelInfo:
     lifecycle: LifecycleStatus
     metrics: Metrics
     metadata: Metadata
+    kernel_group_id: KernelGroupID | None
 
 
 @dataclass
@@ -330,7 +342,7 @@ class KernelSchedulingPhase(StrEnum):
 
 
 @dataclass
-class KernelSchedulingHistoryData:
+class KernelSchedulingHistoryData(FieldData):
     """Domain model for kernel scheduling history."""
 
     id: KernelSchedulingHistoryID

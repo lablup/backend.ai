@@ -1,0 +1,45 @@
+name: backport-migration-check
+
+# Advisory only: this workflow is deliberately kept out of the required status
+# checks, so a red run asks a reviewer to look rather than blocking the merge.
+
+on:
+  pull_request:
+    types: [opened, reopened, edited, synchronize, labeled, unlabeled]
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check-backport-migration:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the revision
+        uses: actions/checkout@v6
+        with:
+          lfs: false
+          sparse-checkout: .github
+      - name: Check whether a migration would be backported
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+          PR_BASE: ${{ github.event.pull_request.base.ref }}
+        run: |
+          if ! warning=$(.github/scripts/check-backport-migration.sh \
+            --pr "$PR_NUMBER" \
+            --title "$PR_TITLE" \
+            --body "$PR_BODY" \
+            --labels "$PR_LABELS" \
+            --base "$PR_BASE"); then
+            if [ -n "$warning" ]; then
+              echo "::warning title=Backport carries a migration::$warning"
+            fi
+            exit 1
+          fi

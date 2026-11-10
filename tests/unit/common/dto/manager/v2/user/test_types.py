@@ -123,12 +123,14 @@ class TestUserOrderField:
     def test_domain_name_value(self) -> None:
         assert UserOrderField.DOMAIN_NAME.value == "domain_name"
 
-    def test_enum_members_count(self) -> None:
-        assert len(list(UserOrderField)) == 8
+    def test_every_value_is_its_name_lowercased(self) -> None:
+        """The order field names the user column, so the value follows the member name.
 
-    def test_all_values_are_strings(self) -> None:
+        The member list grows whenever a declared order is opened, so it is the naming
+        that is pinned here rather than the count.
+        """
         for member in UserOrderField:
-            assert isinstance(member.value, str)
+            assert member.value == member.name.lower()
 
     def test_from_string_username(self) -> None:
         assert UserOrderField("username") is UserOrderField.USERNAME

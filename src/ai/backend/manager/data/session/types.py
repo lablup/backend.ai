@@ -5,9 +5,22 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
 from functools import lru_cache
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 from uuid import UUID
 
+import yarl
+
+from ai.backend.common.data.entity.agent import AgentUUID
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.replica import ReplicaID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.session_dependency import SessionDependencyID
+from ai.backend.common.data.entity.session_designated_agent import SessionDesignatedAgentID
+from ai.backend.common.data.entity.session_group import SessionGroupID
+from ai.backend.common.data.entity.types import EntityData, FieldData
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.vfolder.types import VFolderMountData
 from ai.backend.common.types import (
     AccessKey,
@@ -16,11 +29,13 @@ from ai.backend.common.types import (
     CIStrEnum,
     ClusterMode,
     KernelId,
-    ResourceSlot,
     SessionId,
     SessionResult,
     SessionTypes,
+    VFolderMount,
 )
+from ai.backend.manager.data.network.types import NetworkType
+from ai.backend.manager.data.session.options import SessionStoredOptions
 from ai.backend.manager.data.user.types import UserData
 
 if TYPE_CHECKING:
@@ -33,6 +48,9 @@ class SessionStatus(CIStrEnum):
     # values are only meaningful inside the manager
     PENDING = "PENDING"
     DEPRIORITIZING = "DEPRIORITIZING"  # transient: lower priority and go back to PENDING
+    # holds a resource reservation (preemption plan) and waits for the
+    # victims' resources to free before becoming SCHEDULED
+    RESERVED = "RESERVED"
     # ---
     SCHEDULED = "SCHEDULED"
     PREPARING = "PREPARING"
@@ -45,9 +63,12 @@ class SessionStatus(CIStrEnum):
     RUNNING = "RUNNING"
     RESTARTING = "RESTARTING"
     RUNNING_DEGRADED = "RUNNING_DEGRADED"
-    # transient: confirmed preemption victim; after kernel cleanup it
-    # branches by PreemptionMode to TERMINATED (terminate) or PENDING (reschedule)
+    # transient: confirmed preemption victim; branches by PreemptionMode to
+    # TERMINATING (terminate) or RESCHEDULING (reschedule)
     PREEMPTED = "PREEMPTED"
+    # transient: kernels are being torn down to put the session back in the
+    # queue; becomes PENDING once they are all gone
+    RESCHEDULING = "RESCHEDULING"
     # ---
     TERMINATING = "TERMINATING"
     TERMINATED = "TERMINATED"
@@ -55,13 +76,14 @@ class SessionStatus(CIStrEnum):
     CANCELLED = "CANCELLED"
 
     @classmethod
-    def kernel_awaiting_statuses(cls) -> set[SessionStatus]:
-        return {
+    @lru_cache(maxsize=1)
+    def kernel_awaiting_statuses(cls) -> frozenset[SessionStatus]:
+        return frozenset((
             cls.PREPARING,
             cls.PULLING,
             cls.CREATING,
             cls.TERMINATING,
-        }
+        ))
 
     @classmethod
     @lru_cache(maxsize=1)
@@ -74,8 +96,10 @@ class SessionStatus(CIStrEnum):
                 cls.PENDING,
                 cls.DEPRIORITIZING,
                 cls.PREEMPTED,
+                cls.RESCHEDULING,
                 cls.TERMINATED,
                 cls.CANCELLED,
+                cls.ERROR,
             )
         )
 
@@ -112,14 +136,14 @@ class SessionStatus(CIStrEnum):
 
     @classmethod
     @lru_cache(maxsize=1)
-    def preemptable_statuses(cls) -> frozenset[SessionStatus]:
-        """Return statuses that can transition to PREEMPTED.
+    def preemption_victim_statuses(cls) -> frozenset[SessionStatus]:
+        """Return statuses eligible as preemption victim candidates (BEP-1055).
 
-        Only RUNNING sessions are eligible preemption victims (BEP-1055).
-        Sessions still being provisioned or already terminating are never
-        marked PREEMPTED, so those source statuses are rejected.
+        Still occupying resources and able to transition to termination —
+        strips TERMINATING, whose resources free without preemption, and
+        RESERVED, whose hold belongs to another preemption plan.
         """
-        return frozenset((cls.RUNNING,))
+        return (cls.resource_occupied_statuses() & cls.terminatable_statuses()) - {cls.RESERVED}
 
     @classmethod
     @lru_cache(maxsize=1)
@@ -163,18 +187,17 @@ class KernelMatchType(StrEnum):
 
 # TODO: Add proper types
 @dataclass
-class SessionData:
+class SessionData(EntityData):
     id: UUID
     session_type: SessionTypes
     priority: int
+    job_priority: int
     is_preemptible: bool
     cluster_mode: ClusterMode
     cluster_size: int
     domain_name: str
     group_id: UUID
-    user_uuid: UUID
-    occupying_slots: Any  # TODO: ResourceSlot?
-    requested_slots: Any
+    user_uuid: UUID | None
     use_host_network: bool
     created_at: datetime = field(compare=False)
     status: SessionStatus
@@ -194,7 +217,7 @@ class SessionData:
     timeout: int | None
     batch_timeout: int | None
     terminated_at: datetime | None = field(compare=False)
-    scaling_group_name: str | None
+    resource_group_name: str | None
     starts_at: datetime | None = field(compare=False)
     status_info: str | None = field(compare=False)
     status_data: dict[str, Any] | None = field(compare=False)
@@ -211,6 +234,158 @@ class SessionData:
 
     # The routing replica (RoutingRow.id) this session serves, if any.
     replica_id: UUID | None = None
+    requested_starts_at: datetime | None = field(default=None, compare=False)
+    session_group_id: SessionGroupID | None = None
+
+    @override
+    def entity_id(self) -> SessionID:
+        return SessionID(self.id)
+
+
+class SessionTerminationStatus(StrEnum):
+    """What a termination request did to one session.
+
+    Session-only, so it stays here rather than beside the bulk result: what a bulk
+    run's per-entity value means is the domain's to declare.
+    """
+
+    CANCELLED = "cancelled"
+    TERMINATING = "terminating"
+    FORCE_TERMINATED = "force-terminated"
+    SKIPPED = "skipped"
+
+
+@dataclass(frozen=True)
+class SessionEntityData(EntityData):
+    """A session as its own row states it.
+
+    Every field is a column of ``sessions``; nothing here is read from another table,
+    so building one never loads a relationship. What a caller needs from the kernels
+    or the owner is asked for separately.
+    """
+
+    id: SessionID
+    creation_id: str | None
+    name: str | None
+    session_type: SessionTypes
+    priority: int
+    is_preemptible: bool
+    job_priority: int
+    cluster_mode: str
+    cluster_size: int
+    options: SessionStoredOptions
+    agent_ids: list[str] | None
+    session_group_id: SessionGroupID | None
+    resource_group_id: ResourceGroupID
+    resource_group_name: str
+    target_sgroup_names: list[str] | None
+    domain_name: str
+    domain_id: DomainID
+    group_id: ProjectID
+    user_uuid: UserID | None
+    access_key: AccessKey | None
+    images: list[str] | None
+    image_ids: list[UUID] | None
+    tag: str | None
+    vfolder_mounts: list[VFolderMount] | None
+    environ: dict[str, Any] | None
+    bootstrap_script: str | None
+    use_host_network: bool
+    timeout: int | None
+    batch_timeout: int | None
+    terminated_at: datetime | None = field(compare=False)
+    starts_at: datetime | None = field(compare=False)
+    requested_starts_at: datetime | None = field(compare=False)
+    status: SessionStatus
+    status_info: str | None = field(compare=False)
+    status_data: dict[str, Any] | None = field(compare=False)
+    status_history: dict[str, Any] | None = field(compare=False)
+    callback_url: yarl.URL | None
+    startup_command: str | None
+    result: SessionResult
+    num_queries: int | None
+    last_stat: dict[str, Any] | None = field(compare=False)
+    network_type: NetworkType | None
+    network_id: str | None
+    replica_id: ReplicaID | None
+    created_at: datetime = field(compare=False)
+
+    @override
+    def entity_id(self) -> SessionID:
+        return self.id
+
+    def to_session_data(self, owner: UserData | None = None) -> SessionData:
+        """The same session as the shape the API layer reports.
+
+        ``service_ports`` is left empty: it is a kernel column, and nothing reads it
+        off a session.
+        """
+        return SessionData(
+            id=self.id,
+            session_type=self.session_type,
+            priority=self.priority,
+            job_priority=self.job_priority,
+            is_preemptible=self.is_preemptible,
+            cluster_mode=ClusterMode(self.cluster_mode),
+            cluster_size=self.cluster_size,
+            domain_name=self.domain_name,
+            group_id=self.group_id,
+            user_uuid=self.user_uuid,
+            use_host_network=self.use_host_network,
+            created_at=self.created_at,
+            status=self.status,
+            result=self.result,
+            num_queries=self.num_queries or 0,
+            creation_id=self.creation_id,
+            name=self.name,
+            access_key=self.access_key,
+            agent_ids=self.agent_ids,
+            session_group_id=self.session_group_id,
+            images=self.images,
+            image_ids=self.image_ids,
+            tag=self.tag,
+            vfolder_mounts=[mount.to_dataclass() for mount in self.vfolder_mounts]
+            if self.vfolder_mounts
+            else None,
+            environ=self.environ,
+            bootstrap_script=self.bootstrap_script,
+            target_sgroup_names=self.target_sgroup_names,
+            timeout=self.timeout,
+            batch_timeout=self.batch_timeout,
+            terminated_at=self.terminated_at,
+            resource_group_name=self.resource_group_name,
+            starts_at=self.starts_at,
+            requested_starts_at=self.requested_starts_at,
+            status_info=self.status_info,
+            status_data=self.status_data,
+            status_history=self.status_history,
+            callback_url=str(self.callback_url) if self.callback_url else None,
+            startup_command=self.startup_command,
+            last_stat=self.last_stat,
+            network_type=self.network_type,
+            network_id=self.network_id,
+            replica_id=self.replica_id,
+            owner=owner,
+            service_ports=None,
+        )
+
+
+@dataclass(frozen=True)
+class SessionDependencyData(FieldData):
+    """One edge of the dependency graph: the session and what it waits for."""
+
+    id: SessionDependencyID
+    session_id: SessionID
+    depends_on: SessionID
+
+
+@dataclass(frozen=True)
+class SessionDesignatedAgentData(FieldData):
+    """One agent a session designates for its placement."""
+
+    id: SessionDesignatedAgentID
+    session_id: SessionID
+    agent_uuid: AgentUUID
 
 
 @dataclass(frozen=True)
@@ -243,7 +418,7 @@ class SessionMetadata:
     name: str
     domain_name: str
     group_id: UUID
-    user_uuid: UUID
+    user_uuid: UUID | None
     access_key: str
     session_type: SessionTypes
     priority: int
@@ -255,9 +430,7 @@ class SessionMetadata:
 class ResourceSpec:
     cluster_mode: str
     cluster_size: int
-    occupying_slots: ResourceSlot
-    requested_slots: ResourceSlot
-    scaling_group_name: str | None
+    resource_group_name: str | None
     target_sgroup_names: list[str] | None
     agent_ids: list[str] | None
 
@@ -401,7 +574,7 @@ class SubStepResult(BackendAISchema):
 
 
 @dataclass
-class SessionSchedulingHistoryData:
+class SessionSchedulingHistoryData(FieldData):
     """Domain model for session scheduling history."""
 
     id: UUID
@@ -427,16 +600,6 @@ class SessionSchedulingHistoryListResult:
     """Search result with pagination for session scheduling history."""
 
     items: list[SessionSchedulingHistoryData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
-
-
-@dataclass
-class SessionListResult:
-    """Search result with total count and pagination info for sessions."""
-
-    items: list[SessionData]
     total_count: int
     has_next_page: bool
     has_previous_page: bool

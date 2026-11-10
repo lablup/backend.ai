@@ -1,0 +1,486 @@
+"""What an app config scenario table says besides the call.
+
+The four app config adapters share one design: a definition registers a name, an
+allow-list entry opens it to one scope kind, and a fragment holds a value under that.
+What every table needs is here — the design laid as one nest, and the users a row calls
+as. The merged read's own situations are here too; the other three adapters keep theirs
+beside their tables. How an adapter is built lives in each table's own conftest.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass, field
+from typing import Any, override
+
+from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.data.entity.app_config import AppConfigEntityType
+from ai.backend.common.data.entity.app_config_allow_list import AppConfigAllowListEntityType
+from ai.backend.common.data.entity.app_config_definition import AppConfigDefinitionEntityType
+from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentEntityType
+from ai.backend.common.data.entity.global_entity import GlobalEntityName
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.dto.manager.v2.app_config.response import GetAppConfigsPayload
+from ai.backend.manager.data.app_config.types import (
+    AppConfigAllowListData,
+    AppConfigDefinitionData,
+)
+from ai.backend.manager.data.domain.types import DomainData
+from ai.backend.manager.data.permission.global_entity import global_entity_id
+from ai.backend.manager.data.permission.types import Permission
+from ai.backend.manager.data.user.types import UserData
+from ai.backend.testutils.scenario_steps import (
+    Answered,
+    Given,
+    Held,
+    Language,
+    Same,
+    SameAs,
+    Says,
+    Then,
+    Told,
+    Verdict,
+    in_language,
+)
+from bai_scenario.components.domain import WAS_HERE, SomeoneOf
+from bai_scenario.seeds.app_config.allow_list import SCOPE_NAMES, TestSeedAllowListEntry
+from bai_scenario.seeds.app_config.definition import TestSeedDefinition
+from bai_scenario.seeds.app_config.fragment import TestSeedFragmentOf, TestSeedPublicFragment
+from bai_scenario.seeds.domain.domain import TestSeedDomain
+from bai_scenario.seeds.rbac.role import TestSeedPermission, TestSeedRole
+from bai_scenario.seeds.seeder import Laid, TestSeeder, TestSeedNest
+
+ENFORCEMENT = "manager.rbac.enforcement_enabled"
+
+UNREGISTERED = "unregistered"
+"""등록되지 않은 설정 이름. 미리 만들어 두는 값이 아니므로 리터럴로 둔다."""
+
+ENTITY_NAMES: Mapping[EntityType, Says] = {
+    AppConfigEntityType(): Says("설정", english="config"),
+    AppConfigDefinitionEntityType(): Says("설정 정의", english="config definition"),
+    AppConfigAllowListEntityType(): Says("허용 목록 항목", english="allow-list entry"),
+    AppConfigFragmentEntityType(): Says("설정 조각", english="config fragment"),
+}
+"""레포트에서 권한 대상 엔티티 종류를 가리키는 이름."""
+
+
+def names_of(granted: Sequence[Permission]) -> str:
+    return ", ".join(one.name or str(int(one)) for one in granted)
+
+
+@dataclass(frozen=True)
+class SomeoneGrantedOnTheirOwn(TestSeedNest[Laid[UserData]]):
+    """자기 스코프에 부여된 역할로, 한 엔티티 종류에 지정한 권한만 받은 사용자.
+
+    권한을 하나도 지정하지 않으면 역할을 만들지 않는다.
+    """
+
+    domain: Laid[DomainData]
+    entity_type: EntityType
+    granted: tuple[Permission, ...] = ()
+    role: UserRole = UserRole.USER
+
+    @override
+    def kind(self) -> str:
+        what = ENTITY_NAMES[self.entity_type]
+        what_en = in_language(what, Language.ENGLISH)
+        if not self.granted:
+            return Says(
+                f"{what} 권한이 하나도 없는 사용자 준비",
+                english=f"Prepare a user with no {what_en} permission",
+            )
+        return Says(
+            f"자기 스코프에서 {what}에 대한 {names_of(self.granted)} 권한을 받은 사용자 준비",
+            english=(
+                f"Prepare a user granted the {names_of(self.granted)} permission on "
+                f"{what_en} in their own scope"
+            ),
+        )
+
+    @override
+    def lay(self, seed: TestSeeder) -> Laid[UserData]:
+        someone = seed.within(SomeoneOf(self.domain, role=self.role))
+        if not self.granted:
+            return someone
+        role = seed.creating_from(
+            TestSeedRole(lambda u: UserID(u.id), name_hint="own-scope"), someone
+        )
+        for one in self.granted:
+            seed.adding(TestSeedPermission(entity_type=self.entity_type, permission=one), role)
+        seed.granting(role, someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id))
+        return someone
+
+
+@dataclass(frozen=True)
+class SomeoneGrantedOn[Seat](TestSeedNest[Laid[UserData]]):
+    """지정한 스코프 행에 부여된 역할로, 한 엔티티 종류에 지정한 권한만 받은 사용자.
+
+    도메인 스코프에 부여하면 그 도메인 안의 엔티티를 관리한다.
+    """
+
+    domain: Laid[DomainData]
+    seat: Laid[Seat]
+    seat_id: Callable[[Seat], EntityIdentifier]
+    entity_type: EntityType
+    granted: tuple[Permission, ...] = ()
+    role: UserRole = UserRole.USER
+
+    @override
+    def kind(self) -> str:
+        what = ENTITY_NAMES[self.entity_type]
+        what_en = in_language(what, Language.ENGLISH)
+        if not self.granted:
+            return Says(
+                f"{what} 권한이 하나도 없는 사용자 준비",
+                english=f"Prepare a user with no {what_en} permission",
+            )
+        return Says(
+            f"{self.seat.describe}에서 {what}에 대한 {names_of(self.granted)} 권한을 받은 사용자 준비",
+            english=(
+                f"Prepare a user granted the {names_of(self.granted)} permission on "
+                f"{what_en} in {in_language(self.seat.describe, Language.ENGLISH)}"
+            ),
+        )
+
+    @override
+    def lay(self, seed: TestSeeder) -> Laid[UserData]:
+        someone = seed.within(SomeoneOf(self.domain, role=self.role))
+        if not self.granted:
+            return someone
+        role = seed.creating_from(TestSeedRole(self.seat_id, name_hint="seated"), self.seat)
+        for one in self.granted:
+            seed.adding(TestSeedPermission(entity_type=self.entity_type, permission=one), role)
+        seed.granting(role, someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id))
+        return someone
+
+
+@dataclass(frozen=True)
+class SomeoneGrantedInGlobal(TestSeedNest[Laid[UserData]]):
+    """global 스코프에 부여된 역할로, 한 엔티티 종류에 지정한 권한만 받은 사용자.
+
+    global 스코프에서 만들어지는 엔티티의 권한은 global 스코프의 역할로만 부여된다.
+    """
+
+    domain: Laid[DomainData]
+    entity_type: EntityType
+    granted: tuple[Permission, ...] = ()
+    role: UserRole = UserRole.USER
+
+    @override
+    def kind(self) -> str:
+        what = ENTITY_NAMES[self.entity_type]
+        what_en = in_language(what, Language.ENGLISH)
+        if not self.granted:
+            return Says(
+                f"{what} 권한이 하나도 없는 사용자 준비",
+                english=f"Prepare a user with no {what_en} permission",
+            )
+        return Says(
+            f"global 스코프에서 {what}에 대한 {names_of(self.granted)} 권한을 받은 사용자 준비",
+            english=(
+                f"Prepare a user granted the {names_of(self.granted)} permission on "
+                f"{what_en} in the global scope"
+            ),
+        )
+
+    @override
+    def lay(self, seed: TestSeeder) -> Laid[UserData]:
+        someone = seed.within(SomeoneOf(self.domain, role=self.role))
+        if not self.granted:
+            return someone
+        role = seed.creating_from(
+            TestSeedRole(lambda _: global_entity_id(GlobalEntityName.GLOBAL), name_hint="global"),
+            someone,
+        )
+        for one in self.granted:
+            seed.adding(TestSeedPermission(entity_type=self.entity_type, permission=one), role)
+        seed.granting(role, someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id))
+        return someone
+
+
+@dataclass(frozen=True)
+class LaidDesign:
+    """설정 정의 하나와, 그 이름을 허용하는 허용 목록 항목들의 참조."""
+
+    definition: Laid[AppConfigDefinitionData]
+    entries: Mapping[AppConfigScopeType, Laid[AppConfigAllowListData]]
+
+
+@dataclass(frozen=True)
+class ADesignOf(TestSeedNest[LaidDesign]):
+    """설정 이름 하나를 등록하고, 지정한 스코프 종류마다 허용 목록 항목을 만든다.
+
+    ``ranks``에 없는 종류는 그 종류의 기본 순위를 받는다.
+    """
+
+    allowed: tuple[AppConfigScopeType, ...] = ()
+    ranks: Mapping[AppConfigScopeType, int] = field(default_factory=dict)
+    name_hint: str = "config"
+
+    @override
+    def kind(self) -> str:
+        if not self.allowed:
+            return Says(
+                "어느 스코프에도 허용되지 않은 설정 이름 준비",
+                english="Prepare a config name opened in no scope",
+            )
+        opened_ko = ", ".join(str(SCOPE_NAMES[one]) for one in self.allowed)
+        opened_en = ", ".join(
+            in_language(SCOPE_NAMES[one], Language.ENGLISH) for one in self.allowed
+        )
+        return Says(
+            f"{opened_ko} 스코프에 허용된 설정 이름 준비",
+            english=f"Prepare a config name opened in the {opened_en} scope",
+        )
+
+    @override
+    def lay(self, seed: TestSeeder) -> LaidDesign:
+        definition = seed.creating(TestSeedDefinition(name_hint=self.name_hint))
+        entries = {
+            one: seed.creating_from(
+                TestSeedAllowListEntry(scope_type=one, rank=self.ranks.get(one)), definition
+            )
+            for one in self.allowed
+        }
+        return LaidDesign(definition=definition, entries=entries)
+
+
+def domain_owner(domain: DomainData) -> EntityIdentifier:
+    return domain.id
+
+
+def user_owner(user: UserData) -> EntityIdentifier:
+    return UserID(user.id)
+
+
+# --- the merged read ---------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class AMergeAndACaller:
+    """병합해 읽을 설정 이름들과, 그것을 읽을 사용자."""
+
+    caller: UserData
+    names: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class AConfigLaidAcross(Given[Any, AMergeAndACaller]):
+    """설정 이름 하나에 도메인·프로젝트·사용자 스코프의 설정 조각을 미리 만들어 두고, 그 도메인의 사용자 한 명.
+
+    값을 지정한 스코프에만 설정 조각이 만들어지고, 그 종류의 허용 목록 항목은 조각과 함께
+    만들어진다. 다른 사용자와 다른 도메인의 조각은 같은 이름에 만들어 두되 반환하지 않으므로,
+    병합에 섞이면 바로 불일치가 드러난다.
+    """
+
+    public: Mapping[str, Any] | None = None
+    domain: Mapping[str, Any] | None = None
+    user: Mapping[str, Any] | None = None
+    another_user: Mapping[str, Any] | None = None
+    another_domain: Mapping[str, Any] | None = None
+    also_allowed: tuple[AppConfigScopeType, ...] = ()
+    ranks: Mapping[AppConfigScopeType, int] = field(default_factory=dict)
+    granted: bool = True
+    defined: bool = True
+    asked: int = 1
+
+    def _allowed(self) -> tuple[AppConfigScopeType, ...]:
+        kinds: list[AppConfigScopeType] = list(self.also_allowed)
+        if self.public is not None and AppConfigScopeType.PUBLIC not in kinds:
+            kinds.append(AppConfigScopeType.PUBLIC)
+        if (self.domain is not None or self.another_domain is not None) and (
+            AppConfigScopeType.DOMAIN not in kinds
+        ):
+            kinds.append(AppConfigScopeType.DOMAIN)
+        if (self.user is not None or self.another_user is not None) and (
+            AppConfigScopeType.USER not in kinds
+        ):
+            kinds.append(AppConfigScopeType.USER)
+        return tuple(kinds)
+
+    @override
+    def describe(self) -> str:
+        who = (
+            Says(
+                "자기 스코프에서 설정 읽기 권한을 받은 사용자 한 명",
+                english="one user granted the config read permission in their own scope",
+            )
+            if self.granted
+            else Says(
+                "설정 권한이 하나도 없는 사용자 한 명",
+                english="one user with no config permission",
+            )
+        )
+        who_en = in_language(who, Language.ENGLISH)
+        if not self.defined:
+            return Says(
+                f"등록되지 않은 설정 이름과, {who}",
+                english=f"an unregistered config name, and {who_en}",
+            )
+        laid = [SCOPE_NAMES[one] for one in self._allowed()]
+        if laid:
+            where_ko = ", ".join(str(one) for one in laid)
+            where_en = ", ".join(in_language(one, Language.ENGLISH) for one in laid)
+            return Says(
+                f"{where_ko} 스코프에 허용된 설정 이름 하나와, {who}",
+                english=f"one config name opened in the {where_en} scope, and {who_en}",
+            )
+        return Says(
+            f"어느 스코프에도 허용되지 않은 설정 이름 하나와, {who}",
+            english=f"one config name opened in no scope, and {who_en}",
+        )
+
+    @override
+    async def lay(self, seeding: Any) -> AMergeAndACaller:
+        home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+        caller = await seeding.within(
+            SomeoneGrantedOnTheirOwn(
+                home,
+                AppConfigEntityType(),
+                granted=(Permission.READ,) if self.granted else (),
+            )
+        )
+        if not self.defined:
+            return AMergeAndACaller(caller=seeding.made(caller), names=(UNREGISTERED,) * self.asked)
+        design = await seeding.within(ADesignOf(allowed=self._allowed(), ranks=self.ranks))
+        entries = design.entries
+        if self.public is not None:
+            await seeding.creating_from(
+                TestSeedPublicFragment(config=self.public), entries[AppConfigScopeType.PUBLIC]
+            )
+        if self.domain is not None:
+            await seeding.creating_from_two(
+                TestSeedFragmentOf(
+                    owner_of=domain_owner, config=self.domain, name_hint="domain-fragment"
+                ),
+                entries[AppConfigScopeType.DOMAIN],
+                home,
+            )
+        if self.user is not None:
+            await seeding.creating_from_two(
+                TestSeedFragmentOf(owner_of=user_owner, config=self.user, name_hint="own-fragment"),
+                entries[AppConfigScopeType.USER],
+                caller,
+            )
+        if self.another_user is not None:
+            other = await seeding.within(SomeoneOf(home))
+            await seeding.creating_from_two(
+                TestSeedFragmentOf(
+                    owner_of=user_owner, config=self.another_user, name_hint="anothers-fragment"
+                ),
+                entries[AppConfigScopeType.USER],
+                other,
+            )
+        if self.another_domain is not None:
+            away = await seeding.creating(TestSeedDomain(name_hint="away", description=WAS_HERE))
+            await seeding.creating_from_two(
+                TestSeedFragmentOf(
+                    owner_of=domain_owner,
+                    config=self.another_domain,
+                    name_hint="other-domains-fragment",
+                ),
+                entries[AppConfigScopeType.DOMAIN],
+                away,
+            )
+        name = seeding.made(design.definition).config_name
+        return AMergeAndACaller(caller=seeding.made(caller), names=(name,) * self.asked)
+
+
+@dataclass(frozen=True)
+class SeveralConfigsLaid(Given[Any, AMergeAndACaller]):
+    """공개 설정 조각을 하나씩 가진 설정 이름 여럿과, 그 도메인의 사용자 한 명."""
+
+    publics: tuple[Mapping[str, Any], ...]
+    granted: bool = True
+
+    @override
+    def describe(self) -> str:
+        who = (
+            Says(
+                "자기 스코프에서 설정 읽기 권한을 받은 사용자 한 명",
+                english="one user granted the config read permission in their own scope",
+            )
+            if self.granted
+            else Says(
+                "설정 권한이 하나도 없는 사용자 한 명",
+                english="one user with no config permission",
+            )
+        )
+        return Says(
+            f"공개 설정 조각을 하나씩 가진 설정 이름 {len(self.publics)}개와, {who}",
+            english=(
+                f"{len(self.publics)} config names each holding a public config fragment, "
+                f"and {in_language(who, Language.ENGLISH)}"
+            ),
+        )
+
+    @override
+    async def lay(self, seeding: Any) -> AMergeAndACaller:
+        home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+        caller = await seeding.within(
+            SomeoneGrantedOnTheirOwn(
+                home,
+                AppConfigEntityType(),
+                granted=(Permission.READ,) if self.granted else (),
+            )
+        )
+        names: list[str] = []
+        for config in self.publics:
+            design = await seeding.within(ADesignOf(allowed=(AppConfigScopeType.PUBLIC,)))
+            await seeding.creating_from(
+                TestSeedPublicFragment(config=config), design.entries[AppConfigScopeType.PUBLIC]
+            )
+            names.append(seeding.made(design.definition).config_name)
+        return AMergeAndACaller(caller=seeding.made(caller), names=tuple(names))
+
+
+@dataclass(frozen=True)
+class NotRefused(Verdict):
+    """응답이 반환되어야 한다. 거부되면 그 예외 이름을 문제로 적는다."""
+
+    raised: BaseException | None
+
+    @override
+    def told(self) -> Told:
+        says = Says("응답이 반환됩니다", english="a response comes back")
+        if self.raised is None:
+            return Told(says)
+        return Told(says, problems=(f"{says} 이어야 하는데 {type(self.raised).__name__}",))
+
+
+@dataclass(frozen=True)
+class TheMergedConfigs(Then[AMergeAndACaller, GetAppConfigsPayload]):
+    """요청한 이름마다 하나씩, 요청 순서대로, 병합된 설정이 통째로 반환된다."""
+
+    wanted: tuple[Mapping[str, Any], ...]
+
+    @override
+    def says(self) -> str:
+        return Says(
+            "요청한 이름마다 병합된 설정이 반환됩니다",
+            english="the merged config comes back for every requested name",
+        )
+
+    @override
+    def look(
+        self, laid: AMergeAndACaller, answered: Answered[GetAppConfigsPayload]
+    ) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [NotRefused(answered.raised)]
+        seen: list[Verdict] = [Same("app_configs", len(payload.app_configs), len(self.wanted))]
+        for i, (got, wanted) in enumerate(zip(payload.app_configs, self.wanted, strict=False)):
+            seen.append(
+                Held(
+                    f"app_configs[{i}].config_name",
+                    got.config_name,
+                    SameAs(
+                        laid.names[i],
+                        Says("요청한 이름", english="the requested name"),
+                    ),
+                )
+            )
+            seen.append(Same(f"app_configs[{i}].config", got.config, dict(wanted)))
+        return seen

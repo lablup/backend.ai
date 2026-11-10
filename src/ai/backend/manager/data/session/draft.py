@@ -37,11 +37,12 @@ from uuid import UUID
 import yarl
 from pydantic import ConfigDict, Field
 
-from ai.backend.common.identifier.domain import DomainID, DomainName
-from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.identifier.project import ProjectID
-from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
-from ai.backend.common.identifier.session import SessionID
+from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
+from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -108,8 +109,10 @@ class KernelSpecDraft(_DraftBaseModel):
     Cluster-layout and user-mapping fields are filled by their
     respective rules; ``execution_spec`` is eagerly initialized so a
     rule can ``model_copy`` just the execution-level sub-draft without
-    absence checks. ``vfolder_mounts`` is the per-kernel resolved slot
-    :class:`ResolveVFolderMountsRule` populates after expand.
+    absence checks. ``preopen_ports`` is copied from the kernel's
+    :class:`KernelGroupDraft` at expand; ``vfolder_mounts`` is the
+    per-kernel resolved slot :class:`ResolveVFolderMountsRule`
+    populates after expand.
     """
 
     cluster_role: str | None = None
@@ -199,6 +202,7 @@ class SessionScopeDraft(_DraftBaseModel):
     project_id: ProjectID | None = None
     resource_group_id: ResourceGroupID | None = None
     resource_group_name: ResourceGroupName | None = None
+    session_group_id: SessionGroupID | None = None
 
 
 class SessionClassificationDraft(_DraftBaseModel):
@@ -206,6 +210,20 @@ class SessionClassificationDraft(_DraftBaseModel):
 
     session_type: SessionTypes | None = None
     tag: str | None = None
+
+
+class ResourceSpecDraft(_DraftBaseModel):
+    """Resource-determining portion of a session draft.
+
+    The input of the resource preparer rules (and the whole draft the
+    fitting check operates on): the options that shape resource amounts
+    and the kernel specs the expansion rule fills. The full
+    :class:`SessionResourceSpecDraft` nests this as its ``resource``
+    field; promotion flattens it back into the flat spec shape.
+    """
+
+    options: SessionOptionsDraft = Field(default_factory=SessionOptionsDraft)
+    kernel_specs: tuple[KernelSpecDraft, ...] = ()
 
 
 class SessionResourceSpecDraft(_DraftBaseModel):
@@ -216,8 +234,7 @@ class SessionResourceSpecDraft(_DraftBaseModel):
     network: SessionNetworkDraft = Field(default_factory=SessionNetworkDraft)
     callback_url: yarl.URL | None = None
     dependencies: tuple[SessionID, ...] = ()
-    options: SessionOptionsDraft = Field(default_factory=SessionOptionsDraft)
-    kernel_specs: tuple[KernelSpecDraft, ...] = ()
+    resource: ResourceSpecDraft = Field(default_factory=ResourceSpecDraft)
     internal_data_extras: InternalDataExtras = Field(default_factory=InternalDataExtras)
 
 

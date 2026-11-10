@@ -1,43 +1,27 @@
+from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import EntityType
-from ai.backend.manager.actions.action import BaseAction
-from ai.backend.manager.actions.action.scope import BaseScopeAction, BaseScopeActionResult
-from ai.backend.manager.actions.action.single_entity import (
-    BaseSingleEntityAction,
-    BaseSingleEntityActionResult,
-)
-from ai.backend.manager.actions.action.types import FieldData
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.common.data.entity.user import UserEntityType, UserID
+from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
+from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 
 
-class AuthAction(BaseAction):
+class UserGlobalAction(BaseGlobalAction):
+    """Base for an operation reaching the user rows, or their login rows, at large."""
+
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return EntityType.AUTH
+        return UserEntityType()
 
 
-class KeypairScopeAction(BaseScopeAction):
-    @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
-        return EntityType.KEYPAIR
+@dataclass(frozen=True)
+class UserEntityAction(BaseSingleEntityAction):
+    """Base for an operation on one user's account, credentials or login rows."""
 
-
-class KeypairScopeActionResult(BaseScopeActionResult):
-    pass
-
-
-class KeypairSingleEntityAction(BaseSingleEntityAction):
-    @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
-        return EntityType.KEYPAIR
+    user_id: UserID
 
     @override
-    def field_data(self) -> FieldData | None:
-        return None
-
-
-class KeypairSingleEntityActionResult(BaseSingleEntityActionResult):
-    pass
+    def entity_id(self) -> EntityIdentifier:
+        return self.user_id

@@ -2,6 +2,10 @@ name: SBOM report
 
 on: [workflow_dispatch, workflow_call]
 
+# `contents: read`: only generates the SBOMs
+permissions:
+  contents: read
+
 jobs:
   sbom-python:
     name: Generate Python SBOM
@@ -36,31 +40,9 @@ jobs:
     - name: Find all Dockerfiles and create matrix
       id: set-matrix
       run: |
-        # Find all Dockerfiles in docker/ directory
-        DOCKERFILES=$(find docker -type f -name "*.dockerfile" ! -name "backend.ai-*.dockerfile")
-
-        # Build JSON array for matrix
-        MATRIX_JSON='{"include":['
-        FIRST=true
-
-        for dockerfile in $DOCKERFILES; do
-          # Get image name from filename (e.g., krunner-extractor.dockerfile -> krunner-extractor)
-          BASENAME=$(basename "$dockerfile" .dockerfile)
-
-          if [ "$FIRST" = true ]; then
-            FIRST=false
-          else
-            MATRIX_JSON="${MATRIX_JSON},"
-          fi
-
-          MATRIX_JSON="${MATRIX_JSON}{\"name\":\"${BASENAME}\",\"dockerfile\":\"${dockerfile}\",\"context\":\"docker\"}"
-        done
-
-        MATRIX_JSON="${MATRIX_JSON}]}"
-
+        MATRIX_JSON=$(scripts/list-dockerfiles.sh --infra)
         echo "Found Dockerfiles matrix:"
         echo "$MATRIX_JSON" | jq .
-
         echo "matrix=$MATRIX_JSON" >> $GITHUB_OUTPUT
 
   sbom-containers:
@@ -80,7 +62,7 @@ jobs:
         lfs: false
 
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f  # v3
 
     - name: Resolve project Python version
       id: pyver
@@ -90,7 +72,7 @@ jobs:
 
     - name: Build Docker image
       id: build
-      uses: docker/build-push-action@v6
+      uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8  # v6
       with:
         context: ${{ matrix.context }}
         file: ${{ matrix.dockerfile }}
@@ -101,7 +83,7 @@ jobs:
           PYTHON_VERSION=${{ steps.pyver.outputs.version }}
 
     - name: Generate SBOM with Syft
-      uses: anchore/sbom-action@v0
+      uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610  # v0
       with:
         image: backendai-${{ matrix.name }}:sbom
         format: cyclonedx-json

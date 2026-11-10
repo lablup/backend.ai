@@ -297,6 +297,7 @@ class TestContainerRegistryGQLFromPydantic:
         reg_id = uuid4()
         dto = ContainerRegistryNode(
             id=reg_id,
+            entity_id=reg_id,
             url="https://registry.example.com",
             registry_name="test-registry",
             type=ContainerRegistryType.DOCKER,
@@ -323,6 +324,7 @@ class TestContainerRegistryGQLFromPydantic:
     def test_from_pydantic_with_password_extra(self) -> None:
         dto = ContainerRegistryNode(
             id=uuid4(),
+            entity_id=uuid4(),
             url="https://registry.example.com",
             registry_name="test",
             type=ContainerRegistryType.HARBOR2,
@@ -356,17 +358,23 @@ class TestAdaptersRegistry:
     def test_create_registry(self) -> None:
         adapters = Adapters.create(
             processors=MagicMock(),
+            action_registry=MagicMock(wired_processors=lambda: ()),
             auth_config=MagicMock(),
+            key_provider_pool=MagicMock(),
             deployment_coordinator=MagicMock(),
             schedule_coordinator=MagicMock(),
+            session_lifecycle_handlers=(),
         )
         assert isinstance(adapters, Adapters)
 
     def test_container_registry_adapter_available(self) -> None:
         adapters = Adapters.create(
             processors=MagicMock(),
+            action_registry=MagicMock(wired_processors=lambda: ()),
             auth_config=MagicMock(),
+            key_provider_pool=MagicMock(),
             deployment_coordinator=MagicMock(),
             schedule_coordinator=MagicMock(),
+            session_lifecycle_handlers=(),
         )
         assert isinstance(adapters.container_registry, ContainerRegistryAdapter)

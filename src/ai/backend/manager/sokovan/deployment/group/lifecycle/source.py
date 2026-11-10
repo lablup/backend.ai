@@ -5,8 +5,9 @@ from __future__ import annotations
 from typing import override
 
 from ai.backend.manager.data.deployment.types import ReplicaGroupHandlerCategory
-from ai.backend.manager.models.replica_group.conditions import ReplicaGroupConditions
-from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
+from ai.backend.manager.models.replica_group.searchable_fields import (
+    ReplicaGroupSearchableFields,
+)
 from ai.backend.manager.repositories.replica_group.repository import ReplicaGroupRepository
 from ai.backend.manager.sokovan.deployment.group.lifecycle.types import (
     GroupAutoscaleReconcileInfo,
@@ -34,15 +35,13 @@ class GroupLifecycleSource(
         category: ReplicaGroupHandlerCategory,
         target_statuses: GroupLifecycleTargetStatuses,
     ) -> GroupLifecycleReconcileInfo:
-        querier = BatchQuerier(
-            pagination=NoPagination(),
-            conditions=[
-                ReplicaGroupConditions.by_lifecycles(target_statuses.lifecycles),
-                ReplicaGroupConditions.by_scaling_statuses(target_statuses.scaling_statuses),
-            ],
-        )
+        fields = ReplicaGroupSearchableFields.own
+        conditions = [
+            fields.lifecycle.filter.in_(target_statuses.lifecycles),
+            fields.scaling_status.filter.in_(target_statuses.scaling_statuses),
+        ]
         fetch = await self._replica_group_repository.fetch_lifecycle_reconcile_views(
-            querier, category
+            conditions, category
         )
         return GroupLifecycleReconcileInfo(views=fetch.views, current_time=fetch.now)
 
@@ -68,14 +67,12 @@ class GroupAutoscaleSource(
         category: ReplicaGroupHandlerCategory,
         target_statuses: GroupLifecycleTargetStatuses,
     ) -> GroupAutoscaleReconcileInfo:
-        querier = BatchQuerier(
-            pagination=NoPagination(),
-            conditions=[
-                ReplicaGroupConditions.by_lifecycles(target_statuses.lifecycles),
-                ReplicaGroupConditions.by_scaling_statuses(target_statuses.scaling_statuses),
-            ],
-        )
+        fields = ReplicaGroupSearchableFields.own
+        conditions = [
+            fields.lifecycle.filter.in_(target_statuses.lifecycles),
+            fields.scaling_status.filter.in_(target_statuses.scaling_statuses),
+        ]
         fetch = await self._replica_group_repository.fetch_autoscale_reconcile_views(
-            querier, category
+            conditions, category
         )
         return GroupAutoscaleReconcileInfo(views=fetch.views, current_time=fetch.now)

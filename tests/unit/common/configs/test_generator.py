@@ -263,6 +263,37 @@ class TestTOMLGenerator:
         assert "local-name" in result
         assert "# The configuration name" in result
 
+    def test_generate_collection_examples_as_arrays(self) -> None:
+        """Collection-typed examples render as TOML arrays, not quoted strings."""
+
+        class CollectionConfig(BackendAISchema):
+            allowed: Annotated[
+                set[str] | None,
+                Field(default=None),
+                BackendAIConfigMeta(
+                    description="Allowlist of plugin names",
+                    added_version="25.1.0",
+                    example=ConfigExample(local="", prod='["pkg.one", "pkg.two"]'),
+                ),
+            ]
+            ordering: Annotated[
+                list[str] | None,
+                Field(default=None),
+                BackendAIConfigMeta(
+                    description="Ordered preferences",
+                    added_version="25.1.0",
+                    example=ConfigExample(local="", prod='["first", "second"]'),
+                ),
+            ]
+
+        generator = TOMLGenerator(env=ConfigEnvironment.PROD)
+        result = generator.generate(CollectionConfig)
+
+        assert 'allowed = ["pkg.one", "pkg.two"]' in result
+        assert 'ordering = ["first", "second"]' in result
+        # A quoted JSON string would fail validation against set[str] / list[str]
+        assert '"[\\"pkg.one\\"' not in result
+
     def test_generate_uses_prod_example(self) -> None:
         """PROD environment uses prod example value."""
 

@@ -9,11 +9,17 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Any
+from uuid import UUID
 
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.data.entity.agent import AgentUUID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.dto.manager.pagination import PaginationInfo
+from ai.backend.common.dto.manager.v2.agent.types import ConflictingSessionCleanupPolicyEnum
+from ai.backend.common.types import AgentId
 
 __all__ = (
     "AdminSearchAgentsPayload",
@@ -32,6 +38,7 @@ __all__ = (
     "ComputePluginsGQLDTO",
     "GetAgentDetailPayload",
     "SearchAgentsPayload",
+    "UpdateAgentResourceGroupPayload",
 )
 
 
@@ -144,6 +151,16 @@ class AgentNode(BaseResponseModel):
     """Node model representing an agent entity with nested information groups."""
 
     id: str = Field(description="Agent ID.")
+    entity_id: UUID = Field(
+        description="UUID of the agent. Added in 26.9.0.",
+    )
+    uuid: AgentUUID = Field(
+        description=(
+            "Agent UUID, which is what rows keyed on the agent carry. "
+            "Deprecated since 26.9.0. Use entity_id."
+        ),
+        deprecated=True,
+    )
     resource_info: AgentResourceInfo = Field(
         description="Hardware resource capacity, usage, and availability information."
     )
@@ -187,6 +204,29 @@ class AdminSearchAgentsPayload(BaseResponseModel):
     total_count: int = Field(description="Total number of agents matching the filter.")
     has_next_page: bool = Field(description="Whether there is a next page.")
     has_previous_page: bool = Field(description="Whether there is a previous page.")
+
+
+class UpdateAgentResourceGroupPayload(BaseResponseModel):
+    """Payload for an agent resource-group change."""
+
+    agent_id: AgentId = Field(description="ID of the agent whose resource group was changed.")
+    resource_group_id: ResourceGroupID = Field(description="UUID of the new resource group.")
+    policy: ConflictingSessionCleanupPolicyEnum = Field(
+        description="Cleanup policy applied to the conflicting sessions."
+    )
+    conflicting_session_ids: list[SessionID] = Field(
+        description=(
+            "IDs of the sessions that were still running on the agent under the "
+            "old resource group at the time of the change."
+        )
+    )
+    terminating_session_ids: list[SessionID] = Field(
+        description=(
+            "IDs of the conflicting sessions that were actually transitioned to "
+            "TERMINATING by the applied policy. Their container cleanup proceeds "
+            "asynchronously."
+        )
+    )
 
 
 class AgentResourceStatsPayload(BaseResponseModel):

@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from typing import TYPE_CHECKING
-from unittest.mock import MagicMock
+from typing import TYPE_CHECKING, Any
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import yarl
@@ -16,7 +16,18 @@ from ai.backend.client.v2.v2_registry import V2ClientRegistry
 if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData
 
-from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.common.data.entity.domain import DomainEntityType
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
+from ai.backend.common.data.entity.resource_preset import ResourcePresetEntityType
+from ai.backend.common.data.entity.session import SessionEntityType
+from ai.backend.common.data.entity.user import UserEntityType
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import (
+    Concern,
+    ConcernMeta,
+    GroupMeta,
+)
 from ai.backend.manager.api.adapters.resource_allocation.adapter import ResourceAllocationAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
@@ -27,62 +38,126 @@ from ai.backend.manager.api.rest.v2.resource_allocation.registry import (
     register_v2_resource_allocation_routes,
 )
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.domain.repository import DomainRepository
+from ai.backend.manager.repositories.ops.v2.domain.provider import DomainOpsProvider
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.resource_allocation.provider import (
+    ResourceAllocationOpsProvider,
+)
+from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
+    ResourcePolicyOpsProvider,
+)
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.resource_allocation.repository import (
     ResourceAllocationRepository,
 )
 from ai.backend.manager.repositories.resource_preset.repository import (
     ResourcePresetRepository,
 )
+from ai.backend.manager.repositories.user.repository import UserRepository
+from ai.backend.manager.secret.pool import KeyProviderPool
+from ai.backend.manager.services.domain.processors import DomainProcessors
+from ai.backend.manager.services.domain.service import DomainService
 from ai.backend.manager.services.processors import Processors
-from ai.backend.manager.services.resource_allocation.processors import (
+from ai.backend.manager.services.session.processors import SessionProcessors
+from ai.backend.manager.services.session.resource_allocation.processors import (
     ResourceAllocationProcessors,
 )
-from ai.backend.manager.services.resource_allocation.service import (
+from ai.backend.manager.services.session.resource_allocation.service import (
     ResourceAllocationService,
 )
+from ai.backend.manager.services.user.processors import UserProcessors
+from ai.backend.manager.services.user.service import UserService
 
 
 @pytest.fixture()
 def resource_allocation_processors(
     database_engine: ExtendedAsyncSAEngine,
     config_provider: ManagerConfigProvider,
-    valkey_clients: ValkeyClients,
+    processor_registry: ProcessorRegistry[Any],
 ) -> ResourceAllocationProcessors:
     """Build real resource allocation processors with real DB and config."""
     ra_repo = ResourceAllocationRepository(
         db=database_engine,
+        ops_provider=ResourceAllocationOpsProvider(database_engine),
         config_provider=config_provider,
     )
     rp_repo = ResourcePresetRepository(
         db=database_engine,
-        valkey_stat=valkey_clients.stat,
         config_provider=config_provider,
+        v2_ops_provider=ShareOpsProvider(database_engine),
     )
     service = ResourceAllocationService(
         resource_allocation_repository=ra_repo,
         resource_preset_repository=rp_repo,
     )
+    groups = processor_registry.concern(ConcernMeta(Concern.RESOURCE_GROUP))
     return ResourceAllocationProcessors(
-        service=service,
-        action_monitors=[],
-        validators=MagicMock(spec=ActionValidators),
+        groups.group(GroupMeta(UserEntityType())),
+        groups.group(GroupMeta(ProjectEntityType())),
+        groups.group(GroupMeta(DomainEntityType())),
+        groups.group(GroupMeta(ResourceGroupEntityType())),
+        groups.group(GroupMeta(SessionEntityType())),
+        groups.group(GroupMeta(ResourcePresetEntityType())),
+        service,
     )
+
+
+@pytest.fixture()
+def user_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    processor_registry: ProcessorRegistry[Any],
+) -> UserProcessors:
+    """The adapter resolves an access key to its owner; the rest of the service is unused."""
+    service = UserService(
+        storage_manager=AsyncMock(),
+        valkey_stat_client=AsyncMock(),
+        agent_registry=AsyncMock(),
+        user_repository=UserRepository(
+            database_engine,
+            V2DBOpsProvider(database_engine),
+            ShareOpsProvider(database_engine),
+            ResourcePolicyOpsProvider(database_engine),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        ),
+        scheduling_controller=AsyncMock(),
+    )
+    return UserProcessors(processor_registry.group(GroupMeta(UserEntityType())), service)
+
+
+@pytest.fixture()
+def domain_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    processor_registry: ProcessorRegistry[Any],
+) -> DomainProcessors:
+    """The adapter resolves a domain name to its id, so this runs against the DB."""
+    service = DomainService(
+        repository=DomainRepository(database_engine, DomainOpsProvider(database_engine))
+    )
+    return DomainProcessors(processor_registry.group(GroupMeta(DomainEntityType())), service)
 
 
 @pytest.fixture()
 def server_module_registries(
     route_deps: RouteDeps,
     resource_allocation_processors: ResourceAllocationProcessors,
+    domain_processors: DomainProcessors,
+    user_processors: UserProcessors,
     config_provider: ManagerConfigProvider,
 ) -> list[RouteRegistry]:
     """Register v2 resource allocation REST routes for testing."""
     processors = MagicMock(spec=Processors)
-    processors.resource_allocation = resource_allocation_processors
+    # spec= reads dir(), which omits value-less annotations, so build the branch itself.
+    processors.session = MagicMock(spec=SessionProcessors)
+    processors.domain = domain_processors
+    processors.user = user_processors
+    processors.session.resource_allocation = resource_allocation_processors
 
     adapter = ResourceAllocationAdapter(
-        processors=processors,
+        processors.session,
+        processors.domain,
         config_provider=config_provider,
     )
     handler = V2ResourceAllocationHandler(adapter=adapter)

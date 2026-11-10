@@ -1,8 +1,8 @@
 """Regression test for auto-mount (dot-prefixed) vfolder resolution.
 
-Exercised through ``SchedulerRepository.resolve_vfolder_mounts_by_role`` (the
-repository-layer entry point the scheduling controller calls for vfolder mount
-resolution) against a real test database.
+Exercised through ``SchedulerRepository._resolve_vfolder_mounts_by_role`` (the
+repository-layer resolution step ``fetch_session_spec_context`` composes into
+the enqueue context) against a real test database.
 
 Reproduces the 26.4.4rc6 regression where the underlying db_source
 short-circuited a kernel group with no explicit mount requests::
@@ -24,6 +24,7 @@ is empty STILL resolves the user's accessible auto-mount vfolders into
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import AsyncGenerator
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock
@@ -31,50 +32,69 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
+from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.identifier.domain import DomainName
-from ai.backend.common.identifier.project import ProjectID
+from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.types import BinarySize, QuotaScopeID, ResourceSlot
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.data.session.draft import (
     KernelGroupDraft,
+    ResourceSpecDraft,
     SessionIdentityDraft,
     SessionOptionsDraft,
     SessionResourceSpecDraft,
     SessionScopeDraft,
     SessionSpecDraft,
 )
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
-from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
-from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
-from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
-from ai.backend.manager.models.replica_group import ReplicaGroupRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.deployment_auto_scaling_policy.row import (
+    DeploymentAutoScalingPolicyRow,
+)
+from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
+from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.endpoint.row import EndpointRow
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
+from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.resource_preset import ResourcePresetRow
-from ai.backend.manager.models.resource_slot import ResourceSlotTypeRow
-from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
-from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
-from ai.backend.manager.models.vfolder import VFolderPermissionRow, VFolderRow
+from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
+from ai.backend.manager.models.resource_slot.row import ResourceSlotTypeRow
+from ai.backend.manager.models.routing.row import RoutingRow
+from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
+from ai.backend.manager.models.vfolder.row import (
+    VFolderRow,
+    VFolderUserMountPolicyRow,
+)
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
+from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
+from ai.backend.manager.repositories.rbac.permission_check_repository import (
+    RbacPermissionCheckRepository,
+)
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.fixtures import DomainFixtureData
+from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -110,7 +130,7 @@ class TestAutoMountVFolderResolution:
             [
                 ResourceSlotTypeRow,
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -118,10 +138,10 @@ class TestAutoMountVFolderResolution:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 AgentRow,
                 VFolderRow,
-                VFolderPermissionRow,
+                VFolderUserMountPolicyRow,
                 ContainerRegistryRow,
                 ImageRow,
                 ResourcePresetRow,
@@ -135,20 +155,25 @@ class TestAutoMountVFolderResolution:
                 KernelRow,
                 ReplicaGroupRow,
                 RoutingRow,
+                VirtualEntityRow,
+                EntityMembershipRow,
+                ScopeBindingRow,
             ],
         ):
             yield database_connection
 
     @pytest.fixture
-    async def test_domain_name(
+    async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> str:
+    ) -> DomainFixtureData:
         """Create a test domain that allows mounting on the noop host."""
+        domain_id = DomainID(uuid.uuid4())
         domain_name = f"test-domain-{uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="",
                     is_active=True,
@@ -158,7 +183,7 @@ class TestAutoMountVFolderResolution:
                 )
             )
             await db_sess.flush()
-        return domain_name
+        return DomainFixtureData(domain_name=DomainName(domain_name), domain_id=domain_id)
 
     @pytest.fixture
     async def test_user_resource_policy_name(
@@ -203,7 +228,7 @@ class TestAutoMountVFolderResolution:
     async def test_user(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_user_resource_policy_name: str,
     ) -> UUID:
         """Create a test user that owns the auto-mount vfolder."""
@@ -217,11 +242,12 @@ class TestAutoMountVFolderResolution:
                     password=_password_info(),
                     need_password_change=False,
                     full_name="Test User",
-                    domain_name=test_domain_name,
+                    domain_name=test_domain.domain_name,
                     role=UserRole.USER,
                     status=UserStatus.ACTIVE,
                     status_info="active",
                     resource_policy=test_user_resource_policy_name,
+                    domain_id=test_domain.domain_id,
                 )
             )
             await db_sess.flush()
@@ -231,19 +257,19 @@ class TestAutoMountVFolderResolution:
     async def test_group(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_project_resource_policy_name: str,
     ) -> UUID:
         """Create a test group used as the session's project scope."""
         group_id = uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=group_id,
                     name=f"g-{group_id.hex[:6]}",
                     description="",
                     is_active=True,
-                    domain_name=test_domain_name,
+                    domain_name=test_domain.domain_name,
                     resource_policy=test_project_resource_policy_name,
                     total_resource_slots=ResourceSlot(),
                     allowed_vfolder_hosts={NOOP_VFOLDER_HOST: ["mount-in-session"]},
@@ -253,20 +279,49 @@ class TestAutoMountVFolderResolution:
         return group_id
 
     @pytest.fixture
+    async def test_personal_project(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: DomainFixtureData,
+        test_project_resource_policy_name: str,
+        test_user: UUID,
+    ) -> UUID:
+        """Create the personal project ``test_user``'s own folders are created in."""
+        project_id = uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                ProjectRow(
+                    id=project_id,
+                    name=f"personal-{project_id.hex[:6]}",
+                    description="",
+                    is_active=True,
+                    domain_name=test_domain.domain_name,
+                    resource_policy=test_project_resource_policy_name,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts={},
+                    type=ProjectType.PERSONAL,
+                    creator_id=test_user,
+                )
+            )
+            await db_sess.flush()
+        return project_id
+
+    @pytest.fixture
     async def automount_vfolder_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_user: UUID,
+        test_personal_project: UUID,
     ) -> UUID:
-        """Create a dot-prefixed (auto-mount) vfolder owned by ``test_user``."""
+        """Create a dot-prefixed (auto-mount) vfolder in ``test_user``'s personal project."""
         vfolder_id = uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 VFolderRow(
                     id=vfolder_id,
                     host=NOOP_VFOLDER_HOST,
-                    domain_name=test_domain_name,
+                    domain_name=test_domain.domain_name,
                     quota_scope_id=QuotaScopeID.parse(f"user:{test_user}"),
                     name=AUTOMOUNT_VFOLDER_NAME,
                     creator=f"{test_user.hex[:6]}@example.com",
@@ -274,6 +329,12 @@ class TestAutoMountVFolderResolution:
                 )
             )
             await db_sess.flush()
+            await VirtualEntitySeeder().create_in(
+                db_sess,
+                VFolderEntityType(),
+                vfolder_id,
+                [(ProjectEntityType(), test_personal_project)],
+            )
         return vfolder_id
 
     @pytest.fixture
@@ -290,28 +351,45 @@ class TestAutoMountVFolderResolution:
         return sm
 
     @pytest.fixture
+    def mock_config_provider(self) -> MagicMock:
+        """A config provider whose vfolder-type lookup allows user vfolders."""
+        config_provider = MagicMock(spec=ManagerConfigProvider)
+        config_provider.legacy_etcd_config_loader.get_vfolder_types = AsyncMock(
+            return_value=["user"]
+        )
+        # What is resolved is under test, not the owner's permission on it.
+        config_provider.config.manager.rbac.enforcement_enabled = False
+        return config_provider
+
+    @pytest.fixture
     def scheduler_repository(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        mock_config_provider: MagicMock,
+        mock_storage_manager: MagicMock,
     ) -> SchedulerRepository:
-        """A real repository over the test DB. The cache client and config
-        provider are unused by ``resolve_vfolder_mounts_by_role``, so they are
-        mocked.
+        """A real repository over the test DB. The cache clients are unused by
+        ``_resolve_vfolder_mounts_by_role``, so they are mocked.
         """
         return SchedulerRepository(
             db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
             AsyncMock(spec=ValkeyStatClient),
-            MagicMock(spec=ManagerConfigProvider),
+            AsyncMock(spec=ValkeyScheduleClient),
+            mock_config_provider,
+            mock_storage_manager,
+            RbacPermissionCheckRepository(
+                PermissionOpsProvider(db_with_cleanup), mock_config_provider
+            ),
         )
 
     async def test_automount_resolved_without_explicit_mount_requests(
         self,
         scheduler_repository: SchedulerRepository,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_user: UUID,
         test_group: UUID,
         automount_vfolder_id: UUID,
-        mock_storage_manager: MagicMock,
     ) -> None:
         # A session with a single kernel group and NO explicit mounts —
         # exactly the case the regression dropped auto-mounts for.
@@ -322,22 +400,20 @@ class TestAutoMountVFolderResolution:
                     session_name="automount-regression",
                     user_uuid=test_user,
                 ),
-                options=SessionOptionsDraft(
-                    kernel_groups=(KernelGroupDraft(role="main", replica_count=1),),
+                resource=ResourceSpecDraft(
+                    options=SessionOptionsDraft(
+                        kernel_groups=(KernelGroupDraft(role="main", replica_count=1),),
+                    ),
                 ),
             ),
             scope=SessionScopeDraft(
-                domain_name=DomainName(test_domain_name),
+                domain_name=DomainName(test_domain.domain_name),
                 project_id=ProjectID(test_group),
                 resource_group_name=None,
             ),
         )
 
-        result = await scheduler_repository.resolve_vfolder_mounts_by_role(
-            draft,
-            storage_manager=mock_storage_manager,
-            allowed_vfolder_types=["user"],
-        )
+        result = await scheduler_repository._resolve_vfolder_mounts_by_role(draft, None)
 
         # The "main" role must carry the auto-mount vfolder even though the
         # group requested no mounts explicitly.

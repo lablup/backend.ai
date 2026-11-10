@@ -16,11 +16,18 @@ if TYPE_CHECKING:
     from ai.backend.common.events.dispatcher import EventProducer
     from ai.backend.manager.config.provider import ManagerConfigProvider
 
-_CHECK_INTERVAL: Final[float] = 1.0
+# The heartbeat timeout this compares against is tens of seconds, so a one-second
+# sweep only repeats the same answer. Leadership also lapses for up to a lease
+# during a failover, which a shorter period cannot cover anyway.
+_CHECK_INTERVAL: Final[float] = 5.0
 
 
 class AgentLostCheckerTask(PeriodicTask):
-    """Detect agents whose heartbeat has timed out and fire termination events."""
+    """Detect agents whose heartbeat has timed out and fire termination events.
+
+    Runs on the leader only: it reads cluster-wide state and emits an event per
+    lost agent, so every extra runner is a duplicate event.
+    """
 
     _config_provider: Final[ManagerConfigProvider]
     _valkey_live: Final[ValkeyLiveClient]
@@ -61,6 +68,6 @@ class AgentLostCheckerTask(PeriodicTask):
             prev = datetime.fromtimestamp(prev_timestamp, tzutc())
             if now - prev > timeout:
                 await self._event_producer.anycast_event(
-                    AgentTerminatedEvent("agent-lost"),
+                    AgentTerminatedEvent(reason="agent-lost"),
                     source_override=AgentId(agent_id),
                 )

@@ -14,29 +14,41 @@ trap 'cleanup TERM' SIGTERM
 # --- Hook Body ---
 set -Eeuo pipefail
 
-BASE_PATH=$(cd "$(dirname "$0")"/.. && pwd)
-cd "$BASE_PATH"
+cd "$(git rev-parse --show-toplevel)"
 
-# Setup pants local execution directory
-if [ -f .pants.rc ]; then
-  local_exec_root_dir=$(scripts/pyscript.sh scripts/tomltool.py -f .pants.rc get 'GLOBAL.local_execution_root_dir')
-  mkdir -p "$local_exec_root_dir"
+PY_FILES=()
+while IFS= read -r -d '' f; do
+  PY_FILES+=("$f")
+done < <(git diff --cached --name-only --diff-filter=ACMR -z -- '*.py' '*.pyi')
+
+if [ ${#PY_FILES[@]} -eq 0 ]; then
+  echo "No staged Python files; skipping ruff."
+  exit 0
 fi
+
+if ! command -v uv >/dev/null 2>&1; then
+  echo "❌ uv is not installed. Install it (https://docs.astral.sh/uv/) to run the pre-commit ruff checks." >&2
+  exit 1
+fi
+
+RUFF_VERSION=$(scripts/pyscript.sh scripts/tomltool.py -f pants.toml get 'ruff.version')
+RUFF=(uvx "ruff@${RUFF_VERSION}")
 
 EXIT_CODE=0
 
-echo "Running pre-commit checks..."
+echo "Running pre-commit checks (ruff ${RUFF_VERSION})..."
 
 # 1. Auto-format
 echo "✓ Formatting..."
-if ! pants fmt --changed-since="HEAD"; then
-  echo "❌ Formatting failed"
+if ! "${RUFF[@]}" format --check --force-exclude "${PY_FILES[@]}"; then
+  "${RUFF[@]}" format --force-exclude "${PY_FILES[@]}" || true
+  echo "❌ Files were reformatted. Review the changes, stage them with git add and commit again."
   EXIT_CODE=1
 fi
 
 # 2. Linting
 echo "✓ Linting..."
-if ! pants lint --changed-since="HEAD"; then
+if ! "${RUFF[@]}" check --force-exclude "${PY_FILES[@]}"; then
   echo "❌ Linting failed"
   EXIT_CODE=1
 fi

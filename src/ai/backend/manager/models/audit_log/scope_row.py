@@ -1,0 +1,66 @@
+from __future__ import annotations
+
+import uuid
+from typing import override
+
+import sqlalchemy as sa
+from sqlalchemy.orm import Mapped, mapped_column
+
+from ai.backend.common.data.entity.audit_log import AuditLogID, AuditLogScopeID
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.models.base import GUID, Base, EntityTypeColumn
+
+__all__ = ("AuditLogScopeRow",)
+
+
+class AuditLogScopeRow(Base):
+    """A scope the audited entity belongs to.
+
+    An entity can sit in several scopes at once, so scopes live here rather than as
+    columns on ``audit_logs`` — one affected entity stays one audit row no matter how
+    many scopes matched it. Only scope actions write these; read the action's shape
+    from ``audit_logs.action_kind``, never from whether these rows exist.
+    """
+
+    __tablename__ = "audit_log_scopes"
+    __table_args__ = (
+        sa.UniqueConstraint("audit_log_id", "scope_type", "scope_id", name="uq_audit_log_scope"),
+        sa.Index("ix_audit_log_scopes_scope", "scope_type", "scope_id"),
+    )
+
+    id: Mapped[AuditLogScopeID] = mapped_column(
+        "id", GUID(AuditLogScopeID), primary_key=True, server_default=sa.text("uuid_generate_v7()")
+    )
+    audit_log_id: Mapped[AuditLogID] = mapped_column(
+        "audit_log_id",
+        GUID(AuditLogID),
+        sa.ForeignKey("audit_logs.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    scope_type: Mapped[EntityType] = mapped_column("scope_type", EntityTypeColumn(), nullable=False)
+    scope_id: Mapped[uuid.UUID] = mapped_column("scope_id", GUID(), nullable=False)
+
+    def __init__(
+        self,
+        audit_log_id: AuditLogID,
+        scope_type: EntityType,
+        scope_id: uuid.UUID,
+    ) -> None:
+        self.audit_log_id = audit_log_id
+        self.scope_type = scope_type
+        self.scope_id = scope_id
+
+    @override
+    def __str__(self) -> str:
+        return (
+            f"AuditLogScopeRow("
+            f"audit_log_id: {self.audit_log_id}, "
+            f"scope_type: {self.scope_type}, "
+            f"scope_id: {self.scope_id}"
+            f")"
+        )
+
+    @override
+    def __repr__(self) -> str:
+        return self.__str__()

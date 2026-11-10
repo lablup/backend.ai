@@ -1,21 +1,20 @@
+"""Frozen copies of the RBAC enums as the data migrations found them.
+
+Deprecated: nothing outside `models/alembic/versions/` may read these. They are kept
+so a migration keeps reading the values it was written against, and they do not track
+the live enums.
+"""
+
 from __future__ import annotations
 
 import enum
 
+from ai.backend.common.data.entity.types import EntityType as OriginalEntityType
 from ai.backend.manager.data.permission.status import (
     RoleStatus as OriginalRoleStatus,
 )
 from ai.backend.manager.data.permission.types import (
-    EntityType as OriginalEntityType,
-)
-from ai.backend.manager.data.permission.types import (
-    OperationType as OriginalOperationType,
-)
-from ai.backend.manager.data.permission.types import (
     RoleSource as OriginalRoleSource,
-)
-from ai.backend.manager.data.permission.types import (
-    ScopeType as OriginalScopeType,
 )
 
 
@@ -41,6 +40,12 @@ class RoleStatus(enum.StrEnum):
 
 
 class OperationType(enum.StrEnum):
+    """Deprecated: the live axis is `Permission`, a bitmask.
+
+    The `grant:*` values are retired, not pending: handing an entity to someone else is
+    `entity_share`, not a permission bit. Do not read them as a grant axis to build on.
+    """
+
     CREATE = "create"
     READ = "read"
     UPDATE = "update"
@@ -51,9 +56,6 @@ class OperationType(enum.StrEnum):
     GRANT_UPDATE = "grant:update"
     GRANT_SOFT_DELETE = "grant:soft-delete"
     GRANT_HARD_DELETE = "grant:hard-delete"
-
-    def to_original(self) -> OriginalOperationType:
-        return OriginalOperationType(self.value)
 
     @classmethod
     def owner_operations(cls) -> set[OperationType]:
@@ -99,8 +101,8 @@ class ScopeType(enum.StrEnum):
 
     GLOBAL = "global"
 
-    def to_original(self) -> OriginalScopeType:
-        return OriginalScopeType(self.value)
+    def to_original(self) -> OriginalEntityType:
+        return OriginalEntityType.from_name(self.value)
 
 
 class EntityType(enum.StrEnum):
@@ -122,7 +124,7 @@ class EntityType(enum.StrEnum):
     MODEL_CARD = "model_card"
 
     def to_original(self) -> OriginalEntityType:
-        return OriginalEntityType(self.value)
+        return OriginalEntityType.from_name(self.value)
 
     @classmethod
     def _scope_types(cls) -> set[EntityType]:

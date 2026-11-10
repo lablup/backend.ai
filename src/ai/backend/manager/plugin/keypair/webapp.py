@@ -1,17 +1,20 @@
 import json
 import logging
 from collections.abc import Mapping, Sequence
-from typing import Any, override
+from http import HTTPStatus
+from typing import Any, cast, override
 
 import aiohttp_cors
 import yarl
 from aiohttp import web
 from pydantic import ValidationError
 
-from ai.backend.common.logging_utils import BraceStyleAdapter
 from ai.backend.common.types import BackendAISchema
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.types import CORSOptions, WebMiddleware
+from ai.backend.manager.errors.auth import AuthorizationFailed, InvalidAuthParameters
 from ai.backend.manager.plugin.webapp import WebappPlugin
+from ai.backend.manager.repositories.auth.repository import AuthRepository
 
 from .utils import (
     STokenData,
@@ -19,7 +22,7 @@ from .utils import (
     serialize_stoken,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class LoginRequestData(BackendAISchema):
@@ -37,23 +40,30 @@ async def login(request: web.Request) -> web.Response:
         raw_data = await request.json()
         json_data = LoginRequestData(**raw_data)
     except (json.decoder.JSONDecodeError, ValidationError, TypeError) as e:
-        log.warning(
-            "Invalid login request data: {}",
-            repr(e),
-        )
-        raise web.HTTPBadRequest(reason="Invalid JSON data in request body.") from None
+        log.trace("login request data invalid", error_detail=repr(e))
+        raise InvalidAuthParameters("Invalid JSON data in request body.") from None
+
+    auth_repository = cast(AuthRepository, root_app["_auth_repository"])
+    authenticated = await auth_repository.verify_keypair_secret(
+        json_data.access_key, json_data.secret_key
+    )
+    if not authenticated:
+        log.trace("login failed", access_key=json_data.access_key)
+        raise AuthorizationFailed("Invalid credentials.")
 
     token_secret = plugin_config["secret"]
     redirect_uri = yarl.URL(plugin_config["login_uri"])
     token = serialize_stoken(
-        data=STokenData(
-            access_key=json_data.access_key,
-            secret_key=json_data.secret_key,
-        ),
+        data=STokenData(access_key=json_data.access_key),
         secret=token_secret,
     )
     redirect_location = redirect_uri.update_query({"sToken": token})
-    return web.HTTPFound(redirect_location)
+    return web.Response(
+        status=HTTPStatus.FOUND,
+        headers={"Location": str(redirect_location)},
+        # Legacy body that aiohttp's HTTP*Redirect filled in.
+        text=f"{HTTPStatus.FOUND.value}: {HTTPStatus.FOUND.phrase}",
+    )
 
 
 async def _webapp_init(app: web.Application) -> None:

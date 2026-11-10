@@ -33,7 +33,7 @@ from ai.backend.common.dto.storage.response import (
     HuggingFaceRetrieveModelsResponse,
     HuggingFaceScanModelsResponse,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage.config.unified import (
     HuggingfaceConfig,
     LegacyHuggingfaceConfig,
@@ -49,7 +49,7 @@ from ai.backend.storage.utils import log_client_api_entry
 if TYPE_CHECKING:
     from ai.backend.storage.context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class HuggingFaceRegistryAPIHandler:

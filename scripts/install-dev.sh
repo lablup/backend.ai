@@ -47,6 +47,17 @@ trim() {
   echo "$1" | sed -e 's/^[[:space:]]*//g' -e 's/[[:space:]]*$//g'
 }
 
+# Prints a field of an example account in the seed files: seed_account <username> <field>
+seed_account() {
+  ./py -c '
+import sys, yaml
+username, field = sys.argv[1:3]
+for user in yaml.safe_load(open("seeds/examples/manager/user/default.yaml"))["items"]:
+    if user["username"] == username:
+        print(user[field] if field in user else user["keypairs"][0][field])
+' "$1" "$2"
+}
+
 enable_observability_in_toml() {
   # Flip "enabled = false" to "enabled = true" inside observability sections of
   # a component config. Sections enabled depend on the active flags:
@@ -760,13 +771,11 @@ install_editable_webui() {
     git clone https://github.com/lablup/backend.ai-webui ./src/ai/backend/webui
     cd src/ai/backend/webui
     cp configs/default.toml config.toml
-    local site_name=$(basename $(pwd))
     # The debug mode here is only for 'hard-core' debugging scenarios -- it changes lots of behaviors.
     # (e.g., separate debugging of Electron's renderer and main threads)
     sed_inplace "s@debug = true@debug = false@" config.toml
     # The webserver endpoint to use in the session mode.
     sed_inplace "s@#[[:space:]]*apiEndpoint =.*@apiEndpoint = "'"'"http://127.0.0.1:${WEBSERVER_PORT}"'"@' config.toml
-    sed_inplace "s@#[[:space:]]*apiEndpointText =.*@apiEndpointText = "'"'"${site_name}"'"@' config.toml
     # webServerURL lets the electron app use the web UI contents from the server.
     # The server may be either a `npm run server:d` instance or a `./py -m ai.backend.web.server` instance.
     # In the former case, you may live-edit the webui sources while running them in the electron app.
@@ -1072,9 +1081,23 @@ setup_environment() {
   show_info "Pre-pulling frequently used kernel images..."
   echo "NOTE: Other images will be downloaded from the docker registry when requested.\n"
   if [ "$(uname -m)" = "arm64" ] || [ "$(uname -m)" = "aarch64" ]; then
-    $docker_sudo docker pull "cr.backend.ai/multiarch/python:3.9-ubuntu20.04"
+    $docker_sudo docker pull "cr.backend.ai/stable/python:3.13-ubuntu24.04-arm64"
   else
-    $docker_sudo docker pull "cr.backend.ai/stable/python:3.9-ubuntu20.04"
+    $docker_sudo docker pull "cr.backend.ai/stable/python:3.13-ubuntu24.04-amd64"
+  fi
+}
+
+enable_etcd_auth() {
+  # The etcd image has no shell, so etcdctl runs through `docker compose exec`.
+  local etcd_service="backendai-half-etcd"
+  if [ $CONFIGURE_HA -eq 1 ]; then
+    etcd_service="backendai-half-etcd-node01"
+  fi
+  local etcdctl="$docker_sudo docker compose -f docker-compose.halfstack.current.yml exec -T ${etcd_service} etcdctl"
+  if $etcdctl auth status 2>/dev/null | grep -q "Authentication Status: false"; then
+    show_info "Enabling etcd authentication..."
+    $etcdctl user add root --new-user-password=develove 2>/dev/null || true
+    $etcdctl auth enable
   fi
 }
 
@@ -1083,6 +1106,7 @@ configure_backendai() {
   show_info "Creating docker compose \"halfstack\"..."
   $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" $HALFSTACK_PROFILE_ARGS up -d --wait
   $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" $HALFSTACK_PROFILE_ARGS ps   # You should see containers here.
+  enable_etcd_auth
 
   # Install rover cli for Supergraph generation
   install_rover_cli
@@ -1181,6 +1205,10 @@ configure_backendai() {
 
   # configure agent
   cp configs/agent/halfstack.toml ./agent.toml
+  if [ ! -f fixtures/agent/agent.key_secret ]; then
+    mkdir -p fixtures/agent
+    ./backend.ai mgr generate-rpc-keypair fixtures/agent agent
+  fi
   mkdir -p "$VAR_BASE_PATH"
   sed_inplace "s/port = 8120/port = ${ETCD_PORT}/" ./agent.toml
   sed_inplace "s/port = 6001/port = ${AGENT_RPC_PORT}/" ./agent.toml
@@ -1283,18 +1311,10 @@ configure_backendai() {
   # Apply any pending migrations for existing databases
   ./py -m alembic upgrade head
 
-  ./backend.ai mgr fixture populate fixtures/manager/example-container-registries-harbor.json
-  ./backend.ai mgr fixture populate fixtures/manager/example-users.json
-  ./backend.ai mgr fixture populate fixtures/manager/example-keypairs.json
-  ./backend.ai mgr fixture populate fixtures/manager/example-set-user-main-access-keys.json
-  ./backend.ai mgr fixture populate fixtures/manager/example-resource-slot-types.json
-  ./backend.ai mgr fixture populate fixtures/manager/example-resource-presets.json
-  ./backend.ai mgr fixture populate fixtures/manager/example-runtime-variants.json
-  ./backend.ai mgr fixture populate fixtures/manager/example-runtime-variant-presets.json
-  ./backend.ai mgr fixture populate fixtures/manager/example-login-client-types.json
-  ./backend.ai mgr fixture populate fixtures/manager/example-roles.json
-  ./backend.ai mgr fixture populate fixtures/manager/example-prometheus-query-preset-categories.json
-  ./backend.ai mgr fixture populate fixtures/manager/example-prometheus-query-presets.json
+  ./backend.ai mgr seed apply seeds/manager seeds/examples/manager
+  ./backend.ai mgr permissions provision
+  # The example domain admins are granted roles that `permissions provision` creates.
+  ./backend.ai mgr seed apply seeds/examples/domain_admin
 
   # Populate artifact registries only when the storage halfstack profile is
   # active; the example registry points at the local MinIO and depends on
@@ -1341,9 +1361,9 @@ configure_backendai() {
   show_info "Scanning the image registry..."
   ./backend.ai mgr image rescan cr.backend.ai
   if [ "$(uname -m)" = "arm64" ] || [ "$(uname -m)" = "aarch64" ]; then
-    ./backend.ai mgr image alias python "cr.backend.ai/multiarch/python:3.9-ubuntu20.04" aarch64
+    ./backend.ai mgr image alias python "cr.backend.ai/stable/python:3.13-ubuntu24.04-arm64" aarch64
   else
-    ./backend.ai mgr image alias python "cr.backend.ai/stable/python:3.9-ubuntu20.04" x86_64
+    ./backend.ai mgr image alias python "cr.backend.ai/stable/python:3.13-ubuntu24.04-amd64" x86_64
   fi
 
   # Virtual folder setup
@@ -1365,8 +1385,8 @@ configure_backendai() {
   CLIENT_ADMIN_CONF_FOR_SESSION="env-local-admin-session.sh"
   echo "# Directly access to the manager using API keypair (admin)" > "${CLIENT_ADMIN_CONF_FOR_API}"
   echo "export BACKEND_ENDPOINT=http://127.0.0.1:${MANAGER_PORT}/" >> "${CLIENT_ADMIN_CONF_FOR_API}"
-  echo "export BACKEND_ACCESS_KEY=$(cat fixtures/manager/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="admin@lablup.com") | .access_key')" >> "${CLIENT_ADMIN_CONF_FOR_API}"
-  echo "export BACKEND_SECRET_KEY=$(cat fixtures/manager/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="admin@lablup.com") | .secret_key')" >> "${CLIENT_ADMIN_CONF_FOR_API}"
+  echo "export BACKEND_ACCESS_KEY=$(seed_account admin access_key)" >> "${CLIENT_ADMIN_CONF_FOR_API}"
+  echo "export BACKEND_SECRET_KEY=$(seed_account admin secret_key)" >> "${CLIENT_ADMIN_CONF_FOR_API}"
   echo "export BACKEND_ENDPOINT_TYPE=api" >> "${CLIENT_ADMIN_CONF_FOR_API}"
   chmod +x "${CLIENT_ADMIN_CONF_FOR_API}"
   echo "# Indirectly access to the manager via the web server using a cookie-based login session (admin)" > "${CLIENT_ADMIN_CONF_FOR_SESSION}"
@@ -1385,15 +1405,15 @@ configure_backendai() {
 
   echo "export BACKEND_ENDPOINT_TYPE=session" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
   echo "echo 'Run backend.ai login to make an active session.'" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
-  echo "echo 'Username: $(cat fixtures/manager/example-users.json | jq -r '.users[] | select(.username=="admin") | .email')'" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
-  echo "echo 'Password: $(cat fixtures/manager/example-users.json | jq -r '.users[] | select(.username=="admin") | .password')'" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+  echo "echo 'Username: $(seed_account admin email)'" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+  echo "echo 'Password: $(seed_account admin password)'" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
   chmod +x "${CLIENT_ADMIN_CONF_FOR_SESSION}"
   CLIENT_DOMAINADMIN_CONF_FOR_API="env-local-domainadmin-api.sh"
   CLIENT_DOMAINADMIN_CONF_FOR_SESSION="env-local-domainadmin-session.sh"
   echo "# Directly access to the manager using API keypair (admin)" > "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
   echo "export BACKEND_ENDPOINT=http://127.0.0.1:${MANAGER_PORT}/" >> "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
-  echo "export BACKEND_ACCESS_KEY=$(cat fixtures/manager/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="domain-admin@lablup.com") | .access_key')" >> "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
-  echo "export BACKEND_SECRET_KEY=$(cat fixtures/manager/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="domain-admin@lablup.com") | .secret_key')" >> "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
+  echo "export BACKEND_ACCESS_KEY=$(seed_account domain-admin access_key)" >> "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
+  echo "export BACKEND_SECRET_KEY=$(seed_account domain-admin secret_key)" >> "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
   echo "export BACKEND_ENDPOINT_TYPE=api" >> "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
   chmod +x "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
   echo "# Indirectly access to the manager via the web server using a cookie-based login session (admin)" > "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
@@ -1412,23 +1432,23 @@ configure_backendai() {
 
   echo "export BACKEND_ENDPOINT_TYPE=session" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
   echo "echo 'Run backend.ai login to make an active session.'" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
-  echo "echo 'Username: $(cat fixtures/manager/example-users.json | jq -r '.users[] | select(.username=="domain-admin") | .email')'" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
-  echo "echo 'Password: $(cat fixtures/manager/example-users.json | jq -r '.users[] | select(.username=="domain-admin") | .password')'" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
+  echo "echo 'Username: $(seed_account domain-admin email)'" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
+  echo "echo 'Password: $(seed_account domain-admin password)'" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
   chmod +x "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
   CLIENT_USER_CONF_FOR_API="env-local-user-api.sh"
   CLIENT_USER_CONF_FOR_SESSION="env-local-user-session.sh"
   echo "# Directly access to the manager using API keypair (user)" > "${CLIENT_USER_CONF_FOR_API}"
   echo "export BACKEND_ENDPOINT=http://127.0.0.1:${MANAGER_PORT}/" >> "${CLIENT_USER_CONF_FOR_API}"
-  echo "export BACKEND_ACCESS_KEY=$(cat fixtures/manager/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="user@lablup.com") | .access_key')" >> "${CLIENT_USER_CONF_FOR_API}"
-  echo "export BACKEND_SECRET_KEY=$(cat fixtures/manager/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="user@lablup.com") | .secret_key')" >> "${CLIENT_USER_CONF_FOR_API}"
+  echo "export BACKEND_ACCESS_KEY=$(seed_account user access_key)" >> "${CLIENT_USER_CONF_FOR_API}"
+  echo "export BACKEND_SECRET_KEY=$(seed_account user secret_key)" >> "${CLIENT_USER_CONF_FOR_API}"
   echo "export BACKEND_ENDPOINT_TYPE=api" >> "${CLIENT_USER_CONF_FOR_API}"
   chmod +x "${CLIENT_USER_CONF_FOR_API}"
   CLIENT_USER2_CONF_FOR_API="env-local-user2-api.sh"
   CLIENT_USER2_CONF_FOR_SESSION="env-local-user2-session.sh"
   echo "# Directly access to the manager using API keypair (user2)" > "${CLIENT_USER2_CONF_FOR_API}"
   echo "export BACKEND_ENDPOINT=http://127.0.0.1:${MANAGER_PORT}/" >> "${CLIENT_USER2_CONF_FOR_API}"
-  echo "export BACKEND_ACCESS_KEY=$(cat fixtures/manager/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="user2@lablup.com") | .access_key')" >> "${CLIENT_USER2_CONF_FOR_API}"
-  echo "export BACKEND_SECRET_KEY=$(cat fixtures/manager/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="user2@lablup.com") | .secret_key')" >> "${CLIENT_USER2_CONF_FOR_API}"
+  echo "export BACKEND_ACCESS_KEY=$(seed_account user2 access_key)" >> "${CLIENT_USER2_CONF_FOR_API}"
+  echo "export BACKEND_SECRET_KEY=$(seed_account user2 secret_key)" >> "${CLIENT_USER2_CONF_FOR_API}"
   echo "export BACKEND_ENDPOINT_TYPE=api" >> "${CLIENT_USER2_CONF_FOR_API}"
   chmod +x "${CLIENT_USER2_CONF_FOR_API}"
   echo "# Indirectly access to the manager via the web server using a cookie-based login session (user)" > "${CLIENT_USER_CONF_FOR_SESSION}"
@@ -1447,8 +1467,8 @@ configure_backendai() {
 
   echo "export BACKEND_ENDPOINT_TYPE=session" >> "${CLIENT_USER_CONF_FOR_SESSION}"
   echo "echo 'Run backend.ai login to make an active session.'" >> "${CLIENT_USER_CONF_FOR_SESSION}"
-  echo "echo 'Username: $(cat fixtures/manager/example-users.json | jq -r '.users[] | select(.username=="user") | .email')'" >> "${CLIENT_USER_CONF_FOR_SESSION}"
-  echo "echo 'Password: $(cat fixtures/manager/example-users.json | jq -r '.users[] | select(.username=="user") | .password')'" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+  echo "echo 'Username: $(seed_account user email)'" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+  echo "echo 'Password: $(seed_account user password)'" >> "${CLIENT_USER_CONF_FOR_SESSION}"
   chmod +x "${CLIENT_USER_CONF_FOR_SESSION}"
 
   show_info "Dumping the installed etcd configuration to ./dev.etcd.installed.json as a backup."

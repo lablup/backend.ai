@@ -10,7 +10,10 @@ from uuid import UUID
 import click
 
 from ai.backend.client.cli.v2.helpers import (
+    EntityLabelTerm,
     create_v2_registry,
+    entity_label_filter_options,
+    entity_label_relations,
     load_v2_config,
     parse_order_options,
     print_result,
@@ -155,6 +158,7 @@ def delete(user_id: UUID) -> None:
     type=click.Choice(["superadmin", "admin", "user", "monitor"], case_sensitive=False),
     help="Filter by user role.",
 )
+@entity_label_filter_options
 @click.option(
     "--order-by",
     multiple=True,
@@ -171,6 +175,7 @@ def search(
     status: str | None,
     role: str | None,
     order_by: tuple[str, ...],
+    label: tuple[EntityLabelTerm, ...],
 ) -> None:
     """Search users with optional scope filtering.
 
@@ -195,8 +200,11 @@ def search(
         sys.exit(1)
 
     # Build filter only if any filter option is provided
+    relations = entity_label_relations(label)
     filter_dto: UserFilter | None = None
-    if any(opt is not None for opt in (username_contains, email_contains, status, role)):
+    if relations or any(
+        opt is not None for opt in (username_contains, email_contains, status, role)
+    ):
         from ai.backend.common.dto.manager.query import StringFilter
         from ai.backend.common.dto.manager.v2.user.types import (
             UserRole as UserRoleEnum,
@@ -214,6 +222,7 @@ def search(
             email=StringFilter(contains=email_contains) if email_contains is not None else None,
             status=UserStatusFilter(equals=UserStatus(status)) if status is not None else None,
             role=UserRoleFilter(equals=UserRoleEnum(role)) if role is not None else None,
+            AND=[UserFilter(labels=rel) for rel in relations] or None,
         )
 
     # Build order only if --order-by is provided

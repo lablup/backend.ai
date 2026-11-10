@@ -1,4 +1,1 @@
-python_tests(
-    name="tests",
-    sources=["test_*.py"],
-)
+python_tests()

@@ -1,45 +1,24 @@
 from __future__ import annotations
 
 import logging
-import uuid
-from typing import TYPE_CHECKING, override
+from typing import override
 
 import sqlalchemy as sa
-from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 
-from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.object_storage.types import ObjectStorageData
+from ai.backend.common.data.entity.object_storage import ObjectStorageID
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.models.base import (
     GUID,
     Base,
 )
 
-if TYPE_CHECKING:
-    from ai.backend.manager.models.association_artifacts_storages import (
-        AssociationArtifactsStorageRow,
-    )
-    from ai.backend.manager.models.storage_namespace import StorageNamespaceRow
-
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 __all__ = ("ObjectStorageRow",)
 
 
-def _get_object_storage_association_artifact_join_cond() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.association_artifacts_storages import (
-        AssociationArtifactsStorageRow,
-    )
-
-    return ObjectStorageRow.id == foreign(AssociationArtifactsStorageRow.storage_namespace_id)
-
-
-def _get_object_storage_namespace_join_cond() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.storage_namespace import StorageNamespaceRow
-
-    return foreign(StorageNamespaceRow.storage_id) == ObjectStorageRow.id
-
-
-class ObjectStorageRow(Base):  # type: ignore[misc]
+class ObjectStorageRow(Base):
     """
     Represents an object storage configuration.
     This model is used to store the details of object storage services
@@ -48,8 +27,8 @@ class ObjectStorageRow(Base):  # type: ignore[misc]
 
     __tablename__ = "object_storages"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    id: Mapped[ObjectStorageID] = mapped_column(
+        "id", GUID(ObjectStorageID), primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     name: Mapped[str] = mapped_column("name", sa.String, index=True, unique=True, nullable=False)
     host: Mapped[str] = mapped_column("host", sa.String, index=True, nullable=False)
@@ -74,20 +53,6 @@ class ObjectStorageRow(Base):  # type: ignore[misc]
         nullable=True,
     )
 
-    association_artifacts_storages_rows: Mapped[list[AssociationArtifactsStorageRow]] = (
-        relationship(
-            "AssociationArtifactsStorageRow",
-            back_populates="object_storage_row",
-            primaryjoin=_get_object_storage_association_artifact_join_cond,
-            overlaps="vfs_storage_row",
-        )
-    )
-    namespace_rows: Mapped[list[StorageNamespaceRow]] = relationship(
-        "StorageNamespaceRow",
-        back_populates="object_storage_row",
-        primaryjoin=_get_object_storage_namespace_join_cond,
-    )
-
     @override
     def __str__(self) -> str:
         return (
@@ -104,14 +69,3 @@ class ObjectStorageRow(Base):  # type: ignore[misc]
     @override
     def __repr__(self) -> str:
         return self.__str__()
-
-    def to_dataclass(self) -> ObjectStorageData:
-        return ObjectStorageData(
-            id=self.id,
-            name=self.name,
-            host=self.host,
-            access_key=self.access_key,
-            secret_key=self.secret_key,
-            endpoint=self.endpoint,
-            region=self.region,
-        )

@@ -10,9 +10,9 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import AccessKey
 
 
@@ -73,7 +73,7 @@ class DeploymentContext:
 
 
 @dataclass
-class ScalingGroupNetworkInfo:
+class ResourceGroupNetworkInfo:
     """Network configuration from scaling group."""
 
     use_host_network: bool

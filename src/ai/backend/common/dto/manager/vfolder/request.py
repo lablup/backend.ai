@@ -5,13 +5,13 @@ Request DTOs for VFolder API endpoints.
 from __future__ import annotations
 
 import uuid
-from typing import Any
+from typing import Any, Self
 
-from pydantic import AliasChoices, Field, field_validator
+from pydantic import AliasChoices, Field, field_validator, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.field import VFolderPermissionField
-from ai.backend.common.typed_validators import VFolderName
+from ai.backend.common.typed_validators import VFolderName, VFolderRelativePath
 from ai.backend.common.types import QuotaScopeID, VFolderUsageMode
 
 __all__ = (
@@ -75,13 +75,22 @@ class VFolderCreateReq(BaseRequestModel):
     name: VFolderName = Field(description="Name of the vfolder")
     folder_host: str | None = Field(default=None, alias="host")
     usage_mode: VFolderUsageMode = Field(default=VFolderUsageMode.GENERAL)
-    permission: VFolderPermissionField = Field(default=VFolderPermissionField.READ_WRITE)
+    permission: VFolderPermissionField | None = Field(default=None)
     unmanaged_path: str | None = Field(default=None, alias="unmanagedPath")
     group_id: uuid.UUID | None = Field(
         default=None,
         validation_alias=AliasChoices("group", "groupId"),
     )
     cloneable: bool = Field(default=False)
+
+    @model_validator(mode="after")
+    def _reject_dot_prefixed_project_folder(self) -> Self:
+        """A dot-prefixed name is how a folder is mounted automatically, which only
+        makes sense for a folder of one's own. ``.local`` is the exception the mount
+        path gives a per-user subdirectory of."""
+        if self.group_id is not None and self.name.startswith(".") and self.name != ".local":
+            raise ValueError("dot-prefixed vfolders cannot be a group folder.")
+        return self
 
 
 class RenameVFolderReq(BaseRequestModel):
@@ -154,7 +163,7 @@ class CloneVFolderReq(BaseRequestModel):
     )
     cloneable: bool = Field(default=False, description="Whether the cloned vfolder is cloneable")
     usage_mode: VFolderUsageMode = Field(default=VFolderUsageMode.GENERAL)
-    permission: VFolderPermissionField = Field(default=VFolderPermissionField.READ_WRITE)
+    permission: VFolderPermissionField | None = Field(default=None)
 
     @field_validator("target_quota_scope_id", mode="before")
     @classmethod
@@ -242,7 +251,7 @@ class CreateDownloadSessionReq(BaseRequestModel):
 class CreateUploadSessionReq(BaseRequestModel):
     """Request to create a file upload session."""
 
-    path: str = Field(description="File path to upload to")
+    path: VFolderRelativePath = Field(description="File path to upload to")
     size: int = Field(description="File size in bytes")
 
 

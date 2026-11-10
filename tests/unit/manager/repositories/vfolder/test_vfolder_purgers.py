@@ -10,32 +10,42 @@ from collections.abc import AsyncGenerator
 from typing import TYPE_CHECKING
 
 import pytest
-import sqlalchemy as sa
 
-from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderUsageMode
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-from ai.backend.manager.data.vfolder.types import VFolderMountPermission, VFolderOwnershipType
-from ai.backend.manager.models.agent import AgentRow  # noqa: F401
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.image import ImageRow  # noqa: F401
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
+from ai.backend.common.types import (
+    QuotaScopeID,
+    QuotaScopeType,
+    VFolderMountPolicy,
+    VFolderUsageMode,
+)
+from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
+from ai.backend.manager.models.agent.row import AgentRow  # noqa: F401
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.entity_label.row import EntityLabelRow
+from ai.backend.manager.models.entity_share.row import EntityShareRow
+from ai.backend.manager.models.image.row import ImageRow  # noqa: F401
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
-from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
+from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.vfolder.row import (
-    VFolderInvitationRow,
-    VFolderPermissionRow,
     VFolderRow,
+    VFolderUserMountPolicyRow,
 )
-from ai.backend.manager.repositories.base.purger import BatchPurger, execute_batch_purger
-from ai.backend.manager.repositories.vfolder.purgers import (
-    VFolderInvitationBatchPurgerSpec,
-    VFolderPermissionBatchPurgerSpec,
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
+    EntityMembershipCapRow,
 )
+from ai.backend.manager.models.virtual_entity.entity_membership_field import (
+    EntityMembershipFieldRow,
+)
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFactory, DomainFixtureData
 
@@ -57,12 +67,21 @@ class TestVFolderPurgersIntegration:
                 DomainRow,
                 UserResourcePolicyRow,
                 KeyPairResourcePolicyRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserRow,
                 KeyPairRow,
                 VFolderRow,
-                VFolderInvitationRow,
-                VFolderPermissionRow,
+                VFolderUserMountPolicyRow,
+                # An entity batch purge tears the graph down with each row.
+                VirtualEntityRow,
+                EntityMembershipRow,
+                EntityMembershipCapRow,
+                EntityMembershipFieldRow,
+                ScopeBindingRow,
+                EntityLabelRow,
+                RoleRow,
+                PermissionRow,
+                EntityShareRow,
             ],
         ):
             yield database_connection
@@ -120,6 +139,7 @@ class TestVFolderPurgersIntegration:
                 domain_name=sample_domain.domain_name,
                 role=UserRole.USER,
                 resource_policy=user_resource_policy,
+                domain_id=sample_domain.domain_id,
             )
             session.add(user)
             await session.flush()
@@ -143,7 +163,7 @@ class TestVFolderPurgersIntegration:
                 quota_scope_id=QuotaScopeID(QuotaScopeType.USER, sample_user.uuid),
                 name=f"test-vfolder-{uuid.uuid4().hex[:8]}",
                 usage_mode=VFolderUsageMode.GENERAL,
-                permission=VFolderMountPermission.READ_WRITE,
+                default_mount_permission=VFolderMountPolicy.READ_WRITE,
                 ownership_type=VFolderOwnershipType.USER,
                 user=sample_user.uuid,
             )
@@ -151,121 +171,3 @@ class TestVFolderPurgersIntegration:
             await session.flush()
             await session.refresh(vfolder)
             return vfolder
-
-    @pytest.fixture
-    async def sample_invitations(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        sample_vfolder: VFolderRow,
-        sample_user: UserRow,
-    ) -> list[VFolderInvitationRow]:
-        """Create test vfolder invitations."""
-        invitations: list[VFolderInvitationRow] = []
-        async with db_with_cleanup.begin_session() as session:
-            for i in range(3):
-                invitation = VFolderInvitationRow(
-                    vfolder=sample_vfolder.id,
-                    inviter=sample_user.email,
-                    invitee=f"invitee-{i}@example.com",
-                    permission=VFolderMountPermission.READ_ONLY,
-                )
-                session.add(invitation)
-                invitations.append(invitation)
-            await session.flush()
-            for inv in invitations:
-                await session.refresh(inv)
-        return invitations
-
-    @pytest.fixture
-    async def sample_permissions(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        sample_vfolder: VFolderRow,
-        sample_user: UserRow,
-    ) -> list[VFolderPermissionRow]:
-        """Create test vfolder permissions."""
-        permissions: list[VFolderPermissionRow] = []
-        async with db_with_cleanup.begin_session() as session:
-            for _ in range(3):
-                # Create additional users for permissions
-                perm_user_uuid = uuid.uuid4()
-                perm_user = UserRow(
-                    uuid=perm_user_uuid,
-                    username=f"permuser-{uuid.uuid4().hex[:8]}",
-                    email=f"perm-{uuid.uuid4().hex[:8]}@example.com",
-                    password=PasswordInfo(
-                        password="test_password",
-                        algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
-                        rounds=100_000,
-                        salt_size=32,
-                    ),
-                    need_password_change=False,
-                    full_name="Permission User",
-                    status=UserStatus.ACTIVE,
-                    status_info="",
-                    domain_name=sample_vfolder.domain_name,
-                    role=UserRole.USER,
-                    resource_policy=sample_user.resource_policy,
-                )
-                session.add(perm_user)
-                await session.flush()
-
-                permission = VFolderPermissionRow(
-                    vfolder=sample_vfolder.id,
-                    user=perm_user_uuid,
-                    permission=VFolderMountPermission.READ_ONLY,
-                )
-                session.add(permission)
-                permissions.append(permission)
-            await session.flush()
-            for perm in permissions:
-                await session.refresh(perm)
-        return permissions
-
-    async def test_purge_vfolder_invitations(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        sample_vfolder: VFolderRow,
-        sample_invitations: list[VFolderInvitationRow],
-    ) -> None:
-        """Test purging vfolder invitations."""
-        vfolder_ids = [sample_vfolder.id]
-
-        # Purge invitations
-        async with db_with_cleanup.begin_session() as session:
-            purger = BatchPurger(spec=VFolderInvitationBatchPurgerSpec(vfolder_ids=vfolder_ids))
-            result = await execute_batch_purger(session, purger)
-            assert result.deleted_count == len(sample_invitations)
-
-        # Verify invitations are deleted
-        async with db_with_cleanup.begin_session() as session:
-            count = await session.scalar(
-                sa.select(sa.func.count())
-                .select_from(VFolderInvitationRow)
-                .where(VFolderInvitationRow.vfolder.in_(vfolder_ids))
-            )
-            assert count == 0
-
-    async def test_purge_vfolder_permissions(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        sample_vfolder: VFolderRow,
-        sample_permissions: list[VFolderPermissionRow],
-    ) -> None:
-        """Test purging vfolder permissions."""
-        vfolder_ids = [sample_vfolder.id]
-
-        # Purge permissions
-        async with db_with_cleanup.begin_session() as session:
-            purger = BatchPurger(spec=VFolderPermissionBatchPurgerSpec(vfolder_ids=vfolder_ids))
-            result = await execute_batch_purger(session, purger)
-            assert result.deleted_count == len(sample_permissions)
-
-        # Verify permissions are deleted
-        async with db_with_cleanup.begin_session() as session:
-            count = await session.scalar(
-                sa.select(sa.func.count())
-                .select_from(VFolderPermissionRow)
-                .where(VFolderPermissionRow.vfolder.in_(vfolder_ids))
-            )
-            assert count == 0

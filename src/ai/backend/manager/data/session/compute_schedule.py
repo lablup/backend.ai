@@ -9,8 +9,8 @@ from ai.backend.common.types import ResourceSlotEntry
 class UnschedulableReasonHint:
     """What the caller could change so an unschedulable kernel would fit.
 
-    Surfaces only the user-actionable subset of the selector's
-    ``RemediationHint``.
+    Surfaces only the user-actionable subset of the selector's computed
+    ``PlacementFailure``.
 
     - ``required_reduction`` — subtract these slots to fit the best-fitting node.
     """

@@ -362,7 +362,7 @@ class VFolderByName(BaseFunction):
                             file_req_hdrs[hdrs.IF_RANGE] = if_range
                             file_req_hdrs[hdrs.RANGE] = f"{file_unit}={range_start}-"
                         async with aiohttp.ClientSession(headers=file_req_hdrs) as client:
-                            async with client.get(download_url, ssl=False) as raw_resp:
+                            async with client.get(download_url) as raw_resp:
                                 match raw_resp.status:
                                     case 200:
                                         # First attempt to download file or file has changed.
@@ -474,7 +474,7 @@ class VFolderByName(BaseFunction):
 
                 params = {"token": download_info["token"]}
                 if dst_dir is not None:
-                    params["dst_dir"] = dst_dir
+                    params["dst_dir"] = str(dst_dir)
                 download_url = URL(overriden_url).with_query(params)
             await self._download_file(
                 file_path, download_url, chunk_size, max_retries, show_progress
@@ -514,7 +514,7 @@ class VFolderByName(BaseFunction):
                         )
                 params = {"token": upload_info["token"]}
                 if dst_dir is not None:
-                    params["dst_dir"] = dst_dir
+                    params["dst_dir"] = str(dst_dir)
                 upload_url = URL(overriden_url).with_query(params)
             tus_client = client.TusClient()
             if basedir:

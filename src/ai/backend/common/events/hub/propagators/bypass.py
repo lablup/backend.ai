@@ -6,9 +6,9 @@ from typing import override
 
 from ai.backend.common.events.hub.hub import EventPropagator
 from ai.backend.common.events.types import AbstractEvent
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class AsyncBypassPropagator(EventPropagator):
@@ -43,8 +43,8 @@ class AsyncBypassPropagator(EventPropagator):
                 if event is None:
                     break
                 yield event
-            except Exception as e:
-                log.error("Error propagating event: {}", e)
+            except Exception:
+                log.exception("event propagation failed")
 
     @override
     async def propagate_event(self, event: AbstractEvent) -> None:

@@ -5,7 +5,7 @@ import logging
 import secrets
 import uuid
 from collections.abc import Mapping, MutableMapping
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import datetime
 from typing import Any, cast
 from urllib.parse import urlparse
@@ -18,9 +18,18 @@ import yarl
 from aiohttp.multipart import BodyPartReader
 from dateutil.tz import tzutc
 
+from ai.backend.common.asyncio import IgnoreTaskExceptionHandler
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.data.entity.domain import DomainName
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.resource_group import ResourceGroupName
+from ai.backend.common.data.entity.resource_slot import ResourceSlotName
+from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.session.types import CustomizedImageVisibilityScope
-from ai.backend.common.defs.session import JOB_PRIORITY_DEFAULT, SESSION_PRIORITY_DEFAULT
+from ai.backend.common.defs.session import JOB_PRIORITY_DEFAULT
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
@@ -28,33 +37,35 @@ from ai.backend.common.exception import (
     BackendAIError,
     InvalidAPIParameters,
     UnknownImageReference,
+    UnreachableError,
 )
-from ai.backend.common.identifier.domain import DomainName
-from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.identifier.project import ProjectID
-from ai.backend.common.identifier.resource_group import ResourceGroupName
-from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.json import load_json
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import (
-    AccessKey,
     AgentId,
     BinarySize,
     ContainerId,
-    ImageAlias,
+    KernelId,
+    ResourceSlot,
     ResourceSlotEntry,
+    SessionId,
     SessionTypes,
 )
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.actions.v2.bulk.result import (
+    PartialBulkEntityResult,
+    PartialBulkResult,
+)
 from ai.backend.manager.bgtask.tasks.commit_session import CommitSessionManifest
 from ai.backend.manager.bgtask.types import ManagerBgtaskName
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.data.common.sentinel import undefined
-from ai.backend.manager.data.image.types import ImageIdentifier
+from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
     KernelGroupDraft,
     KernelResourceInput,
+    ResourceSpecDraft,
     SchedulingTargetDraft,
     SessionClassificationDraft,
     SessionIdentityDraft,
@@ -68,8 +79,10 @@ from ai.backend.manager.data.session.options import (
     InternalDataExtras,
     ResourceOpts,
 )
-from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.data.session.types import SessionStatus, SessionTerminationStatus
 from ai.backend.manager.defs import DEFAULT_ROLE
+from ai.backend.manager.errors.agent import AgentNotAllocated
+from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.common import (
     InternalServerError,
     ServiceUnavailable,
@@ -84,23 +97,23 @@ from ai.backend.manager.errors.kernel import (
     TooManySessionsMatched,
 )
 from ai.backend.manager.errors.resource import (
-    AgentNotAllocated,
     AppNotFound,
     NoCurrentTaskContext,
-    TaskTemplateNotFound,
+    SessionTemplateNotFound,
+)
+from ai.backend.manager.errors.session_group import (
+    SessionGroupInUseForEnqueue,
+    SessionGroupNotFound,
 )
 from ai.backend.manager.errors.storage import VFolderBadRequest
 from ai.backend.manager.idle import IdleCheckerHost
-from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.models.session import (
-    DEAD_SESSION_STATUSES,
+from ai.backend.manager.models.session.row import (
     PRIVATE_SESSION_TYPES,
     KernelLoadingStrategy,
 )
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.repositories.session.repository import SessionRepository
-from ai.backend.manager.repositories.session.updaters import SessionUpdaterSpec
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.services.session.actions.batch_get_kernel_resource_allocation import (
     BatchGetKernelResourceAllocationAction,
@@ -108,7 +121,9 @@ from ai.backend.manager.services.session.actions.batch_get_kernel_resource_alloc
 )
 from ai.backend.manager.services.session.actions.batch_get_session_resource_allocation import (
     BatchGetSessionResourceAllocationAction,
-    BatchGetSessionResourceAllocationActionResult,
+)
+from ai.backend.manager.services.session.actions.bulk_get_session_designated_agent_ids import (
+    BulkGetSessionDesignatedAgentIdsAction,
 )
 from ai.backend.manager.services.session.actions.commit_session import (
     CommitSessionAction,
@@ -202,33 +217,13 @@ from ai.backend.manager.services.session.actions.match_sessions import (
     MatchSessionsAction,
     MatchSessionsActionResult,
 )
-from ai.backend.manager.services.session.actions.modify_session import (
-    ModifySessionAction,
-    ModifySessionActionResult,
-)
 from ai.backend.manager.services.session.actions.rename_session import (
     RenameSessionAction,
     RenameSessionActionResult,
 )
-from ai.backend.manager.services.session.actions.resolve_session import (
-    ResolveSessionAction,
-    ResolveSessionActionResult,
-)
 from ai.backend.manager.services.session.actions.resolve_session_name import (
     ResolveSessionNameAction,
     ResolveSessionNameActionResult,
-)
-from ai.backend.manager.services.session.actions.search import (
-    SearchSessionsAction,
-    SearchSessionsActionResult,
-)
-from ai.backend.manager.services.session.actions.search_in_project import (
-    SearchSessionsInProjectAction,
-    SearchSessionsInProjectActionResult,
-)
-from ai.backend.manager.services.session.actions.search_kernel import (
-    SearchKernelsAction,
-    SearchKernelsActionResult,
 )
 from ai.backend.manager.services.session.actions.shutdown_service import (
     ShutdownServiceAction,
@@ -240,7 +235,10 @@ from ai.backend.manager.services.session.actions.start_service import (
 )
 from ai.backend.manager.services.session.actions.terminate_sessions import (
     TerminateSessionsAction,
-    TerminateSessionsActionResult,
+)
+from ai.backend.manager.services.session.actions.update_session import (
+    UpdateSessionAction,
+    UpdateSessionActionResult,
 )
 from ai.backend.manager.services.session.actions.upload_files import (
     UploadFilesAction,
@@ -252,10 +250,13 @@ from ai.backend.manager.services.session.types import (
     overwritten_param_check,
 )
 from ai.backend.manager.services.session.utils import drop_undefined
-from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
+    SchedulingController,
+)
 from ai.backend.manager.types import UserScope
+from ai.backend.manager.utils import check_if_requester_is_eligible_to_act_as_target_user
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @dataclass
@@ -304,33 +305,16 @@ class SessionService:
         self._scheduling_controller = args.scheduling_controller
         self._appproxy_client_pool = args.appproxy_client_pool
         self._database_ptask_group = aiotools.PersistentTaskGroup()
-        self._rpc_ptask_group = aiotools.PersistentTaskGroup()
+        self._rpc_ptask_group = aiotools.PersistentTaskGroup(
+            exception_handler=IgnoreTaskExceptionHandler()
+        )
         self._webhook_ptask_group = aiotools.PersistentTaskGroup()
 
-    async def resolve_session(self, action: ResolveSessionAction) -> ResolveSessionActionResult:
-        """Resolve a live session to its ``session_id`` by ``(session_name, user_id)``.
-        DO NOT USE THIS FOR NEW DEVELOPMENT. This is only for backward compatibility with existing resolvers.
-
-        Callers go through this resolver before invoking any other session operation, so
-        that downstream lookups can rely solely on ``session_id``. The ``user_id`` scope
-        covers sessions created with any of the user's keypair access keys.
-        """
-        session_id = await self._session_repository.resolve_session_id(
-            action.session_name,
-            action.user_id,
-        )
-        return ResolveSessionActionResult(session_id=session_id)
-
     async def compute_schedule(self, action: ComputeScheduleAction) -> ComputeScheduleActionResult:
-        """Build a slim ``SessionSpecDraft`` (one kernel group per requested
+        """Build a resource-only draft (one kernel group per requested
         kernel, unique role for positional correlation) and delegate the
         node-fitting decision to the scheduling controller.
         """
-        user = await self._user_repository.get_user_by_uuid(action.user_uuid)
-        if user.main_access_key is None:
-            raise InternalServerError(f"User {action.user_uuid} has no main access key configured")
-        access_key = AccessKey(user.main_access_key)
-
         kernel_groups = tuple(
             KernelGroupDraft(
                 role=DEFAULT_ROLE if idx == 0 else f"sub{idx}",
@@ -339,25 +323,19 @@ class SessionService:
             )
             for idx, kernel in enumerate(action.kernels)
         )
-        resource_spec = SessionResourceSpecDraft(
-            identity=SessionIdentityDraft(
-                session_id=SessionID(uuid.uuid4()),
-                creation_id=uuid.uuid4().hex,
-                session_name="compute-schedule",
-                access_key=access_key,
-                user_uuid=action.user_uuid,
-            ),
-            classification=SessionClassificationDraft(session_type=SessionTypes.INTERACTIVE),
+        draft = ResourceSpecDraft(
             options=SessionOptionsDraft(
                 cluster_mode=action.cluster_mode,
                 cluster_size=len(action.kernels),
+                scheduling_target=SchedulingTargetDraft(
+                    designated_agents=tuple(action.designated_agent_ids or ()),
+                    agent_selection_policy=action.agent_selection_policy,
+                ),
                 kernel_groups=kernel_groups,
             ),
         )
 
-        result = await self._scheduling_controller.compute_schedule(
-            action.resource_group_id, resource_spec
-        )
+        result = await self._scheduling_controller.compute_schedule(action.resource_group_id, draft)
         return ComputeScheduleActionResult(result=result)
 
     async def resolve_session_name(
@@ -369,12 +347,10 @@ class SessionService:
         downstream name-keyed operations receive a real name. DO NOT USE THIS FOR
         NEW DEVELOPMENT — it only bridges the legacy name-or-id path parameter.
         """
-        session_name = await self._session_repository.get_session_name(action.session_id)
+        session_name = await self._session_repository.get_session_name(SessionId(action.session_id))
         return ResolveSessionNameActionResult(session_name=session_name)
 
     async def commit_session(self, action: CommitSessionAction) -> CommitSessionActionResult:
-        session_name = action.session_name
-        owner_access_key = action.owner_access_key
         filename = action.filename
 
         myself = asyncio.current_task()
@@ -382,8 +358,7 @@ class SessionService:
             raise NoCurrentTaskContext("No current asyncio task context available")
 
         session = await self._session_repository.get_session_validated(
-            session_name,
-            owner_access_key,
+            SessionId(action.session_id),
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
 
@@ -399,14 +374,11 @@ class SessionService:
         )
 
     async def complete(self, action: CompleteAction) -> CompleteActionResult:
-        session_name = action.session_name
-        owner_access_key = action.owner_access_key
         code = action.code
         options = action.options or {}
 
         session = await self._session_repository.get_session_validated(
-            session_name,
-            owner_access_key,
+            SessionId(action.session_id),
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
         try:
@@ -421,8 +393,6 @@ class SessionService:
     async def convert_session_to_image(
         self, action: ConvertSessionToImageAction
     ) -> ConvertSessionToImageActionResult:
-        session_name = action.session_name
-        owner_access_key = action.owner_access_key
         image_name = action.image_name
         image_visibility = action.image_visibility
         image_owner_id = action.image_owner_id
@@ -436,7 +406,7 @@ class SessionService:
 
         # check if user has passed its limit of customized image count
         existing_image_count = await self._session_repository.get_customized_image_count(
-            image_visibility.value, str(image_owner_id)
+            image_owner_id
         )
         customized_image_count_limit = action.max_customized_image_count
         if customized_image_count_limit <= existing_image_count:
@@ -452,38 +422,24 @@ class SessionService:
             )
 
         session = await self._session_repository.get_session_with_group(
-            session_name,
-            owner_access_key,
+            SessionId(action.session_id),
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
 
-        project: GroupRow = session.group
-        if not project.container_registry:
-            raise InvalidAPIParameters(
-                "Project not ready to convert session image (registry configuration not populated)"
-            )
-
-        registry_hostname = project.container_registry["registry"]
-        registry_project = project.container_registry["project"]
-
-        registry_conf = await self._session_repository.get_container_registry(
-            registry_hostname, registry_project
-        )
-        if not registry_conf:
-            raise InvalidAPIParameters(
-                f"Project {registry_project} not found in registry {registry_hostname}."
-            )
+        registry_conf = await self._session_repository.get_image_commit_registry(session.group_id)
+        registry_hostname = registry_conf.registry_name
+        registry_project = registry_conf.project
 
         # Validate image exists
         if session.main_kernel.image and session.main_kernel.architecture:
-            await self._session_repository.resolve_image(
-                [ImageIdentifier(session.main_kernel.image, session.main_kernel.architecture)],
-                alive_only=False,
+            await self._session_repository.resolve_image_by_canonical(
+                session.main_kernel.image, session.main_kernel.architecture, alive_only=False
             )
 
         # Create manifest for background task
         manifest = CommitSessionManifest(
             session_id=session.id,
+            registry_id=registry_conf.id,
             registry_hostname=registry_hostname,
             registry_project=registry_project,
             image_name=image_name,
@@ -511,7 +467,7 @@ class SessionService:
         owner_access_key = action.owner_access_key
         domain_name = action.domain_name
         group_name = action.group_name
-        scaling_group_name = action.scaling_group_name
+        resource_group_name = action.resource_group_name
         session_name = action.session_name
         session_type = action.session_type
         enqueue_only = action.enqueue_only
@@ -521,7 +477,7 @@ class SessionService:
         template = await self._session_repository.get_template_by_id(template_id)
         log.debug("task template: {}", template)
         if not template:
-            raise TaskTemplateNotFound
+            raise SessionTemplateNotFound
 
         try:
             user_info = await self._session_repository.query_userinfo(
@@ -549,7 +505,7 @@ class SessionService:
                 ),
                 owner_access_key,
                 user_info.resource_policy,
-                scaling_group_name,
+                resource_group_name,
                 session_type,
                 tag,
                 enqueue_only=enqueue_only,
@@ -565,7 +521,6 @@ class SessionService:
             raise UnknownImageReferenceError("Unknown image reference!") from e
         except Exception as e:
             await self._error_monitor.capture_exception()
-            log.exception("GET_OR_CREATE: unexpected error!", e)
             raise InternalServerError from e
 
     async def create_from_params(
@@ -613,17 +568,11 @@ class SessionService:
         )
 
         try:
-            image_row = await self._session_repository.resolve_image([
-                ImageIdentifier(
-                    image,
-                    architecture,
-                ),
-                ImageAlias(image),
-            ])
+            image_data = await self._session_repository.resolve_image(image, architecture)
 
             resp = await self._agent_registry.create_session(
                 session_name,
-                image_row.image_ref,
+                image_data.image_ref,
                 UserScope(
                     domain_name=domain_name,
                     group_id=user_info.group_id,
@@ -652,7 +601,7 @@ class SessionService:
                 sudo_session_enabled=sudo_session_enabled,
             )
             await self._session_repository.update_image_last_used_at(
-                image_row.id, datetime.now(tzutc())
+                image_data.id, datetime.now(tzutc())
             )
             return CreateFromParamsActionResult(
                 session_id=uuid.UUID(resp["sessionId"]), result=resp
@@ -663,7 +612,6 @@ class SessionService:
             raise
         except Exception as e:
             await self._error_monitor.capture_exception(context={"user": user_info.owner_uuid})
-            log.exception("GET_OR_CREATE: unexpected error!", e)
             raise InternalServerError from e
 
     async def create_from_template(
@@ -678,7 +626,7 @@ class SessionService:
 
         template_info = await self._session_repository.get_template_info_by_id(template_id)
         if not template_info:
-            raise TaskTemplateNotFound
+            raise SessionTemplateNotFound
         template = template_info["template"]
 
         group_name = None
@@ -690,7 +638,7 @@ class SessionService:
         if isinstance(template, str):
             template = load_json(template)
 
-        log.debug("Template: {0}", template)
+        log.debug("session template: {}", template)
 
         param_from_template = {
             "image": template["spec"]["kernel"]["image"],
@@ -717,8 +665,8 @@ class SessionService:
                 param_from_template["startup_command"] = startup
 
         config_from_template: MutableMapping[Any, Any] = {}
-        if scaling_group := template["spec"].get("scaling_group"):
-            config_from_template["scaling_group"] = scaling_group
+        if resource_group := template["spec"].get("scaling_group"):
+            config_from_template["scaling_group"] = resource_group
         if mounts := template["spec"].get("mounts"):
             config_from_template["mounts"] = list(mounts.keys())
             config_from_template["mount_map"] = {
@@ -734,11 +682,11 @@ class SessionService:
         override_config = drop_undefined(dict(action.params.config))
         override_params = drop_undefined(dict(asdict(action.params)))
 
-        log.debug("Default config: {0}", config_from_template)
-        log.debug("Default params: {0}", param_from_template)
+        log.debug("default config: {}", config_from_template)
+        log.debug("default params: {}", param_from_template)
 
-        log.debug("Override config: {0}", override_config)
-        log.debug("Override params: {0}", override_params)
+        log.debug("override config: {}", override_config)
+        log.debug("override params: {}", override_params)
 
         if override_config:
             config_from_template.update(override_config)
@@ -748,14 +696,12 @@ class SessionService:
         try:
             params = overwritten_param_check.check(param_from_template)
         except RuntimeError as e1:
-            log.exception(e1)
             raise InvalidAPIParameters("Error while validating template") from e1
         except t.DataError as e2:
-            log.debug("Error: {0}", str(e2))
             raise InvalidAPIParameters("Error while validating template") from e2
         params["config"] = config_from_template
 
-        log.debug("Updated param: {0}", params)
+        log.debug("updated params: {}", params)
 
         if git := template["spec"]["kernel"]["git"]:
             if _dest := git.get("dest_dir"):
@@ -819,17 +765,11 @@ class SessionService:
         )
 
         try:
-            image_row = await self._session_repository.resolve_image([
-                ImageIdentifier(
-                    image,
-                    architecture,
-                ),
-                ImageAlias(image),
-            ])
+            image_data = await self._session_repository.resolve_image(image, architecture)
 
             resp = await self._agent_registry.create_session(
                 session_name,
-                image_row.image_ref,
+                image_data.image_ref,
                 UserScope(
                     domain_name=domain_name,
                     group_id=user_info.group_id,
@@ -864,19 +804,15 @@ class SessionService:
             raise
         except Exception as e:
             await self._error_monitor.capture_exception(context={"user": user_info.owner_uuid})
-            log.exception("GET_OR_CREATE: unexpected error!", e)
             raise InternalServerError from e
 
     async def destroy_session(self, action: DestroySessionAction) -> DestroySessionActionResult:
-        session_name = action.session_name
-        owner_access_key = action.owner_access_key
         forced = action.forced
         recursive = action.recursive
 
         # Get session IDs to terminate (based on recursive flag)
         session_ids = await self._session_repository.get_target_session_ids(
-            session_name,
-            owner_access_key,
+            SessionId(action.session_id),
             recursive=recursive,
         )
 
@@ -889,7 +825,7 @@ class SessionService:
         # Mark sessions for termination
         mark_result = await self._scheduling_controller.mark_sessions_for_termination(
             session_ids,
-            reason=reason.value,
+            reason=reason,
             forced=forced,
         )
 
@@ -907,7 +843,7 @@ class SessionService:
 
     async def terminate_sessions(
         self, action: TerminateSessionsAction
-    ) -> TerminateSessionsActionResult:
+    ) -> PartialBulkResult[SessionTerminationStatus]:
         """Terminate multiple sessions by their IDs."""
         reason = (
             KernelLifecycleEventReason.FORCE_TERMINATED
@@ -915,24 +851,37 @@ class SessionService:
             else KernelLifecycleEventReason.USER_REQUESTED
         )
         mark_result = await self._scheduling_controller.mark_sessions_for_termination(
-            action.session_ids, reason=reason.value, forced=action.forced
+            action.session_ids, reason=reason, forced=action.forced
         )
-        return TerminateSessionsActionResult(
-            cancelled=mark_result.cancelled_sessions,
-            terminating=mark_result.terminating_sessions,
-            force_terminated=mark_result.force_terminated_sessions,
-            skipped=mark_result.skipped_sessions,
+        # The controller answers in four buckets; the bulk shape answers per session,
+        # so the state each one ended in becomes that session's value.
+        states: dict[EntityIdentifier, SessionTerminationStatus] = {
+            SessionID(sid): state
+            for state, sids in (
+                (SessionTerminationStatus.CANCELLED, mark_result.cancelled_sessions),
+                (SessionTerminationStatus.TERMINATING, mark_result.terminating_sessions),
+                (SessionTerminationStatus.FORCE_TERMINATED, mark_result.force_terminated_sessions),
+                (SessionTerminationStatus.SKIPPED, mark_result.skipped_sessions),
+            )
+            for sid in sids
+        }
+        return PartialBulkResult(
+            items=[
+                PartialBulkEntityResult[SessionTerminationStatus].succeeded(
+                    entity_id, state, description=state.value
+                )
+                for entity_id in action.entity_ids()
+                if (state := states.get(entity_id)) is not None
+            ]
         )
 
     async def download_file(self, action: DownloadFileAction) -> DownloadFileActionResult:
-        session_name = action.session_name
         owner_access_key = action.owner_access_key
         user_id = action.user_id
         file = action.file
         try:
             session = await self._session_repository.get_session_validated(
-                session_name,
-                owner_access_key,
+                SessionId(action.session_id),
                 kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
             )
             result = await self._agent_registry.download_single(session, owner_access_key, file)
@@ -944,19 +893,15 @@ class SessionService:
             raise
         except Exception as e:
             await self._error_monitor.capture_exception(context={"user": user_id})
-            log.exception("DOWNLOAD_SINGLE: unexpected error!", e)
             raise InternalServerError from e
 
         return DownloadFileActionResult(bytes=result, session_data=session.to_dataclass())
 
     async def download_files(self, action: DownloadFilesAction) -> DownloadFilesActionResult:
-        session_name = action.session_name
-        owner_access_key = action.owner_access_key
         user_id = action.user_id
         files = action.files
         session = await self._session_repository.get_session_validated(
-            session_name,
-            owner_access_key,
+            SessionId(action.session_id),
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
         try:
@@ -978,7 +923,6 @@ class SessionService:
             raise InvalidAPIParameters("The file is not found.") from e
         except Exception as e:
             await self._error_monitor.capture_exception(context={"user": user_id})
-            log.exception("DOWNLOAD_FILE: unexpected error!", e)
             raise InternalServerError from e
 
         with aiohttp.MultipartWriter("mixed") as mpwriter:
@@ -992,14 +936,11 @@ class SessionService:
             )
 
     async def execute_session(self, action: ExecuteSessionAction) -> ExecuteSessionActionResult:
-        session_name = action.session_name
-        owner_access_key = action.owner_access_key
         api_version = action.api_version
 
         resp = {}
         session = await self._session_repository.get_session_validated(
-            session_name,
-            owner_access_key,
+            SessionId(action.session_id),
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
         try:
@@ -1025,7 +966,7 @@ class SessionService:
                 code = action.params.code
                 opts = action.params.options
             else:
-                raise RuntimeError("should not reach here")
+                raise UnreachableError("should not reach here")
             # handle cases when some params are deliberately set to None
             if code is None:
                 code = ""
@@ -1063,7 +1004,6 @@ class SessionService:
                     result["console"] = raw_result.get("console")
                 resp["result"] = result
         except AssertionError as e:
-            log.warning("EXECUTE: invalid/missing parameters: {0!r}", e)
             raise InvalidAPIParameters(extra_msg=e.args[0]) from e
         except BackendAIError:
             raise
@@ -1073,11 +1013,8 @@ class SessionService:
     async def get_abusing_report(
         self, action: GetAbusingReportAction
     ) -> GetAbusingReportActionResult:
-        session_name = action.session_name
-        owner_access_key = action.owner_access_key
         session = await self._session_repository.get_session_validated(
-            session_name,
-            owner_access_key,
+            SessionId(action.session_id),
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
         kernel = session.main_kernel
@@ -1087,12 +1024,8 @@ class SessionService:
         )
 
     async def get_commit_status(self, action: GetCommitStatusAction) -> GetCommitStatusActionResult:
-        session_name = action.session_name
-        owner_access_key = action.owner_access_key
-
         session = await self._session_repository.get_session_validated(
-            session_name,
-            owner_access_key,
+            SessionId(action.session_id),
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
         statuses = await self._agent_registry.get_commit_status([session.main_kernel.id])
@@ -1108,13 +1041,10 @@ class SessionService:
         self, action: GetContainerLogsAction
     ) -> GetContainerLogsActionResult:
         resp = {"result": {"logs": ""}}
-        session_name = action.session_name
-        owner_access_key = action.owner_access_key
         kernel_id = action.kernel_id
 
         compute_session = await self._session_repository.get_session_validated(
-            session_name,
-            owner_access_key,
+            SessionId(action.session_id),
             allow_stale=True,
             kernel_loading_strategy=(
                 KernelLoadingStrategy.MAIN_KERNEL_ONLY
@@ -1123,7 +1053,7 @@ class SessionService:
             ),
         )
 
-        if compute_session.status in DEAD_SESSION_STATUSES:
+        if compute_session.status in SessionStatus.terminal_statuses():
             if kernel_id is None:
                 # Get logs from the main kernel
                 kernel_id = compute_session.main_kernel.id
@@ -1153,11 +1083,8 @@ class SessionService:
     async def get_dependency_graph(
         self, action: GetDependencyGraphAction
     ) -> GetDependencyGraphActionResult:
-        root_session_name = action.root_session_name
-        owner_access_key = action.owner_access_key
-
         dependency_graph = await self._session_repository.find_dependency_sessions(
-            root_session_name, owner_access_key
+            SessionId(action.session_id)
         )
 
         session_id = (
@@ -1179,12 +1106,8 @@ class SessionService:
     async def get_direct_access_info(
         self, action: GetDirectAccessInfoAction
     ) -> GetDirectAccessInfoActionResult:
-        session_name = action.session_name
-        owner_access_key = action.owner_access_key
-
         sess = await self._session_repository.get_session_validated(
-            session_name,
-            owner_access_key,
+            SessionId(action.session_id),
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
         resp = {}
@@ -1216,17 +1139,21 @@ class SessionService:
         return GetDirectAccessInfoActionResult(result=resp, session_data=sess.to_dataclass())
 
     async def get_session_info(self, action: GetSessionInfoAction) -> GetSessionInfoActionResult:
-        session_name = action.session_name
-        owner_access_key = action.owner_access_key
-
         sess = await self._session_repository.get_session_validated(
-            session_name,
-            owner_access_key,
+            SessionId(action.session_id),
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
 
-        created_at = sess.created_at or datetime.now(tzutc())
-        age = datetime.now(tzutc()) - created_at
+        session_id = SessionId(sess.id)
+        main_kernel_id = KernelId(sess.main_kernel.id)
+        session_allocation = (
+            await self._session_repository.batch_get_resource_allocation_by_session([session_id])
+        ).get(session_id)
+        kernel_allocation = (
+            await self._session_repository.batch_get_resource_allocation_by_kernel([main_kernel_id])
+        ).get(main_kernel_id)
+
+        age = datetime.now(tzutc()) - sess.created_at
         session_info = LegacySessionInfo(
             domain_name=sess.domain_name,
             group_id=sess.group_id,
@@ -1239,9 +1166,11 @@ class SessionService:
             container_id=ContainerId(sess.main_kernel.container_id)
             if sess.main_kernel.container_id
             else None,
-            occupied_slots=str(sess.main_kernel.occupied_slots),  # legacy
-            occupying_slots=str(sess.occupying_slots),
-            requested_slots=str(sess.requested_slots),
+            occupied_slots=str(kernel_allocation.used if kernel_allocation else ResourceSlot()),
+            occupying_slots=str(session_allocation.used if session_allocation else ResourceSlot()),
+            requested_slots=str(
+                session_allocation.requested if session_allocation else ResourceSlot()
+            ),
             occupied_shares=str(sess.main_kernel.occupied_shares),  # legacy
             environ=str(sess.environ),
             resource_opts=str(sess.resource_opts),
@@ -1249,7 +1178,7 @@ class SessionService:
             status_info=str(sess.status_info) if sess.status_info else None,
             status_data=sess.status_data,
             age_ms=int(age.total_seconds() * 1000),
-            creation_time=created_at,
+            creation_time=sess.created_at,
             termination_time=sess.terminated_at,
             num_queries_executed=sess.num_queries or 0,
             last_stat=sess.last_stat,
@@ -1265,25 +1194,17 @@ class SessionService:
     async def get_status_history(
         self, action: GetStatusHistoryAction
     ) -> GetStatusHistoryActionResult:
-        session_name = action.session_name
-        owner_access_key = action.owner_access_key
-
         session_row = await self._session_repository.get_session_validated(
-            session_name,
-            owner_access_key,
+            SessionId(action.session_id),
             kernel_loading_strategy=KernelLoadingStrategy.NONE,
         )
         result = session_row.status_history or {}
 
-        return GetStatusHistoryActionResult(status_history=result, session_id=session_row.id)
+        return GetStatusHistoryActionResult(status_history=result)
 
     async def interrupt(self, action: InterruptSessionAction) -> InterruptSessionActionResult:
-        session_name = action.session_name
-        owner_access_key = action.owner_access_key
-
         session = await self._session_repository.get_session_validated(
-            session_name,
-            owner_access_key,
+            SessionId(action.session_id),
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
         await self._agent_registry.interrupt_session(session)
@@ -1291,14 +1212,11 @@ class SessionService:
         return InterruptSessionActionResult(result=None, session_data=session.to_dataclass())
 
     async def list_files(self, action: ListFilesAction) -> ListFilesActionResult:
-        session_name = action.session_name
-        owner_access_key = action.owner_access_key
         user_id = action.user_id
         path = action.path
 
         session = await self._session_repository.get_session_validated(
-            session_name,
-            owner_access_key,
+            SessionId(action.session_id),
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
 
@@ -1306,14 +1224,13 @@ class SessionService:
         try:
             result = await self._agent_registry.list_files(session, path)
             resp.update(result)
-            log.debug("container file list for {0} retrieved", path)
+            log.debug("container file list retrieved", container_path=path)
         except asyncio.CancelledError:
             raise
         except BackendAIError:
             raise
         except Exception as e:
             await self._error_monitor.capture_exception(context={"user": user_id})
-            log.exception("LIST_FILES: unexpected error!", e)
             raise InternalServerError from e
 
         return ListFilesActionResult(result=result, session_data=session.to_dataclass())
@@ -1339,16 +1256,12 @@ class SessionService:
         return MatchSessionsActionResult(result=matches)
 
     async def rename_session(self, action: RenameSessionAction) -> RenameSessionActionResult:
-        session_name = action.session_name
-        owner_access_key = action.owner_access_key
         new_name = action.new_name
 
         try:
             compute_session = await self._session_repository.update_session_name(
-                session_name, new_name, owner_access_key
+                SessionId(action.session_id), new_name
             )
-            if compute_session.status != SessionStatus.RUNNING:
-                raise InvalidAPIParameters("Can't change name of not running session")
         except ValueError as e:
             if "already exists" in str(e):
                 raise InvalidAPIParameters(str(e)) from e
@@ -1357,13 +1270,10 @@ class SessionService:
         return RenameSessionActionResult(session_data=compute_session.to_dataclass())
 
     async def shutdown_service(self, action: ShutdownServiceAction) -> ShutdownServiceActionResult:
-        session_name = action.session_name
-        owner_access_key = action.owner_access_key
         service_name = action.service_name
 
         session = await self._session_repository.get_session_validated(
-            session_name,
-            owner_access_key,
+            SessionId(action.session_id),
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
         await self._agent_registry.shutdown_service(session, service_name)
@@ -1376,24 +1286,23 @@ class SessionService:
 
         arguments = action.arguments
         envs = action.envs
-        login_session_token = action.login_session_token
 
         info = await self._session_repository.get_session_with_routing_minimal(session_id)
         session_data = info.session
 
-        if session_data.scaling_group_name is None:
+        if session_data.resource_group_name is None:
             raise ServiceUnavailable("Session has no scaling group assigned")
-        wsproxy_addr = await self._session_repository.get_scaling_group_wsproxy_addr(
-            session_data.scaling_group_name
+        proxy_connection_info = await self._session_repository.resource_group_proxy_connection_info(
+            session_data.resource_group_name
         )
-        if not wsproxy_addr:
+        if proxy_connection_info is None:
             raise ServiceUnavailable("No coordinator configured for this resource group")
-        client = self._appproxy_client_pool.load_client(wsproxy_addr, "")
+        client = self._appproxy_client_pool.load_client(proxy_connection_info.addr, "")
         wsproxy_status = await client.fetch_status()
         if wsproxy_status.advertise_address:
             wsproxy_advertise_addr = wsproxy_status.advertise_address
         else:
-            wsproxy_advertise_addr = wsproxy_addr
+            wsproxy_advertise_addr = proxy_connection_info.addr
 
         if info.kernel_host is None:
             kernel_host = urlparse(info.agent_addr).hostname
@@ -1449,7 +1358,9 @@ class SessionService:
             )
 
         body = {
-            "login_session_token": login_session_token,
+            # A coordinator of an older version requires the key, and the legacy
+            # backend.ai-proxy-coordinator saves it to a non-nullable column.
+            "login_session_token": "",
             "kernel_host": kernel_host,
             "kernel_port": host_port,
             "session": {
@@ -1461,11 +1372,16 @@ class SessionService:
             },
         }
 
+        conf_request_headers: dict[str, str] = {}
+        if proxy_connection_info.api_token:
+            conf_request_headers["X-BackendAI-Token"] = proxy_connection_info.api_token
+
         async with (
             aiohttp.ClientSession() as req,
             req.post(
-                f"{wsproxy_addr}/v2/conf",
+                f"{proxy_connection_info.addr}/v2/conf",
                 json=body,
+                headers=conf_request_headers,
             ) as resp,
         ):
             token_json = await resp.json()
@@ -1478,13 +1394,10 @@ class SessionService:
             )
 
     async def upload_files(self, action: UploadFilesAction) -> UploadFilesActionResult:
-        session_name = action.session_name
-        owner_access_key = action.owner_access_key
         reader = action.reader
 
         session = await self._session_repository.get_session_validated(
-            session_name,
-            owner_access_key,
+            SessionId(action.session_id),
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
 
@@ -1513,7 +1426,7 @@ class SessionService:
                     chunks.append(chunk)
                     recv_size += chunk_size
                 data = file.decode(b"".join(chunks))
-                log.debug("received file: {0} ({1:,} bytes)", file_name, recv_size)
+                log.debug("file received", file_name=file_name, received_bytes=recv_size)
                 ts.create_task(self._agent_registry.upload_file(session, file_name, data))
 
         return UploadFilesActionResult(result=None, session_data=session.to_dataclass())
@@ -1521,72 +1434,66 @@ class SessionService:
     async def get_session(self, action: GetSessionAction) -> GetSessionActionResult:
         """Get a single session by ID with RBAC validation."""
         session_data = await self._session_repository.get_session_data_by_id(
-            action.session_id,
+            SessionId(action.session_id)
         )
         return GetSessionActionResult(session_data=session_data)
 
-    async def modify_session(self, action: ModifySessionAction) -> ModifySessionActionResult:
+    async def update_session(self, action: UpdateSessionAction) -> UpdateSessionActionResult:
         session_id = action.session_id
-        spec = cast(SessionUpdaterSpec, action.updater.spec)
-        session_name = spec.name.optional_value()
+        session_name = action.updater.name.optional_value()
 
-        session_row = await self._session_repository.modify_session(action.updater, session_name)
-        if session_row is None:
-            raise ValueError(f"Session not found (id:{session_id})")
+        session_data = await self._session_repository.update_session(action.updater, session_name)
         session_owner_data = await self._session_repository.get_session_owner(str(session_id))
 
-        return ModifySessionActionResult(
-            session_data=session_row.to_dataclass(owner=session_owner_data)
+        return UpdateSessionActionResult(
+            session_data=replace(session_data, owner=session_owner_data)
         )
 
-    async def search(self, action: SearchSessionsAction) -> SearchSessionsActionResult:
-        """Search sessions with querier pattern."""
-        result = await self._session_repository.search(action.querier)
-        return SearchSessionsActionResult(
-            data=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
+    async def bulk_get_session_designated_agent_ids(
+        self, action: BulkGetSessionDesignatedAgentIdsAction
+    ) -> PartialBulkResult[list[AgentId]]:
+        """Read the agent ids each session designates; one designating none answers ``[]``."""
+        data = await self._session_repository.bulk_get_designated_agent_ids_by_session(
+            action.session_ids
         )
-
-    async def search_in_project(
-        self, action: SearchSessionsInProjectAction
-    ) -> SearchSessionsInProjectActionResult:
-        """Search sessions scoped to a project."""
-        result = await self._session_repository.search_in_project(action.querier, action.scope)
-        return SearchSessionsInProjectActionResult(
-            data=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
-
-    async def search_kernels(self, action: SearchKernelsAction) -> SearchKernelsActionResult:
-        """Search kernels with querier pattern."""
-        result = await self._session_repository.search_kernels(action.querier)
-        return SearchKernelsActionResult(
-            data=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
+        return PartialBulkResult(
+            items=[
+                PartialBulkEntityResult[list[AgentId]].succeeded(
+                    sid, data.get(sid, []), description="read"
+                )
+                for sid in action.session_ids
+            ]
         )
 
     async def batch_get_session_resource_allocation(
         self, action: BatchGetSessionResourceAllocationAction
-    ) -> BatchGetSessionResourceAllocationActionResult:
+    ) -> PartialBulkResult[ResourceAllocationAggregate]:
         """Aggregate resource_allocations per session (requested/used/allocated)."""
         data = await self._session_repository.batch_get_resource_allocation_by_session(
             action.session_ids
         )
-        return BatchGetSessionResourceAllocationActionResult(data=data)
+        # Every named session is answered for: one with no allocations recorded holds
+        # nothing, which is not the same as an id naming no session.
+        return PartialBulkResult(
+            items=[
+                PartialBulkEntityResult[ResourceAllocationAggregate].succeeded(
+                    SessionID(sid), aggregate, description="aggregated"
+                )
+                if (aggregate := data.get(sid)) is not None
+                else PartialBulkEntityResult[ResourceAllocationAggregate].nothing(
+                    SessionID(sid), description="no allocations"
+                )
+                for sid in action.session_ids
+            ]
+        )
 
     async def batch_get_kernel_resource_allocation(
         self, action: BatchGetKernelResourceAllocationAction
     ) -> BatchGetKernelResourceAllocationActionResult:
         """Aggregate resource_allocations per kernel (requested/used/allocated)."""
-        data = await self._session_repository.batch_get_resource_allocation_by_kernel(
-            action.kernel_ids
-        )
+        data = await self._session_repository.batch_get_resource_allocation_by_kernel([
+            KernelId(kernel_id) for kernel_id in action.kernel_ids
+        ])
         return BatchGetKernelResourceAllocationActionResult(data=data)
 
     async def enqueue_session(self, action: EnqueueSessionAction) -> EnqueueSessionActionResult:
@@ -1595,18 +1502,31 @@ class SessionService:
         Builds a :class:`SessionSpecDraft` inline from the caller-supplied
         action, resolves delegation (``action.owner_id``), and hands the
         draft straight to the scheduling controller. The controller owns
-        every DB read the preparer / validator chain needs — this
-        service just extracts values from the action and shapes them
-        into the draft.
+        every DB read the preparer / validator chain needs; this service
+        reads only the session group the action names, to check it belongs
+        to the session's owner and project.
         """
         user_id = action.user_id
         access_key = action.access_key
         domain_name = action.domain_name
         if action.owner_id is not None:
             owner = await self._user_repository.get_user_by_uuid(action.owner_id)
-            if owner.main_access_key is None:
+            if action.owner_id != action.user_id:
+                try:
+                    check_if_requester_is_eligible_to_act_as_target_user(
+                        action.user_role,
+                        action.domain_name,
+                        owner.role,
+                        owner.domain_name,
+                    )
+                except RuntimeError as e:
+                    raise InsufficientPrivilege(str(e)) from e
+            owner_access_key = await self._user_repository.default_access_key(
+                UserID(action.owner_id)
+            )
+            if owner_access_key is None:
                 raise InternalServerError(
-                    f"Delegated owner {action.owner_id} has no main access key configured"
+                    f"Delegated owner {action.owner_id} has no default access key configured"
                 )
             if owner.role is None:
                 raise InternalServerError(
@@ -1617,15 +1537,29 @@ class SessionService:
                     f"Delegated owner {action.owner_id} has no domain configured"
                 )
             user_id = owner.id
-            access_key = AccessKey(owner.main_access_key)
+            access_key = owner_access_key
             domain_name = owner.domain_name
+
+        owned_session_group_searcher = action.to_owned_session_group_searcher(UserID(user_id))
+        held_session_group_searcher = action.to_held_session_group_searcher(UserID(user_id))
+        if owned_session_group_searcher is not None and held_session_group_searcher is not None:
+            if not await self._scheduler_repository.search_session_groups(
+                owned_session_group_searcher
+            ):
+                raise SessionGroupNotFound(f"Session group {action.session_group_id} not found")
+            if await self._scheduler_repository.search_session_groups(held_session_group_searcher):
+                raise SessionGroupInUseForEnqueue(
+                    f"Session group {action.session_group_id} is used by a replica group"
+                )
 
         # Keep the image resolve so callers passing a stale UUID get a
         # sharp error here instead of deep inside the preparer chain.
         await self._session_repository.resolve_image_by_id(action.image_id)
 
         resource_entries = tuple(
-            ResourceSlotEntry(resource_type=entry.resource_type, quantity=entry.quantity)
+            ResourceSlotEntry(
+                resource_type=ResourceSlotName(entry.resource_type), quantity=entry.quantity
+            )
             for entry in action.resource.entries
         )
         resource_opts_payload: dict[str, Any] = {}
@@ -1653,6 +1587,7 @@ class SessionService:
         dependencies = tuple(SessionID(dep_id) for dep_id in (action.scheduling.dependencies or ()))
         callback_url = yarl.URL(action.callback_url) if action.callback_url else None
 
+        domain_id = await self._scheduler_repository.get_domain_id_by_name(DomainName(domain_name))
         if action.resource.resource_group_id is not None:
             resource_group_id = action.resource.resource_group_id
             resource_group_name = await self._scheduler_repository.get_resource_group_name_by_id(
@@ -1665,14 +1600,13 @@ class SessionService:
             )
         else:
             resource_group_id = await self._scheduler_repository.pick_default_resource_group(
-                access_key=access_key,
-                domain_name=domain_name,
+                domain_id=domain_id,
                 project_id=ProjectID(action.group_id),
+                user_id=UserID(user_id),
             )
             resource_group_name = await self._scheduler_repository.get_resource_group_name_by_id(
                 resource_group_id
             )
-        domain_id = await self._scheduler_repository.get_domain_id_by_name(DomainName(domain_name))
         kernel_groups = await self._resolve_kernel_groups(
             cluster_size=action.resource.cluster_size,
             preopen_ports=preopen_ports,
@@ -1713,19 +1647,22 @@ class SessionService:
                 ),
                 callback_url=callback_url,
                 dependencies=dependencies,
-                options=SessionOptionsDraft(
-                    priority=action.scheduling.priority or SESSION_PRIORITY_DEFAULT,
-                    job_priority=action.scheduling.job_priority,
-                    is_preemptible=action.scheduling.is_preemptible,
-                    cluster_mode=action.resource.cluster_mode,
-                    cluster_size=action.resource.cluster_size,
-                    scheduling_target=SchedulingTargetDraft(
-                        designated_agents=tuple(
-                            AgentId(a) for a in (action.scheduling.agent_list or ())
+                resource=ResourceSpecDraft(
+                    options=SessionOptionsDraft(
+                        priority=action.scheduling.tier,
+                        job_priority=action.scheduling.job_priority,
+                        is_preemptible=action.scheduling.is_preemptible,
+                        cluster_mode=action.resource.cluster_mode,
+                        cluster_size=action.resource.cluster_size,
+                        scheduling_target=SchedulingTargetDraft(
+                            designated_agents=tuple(
+                                AgentId(a) for a in (action.scheduling.agent_list or ())
+                            ),
+                            agent_selection_policy=action.scheduling.agent_selection_policy,
                         ),
+                        kernel_groups=kernel_groups,
+                        handler_options=None,
                     ),
-                    kernel_groups=kernel_groups,
-                    handler_options=None,
                 ),
                 internal_data_extras=InternalDataExtras(
                     sudo_session_enabled=False,
@@ -1737,6 +1674,7 @@ class SessionService:
                 project_id=ProjectID(action.group_id),
                 resource_group_id=resource_group_id,
                 resource_group_name=resource_group_name,
+                session_group_id=action.session_group_id,
             ),
         )
 

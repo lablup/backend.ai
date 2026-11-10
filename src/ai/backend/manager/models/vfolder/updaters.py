@@ -1,0 +1,218 @@
+"""Update specs for vfolders."""
+
+from __future__ import annotations
+
+from collections.abc import Sequence
+from dataclasses import dataclass, field
+from typing import Any, override
+
+import sqlalchemy as sa
+from sqlalchemy.orm import InstrumentedAttribute
+
+from ai.backend.common.data.entity.vfolder import VFolderUUID
+from ai.backend.common.types import VFolderMountPolicy
+from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.data.vfolder.types import (
+    VFolderData,
+    VFolderOperationStatus,
+)
+from ai.backend.manager.errors.storage import VFolderDeletionNotAllowed, VFolderFilterStatusFailed
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.specs.types import GuardCheck, IntegrityErrorCheck
+from ai.backend.manager.models.specs.updater import DataUpdater, GuardedDataUpdater
+from ai.backend.manager.models.vfolder.row import VFolderRow
+from ai.backend.manager.models.vfolder.searchable_fields import VFolderSearchableFields
+from ai.backend.manager.types import OptionalState
+
+
+@dataclass
+class VFolderAttributeUpdater(GuardedDataUpdater[VFolderRow, VFolderData]):
+    """Edit a vfolder's name, cloneable flag and mount permission; refuses while a
+    purge is working through it."""
+
+    vfolder_id: VFolderUUID
+    name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
+    cloneable: OptionalState[bool] = field(default_factory=OptionalState[bool].nop)
+    mount_permission: OptionalState[VFolderMountPolicy] = field(
+        default_factory=OptionalState[VFolderMountPolicy].nop
+    )
+
+    @property
+    @override
+    def row_class(self) -> type[VFolderRow]:
+        return VFolderRow
+
+    @override
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return VFolderRow.id
+
+    @override
+    def target_id_value(self) -> VFolderUUID:
+        return self.vfolder_id
+
+    @override
+    def guard_checks(self) -> Sequence[GuardCheck]:
+        return (
+            GuardCheck(
+                condition=VFolderSearchableFields.own.status.filter.not_in(
+                    VFolderOperationStatus.purge_in_progress()
+                ),
+                error=VFolderFilterStatusFailed(f"VFolder is being purged: {self.vfolder_id}"),
+            ),
+        )
+
+    @property
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return ()
+
+    @override
+    def build_values(self) -> dict[str, Any]:
+        to_update: dict[str, Any] = {}
+        self.name.update_dict(to_update, "name")
+        self.cloneable.update_dict(to_update, "cloneable")
+        self.mount_permission.update_dict(to_update, "default_mount_permission")
+        return to_update
+
+    @override
+    def to_data(self, row: VFolderRow) -> VFolderData:
+        return VFolderSearchableFields.own.to_data(row)
+
+
+@dataclass
+class VFolderSoftDeleteUpdater(DataUpdater[VFolderRow, VFolderData]):
+    """Moves a vfolder to the trash by setting its status to DELETE_PENDING."""
+
+    vfolder_id: VFolderUUID
+
+    @property
+    @override
+    def row_class(self) -> type[VFolderRow]:
+        return VFolderRow
+
+    @override
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return VFolderRow.id
+
+    @override
+    def target_id_value(self) -> VFolderUUID:
+        return self.vfolder_id
+
+    @property
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return ()
+
+    @override
+    def build_values(self) -> dict[str, Any]:
+        return {"status": VFolderOperationStatus.DELETE_PENDING}
+
+    @override
+    def to_data(self, row: VFolderRow) -> VFolderData:
+        return VFolderSearchableFields.own.to_data(row)
+
+
+@dataclass
+class VFolderReadyUpdater(DataUpdater[VFolderRow, VFolderData]):
+    """Marks a vfolder ready once its storage folder is there.
+
+    The row is inserted before the storage call so the name and the allowance are held
+    in the insert's own transaction; this is what makes the folder usable.
+    """
+
+    vfolder_id: VFolderUUID
+
+    @property
+    @override
+    def row_class(self) -> type[VFolderRow]:
+        return VFolderRow
+
+    @override
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return VFolderRow.id
+
+    @override
+    def target_id_value(self) -> VFolderUUID:
+        return self.vfolder_id
+
+    @property
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return ()
+
+    @override
+    def build_values(self) -> dict[str, Any]:
+        return {"status": VFolderOperationStatus.READY}
+
+    @override
+    def to_data(self, row: VFolderRow) -> VFolderData:
+        return VFolderSearchableFields.own.to_data(row)
+
+
+@dataclass
+class VFolderTrashUpdater(GuardedDataUpdater[VFolderRow, VFolderData]):
+    """Moves a vfolder to the trash unless a live session still mounts it.
+
+    ``mount_key`` is the folder's mount identifier as sessions record it, which pairs
+    the quota scope with the folder id and so is read off the row rather than derived
+    from its id.
+    """
+
+    vfolder_id: VFolderUUID
+    mount_key: str
+
+    @property
+    @override
+    def row_class(self) -> type[VFolderRow]:
+        return VFolderRow
+
+    @override
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return VFolderRow.id
+
+    @override
+    def target_id_value(self) -> VFolderUUID:
+        return self.vfolder_id
+
+    @override
+    def guard_checks(self) -> Sequence[GuardCheck]:
+        def not_mounted() -> sa.sql.expression.ColumnElement[bool]:
+            return sa.not_(
+                sa.exists(
+                    sa.select(sa.literal(1))
+                    .select_from(SessionRow)
+                    .where(
+                        SessionRow.status.not_in(SessionStatus.terminal_statuses()),
+                        SessionRow.vfolder_mounts.contains([{"vfid": self.mount_key}]),
+                    )
+                )
+            )
+
+        return (
+            GuardCheck(
+                condition=VFolderSearchableFields.own.status.filter.not_in(
+                    VFolderOperationStatus.purge_in_progress()
+                ),
+                error=VFolderFilterStatusFailed(f"VFolder is being purged: {self.vfolder_id}"),
+            ),
+            GuardCheck(
+                condition=not_mounted,
+                error=VFolderDeletionNotAllowed(
+                    "Cannot delete the vfolder. "
+                    f"The vfolder(id: {self.vfolder_id}) is mounted on a running session."
+                ),
+            ),
+        )
+
+    @property
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return ()
+
+    @override
+    def build_values(self) -> dict[str, Any]:
+        return {"status": VFolderOperationStatus.DELETE_PENDING}
+
+    @override
+    def to_data(self, row: VFolderRow) -> VFolderData:
+        return VFolderSearchableFields.own.to_data(row)

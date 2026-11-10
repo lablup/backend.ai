@@ -11,19 +11,20 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.data.entity.deployment import DeploymentEntityType
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
-from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.plugin.hook import HookPluginContext
-from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderUsageMode
-from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.actions.validators.rbac import RBACValidators
-from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
-from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
-from ai.backend.manager.actions.validators.rbac.single_entity import (
-    SingleEntityActionRBACValidator,
+from ai.backend.common.types import (
+    QuotaScopeID,
+    QuotaScopeType,
+    VFolderMountPolicy,
+    VFolderUsageMode,
 )
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.api.adapters.runtime_variant.adapter import RuntimeVariantAdapter
 from ai.backend.manager.api.rest.deployment.handler import DeploymentAPIHandler
 from ai.backend.manager.api.rest.deployment.registry import register_deployment_routes
@@ -34,36 +35,37 @@ from ai.backend.manager.clients.storage_proxy.session_manager import StorageSess
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
 from ai.backend.manager.data.vfolder.types import (
-    VFolderMountPermission,
     VFolderOperationStatus,
     VFolderOwnershipType,
 )
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import vfolders
+from ai.backend.manager.models.vfolder.row import vfolders
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
-from ai.backend.manager.repositories.permission_controller.repository import (
-    PermissionControllerRepository,
+from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
+from ai.backend.manager.repositories.rbac.permission_check_repository import (
+    RbacPermissionCheckRepository,
 )
-from ai.backend.manager.repositories.scheduler import SchedulerRepository
+from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.deployment.service import DeploymentService
 from ai.backend.manager.sokovan.deployment.deployment_controller import (
     DeploymentController,
     DeploymentControllerArgs,
 )
-from ai.backend.manager.sokovan.deployment.revision_draft import RevisionDraftReader
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.concentrated import (
-    ConcentratedAgentSelector,
+from ai.backend.manager.sokovan.deployment.revision_draft.reader import RevisionDraftReader
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.pool import (
+    create_agent_selector,
 )
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import AgentSelector
-from ai.backend.manager.sokovan.scheduling_controller import (
+from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
     SchedulingController,
     SchedulingControllerArgs,
 )
@@ -103,19 +105,30 @@ def deployment_processors(
     network_plugin_ctx: NetworkPluginContext,
     hook_plugin_ctx: HookPluginContext,
     mock_appproxy_client_pool: MagicMock,
+    processor_registry: ProcessorRegistry[Any],
 ) -> DeploymentProcessors:
     """Real DeploymentProcessors with real DeploymentService and DeploymentRepository."""
+    # The model folders these tests create are not in the graph, so the requester's
+    # permission is not enforced here.
+    rbac_off = MagicMock()
+    rbac_off.config.manager.rbac.enforcement_enabled = False
     repo = DeploymentRepository(
         database_engine,
+        ReconcileOpsProvider(database_engine),
         storage_manager,
         valkey_clients.stat,
         valkey_clients.live,
         valkey_clients.schedule,
+        RbacPermissionCheckRepository(PermissionOpsProvider(database_engine), rbac_off),
     )
     scheduler_repository = SchedulerRepository(
         database_engine,
+        ReconcileOpsProvider(database_engine),
         valkey_clients.stat,
+        valkey_clients.schedule,
         config_provider,
+        storage_manager,
+        RbacPermissionCheckRepository(PermissionOpsProvider(database_engine), config_provider),
     )
     scheduling_controller = SchedulingController(
         SchedulingControllerArgs(
@@ -126,10 +139,8 @@ def deployment_processors(
             valkey_schedule=valkey_clients.schedule,
             network_plugin_ctx=network_plugin_ctx,
             hook_plugin_ctx=hook_plugin_ctx,
-            agent_selector=AgentSelector(
-                ConcentratedAgentSelector(
-                    config_provider.config.manager.agent_selection_resource_priority
-                )
+            agent_selector=create_agent_selector(
+                config_provider.config.manager.agent_selection_resource_priority
             ),
         )
     )
@@ -151,19 +162,8 @@ def deployment_processors(
         repo,
         appproxy_client_pool=mock_appproxy_client_pool,
     )
-    permission_controller_repo = PermissionControllerRepository(database_engine)
     return DeploymentProcessors(
-        service=service,
-        action_monitors=[],
-        validators=ActionValidators(
-            rbac=RBACValidators(
-                scope=ScopeActionRBACValidator(permission_controller_repo, MagicMock()),
-                single_entity=SingleEntityActionRBACValidator(
-                    permission_controller_repo, MagicMock()
-                ),
-                bulk=BulkActionRBACValidator(permission_controller_repo, MagicMock()),
-            ),
-        ),
+        processor_registry.group(GroupMeta(DeploymentEntityType())), service
     )
 
 
@@ -320,7 +320,7 @@ async def vfolder_factory(
                     domain_name=domain_fixture.domain_name,
                     quota_scope_id=str(quota_scope_id),
                     usage_mode=VFolderUsageMode.MODEL,
-                    permission=VFolderMountPermission.READ_ONLY,
+                    default_mount_permission=VFolderMountPolicy.READ_ONLY,
                     ownership_type=VFolderOwnershipType.USER,
                     user=str(user_uuid),
                     creator="admin-test@test.local",
@@ -374,5 +374,13 @@ async def deployment_seed_data(
         await conn.execute(
             EndpointRow.__table__.delete().where(
                 EndpointRow.__table__.c.domain == domain_fixture.domain_name
+            )
+        )
+        # Replica group creation makes a SessionGroup with it; the rows
+        # outlive the endpoint delete and hold RESTRICT FKs on the domain
+        # and project fixtures torn down after this one.
+        await conn.execute(
+            SessionGroupRow.__table__.delete().where(
+                SessionGroupRow.__table__.c.domain_id == domain_fixture.domain_id
             )
         )

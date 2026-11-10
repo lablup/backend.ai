@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.deployment.scale import ModelDeploymentAutoScalingRuleCreator
 from ai.backend.manager.data.deployment.types import ModelDeploymentAutoScalingRuleData
@@ -15,8 +14,9 @@ class CreateAutoScalingRuleAction(AutoScalingRuleBaseAction):
     creator: ModelDeploymentAutoScalingRuleCreator
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "create_auto_scaling_rule"
 
     @override
     @classmethod
@@ -25,9 +25,5 @@ class CreateAutoScalingRuleAction(AutoScalingRuleBaseAction):
 
 
 @dataclass
-class CreateAutoScalingRuleActionResult(BaseActionResult):
+class CreateAutoScalingRuleActionResult:
     data: ModelDeploymentAutoScalingRuleData
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.data.id)

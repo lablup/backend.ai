@@ -17,30 +17,37 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
+from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.config import ModelDefinition
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
+from ai.backend.common.config import DefaultModelDefinition, ModelDefinition
 from ai.backend.common.container_registry import ContainerRegistryType
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.identifier.replica_group import ReplicaGroupID
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.replica_group import ReplicaGroupID
+from ai.backend.common.data.entity.session_group import SessionGroupID
+from ai.backend.common.schema.deployment import IntOrPercent, ReplicaGroupRolloutSpec
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.deployment.types import RouteStatus
 from ai.backend.manager.data.image.types import ImageType
 from ai.backend.manager.data.model_serving.types import EndpointData, EndpointLifecycle
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
-from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.replica_group import ReplicaGroupRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
+from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.endpoint.row import EndpointRow
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
@@ -49,15 +56,17 @@ from ai.backend.manager.models.resource_slot.row import (
     DeploymentRevisionResourceSlotRow,
     ResourceSlotTypeRow,
 )
-from ai.backend.manager.models.routing import RouteStatus, RoutingRow
-from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
-from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
+from ai.backend.manager.models.routing.row import RoutingRow
+from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 
 @pytest.fixture
@@ -69,13 +78,13 @@ async def db_with_cleanup(
         database_connection,
         [
             DomainRow,
-            ScalingGroupRow,
+            ResourceGroupRow,
             UserResourcePolicyRow,
             ProjectResourcePolicyRow,
             KeyPairResourcePolicyRow,
             UserRow,
             KeyPairRow,
-            GroupRow,
+            ProjectRow,
             ContainerRegistryRow,
             ImageRow,
             VFolderRow,
@@ -94,12 +103,21 @@ async def db_with_cleanup(
 
 
 @pytest.fixture
-async def test_domain(db_with_cleanup: ExtendedAsyncSAEngine) -> str:
+async def test_domain(
+    db_with_cleanup: ExtendedAsyncSAEngine,
+) -> DomainFixtureData:
+    domain_id = DomainID(uuid.uuid4())
     name = f"test-domain-{uuid.uuid4().hex[:8]}"
     async with db_with_cleanup.begin_session() as sess:
-        sess.add(DomainRow(name=name, total_resource_slots=ResourceSlot()))
+        sess.add(
+            DomainRow(
+                id=domain_id,
+                name=name,
+                total_resource_slots=ResourceSlot(),
+            )
+        )
         await sess.flush()
-    return name
+    return DomainFixtureData(domain_name=DomainName(name), domain_id=domain_id)
 
 
 @pytest.fixture
@@ -107,11 +125,11 @@ async def test_scaling_group(db_with_cleanup: ExtendedAsyncSAEngine) -> str:
     name = f"test-sg-{uuid.uuid4().hex[:8]}"
     async with db_with_cleanup.begin_session() as sess:
         sess.add(
-            ScalingGroupRow(
+            ResourceGroupRow(
                 name=name,
                 driver="static",
                 scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(),
+                scheduler_opts=ResourceGroupOpts(),
             )
         )
         await sess.flush()
@@ -120,7 +138,7 @@ async def test_scaling_group(db_with_cleanup: ExtendedAsyncSAEngine) -> str:
 
 @pytest.fixture
 async def test_user(
-    db_with_cleanup: ExtendedAsyncSAEngine, test_domain: str
+    db_with_cleanup: ExtendedAsyncSAEngine, test_domain: DomainFixtureData
 ) -> tuple[uuid.UUID, str]:
     user_id = uuid.uuid4()
     email = f"test-{uuid.uuid4().hex[:8]}@test.com"
@@ -146,7 +164,8 @@ async def test_user(
                     rounds=1,
                     salt_size=16,
                 ),
-                domain_name=test_domain,
+                domain_id=test_domain.domain_id,
+                domain_name=test_domain.domain_name,
                 resource_policy="default",
                 role=UserRole.SUPERADMIN,
                 status=UserStatus.ACTIVE,
@@ -167,25 +186,24 @@ async def test_user(
         await sess.flush()
         sess.add(
             KeyPairRow(
-                user_id=email,
                 access_key="TESTKEY",
-                secret_key="TESTSECRET",
+                secret_key=SecretValue("TESTSECRET"),
                 is_active=True,
                 is_admin=True,
                 user=user_id,
                 resource_policy="default",
+                is_default=True,
             )
         )
         await sess.flush()
-        await sess.execute(
-            sa.update(UserRow).where(UserRow.uuid == user_id).values(main_access_key="TESTKEY")
-        )
         await sess.flush()
     return user_id, email
 
 
 @pytest.fixture
-async def test_group_id(db_with_cleanup: ExtendedAsyncSAEngine, test_domain: str) -> uuid.UUID:
+async def test_group_id(
+    db_with_cleanup: ExtendedAsyncSAEngine, test_domain: DomainFixtureData
+) -> uuid.UUID:
     group_id = uuid.uuid4()
     async with db_with_cleanup.begin_session() as sess:
         sess.add(
@@ -198,10 +216,10 @@ async def test_group_id(db_with_cleanup: ExtendedAsyncSAEngine, test_domain: str
         )
         await sess.flush()
         sess.add(
-            GroupRow(
+            ProjectRow(
                 id=group_id,
                 name=f"test-grp-{uuid.uuid4().hex[:8]}",
-                domain_name=test_domain,
+                domain_name=test_domain.domain_name,
                 total_resource_slots=ResourceSlot(),
                 resource_policy="default",
             )
@@ -217,7 +235,7 @@ async def test_image_id(db_with_cleanup: ExtendedAsyncSAEngine) -> uuid.UUID:
     async with db_with_cleanup.begin_session() as sess:
         sess.add(
             ContainerRegistryRow(
-                id=registry_id,
+                id=ContainerRegistryID(registry_id),
                 url="http://test.local",
                 registry_name=f"test-reg-{uuid.uuid4().hex[:8]}",
                 type=ContainerRegistryType.DOCKER,
@@ -248,7 +266,7 @@ async def test_image_id(db_with_cleanup: ExtendedAsyncSAEngine) -> uuid.UUID:
 async def listed_endpoint(
     db_with_cleanup: ExtendedAsyncSAEngine,
     test_user: tuple[uuid.UUID, str],
-    test_domain: str,
+    test_domain: DomainFixtureData,
     test_group_id: uuid.UUID,
     test_scaling_group: str,
     test_image_id: uuid.UUID,
@@ -271,7 +289,7 @@ async def listed_endpoint(
                 name=endpoint_name,
                 created_user=user_id,
                 session_owner=user_id,
-                domain=test_domain,
+                domain=test_domain.domain_name,
                 project=test_group_id,
                 resource_group=test_scaling_group,
                 # ``list_endpoints_by_owner_validated`` filters by CREATED.
@@ -288,7 +306,7 @@ async def listed_endpoint(
                 id=runtime_variant_id,
                 name=f"variant-{runtime_variant_id.hex[:8]}",
                 description="test variant",
-                default_model_definition=ModelDefinition.model_validate({"models": []}),
+                default_model_definition=DefaultModelDefinition(models=[]),
             )
         )
         await sess.flush()
@@ -333,9 +351,14 @@ async def listed_endpoint(
         group_id = uuid.uuid4()
         sess.add(
             ReplicaGroupRow(
+                session_group_id=SessionGroupID(uuid.uuid4()),
                 id=ReplicaGroupID(group_id),
                 deployment_id=DeploymentID(endpoint_id),
                 current_revision_id=revision_id,
+                rollout=ReplicaGroupRolloutSpec(
+                    max_surge=IntOrPercent(count=1),
+                    max_unavailable=IntOrPercent(count=0),
+                ),
             )
         )
         await sess.flush()
@@ -354,7 +377,7 @@ async def listed_endpoint(
                 status=RouteStatus.RUNNING,
                 traffic_ratio=1.0,
                 session_owner=user_id,
-                domain=test_domain,
+                domain=test_domain.domain_name,
                 project=test_group_id,
                 revision=revision_id,
             )
@@ -366,7 +389,11 @@ async def listed_endpoint(
 
 @pytest.fixture
 def repository(db_with_cleanup: ExtendedAsyncSAEngine) -> ModelServingRepository:
-    return ModelServingRepository(db=db_with_cleanup)
+    return ModelServingRepository(
+        db=db_with_cleanup,
+        v2_ops_provider=V2DBOpsProvider(db_with_cleanup),
+        permission_check=MagicMock(),
+    )
 
 
 async def test_list_endpoints_by_owner_validated_drives_to_data_end_to_end(

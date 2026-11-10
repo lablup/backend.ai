@@ -1,90 +1,111 @@
-from typing import override
+from __future__ import annotations
 
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
-from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.common.data.entity.resource_policy import KeyPairResourcePolicyUUID
+from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.lookup.bulk_processor import BulkLookupActionProcessor
+from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
+from ai.backend.manager.actions.v2.ops.result import (
+    BatchOpsResult,
+    BulkLookupOpsResult,
+    CreatedEntityOpsResult,
+    EntityOpsResult,
+    LookupOpsResult,
+    ScopedBatchOpsResult,
+)
+from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
+from ai.backend.manager.actions.v2.single_entity.processor import (
+    SingleEntityActionProcessor,
+)
+from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
+from ai.backend.manager.services.keypair_resource_policy.actions.bulk_get import (
+    BulkGetKeypairResourcePoliciesAction,
+)
+from ai.backend.manager.services.keypair_resource_policy.actions.bulk_lookup import (
+    BulkLookupKeypairResourcePoliciesAction,
+)
 from ai.backend.manager.services.keypair_resource_policy.actions.create_keypair_resource_policy import (
     CreateKeyPairResourcePolicyAction,
-    CreateKeyPairResourcePolicyActionResult,
 )
-from ai.backend.manager.services.keypair_resource_policy.actions.delete_keypair_resource_policy import (
-    DeleteKeyPairResourcePolicyAction,
-    DeleteKeyPairResourcePolicyActionResult,
+from ai.backend.manager.services.keypair_resource_policy.actions.get import (
+    GetKeyPairResourcePolicyAction,
 )
-from ai.backend.manager.services.keypair_resource_policy.actions.get_keypair_resource_policy import (
-    GetKeypairResourcePolicyAction,
-    GetKeypairResourcePolicyActionResult,
+from ai.backend.manager.services.keypair_resource_policy.actions.global_search_keypair_resource_policies import (
+    GlobalSearchKeypairResourcePoliciesAction,
 )
-from ai.backend.manager.services.keypair_resource_policy.actions.get_my_keypair_resource_policy import (
-    GetMyKeypairResourcePolicyAction,
-    GetMyKeypairResourcePolicyActionResult,
+from ai.backend.manager.services.keypair_resource_policy.actions.lookup import (
+    LookupKeypairResourcePolicyAction,
 )
-from ai.backend.manager.services.keypair_resource_policy.actions.modify_keypair_resource_policy import (
-    ModifyKeyPairResourcePolicyAction,
-    ModifyKeyPairResourcePolicyActionResult,
+from ai.backend.manager.services.keypair_resource_policy.actions.partial_bulk_purge_keypair_resource_policies import (
+    PartialBulkPurgeKeypairResourcePoliciesAction,
+)
+from ai.backend.manager.services.keypair_resource_policy.actions.partial_bulk_update_keypair_resource_policies import (
+    PartialBulkUpdateKeypairResourcePoliciesAction,
+)
+from ai.backend.manager.services.keypair_resource_policy.actions.purge_keypair_resource_policy import (
+    PurgeKeyPairResourcePolicyAction,
 )
 from ai.backend.manager.services.keypair_resource_policy.actions.search_keypair_resource_policies import (
     SearchKeypairResourcePoliciesAction,
-    SearchKeypairResourcePoliciesActionResult,
 )
-from ai.backend.manager.services.keypair_resource_policy.service import (
-    KeypairResourcePolicyService,
+from ai.backend.manager.services.keypair_resource_policy.actions.update_keypair_resource_policy import (
+    UpdateKeyPairResourcePolicyAction,
 )
 
 
-class KeypairResourcePolicyProcessors(AbstractProcessorPackage):
-    get_keypair_resource_policy: ActionProcessor[
-        GetKeypairResourcePolicyAction, GetKeypairResourcePolicyActionResult
+class KeypairResourcePolicyProcessors:
+    """Every operation runs straight against ops, so this domain has no service."""
+
+    get: SingleEntityActionProcessor[
+        GetKeyPairResourcePolicyAction, EntityOpsResult[KeyPairResourcePolicyData]
     ]
-    get_my_keypair_resource_policy: ActionProcessor[
-        GetMyKeypairResourcePolicyAction, GetMyKeypairResourcePolicyActionResult
+    lookup: LookupActionProcessor[
+        LookupKeypairResourcePolicyAction, LookupOpsResult[KeyPairResourcePolicyUUID]
     ]
-    search_keypair_resource_policies: ActionProcessor[
-        SearchKeypairResourcePoliciesAction, SearchKeypairResourcePoliciesActionResult
+    bulk_lookup_names: BulkLookupActionProcessor[
+        BulkLookupKeypairResourcePoliciesAction, BulkLookupOpsResult[str, KeyPairResourcePolicyUUID]
     ]
-    create_keypair_resource_policy: ActionProcessor[
-        CreateKeyPairResourcePolicyAction, CreateKeyPairResourcePolicyActionResult
+    bulk_get_ids: PartialBulkActionProcessor[
+        BulkGetKeypairResourcePoliciesAction, KeyPairResourcePolicyData
     ]
-    modify_keypair_resource_policy: ActionProcessor[
-        ModifyKeyPairResourcePolicyAction, ModifyKeyPairResourcePolicyActionResult
+    search: ScopeActionProcessor[
+        SearchKeypairResourcePoliciesAction, ScopedBatchOpsResult[KeyPairResourcePolicyData]
     ]
-    delete_keypair_resource_policy: ActionProcessor[
-        DeleteKeyPairResourcePolicyAction, DeleteKeyPairResourcePolicyActionResult
+    global_search: GlobalActionProcessor[
+        GlobalSearchKeypairResourcePoliciesAction, BatchOpsResult[KeyPairResourcePolicyData]
+    ]
+    global_create: GlobalActionProcessor[
+        CreateKeyPairResourcePolicyAction, CreatedEntityOpsResult[KeyPairResourcePolicyData]
+    ]
+    update: SingleEntityActionProcessor[
+        UpdateKeyPairResourcePolicyAction, EntityOpsResult[KeyPairResourcePolicyData]
+    ]
+    purge: SingleEntityActionProcessor[
+        PurgeKeyPairResourcePolicyAction, EntityOpsResult[KeyPairResourcePolicyData]
+    ]
+    partial_bulk_update: PartialBulkActionProcessor[
+        PartialBulkUpdateKeypairResourcePoliciesAction, KeyPairResourcePolicyData
+    ]
+    partial_bulk_purge: PartialBulkActionProcessor[
+        PartialBulkPurgeKeypairResourcePoliciesAction, KeyPairResourcePolicyData
     ]
 
-    def __init__(
-        self,
-        service: KeypairResourcePolicyService,
-        action_monitors: list[ActionMonitor],
-        validators: ActionValidators,
-    ) -> None:
-        self.get_keypair_resource_policy = ActionProcessor(
-            service.get_keypair_resource_policy, action_monitors
+    def __init__(self, group: ProcessorGroup[KeyPairResourcePolicyData]) -> None:
+        self.get = group.single_get_ops(GetKeyPairResourcePolicyAction)
+        self.lookup = group.lookup_ops(LookupKeypairResourcePolicyAction)
+        self.bulk_lookup_names = group.public_bulk_lookup_ops(
+            BulkLookupKeypairResourcePoliciesAction
         )
-        self.get_my_keypair_resource_policy = ActionProcessor(
-            service.get_my_keypair_resource_policy, action_monitors
+        self.bulk_get_ids = group.partial_bulk_get_ops(BulkGetKeypairResourcePoliciesAction)
+        self.search = group.scoped_search_ops(SearchKeypairResourcePoliciesAction)
+        self.global_search = group.global_searcher_ops(GlobalSearchKeypairResourcePoliciesAction)
+        self.global_create = group.global_create_ops(CreateKeyPairResourcePolicyAction)
+        self.update = group.single_update_ops(UpdateKeyPairResourcePolicyAction)
+        self.purge = group.entity_purge_ops(PurgeKeyPairResourcePolicyAction)
+        self.partial_bulk_update = group.partial_bulk_update_ops(
+            PartialBulkUpdateKeypairResourcePoliciesAction
         )
-        self.search_keypair_resource_policies = ActionProcessor(
-            service.search_keypair_resource_policies, action_monitors
+        self.partial_bulk_purge = group.entity_partial_bulk_purge_ops(
+            PartialBulkPurgeKeypairResourcePoliciesAction
         )
-        self.create_keypair_resource_policy = ActionProcessor(
-            service.create_keypair_resource_policy, action_monitors
-        )
-        self.modify_keypair_resource_policy = ActionProcessor(
-            service.modify_keypair_resource_policy, action_monitors
-        )
-        self.delete_keypair_resource_policy = ActionProcessor(
-            service.delete_keypair_resource_policy, action_monitors
-        )
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            GetKeypairResourcePolicyAction.spec(),
-            GetMyKeypairResourcePolicyAction.spec(),
-            SearchKeypairResourcePoliciesAction.spec(),
-            CreateKeyPairResourcePolicyAction.spec(),
-            ModifyKeyPairResourcePolicyAction.spec(),
-            DeleteKeyPairResourcePolicyAction.spec(),
-        ]

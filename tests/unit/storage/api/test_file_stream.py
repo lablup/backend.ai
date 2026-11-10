@@ -9,27 +9,30 @@ This test suite covers:
 
 from __future__ import annotations
 
+import io
 import urllib.parse
-from collections.abc import Callable
+import zipfile
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, cast
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 from uuid import uuid4
 
 import jwt
 import pytest
 from aiohttp import web
 
-from ai.backend.common.api_handlers import APIStreamResponse
+from ai.backend.common.api_handlers import APIStreamResponse, stream_api_handler
 from ai.backend.common.dto.storage.request import (
     ArchiveDownloadTokenData,
     TokenOperationType,
 )
 from ai.backend.common.types import VFolderID
-from ai.backend.storage.api.client import DownloadHandler
+from ai.backend.storage.api.client import DownloadHandler, download_directory_as_archive
 from ai.backend.storage.errors import InvalidAPIParameters
 from ai.backend.storage.services.file_stream.zip import ZipArchiveStreamReader
+from ai.backend.storage.storages.vfs_storage import VFSFileDownloadServerStreamReader
 
 
 class TestJWTTokenForArchiveDownload:
@@ -128,8 +131,7 @@ class TestDownloadArchiveHandler:
         # Mock root context
         root_ctx = MagicMock()
         root_ctx.local_config.storage_proxy.secret = secret
-        root_ctx.get_volume.return_value.__aenter__ = AsyncMock(return_value=volume)
-        root_ctx.get_volume.return_value.__aexit__ = AsyncMock(return_value=None)
+        root_ctx.volume_pool.get_volume_by_name = MagicMock(return_value=volume)
 
         # Mock storage context
         ctx = MagicMock()
@@ -195,7 +197,9 @@ class TestDownloadArchiveHandler:
         response = await unwrapped(download_handler, mock_query_param, mock_context)
 
         # Verify volume was accessed from token
-        mock_context.root_ctx.get_volume.assert_called_once_with(token_data.volume)
+        mock_context.root_ctx.volume_pool.get_volume_by_name.assert_called_once_with(
+            token_data.volume
+        )
 
         # Verify response is successful
         api_response = cast(APIStreamResponse, response)
@@ -361,3 +365,94 @@ class TestDownloadArchiveHandler:
         content_disposition = response.headers.get("Content-Disposition")
         assert content_disposition is not None
         assert expected_in_header in content_disposition
+
+
+class TestVFSFileDownloadStreaming:
+    """
+    Test end-to-end streaming of VFS file downloads through ``stream_api_handler``.
+
+    Focus: a zero-byte file must be served as an empty 200 response rather than
+    a 500, since the underlying reader yields no chunk at all.
+    """
+
+    @pytest.fixture
+    def make_client(self, aiohttp_client: Any) -> Callable[[Path], Awaitable[Any]]:
+        """Factory serving the given path via a ``stream_api_handler`` endpoint."""
+
+        async def _make(file_path: Path) -> Any:
+            reader = VFSFileDownloadServerStreamReader(file_path, chunk_size=4)
+
+            class _Handler:
+                @stream_api_handler
+                async def handle(self) -> APIStreamResponse:
+                    return APIStreamResponse(body=reader, status=200)
+
+            app = web.Application()
+            app.router.add_get("/download", _Handler().handle)
+            return await aiohttp_client(app)
+
+        return _make
+
+    async def test_zero_byte_file_returns_empty_body(
+        self,
+        tmp_path: Path,
+        make_client: Callable[[Path], Awaitable[Any]],
+    ) -> None:
+        empty_file = tmp_path / "safetensors-md5sum.txt"
+        empty_file.write_bytes(b"")
+
+        client = await make_client(empty_file)
+        resp = await client.get("/download")
+
+        assert resp.status == 200
+        assert await resp.read() == b""
+        assert resp.headers["Content-Length"] == "0"
+
+    async def test_non_empty_file_is_streamed_fully(
+        self,
+        tmp_path: Path,
+        make_client: Callable[[Path], Awaitable[Any]],
+    ) -> None:
+        content = b"0123456789abcdef"
+        data_file = tmp_path / "model.safetensors"
+        data_file.write_bytes(content)
+
+        client = await make_client(data_file)
+        resp = await client.get("/download")
+
+        assert resp.status == 200
+        assert await resp.read() == content
+
+
+class TestDownloadDirectoryAsArchive:
+    async def test_excludes_symlinks_inside_directory(
+        self,
+        tmp_path: Path,
+        aiohttp_client: Any,
+    ) -> None:
+        outside_dir = tmp_path / "outside"
+        outside_dir.mkdir()
+        outside_file = outside_dir / "target.txt"
+        outside_file.write_text("outside content")
+        mydir = tmp_path / "mydir"
+        mydir.mkdir()
+        (mydir / "regular.txt").write_text("regular")
+        (mydir / "file_link.txt").symlink_to(outside_file)
+        (mydir / "dir_link").symlink_to(outside_dir)
+        (mydir / "dangling_link.txt").symlink_to(outside_dir / "missing.txt")
+        link_only = mydir / "link_only"
+        link_only.mkdir()
+        (link_only / "file_link.txt").symlink_to(outside_file)
+
+        async def handle(request: web.Request) -> web.StreamResponse:
+            return await download_directory_as_archive(request, mydir)
+
+        app = web.Application()
+        app.router.add_get("/download", handle)
+        client = await aiohttp_client(app)
+        resp = await client.get("/download")
+
+        assert resp.status == 200
+        with zipfile.ZipFile(io.BytesIO(await resp.read())) as zf:
+            assert sorted(zf.namelist()) == ["link_only/", "regular.txt"]
+            assert zf.read("regular.txt") == b"regular"

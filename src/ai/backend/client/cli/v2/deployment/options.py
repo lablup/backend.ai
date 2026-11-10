@@ -21,7 +21,7 @@ def options() -> None:
 @click.argument("deployment_id", type=str)
 def get_options(deployment_id: str) -> None:
     """Show the current options surface of a deployment."""
-    from ai.backend.common.identifier.deployment import DeploymentID
+    from ai.backend.common.data.entity.deployment import DeploymentID
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
@@ -88,11 +88,18 @@ def _parse_default(raw: str | None) -> int | None:
         "(e.g., --config @options.json). Overrides --default-timeout / --handler."
     ),
 )
+@click.option(
+    "--agent-selection-policy",
+    type=click.Choice(["strict", "preferred"]),
+    default=None,
+    help="How designated agents are enforced. Omit to keep the stored policy.",
+)
 def replace_options(
     deployment_id: str,
     default_timeout: str | None,
     handlers: tuple[str, ...],
     config_path: str | None,
+    agent_selection_policy: str | None,
 ) -> None:
     """Fully replace the options surface of a deployment.
 
@@ -111,6 +118,7 @@ def replace_options(
         HandlerOptionsEntryInput,
         HandlerOptionsInput,
     )
+    from ai.backend.common.dto.manager.v2.session_options.types import AgentSelectionPolicyEnum
 
     if config_path is not None:
         if not config_path.startswith("@"):
@@ -143,10 +151,15 @@ def replace_options(
                     default=HandlerOptionsInput(timeout_sec=_parse_default(default_timeout)),
                     by_handler=entries,
                 ),
+                agent_selection_policy=(
+                    AgentSelectionPolicyEnum(agent_selection_policy)
+                    if agent_selection_policy is not None
+                    else None
+                ),
             ),
         )
 
-    from ai.backend.common.identifier.deployment import DeploymentID
+    from ai.backend.common.data.entity.deployment import DeploymentID
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())

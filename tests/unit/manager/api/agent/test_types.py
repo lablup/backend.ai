@@ -6,32 +6,34 @@ Tests the GraphQL type layer for agent-related queries.
 
 from __future__ import annotations
 
+import uuid
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from ai.backend.common.types import AgentId, ResourceSlot, SlotName
+from ai.backend.common.data.entity.agent import AgentUUID
+from ai.backend.common.data.entity.agent_resource import AgentResourceID
+from ai.backend.common.types import AgentId
 from ai.backend.manager.api.gql_legacy.agent import AgentSummary
-from ai.backend.manager.data.agent.types import AgentData, AgentStatus
+from ai.backend.manager.data.agent.types import AgentData, AgentDetailData, AgentStatus
+from ai.backend.manager.data.resource_slot.types import AgentResourceData
 
 
 def create_mock_agent_data(
     agent_id: str,
     status: AgentStatus = AgentStatus.ALIVE,
-    scaling_group: str = "default",
-) -> AgentData:
-    """Create a mock AgentData for testing."""
-    return AgentData(
+    resource_group: str = "default",
+) -> AgentDetailData:
+    """Create a mock AgentDetailData for testing."""
+    agent = AgentData(
+        uuid=AgentUUID(uuid.uuid4()),
         id=AgentId(agent_id),
         status=status,
         status_changed=None,
         region="test-region",
-        scaling_group=scaling_group,
+        resource_group=resource_group,
         schedulable=True,
-        available_slots=ResourceSlot({SlotName("cpu"): Decimal("8")}),
-        cached_occupied_slots=ResourceSlot({}),
-        actual_occupied_slots=ResourceSlot({}),
         addr="tcp://127.0.0.1:6001",
         public_host="127.0.0.1",
         first_contact=None,
@@ -41,6 +43,21 @@ def create_mock_agent_data(
         compute_plugins={},
         public_key=None,
         auto_terminate_abusing_kernel=False,
+    )
+    return AgentDetailData(
+        agent=agent,
+        resources=[
+            AgentResourceData(
+                id=AgentResourceID(uuid.uuid4()),
+                agent_id=agent_id,
+                slot_name="cpu",
+                capacity=Decimal("8"),
+                reserved=Decimal(0),
+                prereserved=Decimal(0),
+                used=Decimal(0),
+            )
+        ],
+        permissions=[],
     )
 
 
@@ -116,7 +133,7 @@ class TestAgentSummaryLoadSlice:
             requested_ids.extend(ids)
             return MagicMock()
 
-        async def mock_list_data(_: list[AgentId]) -> list[AgentData]:
+        async def mock_list_data(_: list[AgentId]) -> list[AgentDetailData]:
             return [agent_data_map[aid] for aid in requested_ids if aid in agent_data_map]
 
         mock_graph_ctx.agent_repository.list_data = AsyncMock(side_effect=mock_list_data)

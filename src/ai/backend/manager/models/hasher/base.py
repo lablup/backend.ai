@@ -8,7 +8,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .types import HashInfo, PasswordInfo
+    from ai.backend.common.auth.password import HashInfo, PasswordInfo
 
 
 class PasswordHasher(ABC):

@@ -1,95 +1,46 @@
-"""Scoped audit-log search action and its searchable targets."""
+"""Audit-log search over the entities it reads the records of."""
 
 from __future__ import annotations
 
-import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import override
+from typing import final, override
 
-from ai.backend.common.data.permission.types import EntityType, RBACElementType
-from ai.backend.manager.actions.action.bulk import BaseBulkAction, BaseBulkActionResult
-from ai.backend.manager.actions.action.types import SearchableActionTarget
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.manager.actions.v2.ops.base import BulkScopedSearchOpsAction
 from ai.backend.manager.data.audit_log.types import AuditLogData
-from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.models.scopes import SearchScope
-from ai.backend.manager.repositories.audit_log.types import (
-    EntityAuditLogSearchScope,
-    TriggeredByAuditLogSearchScope,
-)
-from ai.backend.manager.repositories.base import BatchQuerier
-
-
-@dataclass(frozen=True)
-class EntityAuditLogTarget(SearchableActionTarget):
-    """Scope item keyed by a target entity ``(element_type, element_id)``."""
-
-    element_type: RBACElementType
-    element_id: str
-
-    @override
-    def to_rbac_element_ref(self) -> RBACElementRef:
-        return RBACElementRef(element_type=self.element_type, element_id=self.element_id)
-
-    @override
-    def to_search_scope(self) -> SearchScope:
-        return EntityAuditLogSearchScope(
-            entity_type=self.element_type,
-            entity_id=self.element_id,
-        )
-
-
-@dataclass(frozen=True)
-class TriggeredByAuditLogTarget(SearchableActionTarget):
-    """Scope item keyed by the actor (triggered_by) user."""
-
-    user_id: uuid.UUID
-
-    @override
-    def to_rbac_element_ref(self) -> RBACElementRef:
-        return RBACElementRef(
-            element_type=RBACElementType.USER,
-            element_id=str(self.user_id),
-        )
-
-    @override
-    def to_search_scope(self) -> SearchScope:
-        return TriggeredByAuditLogSearchScope(triggered_by=str(self.user_id))
+from ai.backend.manager.models.audit_log.row import AuditLogRow
+from ai.backend.manager.models.audit_log.scopes import AuditLogTarget
+from ai.backend.manager.models.audit_log.searchers import AuditLogSearcher
+from ai.backend.manager.models.scopes import OperationScope
 
 
 @dataclass
-class ScopedSearchAuditLogsAction(BaseBulkAction[SearchableActionTarget]):
-    items: list[SearchableActionTarget]
-    querier: BatchQuerier
+class ScopedSearchAuditLogsAction(BulkScopedSearchOpsAction[AuditLogRow, AuditLogData]):
+    """Page through the records of the entities named, combined with OR.
 
-    @override
-    def entity_id(self) -> str | None:
-        return None
+    Every entity is authorized before the read runs, so a caller reaching for one they
+    cannot see is refused rather than served the rest.
+    """
 
-    @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
-        return EntityType.AUDIT_LOG
+    targets: Sequence[AuditLogTarget]
+    searcher: AuditLogSearcher
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
+    def action_name(cls) -> str:
+        return "scoped_search_audit_logs"
+
+    @final
+    @override
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
+        return [target.scope_id() for target in self.targets]
+
+    @final
+    @override
+    def operation_scopes(self) -> Sequence[OperationScope]:
+        return self.targets
 
     @override
-    def targets(self) -> Sequence[SearchableActionTarget]:
-        return list(self.items)
-
-
-@dataclass
-class ScopedSearchAuditLogsActionResult(BaseBulkActionResult):
-    data: list[AuditLogData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
-    queried_refs: list[RBACElementRef]
-
-    @override
-    def element_refs(self) -> list[RBACElementRef]:
-        return list(self.queried_refs)
+    def to_searcher(self) -> AuditLogSearcher:
+        return self.searcher

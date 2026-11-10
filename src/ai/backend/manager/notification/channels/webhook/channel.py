@@ -11,12 +11,12 @@ import aiohttp
 from ai.backend.common.clients.http_client import ClientPool
 from ai.backend.common.clients.http_client.client_pool import ClientKey
 from ai.backend.common.data.notification.types import WebhookSpec
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.errors.notification import NotificationProcessingFailure
 from ai.backend.manager.notification.channels.base import AbstractNotificationChannel
 from ai.backend.manager.notification.types import NotificationMessage, SendResult
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 __all__ = ("WebhookChannel",)
 
@@ -81,20 +81,15 @@ class WebhookChannel(AbstractNotificationChannel):
             timeout=timeout,
         ) as response:
             if response.status in self._webhook_spec.success_status_codes:
-                log.info(
-                    "Webhook sent successfully to {} (status: {})",
-                    webhook_url,
-                    response.status,
+                log.trace(
+                    "webhook notification sent",
+                    webhook_url=webhook_url,
+                    status_code=response.status,
                 )
                 return SendResult(
                     message=f"Webhook sent successfully (status: {response.status})",
                 )
             response_text = await response.text()
-            log.warning(
-                "Webhook request failed with status {}: {}",
-                response.status,
-                response_text[:200],
-            )
             raise NotificationProcessingFailure(
                 f"Webhook delivery failed with status {response.status}: {response_text[:200]}"
             )

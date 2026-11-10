@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
@@ -7,6 +8,7 @@ from ai.backend.common.stage.types import (
     Provisioner,
     ProvisionStage,
 )
+from ai.backend.common.types import SessionId
 
 
 @dataclass
@@ -16,6 +18,8 @@ class CmdArgSpec:
     sandbox_type: ContainerSandboxType
     jail_args: list[str]
     debug_kernel_runner: bool
+    session_id: SessionId
+    cluster_roles: Sequence[str]
 
 
 class CmdArgSpecGenerator(ArgsSpecGenerator[CmdArgSpec]):
@@ -49,6 +53,9 @@ class CmdArgProvisioner(Provisioner[CmdArgSpec, CmdArgResult]):
             cmdargs += ["--"]
         if spec.debug_kernel_runner:
             krunner_opts.append("--debug")
+        krunner_opts += ["--session-id", str(spec.session_id)]
+        for cluster_role in spec.cluster_roles:
+            krunner_opts += ["--cluster-role", cluster_role]
         cmdargs += [
             "/opt/backend.ai/bin/python",
             "-s",

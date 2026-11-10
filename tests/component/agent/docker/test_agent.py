@@ -4,7 +4,6 @@ import secrets
 import signal
 from collections.abc import Mapping
 from http import HTTPStatus
-from pickle import PickleError
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
@@ -15,6 +14,7 @@ from ai.backend.agent.agent import AgentClass
 from ai.backend.agent.docker.agent import DockerAgent
 from ai.backend.agent.kernel import KernelRegistry
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import ImageNotAvailable
 from ai.backend.common.types import AutoPullBehavior
@@ -43,6 +43,7 @@ async def agent(local_config: Any, test_id: str, mocker: Any, socket_relay_image
         computers={},
         slots={},
         agent_class=AgentClass.PRIMARY,
+        sentinel_monitors=SentinelMonitorSet([]),
     )  # for faster test iteration
     agent.local_instance_id = test_case_id  # use per-test private registry file
     try:
@@ -209,13 +210,3 @@ async def test_auto_pull_none_when_missing(agent: DockerAgent, mocker: Any) -> N
         await agent.check_image(imgref, query_digest, behavior)
     assert e.value.args[0] is imgref
     inspect_mock.assert_called_with(imgref.canonical)
-
-
-async def test_save_last_registry_exception(agent: DockerAgent, mocker: Any) -> None:
-    agent.latest_registry_written_time = MagicMock(return_value=0)  # type: ignore[attr-defined]
-    mocker.patch("ai.backend.agent.agent.pickle.dump", side_effect=PickleError)
-    registry_state_path = (
-        agent.local_config.agent.var_base_path / f"last_registry.{agent.local_instance_id}.dat"
-    )
-    await agent.save_last_registry()
-    assert not registry_state_path.exists()

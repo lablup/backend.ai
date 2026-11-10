@@ -30,6 +30,7 @@ class KernelStatusEnum(StrEnum):
     """Kernel lifecycle status values for DTO filtering."""
 
     PENDING = "PENDING"
+    RESERVED = "RESERVED"
     SCHEDULED = "SCHEDULED"
     PREPARING = "PREPARING"
     PREPARED = "PREPARED"

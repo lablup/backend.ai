@@ -8,12 +8,14 @@ from uuid import UUID
 
 from pydantic import Field, field_validator
 
-from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.v2.common import NonEmptyList
 from ai.backend.common.dto.manager.v2.object_storage.types import (
     ObjectStorageOrderField,
     OrderDirection,
 )
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 __all__ = (
     "AdminSearchObjectStoragesInput",
@@ -23,6 +25,8 @@ __all__ = (
     "GetPresignedUploadURLInput",
     "ObjectStorageFilter",
     "ObjectStorageOrder",
+    "PartialBulkPurgeObjectStoragesInput",
+    "PartialBulkUpdateObjectStoragesInput",
     "UpdateObjectStorageInput",
 )
 
@@ -50,14 +54,24 @@ class UpdateObjectStorageInput(BaseRequestModel):
     """Input for updating an object storage."""
 
     id: UUID = Field(description="Object storage ID to update")
-    name: str | None = Field(default=None, description="Updated name of the object storage")
-    host: str | None = Field(default=None, description="Updated host address")
-    access_key: str | None = Field(default=None, description="Updated access key")
-    secret_key: str | None = Field(default=None, description="Updated secret key")
-    endpoint: str | None = Field(default=None, description="Updated endpoint URL")
-    region: str | Sentinel | None = Field(
-        default=SENTINEL,
-        description="Updated region. Use SENTINEL (default) for no change, None to clear.",
+    name: str | None | Unset = Field(
+        default=UNSET, description="Updated name of the object storage. Omit to leave unchanged."
+    )
+    host: str | None | Unset = Field(
+        default=UNSET, description="Updated host address. Omit to leave unchanged."
+    )
+    access_key: str | None | Unset = Field(
+        default=UNSET, description="Updated access key. Omit to leave unchanged."
+    )
+    secret_key: str | None | Unset = Field(
+        default=UNSET, description="Updated secret key. Omit to leave unchanged."
+    )
+    endpoint: str | None | Unset = Field(
+        default=UNSET, description="Updated endpoint URL. Omit to leave unchanged."
+    )
+    region: str | None | Unset = Field(
+        default=UNSET,
+        description="Updated region. Omit to leave unchanged; null clears.",
     )
 
 
@@ -65,6 +79,20 @@ class DeleteObjectStorageInput(BaseRequestModel):
     """Input for deleting an object storage."""
 
     id: UUID = Field(description="Object storage ID to delete")
+
+
+class PartialBulkUpdateObjectStoragesInput(BaseRequestModel):
+    """Input for updating several object storages, each answered for separately."""
+
+    items: NonEmptyList[UpdateObjectStorageInput] = Field(
+        description="The object storages to update, each with its ID and fields."
+    )
+
+
+class PartialBulkPurgeObjectStoragesInput(BaseRequestModel):
+    """Input for permanently purging several object storages, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the object storages to purge.")
 
 
 class GetPresignedUploadURLInput(BaseRequestModel):
@@ -88,7 +116,12 @@ class ObjectStorageFilter(BaseRequestModel):
 class ObjectStorageOrder(BaseRequestModel):
     """Single ordering criterion for object storage search."""
 
-    field: ObjectStorageOrderField = Field(description="Field to order by.")
+    field: ObjectStorageOrderField = Field(
+        description=(
+            "Field to order by. `CREATED_AT` is deprecated since 26.9.0: it is not used"
+            " for ordering and is removed in the next release."
+        )
+    )
     direction: OrderDirection = Field(default=OrderDirection.ASC, description="Sort direction.")
 
 

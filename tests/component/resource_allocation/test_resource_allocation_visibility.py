@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncIterator, Callable
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -18,14 +18,27 @@ import yarl
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
+from ai.backend.common.data.entity.domain import DomainEntityType
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.resource_group import (
+    ResourceGroupEntityType,
+    ResourceGroupName,
+)
+from ai.backend.common.data.entity.resource_preset import ResourcePresetEntityType
+from ai.backend.common.data.entity.session import SessionEntityType
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.dto.manager.v2.resource_allocation.request import (
     EffectiveResourceAllocationInput,
 )
 from ai.backend.common.dto.manager.v2.resource_allocation.response import (
     EffectiveResourceAllocationPayload,
 )
-from ai.backend.common.identifier.resource_group import ResourceGroupName
-from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import (
+    Concern,
+    ConcernMeta,
+    GroupMeta,
+)
 from ai.backend.manager.api.adapters.resource_allocation.adapter import ResourceAllocationAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
@@ -37,8 +50,11 @@ from ai.backend.manager.api.rest.v2.resource_allocation.registry import (
 )
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
-from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.ops.v2.resource_allocation.provider import (
+    ResourceAllocationOpsProvider,
+)
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.resource_allocation.repository import (
     ResourceAllocationRepository,
 )
@@ -46,10 +62,10 @@ from ai.backend.manager.repositories.resource_preset.repository import (
     ResourcePresetRepository,
 )
 from ai.backend.manager.services.processors import Processors
-from ai.backend.manager.services.resource_allocation.processors import (
+from ai.backend.manager.services.session.resource_allocation.processors import (
     ResourceAllocationProcessors,
 )
-from ai.backend.manager.services.resource_allocation.service import (
+from ai.backend.manager.services.session.resource_allocation.service import (
     ResourceAllocationService,
 )
 
@@ -99,9 +115,11 @@ def _build_registries(
 ) -> list[RouteRegistry]:
     """Build route registries with the given config provider."""
     processors = MagicMock(spec=Processors)
-    processors.resource_allocation = ra_processors
+    processors.session = MagicMock()
+    processors.session.resource_allocation = ra_processors
     adapter = ResourceAllocationAdapter(
-        processors=processors,
+        processors.session,
+        MagicMock(),
         config_provider=config_provider,
     )
     handler = V2ResourceAllocationHandler(adapter=adapter)
@@ -123,6 +141,7 @@ class TestHideAgentsVisibility:
         self,
         config_provider: ManagerConfigProvider,
         config_provider_factory: Callable[[ManagerUnifiedConfig], ManagerConfigProvider],
+        processor_registry: ProcessorRegistry[Any],
     ) -> ManagerConfigProvider:
         return _make_config_provider(config_provider, config_provider_factory, hide_agents=True)
 
@@ -131,25 +150,31 @@ class TestHideAgentsVisibility:
         self,
         database_engine: ExtendedAsyncSAEngine,
         config_provider_hide_agents: ManagerConfigProvider,
-        valkey_clients: ValkeyClients,
+        processor_registry: ProcessorRegistry[Any],
     ) -> ResourceAllocationProcessors:
         ra_repo = ResourceAllocationRepository(
             db=database_engine,
+            ops_provider=ResourceAllocationOpsProvider(database_engine),
             config_provider=config_provider_hide_agents,
         )
         rp_repo = ResourcePresetRepository(
             db=database_engine,
-            valkey_stat=valkey_clients.stat,
             config_provider=config_provider_hide_agents,
+            v2_ops_provider=ShareOpsProvider(database_engine),
         )
         service = ResourceAllocationService(
             resource_allocation_repository=ra_repo,
             resource_preset_repository=rp_repo,
         )
+        groups = processor_registry.concern(ConcernMeta(Concern.RESOURCE_GROUP))
         return ResourceAllocationProcessors(
-            service=service,
-            action_monitors=[],
-            validators=MagicMock(spec=ActionValidators),
+            groups.group(GroupMeta(UserEntityType())),
+            groups.group(GroupMeta(ProjectEntityType())),
+            groups.group(GroupMeta(DomainEntityType())),
+            groups.group(GroupMeta(ResourceGroupEntityType())),
+            groups.group(GroupMeta(SessionEntityType())),
+            groups.group(GroupMeta(ResourcePresetEntityType())),
+            service,
         )
 
     @pytest.fixture()
@@ -205,13 +230,13 @@ class TestHideAgentsVisibility:
         self,
         user_v2_registry: V2ClientRegistry,
         group_fixture: uuid.UUID,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
     ) -> None:
         """Regular user with hide_agents=True should get resource_group=null."""
         result = await user_v2_registry.resource_allocation.effective(
             EffectiveResourceAllocationInput(
                 project_id=group_fixture,
-                resource_group_name=scaling_group_name,
+                resource_group_name=resource_group_name,
             ),
         )
         assert isinstance(result, EffectiveResourceAllocationPayload)
@@ -224,13 +249,13 @@ class TestHideAgentsVisibility:
         self,
         admin_v2_registry: V2ClientRegistry,
         group_fixture: uuid.UUID,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
     ) -> None:
         """Admin should see resource_group even when hide_agents=True."""
         result = await admin_v2_registry.resource_allocation.effective(
             EffectiveResourceAllocationInput(
                 project_id=group_fixture,
-                resource_group_name=scaling_group_name,
+                resource_group_name=resource_group_name,
             ),
         )
         assert isinstance(result, EffectiveResourceAllocationPayload)
@@ -261,25 +286,31 @@ class TestGroupResourceVisibility:
         self,
         database_engine: ExtendedAsyncSAEngine,
         config_provider_no_grv: ManagerConfigProvider,
-        valkey_clients: ValkeyClients,
+        processor_registry: ProcessorRegistry[Any],
     ) -> ResourceAllocationProcessors:
         ra_repo = ResourceAllocationRepository(
             db=database_engine,
+            ops_provider=ResourceAllocationOpsProvider(database_engine),
             config_provider=config_provider_no_grv,
         )
         rp_repo = ResourcePresetRepository(
             db=database_engine,
-            valkey_stat=valkey_clients.stat,
             config_provider=config_provider_no_grv,
+            v2_ops_provider=ShareOpsProvider(database_engine),
         )
         service = ResourceAllocationService(
             resource_allocation_repository=ra_repo,
             resource_preset_repository=rp_repo,
         )
+        groups = processor_registry.concern(ConcernMeta(Concern.RESOURCE_GROUP))
         return ResourceAllocationProcessors(
-            service=service,
-            action_monitors=[],
-            validators=MagicMock(spec=ActionValidators),
+            groups.group(GroupMeta(UserEntityType())),
+            groups.group(GroupMeta(ProjectEntityType())),
+            groups.group(GroupMeta(DomainEntityType())),
+            groups.group(GroupMeta(ResourceGroupEntityType())),
+            groups.group(GroupMeta(SessionEntityType())),
+            groups.group(GroupMeta(ResourcePresetEntityType())),
+            service,
         )
 
     @pytest.fixture()
@@ -335,13 +366,13 @@ class TestGroupResourceVisibility:
         self,
         user_v2_registry: V2ClientRegistry,
         group_fixture: uuid.UUID,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
     ) -> None:
         """Regular user with group_resource_visibility=False should get project=null."""
         result = await user_v2_registry.resource_allocation.effective(
             EffectiveResourceAllocationInput(
                 project_id=group_fixture,
-                resource_group_name=scaling_group_name,
+                resource_group_name=resource_group_name,
             ),
         )
         assert isinstance(result, EffectiveResourceAllocationPayload)
@@ -354,13 +385,13 @@ class TestGroupResourceVisibility:
         self,
         admin_v2_registry: V2ClientRegistry,
         group_fixture: uuid.UUID,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
     ) -> None:
         """Admin should see project even when group_resource_visibility=False."""
         result = await admin_v2_registry.resource_allocation.effective(
             EffectiveResourceAllocationInput(
                 project_id=group_fixture,
-                resource_group_name=scaling_group_name,
+                resource_group_name=resource_group_name,
             ),
         )
         assert isinstance(result, EffectiveResourceAllocationPayload)

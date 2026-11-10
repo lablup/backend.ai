@@ -1,19 +1,30 @@
 import logging
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Literal, override
+from typing import Any, ClassVar, Literal, override
 
+from ai.backend.common.clients.storage_backends.gpfs.client import (
+    GPFSAPIClient,
+    GPFSAPIClientArgs,
+)
+from ai.backend.common.configs.volume_status_check import VolumeStatusCheckConfig
+from ai.backend.common.data.entity.storage_volume import StorageVolumeName
+from ai.backend.common.data.storage.types import (
+    StorageBackendCapability,
+    StorageBackendType,
+)
+from ai.backend.common.dto.clients.storage_backends.gpfs.request import (
+    GPFSCopyFolderRequest,
+    GPFSCreateFilesetRequest,
+    GPFSSetQuotaRequest,
+)
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage.types import CapacityUsage, FSPerfMetric, QuotaConfig, QuotaUsage
 from ai.backend.storage.volumes.abc import (
-    CAP_FAST_FS_SIZE,
-    CAP_METRIC,
-    CAP_QUOTA,
-    CAP_VFOLDER,
     AbstractFSOpModel,
     AbstractQuotaModel,
 )
@@ -21,13 +32,16 @@ from ai.backend.storage.volumes.vfs import BaseFSOpModel, BaseQuotaModel, BaseVo
 from ai.backend.storage.watcher import WatcherClient
 
 from .exceptions import GPFSNoMetricError
-from .gpfs_client import GPFSAPIClient
-from .types import GPFSSystemHealthState
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
+
+_UNHEALTHY_STATES: frozenset[str] = frozenset(["FAILED", "DEGRADED", "ERROR"])
 
 
 class GPFSQuotaModel(BaseQuotaModel):
+    api_client: GPFSAPIClient
+    fs: str
+    gpfs_owner: str
     _fileset_prefix: str
 
     def __init__(
@@ -58,19 +72,25 @@ class GPFSQuotaModel(BaseQuotaModel):
         qspath = self.mangle_qspath(quota_scope_id)
         await self.api_client.create_fileset(
             self.fs,
-            self._get_fileset_name(quota_scope_id),
-            path=qspath,
-            owner=self.gpfs_owner,
+            GPFSCreateFilesetRequest(
+                filesetName=self._get_fileset_name(quota_scope_id),
+                owner=self.gpfs_owner,
+                path=qspath.as_posix(),
+            ),
         )
         if options is not None:
             await self.update_quota_scope(quota_scope_id, options)
 
     @override
     async def update_quota_scope(self, quota_scope_id: QuotaScopeID, config: QuotaConfig) -> None:
+        limit_str = str(int(config.limit_bytes))
         await self.api_client.set_quota(
             self.fs,
-            self._get_fileset_name(quota_scope_id),
-            config.limit_bytes,
+            GPFSSetQuotaRequest(
+                objectName=self._get_fileset_name(quota_scope_id),
+                blockSoftLimit=limit_str,
+                blockHardLimit=limit_str,
+            ),
         )
 
     @override
@@ -84,19 +104,17 @@ class GPFSQuotaModel(BaseQuotaModel):
         )
         custom_defined_quotas = [q for q in quotas if not q.isDefaultQuota]
         if len(custom_defined_quotas) == 0:
-            log.warning("No custom defined quotas found for quota scope {} in GPFS", quota_scope_id)
+            log.warning("no custom quota defined for quota scope")
             return QuotaUsage(-1, -1)
         quota_info = custom_defined_quotas[0]
-        # The units are kilobytes (ref: )
         used_bytes = quota_info.blockUsage * 1024 if quota_info.blockUsage is not None else -1
         limit_bytes = quota_info.blockLimit * 1024 if quota_info.blockLimit is not None else -1
         if used_bytes < 0 or limit_bytes < 0:
             log.warning(
-                "Data from GPFS API negative values in used_bytes ({}) or limit_bytes ({}) for quota scope {}: response from GPFS API = {}",
-                used_bytes,
-                limit_bytes,
-                quota_scope_id,
-                quota_info.to_json(),
+                "negative quota usage reported",
+                used_bytes=used_bytes,
+                limit_bytes=limit_bytes,
+                response_body=quota_info.model_dump_json(),
             )
         return QuotaUsage(
             used_bytes=used_bytes,
@@ -113,6 +131,9 @@ class GPFSQuotaModel(BaseQuotaModel):
 
 
 class GPFSOpModel(BaseFSOpModel):
+    api_client: GPFSAPIClient
+    fs: str
+
     def __init__(
         self,
         mount_path: Path,
@@ -133,16 +154,18 @@ class GPFSOpModel(BaseFSOpModel):
         await self.api_client.copy_folder(
             self.fs,
             src_path,
-            self.fs,
-            dst_path,
+            GPFSCopyFolderRequest(
+                targetFilesystem=self.fs,
+                targetPath=dst_path.as_posix(),
+            ),
         )
 
 
 class GPFSVolume(BaseVolume):
-    name = "gpfs"
+    name: ClassVar[StorageBackendType] = StorageBackendType("gpfs")
     api_client: GPFSAPIClient
-
     fs: str
+    gpfs_owner: str
 
     def __init__(
         self,
@@ -154,30 +177,34 @@ class GPFSVolume(BaseVolume):
         event_producer: EventProducer,
         watcher: WatcherClient | None = None,
         options: Mapping[str, Any] | None = None,
+        volume_name: StorageVolumeName,
+        status_check_config: VolumeStatusCheckConfig | None,
     ) -> None:
         super().__init__(
             local_config,
             mount_path,
             etcd=etcd,
             options=options,
+            volume_name=volume_name,
+            status_check_config=status_check_config,
             event_dispatcher=event_dispatcher,
             event_producer=event_producer,
             watcher=watcher,
         )
-        verify_ssl = self.config.get("gpfs_verify_ssl", False)
         self.api_client = GPFSAPIClient(
-            self.config["gpfs_endpoint"],
-            self.config["gpfs_username"],
-            self.config["gpfs_password"],
-            # follows ssl parameter on https://docs.aiohttp.org/en/v3.10.5/client_reference.html
-            ssl=verify_ssl,
+            GPFSAPIClientArgs(
+                endpoint=self.config["gpfs_endpoint"],
+                username=self.config["gpfs_username"],
+                password=self.config["gpfs_password"],
+                ssl=self.config.get("gpfs_verify_ssl", False),
+            )
         )
         self.fs = self.config["gpfs_fs_name"]
         self.gpfs_owner = self.config.get("gpfs_owner", "1000:1000")
 
     @override
-    async def init(self) -> None:
-        await super().init()
+    async def shutdown(self) -> None:
+        await self.api_client.aclose()
 
     @override
     async def create_quota_model(self) -> AbstractQuotaModel:
@@ -199,26 +226,29 @@ class GPFSVolume(BaseVolume):
         )
 
     @override
-    async def get_capabilities(self) -> frozenset[str]:
-        return frozenset([CAP_FAST_FS_SIZE, CAP_VFOLDER, CAP_QUOTA, CAP_METRIC])
+    async def get_capabilities(self) -> frozenset[StorageBackendCapability]:
+        return frozenset([
+            StorageBackendCapability.FAST_FS_SIZE,
+            StorageBackendCapability.VFOLDER,
+            StorageBackendCapability.QUOTA,
+            StorageBackendCapability.METRIC,
+        ])
 
     @override
     async def get_hwinfo(self) -> HardwareMetadata:
         nodes = await self.api_client.list_nodes()
-        invalid_status = ["FAILED", "DEGRADED", "ERROR"]
-        health_status: str | GPFSSystemHealthState = "HEALTHY"
+        health_state: str | None = None
 
         for node in nodes:
-            if health_status == "ERROR":
+            if health_state == "ERROR":
                 break
-            node_health_statuses = await self.api_client.get_node_health(node)
-            for node_health_status in node_health_statuses:
-                if node_health_status.state in invalid_status:
-                    health_status = node_health_status
+            for node_health in await self.api_client.get_node_health(node.adminNodeName):
+                if node_health.state in _UNHEALTHY_STATES:
+                    health_state = node_health.state
 
         status: Literal["healthy", "degraded", "unavailable"]
-        match health_status:
-            case "HEALTHY":
+        match health_state:
+            case None:
                 status = "healthy"
             case "DEGRADED":
                 status = "degraded"
@@ -230,8 +260,8 @@ class GPFSVolume(BaseVolume):
             "status": status,
             "status_info": None,
             "metadata": {
-                "quota": dump_json_str([q.to_json() for q in quotas]),
-                "cluster_info": dump_json_str(cluster_info),
+                "quota": dump_json_str([q.model_dump(mode="json") for q in quotas]),
+                "cluster_info": dump_json_str(cluster_info.model_dump(mode="json")),
             },
         }
 
@@ -252,7 +282,6 @@ class GPFSVolume(BaseVolume):
 
     @override
     async def get_performance_metric(self) -> FSPerfMetric:
-        # ref: https://www.ibm.com/docs/en/spectrum-scale/5.0.3?topic=2-perfmondata-get
         query = (
             "metrics "
             "avg(gpfs_ns_read_ops),"
@@ -264,16 +293,17 @@ class GPFSVolume(BaseVolume):
             "last 1 "
             "bucket_size 10"
         )
-        try:
-            metrics = await self.api_client.get_metric(query)
-            latest_metric = metrics["performanceData"]["rows"][-1]["values"]
-        except (KeyError, IndexError) as e:
-            raise GPFSNoMetricError from e
+        metrics = await self.api_client.get_metric(query)
+        if metrics.performanceData is None or not metrics.performanceData.rows:
+            raise GPFSNoMetricError
+        latest_metric = metrics.performanceData.rows[-1].values
+        if len(latest_metric) < 6:
+            raise GPFSNoMetricError
         return FSPerfMetric(
-            iops_read=latest_metric[0] or 0,
-            iops_write=latest_metric[1] or 0,
-            io_bytes_read=latest_metric[2] or 0,
-            io_bytes_write=latest_metric[3] or 0,
+            iops_read=int(latest_metric[0] or 0),
+            iops_write=int(latest_metric[1] or 0),
+            io_bytes_read=int(latest_metric[2] or 0),
+            io_bytes_write=int(latest_metric[3] or 0),
             io_usec_read=latest_metric[4] or 0,
             io_usec_write=latest_metric[5] or 0,
         )

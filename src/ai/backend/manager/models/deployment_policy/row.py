@@ -1,19 +1,15 @@
 from __future__ import annotations
 
 import logging
-import uuid
-from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_policy import DeploymentPolicyID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.schema.deployment import BlueGreenSpec, RollingUpdateSpec
-from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.deployment.types import DeploymentPolicyData
-from ai.backend.manager.errors.deployment import InvalidDeploymentStrategy
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -21,15 +17,12 @@ from ai.backend.manager.models.base import (
 )
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
-if TYPE_CHECKING:
-    from ai.backend.manager.models.endpoint import EndpointRow
-
 __all__ = ("DeploymentPolicyRow",)
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
-class DeploymentPolicyRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+class DeploymentPolicyRow(LifecycleTimestampsMixin, Base):
     """
     Represents a deployment policy for a deployment.
 
@@ -45,12 +38,15 @@ class DeploymentPolicyRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
         sa.Index("ix_deployment_policies_endpoint", "endpoint"),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    id: Mapped[DeploymentPolicyID] = mapped_column(
+        "id",
+        GUID(DeploymentPolicyID),
+        primary_key=True,
+        server_default=sa.text("uuid_generate_v7()"),
     )
     endpoint: Mapped[DeploymentID] = mapped_column(
         "endpoint",
-        GUID,
+        GUID(DeploymentID),
         sa.ForeignKey("endpoints.id", name="fk_deployment_policies_endpoint", ondelete="CASCADE"),
         nullable=False,
     )
@@ -69,31 +65,3 @@ class DeploymentPolicyRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
         nullable=False,
         server_default="{}",
     )
-
-    endpoint_row: Mapped[EndpointRow | None] = relationship(
-        "EndpointRow",
-        back_populates="deployment_policy",
-        foreign_keys=[endpoint],
-        uselist=False,
-    )
-
-    def to_data(self) -> DeploymentPolicyData:
-        """Convert to DeploymentPolicyData dataclass."""
-        return DeploymentPolicyData(
-            id=self.id,
-            endpoint=self.endpoint,
-            strategy=self.strategy,
-            strategy_spec=self.get_strategy_spec(),
-            created_at=self.created_at,
-            updated_at=self.updated_at,
-        )
-
-    def get_strategy_spec(self) -> RollingUpdateSpec | BlueGreenSpec:
-        """Parse strategy spec to the appropriate Pydantic model based on strategy type."""
-        match self.strategy:
-            case DeploymentStrategy.ROLLING:
-                return RollingUpdateSpec.model_validate(self.strategy_spec or {})
-            case DeploymentStrategy.BLUE_GREEN:
-                return BlueGreenSpec.model_validate(self.strategy_spec or {})
-            case _:
-                raise InvalidDeploymentStrategy(f"Unknown deployment strategy: {self.strategy}")

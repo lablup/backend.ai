@@ -59,45 +59,38 @@ from ai.backend.manager.data.fair_share.types import (
     ProjectFairShareData,
     UserFairShareData,
 )
-from ai.backend.manager.data.scaling_group.types import FairShareScalingGroupSpec
-from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.fair_share.conditions import (
-    DomainFairShareConditions,
-    ProjectFairShareConditions,
-    RGDomainFairShareConditions,
-    RGProjectFairShareConditions,
-    RGUserFairShareConditions,
-    UserFairShareConditions,
-)
-from ai.backend.manager.models.fair_share.orders import (
-    DomainFairShareOrders,
-    ProjectFairShareOrders,
-    RGDomainFairShareOrders,
-    RGProjectFairShareOrders,
-    RGUserFairShareOrders,
-    UserFairShareOrders,
-)
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
-from ai.backend.manager.repositories.resource_usage_history.options import (
-    DomainUsageBucketConditions,
-    DomainUsageBucketOrders,
-    ProjectUsageBucketConditions,
-    ProjectUsageBucketOrders,
-    UserUsageBucketConditions,
-    UserUsageBucketOrders,
-)
-from ai.backend.manager.repositories.resource_usage_history.types import (
+from ai.backend.manager.data.resource_group.types import FairShareResourceGroupSpec
+from ai.backend.manager.data.resource_usage_history.types import (
     DomainUsageBucketData,
     ProjectUsageBucketData,
     UserUsageBucketData,
 )
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.fair_share.deprecated_search import (
+    DeprecatedDomainFairShareFields,
+    DeprecatedProjectFairShareFields,
+    DeprecatedUserFairShareFields,
+)
+from ai.backend.manager.models.fair_share.searchable_fields import (
+    DomainFairShareSearchableFields,
+    ProjectFairShareSearchableFields,
+    UserFairShareSearchableFields,
+)
+from ai.backend.manager.models.resource_usage_history.searchable_fields import (
+    DomainUsageBucketSearchableFields,
+    ProjectUsageBucketSearchableFields,
+    UserUsageBucketSearchableFields,
+)
+from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
+from ai.backend.manager.repositories.base.querier import BatchQuerier
 
 SECONDS_PER_DAY = Decimal("86400")
 
 __all__ = ("FairShareAdapter",)
 
 
-class FairShareAdapter:
+class FairShareAdapter(BaseFilterAdapter):
     """Adapter for converting fair share requests to repository queries."""
 
     # Domain Fair Share
@@ -124,27 +117,17 @@ class FairShareAdapter:
         """Convert domain fair share filter to list of query conditions."""
         conditions: list[QueryCondition] = []
 
-        if filter.resource_group is not None:
-            cond = filter.resource_group.build_query_condition(
-                contains_factory=DomainFairShareConditions.by_resource_group_contains,
-                equals_factory=DomainFairShareConditions.by_resource_group_equals,
-                starts_with_factory=DomainFairShareConditions.by_resource_group_starts_with,
-                ends_with_factory=DomainFairShareConditions.by_resource_group_ends_with,
-                in_factory=DomainFairShareConditions.by_resource_group_in,
+        conditions.extend(
+            self.apply_string_filter(
+                filter.resource_group, DomainFairShareSearchableFields.own.resource_group.filter
             )
-            if cond is not None:
-                conditions.append(cond)
+        )
 
-        if filter.domain_name is not None:
-            cond = filter.domain_name.build_query_condition(
-                contains_factory=DomainFairShareConditions.by_domain_name_contains,
-                equals_factory=DomainFairShareConditions.by_domain_name_equals,
-                starts_with_factory=DomainFairShareConditions.by_domain_name_starts_with,
-                ends_with_factory=DomainFairShareConditions.by_domain_name_ends_with,
-                in_factory=DomainFairShareConditions.by_domain_name_in,
+        conditions.extend(
+            self.apply_string_filter(
+                filter.domain_name, DomainFairShareSearchableFields.own.domain_name.filter
             )
-            if cond is not None:
-                conditions.append(cond)
+        )
 
         return conditions
 
@@ -154,11 +137,11 @@ class FairShareAdapter:
 
         match order.field:
             case DomainFairShareOrderField.FAIR_SHARE_FACTOR:
-                return DomainFairShareOrders.by_fair_share_factor(ascending=ascending)
+                return DomainFairShareSearchableFields.own.fair_share_factor.order.apply(ascending)
             case DomainFairShareOrderField.DOMAIN_NAME:
-                return DomainFairShareOrders.by_domain_name(ascending=ascending)
+                return DomainFairShareSearchableFields.own.domain_name.order.apply(ascending)
             case DomainFairShareOrderField.CREATED_AT:
-                return DomainFairShareOrders.by_created_at(ascending=ascending)
+                return DomainFairShareSearchableFields.own.created_at.order.apply(ascending)
 
         raise ValueError(f"Unknown order field: {order.field}")
 
@@ -188,27 +171,17 @@ class FairShareAdapter:
         """Convert domain fair share filter using RG-context conditions."""
         conditions: list[QueryCondition] = []
 
-        if filter.resource_group is not None:
-            cond = filter.resource_group.build_query_condition(
-                contains_factory=RGDomainFairShareConditions.by_resource_group_contains,
-                equals_factory=RGDomainFairShareConditions.by_resource_group_equals,
-                starts_with_factory=RGDomainFairShareConditions.by_resource_group_starts_with,
-                ends_with_factory=RGDomainFairShareConditions.by_resource_group_ends_with,
-                in_factory=RGDomainFairShareConditions.by_resource_group_in,
+        conditions.extend(
+            self.apply_string_filter(
+                filter.resource_group, DomainFairShareSearchableFields.own.resource_group.filter
             )
-            if cond is not None:
-                conditions.append(cond)
+        )
 
-        if filter.domain_name is not None:
-            cond = filter.domain_name.build_query_condition(
-                contains_factory=RGDomainFairShareConditions.by_domain_name_contains,
-                equals_factory=RGDomainFairShareConditions.by_domain_name_equals,
-                starts_with_factory=RGDomainFairShareConditions.by_domain_name_starts_with,
-                ends_with_factory=RGDomainFairShareConditions.by_domain_name_ends_with,
-                in_factory=RGDomainFairShareConditions.by_domain_name_in,
+        conditions.extend(
+            self.apply_string_filter(
+                filter.domain_name, DeprecatedDomainFairShareFields.name.filter
             )
-            if cond is not None:
-                conditions.append(cond)
+        )
 
         return conditions
 
@@ -218,11 +191,11 @@ class FairShareAdapter:
 
         match order.field:
             case DomainFairShareOrderField.FAIR_SHARE_FACTOR:
-                return RGDomainFairShareOrders.by_fair_share_factor(ascending=ascending)
+                return DomainFairShareSearchableFields.own.fair_share_factor.order.apply(ascending)
             case DomainFairShareOrderField.DOMAIN_NAME:
-                return RGDomainFairShareOrders.by_domain_name(ascending=ascending)
+                return DeprecatedDomainFairShareFields.name.order.apply(ascending)
             case DomainFairShareOrderField.CREATED_AT:
-                return RGDomainFairShareOrders.by_created_at(ascending=ascending)
+                return DomainFairShareSearchableFields.own.created_at.order.apply(ascending)
 
         raise ValueError(f"Unknown order field: {order.field}")
 
@@ -277,35 +250,23 @@ class FairShareAdapter:
         """Convert project fair share filter to list of query conditions."""
         conditions: list[QueryCondition] = []
 
-        if filter.resource_group is not None:
-            cond = filter.resource_group.build_query_condition(
-                contains_factory=ProjectFairShareConditions.by_resource_group_contains,
-                equals_factory=ProjectFairShareConditions.by_resource_group_equals,
-                starts_with_factory=ProjectFairShareConditions.by_resource_group_starts_with,
-                ends_with_factory=ProjectFairShareConditions.by_resource_group_ends_with,
-                in_factory=ProjectFairShareConditions.by_resource_group_in,
+        conditions.extend(
+            self.apply_string_filter(
+                filter.resource_group, ProjectFairShareSearchableFields.own.resource_group.filter
             )
-            if cond is not None:
-                conditions.append(cond)
+        )
 
-        if filter.project_id is not None:
-            cond = filter.project_id.build_query_condition(
-                equals_factory=ProjectFairShareConditions.by_project_id,
-                in_factory=ProjectFairShareConditions.by_project_ids,
+        conditions.extend(
+            self.apply_uuid_filter(
+                filter.project_id, ProjectFairShareSearchableFields.own.project_id.filter
             )
-            if cond is not None:
-                conditions.append(cond)
+        )
 
-        if filter.domain_name is not None:
-            cond = filter.domain_name.build_query_condition(
-                contains_factory=ProjectFairShareConditions.by_domain_name_contains,
-                equals_factory=ProjectFairShareConditions.by_domain_name_equals,
-                starts_with_factory=ProjectFairShareConditions.by_domain_name_starts_with,
-                ends_with_factory=ProjectFairShareConditions.by_domain_name_ends_with,
-                in_factory=ProjectFairShareConditions.by_domain_name_in,
+        conditions.extend(
+            self.apply_string_filter(
+                filter.domain_name, ProjectFairShareSearchableFields.own.domain_name.filter
             )
-            if cond is not None:
-                conditions.append(cond)
+        )
 
         return conditions
 
@@ -315,9 +276,9 @@ class FairShareAdapter:
 
         match order.field:
             case ProjectFairShareOrderField.FAIR_SHARE_FACTOR:
-                return ProjectFairShareOrders.by_fair_share_factor(ascending=ascending)
+                return ProjectFairShareSearchableFields.own.fair_share_factor.order.apply(ascending)
             case ProjectFairShareOrderField.CREATED_AT:
-                return ProjectFairShareOrders.by_created_at(ascending=ascending)
+                return ProjectFairShareSearchableFields.own.created_at.order.apply(ascending)
 
         raise ValueError(f"Unknown order field: {order.field}")
 
@@ -346,35 +307,21 @@ class FairShareAdapter:
         """Convert project fair share filter using RG-context conditions."""
         conditions: list[QueryCondition] = []
 
-        if filter.resource_group is not None:
-            cond = filter.resource_group.build_query_condition(
-                contains_factory=RGProjectFairShareConditions.by_resource_group_contains,
-                equals_factory=RGProjectFairShareConditions.by_resource_group_equals,
-                starts_with_factory=RGProjectFairShareConditions.by_resource_group_starts_with,
-                ends_with_factory=RGProjectFairShareConditions.by_resource_group_ends_with,
-                in_factory=RGProjectFairShareConditions.by_resource_group_in,
+        conditions.extend(
+            self.apply_string_filter(
+                filter.resource_group, ProjectFairShareSearchableFields.own.resource_group.filter
             )
-            if cond is not None:
-                conditions.append(cond)
+        )
 
-        if filter.project_id is not None:
-            cond = filter.project_id.build_query_condition(
-                equals_factory=RGProjectFairShareConditions.by_project_id,
-                in_factory=RGProjectFairShareConditions.by_project_ids,
-            )
-            if cond is not None:
-                conditions.append(cond)
+        conditions.extend(
+            self.apply_uuid_filter(filter.project_id, DeprecatedProjectFairShareFields.id.filter)
+        )
 
-        if filter.domain_name is not None:
-            cond = filter.domain_name.build_query_condition(
-                contains_factory=RGProjectFairShareConditions.by_domain_name_contains,
-                equals_factory=RGProjectFairShareConditions.by_domain_name_equals,
-                starts_with_factory=RGProjectFairShareConditions.by_domain_name_starts_with,
-                ends_with_factory=RGProjectFairShareConditions.by_domain_name_ends_with,
-                in_factory=RGProjectFairShareConditions.by_domain_name_in,
+        conditions.extend(
+            self.apply_string_filter(
+                filter.domain_name, DeprecatedProjectFairShareFields.domain_name.filter
             )
-            if cond is not None:
-                conditions.append(cond)
+        )
 
         return conditions
 
@@ -384,9 +331,9 @@ class FairShareAdapter:
 
         match order.field:
             case ProjectFairShareOrderField.FAIR_SHARE_FACTOR:
-                return RGProjectFairShareOrders.by_fair_share_factor(ascending=ascending)
+                return ProjectFairShareSearchableFields.own.fair_share_factor.order.apply(ascending)
             case ProjectFairShareOrderField.CREATED_AT:
-                return RGProjectFairShareOrders.by_created_at(ascending=ascending)
+                return ProjectFairShareSearchableFields.own.created_at.order.apply(ascending)
 
         raise ValueError(f"Unknown order field: {order.field}")
 
@@ -434,43 +381,29 @@ class FairShareAdapter:
         """Convert user fair share filter to list of query conditions."""
         conditions: list[QueryCondition] = []
 
-        if filter.resource_group is not None:
-            cond = filter.resource_group.build_query_condition(
-                contains_factory=UserFairShareConditions.by_resource_group_contains,
-                equals_factory=UserFairShareConditions.by_resource_group_equals,
-                starts_with_factory=UserFairShareConditions.by_resource_group_starts_with,
-                ends_with_factory=UserFairShareConditions.by_resource_group_ends_with,
-                in_factory=UserFairShareConditions.by_resource_group_in,
+        conditions.extend(
+            self.apply_string_filter(
+                filter.resource_group, UserFairShareSearchableFields.own.resource_group.filter
             )
-            if cond is not None:
-                conditions.append(cond)
+        )
 
-        if filter.user_uuid is not None:
-            cond = filter.user_uuid.build_query_condition(
-                equals_factory=UserFairShareConditions.by_user_uuid,
-                in_factory=UserFairShareConditions.by_user_uuids,
+        conditions.extend(
+            self.apply_uuid_filter(
+                filter.user_uuid, UserFairShareSearchableFields.own.user_uuid.filter
             )
-            if cond is not None:
-                conditions.append(cond)
+        )
 
-        if filter.project_id is not None:
-            cond = filter.project_id.build_query_condition(
-                equals_factory=UserFairShareConditions.by_project_id,
-                in_factory=UserFairShareConditions.by_project_ids,
+        conditions.extend(
+            self.apply_uuid_filter(
+                filter.project_id, UserFairShareSearchableFields.own.project_id.filter
             )
-            if cond is not None:
-                conditions.append(cond)
+        )
 
-        if filter.domain_name is not None:
-            cond = filter.domain_name.build_query_condition(
-                contains_factory=UserFairShareConditions.by_domain_name_contains,
-                equals_factory=UserFairShareConditions.by_domain_name_equals,
-                starts_with_factory=UserFairShareConditions.by_domain_name_starts_with,
-                ends_with_factory=UserFairShareConditions.by_domain_name_ends_with,
-                in_factory=UserFairShareConditions.by_domain_name_in,
+        conditions.extend(
+            self.apply_string_filter(
+                filter.domain_name, UserFairShareSearchableFields.own.domain_name.filter
             )
-            if cond is not None:
-                conditions.append(cond)
+        )
 
         return conditions
 
@@ -480,9 +413,9 @@ class FairShareAdapter:
 
         match order.field:
             case UserFairShareOrderField.FAIR_SHARE_FACTOR:
-                return UserFairShareOrders.by_fair_share_factor(ascending=ascending)
+                return UserFairShareSearchableFields.own.fair_share_factor.order.apply(ascending)
             case UserFairShareOrderField.CREATED_AT:
-                return UserFairShareOrders.by_created_at(ascending=ascending)
+                return UserFairShareSearchableFields.own.created_at.order.apply(ascending)
 
         raise ValueError(f"Unknown order field: {order.field}")
 
@@ -511,43 +444,29 @@ class FairShareAdapter:
         """Convert user fair share filter using RG-context conditions."""
         conditions: list[QueryCondition] = []
 
-        if filter.resource_group is not None:
-            cond = filter.resource_group.build_query_condition(
-                contains_factory=RGUserFairShareConditions.by_resource_group_contains,
-                equals_factory=RGUserFairShareConditions.by_resource_group_equals,
-                starts_with_factory=RGUserFairShareConditions.by_resource_group_starts_with,
-                ends_with_factory=RGUserFairShareConditions.by_resource_group_ends_with,
-                in_factory=RGUserFairShareConditions.by_resource_group_in,
+        conditions.extend(
+            self.apply_string_filter(
+                filter.resource_group, UserFairShareSearchableFields.own.resource_group.filter
             )
-            if cond is not None:
-                conditions.append(cond)
+        )
 
-        if filter.user_uuid is not None:
-            cond = filter.user_uuid.build_query_condition(
-                equals_factory=RGUserFairShareConditions.by_user_uuid,
-                in_factory=RGUserFairShareConditions.by_user_uuids,
+        conditions.extend(
+            self.apply_uuid_filter(
+                filter.user_uuid, DeprecatedUserFairShareFields.membership_user_id.filter
             )
-            if cond is not None:
-                conditions.append(cond)
+        )
 
-        if filter.project_id is not None:
-            cond = filter.project_id.build_query_condition(
-                equals_factory=RGUserFairShareConditions.by_project_id,
-                in_factory=RGUserFairShareConditions.by_project_ids,
+        conditions.extend(
+            self.apply_uuid_filter(
+                filter.project_id, DeprecatedUserFairShareFields.membership_project_id.filter
             )
-            if cond is not None:
-                conditions.append(cond)
+        )
 
-        if filter.domain_name is not None:
-            cond = filter.domain_name.build_query_condition(
-                contains_factory=RGUserFairShareConditions.by_domain_name_contains,
-                equals_factory=RGUserFairShareConditions.by_domain_name_equals,
-                starts_with_factory=RGUserFairShareConditions.by_domain_name_starts_with,
-                ends_with_factory=RGUserFairShareConditions.by_domain_name_ends_with,
-                in_factory=RGUserFairShareConditions.by_domain_name_in,
+        conditions.extend(
+            self.apply_string_filter(
+                filter.domain_name, DeprecatedUserFairShareFields.domain_name.filter
             )
-            if cond is not None:
-                conditions.append(cond)
+        )
 
         return conditions
 
@@ -557,9 +476,9 @@ class FairShareAdapter:
 
         match order.field:
             case UserFairShareOrderField.FAIR_SHARE_FACTOR:
-                return RGUserFairShareOrders.by_fair_share_factor(ascending=ascending)
+                return UserFairShareSearchableFields.own.fair_share_factor.order.apply(ascending)
             case UserFairShareOrderField.CREATED_AT:
-                return RGUserFairShareOrders.by_created_at(ascending=ascending)
+                return UserFairShareSearchableFields.own.created_at.order.apply(ascending)
 
         raise ValueError(f"Unknown order field: {order.field}")
 
@@ -616,27 +535,17 @@ class FairShareAdapter:
         """Convert domain usage bucket filter to list of query conditions."""
         conditions: list[QueryCondition] = []
 
-        if filter.resource_group is not None:
-            cond = filter.resource_group.build_query_condition(
-                contains_factory=DomainUsageBucketConditions.by_resource_group_contains,
-                equals_factory=DomainUsageBucketConditions.by_resource_group_equals,
-                starts_with_factory=DomainUsageBucketConditions.by_resource_group_starts_with,
-                ends_with_factory=DomainUsageBucketConditions.by_resource_group_ends_with,
-                in_factory=DomainUsageBucketConditions.by_resource_group_in,
+        conditions.extend(
+            self.apply_string_filter(
+                filter.resource_group, DomainUsageBucketSearchableFields.own.resource_group.filter
             )
-            if cond is not None:
-                conditions.append(cond)
+        )
 
-        if filter.domain_name is not None:
-            cond = filter.domain_name.build_query_condition(
-                contains_factory=DomainUsageBucketConditions.by_domain_name_contains,
-                equals_factory=DomainUsageBucketConditions.by_domain_name_equals,
-                starts_with_factory=DomainUsageBucketConditions.by_domain_name_starts_with,
-                ends_with_factory=DomainUsageBucketConditions.by_domain_name_ends_with,
-                in_factory=DomainUsageBucketConditions.by_domain_name_in,
+        conditions.extend(
+            self.apply_string_filter(
+                filter.domain_name, DomainUsageBucketSearchableFields.own.domain_name.filter
             )
-            if cond is not None:
-                conditions.append(cond)
+        )
 
         return conditions
 
@@ -646,7 +555,7 @@ class FairShareAdapter:
 
         match order.field:
             case DomainUsageBucketOrderField.PERIOD_START:
-                return DomainUsageBucketOrders.by_period_start(ascending=ascending)
+                return DomainUsageBucketSearchableFields.own.period_start.order.apply(ascending)
 
         raise ValueError(f"Unknown order field: {order.field}")
 
@@ -700,24 +609,17 @@ class FairShareAdapter:
         """Convert project usage bucket filter to list of query conditions."""
         conditions: list[QueryCondition] = []
 
-        if filter.resource_group is not None:
-            cond = filter.resource_group.build_query_condition(
-                contains_factory=ProjectUsageBucketConditions.by_resource_group_contains,
-                equals_factory=ProjectUsageBucketConditions.by_resource_group_equals,
-                starts_with_factory=ProjectUsageBucketConditions.by_resource_group_starts_with,
-                ends_with_factory=ProjectUsageBucketConditions.by_resource_group_ends_with,
-                in_factory=ProjectUsageBucketConditions.by_resource_group_in,
+        conditions.extend(
+            self.apply_string_filter(
+                filter.resource_group, ProjectUsageBucketSearchableFields.own.resource_group.filter
             )
-            if cond is not None:
-                conditions.append(cond)
+        )
 
-        if filter.project_id is not None:
-            cond = filter.project_id.build_query_condition(
-                equals_factory=ProjectUsageBucketConditions.by_project_id,
-                in_factory=ProjectUsageBucketConditions.by_project_ids,
+        conditions.extend(
+            self.apply_uuid_filter(
+                filter.project_id, ProjectUsageBucketSearchableFields.own.project_id.filter
             )
-            if cond is not None:
-                conditions.append(cond)
+        )
 
         return conditions
 
@@ -727,7 +629,7 @@ class FairShareAdapter:
 
         match order.field:
             case ProjectUsageBucketOrderField.PERIOD_START:
-                return ProjectUsageBucketOrders.by_period_start(ascending=ascending)
+                return ProjectUsageBucketSearchableFields.own.period_start.order.apply(ascending)
 
         raise ValueError(f"Unknown order field: {order.field}")
 
@@ -782,32 +684,23 @@ class FairShareAdapter:
         """Convert user usage bucket filter to list of query conditions."""
         conditions: list[QueryCondition] = []
 
-        if filter.resource_group is not None:
-            cond = filter.resource_group.build_query_condition(
-                contains_factory=UserUsageBucketConditions.by_resource_group_contains,
-                equals_factory=UserUsageBucketConditions.by_resource_group_equals,
-                starts_with_factory=UserUsageBucketConditions.by_resource_group_starts_with,
-                ends_with_factory=UserUsageBucketConditions.by_resource_group_ends_with,
-                in_factory=UserUsageBucketConditions.by_resource_group_in,
+        conditions.extend(
+            self.apply_string_filter(
+                filter.resource_group, UserUsageBucketSearchableFields.own.resource_group.filter
             )
-            if cond is not None:
-                conditions.append(cond)
+        )
 
-        if filter.user_uuid is not None:
-            cond = filter.user_uuid.build_query_condition(
-                equals_factory=UserUsageBucketConditions.by_user_uuid,
-                in_factory=UserUsageBucketConditions.by_user_uuids,
+        conditions.extend(
+            self.apply_uuid_filter(
+                filter.user_uuid, UserUsageBucketSearchableFields.own.user_uuid.filter
             )
-            if cond is not None:
-                conditions.append(cond)
+        )
 
-        if filter.project_id is not None:
-            cond = filter.project_id.build_query_condition(
-                equals_factory=UserUsageBucketConditions.by_project_id,
-                in_factory=UserUsageBucketConditions.by_project_ids,
+        conditions.extend(
+            self.apply_uuid_filter(
+                filter.project_id, UserUsageBucketSearchableFields.own.project_id.filter
             )
-            if cond is not None:
-                conditions.append(cond)
+        )
 
         return conditions
 
@@ -817,7 +710,7 @@ class FairShareAdapter:
 
         match order.field:
             case UserUsageBucketOrderField.PERIOD_START:
-                return UserUsageBucketOrders.by_period_start(ascending=ascending)
+                return UserUsageBucketSearchableFields.own.period_start.order.apply(ascending)
 
         raise ValueError(f"Unknown order field: {order.field}")
 
@@ -929,8 +822,8 @@ class FairShareAdapter:
     def merge_fair_share_spec(
         self,
         request: UpdateResourceGroupFairShareSpecRequest,
-        existing: FairShareScalingGroupSpec,
-    ) -> FairShareScalingGroupSpec:
+        existing: FairShareResourceGroupSpec,
+    ) -> FairShareResourceGroupSpec:
         """Merge partial update request with existing spec.
 
         Only provided fields are updated; others retain existing values.
@@ -949,7 +842,7 @@ class FairShareAdapter:
                     merged_weights_dict[entry.resource_type] = entry.weight
             merged_resource_weights = ResourceSlot(merged_weights_dict)
 
-        return FairShareScalingGroupSpec(
+        return FairShareResourceGroupSpec(
             half_life_days=(
                 request.half_life_days
                 if request.half_life_days is not None
@@ -973,9 +866,9 @@ class FairShareAdapter:
             resource_weights=merged_resource_weights,
         )
 
-    def convert_scaling_group_spec_to_dto(
+    def convert_resource_group_spec_to_dto(
         self,
-        spec: FairShareScalingGroupSpec,
+        spec: FairShareResourceGroupSpec,
     ) -> ResourceGroupFairShareSpecDTO:
         """Convert FairShareScalingGroupSpec to DTO."""
         return ResourceGroupFairShareSpecDTO(

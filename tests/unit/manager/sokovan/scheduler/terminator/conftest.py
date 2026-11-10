@@ -13,7 +13,8 @@ import pytest
 from dateutil.tz import tzutc
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import HealthCheckStatus
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -44,14 +45,14 @@ from ai.backend.manager.data.kernel.types import (
 from ai.backend.manager.data.kernel.types import (
     Metrics as KernelMetrics,
 )
-from ai.backend.manager.models.session import SessionStatus
-from ai.backend.manager.repositories.scheduler import (
-    TerminatingKernelData,
-    TerminatingSessionData,
-)
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.sokovan.scheduler.terminator.terminator import (
     SessionTerminator,
     SessionTerminatorArgs,
+)
+from ai.backend.manager.views.sokovan.session import (
+    TerminatingKernelData,
+    TerminatingSessionData,
 )
 
 # =============================================================================
@@ -130,7 +131,7 @@ def _create_terminating_kernel_data(
 def _create_terminating_session_data(
     session_id: SessionId | None = None,
     kernels: list[TerminatingKernelData] | None = None,
-    status_info: str = "user-requested",
+    status_info: KernelLifecycleEventReason = KernelLifecycleEventReason.USER_REQUESTED,
 ) -> TerminatingSessionData:
     """Create TerminatingSessionData for termination tests."""
     if kernels is None:
@@ -248,13 +249,11 @@ def _create_kernel_info(
             cluster_hostname="kernel-0",
         ),
         resource=ResourceInfo(
-            scaling_group="default",
+            resource_group="default",
             resource_group_id=ResourceGroupID(uuid4()),
             agent=aid,
             agent_addr=f"tcp://{aid}:5001" if aid else None,
             container_id=f"container-{kid}",
-            occupied_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")}),
-            requested_slots=ResourceSlot(),
             occupied_shares={},
             attached_devices={},
             resource_opts={},
@@ -282,6 +281,7 @@ def _create_kernel_info(
         ),
         metrics=KernelMetrics(num_queries=0, last_stat=None, container_log=None),
         metadata=KernelMetadata(callback_url=None, internal_data=None),
+        kernel_group_id=None,
     )
 
 

@@ -1,34 +1,30 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.identifier.retention_policy import RetentionPolicyID
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.manager.actions.v2.ops.base import PurgeEntityOpsAction
 from ai.backend.manager.data.retention.types import RetentionPolicyData
+from ai.backend.manager.models.retention.purgers import RetentionPolicyPurger
 from ai.backend.manager.models.retention.row import RetentionPolicyRow
-from ai.backend.manager.repositories.base.purger import Purger
-from ai.backend.manager.services.retention_policy.actions.base import RetentionPolicyAction
 
 
 @dataclass
-class PurgeRetentionPolicyAction(RetentionPolicyAction):
-    id: RetentionPolicyID
-    purger: Purger[RetentionPolicyRow]
+class PurgeRetentionPolicyAction(PurgeEntityOpsAction[RetentionPolicyRow, RetentionPolicyData]):
+    """Remove a retention policy row from the catalog."""
 
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.id)
+    purger: RetentionPolicyPurger
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.PURGE
-
-
-@dataclass
-class PurgeRetentionPolicyActionResult(BaseActionResult):
-    policy: RetentionPolicyData
+    def action_name(cls) -> str:
+        return "purge_retention_policy"
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.policy.id)
+    def entity_id(self) -> EntityIdentifier:
+        return self.to_purger().entity_id()
+
+    @override
+    def to_purger(self) -> RetentionPolicyPurger:
+        return self.purger

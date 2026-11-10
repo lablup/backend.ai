@@ -6,35 +6,70 @@ from datetime import datetime
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ai.backend.common.data.idle_checker.types import CheckerType, IdleCheckerSpec
-from ai.backend.common.identifier.idle_checker import IdleCheckerID
+from ai.backend.common.data.entity.idle_checker import IdleCheckerAssignmentID, IdleCheckerID
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.idle_checker.types import CheckerType, IdleCheckerSpec, IdleCheckPhase
 from ai.backend.common.types import SessionId, SessionTypes
+from ai.backend.manager.data.idle_checker.types import (
+    IdleCheckerAssignmentData,
+    IdleCheckerData,
+    SessionIdleCheckData,
+)
 from ai.backend.manager.models.base import GUID, Base, PydanticColumn, StrEnumType
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin, UpdatedAtMixin
 
 
-class IdleCheckerRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+class IdleCheckerRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "idle_checkers"
+    __table_args__ = (
+        sa.CheckConstraint(
+            "initial_grace_period_seconds >= 0",
+            name="initial_grace_period_seconds_non_negative",
+        ),
+    )
 
     id: Mapped[IdleCheckerID] = mapped_column(
-        "id", GUID(IdleCheckerID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID(IdleCheckerID), primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     name: Mapped[str] = mapped_column("name", sa.String(length=128), nullable=False)
     description: Mapped[str | None] = mapped_column("description", sa.Text, nullable=True)
     checker_type: Mapped[CheckerType] = mapped_column(
-        "checker_type", StrEnumType(CheckerType), nullable=False
+        "checker_type",
+        StrEnumType(CheckerType),
+        sa.Computed("spec ->> 'type'", persisted=True),
+        nullable=False,
     )
     target_session_types: Mapped[list[SessionTypes]] = mapped_column(
         "target_session_types",
         sa.ARRAY(StrEnumType(SessionTypes, use_name=True)),
         nullable=False,
     )
+    initial_grace_period_seconds: Mapped[int] = mapped_column(
+        "initial_grace_period_seconds",
+        sa.Integer(),
+        nullable=False,
+        server_default=sa.text("0"),
+    )
     spec: Mapped[IdleCheckerSpec] = mapped_column(
         "spec", PydanticColumn(IdleCheckerSpec), nullable=False
     )
 
+    def to_data(self) -> IdleCheckerData:
+        return IdleCheckerData(
+            id=self.id,
+            name=self.name,
+            description=self.description,
+            checker_type=self.checker_type,
+            target_session_types=self.target_session_types,
+            initial_grace_period_seconds=self.initial_grace_period_seconds,
+            spec=self.spec,
+            created_at=self.created_at,
+            updated_at=self.updated_at,
+        )
 
-class IdleCheckerBindingRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+
+class IdleCheckerBindingRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "idle_checker_bindings"
     __table_args__ = (
         sa.ForeignKeyConstraint(
@@ -53,7 +88,7 @@ class IdleCheckerBindingRow(LifecycleTimestampsMixin, Base):  # type: ignore[mis
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     scope_type: Mapped[str] = mapped_column("scope_type", sa.String(length=64), nullable=False)
     scope_id: Mapped[uuid.UUID] = mapped_column("scope_id", GUID, nullable=False)
@@ -64,8 +99,19 @@ class IdleCheckerBindingRow(LifecycleTimestampsMixin, Base):  # type: ignore[mis
         "enabled", sa.Boolean, nullable=False, server_default=sa.true()
     )
 
+    def to_data(self) -> IdleCheckerAssignmentData:
+        return IdleCheckerAssignmentData(
+            id=IdleCheckerAssignmentID(self.id),
+            scope_type=EntityType.from_name(self.scope_type),
+            scope_id=self.scope_id,
+            idle_checker_id=self.idle_checker_id,
+            enabled=self.enabled,
+            created_at=self.created_at,
+            updated_at=self.updated_at,
+        )
 
-class SessionIdleCheckRow(UpdatedAtMixin, Base):  # type: ignore[misc]
+
+class SessionIdleCheckRow(UpdatedAtMixin, Base):
     __tablename__ = "session_idle_checks"
     __table_args__ = (
         sa.ForeignKeyConstraint(
@@ -85,10 +131,20 @@ class SessionIdleCheckRow(UpdatedAtMixin, Base):  # type: ignore[misc]
             "idle_checker_id",
             name="pk_session_idle_checks",
         ),
+        sa.ForeignKeyConstraint(
+            ["manually_triggered_by"],
+            ["users.uuid"],
+            name="fk_session_idle_checks_manually_triggered_by",
+            ondelete="SET NULL",
+        ),
         sa.Index(
             "ix_session_idle_checks_expire_at_not_null",
             "expire_at",
             postgresql_where=sa.text("expire_at IS NOT NULL"),
+        ),
+        sa.CheckConstraint(
+            "manually_triggered_by IS NULL OR is_manual",
+            name="manual_trigger",
         ),
     )
 
@@ -99,5 +155,28 @@ class SessionIdleCheckRow(UpdatedAtMixin, Base):  # type: ignore[misc]
     expire_at: Mapped[datetime | None] = mapped_column(
         "expire_at", sa.DateTime(timezone=True), nullable=True
     )
-    last_status: Mapped[str] = mapped_column("last_status", sa.String(length=64), nullable=False)
+    last_status: Mapped[IdleCheckPhase] = mapped_column(
+        "last_status", StrEnumType(IdleCheckPhase), nullable=False
+    )
     last_message: Mapped[str] = mapped_column("last_message", sa.Text, nullable=False)
+    is_manual: Mapped[bool] = mapped_column(
+        "is_manual",
+        sa.Boolean,
+        nullable=False,
+        default=False,
+        server_default=sa.false(),
+    )
+    manually_triggered_by: Mapped[UserID | None] = mapped_column(
+        "manually_triggered_by", GUID(UserID), nullable=True, default=None
+    )
+
+    def to_data(self) -> SessionIdleCheckData:
+        return SessionIdleCheckData(
+            session_id=self.session_id,
+            idle_checker_id=self.idle_checker_id,
+            expire_at=self.expire_at,
+            last_status=self.last_status,
+            last_message=self.last_message,
+            is_manual=self.is_manual,
+            manually_triggered_by=self.manually_triggered_by,
+        )

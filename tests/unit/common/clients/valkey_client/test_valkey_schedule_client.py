@@ -26,8 +26,8 @@ from ai.backend.common.clients.valkey_client.valkey_schedule.types import (
     ReplicaHealthResult,
     ReplicaProbeTarget,
 )
+from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.defs import REDIS_LIVE_DB
-from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import AgentId, KernelId, SessionId, ValkeyTarget
 

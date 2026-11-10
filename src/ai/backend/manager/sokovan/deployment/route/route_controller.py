@@ -4,10 +4,10 @@ import logging
 from dataclasses import dataclass
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.sokovan.deployment.route.types import RouteLifecycleType
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 
 @dataclass
@@ -37,4 +37,4 @@ class RouteController:
             lifecycle_type: Type of route lifecycle to mark as needed
         """
         await self._valkey_schedule.mark_route_needed(lifecycle_type.value)
-        log.debug("Marked route lifecycle needed for type: {}", lifecycle_type.value)
+        log.debug("route lifecycle requested", lifecycle_type=lifecycle_type)

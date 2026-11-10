@@ -5,26 +5,22 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from ai.backend.manager.data.manager_status.types import ManagerStatus
-from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.errors.resource import InstanceNotFound
+from ai.backend.manager.errors.agent import AgentNotFound
 from ai.backend.manager.repositories.manager_admin.health import get_manager_db_cxn_status
 
 from .actions.fetch_status import FetchManagerStatusAction, FetchManagerStatusActionResult
-from .actions.get_announcement import GetAnnouncementAction, GetAnnouncementActionResult
 from .actions.get_db_cxn_status import GetDbCxnStatusAction, GetDbCxnStatusActionResult
 from .actions.perform_scheduler_ops import (
     PerformSchedulerOpsAction,
     PerformSchedulerOpsActionResult,
 )
-from .actions.update_announcement import UpdateAnnouncementAction, UpdateAnnouncementActionResult
 from .actions.update_status import UpdateManagerStatusAction, UpdateManagerStatusActionResult
 
 if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-    from ai.backend.common.etcd import AsyncEtcd
     from ai.backend.manager.config.provider import ManagerConfigProvider
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-    from ai.backend.manager.repositories.manager_admin import ManagerAdminRepository
+    from ai.backend.manager.repositories.manager_admin.repository import ManagerAdminRepository
 
 __all__ = ("ManagerAdminService",)
 
@@ -35,7 +31,6 @@ class ManagerAdminService:
 
     _repository: ManagerAdminRepository
     _config_provider: ManagerConfigProvider
-    _etcd: AsyncEtcd
     _db: ExtendedAsyncSAEngine
     _valkey_stat: ValkeyStatClient
 
@@ -44,13 +39,11 @@ class ManagerAdminService:
         *,
         repository: ManagerAdminRepository,
         config_provider: ManagerConfigProvider,
-        etcd: AsyncEtcd,
         db: ExtendedAsyncSAEngine,
         valkey_stat: ValkeyStatClient,
     ) -> None:
         self._repository = repository
         self._config_provider = config_provider
-        self._etcd = etcd
         self._db = db
         self._valkey_stat = valkey_stat
 
@@ -80,27 +73,6 @@ class ManagerAdminService:
         await self._config_provider.legacy_etcd_config_loader.update_manager_status(status)
         return UpdateManagerStatusActionResult()
 
-    async def get_announcement(self, action: GetAnnouncementAction) -> GetAnnouncementActionResult:
-        """Get the current announcement from etcd."""
-        data = await self._etcd.get("manager/announcement")
-        if data is None:
-            return GetAnnouncementActionResult(enabled=False, message="")
-        return GetAnnouncementActionResult(enabled=True, message=data)
-
-    async def update_announcement(
-        self, action: UpdateAnnouncementAction
-    ) -> UpdateAnnouncementActionResult:
-        """Update the announcement in etcd."""
-        if action.enabled:
-            if not action.message:
-                raise InvalidAPIParameters(
-                    extra_msg="Empty message not allowed to enable announcement"
-                )
-            await self._etcd.put("manager/announcement", action.message)
-        else:
-            await self._etcd.delete("manager/announcement")
-        return UpdateAnnouncementActionResult()
-
     async def perform_scheduler_ops(
         self, action: PerformSchedulerOpsAction
     ) -> PerformSchedulerOpsActionResult:
@@ -109,7 +81,7 @@ class ManagerAdminService:
             action.agent_ids, action.schedulable
         )
         if rowcount < len(action.agent_ids):
-            raise InstanceNotFound()
+            raise AgentNotFound()
         return PerformSchedulerOpsActionResult()
 
     async def get_db_cxn_status(self, action: GetDbCxnStatusAction) -> GetDbCxnStatusActionResult:

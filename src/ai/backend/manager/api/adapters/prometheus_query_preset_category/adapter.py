@@ -5,11 +5,15 @@ from __future__ import annotations
 from collections.abc import Sequence
 from uuid import UUID
 
+from ai.backend.common.data.entity.prometheus_query_preset_category import (
+    PrometheusQueryPresetCategoryID,
+)
+from ai.backend.common.dto.manager.v2.common import PartialBulkFailure, PartialBulkPayload
 from ai.backend.common.dto.manager.v2.prometheus_query_preset_category.request import (
     CategoryFilter,
     CategoryOrder,
     CreateCategoryInput,
-    DeleteCategoryInput,
+    PartialBulkPurgeQueryPresetCategoriesInput,
     SearchCategoriesInput,
 )
 from ai.backend.common.dto.manager.v2.prometheus_query_preset_category.response import (
@@ -22,69 +26,101 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset_category.response 
 from ai.backend.common.dto.manager.v2.prometheus_query_preset_category.types import (
     OrderDirection,
 )
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkResult
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
-from ai.backend.manager.data.prometheus_query_preset_category import (
+from ai.backend.manager.data.prometheus_query_preset_category.types import (
     PrometheusQueryPresetCategoryData,
 )
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.prometheus_query_preset_category import (
-    PrometheusQueryPresetCategoryRow,
-)
-from ai.backend.manager.models.prometheus_query_preset_category.conditions import (
-    PrometheusQueryPresetCategoryConditions,
-)
-from ai.backend.manager.models.prometheus_query_preset_category.orders import (
-    PrometheusQueryPresetCategoryOrders,
-)
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    Creator,
-    OffsetPagination,
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
     combine_conditions_or,
     negate_conditions,
 )
-from ai.backend.manager.repositories.prometheus_query_preset_category.creators import (
-    PrometheusQueryPresetCategoryCreatorSpec,
+from ai.backend.manager.models.prometheus_query_preset_category.creators import (
+    PrometheusQueryPresetCategoryCreator,
 )
-from ai.backend.manager.services.prometheus_query_preset_category.actions import (
+from ai.backend.manager.models.prometheus_query_preset_category.row import (
+    PrometheusQueryPresetCategoryRow,
+)
+from ai.backend.manager.models.prometheus_query_preset_category.scopes import (
+    PublicPrometheusQueryPresetCategoryTarget,
+)
+from ai.backend.manager.models.prometheus_query_preset_category.searchable_fields import (
+    PrometheusQueryPresetCategorySearchableFields,
+)
+from ai.backend.manager.models.prometheus_query_preset_category.searchers import (
+    PrometheusQueryPresetCategorySearcher,
+)
+from ai.backend.manager.models.specs.searcher import ScopedSearcher
+from ai.backend.manager.services.prometheus_query_preset_category.actions.bulk_get import (
+    BulkGetCategoriesAction,
+)
+from ai.backend.manager.services.prometheus_query_preset_category.actions.create import (
     CreateCategoryAction,
-    DeleteCategoryAction,
+)
+from ai.backend.manager.services.prometheus_query_preset_category.actions.get import (
     GetCategoryAction,
-    SearchCategoriesAction,
+)
+from ai.backend.manager.services.prometheus_query_preset_category.actions.partial_bulk_purge import (
+    PartialBulkPurgeCategoriesAction,
+)
+from ai.backend.manager.services.prometheus_query_preset_category.actions.purge import (
+    PurgeCategoryAction,
+)
+from ai.backend.manager.services.prometheus_query_preset_category.actions.scoped_search import (
+    ScopedSearchCategoriesAction,
+)
+from ai.backend.manager.services.prometheus_query_preset_category.processors import (
+    PrometheusQueryPresetCategoryProcessors,
 )
 
 
 class PrometheusQueryPresetCategoryAdapter(BaseAdapter):
     """Adapter for prometheus query preset category domain operations."""
 
-    async def batch_load_by_ids(self, ids: Sequence[UUID]) -> list[CategoryNode | None]:
+    _prometheus_query_preset_category: PrometheusQueryPresetCategoryProcessors
+
+    def __init__(
+        self,
+        prometheus_query_preset_category: PrometheusQueryPresetCategoryProcessors,
+    ) -> None:
+        self._prometheus_query_preset_category = prometheus_query_preset_category
+
+    async def batch_load_by_ids(
+        self, ids: Sequence[PrometheusQueryPresetCategoryID]
+    ) -> list[CategoryNode | Exception | None]:
+        """Batch load categories by id for DataLoader use.
+
+        One answer per id in the given order: the node, ``None`` for an id matching no
+        row, and the denial for one the caller may not read.
+        """
         if not ids:
             return []
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=len(ids)),
-            conditions=[PrometheusQueryPresetCategoryConditions.by_ids(ids)],
+        entity_ids = [PrometheusQueryPresetCategoryID(value) for value in ids]
+        result = await self._prometheus_query_preset_category.bulk_get_categories.run(
+            BulkGetCategoriesAction(ids=entity_ids)
         )
-        action_result = await self._processors.prometheus_query_preset_category.search_categories.wait_for_complete(
-            SearchCategoriesAction(querier=querier)
-        )
-        category_map = {item.id: self._data_to_dto(item) for item in action_result.items}
-        return [category_map.get(category_id) for category_id in ids]
+        return [
+            self._data_to_dto(item.value)
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
 
     async def create(self, input: CreateCategoryInput) -> CreateCategoryPayload:
         """Create a new prometheus query preset category."""
-        creator: Creator[PrometheusQueryPresetCategoryRow] = Creator(
-            spec=PrometheusQueryPresetCategoryCreatorSpec(
-                name=input.name,
-                description=input.description,
-            )
+        creator = PrometheusQueryPresetCategoryCreator(
+            name=input.name,
+            description=input.description,
         )
 
-        action_result = await self._processors.prometheus_query_preset_category.create_category.wait_for_complete(
+        action_result = await self._prometheus_query_preset_category.global_create_category.run(
             CreateCategoryAction(creator=creator)
         )
 
-        return CreateCategoryPayload(item=self._data_to_dto(action_result.category))
+        return CreateCategoryPayload(item=self._data_to_dto(action_result.data))
 
     async def search(self, input: SearchCategoriesInput) -> SearchCategoriesPayload:
         """Search prometheus query preset categories.
@@ -92,10 +128,16 @@ class PrometheusQueryPresetCategoryAdapter(BaseAdapter):
         Available to any authenticated user via REST/GQL — categories are a
         shared catalog for organizing metric query templates.
         """
-        querier = self.build_querier(input)
+        searcher = self.build_searcher(input)
 
-        action_result = await self._processors.prometheus_query_preset_category.search_categories.wait_for_complete(
-            SearchCategoriesAction(querier=querier)
+        action_result = await self._prometheus_query_preset_category.scoped_search_categories.run(
+            ScopedSearchCategoriesAction(
+                searcher=ScopedSearcher(
+                    scopes=[PublicPrometheusQueryPresetCategoryTarget()],
+                    used_by=(),
+                    searcher=searcher,
+                )
+            )
         )
 
         return SearchCategoriesPayload(
@@ -107,35 +149,58 @@ class PrometheusQueryPresetCategoryAdapter(BaseAdapter):
 
     async def get(self, category_id: UUID) -> GetCategoryPayload:
         """Get a single category by ID."""
-        action_result = (
-            await self._processors.prometheus_query_preset_category.get_category.wait_for_complete(
-                GetCategoryAction(category_id=category_id)
+        action_result = await self._prometheus_query_preset_category.get_category.run(
+            GetCategoryAction(category_id=PrometheusQueryPresetCategoryID(category_id))
+        )
+
+        return GetCategoryPayload(item=self._data_to_dto(action_result.data))
+
+    async def purge(self, category_id: PrometheusQueryPresetCategoryID) -> DeleteCategoryPayload:
+        """Permanently remove a category."""
+        action_result = await self._prometheus_query_preset_category.purge_category.run(
+            PurgeCategoryAction(category_id=category_id)
+        )
+
+        return DeleteCategoryPayload(id=action_result.data.id)
+
+    async def partial_bulk_purge(
+        self, input: PartialBulkPurgeQueryPresetCategoriesInput
+    ) -> PartialBulkPayload[CategoryNode]:
+        """Permanently remove several categories, answering for each one."""
+        result = await self._prometheus_query_preset_category.partial_bulk_purge_categories.run(
+            PartialBulkPurgeCategoriesAction(
+                ids=[PrometheusQueryPresetCategoryID(category_id) for category_id in input.ids]
             )
         )
+        return self._to_partial_bulk_payload(result)
 
-        return GetCategoryPayload(item=self._data_to_dto(action_result.category))
-
-    async def delete(self, input: DeleteCategoryInput) -> DeleteCategoryPayload:
-        """Delete a category by ID."""
-        action_result = await self._processors.prometheus_query_preset_category.delete_category.wait_for_complete(
-            DeleteCategoryAction(category_id=input.id)
+    def _to_partial_bulk_payload(
+        self, result: PartialBulkResult[PrometheusQueryPresetCategoryData]
+    ) -> PartialBulkPayload[CategoryNode]:
+        return PartialBulkPayload[CategoryNode](
+            successes=[
+                self._data_to_dto(item.value) for item in result.items if item.value is not None
+            ],
+            failed=[
+                PartialBulkFailure(id=item.entity_id, message=str(item.error))
+                for item in result.items
+                if item.error is not None
+            ],
         )
 
-        return DeleteCategoryPayload(id=action_result.category_id)
-
     _PAGINATION_SPEC = PaginationSpec(
-        forward_order=PrometheusQueryPresetCategoryOrders.created_at(ascending=False),
-        backward_order=PrometheusQueryPresetCategoryOrders.created_at(ascending=True),
-        forward_condition_factory=PrometheusQueryPresetCategoryConditions.by_cursor_forward,
-        backward_condition_factory=PrometheusQueryPresetCategoryConditions.by_cursor_backward,
-        tiebreaker_order=PrometheusQueryPresetCategoryRow.id.asc(),
+        forward_order=PrometheusQueryPresetCategorySearchableFields.own.created_at.order.apply(
+            ascending=False
+        ),
+        cursor_column=PrometheusQueryPresetCategoryRow.id,
     )
 
-    def build_querier(self, input: SearchCategoriesInput) -> BatchQuerier:
-        """Build a BatchQuerier from the search input DTO."""
+    def build_searcher(self, input: SearchCategoriesInput) -> PrometheusQueryPresetCategorySearcher:
+        """Build the searcher from the search input DTO."""
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
-        return self._build_querier(
+        return self._build_searcher(
+            PrometheusQueryPresetCategorySearcher,
             conditions=conditions,
             orders=orders,
             pagination_spec=self._PAGINATION_SPEC,
@@ -148,19 +213,10 @@ class PrometheusQueryPresetCategoryAdapter(BaseAdapter):
         )
 
     def _convert_filter(self, filter: CategoryFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-
-        if filter.name is not None:
-            condition = self.convert_string_filter(
-                filter.name,
-                contains_factory=PrometheusQueryPresetCategoryConditions.by_name_contains,
-                equals_factory=PrometheusQueryPresetCategoryConditions.by_name_equals,
-                starts_with_factory=PrometheusQueryPresetCategoryConditions.by_name_starts_with,
-                ends_with_factory=PrometheusQueryPresetCategoryConditions.by_name_ends_with,
-                in_factory=PrometheusQueryPresetCategoryConditions.by_name_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
+        fields = PrometheusQueryPresetCategorySearchableFields.own
+        conditions: list[QueryCondition] = [
+            *self.apply_string_filter(filter.name, fields.name.filter),
+        ]
 
         if filter.AND:
             for sub_filter in filter.AND:
@@ -168,28 +224,29 @@ class PrometheusQueryPresetCategoryAdapter(BaseAdapter):
         if filter.OR:
             or_conditions: list[QueryCondition] = []
             for sub_filter in filter.OR:
-                or_conditions.extend(self._convert_filter(sub_filter))
+                sub_conditions = self._convert_filter(sub_filter)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if filter.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub_filter in filter.NOT:
-                not_conditions.extend(self._convert_filter(sub_filter))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_filter(sub_filter)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
 
         return conditions
 
-    @staticmethod
-    def _convert_orders(orders: list[CategoryOrder]) -> list[QueryOrder]:
+    def _convert_orders(self, orders: list[CategoryOrder]) -> list[QueryOrder]:
+        fields = PrometheusQueryPresetCategorySearchableFields.own
         result: list[QueryOrder] = []
         for order in orders:
             ascending = order.direction == OrderDirection.ASC
             match order.field.value:
                 case "name":
-                    result.append(PrometheusQueryPresetCategoryOrders.name(ascending))
+                    result.append(fields.name.order.apply(ascending))
                 case "created_at":
-                    result.append(PrometheusQueryPresetCategoryOrders.created_at(ascending))
+                    result.append(fields.created_at.order.apply(ascending))
         return result
 
     @staticmethod
@@ -197,6 +254,7 @@ class PrometheusQueryPresetCategoryAdapter(BaseAdapter):
         """Convert data layer type to Pydantic DTO."""
         return CategoryNode(
             id=data.id,
+            entity_id=data.entity_id(),
             name=data.name,
             description=data.description,
             created_at=data.created_at,

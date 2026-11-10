@@ -3,11 +3,24 @@
 from __future__ import annotations
 
 import secrets
+from collections.abc import Sequence
+from typing import assert_never
 from uuid import UUID
 
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.model_card import ModelCardID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.common.data.permission.types import Permission
+from ai.backend.common.data.user.types import UserData
+from ai.backend.common.dto.manager.v2.common import PartialBulkFailure, PartialBulkPayload
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
+from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO
 from ai.backend.common.dto.manager.v2.vfolder.request import (
     BulkDeleteVFoldersInput,
     BulkPurgeVFoldersInput,
@@ -21,13 +34,21 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     ListFilesInput,
     MkdirInput,
     MoveFileInput,
+    PartialBulkDeleteVFoldersInput,
+    PartialBulkRestoreVFoldersInput,
+    PartialBulkUpdateVFoldersInput,
     PurgeVFolderInput,
+    ScopedSearchVFoldersInput,
     SearchVFoldersInput,
+    SetVFolderMountPolicyInput,
+    UnsetVFolderMountPolicyInput,
+    UpdateVFolderInput,
     VFolderFilter,
     VFolderOrder,
 )
 from ai.backend.common.dto.manager.v2.vfolder.response import (
     BulkDeleteVFoldersPayload,
+    BulkDeleteVFolderV2Error,
     BulkPurgeVFoldersPayload,
     BulkPurgeVFolderV2Error,
     CloneVFolderPayload,
@@ -44,21 +65,39 @@ from ai.backend.common.dto.manager.v2.vfolder.response import (
     PurgeVFolderPayload,
     RestoreVFolderPayload,
     SearchVFoldersPayload,
+    SetVFolderMountPolicyPayload,
+    UnsetVFolderMountPolicyPayload,
+    UpdateVFolderPayload,
+    VFolderMountPoliciesPayload,
+    VFolderMountPolicyNode,
     VFolderNode,
 )
 from ai.backend.common.dto.manager.v2.vfolder.types import (
     FileEntryType,
+    OrderDirection,
     VFolderAccessControlInfo,
     VFolderMetadataInfo,
+    VFolderOrderField,
     VFolderOwnershipInfo,
+    VFolderPermissionField,
     VFolderQuotaInfo,
+    VFolderScope,
+    VFolderUsage,
 )
 from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderUsageInfo as VFolderUsageInfoDTO,
 )
 from ai.backend.common.exception import BackendAIError, UnreachableError
 from ai.backend.common.schema.deployment import BlueGreenSpec, RollingUpdateSpec
-from ai.backend.common.types import BinarySize, MountPermission, VFolderUsageMode
+from ai.backend.common.types import (
+    BinarySize,
+    MountPermission,
+    QuotaScopeID,
+    QuotaScopeType,
+    VFolderMountPolicy,
+    VFolderUsageMode,
+)
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkResult
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.deployment.creator import (
@@ -74,41 +113,49 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.data.vfolder.types import (
     VFolderData,
-    VFolderOperationStatus,
+    VFolderMountPolicyData,
 )
 from ai.backend.manager.errors.resource import NotAModelVFolder
-from ai.backend.manager.errors.storage import VFolderNotFound
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.vfolder import VFolderPermission
-from ai.backend.manager.models.vfolder.conditions import VFolderConditions
-from ai.backend.manager.models.vfolder.orders import (
-    DEFAULT_BACKWARD_ORDER as VFOLDER_DEFAULT_BACKWARD_ORDER,
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
+    combine_conditions_or,
+    negate_conditions,
 )
-from ai.backend.manager.models.vfolder.orders import (
-    DEFAULT_FORWARD_ORDER as VFOLDER_DEFAULT_FORWARD_ORDER,
+from ai.backend.manager.models.scopes import ScopeTarget
+from ai.backend.manager.models.specs.search.usage import UsedBy
+from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
+from ai.backend.manager.models.vfolder.creators import (
+    PersonalVFolderCreator,
+    ProjectVFolderCreator,
+    VFolderBaseCreator,
 )
-from ai.backend.manager.models.vfolder.orders import (
-    TIEBREAKER_ORDER as VFOLDER_TIEBREAKER_ORDER,
+from ai.backend.manager.models.vfolder.row import VFolderRow
+from ai.backend.manager.models.vfolder.scopes import (
+    DomainVFolderTarget,
+    ProjectVFolderTarget,
+    UserVFolderTarget,
 )
-from ai.backend.manager.models.vfolder.orders import (
-    resolve_order as resolve_vfolder_order,
-)
-from ai.backend.manager.repositories.base import combine_conditions_or, negate_conditions
-from ai.backend.manager.repositories.vfolder.types import (
-    ProjectVFolderSearchScope,
-    UserVFolderSearchScope,
-)
+from ai.backend.manager.models.vfolder.searchable_fields import VFolderSearchableFields
+from ai.backend.manager.models.vfolder.searchers import VFolderSearcher
+from ai.backend.manager.models.vfolder.updaters import VFolderAttributeUpdater
 from ai.backend.manager.services.deployment.actions.create_deployment import CreateDeploymentAction
+from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.vfolder.actions.admin_search_vfolders import (
-    AdminSearchVFoldersAction,
+    GlobalSearchVFoldersAction,
 )
 from ai.backend.manager.services.vfolder.actions.base import (
     RestoreVFolderFromTrashAction,
+    UpdateVFolderAttributeAction,
 )
-from ai.backend.manager.services.vfolder.actions.batch_load_by_ids import (
-    BatchLoadVFoldersByIdsAction,
+from ai.backend.manager.services.vfolder.actions.bulk_get import BulkGetVFoldersAction
+from ai.backend.manager.services.vfolder.actions.bulk_load_mount_levels import (
+    BulkLoadVFolderMountLevelsAction,
 )
-from ai.backend.manager.services.vfolder.actions.create_v2 import CreateVFolderV2Action
+from ai.backend.manager.services.vfolder.actions.bulk_load_permissions import (
+    BulkLoadVFolderPermissionsAction,
+)
+from ai.backend.manager.services.vfolder.actions.create import CreateVFolderAction
 from ai.backend.manager.services.vfolder.actions.file_v2 import (
     CloneVFolderV2Action,
     CreateDownloadSessionV2Action,
@@ -121,29 +168,40 @@ from ai.backend.manager.services.vfolder.actions.get_usage import (
     GetVFolderUsageAction,
 )
 from ai.backend.manager.services.vfolder.actions.get_v2 import GetVFolderV2Action
-from ai.backend.manager.services.vfolder.actions.search_in_project import (
-    SearchVFoldersInProjectAction,
+from ai.backend.manager.services.vfolder.actions.mount_policy import (
+    ListVFolderMountPoliciesAction,
+    SetVFolderMountPolicyAction,
+    UnsetVFolderMountPolicyAction,
 )
-from ai.backend.manager.services.vfolder.actions.search_user_vfolders import (
-    SearchUserVFoldersAction,
+from ai.backend.manager.services.vfolder.actions.partial_bulk_delete_vfolders import (
+    PartialBulkDeleteVFoldersAction,
 )
+from ai.backend.manager.services.vfolder.actions.partial_bulk_restore_vfolders import (
+    PartialBulkRestoreVFoldersAction,
+)
+from ai.backend.manager.services.vfolder.actions.partial_bulk_update_vfolders import (
+    PartialBulkUpdateVFoldersAction,
+)
+from ai.backend.manager.services.vfolder.actions.scoped_search import ScopedSearchVFoldersAction
 from ai.backend.manager.services.vfolder.actions.upload_session_v2 import (
     CreateUploadSessionV2Action,
-)
-from ai.backend.manager.services.vfolder.actions.vfolder_in_project import (
-    CreateVFolderInProjectAction,
 )
 from ai.backend.manager.services.vfolder.actions.vfolder_v2 import (
     DeleteVFolderV2Action,
     PurgeVFolderV2Action,
 )
+from ai.backend.manager.services.vfolder.processors.file import VFolderFileProcessors
+from ai.backend.manager.services.vfolder.processors.mount_policy import VFolderMountPolicyProcessors
+from ai.backend.manager.services.vfolder.processors.vfolder import VFolderProcessors
+from ai.backend.manager.services.vfolder.processors.vfolder_admin import VFolderAdminProcessors
+from ai.backend.manager.types import OptionalState
+
+# The ``vfolders.max_files`` column default; no path ever wrote another value.
+_LEGACY_MAX_FILES = 1000
 
 _VFOLDER_PAGINATION_SPEC = PaginationSpec(
-    forward_order=VFOLDER_DEFAULT_FORWARD_ORDER,
-    backward_order=VFOLDER_DEFAULT_BACKWARD_ORDER,
-    forward_condition_factory=VFolderConditions.by_cursor_forward,
-    backward_condition_factory=VFolderConditions.by_cursor_backward,
-    tiebreaker_order=VFOLDER_TIEBREAKER_ORDER,
+    forward_order=VFolderSearchableFields.own.created_at.order.apply(ascending=False),
+    cursor_column=VFolderRow.id,
 )
 
 
@@ -186,11 +244,32 @@ def _build_policy_from_strategy_input(
 class VFolderAdapter(BaseAdapter):
     """Adapter for VFolder domain operations."""
 
+    _vfolder: VFolderProcessors
+    _vfolder_file: VFolderFileProcessors
+    _vfolder_admin: VFolderAdminProcessors
+    _deployment: DeploymentProcessors
+    _mount_policy: VFolderMountPolicyProcessors
+
+    def __init__(
+        self,
+        vfolder: VFolderProcessors,
+        vfolder_file: VFolderFileProcessors,
+        vfolder_admin: VFolderAdminProcessors,
+        deployment: DeploymentProcessors,
+        mount_policy: VFolderMountPolicyProcessors,
+    ) -> None:
+        self._vfolder = vfolder
+        self._vfolder_file = vfolder_file
+        self._vfolder_admin = vfolder_admin
+        self._deployment = deployment
+        self._mount_policy = mount_policy
+
     @staticmethod
     def _vfolder_data_to_node(data: VFolderData) -> VFolderNode:
         """Convert VFolderData to VFolderNode DTO."""
         return VFolderNode(
             id=data.id,
+            entity_id=data.entity_id(),
             status=data.status.to_field(),
             host=data.host,
             metadata=VFolderMetadataInfo(
@@ -202,7 +281,7 @@ class VFolderAdapter(BaseAdapter):
                 cloneable=data.cloneable,
             ),
             access_control=VFolderAccessControlInfo(
-                permission=data.permission.to_field() if data.permission else None,
+                permission=VFolderPermissionField(data.default_mount_permission.value),
                 ownership_type=data.ownership_type.to_field(),
             ),
             ownership=VFolderOwnershipInfo(
@@ -211,12 +290,7 @@ class VFolderAdapter(BaseAdapter):
                 creator_id=data.creator_id,
                 creator_email=data.creator,
             ),
-            quota=VFolderQuotaInfo(
-                max_size=BinarySize.to_size_info(data.max_size)
-                if data.max_size is not None
-                else None,
-                max_files=data.max_files,
-            ),
+            quota=VFolderQuotaInfo(max_size=None, max_files=_LEGACY_MAX_FILES),
             unmanaged_path=data.unmanaged_path,
         )
 
@@ -224,23 +298,73 @@ class VFolderAdapter(BaseAdapter):
     # Batch load (DataLoader)
     # -------------------------------------------------------------------------
 
-    async def batch_load_by_ids(self, ids: list[UUID]) -> list[VFolderNode | None]:
-        """Batch fetch vfolders by IDs for GraphQL DataLoader.
+    async def batch_load_by_ids(
+        self, ids: Sequence[VFolderUUID]
+    ) -> list[VFolderNode | Exception | None]:
+        """Batch load vfolders by id for DataLoader use, checked per folder.
 
-        Used by field resolvers (e.g. ``ModelCardGQL.vfolder``) that surface a
-        related vfolder for an entity that is already accessible to the caller.
-        Returns nodes in the same order as the input IDs; missing entries are
-        ``None``.
+        One answer per id in the given order: the node, ``None`` for an id matching no
+        row, and the denial for one the caller may not read.
         """
         if not ids:
             return []
-        action_result = await self._processors.vfolder.batch_load_vfolders_by_ids.wait_for_complete(
-            BatchLoadVFoldersByIdsAction(ids=list(ids))
-        )
+        result = await self._vfolder.bulk_get.run(BulkGetVFoldersAction(ids=list(ids)))
         return [
-            self._vfolder_data_to_node(item) if item is not None else None
-            for item in action_result.data
+            self._vfolder_data_to_node(item.value)
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in result.items
         ]
+
+    async def batch_load_permissions(
+        self, vfolder_ids: Sequence[VFolderUUID]
+    ) -> list[list[PermissionBitDTO] | Exception]:
+        """The permission bits the caller holds on each vfolder, in the given order.
+
+        A folder the caller may not read answers with its denial.
+        """
+        if not vfolder_ids:
+            return []
+        result = await self._vfolder.bulk_load_permissions.run(
+            BulkLoadVFolderPermissionsAction(vfolder_ids=vfolder_ids)
+        )
+        held = result.values()
+        errors = result.errors()
+        answers: list[list[PermissionBitDTO] | Exception] = []
+        for vfolder_id in vfolder_ids:
+            error = self.batch_load_failure(errors.get(vfolder_id))
+            if error is not None:
+                answers.append(error)
+                continue
+            bits = held.get(vfolder_id, Permission.NONE)
+            answers.append([dto for dto in PermissionBitDTO if bits & Permission[dto.name]])
+        return answers
+
+    async def batch_load_mount_permissions(
+        self, vfolder_ids: Sequence[VFolderUUID]
+    ) -> list[VFolderPermissionField | Exception | None]:
+        """The level the caller mounts each vfolder at, in the given order.
+
+        An id naming no folder answers ``None``.
+        """
+        if not vfolder_ids:
+            return []
+        result = await self._vfolder.bulk_load_mount_levels.run(
+            BulkLoadVFolderMountLevelsAction(vfolder_ids=vfolder_ids)
+        )
+        levels = result.values()
+        errors = result.errors()
+        mount_permissions: list[VFolderPermissionField | Exception | None] = []
+        for vfolder_id in vfolder_ids:
+            error = self.batch_load_failure(errors.get(vfolder_id))
+            if error is not None:
+                mount_permissions.append(error)
+                continue
+            level = levels.get(vfolder_id)
+            mount_permissions.append(
+                VFolderPermissionField(level.value) if level is not None else None
+            )
+        return mount_permissions
 
     # -------------------------------------------------------------------------
     # Search
@@ -251,61 +375,16 @@ class VFolderAdapter(BaseAdapter):
         input: SearchVFoldersInput,
     ) -> SearchVFoldersPayload:
         """Admin search for VFolders with system scope."""
-        conditions = self._convert_vfolder_filter(input.filter) if input.filter else []
-        orders = self._convert_vfolder_orders(input.order) if input.order else []
-        querier = self._build_querier(
-            conditions=conditions,
-            orders=orders,
-            pagination_spec=_VFOLDER_PAGINATION_SPEC,
-            first=input.first,
-            after=input.after,
-            last=input.last,
-            before=input.before,
-            limit=input.limit,
-            offset=input.offset,
-        )
-        action_result = (
-            await self._processors.vfolder_admin.admin_search_vfolders.wait_for_complete(
-                AdminSearchVFoldersAction(querier=querier)
+        action_result = await self._vfolder_admin.admin_search_vfolders.run(
+            GlobalSearchVFoldersAction(
+                searcher=GlobalSearcher(
+                    used_by=self._usage(input.usage),
+                    searcher=self._build_vfolder_searcher(input),
+                )
             )
         )
         return SearchVFoldersPayload(
-            items=[self._vfolder_data_to_node(item) for item in action_result.data],
-            total_count=action_result.total_count,
-            has_next_page=action_result.has_next_page,
-            has_previous_page=action_result.has_previous_page,
-        )
-
-    async def my_search(
-        self,
-        input: SearchVFoldersInput,
-    ) -> SearchVFoldersPayload:
-        """Search vfolders accessible to the current user.
-
-        Calls current_user() internally -- the caller does not need to pass scope.
-        """
-        me = current_user()
-        if me is None:
-            raise UnreachableError("User context is not available")
-        scope = UserVFolderSearchScope(user_id=me.user_id)
-        conditions = self._convert_vfolder_filter(input.filter) if input.filter else []
-        orders = self._convert_vfolder_orders(input.order) if input.order else []
-        querier = self._build_querier(
-            conditions=conditions,
-            orders=orders,
-            pagination_spec=_VFOLDER_PAGINATION_SPEC,
-            first=input.first,
-            after=input.after,
-            last=input.last,
-            before=input.before,
-            limit=input.limit,
-            offset=input.offset,
-        )
-        action_result = await self._processors.vfolder.search_user_vfolders.wait_for_complete(
-            SearchUserVFoldersAction(scope=scope, querier=querier)
-        )
-        return SearchVFoldersPayload(
-            items=[self._vfolder_data_to_node(item) for item in action_result.data],
+            items=[self._vfolder_data_to_node(item) for item in action_result.items],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
@@ -320,12 +399,78 @@ class VFolderAdapter(BaseAdapter):
 
         Used for the project admin page.
         """
-        scope = ProjectVFolderSearchScope(project_id=project_id)
-        conditions = self._convert_vfolder_filter(input.filter) if input.filter else []
-        orders = self._convert_vfolder_orders(input.order) if input.order else []
-        querier = self._build_querier(
-            conditions=conditions,
-            orders=orders,
+        action_result = await self._vfolder.scoped_search.run(
+            self._scoped_search_action(
+                [ProjectVFolderTarget(project_id=ProjectID(project_id))], input
+            )
+        )
+        return SearchVFoldersPayload(
+            items=[self._vfolder_data_to_node(item) for item in action_result.items],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+        )
+
+    def _scope_targets(self, scope: VFolderScope) -> list[ScopeTarget]:
+        """The scopes the request named, in the order the input lists them."""
+        scopes: list[ScopeTarget] = [
+            DomainVFolderTarget(domain_id=DomainID(entry.value)) for entry in scope.domain or ()
+        ]
+        scopes.extend(
+            ProjectVFolderTarget(project_id=ProjectID(entry.value)) for entry in scope.project or ()
+        )
+        scopes.extend(UserVFolderTarget(user_id=UserID(entry.value)) for entry in scope.user or ())
+        return scopes
+
+    def _usage(self, usage: VFolderUsage | None) -> list[UsedBy]:
+        """The uses the request named, deployments before model cards before sessions."""
+        if usage is None or usage.used_by is None:
+            return []
+        used_by = usage.used_by
+        linked = VFolderSearchableFields.linked.usage
+        return [
+            *(
+                linked.deployments.used_by(DeploymentID(entity_id))
+                for entity_id in used_by.deployment or ()
+            ),
+            *(
+                linked.model_cards.used_by(ModelCardID(entity_id))
+                for entity_id in used_by.model_card or ()
+            ),
+            *(linked.sessions.used_by(SessionID(entity_id)) for entity_id in used_by.session or ()),
+        ]
+
+    def _scoped_search_action(
+        self, scopes: Sequence[ScopeTarget], input: SearchVFoldersInput
+    ) -> ScopedSearchVFoldersAction:
+        return ScopedSearchVFoldersAction(
+            searcher=ScopedSearcher(
+                scopes=scopes,
+                used_by=self._usage(input.usage),
+                searcher=self._build_vfolder_searcher(input),
+            )
+        )
+
+    async def scoped_search(
+        self,
+        input: ScopedSearchVFoldersInput,
+    ) -> SearchVFoldersPayload:
+        """Search the vfolders the named scopes reach, combined with OR."""
+        action_result = await self._vfolder.scoped_search.run(
+            self._scoped_search_action(self._scope_targets(input.scope), input)
+        )
+        return SearchVFoldersPayload(
+            items=[self._vfolder_data_to_node(item) for item in action_result.items],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+        )
+
+    def _build_vfolder_searcher(self, input: SearchVFoldersInput) -> VFolderSearcher:
+        return self._build_searcher(
+            VFolderSearcher,
+            conditions=self._convert_vfolder_filter(input.filter) if input.filter else [],
+            orders=self._convert_vfolder_orders(input.order) if input.order else [],
             pagination_spec=_VFOLDER_PAGINATION_SPEC,
             first=input.first,
             after=input.after,
@@ -334,33 +479,15 @@ class VFolderAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.vfolder.search_vfolders_in_project.wait_for_complete(
-            SearchVFoldersInProjectAction(scope=scope, querier=querier)
-        )
-        return SearchVFoldersPayload(
-            items=[self._vfolder_data_to_node(item) for item in action_result.data],
-            total_count=action_result.total_count,
-            has_next_page=action_result.has_next_page,
-            has_previous_page=action_result.has_previous_page,
-        )
 
     async def create(self, input: CreateVFolderInput) -> CreateVFolderPayload:
         """Create a new vfolder."""
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
-        action = CreateVFolderV2Action(
-            name=input.name,
-            user_id=me.user_id,
-            domain_name=me.domain_name,
-            project_id=input.project_id,
-            host=input.host,
-            usage_mode=VFolderUsageMode(input.usage_mode.value),
-            permission=VFolderPermission(input.permission.value),
-            cloneable=input.cloneable,
-        )
-        result = await self._processors.vfolder.create_vfolder_v2.wait_for_complete(action)
-        return CreateVFolderPayload(vfolder=self._vfolder_data_to_node(result.vfolder))
+        if input.project_id is not None:
+            return await self._create(self._project_creator(me, ProjectID(input.project_id), input))
+        return await self._create(self._personal_creator(me, input))
 
     async def create_in_project(
         self,
@@ -369,24 +496,56 @@ class VFolderAdapter(BaseAdapter):
     ) -> CreateVFolderPayload:
         """Create a vfolder owned by the given project.
 
-        Uses ``CreateVFolderInProjectAction`` which is PROJECT-scoped so the
-        caller must hold CREATE permission on the project.
+        PROJECT-scoped, so the caller must hold CREATE permission on the project.
         """
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
-        action = CreateVFolderInProjectAction(
-            project_id=project_id,
-            user_id=me.user_id,
-            domain_name=me.domain_name,
+        return await self._create(self._project_creator(me, ProjectID(project_id), input))
+
+    async def _create(self, creator: VFolderBaseCreator) -> CreateVFolderPayload:
+        result = await self._vfolder.create_vfolder.run(CreateVFolderAction(creator=creator))
+        return CreateVFolderPayload(vfolder=self._vfolder_data_to_node(result.vfolder))
+
+    def _personal_creator(
+        self, me: UserData, input: CreateVFolderInput | CreateVFolderInScopeInput
+    ) -> PersonalVFolderCreator:
+        """The caller's own folder. The personal project is not named here — the spec
+        finds it by the owner, so no request reaches somebody else's."""
+        return PersonalVFolderCreator(
             name=input.name,
-            host=input.host,
+            domain_name=me.domain_name,
+            quota_scope_id=str(QuotaScopeID(QuotaScopeType.USER, me.user_id)),
+            host=input.host or "",
+            creator_id=me.user_id,
+            user=UserID(me.user_id),
             usage_mode=VFolderUsageMode(input.usage_mode.value),
-            permission=VFolderPermission(input.permission.value),
+            default_mount_permission=(
+                None if input.permission is None else VFolderMountPolicy(input.permission.value)
+            ),
             cloneable=input.cloneable,
         )
-        result = await self._processors.vfolder.create_vfolder_in_project.wait_for_complete(action)
-        return CreateVFolderPayload(vfolder=self._vfolder_data_to_node(result.vfolder))
+
+    def _project_creator(
+        self,
+        me: UserData,
+        project_id: ProjectID,
+        input: CreateVFolderInput | CreateVFolderInScopeInput,
+    ) -> ProjectVFolderCreator:
+        """A folder the named project owns."""
+        return ProjectVFolderCreator(
+            name=input.name,
+            domain_name=me.domain_name,
+            quota_scope_id=str(QuotaScopeID(QuotaScopeType.PROJECT, project_id)),
+            host=input.host or "",
+            creator_id=me.user_id,
+            project=project_id,
+            usage_mode=VFolderUsageMode(input.usage_mode.value),
+            default_mount_permission=(
+                None if input.permission is None else VFolderMountPolicy(input.permission.value)
+            ),
+            cloneable=input.cloneable,
+        )
 
     async def create_upload_session(
         self, vfolder_id: UUID, input: CreateUploadSessionInput
@@ -397,19 +556,66 @@ class VFolderAdapter(BaseAdapter):
             raise UnreachableError("User context is not available")
         action = CreateUploadSessionV2Action(
             user_id=me.user_id,
-            vfolder_id=vfolder_id,
+            vfolder_uuid=VFolderUUID(vfolder_id),
             path=input.path,
             size=input.size,
         )
-        result = await self._processors.vfolder.create_upload_session_v2.wait_for_complete(action)
+        result = await self._vfolder.create_upload_session_v2.run(action)
         return CreateUploadSessionPayload(token=result.token, url=result.url)
 
     async def get(self, vfolder_id: UUID) -> VFolderNode:
         """Get a single vfolder by ID with RBAC validation."""
-        result = await self._processors.vfolder.get_v2.wait_for_complete(
-            GetVFolderV2Action(vfolder_uuid=vfolder_id)
+        result = await self._vfolder.get_v2.run(
+            GetVFolderV2Action(vfolder_uuid=VFolderUUID(vfolder_id))
         )
         return self._vfolder_data_to_node(result.vfolder)
+
+    async def set_mount_policy(
+        self, vfolder_id: UUID, input: SetVFolderMountPolicyInput
+    ) -> SetVFolderMountPolicyPayload:
+        """Set the mount level one user gets on the folder."""
+        result = await self._mount_policy.set.run(
+            SetVFolderMountPolicyAction(
+                vfolder_uuid=VFolderUUID(vfolder_id),
+                user_id=UserID(input.user_id),
+                permission=VFolderMountPolicy(input.permission.value),
+            )
+        )
+        return SetVFolderMountPolicyPayload(policy=self._mount_policy_to_node(result.policy))
+
+    async def unset_mount_policy(
+        self, vfolder_id: UUID, input: UnsetVFolderMountPolicyInput
+    ) -> UnsetVFolderMountPolicyPayload:
+        """Take back the mount level one user was given on the folder."""
+        result = await self._mount_policy.unset.run(
+            UnsetVFolderMountPolicyAction(
+                vfolder_uuid=VFolderUUID(vfolder_id), user_id=UserID(input.user_id)
+            )
+        )
+        return UnsetVFolderMountPolicyPayload(
+            vfolder_id=vfolder_id, user_id=input.user_id, removed=result.removed
+        )
+
+    async def list_mount_policies(self, vfolder_id: UUID) -> VFolderMountPoliciesPayload:
+        """The mount levels set on the folder, one row per user."""
+        result = await self._mount_policy.list.run(
+            ListVFolderMountPoliciesAction(vfolder_uuid=VFolderUUID(vfolder_id))
+        )
+        return VFolderMountPoliciesPayload(
+            items=[self._mount_policy_to_node(policy) for policy in result.policies]
+        )
+
+    @staticmethod
+    def _mount_policy_to_node(data: VFolderMountPolicyData) -> VFolderMountPolicyNode:
+        return VFolderMountPolicyNode(
+            id=data.id,
+            field_id=data.id,
+            vfolder_id=data.vfolder_id,
+            user_id=data.user_id,
+            permission=VFolderPermissionField(data.permission.value),
+            created_at=data.created_at,
+            updated_at=data.updated_at,
+        )
 
     async def get_folder_usage(self, vfolder_id: UUID) -> VFolderUsageInfoDTO | None:
         """Fetch usage statistics on demand through the storage proxy.
@@ -419,8 +625,8 @@ class VFolderAdapter(BaseAdapter):
         walk on vfs). Returns ``None`` for unmanaged vfolders, which have no
         storage-proxy backing.
         """
-        result = await self._processors.vfolder.get_folder_usage.wait_for_complete(
-            GetVFolderUsageAction(vfolder_uuid=vfolder_id)
+        result = await self._vfolder.get_folder_usage.run(
+            GetVFolderUsageAction(vfolder_uuid=VFolderUUID(vfolder_id))
         )
         usage = result.usage
         if usage is None:
@@ -430,11 +636,89 @@ class VFolderAdapter(BaseAdapter):
             used_bytes=BinarySize.to_size_info(usage.used_bytes),
         )
 
+    async def update(self, vfolder_id: UUID, input: UpdateVFolderInput) -> UpdateVFolderPayload:
+        """Update a vfolder's name and options."""
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
+        result = await self._vfolder.update_vfolder_attribute.run(
+            UpdateVFolderAttributeAction(
+                user_uuid=me.user_id,
+                vfolder_uuid=VFolderUUID(vfolder_id),
+                updater=self._to_updater(vfolder_id, input),
+            )
+        )
+        return UpdateVFolderPayload(vfolder=self._vfolder_data_to_node(result.vfolder))
+
+    async def partial_bulk_update(
+        self, input: PartialBulkUpdateVFoldersInput
+    ) -> PartialBulkPayload[VFolderNode]:
+        """Update several vfolders, answering for each one."""
+        result = await self._vfolder.partial_bulk_update.run(
+            PartialBulkUpdateVFoldersAction(
+                updaters=[self._to_updater(item.id, item.input) for item in input.items]
+            )
+        )
+        return self._to_partial_bulk_payload(result)
+
+    async def partial_bulk_delete(
+        self, input: PartialBulkDeleteVFoldersInput
+    ) -> PartialBulkPayload[VFolderNode]:
+        """Soft-delete several vfolders, answering for each one."""
+        result = await self._vfolder.partial_bulk_delete.run(
+            PartialBulkDeleteVFoldersAction(
+                vfolder_ids=[VFolderUUID(vfolder_id) for vfolder_id in input.ids]
+            )
+        )
+        return self._to_partial_bulk_payload(result)
+
+    async def partial_bulk_restore(
+        self, input: PartialBulkRestoreVFoldersInput
+    ) -> PartialBulkPayload[VFolderNode]:
+        """Restore several soft-deleted vfolders, answering for each one."""
+        result = await self._vfolder.partial_bulk_restore.run(
+            PartialBulkRestoreVFoldersAction(
+                vfolder_ids=[VFolderUUID(vfolder_id) for vfolder_id in input.ids]
+            )
+        )
+        return self._to_partial_bulk_payload(result)
+
+    def _to_updater(self, vfolder_id: UUID, input: UpdateVFolderInput) -> VFolderAttributeUpdater:
+        permission = input.permission
+        return VFolderAttributeUpdater(
+            vfolder_id=VFolderUUID(vfolder_id),
+            name=OptionalState.from_unset(input.name),
+            cloneable=OptionalState.from_unset(input.cloneable),
+            mount_permission=(
+                OptionalState[VFolderMountPolicy].update(VFolderMountPolicy(permission.value))
+                if isinstance(permission, VFolderPermissionField)
+                else OptionalState[VFolderMountPolicy].nop()
+            ),
+        )
+
+    def _to_partial_bulk_payload(
+        self, result: PartialBulkResult[VFolderData]
+    ) -> PartialBulkPayload[VFolderNode]:
+        return PartialBulkPayload[VFolderNode](
+            successes=[
+                self._vfolder_data_to_node(item.value)
+                for item in result.items
+                if item.value is not None
+            ],
+            failed=[
+                PartialBulkFailure(id=item.entity_id, message=str(item.error))
+                for item in result.items
+                if item.error is not None
+            ],
+        )
+
     async def delete(self, vfolder_id: UUID) -> DeleteVFolderPayload:
         """Soft-delete a vfolder (move to trash). RBAC enforced."""
-        action = DeleteVFolderV2Action(vfolder_id=vfolder_id)
-        await self._processors.vfolder.delete_v2.wait_for_complete(action)
-        return DeleteVFolderPayload(id=vfolder_id)
+        action = DeleteVFolderV2Action(vfolder_uuid=VFolderUUID(vfolder_id))
+        result = await self._vfolder.delete_v2.run(action)
+        return DeleteVFolderPayload(
+            id=vfolder_id, vfolder=self._vfolder_data_to_node(result.vfolder)
+        )
 
     async def restore(self, vfolder_id: UUID) -> RestoreVFolderPayload:
         """Restore a trashed vfolder. RBAC enforced."""
@@ -443,20 +727,22 @@ class VFolderAdapter(BaseAdapter):
             raise UnreachableError("User context is not available")
         action = RestoreVFolderFromTrashAction(
             user_uuid=me.user_id,
-            vfolder_uuid=vfolder_id,
+            vfolder_uuid=VFolderUUID(vfolder_id),
         )
-        await self._processors.vfolder.restore_vfolder_from_trash.wait_for_complete(action)
+        await self._vfolder.restore_vfolder_from_trash.run(action)
         return RestoreVFolderPayload(id=vfolder_id)
 
     async def purge(self, vfolder_id: UUID, input: PurgeVFolderInput) -> PurgeVFolderPayload:
         """Permanently delete a vfolder, optionally cascading linked model cards."""
         action = PurgeVFolderV2Action(
-            vfolder_id=vfolder_id,
+            vfolder_uuid=VFolderUUID(vfolder_id),
             cascade_model_card=input.options.cascade_model_card,
             force=input.options.force,
         )
-        await self._processors.vfolder.purge_v2.wait_for_complete(action)
-        return PurgeVFolderPayload(id=vfolder_id)
+        result = await self._vfolder.purge_v2.run(action)
+        return PurgeVFolderPayload(
+            id=vfolder_id, vfolder=self._vfolder_data_to_node(result.vfolder)
+        )
 
     async def deploy(
         self,
@@ -476,12 +762,10 @@ class VFolderAdapter(BaseAdapter):
         if me is None:
             raise UnreachableError("User context is not available")
 
-        batch_result = await self._processors.vfolder.batch_load_vfolders_by_ids.wait_for_complete(
-            BatchLoadVFoldersByIdsAction(ids=[vfolder_id])
+        get_result = await self._vfolder.get_v2.run(
+            GetVFolderV2Action(vfolder_uuid=VFolderUUID(vfolder_id))
         )
-        if not batch_result.data or batch_result.data[0] is None:
-            raise VFolderNotFound()
-        vfolder = batch_result.data[0]
+        vfolder = get_result.vfolder
         if vfolder.usage_mode != VFolderUsageMode.MODEL:
             raise NotAModelVFolder()
 
@@ -519,7 +803,7 @@ class VFolderAdapter(BaseAdapter):
             model_revision=ModelRevisionCreator(
                 image_id=None,
                 mounts=VFolderMountsCreator(
-                    model_vfolder_id=vfolder.id,
+                    model_vfolder_id=(vfolder.id),
                     model_definition_path=None,
                     model_mount_destination="/models",
                     extra_mounts=[],
@@ -531,8 +815,12 @@ class VFolderAdapter(BaseAdapter):
             policy=policy,
         )
 
-        result = await self._processors.deployment.create_deployment.wait_for_complete(
-            CreateDeploymentAction(creator=creator, auto_activate=True)
+        result = await self._deployment.create_deployment.run(
+            CreateDeploymentAction(
+                project_id=ProjectID(creator.metadata.project),
+                creator=creator,
+                auto_activate=True,
+            )
         )
         return DeployVFolderPayload(
             deployment_id=result.data.id,
@@ -540,11 +828,18 @@ class VFolderAdapter(BaseAdapter):
         )
 
     async def bulk_delete(self, input: BulkDeleteVFoldersInput) -> BulkDeleteVFoldersPayload:
-        """Soft-delete multiple vfolders."""
-        for vfolder_id in input.ids:
-            action = DeleteVFolderV2Action(vfolder_id=vfolder_id)
-            await self._processors.vfolder.delete_v2.wait_for_complete(action)
-        return BulkDeleteVFoldersPayload(deleted_count=len(input.ids))
+        """Deprecated. Use :meth:`partial_bulk_delete`."""
+        if not input.ids:
+            return BulkDeleteVFoldersPayload(items=[], deleted_count=0, failed=[])
+        payload = await self.partial_bulk_delete(PartialBulkDeleteVFoldersInput(ids=input.ids))
+        return BulkDeleteVFoldersPayload(
+            items=payload.successes,
+            deleted_count=len(payload.successes),
+            failed=[
+                BulkDeleteVFolderV2Error(vfolder_id=failure.id, message=failure.message)
+                for failure in payload.failed
+            ],
+        )
 
     async def bulk_purge(self, input: BulkPurgeVFoldersInput) -> BulkPurgeVFoldersPayload:
         """Permanently purge multiple vfolders, optionally cascading linked model cards.
@@ -552,29 +847,35 @@ class VFolderAdapter(BaseAdapter):
         Each vfolder is processed independently; per-id failures are collected
         into ``failed`` rather than aborting the whole batch.
         """
-        purged_count = 0
+        purged: list[UUID] = []
         failed: list[BulkPurgeVFolderV2Error] = []
         for vfolder_id in input.ids:
             action = PurgeVFolderV2Action(
-                vfolder_id=vfolder_id,
+                vfolder_uuid=VFolderUUID(vfolder_id),
                 cascade_model_card=input.options.cascade_model_card,
                 force=input.options.force,
             )
             try:
-                await self._processors.vfolder.purge_v2.wait_for_complete(action)
+                await self._vfolder.purge_v2.run(action)
             except BackendAIError as e:
                 failed.append(BulkPurgeVFolderV2Error(vfolder_id=vfolder_id, message=str(e)))
                 continue
-            purged_count += 1
-        return BulkPurgeVFoldersPayload(purged_count=purged_count, failed=failed)
+            purged.append(vfolder_id)
+        return BulkPurgeVFoldersPayload(
+            successes=purged,
+            purged_count=len(purged),
+            failed=failed,
+        )
 
     async def list_files(self, vfolder_id: UUID, input: ListFilesInput) -> ListFilesPayload:
         """List files in a vfolder."""
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
-        action = ListFilesV2Action(user_id=me.user_id, vfolder_id=vfolder_id, path=input.path)
-        result = await self._processors.vfolder_file.list_files_v2.wait_for_complete(action)
+        action = ListFilesV2Action(
+            user_id=me.user_id, vfolder_uuid=VFolderUUID(vfolder_id), path=input.path
+        )
+        result = await self._vfolder_file.list_files_v2.run(action)
         return ListFilesPayload(
             items=[
                 FileEntryNode(
@@ -596,12 +897,12 @@ class VFolderAdapter(BaseAdapter):
             raise UnreachableError("User context is not available")
         action = MkdirV2Action(
             user_id=me.user_id,
-            vfolder_id=vfolder_id,
+            vfolder_uuid=VFolderUUID(vfolder_id),
             path=input.path,
             parents=input.parents,
             exist_ok=input.exist_ok,
         )
-        await self._processors.vfolder_file.mkdir_v2.wait_for_complete(action)
+        await self._vfolder_file.mkdir_v2.run(action)
         paths = [input.path] if isinstance(input.path, str) else input.path
         return MkdirPayload(results=paths)
 
@@ -611,9 +912,9 @@ class VFolderAdapter(BaseAdapter):
         if me is None:
             raise UnreachableError("User context is not available")
         action = MoveFileV2Action(
-            user_id=me.user_id, vfolder_id=vfolder_id, src=input.src, dst=input.dst
+            user_id=me.user_id, vfolder_uuid=VFolderUUID(vfolder_id), src=input.src, dst=input.dst
         )
-        await self._processors.vfolder_file.move_file_v2.wait_for_complete(action)
+        await self._vfolder_file.move_file_v2.run(action)
         return MoveFilePayload(src=input.src, dst=input.dst)
 
     async def delete_files(self, vfolder_id: UUID, input: DeleteFilesInput) -> DeleteFilesPayload:
@@ -623,11 +924,11 @@ class VFolderAdapter(BaseAdapter):
             raise UnreachableError("User context is not available")
         action = DeleteFilesV2Action(
             user_id=me.user_id,
-            vfolder_id=vfolder_id,
+            vfolder_uuid=VFolderUUID(vfolder_id),
             files=input.files,
             recursive=input.recursive,
         )
-        result = await self._processors.vfolder_file.delete_files_v2.wait_for_complete(action)
+        result = await self._vfolder_file.delete_files_v2.run(action)
         return DeleteFilesPayload(bgtask_id=result.bgtask_id)
 
     async def create_download_session(
@@ -639,11 +940,11 @@ class VFolderAdapter(BaseAdapter):
             raise UnreachableError("User context is not available")
         action = CreateDownloadSessionV2Action(
             user_id=me.user_id,
-            vfolder_id=vfolder_id,
+            vfolder_uuid=VFolderUUID(vfolder_id),
             path=input.path,
             archive=input.archive,
         )
-        result = await self._processors.vfolder_file.download_file_v2.wait_for_complete(action)
+        result = await self._vfolder_file.download_file_v2.run(action)
         return CreateDownloadSessionPayload(token=result.token, url=result.url)
 
     async def clone(self, vfolder_id: UUID, input: CloneVFolderInput) -> CloneVFolderPayload:
@@ -653,11 +954,11 @@ class VFolderAdapter(BaseAdapter):
             raise UnreachableError("User context is not available")
         action = CloneVFolderV2Action(
             user_id=me.user_id,
-            vfolder_id=vfolder_id,
+            vfolder_uuid=VFolderUUID(vfolder_id),
             target_name=input.name,
             target_host=input.host,
         )
-        result = await self._processors.vfolder.clone_v2.wait_for_complete(action)
+        result = await self._vfolder.clone_v2.run(action)
         # Fetch the newly created vfolder for the response
         cloned_vfolder = await self.get(result.new_vfolder_id)
         return CloneVFolderPayload(
@@ -670,90 +971,55 @@ class VFolderAdapter(BaseAdapter):
     # -------------------------------------------------------------------------
 
     def _convert_vfolder_filter(self, f: VFolderFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if f.name is not None:
-            c = self.convert_string_filter(
-                f.name,
-                contains_factory=VFolderConditions.by_name_contains,
-                equals_factory=VFolderConditions.by_name_equals,
-                starts_with_factory=VFolderConditions.by_name_starts_with,
-                ends_with_factory=VFolderConditions.by_name_ends_with,
-                in_factory=VFolderConditions.by_name_in,
-            )
-            if c is not None:
-                conditions.append(c)
-        if f.host is not None:
-            c = self.convert_string_filter(
-                f.host,
-                contains_factory=VFolderConditions.by_host_contains,
-                equals_factory=VFolderConditions.by_host_equals,
-                starts_with_factory=VFolderConditions.by_host_starts_with,
-                ends_with_factory=VFolderConditions.by_host_ends_with,
-                in_factory=VFolderConditions.by_host_in,
-            )
-            if c is not None:
-                conditions.append(c)
-        if f.status is not None:
-            if f.status.equals is not None:
-                conditions.append(
-                    VFolderConditions.by_status_equals(VFolderOperationStatus(f.status.equals))
-                )
-            if f.status.in_ is not None:
-                status_values = [VFolderOperationStatus(s) for s in f.status.in_]
-                conditions.append(VFolderConditions.by_status_in(status_values))
-            if f.status.not_equals is not None:
-                conditions.append(
-                    VFolderConditions.by_status_not_equals(
-                        VFolderOperationStatus(f.status.not_equals)
-                    )
-                )
-            if f.status.not_in is not None:
-                status_values = [VFolderOperationStatus(s) for s in f.status.not_in]
-                conditions.append(VFolderConditions.by_status_not_in(status_values))
-        if f.usage_mode is not None:
-            if f.usage_mode.equals is not None:
-                conditions.append(
-                    VFolderConditions.by_usage_mode_equals(VFolderUsageMode(f.usage_mode.equals))
-                )
-            if f.usage_mode.in_ is not None:
-                mode_values = [VFolderUsageMode(m) for m in f.usage_mode.in_]
-                conditions.append(VFolderConditions.by_usage_mode_in(mode_values))
-            if f.usage_mode.not_equals is not None:
-                conditions.append(
-                    VFolderConditions.by_usage_mode_not_equals(
-                        VFolderUsageMode(f.usage_mode.not_equals)
-                    )
-                )
-            if f.usage_mode.not_in is not None:
-                mode_values = [VFolderUsageMode(m) for m in f.usage_mode.not_in]
-                conditions.append(VFolderConditions.by_usage_mode_not_in(mode_values))
-        if f.created_at is not None:
-            c = f.created_at.build_query_condition(
-                before_factory=VFolderConditions.by_created_at_before,
-                after_factory=VFolderConditions.by_created_at_after,
-                equals_factory=VFolderConditions.by_created_at_equals,
-            )
-            if c is not None:
-                conditions.append(c)
-        if f.cloneable is not None:
-            conditions.append(VFolderConditions.by_cloneable(f.cloneable))
+        fields = VFolderSearchableFields.own
+        conditions = [
+            *self.apply_string_filter(f.name, fields.name.filter),
+            *self.apply_string_filter(f.host, fields.host.filter),
+            *self.apply_enum_filter(f.status, fields.status.filter),
+            *self.apply_enum_filter(f.usage_mode, fields.usage_mode.filter),
+            *self.apply_datetime_filter(f.created_at, fields.created_at.filter),
+            *self.apply_bool_filter(f.cloneable, fields.cloneable.filter),
+            *self.apply_uuid_filter(f.entity_id, fields.id.filter),
+            *self.apply_to_many_filter(
+                f.labels,
+                VFolderSearchableFields.nested.labels.correlation,
+                self._convert_entity_label_filter,
+            ),
+        ]
         if f.AND:
             for sub in f.AND:
                 conditions.extend(self._convert_vfolder_filter(sub))
         if f.OR:
             or_conditions: list[QueryCondition] = []
             for sub in f.OR:
-                or_conditions.extend(self._convert_vfolder_filter(sub))
+                sub_conditions = self._convert_vfolder_filter(sub)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub in f.NOT:
-                not_conditions.extend(self._convert_vfolder_filter(sub))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_vfolder_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
-    @staticmethod
-    def _convert_vfolder_orders(orders: list[VFolderOrder]) -> list[QueryOrder]:
-        return [resolve_vfolder_order(o.field, o.direction) for o in orders]
+    def _convert_vfolder_orders(self, orders: list[VFolderOrder]) -> list[QueryOrder]:
+        return [self._convert_vfolder_order(order) for order in orders]
+
+    def _convert_vfolder_order(self, order: VFolderOrder) -> QueryOrder:
+        fields = VFolderSearchableFields.own
+        ascending = order.direction == OrderDirection.ASC
+        match order.field:
+            case VFolderOrderField.NAME:
+                return fields.name.order.apply(ascending)
+            case VFolderOrderField.CREATED_AT:
+                return fields.created_at.order.apply(ascending)
+            case VFolderOrderField.STATUS:
+                return fields.status.order.apply(ascending)
+            case VFolderOrderField.USAGE_MODE:
+                return fields.usage_mode.order.apply(ascending)
+            case VFolderOrderField.HOST:
+                return fields.host.order.apply(ascending)
+            case _:
+                assert_never(order.field)

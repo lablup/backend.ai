@@ -15,7 +15,7 @@ from pydantic import AliasChoices, AnyUrl, Field
 
 from ai.backend.common.api_handlers import BaseFieldModel
 from ai.backend.common.config import ModelHealthCheck
-from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment import DeploymentID
 
 
 class SessionTagsModel(BaseFieldModel):

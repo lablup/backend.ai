@@ -1,38 +1,27 @@
-"""Action for searching deployment policies."""
+from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.deployment import DeploymentEntityType
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import GlobalSearcherOpsAction
 from ai.backend.manager.data.deployment.types import DeploymentPolicyData
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.services.deployment.actions.deployment_policy.base import (
-    DeploymentPolicyBaseAction,
-)
+from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
 
 
-@dataclass
-class SearchDeploymentPoliciesAction(DeploymentPolicyBaseAction):
-    querier: BatchQuerier
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
+@dataclass(frozen=True)
+class SearchDeploymentPoliciesAction(
+    GlobalSearcherOpsAction[DeploymentPolicyRow, DeploymentPolicyData]
+):
+    """Page through every deployment policy."""
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
-
-
-@dataclass
-class SearchDeploymentPoliciesActionResult(BaseActionResult):
-    data: list[DeploymentPolicyData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
+    def entity_type(cls) -> EntityType:
+        return DeploymentEntityType()
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "search_deployment_policies"

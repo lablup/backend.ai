@@ -13,7 +13,7 @@ import graphene
 import pytest
 
 from ai.backend.manager.api.gql_legacy.base import scoped_query
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user.row import UserRole
 
 
 class TestScopedQuery:

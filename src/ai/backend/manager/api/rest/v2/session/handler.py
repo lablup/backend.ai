@@ -7,11 +7,18 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam, QueryParam
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.dto.manager.v2.kernel.request import AdminSearchKernelsInput
+from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
+from ai.backend.common.dto.manager.v2.scheduler.request import ComputeScheduleInput
 from ai.backend.common.dto.manager.v2.session.request import (
     AdminSearchSessionsInput,
     EnqueueSessionInput,
+    ExcludeSessionIdleChecksInput,
     GetSessionLogsQuery,
+    IncludeSessionIdleChecksInput,
+    PartialBulkTerminateSessionsInput,
+    ScopedSearchSessionsInput,
     ShutdownSessionServiceInput,
     StartSessionServiceInput,
     TerminateSessionsInput,
@@ -20,9 +27,9 @@ from ai.backend.common.dto.manager.v2.session.request import (
 from ai.backend.common.dto.manager.v2.session.request import (
     SessionIdPathParam as SessionIdPathParamDTO,
 )
-from ai.backend.common.identifier.session import SessionID
+from ai.backend.common.dto.manager.v2.session.types import SessionScope
 from ai.backend.common.types import AgentId, SessionId
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.v2.path_params import (
     AgentIdPathParam,
     ProjectIdPathParam,
@@ -33,7 +40,7 @@ from ai.backend.manager.dto.context import UserContext
 if TYPE_CHECKING:
     from ai.backend.manager.api.adapters.session.adapter import SessionAdapter
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class V2SessionHandler:
@@ -57,6 +64,14 @@ class V2SessionHandler:
             group_id=body.parsed.project_id,
         )
         return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=result)
+
+    async def compute_schedule(
+        self,
+        body: BodyParam[ComputeScheduleInput],
+    ) -> APIResponse:
+        """Compute whether a would-be session fits a resource group, without provisioning."""
+        result = await self._adapter.compute_schedule(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def admin_search_sessions(
         self,
@@ -117,10 +132,32 @@ class V2SessionHandler:
 
     async def my_search(
         self,
+        user_ctx: UserContext,
         body: BodyParam[AdminSearchSessionsInput],
     ) -> APIResponse:
         """Search sessions owned by the current user."""
-        result = await self._adapter.my_search(body.parsed)
+        result = await self._adapter.scoped_search(
+            ScopedSearchSessionsInput(
+                scope=SessionScope(user=[UUIDScope(value=user_ctx.user_uuid)]),
+                usage=body.parsed.usage,
+                filter=body.parsed.filter,
+                order=body.parsed.order,
+                first=body.parsed.first,
+                after=body.parsed.after,
+                last=body.parsed.last,
+                before=body.parsed.before,
+                limit=body.parsed.limit,
+                offset=body.parsed.offset,
+            )
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def scoped_search(
+        self,
+        body: BodyParam[ScopedSearchSessionsInput],
+    ) -> APIResponse:
+        """Search the sessions the named scopes reach, combined with OR."""
+        result = await self._adapter.scoped_search(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def project_search(
@@ -132,12 +169,36 @@ class V2SessionHandler:
         result = await self._adapter.project_search(path.parsed.project_id, body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
+    async def partial_bulk_terminate(
+        self,
+        body: BodyParam[PartialBulkTerminateSessionsInput],
+    ) -> APIResponse:
+        """Terminate several sessions, answering for each one."""
+        result = await self._adapter.partial_bulk_terminate(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
     async def terminate(
         self,
         body: BodyParam[TerminateSessionsInput],
     ) -> APIResponse:
-        """Terminate one or more sessions."""
+        """Deprecated. Use `POST /v2/sessions/partial-bulk-terminate`."""
         result = await self._adapter.terminate(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def exclude_idle_checks(
+        self,
+        body: BodyParam[ExcludeSessionIdleChecksInput],
+    ) -> APIResponse:
+        """Exclude checker-session pairs from idle checks."""
+        result = await self._adapter.exclude_idle_checks(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def include_idle_checks(
+        self,
+        body: BodyParam[IncludeSessionIdleChecksInput],
+    ) -> APIResponse:
+        """Include checker-session pairs into idle checks."""
+        result = await self._adapter.include_idle_checks(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def start_service(

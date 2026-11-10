@@ -5,11 +5,11 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, override
 
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.common.types import VFolderMountPolicy
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.models.vfolder import VFolderOperationStatus, VFolderPermission
+from ai.backend.manager.data.vfolder.types import VFolderOperationStatus
 
-from .base import VFolderAction
+from .base import VFolderAction, VFolderGlobalAction
 
 
 @dataclass
@@ -23,17 +23,15 @@ class VFolderSharedInfo:
     folder_type: str  # "project" or "user"
     shared_user_uuid: uuid.UUID
     shared_user_email: str
-    permission: VFolderPermission
+    permission: VFolderMountPolicy
 
 
 @dataclass
 class ShareVFolderAction(VFolderAction):
     """Share a group vfolder with users by granting permissions directly."""
 
-    user_uuid: uuid.UUID
-    vfolder_uuid: uuid.UUID
     resource_policy: Mapping[str, Any]
-    permission: VFolderPermission
+    permission: VFolderMountPolicy
     emails: list[str] = field(default_factory=list)
 
     @override
@@ -42,25 +40,20 @@ class ShareVFolderAction(VFolderAction):
         return ActionOperationType.UPDATE
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.vfolder_uuid)
+    @classmethod
+    def action_name(cls) -> str:
+        return "share_vfolder"
 
 
 @dataclass
-class ShareVFolderActionResult(BaseActionResult):
+class ShareVFolderActionResult:
     shared_emails: list[str] = field(default_factory=list)
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
 
 
 @dataclass
 class UnshareVFolderAction(VFolderAction):
     """Revoke direct sharing permissions from users."""
 
-    user_uuid: uuid.UUID
-    vfolder_uuid: uuid.UUID
     resource_policy: Mapping[str, Any]
     emails: list[str] = field(default_factory=list)
 
@@ -70,24 +63,19 @@ class UnshareVFolderAction(VFolderAction):
         return ActionOperationType.DELETE
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.vfolder_uuid)
+    @classmethod
+    def action_name(cls) -> str:
+        return "unshare_vfolder"
 
 
 @dataclass
-class UnshareVFolderActionResult(BaseActionResult):
+class UnshareVFolderActionResult:
     unshared_emails: list[str] = field(default_factory=list)
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
 
 
 @dataclass
 class ListSharedVFoldersAction(VFolderAction):
-    """List all shared vfolder permissions, optionally filtered by vfolder ID."""
-
-    vfolder_id: uuid.UUID | None = None
+    """List the sharing permissions granted on one vfolder."""
 
     @override
     @classmethod
@@ -95,26 +83,22 @@ class ListSharedVFoldersAction(VFolderAction):
         return ActionOperationType.SEARCH
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.vfolder_id) if self.vfolder_id else None
+    @classmethod
+    def action_name(cls) -> str:
+        return "list_shared_vfolders"
 
 
 @dataclass
-class ListSharedVFoldersActionResult(BaseActionResult):
+class ListSharedVFoldersActionResult:
     shared: list[VFolderSharedInfo] = field(default_factory=list)
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
 
 
 @dataclass
 class UpdateVFolderSharingStatusAction(VFolderAction):
     """Batch update or delete sharing permissions."""
 
-    vfolder_id: uuid.UUID = field(default_factory=uuid.uuid4)
     to_delete: list[uuid.UUID] = field(default_factory=list)
-    to_update: list[tuple[uuid.UUID, VFolderPermission]] = field(default_factory=list)
+    to_update: list[tuple[uuid.UUID, VFolderMountPolicy]] = field(default_factory=list)
 
     @override
     @classmethod
@@ -122,12 +106,57 @@ class UpdateVFolderSharingStatusAction(VFolderAction):
         return ActionOperationType.UPDATE
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.vfolder_id)
+    @classmethod
+    def action_name(cls) -> str:
+        return "update_vfolder_sharing_status"
 
 
 @dataclass
-class UpdateVFolderSharingStatusActionResult(BaseActionResult):
+class UpdateVFolderSharingStatusActionResult:
+    pass
+
+
+@dataclass
+class PublicListSharedVFoldersAction(VFolderGlobalAction):
+    """List the sharing permissions the requester is party to.
+
+    Read-only and open to any authenticated caller, as the legacy route was. The
+    requester bounds the rows, so no caller learns of a share on a folder they
+    neither hold, own, created, nor reach through their projects. The requester is
+    the user in context, never a field a caller fills in.
+    """
+
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "public_list_shared_vfolders"
+
+
+@dataclass
+class PublicListSharedVFoldersActionResult:
+    shared: list[VFolderSharedInfo] = field(default_factory=list)
+
+
+@dataclass
+class GlobalListSharedVFoldersAction(VFolderGlobalAction):
+    """List the sharing permissions granted across every vfolder."""
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "global_list_shared_vfolders"
+
+
+@dataclass
+class GlobalListSharedVFoldersActionResult:
+    shared: list[VFolderSharedInfo] = field(default_factory=list)

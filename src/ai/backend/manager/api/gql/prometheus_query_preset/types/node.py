@@ -2,13 +2,19 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
-from typing import Any
+from typing import Any, override
 from uuid import UUID
 
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.prometheus_query_preset import PrometheusQueryPresetID
+from ai.backend.common.data.entity.prometheus_query_preset_category import (
+    PrometheusQueryPresetCategoryID,
+)
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
     CreateQueryDefinitionGQLPayload as CreateQueryDefinitionGQLPayloadDTO,
 )
@@ -18,6 +24,8 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
     QueryDefinitionNode,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.common_types import PartialBulkFailureGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -42,6 +50,12 @@ from .payloads import QueryDefinitionOptionsGQL
 )
 class QueryDefinitionGQL(PydanticNodeMixin[QueryDefinitionNode]):
     id: NodeID[str] = gql_field(description="Query definition UUID (primary key).")
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="UUID of the query preset.",
+        ),
+    )
     name: str = gql_field(description="Human-readable query definition identifier.")
     description: str | None = gql_field(description="Human-readable description.")
     rank: int = gql_field(description="Sort rank (lower = higher priority).")
@@ -63,7 +77,22 @@ class QueryDefinitionGQL(PydanticNodeMixin[QueryDefinitionNode]):
     async def category(self, info: Info[StrawberryGQLContext]) -> CategoryGQL | None:
         if self.category_id is None:
             return None
-        return await info.context.data_loaders.category_loader.load(self.category_id)
+        return await info.context.data_loaders.category_loader.load(
+            PrometheusQueryPresetCategoryID(self.category_id)
+        )
+
+    @classmethod
+    @override
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[QueryDefinitionGQL | None]:
+        return await info.context.data_loaders.query_definition_loader.load_many([
+            PrometheusQueryPresetID(UUID(nid)) for nid in node_ids
+        ])
 
 
 QueryDefinitionEdge = Edge[QueryDefinitionGQL]
@@ -111,3 +140,27 @@ class ModifyQueryDefinitionPayload(PydanticOutputMixin[ModifyQueryDefinitionGQLP
     """Payload for query definition modification mutation."""
 
     preset: QueryDefinitionGQL = gql_field(description="Updated query definition.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Result of a partial bulk query definition operation: the query definitions "
+            "processed and the ones that failed."
+        ),
+    ),
+    model=PartialBulkPayload[QueryDefinitionNode],
+    name="PartialBulkQueryDefinitionsPayload",
+)
+class PartialBulkQueryDefinitionsPayloadGQL(
+    PydanticOutputMixin[PartialBulkPayload[QueryDefinitionNode]]
+):
+    """Payload for partial bulk query definition mutations."""
+
+    successes: list[QueryDefinitionGQL] = gql_field(
+        description="The query definitions processed, as they now stand."
+    )
+    failed: list[PartialBulkFailureGQL] = gql_field(
+        description="The query definitions not processed, each with the reason."
+    )

@@ -5,25 +5,37 @@ Shared between Client SDK and Manager API.
 
 from __future__ import annotations
 
+from uuid import UUID
+
 from pydantic import Field
 
-from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT
-from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
+from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.v2.common import NonEmptyList, String64
 from ai.backend.common.dto.manager.v2.domain.types import (
     DomainOrderField,
     DomainProjectFilter,
+    DomainScope,
     DomainUserFilter,
     OrderDirection,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 __all__ = (
     "AdminSearchDomainsInput",
     "CreateDomainInput",
     "DeleteDomainInput",
+    "RestoreDomainInput",
     "DomainFilter",
     "DomainOrder",
+    "PartialBulkDeleteDomainsInput",
+    "PartialBulkRestoreDomainsInput",
+    "PartialBulkUpdateDomainItemInput",
+    "PartialBulkUpdateDomainsInput",
     "PurgeDomainInput",
+    "ScopedSearchDomainsInput",
     "SearchDomainsRequest",
     "UpdateDomainInput",
 )
@@ -57,26 +69,31 @@ class CreateDomainInput(BaseRequestModel):
 class UpdateDomainInput(BaseRequestModel):
     """Input for updating domain information. All fields optional — only provided fields will be updated."""
 
-    name: str | None = Field(
-        default=None,
-        description="New domain name.",
-        max_length=64,
+    name: String64 | None | Unset = Field(
+        default=UNSET,
+        description="New domain name. Omit to leave unchanged.",
     )
-    description: str | Sentinel | None = Field(
-        default=SENTINEL,
-        description="New domain description. Set to null to clear.",
+    description: str | None | Unset = Field(
+        default=UNSET,
+        description="Updated domain description. Omit to leave unchanged; null clears.",
     )
-    is_active: bool | None = Field(
-        default=None,
-        description="Updated active status.",
+    is_active: bool | None | Unset = Field(
+        default=UNSET,
+        description=(
+            f"Deprecated since {NEXT_RELEASE_VERSION}. Use the domain delete and restore "
+            "operations. false soft-deletes the domain and true restores it, as those "
+            "operations do; nothing happens when it is already in that state. Omit to "
+            "leave unchanged."
+        ),
+        deprecated=True,
     )
-    allowed_docker_registries: list[str] | Sentinel | None = Field(
-        default=SENTINEL,
-        description="New list of allowed Docker registry URLs. Set to null to clear.",
+    allowed_docker_registries: list[str] | None | Unset = Field(
+        default=UNSET,
+        description="Updated list of allowed Docker registry URLs. Omit to leave unchanged.",
     )
-    integration_name: str | Sentinel | None = Field(
-        default=SENTINEL,
-        description="New external integration identifier. Set to null to clear.",
+    integration_name: str | None | Unset = Field(
+        default=UNSET,
+        description="Updated external integration identifier. Omit to leave unchanged; null clears.",
     )
 
 
@@ -86,16 +103,58 @@ class DeleteDomainInput(BaseRequestModel):
     name: str = Field(description="Name of the domain to soft-delete.")
 
 
+class RestoreDomainInput(BaseRequestModel):
+    """Input for restoring a soft-deleted domain."""
+
+    name: str = Field(description="Name of the domain to restore.")
+
+
 class PurgeDomainInput(BaseRequestModel):
     """Input for permanently purging a domain and all associated data."""
 
     name: str = Field(description="Name of the domain to permanently purge.")
 
 
+class PartialBulkUpdateDomainItemInput(BaseRequestModel):
+    """One domain of a partial bulk update and the fields to update on it."""
+
+    id: UUID = Field(description="ID of the domain to update.")
+    input: UpdateDomainInput = Field(description="Fields to update on the domain.")
+
+
+class PartialBulkUpdateDomainsInput(BaseRequestModel):
+    """Input for updating several domains, each answered for separately."""
+
+    items: NonEmptyList[PartialBulkUpdateDomainItemInput] = Field(
+        description="The domains to update, each with its fields."
+    )
+
+
+class PartialBulkDeleteDomainsInput(BaseRequestModel):
+    """Input for soft-deleting several domains, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the domains to soft-delete.")
+
+
+class PartialBulkRestoreDomainsInput(BaseRequestModel):
+    """Input for restoring several soft-deleted domains, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the domains to restore.")
+
+
 class DomainFilter(BaseRequestModel):
     """Filter criteria for searching domains."""
 
     name: StringFilter | None = Field(default=None, description="Filter by domain name.")
+    id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `entity_id`.",
+        deprecated=True,
+    )
+    entity_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by domain ID.",
+    )
     description: StringFilter | None = Field(default=None, description="Filter by description.")
     is_active: bool | None = Field(default=None, description="Filter by active status.")
     created_at: DateTimeFilter | None = Field(default=None, description="Filter by creation time.")
@@ -103,10 +162,20 @@ class DomainFilter(BaseRequestModel):
         default=None, description="Filter by last modification time."
     )
     project: DomainProjectFilter | None = Field(
-        default=None, description="Filter by nested project conditions."
+        default=None,
+        description=(
+            "Filter by the projects the domain holds. Deprecated: search projects first, "
+            "then narrow by `name`."
+        ),
+        deprecated=True,
     )
     user: DomainUserFilter | None = Field(
-        default=None, description="Filter by nested user conditions."
+        default=None,
+        description=(
+            "Filter by the users the domain holds. Deprecated: search users first, then "
+            "narrow by `name`."
+        ),
+        deprecated=True,
     )
     AND: list[DomainFilter] | None = Field(default=None, description="AND logical combinator.")
     OR: list[DomainFilter] | None = Field(default=None, description="OR logical combinator.")
@@ -138,6 +207,20 @@ class SearchDomainsRequest(BaseRequestModel):
         description="Maximum items to return.",
     )
     offset: int = Field(default=0, ge=0, description="Number of items to skip.")
+
+
+class ScopedSearchDomainsInput(BaseRequestModel):
+    """Input for searching the domains the named scopes reach."""
+
+    scope: DomainScope = Field(description="Scope (OR across all items).")
+    filter: DomainFilter | None = Field(default=None, description="Filter conditions.")
+    order: list[DomainOrder] | None = Field(default=None, description="Order specifications.")
+    first: int | None = Field(default=None, description="Cursor pagination: number of items.")
+    after: str | None = Field(default=None, description="Cursor pagination: after cursor.")
+    last: int | None = Field(default=None, description="Cursor pagination: last N items.")
+    before: str | None = Field(default=None, description="Cursor pagination: before cursor.")
+    limit: int | None = Field(default=None, description="Offset pagination: maximum items.")
+    offset: int | None = Field(default=None, description="Offset pagination: number to skip.")
 
 
 class AdminSearchDomainsInput(BaseRequestModel):

@@ -27,6 +27,7 @@ class FileHandlingInMountedVFolderSuccess(TestCode):
         session_meta = CreatedSessionMetaContext.current()
         session_name = session_meta.name
 
+        file_upload_meta: _UploadFileMeta | None = None
         try:
             file_upload_meta = await self._create_dummy_file()
 
@@ -47,7 +48,7 @@ class FileHandlingInMountedVFolderSuccess(TestCode):
                 downloaded_file_path=f"{file_upload_meta.base_dir}/downloaded/{file_upload_meta.file_name}",
             )
         finally:
-            if file_upload_meta:
+            if file_upload_meta is not None:
                 await self._cleanup_dummy_file(file_upload_meta)
 
     def _verify_downloaded_file_identical(

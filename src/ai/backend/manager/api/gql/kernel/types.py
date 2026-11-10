@@ -42,13 +42,26 @@ from ai.backend.manager.api.gql.decorators import (
 )
 
 if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.kernel_group.types import KernelGroupGQL
     from ai.backend.manager.api.gql.resource_slot.types import (
         KernelResourceAllocationFilterGQL,
         KernelResourceAllocationOrderByGQL,
         ResourceAllocationConnectionGQL,
     )
+    from ai.backend.manager.api.gql.scheduling_history.resolver import (
+        KernelSchedulingHistoryConnectionGQL,
+    )
+    from ai.backend.manager.api.gql.scheduling_history.types import (
+        KernelSchedulingHistoryFilterGQL,
+        KernelSchedulingHistoryOrderByGQL,
+    )
     from ai.backend.manager.api.gql.session.types import SessionV2GQL
 
+from ai.backend.common.data.entity.kernel import KernelID
+from ai.backend.common.data.entity.kernel_group import KernelGroupID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import ImageID
 from ai.backend.manager.api.gql.agent.types import AgentV2GQL
 from ai.backend.manager.api.gql.common.types import (
@@ -74,6 +87,7 @@ class KernelV2StatusGQL(StrEnum):
     """GraphQL enum for kernel status."""
 
     PENDING = "PENDING"
+    RESERVED = "RESERVED"
     SCHEDULED = "SCHEDULED"
     PREPARING = "PREPARING"
     PREPARED = "PREPARED"
@@ -120,7 +134,15 @@ class KernelV2StatusFilterGQL(PydanticInputMixin[KernelStatusFilter]):
     name="KernelV2Filter",
 )
 class KernelV2FilterGQL(PydanticInputMixin[KernelFilter]):
-    id: UUIDFilter | None = None
+    id: UUIDFilter | None = gql_field(
+        description="Filter by kernel ID.",
+        default=None,
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `fieldId`.",
+    )
+    field_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter by kernel ID."),
+        default=None,
+    )
     status: KernelV2StatusFilterGQL | None = None
     session_id: UUIDFilter | None = None
 
@@ -195,7 +217,10 @@ class KernelV2ClusterInfoGQL:
 )
 class KernelV2UserInfoGQL:
     user_id: UUID | None = gql_field(description="The UUID of the user who owns this kernel.")
-    access_key: str | None = gql_field(description="The access key used to create this kernel.")
+    access_key: str | None = gql_field(
+        description="The access key used to create this kernel.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `userId`.",
+    )
     domain_name: str | None = gql_field(description="The domain this kernel belongs to.")
     group_id: UUID | None = gql_field(description="The group (project) ID this kernel belongs to.")
 
@@ -217,7 +242,7 @@ class ResourceAllocationGQL(PydanticOutputMixin[ResourceAllocationGQLDTO]):
     )
     allocated: ResourceSlotGQL | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.8.0",
             description=(
                 "The resource slots actually allocated, computed from the "
                 "resource_allocations table. Unlike `used`, this persists after the "
@@ -311,8 +336,20 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
     """Kernel type representing a compute container."""
 
     id: NodeID[str]
+    field_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="UUID of the kernel.",
+        ),
+    )
     image_id: strawberry.ID | None = gql_field(
         description="The UUID of the image used by this kernel. Null if the image has been purged.",
+    )
+    kernel_group_id: UUID | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="ID of the kernel group this kernel belongs to.",
+        )
     )
 
     # Inlined fields (from single-element types)
@@ -364,12 +401,30 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
         return await info.context.data_loaders.image_loader.load(ImageID(UUID(str(self.image_id))))
 
     @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The kernel group this kernel belongs to.",
+        )
+    )  # type: ignore[misc]
+    async def kernel_group(
+        self, info: Info[StrawberryGQLContext]
+    ) -> (
+        Annotated[KernelGroupGQL, strawberry.lazy("ai.backend.manager.api.gql.kernel_group.types")]
+        | None
+    ):
+        if self.kernel_group_id is None:
+            return None
+        return await info.context.data_loaders.kernel_group_loader.load(
+            KernelGroupID(self.kernel_group_id)
+        )
+
+    @gql_added_field(
         BackendAIGQLMeta(added_version="26.2.0", description="The user who owns this kernel.")
     )  # type: ignore[misc]
     async def user(self, info: Info[StrawberryGQLContext]) -> UserV2GQL | None:
         if self.user_info.user_id is None:
             return None
-        user_data = await info.context.data_loaders.user_loader.load(self.user_info.user_id)
+        user_data = await info.context.data_loaders.user_loader.load(UserID(self.user_info.user_id))
         if user_data is None:
             return None
         return user_data
@@ -380,7 +435,9 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
     async def project(self, info: Info[StrawberryGQLContext]) -> ProjectV2GQL | None:
         if self.user_info.group_id is None:
             return None
-        project_data = await info.context.data_loaders.project_loader.load(self.user_info.group_id)
+        project_data = await info.context.data_loaders.project_loader.load(
+            ProjectID(self.user_info.group_id)
+        )
         if project_data is None:
             return None
         return project_data
@@ -391,7 +448,12 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
     async def domain(self, info: Info[StrawberryGQLContext]) -> DomainV2GQL | None:
         if self.user_info.domain_name is None:
             return None
-        return await info.context.data_loaders.domain_loader.load(self.user_info.domain_name)
+        domain_id = await info.context.data_loaders.domain_id_by_name_loader.load(
+            self.user_info.domain_name
+        )
+        if domain_id is None:
+            return None
+        return await info.context.data_loaders.domain_by_id_loader.load(domain_id)
 
     @gql_added_field(
         BackendAIGQLMeta(
@@ -410,7 +472,7 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.8.0",
             description=(
                 "Resource allocation (requested / used / allocated) computed on-demand "
                 "from the resource_allocations table. Unlike the deprecated eager "
@@ -421,7 +483,7 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
     )  # type: ignore[misc]
     async def resource_allocation(self, info: Info[StrawberryGQLContext]) -> ResourceAllocationGQL:
         return await info.context.data_loaders.kernel_resource_allocation_loader.load(
-            KernelId(UUID(str(self.id)))
+            KernelID(UUID(str(self.id)))
         )
 
     @gql_added_field(
@@ -437,10 +499,8 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
         ]
         | None
     ):
-        from ai.backend.common.types import SessionId
-
         return await info.context.data_loaders.session_loader.load(
-            SessionId(self.session_info.session_id)
+            SessionID(self.session_info.session_id)
         )
 
     @gql_added_field(
@@ -537,11 +597,12 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
             slot_name = item.slot_name
             node = KernelResourceAllocationGQL(
                 id=_strawberry.ID(item.id),
+                field_id=item.field_id,
                 slot_name=slot_name,
                 requested=Decimal(item.requested),
                 used=Decimal(item.used) if item.used is not None else None,
             )
-            cursor = encode_cursor(slot_name)
+            cursor = encode_cursor(item.field_id)
             edges.append(KernelResourceAllocationEdgeGQL(node=node, cursor=cursor))
 
         return ResourceAllocationConnectionGQL(
@@ -555,6 +616,88 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
             ),
         )
 
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.8.0",
+            description="Scheduling history of this kernel with pagination support.",
+        )
+    )  # type: ignore[misc]
+    async def scheduling_histories(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: Annotated[
+            KernelSchedulingHistoryFilterGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.scheduling_history.types"),
+        ]
+        | None = None,
+        order_by: list[
+            Annotated[
+                KernelSchedulingHistoryOrderByGQL,
+                strawberry.lazy("ai.backend.manager.api.gql.scheduling_history.types"),
+            ]
+        ]
+        | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> (
+        Annotated[
+            KernelSchedulingHistoryConnectionGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.scheduling_history.resolver"),
+        ]
+        | None
+    ):
+        """Fetch the scheduling history of this kernel."""
+        from uuid import UUID
+
+        from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
+        from ai.backend.common.dto.manager.v2.scheduling_history.request import (
+            ScopedSearchKernelHistoriesInput,
+        )
+        from ai.backend.common.dto.manager.v2.scheduling_history.types import (
+            KernelHistoryScopeDTO,
+        )
+        from ai.backend.manager.api.gql.base import encode_cursor
+        from ai.backend.manager.api.gql.scheduling_history.resolver import (
+            KernelSchedulingHistoryConnectionGQL,
+            KernelSchedulingHistoryEdgeGQL,
+        )
+        from ai.backend.manager.api.gql.scheduling_history.types import (
+            KernelSchedulingHistoryGQL,
+        )
+
+        result = await info.context.adapters.scheduling_history.scoped_search_kernel_history(
+            ScopedSearchKernelHistoriesInput(
+                scope=KernelHistoryScopeDTO(kernel=[UUIDScope(value=UUID(str(self.id)))]),
+                filter=filter.to_pydantic() if filter else None,
+                order=[o.to_pydantic() for o in order_by] if order_by else None,
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+                limit=limit,
+                offset=offset,
+            )
+        )
+        nodes = [KernelSchedulingHistoryGQL.from_pydantic(item) for item in result.items]
+        edges = [
+            KernelSchedulingHistoryEdgeGQL(node=node, cursor=encode_cursor(str(node.id)))
+            for node in nodes
+        ]
+        return KernelSchedulingHistoryConnectionGQL(
+            edges=edges,
+            page_info=strawberry.relay.PageInfo(
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+            count=result.total_count,
+        )
+
     @classmethod
     @override
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
@@ -565,7 +708,7 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
         required: bool = False,
     ) -> Iterable[Self | None]:
         results = await info.context.data_loaders.kernel_loader.load_many([
-            KernelId(UUID(nid)) for nid in node_ids
+            KernelID(KernelId(UUID(nid))) for nid in node_ids
         ])
         return cast(list[Self | None], results)
 

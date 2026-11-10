@@ -71,10 +71,10 @@ def list_allowed_types() -> None:
 @click.option(
     "-g",
     "--group",
-    metavar="GROUP",
+    metavar="GROUP_ID",
     type=str,
     default=None,
-    help="Group ID or NAME. Specify this option if you want to create a group folder.",
+    help="Project ID (UUID). Specify this option if you want to create a project folder.",
 )
 @click.option(
     "--unmanaged",
@@ -117,7 +117,7 @@ def list_allowed_types() -> None:
     default="rw",
     help=(
         "Folder's innate permission. "
-        'Group folders can be shared as read-only by setting this option to "ro". '
+        'Project folders can be shared as read-only by setting this option to "ro". '
         "Invited folders override this setting by its own invitation permission. "
     ),
 )
@@ -309,6 +309,16 @@ def info(name: str) -> None:
     ),
 )
 @click.option(
+    "-d",
+    "--dst-dir",
+    type=Path,
+    default=None,
+    help=(
+        "The destination directory inside the virtual folder. "
+        "[default: the root of the virtual folder]"
+    ),
+)
+@click.option(
     "-r",
     "--recursive",
     is_flag=True,
@@ -338,6 +348,7 @@ def upload(
     name: str,
     filenames: tuple[Path, ...],
     base_dir: Path | None,
+    dst_dir: Path | None,
     recursive: bool,
     chunk_size: int,
     override_storage_proxy: dict[str, str] | None,
@@ -355,6 +366,7 @@ def upload(
             _ = session.VFolder(name).upload(
                 filenames,
                 basedir=base_dir,
+                dst_dir=dst_dir,
                 recursive=recursive,
                 chunk_size=chunk_size,
                 show_progress=True,

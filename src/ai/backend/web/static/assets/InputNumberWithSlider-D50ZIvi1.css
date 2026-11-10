@@ -1,0 +1,17 @@
+/**
+ @license
+ Copyright (c) 2015-2026 Lablup Inc. All rights reserved.
+
+ Two things Astryx `Slider` does not expose as props, both previously done
+ with antd's `styles={{ handle, track }}` slot API (Astryx has none — it is
+ closed by construction, P5):
+
+ 1. The node-valued marks layer. Geometry is copied from Astryx's own
+    `marksContainer` / `markLabelHorizontal` (THUMB_SIZE 20, label offset
+    `THUMB_SIZE / 2 + 4`), so an overlay mark lands on the same pixel as the
+    tick Astryx draws for the same value.
+ 2. `disableMode="empty"`: hide the thumb and the filled track so only the
+    muted rail remains. `astryx-slider-thumb` is a themeable class; the filled
+    track is the element right after `astryx-slider-track` inside the track
+    container, which is a stable structural position in Slider.tsx.
+*/.bai-slider{position:relative}.bai-slider__node-marks{position:absolute;inset-inline:0;top:10px;pointer-events:none}.bai-slider__node-mark{position:absolute;top:14px;transform:translate(-50%);white-space:nowrap;font-family:var(--font-family-body);font-size:var(--text-supporting-size);color:var(--color-text-secondary)}:is([dir=rtl] *) .bai-slider__node-mark{transform:translate(50%)}.bai-slider--empty .astryx-slider-thumb,.bai-slider--empty .astryx-slider-track+*{display:none}

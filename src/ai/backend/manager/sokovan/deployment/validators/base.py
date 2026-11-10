@@ -4,7 +4,7 @@ Two entry points are provided because the v2 and legacy paths emit
 different finalized shapes:
 
 - :meth:`DeploymentRevisionValidator.validate` —
-  v2 ``add_revision`` builds a :class:`DeploymentRevisionCreatorSpec` and
+  v2 ``add_revision`` builds a :class:`DeploymentRevisionCreator` and
   validates it right before persistence.
 - :meth:`DeploymentRevisionValidator.validate_legacy_revision_spec` —
   legacy paths (``build_creator_from_legacy_draft``,
@@ -19,24 +19,24 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from collections.abc import Iterable, Sequence
+from collections.abc import Collection, Iterable, Sequence
 from dataclasses import dataclass, field
 
 from ai.backend.common.types import SlotName
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.deployment.types import ModelRevisionSpec
-from ai.backend.manager.repositories.deployment.creators.revision import (
-    DeploymentRevisionCreatorSpec,
+from ai.backend.manager.models.deployment_revision.creators import (
+    DeploymentRevisionCreator,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @dataclass(frozen=True)
 class DeploymentRevisionValidationContext:
     """Read-only global state the validator chain consumes."""
 
-    required_slot_names: Iterable[SlotName] = field(default_factory=frozenset)
+    required_slot_names: Collection[SlotName] = field(default_factory=frozenset)
 
 
 class DeploymentRevisionValidatorRule(ABC):
@@ -49,10 +49,10 @@ class DeploymentRevisionValidatorRule(ABC):
     @abstractmethod
     def validate(
         self,
-        spec: DeploymentRevisionCreatorSpec,
+        spec: DeploymentRevisionCreator,
         context: DeploymentRevisionValidationContext,
     ) -> None:
-        """Validate the v2 :class:`DeploymentRevisionCreatorSpec`."""
+        """Validate the v2 :class:`DeploymentRevisionCreator`."""
         raise NotImplementedError
 
     @abstractmethod
@@ -75,11 +75,11 @@ class DeploymentRevisionValidator:
 
     def validate(
         self,
-        spec: DeploymentRevisionCreatorSpec,
+        spec: DeploymentRevisionCreator,
         context: DeploymentRevisionValidationContext,
     ) -> None:
         for rule in self._rules:
-            log.debug("Applying DeploymentRevisionCreatorSpec validation rule: {}", rule.name())
+            log.trace("deployment revision validation rule applying: {}", rule.name())
             rule.validate(spec, context)
 
     def validate_legacy_revision_spec(
@@ -88,5 +88,5 @@ class DeploymentRevisionValidator:
         context: DeploymentRevisionValidationContext,
     ) -> None:
         for rule in self._rules:
-            log.debug("Applying ModelRevisionSpec validation rule: {}", rule.name())
+            log.trace("model revision validation rule applying: {}", rule.name())
             rule.validate_legacy_revision_spec(spec, context)

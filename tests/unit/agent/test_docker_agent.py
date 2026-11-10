@@ -1,17 +1,49 @@
 """
-Unit tests for `DockerKernelCreationContext` helpers.
+Unit tests for `ai.backend.agent.docker.agent` helpers.
 """
 
 from __future__ import annotations
 
+import sys
 from http import HTTPStatus
-from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from pathlib import Path
+from types import SimpleNamespace
+from typing import Any, cast
+from unittest.mock import AsyncMock, MagicMock, patch
+from uuid import uuid4
 
 import pytest
 from aiodocker.exceptions import DockerError
 
-from ai.backend.agent.docker.agent import DockerKernelCreationContext
+from ai.backend.agent.config.unified import (
+    AgentUnifiedConfig,
+    ContainerLogDriver,
+    ContainerLogsConfig,
+)
+from ai.backend.agent.docker.agent import (
+    DockerAgent,
+    DockerKernelCreationContext,
+    LogDriverOptions,
+    _build_log_config,
+    _clean_scratch,
+    _parse_distro_from_ldd_output,
+)
+from ai.backend.common.types import ContainerId, KernelId
+
+LDD_PRELOAD_ERROR_LINES = "\n".join([
+    "ERROR: ld.so: object '/opt/kernel/libbaihook.so' from LD_PRELOAD cannot be preloaded"
+    " (file too short): ignored.",
+    "ERROR: ld.so: object '/opt/kernel/libnvmlhook.ubuntu18.04.x86_64.so' from LD_PRELOAD cannot"
+    " be preloaded (file too short): ignored.",
+    "ERROR: ld.so: object '/opt/kernel/libcudahook.ubuntu18.04.x86_64.so' from /etc/ld.so.preload"
+    " cannot be preloaded (file too short): ignored.",
+])
+LDD_GLIBC_TRAILER = "\n".join([
+    "Copyright (C) 2024 Free Software Foundation, Inc.",
+    "This is free software; see the source for copying conditions.  There is NO",
+    "warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.",
+    "Written by Roland McGrath and Ulrich Drepper.",
+])
 
 
 def _make_container_show_response(networks: dict[str, dict[str, Any] | None]) -> dict[str, Any]:
@@ -30,6 +62,114 @@ def _make_docker_mock(network_get: AsyncMock | None = None) -> MagicMock:
     docker.networks = MagicMock()
     docker.networks.get = network_get if network_get is not None else AsyncMock()
     return docker
+
+
+class TestParseDistroFromLddOutput:
+    @pytest.mark.parametrize(
+        ("output", "expected"),
+        [
+            pytest.param(
+                f"ldd (GNU libc) 2.35\n{LDD_GLIBC_TRAILER}",
+                "ubuntu22.04",
+                id="glibc-banner-on-first-line",
+            ),
+            pytest.param(
+                "\n".join([
+                    LDD_PRELOAD_ERROR_LINES,
+                    "ldd (Ubuntu GLIBC 2.39-0ubuntu8.7) 2.39",
+                    LDD_GLIBC_TRAILER,
+                ]),
+                "ubuntu24.04",
+                id="glibc-banner-after-ld-preload-errors",
+            ),
+            pytest.param(
+                "ERROR: ld.so: ignored.\r\nldd (Ubuntu GLIBC 2.31-0ubuntu9) 2.31\r\n",
+                "ubuntu20.04",
+                id="glibc-banner-with-carriage-returns",
+            ),
+            pytest.param(
+                "ldd (GNU libc) 2.39.1",
+                "ubuntu24.04",
+                id="glibc-version-with-patch-component",
+            ),
+            pytest.param(
+                "ldd (GNU libc) 2",
+                "centos7.6",
+                id="glibc-version-without-minor-component",
+            ),
+            pytest.param(
+                "ldd (GNU libc) 2.33",
+                "ubuntu20.04",
+                id="glibc-version-between-known-versions",
+            ),
+            pytest.param(
+                "ldd (GNU libc) 2.12",
+                "centos7.6",
+                id="glibc-version-older-than-known-versions",
+            ),
+            pytest.param(
+                "ldd (GNU libc) 2.41",
+                "ubuntu24.04",
+                id="glibc-version-newer-than-known-versions",
+            ),
+            pytest.param(
+                "musl libc (x86_64)\nVersion 1.2.4\nDynamic Program Loader",
+                "alpine3.8",
+                id="musl-banner-on-first-line",
+            ),
+            pytest.param(
+                f"{LDD_PRELOAD_ERROR_LINES}\nmusl libc (x86_64)\nVersion 1.2.4",
+                "alpine3.8",
+                id="musl-banner-after-ld-preload-errors",
+            ),
+            pytest.param(
+                "GNU C Library (Debian GLIBC 2.41-12+deb13u3) stable release version 2.41.\n"
+                "Copyright (C) 2025 Free Software Foundation, Inc.",
+                "ubuntu24.04",
+                id="glibc-library-run-directly",
+            ),
+            pytest.param(
+                "GNU C Library (GNU libc) stable release version 2.17, by Roland McGrath et al.",
+                "centos7.6",
+                id="glibc-library-run-directly-old-style",
+            ),
+            pytest.param(
+                "musl libc (aarch64)\nVersion 1.2.6\nDynamic Program Loader\n"
+                "Usage: /lib/ld-musl-aarch64.so.1 [options] [--] pathname [args]",
+                "alpine3.8",
+                id="musl-loader-run-directly",
+            ),
+        ],
+    )
+    def test_detects_distro_from_libc_banner(self, output: str, expected: str) -> None:
+        assert _parse_distro_from_ldd_output([output]) == expected
+
+    @pytest.mark.parametrize(
+        "chunk_size",
+        [pytest.param(1, id="one-byte-chunks"), pytest.param(16, id="sixteen-byte-chunks")],
+    )
+    def test_detects_distro_from_chunked_log(self, chunk_size: int) -> None:
+        output = "\r\n".join([
+            LDD_PRELOAD_ERROR_LINES,
+            "ldd (Ubuntu GLIBC 2.39-0ubuntu8.7) 2.39",
+            LDD_GLIBC_TRAILER,
+        ])
+        chunks = [output[i : i + chunk_size] for i in range(0, len(output), chunk_size)]
+        assert _parse_distro_from_ldd_output(chunks) == "ubuntu24.04"
+
+    @pytest.mark.parametrize(
+        "output",
+        [
+            pytest.param("", id="empty-output"),
+            pytest.param(
+                f"{LDD_PRELOAD_ERROR_LINES}\nldd: command not found",
+                id="no-libc-banner",
+            ),
+            pytest.param("ldd (GNU libc)", id="banner-without-version"),
+        ],
+    )
+    def test_returns_none_without_libc_banner(self, output: str) -> None:
+        assert _parse_distro_from_ldd_output([output]) is None
 
 
 @pytest.fixture
@@ -178,3 +318,162 @@ class TestAttachAdditionalNetworks:
 
         with pytest.raises(DockerError):
             await context._attach_additional_networks(docker, container, {"bridge"})
+
+
+def _log_config(driver: ContainerLogDriver) -> AgentUnifiedConfig:
+    """Only ``container_logs`` is read, so leave the rest of the schema unpopulated."""
+    fields: dict[str, Any] = {
+        "container_logs": ContainerLogsConfig.model_validate({
+            "driver": driver,
+            "max_length": "10M",
+        }),
+    }
+    return AgentUnifiedConfig.model_construct(**fields)
+
+
+class TestBuildLogConfig:
+    @pytest.mark.parametrize(
+        "driver",
+        [ContainerLogDriver.LOCAL, ContainerLogDriver.JSON_FILE],
+    )
+    def test_drivers_carry_size_options(self, driver: ContainerLogDriver) -> None:
+        log_config = _build_log_config(_log_config(driver))
+
+        assert log_config.type == driver
+        assert log_config.config == LogDriverOptions(max_size="2m", max_file="5", compress="false")
+
+    @pytest.mark.parametrize(
+        ("driver", "expected"),
+        [
+            (
+                ContainerLogDriver.LOCAL,
+                {
+                    "Type": "local",
+                    "Config": {"max-size": "2m", "max-file": "5", "compress": "false"},
+                },
+            ),
+            (
+                ContainerLogDriver.JSON_FILE,
+                {
+                    "Type": "json-file",
+                    "Config": {"max-size": "2m", "max-file": "5", "compress": "false"},
+                },
+            ),
+        ],
+    )
+    def test_dumped_payload_uses_docker_api_keys(
+        self, driver: ContainerLogDriver, expected: dict[str, Any]
+    ) -> None:
+        """The dump is what actually goes into the container creation request."""
+        log_config = _build_log_config(_log_config(driver))
+
+        dumped = log_config.model_dump(mode="json", by_alias=True)
+
+        assert dumped == expected
+        assert type(dumped["Type"]) is str
+
+
+class _GoneContainerDocker:
+    """A Docker client whose container delete fails with ``error``."""
+
+    containers: MagicMock
+
+    def __init__(self, error: DockerError) -> None:
+        container = MagicMock()
+        container.delete = AsyncMock(side_effect=error)
+        self.containers = MagicMock()
+        self.containers.container.return_value = container
+
+    async def close(self) -> None:
+        pass
+
+
+def _cleanable_agent() -> SimpleNamespace:
+    return SimpleNamespace(
+        _invalidate_cgroup_path_cache=MagicMock(),
+        collect_logs=AsyncMock(),
+        kernel_registry={},
+        local_config=SimpleNamespace(
+            debug=SimpleNamespace(skip_container_deletion=False),
+            container=SimpleNamespace(scratch_type="hostdir", scratch_root="/scratch"),
+        ),
+    )
+
+
+class TestAContainerAlreadyGoneStillReturnsItsScratch:
+    """A container already gone is what the delete wanted; the scratch below it must still go.
+    A removal already in progress belongs to another clean, which owns the scratch."""
+
+    async def _clean(self, error: DockerError, restarting: bool) -> AsyncMock:
+        clean_scratch = AsyncMock()
+        with (
+            patch("ai.backend.agent.docker.agent.Docker", lambda: _GoneContainerDocker(error)),
+            patch("ai.backend.agent.docker.agent._clean_scratch", clean_scratch),
+        ):
+            await DockerAgent.clean_kernel(
+                cast(Any, _cleanable_agent()), KernelId(uuid4()), ContainerId("cid-1"), restarting
+            )
+        return clean_scratch
+
+    async def test_the_scratch_is_cleaned_when_the_container_is_not_found(self) -> None:
+        clean_scratch = await self._clean(
+            DockerError(HTTPStatus.NOT_FOUND, "No such container"), restarting=False
+        )
+        clean_scratch.assert_awaited_once()
+
+    async def test_the_scratch_is_kept_for_a_restarting_kernel(self) -> None:
+        clean_scratch = await self._clean(
+            DockerError(HTTPStatus.NOT_FOUND, "No such container"), restarting=True
+        )
+        clean_scratch.assert_not_awaited()
+
+    async def test_a_removal_in_progress_leaves_the_scratch_to_its_owner(self) -> None:
+        clean_scratch = await self._clean(
+            DockerError(HTTPStatus.CONFLICT, "removal of container cid-1 is already in progress"),
+            restarting=False,
+        )
+        clean_scratch.assert_not_awaited()
+
+
+@pytest.mark.skipif(not sys.platform.startswith("linux"), reason="hostfile scratch is linux-only")
+class TestCleaningAHostfileScratch:
+    """A hostfile scratch an earlier clean already removed counts as cleaned;
+    a scratch still mounted whose umount fails is still an error."""
+
+    @pytest.fixture
+    def kernel_id(self) -> KernelId:
+        return KernelId(uuid4())
+
+    async def test_a_second_clean_of_a_removed_scratch_succeeds(
+        self, tmp_path: Path, kernel_id: KernelId
+    ) -> None:
+        spawn = AsyncMock()
+        with patch("ai.backend.agent.scratch.utils.asyncio.create_subprocess_exec", spawn):
+            await _clean_scratch("hostfile", tmp_path, kernel_id)
+        spawn.assert_not_awaited()
+
+    async def test_unmounted_leftovers_are_removed(
+        self, tmp_path: Path, kernel_id: KernelId
+    ) -> None:
+        (tmp_path / str(kernel_id)).mkdir()
+        (tmp_path / f"{kernel_id}.img").touch()
+
+        await _clean_scratch("hostfile", tmp_path, kernel_id)
+
+        assert list(tmp_path.iterdir()) == []
+
+    async def test_a_failed_umount_of_a_mounted_scratch_raises(
+        self, tmp_path: Path, kernel_id: KernelId
+    ) -> None:
+        (tmp_path / str(kernel_id)).mkdir()
+        umount = MagicMock()
+        umount.wait = AsyncMock(return_value=32)
+        with (
+            patch("ai.backend.agent.scratch.utils.os.path.ismount", return_value=True),
+            patch(
+                "ai.backend.agent.scratch.utils.asyncio.create_subprocess_exec",
+                AsyncMock(return_value=umount),
+            ),
+            pytest.raises(RuntimeError, match="umount failed"),
+        ):
+            await _clean_scratch("hostfile", tmp_path, kernel_id)

@@ -9,7 +9,7 @@ import pytest
 
 from ai.backend.manager.api.gql_legacy.schema import Query
 from ai.backend.manager.errors.common import GenericForbidden
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user.row import UserRole
 
 
 class ExpectedResult(Enum):

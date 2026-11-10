@@ -22,6 +22,9 @@ class ResourcePresetNode(BaseResponseModel):
     """Node model representing a resource preset entity."""
 
     id: UUID = Field(description="Resource preset UUID.")
+    entity_id: UUID = Field(
+        description="UUID of the resource preset. Added in 26.9.0.",
+    )
     name: str = Field(description="Resource preset name.")
     resource_slots: list[ResourceSlotEntryInfo] = Field(description="Resource slot allocations.")
     shared_memory: BinarySizeInfo | None = Field(
@@ -48,6 +51,7 @@ class DeleteResourcePresetPayload(BaseResponseModel):
     """Payload for resource preset deletion."""
 
     id: UUID = Field(description="UUID of the deleted resource preset.")
+    entity_id: UUID = Field(description="UUID of the deleted resource preset. Added in 26.10.0.")
 
 
 class AdminSearchResourcePresetsPayload(BaseResponseModel):

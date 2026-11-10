@@ -19,11 +19,10 @@
   # management.
   # Added in 25.8.0
   type = "postgresql"
-  # Network address and port of the PostgreSQL database server. Default is the
-  # standard PostgreSQL port (5432) on localhost. In production, point this to
-  # your database server or cluster endpoint.
-  # Added in 25.8.0
-  addr = { host = "db.example.com", port = 5432 }
+  # Timeout in seconds for connecting to one member of addrs. When it expires,
+  # the next member is tried.
+  # Added in 26.9.0
+  connect-timeout = 5.0
   # Name of the PostgreSQL database to use for Backend.AI. This database must
   # exist and be accessible by the configured user. The database should be
   # created before starting the manager. Length must be between 2 and 64
@@ -72,6 +71,21 @@
   # Added in 25.8.0
   lock-conn-timeout = 30.0
 
+  # Addresses of the PostgreSQL cluster members. List every member of an HA
+  # cluster, or a single address of a standalone server or a proxy in front of
+  # the cluster.
+  # Added in 26.9.0
+  [[db.addrs]]
+  # Add multiple [[db.addrs]] sections as needed
+    # Host address of the service. Can be a hostname, IP address, or special
+    # addresses like 0.0.0.0 to bind to all interfaces.
+    # Added in 22.03.0
+    host = "db1.example.com"
+    # Port number of the service. Must be between 1 and 65535. Ports below 1024
+    # require root/admin privileges.
+    # Added in 22.03.0
+    port = 5432
+
 # Etcd distributed key-value store configuration. Etcd is used for cluster
 # coordination, service discovery, and shared configuration between manager
 # instances. In multi-manager deployments, etcd ensures consistent state across
@@ -83,19 +97,63 @@
   # keys will be stored under this namespace.
   # Added in 22.03.0
   namespace = "backend"
-  # Network address of the etcd server. Default is the standard etcd port on
-  # localhost. In production, should point to one or more etcd instance
-  # endpoint(s).
+  # Username for authenticating with etcd. Set together with the password field.
+  # Required since 26.10.0.
   # Added in 22.03.0
-  addr = { host = "etcd-cluster", port = 2379 }
-  # Username for authenticating with etcd. Optional if etcd doesn't require
-  # authentication. Should be set along with password for secure deployments.
+  user = "backend"
+  # Password for authenticating with etcd. Set together with the user field.
+  # Required since 26.10.0.
   # Added in 22.03.0
-  ## user = "backend"
-  # Password for authenticating with etcd. Should be kept secret in production
-  # environments. Set together with the user field for authentication.
-  # Added in 22.03.0
-  ## password = "ETCD_PASSWORD"
+  password = "ETCD_PASSWORD"
+  # Seconds without a frame from an etcd member before a keep-alive ping is sent
+  # on a connection with requests in flight. Must not be below the server's
+  # --grpc-keepalive-min-time (5 seconds by default).
+  # Added in 26.10.0
+  keep-alive-interval = 5.0
+  # Seconds to wait for a keep-alive ping reply before the connection to that
+  # etcd member is closed and its requests go to the other members.
+  # Added in 26.10.0
+  keep-alive-timeout = 3.0
+
+  # TLS settings for the connection to etcd.
+  # Added in 26.10.0
+  [etcd.tls]
+    # Connect to etcd over TLS.
+    # Added in 26.10.0
+    enabled = false
+
+    # PEM file of the CA certificate that signed the etcd server certificate.
+    # Required if TLS is enabled.
+    # Added in 26.10.0
+    ## ca-cert = "/etc/backend.ai/etcd/ca.pem"
+
+    # PEM file of the client certificate, for an etcd started with --client-
+    # cert-auth. Set together with client-key.
+    # Added in 26.10.0
+    ## client-cert = "/etc/backend.ai/etcd/client.pem"
+
+    # PEM file of the client private key. Set together with client-cert.
+    # Added in 26.10.0
+    ## client-key = "/etc/backend.ai/etcd/client-key.pem"
+
+    # Seconds to wait for the TLS handshake with an etcd member. When not set,
+    # the handshake has no limit: request timeouts do not end it.
+    # Added in 26.10.0
+    ## handshake-timeout = 10.0
+
+  # Addresses of the etcd cluster members. List every member of an etcd cluster,
+  # or a single address of a standalone server.
+  # Added in 26.10.0
+  [[etcd.addrs]]
+  # Add multiple [[etcd.addrs]] sections as needed
+    # Host address of the service. Can be a hostname, IP address, or special
+    # addresses like 0.0.0.0 to bind to all interfaces.
+    # Added in 22.03.0
+    host = "etcd1.example.com"
+    # Port number of the service. Must be between 1 and 65535. Ports below 1024
+    # require root/admin privileges.
+    # Added in 22.03.0
+    port = 2379
 
 # Core manager service configuration. Controls fundamental manager behavior
 # including network binding, process management, scaling parameters, and
@@ -103,6 +161,11 @@
 # the manager component itself.
 # Added in 25.8.0
 [manager]
+  # Seconds to keep accepting and serving requests after announcing the drain,
+  # before closing the listeners. Set it to about three times the health check
+  # interval of the clients' endpoint pool.
+  # Added in 26.10.0
+  shutdown-grace-period = 30.0
   # Base directory path for inter-process communication files. Used for Unix
   # domain sockets and other IPC mechanisms. This directory must be writable by
   # the manager process. In production, consider using /var/run/backend.ai/ipc
@@ -189,10 +252,15 @@
   # Added in 25.8.0
   ## ssl-privkey = "/etc/backend.ai/ssl/manager.key"
   # List of trusted reverse proxy IP addresses or CIDR ranges. When configured,
-  # the manager uses aiohttp_remotes.XForwardedStrict middleware to securely
-  # resolve client IPs from X-Forwarded-For headers. Only proxies in this list
-  # are trusted to set forwarding headers. If empty (default), the manager falls
-  # back to manual X-Forwarded-For parsing.
+  # the client IP is resolved by walking the X-Forwarded-For chain inwards from
+  # the peer of the connection and taking the first address that is not one of
+  # these proxies, so any number of proxy hops is supported. The X-Forwarded-URL
+  # and X-Forwarded-Prefix headers, which override the host and path used for
+  # HMAC signature verification, are honored only when the request comes
+  # directly from one of these proxies; X-Forwarded-Prefix is ignored entirely
+  # when this list is empty. If empty (default), the manager falls back to
+  # manual X-Forwarded-For parsing and accepts X-Forwarded-URL from any client,
+  # which is deprecated.
   # Added in 26.4.2
   trusted-proxies = ["10.0.0.0/8", "172.16.0.0/12"]
   # Event loop implementation to use for async operations. 'asyncio' is the
@@ -252,12 +320,12 @@
   # exactly which plugins are active in production. Leave as None to load all
   # available plugins except disabled_plugins.
   # Added in 25.8.0
-  ## allowed-plugins = "[\"example.plugin.what.you.want\"]"
+  ## allowed-plugins = ["example.plugin.what.you.want"]
   # List of plugins to explicitly disable (blacklist). These plugins won't be
   # loaded even if they're installed. Useful for disabling problematic or
   # unwanted plugins without uninstalling.
   # Added in 25.8.0
-  ## disabled-plugins = "[\"example.plugin.what.you.want\"]"
+  ## disabled-plugins = ["example.plugin.what.you.want"]
   # Whether to hide detailed agent information in API responses. When enabled,
   # agent details are obscured in user-facing APIs. Recommended for multi-tenant
   # environments to improve security and privacy.
@@ -285,11 +353,6 @@
   # only from trusted networks for security.
   # Added in 25.8.0
   aiomonitor-webui-port = 39100
-  # Whether to use the experimental Redis-based event dispatcher. May provide
-  # better performance for event handling in large clusters. Not recommended for
-  # production use unless specifically tested and needed.
-  # Added in 25.8.0
-  use-experimental-redis-event-dispatcher = false
   # Interval in seconds between manager status updates to the cluster. Controls
   # how frequently the manager broadcasts its health status. Smaller values
   # provide more real-time information but increase network overhead.
@@ -457,6 +520,20 @@
   # Added in 24.12.1
   ## sample-rate = 100
 
+# Plugin wheels loaded when the manager starts. Read only from the config file:
+# etcd values are ignored. Wheels provided here run without verification, so
+# keep the path writable only by trusted operators.
+# Added in 26.10.0
+[wheelhouse]
+  # Whether to load the plugin wheels in the path when the server starts.
+  # Added in 26.10.0
+  allow = false
+  # Directory holding the plugin wheels. A relative path starts from the current
+  # directory of the server. The storage-proxy runs from the directory of its
+  # config file.
+  # Added in 26.10.0
+  path = "wheelhouse"
+
 # Debugging options configuration. Controls various debugging features that aid
 # in development and troubleshooting. Most debug options should be disabled in
 # production environments as they may impact performance or expose sensitive
@@ -513,6 +590,20 @@
   # customizable alerting based on system events.
   # Added in 25.8.0
   [reporter.action-monitors]
+
+# Audit log recording policy. Mutating operations are always recorded, as are
+# failures and permission denials; this section only opts successful read
+# operations in.
+# Added in 26.9.0
+[audit-log]
+  # Opt-in list: a read operation is recorded only if it is named here. The
+  # default is an empty list, so successful reads are not recorded at all and
+  # read volume stays off until an operator turns it on. A listed operation is
+  # recorded for every entity type. Must be 'get', 'search' or 'lookup':
+  # mutating operations are always recorded and listing them here is rejected.
+  # Failed and denied reads are recorded either way.
+  # Added in 26.9.0
+  record-read-operations = []
 
 # System-wide configuration settings. Controls general Backend.AI system
 # behavior that affects all components. These settings typically apply globally
@@ -828,6 +919,37 @@
   # Added in 26.4.2
   login-session-max-age = 604800
 
+# At-rest encryption for secret columns such as the keypair secret key. Names
+# which key provider writes new secrets and configures the providers. New
+# secrets are stored as plaintext until a write provider is named.
+# Added in 26.9.0
+[secret-encryption]
+  # The key provider new secrets are written through, named by its type. 'plain'
+  # stores them unencrypted; every other type is configured by the matching
+  # provider section below. Reads are decided by the stored value, so secrets
+  # written earlier keep decrypting through the provider they name, and a batch
+  # re-encryption normalizes stored secrets to whatever this names.
+  # Added in 26.9.0
+  write-provider-type = "config"
+
+  # The key provider that holds its key encryption keys in this file, under the
+  # id 'config'. Omit this section to leave that provider unconfigured, in which
+  # case no stored secret naming it can be read.
+  # Added in 26.9.0
+  [secret-encryption.config-provider]
+    # The key id new values are encrypted under. Rotating a key is adding a new
+    # id to the key list and pointing this at it; the previous ids stay so their
+    # values keep decrypting.
+    # Added in 26.9.0
+    active-key-id = "v1"
+    # Key encryption keys by id, each 32 random bytes in base64 as produced by
+    # `openssl rand -base64 32`; the standard and url-safe alphabets are both
+    # accepted. A key wraps the per-value data encryption keys rather than the
+    # values themselves, so an id may be retired only once no stored value still
+    # names it.
+    # Added in 26.9.0
+    keys = {}
+
 # JWT (JSON Web Token) authentication configuration. Controls JWT token signing
 # and verification settings used for stateless authentication between
 # components. Shared between manager and webserver for consistent token
@@ -1101,3 +1223,25 @@
   # overload from too many simultaneous export operations.
   # Added in 26.1.0
   max-concurrent-exports = 10
+
+# DB record retention sweep configuration. Controls the leader-cron sweep that
+# deletes accumulated records past each enabled retention policy's age boundary,
+# including tick cadence, delete chunk size, and an optional per-tick budget.
+# Added in 26.7.0
+[retention]
+  # Interval in seconds between retention sweep ticks. A single tick loads all
+  # enabled retention policies and purges records older than each policy's
+  # boundary. The sweep runs only on the leader manager.
+  # Added in 26.7.0
+  sweep-interval = 3600.0
+  # Number of rows deleted per chunk during a sweep. Each category's tables are
+  # drained in delete-and-advance chunks of this size so a large backlog never
+  # becomes a single huge DELETE.
+  # Added in 26.7.0
+  batch-size = 1000
+  # Optional upper bound on the total rows deleted in one tick, enforced across
+  # categories at category boundaries: once a tick's cumulative deletions reach
+  # this budget the remaining categories are deferred to the next tick. Null
+  # means no budget (every enabled category is fully drained each tick).
+  # Added in 26.7.0
+  ## per-tick-budget = 100000

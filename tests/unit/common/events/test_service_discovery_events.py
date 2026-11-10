@@ -19,7 +19,7 @@ class TestServiceRegisteredEvent:
     def test_event_domain(self) -> None:
         assert ServiceRegisteredEvent.event_domain() == EventDomain.SERVICE_DISCOVERY
 
-    def test_serialize_deserialize_roundtrip(self) -> None:
+    def test_message_roundtrip(self) -> None:
         startup = datetime(2026, 1, 15, 10, 30, 0, tzinfo=UTC)
         event = ServiceRegisteredEvent(
             instance_id="manager-001",
@@ -41,11 +41,7 @@ class TestServiceRegisteredEvent:
             config_hash="abc123",
         )
 
-        serialized = event.serialize()
-        assert isinstance(serialized, tuple)
-        assert len(serialized) == 2
-
-        restored = ServiceRegisteredEvent.deserialize(serialized)
+        restored = ServiceRegisteredEvent.from_message(event.to_message())
         assert restored.instance_id == "manager-001"
         assert restored.service_group == "manager"
         assert restored.display_name == "Manager Instance 1"
@@ -58,7 +54,7 @@ class TestServiceRegisteredEvent:
         assert restored.startup_time == startup
         assert restored.config_hash == "abc123"
 
-    def test_serialize_deserialize_minimal(self) -> None:
+    def test_message_roundtrip_minimal(self) -> None:
         startup = datetime(2026, 2, 1, 0, 0, 0, tzinfo=UTC)
         event = ServiceRegisteredEvent(
             instance_id="agent-001",
@@ -68,7 +64,7 @@ class TestServiceRegisteredEvent:
             startup_time=startup,
         )
 
-        restored = ServiceRegisteredEvent.deserialize(event.serialize())
+        restored = ServiceRegisteredEvent.from_message(event.to_message())
         assert restored.instance_id == "agent-001"
         assert restored.labels == {}
         assert restored.endpoints == []
@@ -104,17 +100,13 @@ class TestServiceDeregisteredEvent:
     def test_event_domain(self) -> None:
         assert ServiceDeregisteredEvent.event_domain() == EventDomain.SERVICE_DISCOVERY
 
-    def test_serialize_deserialize_roundtrip(self) -> None:
+    def test_message_roundtrip(self) -> None:
         event = ServiceDeregisteredEvent(
             instance_id="manager-001",
             service_group="manager",
         )
 
-        serialized = event.serialize()
-        assert isinstance(serialized, tuple)
-        assert len(serialized) == 2
-
-        restored = ServiceDeregisteredEvent.deserialize(serialized)
+        restored = ServiceDeregisteredEvent.from_message(event.to_message())
         assert restored.instance_id == "manager-001"
         assert restored.service_group == "manager"
 

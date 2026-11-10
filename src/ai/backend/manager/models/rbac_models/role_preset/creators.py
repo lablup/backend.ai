@@ -1,0 +1,65 @@
+from __future__ import annotations
+
+from collections.abc import Sequence
+from dataclasses import dataclass
+from typing import override
+
+from ai.backend.common.data.entity.role_preset import RolePresetID
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.data.role_preset.types import RolePresetData
+from ai.backend.manager.errors.repository import UniqueConstraintViolationError
+from ai.backend.manager.errors.role_preset import RolePresetCreateConflict
+from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
+from ai.backend.manager.models.rbac_models.role_preset.searchable_fields import (
+    RolePresetSearchableFields,
+)
+from ai.backend.manager.models.specs.created_in import CreatedInGlobal
+from ai.backend.manager.models.specs.creator import EntityCreator
+from ai.backend.manager.models.specs.types import IntegrityErrorCheck
+
+
+@dataclass
+class RolePresetCreator(
+    CreatedInGlobal[RolePresetRow], EntityCreator[RolePresetRow, RolePresetData]
+):
+    """Creator for a role preset — the global catalog of roles a scope type provisions.
+
+    Created in the `global` scope: a preset declares which roles a scope type gets.
+    Its permission rows hang off it as fields.
+    """
+
+    name: str
+    scope_type: EntityType
+    auto_assign: bool = False
+    auto_assign_to_owner: bool = False
+    role_name_template: str | None = None
+
+    @override
+    def entity_id(self, row: RolePresetRow) -> RolePresetID:
+        return RolePresetID(row.id)
+
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return (
+            IntegrityErrorCheck(
+                violation_type=UniqueConstraintViolationError,
+                constraint_name="uq_role_presets_name",
+                error=RolePresetCreateConflict(
+                    f"A role preset named '{self.name}' already exists for {self.scope_type}"
+                ),
+            ),
+        )
+
+    @override
+    def build_row(self) -> RolePresetRow:
+        return RolePresetRow(
+            name=self.name,
+            role_name_template=self.role_name_template,
+            scope_type=self.scope_type,
+            auto_assign=self.auto_assign,
+            auto_assign_to_owner=self.auto_assign_to_owner,
+        )
+
+    @override
+    def to_data(self, row: RolePresetRow) -> RolePresetData:
+        return RolePresetSearchableFields.own.to_data(row)

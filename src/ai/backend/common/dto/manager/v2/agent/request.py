@@ -9,13 +9,19 @@ from __future__ import annotations
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT
-from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.agent.types import (
     AgentOrderField,
     AgentStatusFilter,
+    AgentUsage,
+    ConflictingSessionCleanupPolicyEnum,
     OrderDirection,
 )
+from ai.backend.common.dto.manager.v2.entity_label.request import EntityLabelNestedFilter
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.common.types import AgentId
 
 __all__ = (
     "AdminSearchAgentsInput",
@@ -23,6 +29,8 @@ __all__ = (
     "AgentOrder",
     "AgentPathParam",
     "SearchAgentsInput",
+    "UpdateAgentResourceGroupBody",
+    "UpdateAgentResourceGroupInput",
 )
 
 
@@ -49,6 +57,10 @@ class AgentFilter(BaseRequestModel):
         default=None,
         description="Filter by agent ID. Supports string match operations.",
     )
+    entity_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by agent entity ID.",
+    )
     status: AgentStatusFilter | None = Field(
         default=None,
         description="Filter by agent status. Supports equals, in, not_equals, and not_in operations.",
@@ -64,6 +76,9 @@ class AgentFilter(BaseRequestModel):
             "Supports equals, contains, starts_with, ends_with, "
             "and their case-insensitive and negated variants."
         ),
+    )
+    labels: EntityLabelNestedFilter | None = Field(
+        default=None, description="Filter by the labels on the entity"
     )
     AND: list[AgentFilter] | None = Field(
         default=None, description="All sub-conditions must match."
@@ -100,9 +115,57 @@ class SearchAgentsInput(BaseRequestModel):
     offset: int = Field(default=0, ge=0)
 
 
+class UpdateAgentResourceGroupBody(BaseRequestModel):
+    """Mutable part of an agent resource-group change.
+
+    Used directly as the REST request body, where the agent ID is supplied as a
+    URL path segment instead of a body field. ``UpdateAgentResourceGroupInput``
+    extends this with the agent ID for the GQL/adapter call path.
+    """
+
+    resource_group_id: ResourceGroupID = Field(
+        description="UUID of the target resource group to move the agent into.",
+    )
+    policy: ConflictingSessionCleanupPolicyEnum | None = Field(
+        default=None,
+        description=(
+            "How to handle sessions still running on the agent under the old "
+            "resource group. Defaults to 'terminate', which is currently the "
+            "only supported policy."
+        ),
+    )
+    force: bool = Field(
+        default=False,
+        description=(
+            "When false, the change is rejected with a conflict error if the agent "
+            "still has active sessions or unterminated sessions or deployments of "
+            "other resource groups designate it. When true, the group is changed "
+            "anyway, the active sessions are cleaned up per the policy, and those "
+            "designations are removed."
+        ),
+    )
+
+
+class UpdateAgentResourceGroupInput(UpdateAgentResourceGroupBody):
+    """Input for changing the resource group of an agent, carrying the agent ID.
+
+    Extends ``UpdateAgentResourceGroupBody`` with ``agent_id`` for the GQL
+    mutation and adapter call path.
+    """
+
+    agent_id: AgentId = Field(description="ID of the agent to move.")
+
+
 class AdminSearchAgentsInput(BaseRequestModel):
     """Input for admin-scoped paginated agent search with cursor and offset pagination."""
 
+    usage: AgentUsage | None = Field(
+        default=None,
+        description=(
+            "Uses narrowing the result. Each listed entity must be readable by the caller; "
+            "agents the caller cannot read are left out."
+        ),
+    )
     filter: AgentFilter | None = None
     order: list[AgentOrder] | None = None
     # Cursor pagination

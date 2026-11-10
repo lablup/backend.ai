@@ -10,11 +10,11 @@ from ai.backend.appproxy.common.types import RouteInfo
 from ai.backend.appproxy.worker.errors import InvalidFrontendTypeError, SubprocessPipeError
 from ai.backend.appproxy.worker.proxy.backend.h2 import BackendConfig, H2Backend
 from ai.backend.appproxy.worker.types import Circuit, SubdomainFrontendInfo
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .base import H2Frontend
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class SubdomainFrontend(H2Frontend[str]):
@@ -66,7 +66,7 @@ class SubdomainFrontend(H2Frontend[str]):
             asyncio.create_task(self._log_monitor_task(proc.stderr, "stderr"))
         )
         self.proc_monitor_task = asyncio.create_task(self._proc_monitor_task(proc))
-        log.info("accepting proxy requests at {}:{}", service_addr.host, service_addr.port)
+        log.info("accepting proxy requests", service_addr=str(service_addr))
 
     @override
     async def stop(self) -> None:

@@ -13,7 +13,7 @@ Guides the Backend.AI release process: version bump, changelog generation, and R
 
 ## Parameters
 
-- **target_version** (required): Release version (e.g., `26.2.0`, `26.2.0rc2`)
+- **target_version** (required): Release version (for example `26.2.0`, `26.2.0rc2`)
 - **webui_version** (optional): WebUI version to bundle
 
 ## Workflow
@@ -30,16 +30,30 @@ Guides the Backend.AI release process: version bump, changelog generation, and R
    - Confirm on expected base branch (usually `main`)
 
 3. **Determine release type**
-   - **Pre-release**: version contains `rc`, `alpha`, `beta`, or `dev` (e.g., `26.2.0rc1`)
-   - **Final release**: clean semver (e.g., `26.2.0`)
+   - **Pre-release**: version contains `rc`, `alpha`, `beta` or `dev` (for example `26.2.0rc1`)
+   - **Final release**: clean semver (for example `26.2.0`)
 
-4. **For final releases, check for prior RC sections**
-   - Scan `CHANGELOG.md` for sections matching `## {major}.{minor}.{patch}rc\d+`
+4. **Locate the changelog file**
+   - The changelog is split per version branch: `CHANGELOG/{major}.{minor}.md`
+     (`26.9.0rc1`, `26.9.0` and `26.9.1` all live in `CHANGELOG/26.9.md`)
+   - The root `CHANGELOG.md` archives the releases made before the split. Do not write to it
+   - The file may not exist yet; the first release of the version branch creates it
+
+5. **For final releases, check for prior RC sections**
+   - Scan `CHANGELOG/{major}.{minor}.md` for sections matching `## {major}.{minor}.{patch}rc\d+`
    - List found RC sections to user
    - These will be consolidated in Phase 3
 
-5. **Confirm with user before proceeding**
-   - Show: target version, release type, WebUI version (if any), RC sections to consolidate (if any)
+6. **For a `{major}.{minor}.0rc1` target, settle the support level**
+   - That form is the rc that cuts a new release line; the release script recognizes it
+     on its own, so nothing else has to be classified by hand
+   - Ask the user whether the line is LTS (the March and September sprints are, per the
+     versioning scheme); a year of support is a commitment and is not inferred
+   - If it is, pass `--lts` to the release script below
+
+7. **Confirm with user before proceeding**
+   - Show: target version, release type, WebUI version (if any), RC sections to consolidate (if any),
+     and for a branch cut, whether the line is LTS
    - Wait for user approval
 
 ### Phase 2: Release Script Execution
@@ -50,10 +64,10 @@ Run `scripts/release.sh` which performs these steps:
 scripts/release.sh {target_version} [webui_version]
 ```
 
-To override the next development version (year rollover or planned sprint skip):
+When the line being cut is LTS:
 
 ```bash
-NEXT_DEV_VERSION={next_version} scripts/release.sh {target_version} [webui_version]
+scripts/release.sh --lts {target_version} [webui_version]
 ```
 
 **What the script does:**
@@ -61,22 +75,22 @@ NEXT_DEV_VERSION={next_version} scripts/release.sh {target_version} [webui_versi
 2. Downloads WebUI release (if `webui_version` provided)
 3. Updates `VERSION` file
 4. Freezes `NEXT_RELEASE_VERSION` placeholders to the actual version (stable releases only; skipped for `rc`/`a`/`b`/`dev`/`post`)
-5. Runs towncrier to generate changelog entries
+   - Then runs `ruff check --fix` and `ruff format` on the frozen files through `uvx`, with the ruff version from `pants.toml`. The script does not run pants; the release PR's CI runs `pants tailor` and `pants check`
+5. Runs `scripts/run-towncrier.py {target_version}`, which consumes the `changes/` fragments into `CHANGELOG/{major}.{minor}.md` (skipped entirely when there are no fragments)
+6. Runs `.github/scripts/update-maintained-versions.sh {target_version}`, which registers the line when the target is an `X.Y.0rc1` cut and retires the lines that are due: an LTS line once its recorded `retire_after` has passed, a regular line as soon as any newer line exists.
+   **Report its output to the user**: a retirement means that version stops receiving backports and drops out of the installer channel selection from that point on.
 6. Generates sample config files
 7. Generates API docs (OpenAPI, GraphQL schema)
-8. Runs quality checks: `pants tailor --check`, `pants check ::`
-9. Commits everything as `release: {target_version}`
-10. For sprint releases only (`{year}.{sprint}.0`): advances `NEXT_RELEASE_VERSION` in `meta.py` to the next sprint and commits it separately as `chore: bump NEXT_RELEASE_VERSION to {next_version}`
-
-**NEXT_RELEASE_VERSION auto-advance (step 10):**
-- Runs only for sprint releases — patch must be `0` (e.g. `26.7.0`). Patch releases (`26.7.1`) and pre-releases (`rc`/`a`/`b`/`dev`/`post`) are skipped automatically.
-- Default: increments the sprint number, resets patch to `0` (`26.7.0` → `26.8.0`).
-- Override the default by setting `NEXT_DEV_VERSION` (e.g. `27.1.0` for a year rollover, or to skip sprints).
-- Produces a second commit, kept separate from the `release:` commit (freeze = this release; bump = next dev cycle).
+8. Commits everything as `release: {target_version}`
+**Advancing NEXT_RELEASE_VERSION:**
+- `release.sh` does not advance it. When an `X.Y.0rc1` release PR merges and cuts `X.Y`, `create-version-branch.yml` opens a `release: freeze X.Y.0 and bump NEXT_RELEASE_VERSION to X.(Y+1).0` PR against `main`
+- That PR also freezes `main`'s `NEXT_RELEASE_VERSION` references to `X.Y.0`, the same value the version branch freezes them to at its final release. When it rewrites a migration's `# Part of:` marker, it carries the `allow:migration-edit` label
+- No PR is opened when `main` is already at that version or past it
+- For a year rollover or a sprint skip, set the `NEXT_DEV_VERSION` repository variable (for example `27.1.0`) before the rc1 merges, and clear it afterwards
 
 **Error handling:**
-- If quality checks fail, report errors and stop
 - If towncrier fails, check `pyproject.toml` towncrier config and `changes/` directory
+- If no changelog block was produced, check whether `changes/` held any fragment; `run-towncrier.py` skips towncrier when there is none, by design
 - If config generation fails, check component CLI availability
 - On any failure, suggest user fix the issue and re-run the script manually
 
@@ -85,31 +99,33 @@ NEXT_DEV_VERSION={next_version} scripts/release.sh {target_version} [webui_versi
 #### For Pre-release (RC/alpha/beta/dev)
 
 - towncrier generates a flat bullet list under `## {version} (date)`
-- **No editing needed** - the flat list is the final format for pre-releases
+- **No editing needed**; the flat list is the final format for pre-releases
 - Skip directly to Phase 4
 
 #### For Final Release (RC Consolidation Required)
 
-This is the core value of the skill. When releasing a final version (e.g., `26.2.0`), all previous RC changelog sections (e.g., `26.2.0rc1`, `26.2.0rc2`) must be consolidated into the final version section.
+This is the core value of the skill. When releasing a final version (for example `26.2.0`), all previous RC changelog sections (for example `26.2.0rc1`, `26.2.0rc2`) must be consolidated into the final version section.
 
 **Step 1: Collect RC entries**
-- Find all RC sections for the same major.minor.patch in `CHANGELOG.md`
+- Find all RC sections for the same major.minor.patch in `CHANGELOG/{major}.{minor}.md`
   - Pattern: `## {major}.{minor}.{patch}rc\d+ \(.*\)`
-- Extract all bullet items from each RC section, grouped by category (`### Features`, `### Improvements`, `### Fixes`, etc.)
+- Extract all bullet items from each RC section, grouped by category (`### Features`, `### Improvements`, `### Fixes` and so on)
 
 **Step 2: Merge with new entries**
 - towncrier has already generated the new final version section with any remaining `changes/` fragments
-- Combine: new entries + all RC entries, deduplicated by PR/issue number
-- Group by category: Features, Improvements, Fixes, etc.
+- Combine: new entries and all RC entries, deduplicated by PR or issue number
+- Group by category: Features, Improvements, Fixes and so on
 
 **Step 3: Remove RC sections**
-- Delete the RC section blocks from `CHANGELOG.md`
-- Only the final version section should remain
+- Delete the RC section blocks from `CHANGELOG/{major}.{minor}.md`
+- Only the final version section should remain for this patch level; sections for
+  earlier patch releases of the same version branch (for example `## 26.9.0` when
+  releasing `26.9.1`) stay untouched below it
 
 **Step 4: Subsection grouping**
 - For each category (Features, Improvements, Fixes), group related items into `#### Subsection Title` blocks
 - Each subsection gets a 1-2 sentence description explaining the group
-- Follow the established pattern from previous final releases (e.g., 26.1.0):
+- Follow the established pattern from previous final releases (for example 26.1.0):
 
 ```markdown
 ### Features
@@ -136,34 +152,34 @@ Introduced StorageTarget abstraction for flexible storage configuration.
 
 **Grouping criteria (priority order):**
 
-1. **Feature Initiative**: Group PRs that serve the same goal or project, even if they span multiple layers (model, repository, service, API, CLI). A single initiative = a single group.
-   - e.g., "Fair Share Scheduler" — includes row models, repository, service, API, CLI, observer, sequencer
-   - e.g., "Sokovan Scheduler Redesign" — includes handler unification, status transitions, coordinator redesign
-   - e.g., "Email Notification System" — includes SMTP channel implementation + endpoint lifecycle notifications
+1. **Feature Initiative**: Group PRs that serve the same goal or project, even if they span multiple layers (model, repository, service, API, CLI). A single initiative is a single group.
+   - for example, "Fair Share Scheduler": includes row models, repository, service, API, CLI, observer, sequencer
+   - for example, "Sokovan Scheduler Redesign": includes handler unification, status transitions, coordinator redesign
+   - for example, "Email Notification System": includes SMTP channel implementation and endpoint lifecycle notifications
 
 2. **System/Subsystem**: Group PRs that improve a specific system across multiple areas under the system name.
-   - e.g., "RBAC System Improvements" — Creator/Purger/Granter, entity_fields, data migration
-   - e.g., "RBAC System Data Migration" — batch entity migration to RBAC DB
+   - for example, "RBAC System Improvements": Creator/Purger/Granter, entity_fields, data migration
+   - for example, "RBAC System Data Migration": batch entity migration to RBAC DB
 
 3. **Domain Entity**: Group PRs that target the same entity's Action/Repository/Service work under the entity name.
-   - e.g., "Scaling Group Management" — Create/Modify/Associate/Disassociate actions
-   - e.g., "Model Deployment Data Model Extension" — revision, autoscaling, policy row/repository/API
+   - for example, "Scaling Group Management": Create/Modify/Associate/Disassociate actions
+   - for example, "Model Deployment Data Model Extension": revision, autoscaling, policy row/repository/API
 
 4. **Technical Pattern**: Group PRs that apply the same technical pattern across multiple entities under the pattern name.
-   - e.g., "Repository Pattern Standardization" — batch Admin*Repository consolidation
-   - e.g., "GraphQL DataLoader Extension" — DataLoader implementation for multiple entities
-   - e.g., "Code Quality and Consistency" — batch linter rule enablement, refactoring
+   - for example, "Repository Pattern Standardization": batch Admin*Repository consolidation
+   - for example, "GraphQL DataLoader Extension": DataLoader implementation for multiple entities
+   - for example, "Code Quality and Consistency": batch linter rule enablement, refactoring
 
 5. **Infrastructure**: Group PRs that address infrastructure-level changes under the infrastructure area name.
-   - e.g., "Agent RPC Connection Pooling" — pool implementation + migration
-   - e.g., "CSV Export Infrastructure" — foundation implementation + per-domain exports
+   - for example, "Agent RPC Connection Pooling": pool implementation and migration
+   - for example, "CSV Export Infrastructure": foundation implementation and per-domain exports
 
 **Grouping rules:**
 - If a PR could belong to multiple groups, place it in the most specific initiative group
 - A group requires 2+ PRs, except for significant standalone features which may form a single-PR group
-- Items that don't fit any group go under `#### Other {Category}` (e.g., `#### Other Features`)
-- Subsection descriptions should be past tense, summarizing the group's purpose/outcome in 1-2 sentences
-- Never group by component (manager, agent, storage-proxy) — always group by functional area
+- Items that do not fit any group go under `#### Other {Category}` (for example `#### Other Features`)
+- Subsection descriptions should be past tense, summarizing the group's purpose and result in 1-2 sentences
+- Do not group by component (manager, agent, storage-proxy). Always group by functional area
 
 **Step 5: User review**
 - Present the reorganized changelog to the user
@@ -172,7 +188,7 @@ Introduced StorageTarget abstraction for flexible storage configuration.
 
 **Step 6: Amend the release commit**
 ```bash
-git add CHANGELOG.md
+git add CHANGELOG/{major}.{minor}.md
 git commit --amend --no-edit
 ```
 
@@ -208,7 +224,7 @@ Options:
 
 ### No changes/ fragments
 ```
-No news fragments found in changes/ directory.
+No changelog fragments found in changes/ directory.
 
 This means no new changes since the last release.
 If this is a final release consolidating RCs, this is expected - proceed to Phase 3.
@@ -235,7 +251,7 @@ Agent: [Checks VERSION, runs release.sh, towncrier generates flat list, reports 
 ### Final release with RC consolidation
 ```
 User: /release 26.2.0
-Agent: [Checks VERSION, finds rc1/rc2 sections in CHANGELOG, runs release.sh,
+Agent: [Checks VERSION, finds rc1/rc2 sections in CHANGELOG/26.2.md, runs release.sh,
         consolidates RC entries + new entries, groups into subsections,
         presents for review, amends commit, reports summary]
 ```
@@ -246,9 +262,12 @@ User: /release 26.2.0 25.3.2
 Agent: [Runs release.sh with WebUI version, full workflow]
 ```
 
-## Related
+## Related documents
 
 - `scripts/release.sh` - The release automation script
+- `scripts/run-towncrier.py` - Runs towncrier against `CHANGELOG/{major}.{minor}.md`
+- `scripts/changelog_files.py` - Version to changelog path mapping
 - `pyproject.toml` - towncrier configuration (fragment types, template)
-- `changes/` - News fragment directory
+- `changes/` - Changelog fragment directory
+- `CHANGELOG/` - Per-version-branch changelogs; root `CHANGELOG.md` archives the pre-split releases
 - `/submit` - For regular PR submissions (not releases)

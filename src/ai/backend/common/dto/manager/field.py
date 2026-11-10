@@ -5,6 +5,7 @@ from ai.backend.common.types import VFolderUsageMode
 
 
 class VFolderPermissionField(enum.StrEnum):
+    NONE = "none"
     READ_ONLY = "ro"
     READ_WRITE = "rw"
     RW_DELETE = "wd"
@@ -13,6 +14,7 @@ class VFolderPermissionField(enum.StrEnum):
 
 class VFolderOperationStatusField(enum.StrEnum):
     READY = "ready"
+    CREATING = "creating"
     PERFORMING = "performing"
     CLONING = "cloning"
     MOUNTED = "mounted"

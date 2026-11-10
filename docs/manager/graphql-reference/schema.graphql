@@ -121,7 +121,7 @@ type Query {
     domain_name: String
     is_active: Boolean
 
-    """Added in 24.03.0. Available values: GENERAL, MODEL_STORE"""
+    """Added in 24.03.0. Available values: GENERAL, MODEL_STORE, PERSONAL"""
     type: [String] = ["GENERAL"]
   ): [Group]
   image(
@@ -323,7 +323,7 @@ type Query {
   """Added in 25.5.0."""
   total_resource_slot(
     """
-    `statuses` argument is an array of session statuses. Only sessions with the specified statuses will be queried to calculate the sum of total resource slots. The argument should be an array of the following valid status values: ['PENDING', 'DEPRIORITIZING', 'SCHEDULED', 'PREPARING', 'PULLING', 'PREPARED', 'CREATING', 'RUNNING', 'RESTARTING', 'RUNNING_DEGRADED', 'PREEMPTED', 'TERMINATING', 'TERMINATED', 'ERROR', 'CANCELLED'].
+    Added in 25.5.0. `statuses` argument is an array of session statuses. Only sessions with the specified statuses will be queried to calculate the sum of total resource slots. The argument should be an array of the following valid status values: ['PENDING', 'DEPRIORITIZING', 'RESERVED', 'SCHEDULED', 'PREPARING', 'PULLING', 'PREPARED', 'CREATING', 'RUNNING', 'RESTARTING', 'RUNNING_DEGRADED', 'PREEMPTED', 'RESCHEDULING', 'TERMINATING', 'TERMINATED', 'ERROR', 'CANCELLED'].
     Default value is null.
     """
     statuses: [String] = null
@@ -381,7 +381,7 @@ type Query {
   available_service: AvailableServiceNode
 
   """Added in 25.8.0."""
-  available_services(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): AvailableServiceConnection
+  available_services(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): AvailableServiceConnection @deprecated(reason: "Deprecated since 26.9.0.")
 
   """Added in 25.8.0."""
   service_config(service: String!): ServiceConfigNode
@@ -745,7 +745,6 @@ type ScalingGroupNode implements Node @key(fields: "id") {
   is_public: Boolean
   created_at: DateTime
   wsproxy_addr: String
-  wsproxy_api_token: String
   driver: String
   driver_opts: JSONString
   scheduler: String
@@ -941,7 +940,7 @@ type GroupNode implements Node @key(fields: "id") {
   integration_id: String
   resource_policy: String
 
-  """Added in 24.03.7. One of ['GENERAL', 'MODEL_STORE']."""
+  """Added in 24.03.7. One of ['GENERAL', 'MODEL_STORE', 'PERSONAL']."""
   type: String
 
   """Added in 24.03.7."""
@@ -1117,6 +1116,8 @@ type Image {
 enum ImageStatus {
   ALIVE
   DELETED
+  PURGING
+  PURGE_ERROR
 }
 
 """Added in 25.3.0."""
@@ -1169,9 +1170,9 @@ type User implements Item {
   sudo_session_enabled: Boolean
 
   """
-  Added in 24.03.0. Used as the default authentication credential for password-based logins and sets the user's total resource usage limit. User's main_access_key cannot be deleted, and only super-admin can replace main_access_key.
+  Added in 24.03.0. Deprecated since 26.9.0. Use the keypair's is_default field. Used as the default authentication credential for password-based logins and sets the user's total resource usage limit. User's main_access_key cannot be deleted, and only super-admin can replace main_access_key.
   """
-  main_access_key: String
+  main_access_key: String @deprecated(reason: "Deprecated since 26.9.0. Use the keypair's is_default field.")
 
   """
   Added in 25.2.0. The user ID (UID) assigned to processes running inside the container.
@@ -1208,6 +1209,9 @@ type KeyPair implements Item {
   secret_key: String
   is_active: Boolean
   is_admin: Boolean
+
+  """Added in 26.9.0. Whether this is the owner's default keypair."""
+  is_default: Boolean
   resource_policy: String
   created_at: DateTime
   last_used: DateTime
@@ -2150,7 +2154,7 @@ type UserUtilizationMetric {
 type ContainerUtilizationMetric {
   metric_name: String
 
-  """One of 'current', 'capacity'."""
+  """One of 'current', 'capacity', 'pct'."""
   value_type: String
   values: [MetricResultValue]
 
@@ -2169,7 +2173,7 @@ type MetricResultValue {
 
 """Added in 25.6.0."""
 input UserUtilizationMetricQueryInput {
-  """One of 'current', 'capacity'. Default value is 'current'."""
+  """One of 'current', 'capacity', 'pct'. Default value is 'current'."""
   value_type: String = "current"
 
   """metric name of container utilization. For example, 'cpu_util', 'mem'."""
@@ -2342,9 +2346,9 @@ type Mutation {
     """Agent ID to rescan GPU alloc map"""
     agent_id: String!
   ): RescanGPUAllocMaps
-  create_keypair(props: KeyPairInput!, user_id: String!): CreateKeyPair
-  modify_keypair(access_key: String!, props: ModifyKeyPairInput!): ModifyKeyPair
-  delete_keypair(access_key: String!): DeleteKeyPair
+  create_keypair(props: KeyPairInput!, user_id: String!): CreateKeyPair @deprecated(reason: "Deprecated since 26.10.0. Use `adminCreateKeypairV2` instead.")
+  modify_keypair(access_key: String!, props: ModifyKeyPairInput!): ModifyKeyPair @deprecated(reason: "Deprecated since 26.10.0. Use `adminUpdateKeypairV2` instead.")
+  delete_keypair(access_key: String!): DeleteKeyPair @deprecated(reason: "Deprecated since 26.10.0. Use `adminDeleteKeypairV2` instead.")
   rescan_images(
     """Added in 25.1.0."""
     project: String
@@ -2655,7 +2659,9 @@ type PurgeDomain {
   msg: String
 }
 
-"""Added in 24.12.0."""
+"""
+Added in 24.12.0. Creates the domain, then links the given scaling groups in a separate step. If linking fails, the domain remains without them.
+"""
 type CreateDomainNode {
   ok: Boolean
   msg: String
@@ -2675,7 +2681,9 @@ input CreateDomainNodeInput {
   scaling_groups: [String]
 }
 
-"""Added in 24.12.0."""
+"""
+Added in 24.12.0. Updates the domain, then adds and removes the given scaling groups in separate steps. If linking fails, the domain update remains.
+"""
 type ModifyDomainNode {
   item: DomainNode
   client_mutation_id: String
@@ -2703,7 +2711,7 @@ type CreateGroup {
 }
 
 input GroupInput {
-  """Added in 24.03.0. Available values: GENERAL, MODEL_STORE"""
+  """Added in 24.03.0. Available values: GENERAL, MODEL_STORE, PERSONAL"""
   type: String = "GENERAL"
   description: String = ""
   is_active: Boolean = true
@@ -2736,7 +2744,7 @@ input ModifyGroupInput {
   resource_policy: String
 
   """Added in 24.03.0"""
-  container_registry: JSONString = "{}"
+  container_registry: JSONString
 }
 
 """Instead of deleting the group, just mark it as inactive."""

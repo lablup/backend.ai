@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
-from ai.backend.common.dto.manager.v2.rbac.types import RBACElementTypeDTO
-from ai.backend.common.identifier.role_preset import RolePresetID
+from ai.backend.common.data.entity.role_preset import RolePresetID
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "BulkDeleteRolePresetsPayload",
@@ -16,6 +17,9 @@ __all__ = (
     "BulkRestoreRolePresetsPayload",
     "BulkRolePresetFailureInfo",
     "CreateRolePresetPayload",
+    "DeleteRolePresetPayload",
+    "PurgeRolePresetPayload",
+    "RestoreRolePresetPayload",
     "RolePresetNode",
     "SearchRolePresetsPayload",
     "UpdateRolePresetPayload",
@@ -30,18 +34,44 @@ class RolePresetNode(BaseResponseModel):
     """
 
     id: RolePresetID = Field(description="Role preset UUID.")
+    entity_id: UUID = Field(
+        description="UUID of the role preset. Added in 26.9.0.",
+    )
     name: str = Field(description="Role preset name.")
-    scope_type: RBACElementTypeDTO = Field(description="Scope type this preset targets.")
+    scope_type: str = Field(
+        description=(
+            "Scope type this preset targets. A preset of the `global` type reads as the "
+            "global entity its role is created in: `global` or `public`."
+        )
+    )
+    role_name_template: str | None = Field(
+        default=None,
+        description=(
+            "Jinja template rendering the name of each role instantiated from this preset. "
+            f"Added in {NEXT_RELEASE_VERSION}."
+        ),
+    )
     auto_assign: bool = Field(
         description=(
             "Default value for the `auto_assign` flag copied onto roles instantiated "
             "from this preset."
         ),
     )
-    deleted: bool = Field(
+    auto_assign_to_owner: bool = Field(
         description=(
-            "Soft-delete flag. Set by the Delete mutation and cleared by the Restore "
-            "mutation; archived rows are excluded from default searches."
+            f"Added in {NEXT_RELEASE_VERSION}. Whether a personal project's owner is mapped to "
+            "the role made from this preset. Allowed only on a project preset."
+        ),
+    )
+    deleted: bool = Field(
+        description=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `deleted_at`.",
+        deprecated=True,
+    )
+    deleted_at: datetime | None = Field(
+        default=None,
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. Soft-delete time. Set by the Delete mutation and "
+            "cleared by the Restore mutation; null while the preset is in use."
         ),
     )
     created_at: datetime = Field(description="Creation timestamp.")
@@ -58,6 +88,25 @@ class UpdateRolePresetPayload(BaseResponseModel):
     """Payload for role preset update."""
 
     role_preset: RolePresetNode = Field(description="Updated role preset.")
+
+
+class DeleteRolePresetPayload(BaseResponseModel):
+    """Payload for role preset soft deletion."""
+
+    role_preset: RolePresetNode = Field(description="Soft-deleted role preset.")
+
+
+class RestoreRolePresetPayload(BaseResponseModel):
+    """Payload for role preset restoration."""
+
+    role_preset: RolePresetNode = Field(description="Restored role preset.")
+
+
+class PurgeRolePresetPayload(BaseResponseModel):
+    """Payload for role preset purge."""
+
+    role_preset: RolePresetNode = Field(description="Purged role preset, as it stood.")
+    entity_id: UUID = Field(description="UUID of the purged role preset. Added in 26.10.0.")
 
 
 class BulkRolePresetFailureInfo(BaseResponseModel):

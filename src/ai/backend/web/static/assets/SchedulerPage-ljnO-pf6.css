@@ -1,0 +1,18 @@
+/**
+ @license
+ Copyright (c) 2015-2026 Lablup Inc. All rights reserved.
+
+ Recharts theming for UsageBucketChartContent (to-astryx ticket 33). Replaces
+ the antd-style `createStyles` block; imported by the component itself (P17).
+ Nothing here targets `.ant-*` — the selectors are recharts' own, so the rules
+ outlive antd (P6).
+
+ Token mapping (P19-checked against the declared Astryx set):
+   token.colorTextDescription -> var(--color-text-secondary)  ('self' token)
+   token.colorBorder          -> var(--color-border-emphasized)
+   token.colorBgSpotlight     -> var(--color-background-inverted)  ('self'
+     token: antd's opaque dark tooltip surface; Astryx's inverted background
+     is the declared counterpart)
+   token.colorTextLightSolid  -> var(--color-on-dark)
+   token.borderRadius         -> var(--radius-inner)
+*/.usage-bucket-chart .recharts-label{fill:var(--color-text-secondary)}.usage-bucket-chart .recharts-cartesian-axis-line,.usage-bucket-chart .recharts-cartesian-axis-tick-line{stroke:var(--color-border-emphasized)}.usage-bucket-chart .recharts-cartesian-axis-tick-value{fill:var(--color-text-secondary)}.usage-bucket-chart .recharts-default-tooltip{background-color:var(--color-background-inverted)!important;border:none!important;border-radius:var(--radius-inner)!important}.usage-bucket-chart .recharts-tooltip-label,.usage-bucket-chart .recharts-tooltip-item{color:var(--color-on-dark)!important}

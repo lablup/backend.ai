@@ -1,0 +1,55 @@
+from __future__ import annotations
+
+from collections.abc import Sequence
+from dataclasses import dataclass
+from typing import override
+
+from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentEntityType
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
+from ai.backend.manager.data.app_config.types import AppConfigFragmentData
+from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
+from ai.backend.manager.models.app_config_fragment.scopes import AppConfigFragmentTarget
+from ai.backend.manager.models.app_config_fragment.searchers import (
+    AppConfigFragmentSearcher,
+)
+from ai.backend.manager.models.scopes import OperationScope
+
+
+@dataclass
+class ScopedSearchAppConfigFragmentAction(
+    OperationScopeOpsAction[AppConfigFragmentRow, AppConfigFragmentData]
+):
+    """Search the fragments one owner holds; ``None`` reads the ``public`` ones.
+
+    The public rows carry the values every caller already reads merged, including before
+    signing in, so they are answered for by authentication alone.
+    """
+
+    owner: EntityIdentifier | None
+    searcher: AppConfigFragmentSearcher
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return AppConfigFragmentEntityType()
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "search_app_config_fragments"
+
+    @override
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        owner = self.owner
+        if owner is None:
+            return ()
+        return (owner,)
+
+    @override
+    def operation_scopes(self) -> Sequence[OperationScope]:
+        return (AppConfigFragmentTarget(owner=self.owner),)
+
+    @override
+    def to_searcher(self) -> AppConfigFragmentSearcher:
+        return self.searcher

@@ -1,74 +1,47 @@
-import logging
+from __future__ import annotations
 
-from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, PartialBulkResult
+from ai.backend.manager.actions.v2.ops.result import EntityOpsResult
+from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
+from ai.backend.manager.models.runtime_variant.purgers import RuntimeVariantPurger
 from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVariantRepository
-from ai.backend.manager.services.runtime_variant.actions.create import (
-    CreateRuntimeVariantAction,
-    CreateRuntimeVariantActionResult,
+from ai.backend.manager.services.runtime_variant.actions.bulk_purge import (
+    BulkPurgeRuntimeVariantsAction,
 )
-from ai.backend.manager.services.runtime_variant.actions.delete import (
-    DeleteRuntimeVariantAction,
-    DeleteRuntimeVariantActionResult,
-)
-from ai.backend.manager.services.runtime_variant.actions.resolve_by_name import (
-    ResolveRuntimeVariantByNameAction,
-    ResolveRuntimeVariantByNameActionResult,
-)
-from ai.backend.manager.services.runtime_variant.actions.search import (
-    SearchRuntimeVariantsAction,
-    SearchRuntimeVariantsActionResult,
-)
-from ai.backend.manager.services.runtime_variant.actions.update import (
-    UpdateRuntimeVariantAction,
-    UpdateRuntimeVariantActionResult,
-)
+from ai.backend.manager.services.runtime_variant.actions.purge import PurgeRuntimeVariantAction
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+__all__ = ("RuntimeVariantService",)
 
 
 class RuntimeVariantService:
+    """The purges that clear a variant's presets first; every other operation runs against ops."""
+
     _repository: RuntimeVariantRepository
 
     def __init__(self, repository: RuntimeVariantRepository) -> None:
         self._repository = repository
 
-    async def create(self, action: CreateRuntimeVariantAction) -> CreateRuntimeVariantActionResult:
-        data = await self._repository.create(action.creator)
-        return CreateRuntimeVariantActionResult(runtime_variant=data)
+    async def purge(self, action: PurgeRuntimeVariantAction) -> EntityOpsResult[RuntimeVariantData]:
+        """Purge a runtime variant with the presets in its catalog."""
+        data = await self._repository.purge(action.to_purger())
+        return EntityOpsResult(data=data)
 
-    async def update(self, action: UpdateRuntimeVariantAction) -> UpdateRuntimeVariantActionResult:
-        action.updater.pk_value = action.id
-        data = await self._repository.update(action.updater)
-        return UpdateRuntimeVariantActionResult(runtime_variant=data)
-
-    async def delete(self, action: DeleteRuntimeVariantAction) -> DeleteRuntimeVariantActionResult:
-        data = await self._repository.delete(action.id)
-        return DeleteRuntimeVariantActionResult(runtime_variant=data)
-
-    async def search(
-        self, action: SearchRuntimeVariantsAction
-    ) -> SearchRuntimeVariantsActionResult:
-        items, total_count, has_next_page, has_previous_page = await self._repository.search(
-            action.querier
-        )
-        return SearchRuntimeVariantsActionResult(
-            items=items,
-            total_count=total_count,
-            has_next_page=has_next_page,
-            has_previous_page=has_previous_page,
-        )
-
-    async def resolve_by_name(
-        self, action: ResolveRuntimeVariantByNameAction
-    ) -> ResolveRuntimeVariantByNameActionResult:
-        """Resolve a runtime variant name into its ``RuntimeVariantID``.
-
-        Legacy API handlers call this before invoking id-typed internal
-        adapters so that the adapter / service / sokovan chain never has
-        to touch a name string.
-        """
-        data = await self._repository.get_by_name(action.name)
-        return ResolveRuntimeVariantByNameActionResult(
-            runtime_variant_id=RuntimeVariantID(data.id),
+    async def bulk_purge(
+        self, action: BulkPurgeRuntimeVariantsAction
+    ) -> PartialBulkResult[RuntimeVariantData]:
+        """Purge each named runtime variant with its presets, answering for every one."""
+        result = await self._repository.partial_bulk_purge([
+            RuntimeVariantPurger(variant_id=variant_id) for variant_id in action.ids
+        ])
+        return PartialBulkResult(
+            items=[
+                PartialBulkEntityResult[RuntimeVariantData].succeeded(
+                    variant_id, result.successes[variant_id]
+                )
+                if variant_id in result.successes
+                else PartialBulkEntityResult[RuntimeVariantData].failed(
+                    variant_id, result.errors[variant_id]
+                )
+                for variant_id in action.ids
+            ]
         )

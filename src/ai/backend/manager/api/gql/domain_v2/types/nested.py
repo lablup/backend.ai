@@ -87,5 +87,8 @@ class DomainLifecycleInfoGQL:
     is_active: bool = gql_field(
         description="Whether the domain is active. Inactive domains cannot create new projects or perform operations."
     )
+    is_default: bool = gql_field(
+        description="Added in 26.9.0. Whether this is the default domain. At most one domain carries the marker."
+    )
     created_at: datetime = gql_field(description="Timestamp when the domain was created.")
     modified_at: datetime = gql_field(description="Timestamp when the domain was last modified.")

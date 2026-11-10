@@ -3,52 +3,25 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import RBACElementType, ScopeType
-from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.notification import NotificationChannelData
-from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.repositories.base import BatchQuerier
-
-from .base import NotificationChannelScopeAction, NotificationChannelScopeActionResult
+from ai.backend.common.data.entity.notification import NotificationChannelEntityType
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import GlobalSearcherOpsAction
+from ai.backend.manager.data.notification.types import NotificationChannelData
+from ai.backend.manager.models.notification.row import NotificationChannelRow
 
 
-@dataclass
-class SearchChannelsAction(NotificationChannelScopeAction):
-    """Action to search notification channels."""
-
-    querier: BatchQuerier
+@dataclass(frozen=True)
+class SearchChannelsAction(
+    GlobalSearcherOpsAction[NotificationChannelRow, NotificationChannelData]
+):
+    """Page through the notification channels."""
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
+    def entity_type(cls) -> EntityType:
+        return NotificationChannelEntityType()
 
     @override
-    def scope_type(self) -> ScopeType:
-        return ScopeType.GLOBAL
-
-    @override
-    def scope_id(self) -> str:
-        return ""
-
-    @override
-    def target_element(self) -> RBACElementRef:
-        return RBACElementRef(RBACElementType.NOTIFICATION_CHANNEL, "")
-
-
-@dataclass
-class SearchChannelsActionResult(NotificationChannelScopeActionResult):
-    """Result of searching notification channels."""
-
-    channels: list[NotificationChannelData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
-
-    @override
-    def scope_type(self) -> ScopeType:
-        return ScopeType.GLOBAL
-
-    @override
-    def scope_id(self) -> str:
-        return ""
+    @classmethod
+    def action_name(cls) -> str:
+        return "search_notification_channels"

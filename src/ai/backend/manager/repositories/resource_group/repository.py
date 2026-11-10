@@ -1,0 +1,281 @@
+from __future__ import annotations
+
+from collections.abc import Sequence
+from typing import TYPE_CHECKING
+from uuid import UUID
+
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
+from ai.backend.common.metrics.metric import DomainType, LayerType
+from ai.backend.common.resilience import (
+    MetricArgs,
+    MetricPolicy,
+    Resilience,
+    RetryArgs,
+    RetryPolicy,
+)
+from ai.backend.common.resilience.policies.retry import BackoffStrategy
+from ai.backend.manager.data.deployment.types import DeploymentHandlerOptions, DeploymentOptions
+from ai.backend.manager.data.resource_group.types import (
+    ResourceGroupData,
+    ResourceInfo,
+)
+from ai.backend.manager.data.session.options import AgentSelectionPolicy, DefaultSessionOptions
+from ai.backend.manager.errors.resource import ResourceGroupNotFound
+from ai.backend.manager.models.resource_group.creators import ResourceGroupCreator
+from ai.backend.manager.models.resource_group.purgers import ResourceGroupPurger
+from ai.backend.manager.models.resource_group.scopes import ResourceGroupTarget
+from ai.backend.manager.models.resource_group.searchable_fields import (
+    ResourceGroupSearchableFields,
+)
+from ai.backend.manager.models.resource_group.searchers import ResourceGroupSearcher
+from ai.backend.manager.models.resource_group.updaters import ResourceGroupUpdater
+from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.resource_group.db_source.db_source import ResourceGroupDBSource
+
+if TYPE_CHECKING:
+    from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+
+__all__ = ("ResourceGroupRepository",)
+
+
+resource_group_repository_resilience = Resilience(
+    policies=[
+        MetricPolicy(
+            MetricArgs(domain=DomainType.REPOSITORY, layer=LayerType.SCALING_GROUP_REPOSITORY)
+        ),
+        RetryPolicy(
+            RetryArgs(
+                max_retries=10,
+                retry_delay=0.1,
+                backoff_strategy=BackoffStrategy.FIXED,
+            )
+        ),
+    ]
+)
+
+
+class ResourceGroupRepository:
+    """Repository for resource group-related data access."""
+
+    _db_source: ResourceGroupDBSource
+    _v2_ops: V2DBOpsProvider
+
+    def __init__(
+        self,
+        db: ExtendedAsyncSAEngine,
+        v2_ops_provider: V2DBOpsProvider,
+    ) -> None:
+        self._db_source = ResourceGroupDBSource(db)
+        self._v2_ops = v2_ops_provider
+
+    @resource_group_repository_resilience.apply()
+    async def create_resource_group(
+        self,
+        creator: ResourceGroupCreator,
+    ) -> ResourceGroupData:
+        """Register a resource group as the scope it becomes.
+
+        Raises ResourceGroupConflict if a resource group with the same name already exists.
+        """
+        async with self._v2_ops.write_ops() as w:
+            return await w.create_role_managed_entity(creator)
+
+    @resource_group_repository_resilience.apply()
+    async def get_resource_group_id_by_name(self, name: ResourceGroupName) -> ResourceGroupID:
+        return await self._db_source.get_resource_group_id_by_name(name)
+
+    @resource_group_repository_resilience.apply()
+    async def get_resource_group_ids_by_names(
+        self,
+        names: list[ResourceGroupName],
+    ) -> dict[ResourceGroupName, ResourceGroupID]:
+        """Resolve resource group row IDs from names; missing names are absent."""
+        return await self._db_source.get_resource_group_ids_by_names(names)
+
+    @resource_group_repository_resilience.apply()
+    async def get_resource_group_by_name(
+        self,
+        name: str,
+    ) -> ResourceGroupData:
+        """Get a single resource group by name (primary key).
+
+        Args:
+            name: The name of the resource group (primary key).
+
+        Returns:
+            ResourceGroupData for the requested resource group.
+
+        Raises:
+            ScalingGroupNotFound: If the resource group does not exist.
+        """
+        return await self._db_source.get_resource_group_by_name(name=name)
+
+    @resource_group_repository_resilience.apply()
+    async def purge_resource_group(
+        self,
+        resource_group_id: ResourceGroupID,
+    ) -> ResourceGroupData:
+        """Remove a resource group and the scope it was.
+
+        Rows that reference the group are not touched: a group still holding sessions,
+        kernels, endpoints or agents fails on the foreign key.
+
+        Raises ResourceGroupNotFound if the resource group does not exist.
+        """
+        async with self._v2_ops.write_ops() as w:
+            data = await w.purge_entity(ResourceGroupPurger(resource_group_id=resource_group_id))
+            if data is None:
+                raise ResourceGroupNotFound(f"Resource group not found (id:{resource_group_id})")
+            return data
+
+    @resource_group_repository_resilience.apply()
+    async def update_resource_group(
+        self,
+        updater: ResourceGroupUpdater,
+    ) -> ResourceGroupData:
+        """Edit an existing resource group.
+
+        Raises ResourceGroupNotFound if the resource group does not exist.
+        """
+        async with self._v2_ops.write_ops() as w:
+            data = await w.update_data(updater)
+            if data is None:
+                raise ResourceGroupNotFound(
+                    f"Resource group not found (id:{updater.resource_group_id})"
+                )
+            return data
+
+    @resource_group_repository_resilience.apply()
+    async def replace_default_deployment_options(
+        self,
+        name: ResourceGroupName,
+        handler_options: DeploymentHandlerOptions,
+        agent_selection_policy: AgentSelectionPolicy | None,
+    ) -> DeploymentOptions:
+        """Fully replace a resource group's ``default_deployment_options``.
+
+        ``agent_selection_policy`` replaces the policy; ``None`` keeps the stored one.
+
+        Returns the persisted :class:`DeploymentOptions` value without
+        re-materialising the surrounding resource group node.
+
+        Raises:
+            ScalingGroupNotFound: If the resource group does not exist.
+        """
+        return await self._db_source.replace_default_deployment_options(
+            name, handler_options, agent_selection_policy
+        )
+
+    @resource_group_repository_resilience.apply()
+    async def replace_default_session_options(
+        self,
+        name: ResourceGroupName,
+        options: DefaultSessionOptions,
+    ) -> DefaultSessionOptions:
+        """Fully replace a resource group's ``default_session_options``.
+
+        Returns the persisted :class:`DefaultSessionOptions` value via
+        ``UPDATE ... RETURNING`` so this path does a single round-trip
+        and does not re-materialise the surrounding resource group node.
+
+        Raises:
+            ScalingGroupNotFound: If the resource group does not exist.
+        """
+        return await self._db_source.replace_default_session_options(name, options)
+
+    async def check_resource_group_domain_association_exists(
+        self,
+        resource_group_id: ResourceGroupID,
+        domain_id: DomainID,
+    ) -> bool:
+        """Checks if a resource group is associated with a domain."""
+        return await self._db_source.check_resource_group_domain_association_exists(
+            resource_group_id=resource_group_id,
+            domain_id=domain_id,
+        )
+
+    async def check_resource_group_keypair_association_exists(
+        self,
+        resource_group_id: ResourceGroupID,
+        access_key: str,
+    ) -> bool:
+        """Checks if a resource group is associated with a keypair."""
+        return await self._db_source.check_resource_group_keypair_association_exists(
+            resource_group_id, access_key
+        )
+
+    async def check_resource_group_user_group_association_exists(
+        self,
+        resource_group_id: ResourceGroupID,
+        user_group: UUID,
+    ) -> bool:
+        """Checks if a resource group is associated with a user group (project)."""
+        return await self._db_source.check_resource_group_user_group_association_exists(
+            resource_group_id=resource_group_id,
+            user_group=user_group,
+        )
+
+    @resource_group_repository_resilience.apply()
+    async def list_active_resource_groups(
+        self, targets: Sequence[ResourceGroupTarget]
+    ) -> list[ResourceGroupData]:
+        """List the active resource groups the named scopes reach, in name order."""
+        fields = ResourceGroupSearchableFields.own
+        searcher = ResourceGroupSearcher(
+            pagination=NoPagination(),
+            conditions=[fields.is_active.filter.equals(True)],
+            orders=[fields.name.order.apply(ascending=True)],
+        )
+        async with self._v2_ops.read_ops() as r:
+            result = await r.search_with_scopes(list(targets), searcher)
+        return result.items
+
+    async def get_resource_info(
+        self,
+        resource_group: str,
+    ) -> ResourceInfo:
+        """Get aggregated resource information for a resource group.
+
+        Args:
+            resource_group: The name of the resource group.
+
+        Returns:
+            ResourceInfo containing capacity, used, and free resource metrics.
+
+        Raises:
+            ScalingGroupNotFound: If the resource group does not exist.
+        """
+        return await self._db_source.get_resource_info(resource_group)
+
+    # Allow / Disallow operations
+
+    async def get_allowed_domains_for_resource_group(
+        self,
+        resource_group_id: ResourceGroupID,
+    ) -> list[str]:
+        """Get allowed domain names for a resource group."""
+        return await self._db_source.get_allowed_domains_for_resource_group(resource_group_id)
+
+    async def get_allowed_projects_for_resource_group(
+        self,
+        resource_group_id: ResourceGroupID,
+    ) -> list[UUID]:
+        """Get allowed projects for a resource group."""
+        return await self._db_source.get_allowed_projects_for_resource_group(resource_group_id)
+
+    async def get_allowed_resource_groups_for_domain(
+        self,
+        domain_id: DomainID,
+    ) -> list[str]:
+        """Get allowed resource group names for a domain."""
+        return await self._db_source.get_allowed_resource_groups_for_domain(domain_id)
+
+    async def get_allowed_resource_groups_for_project(
+        self,
+        project_id: ProjectID,
+    ) -> list[str]:
+        """Get allowed resource group names for a project."""
+        return await self._db_source.get_allowed_resource_groups_for_project(project_id)

@@ -8,10 +8,12 @@ advances across batches, and the per-tick budget defers the rest.
 
 ``sessions`` exercises the ordered kernels->sessions delete with the
 remaining-kernel / live-routing NOT EXISTS guards. The terminal-state filter is
-validated on the FK-free ``roles`` table via ``RetentionPurgerSpec`` directly;
+validated on the FK-free ``roles`` table via ``RetentionDrain`` directly;
 ``login`` and the invitation tables share that exact spec, so they are not
 duplicated here. deployments' specs are likewise exercised directly (its
-deployment_revisions FK chain makes a full sweep disproportionate).
+deployment_revisions FK chain makes a full sweep disproportionate); its
+session_groups tail is drained straight from the catalog, so the position of
+that spec within the category is covered too.
 
 sweep() derives its threshold from DB ``now``, so fixtures use timestamps
 relative to the real current time; every category is seeded with a 30-day policy
@@ -21,7 +23,7 @@ so its threshold lands at ~now-30d.
 from __future__ import annotations
 
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
@@ -30,38 +32,53 @@ from unittest.mock import MagicMock
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.role import RoleEntityType
+from ai.backend.common.data.entity.session_group import SessionGroupID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.events.types import EventDomain
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.schema.deployment import IntOrPercent, ReplicaGroupRolloutSpec
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import ResourceSlot, SessionTypes
 from ai.backend.manager.actions.types import OperationStatus
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-from ai.backend.manager.data.deployment.types import ReplicaGroupLifecycle
+from ai.backend.manager.data.deployment.types import ReplicaGroupLifecycle, RouteStatus
 from ai.backend.manager.data.error_log.types import ErrorLogSeverity
 from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.retention.types import RetentionCategory, RetentionPurgeResult
-from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.data.session_group.types import (
+    SessionGroupPlacementDirection,
+    SessionGroupPlacementEnforcement,
+)
+from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.audit_log.row import AuditLogRow
 from ai.backend.manager.models.base import Base
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow, EndpointTokenRow
-from ai.backend.manager.models.error_logs import ErrorLogRow
+from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.endpoint.row import EndpointRow, EndpointTokenRow
+from ai.backend.manager.models.entity_label.row import EntityLabelRow
+from ai.backend.manager.models.entity_share.row import EntityShareRow
+from ai.backend.manager.models.error_log.row import ErrorLogRow
 from ai.backend.manager.models.event_log.row import EventLogRow
-from ai.backend.manager.models.group import GroupRow, ProjectType
-from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.models.replica_group import ReplicaGroupRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.project.row import ProjectRow, ProjectType
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
 from ai.backend.manager.models.replica_group_history.row import ReplicaGroupHistoryRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
@@ -74,28 +91,26 @@ from ai.backend.manager.models.resource_usage_history.row import (
     UserUsageBucketRow,
 )
 from ai.backend.manager.models.retention.row import RetentionPolicyRow
-from ai.backend.manager.models.routing.row import RouteStatus, RoutingRow
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
+from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.models.scheduling_history.row import (
     DeploymentHistoryRow,
     KernelSchedulingHistoryRow,
     RouteHistoryRow,
     SessionSchedulingHistoryRow,
 )
-from ai.backend.manager.models.session import (
-    SessionDependencyRow,
-    SessionRow,
-    SessionStatus,
-    SessionTypes,
-)
-from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
+from ai.backend.manager.models.session.row import SessionDependencyRow, SessionRow
+from ai.backend.manager.models.session_group.row import SessionGroupRow
+from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder.row import VFolderRow
-from ai.backend.manager.repositories.base import BatchPurger
-from ai.backend.manager.repositories.ops import DBOpsProvider
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
+from ai.backend.manager.repositories.ops.v2.retention.provider import RetentionOpsProvider
+from ai.backend.manager.repositories.ops.v2.retention.write import RetentionDrain
 from ai.backend.manager.repositories.retention.db_source.db_source import RetentionDBSource
-from ai.backend.manager.repositories.retention.purgers import RetentionPurgerSpec
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
 _NOW = datetime.now(UTC)
 _THRESHOLD = _NOW - timedelta(days=30)
@@ -155,6 +170,79 @@ def _policy_row(
     )
 
 
+async def _seed_scope(engine: ExtendedAsyncSAEngine) -> _Scope:
+    """Insert the parent rows a session / endpoint / placement group hangs off of."""
+    scope = _Scope()
+    async with engine.begin_session() as sess:
+        sess.add(
+            ProjectResourcePolicyRow(
+                name=scope.policy_name,
+                max_vfolder_count=0,
+                max_quota_scope_size=-1,
+                max_network_count=0,
+            )
+        )
+        sess.add(
+            UserResourcePolicyRow(
+                name=scope.user_policy_name,
+                max_vfolder_count=0,
+                max_quota_scope_size=-1,
+                max_session_count_per_model_session=10,
+                max_customized_image_count=10,
+            )
+        )
+        sess.add(
+            DomainRow(id=scope.domain_id, name=scope.domain_name, description=None, is_active=True)
+        )
+        sess.add(
+            ResourceGroupRow(
+                name=scope.sgroup_name,
+                id=scope.sgroup_id,
+                driver="static",
+                driver_opts={},
+                scheduler="fifo",
+                scheduler_opts=ResourceGroupOpts(),
+            )
+        )
+        sess.add(
+            UserRow(
+                uuid=scope.user_uuid,
+                username="retention-user",
+                email="retention@example.com",
+                password=PasswordInfo(
+                    password="pw",
+                    algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+                    rounds=100_000,
+                    salt_size=32,
+                ),
+                need_password_change=False,
+                full_name="Retention User",
+                description="",
+                status=UserStatus.ACTIVE,
+                status_info="",
+                domain_name=scope.domain_name,
+                role=UserRole.USER,
+                resource_policy=scope.user_policy_name,
+                domain_id=scope.domain_id,
+            )
+        )
+        sess.add(
+            ProjectRow(
+                id=scope.group_id,
+                name="retention-group",
+                description=None,
+                is_active=True,
+                domain_name=scope.domain_name,
+                total_resource_slots=ResourceSlot(),
+                allowed_vfolder_hosts={},
+                dotfiles=b"\x90",
+                resource_policy=scope.policy_name,
+                type=ProjectType.GENERAL,
+            )
+        )
+    return scope
+
+
 def _make_db_source(
     engine: ExtendedAsyncSAEngine,
     *,
@@ -164,7 +252,7 @@ def _make_db_source(
     config_provider = MagicMock()
     config_provider.config.retention.batch_size = batch_size
     config_provider.config.retention.per_tick_budget = per_tick_budget
-    return RetentionDBSource(DBOpsProvider(engine), config_provider)
+    return RetentionDBSource(RetentionOpsProvider(engine), config_provider)
 
 
 async def _sweep_category(
@@ -223,6 +311,7 @@ class TestLogsRetention:
                 AuditLogRow(
                     entity_type="t",
                     operation="op",
+                    action_name="op_t",
                     action_id=uuid.uuid4(),
                     description="old",
                     created_at=_OLD,
@@ -402,34 +491,116 @@ class TestTerminalStateFilter:
     async def db(
         self, database_connection: ExtendedAsyncSAEngine
     ) -> AsyncIterator[ExtendedAsyncSAEngine]:
-        async with with_tables(database_connection, [RoleRow]):
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                UserResourcePolicyRow,
+                UserRow,
+                RoleRow,
+                VirtualEntityRow,
+                EntityMembershipRow,
+                ScopeBindingRow,
+                EntityLabelRow,
+                EntityShareRow,
+            ],
+        ):
             yield database_connection
 
     async def test_only_deleted_rows_past_boundary_are_purged(
         self, db: ExtendedAsyncSAEngine
     ) -> None:
-        await _insert(
+        await self._insert_roles(
             db,
             [
-                RoleRow(name="deleted-old", status=RoleStatus.DELETED, deleted_at=_OLD),
-                RoleRow(name="deleted-new", status=RoleStatus.DELETED, deleted_at=_NEW),
+                RoleRow(
+                    scope_type=ProjectEntityType(),
+                    scope_id=uuid.uuid4(),
+                    name="deleted-old",
+                    status=RoleStatus.DELETED,
+                    deleted_at=_OLD,
+                ),
+                RoleRow(
+                    scope_type=ProjectEntityType(),
+                    scope_id=uuid.uuid4(),
+                    name="deleted-new",
+                    status=RoleStatus.DELETED,
+                    deleted_at=_NEW,
+                ),
                 # Active role: never deleted, deleted_at is NULL -> preserved.
-                RoleRow(name="active", status=RoleStatus.ACTIVE),
+                RoleRow(
+                    scope_type=ProjectEntityType(),
+                    scope_id=uuid.uuid4(),
+                    name="active",
+                    status=RoleStatus.ACTIVE,
+                ),
             ],
         )
-        spec = RetentionPurgerSpec(
+        spec = RetentionDrain(
             RoleRow,
             RoleRow.deleted_at,
             _THRESHOLD,
             conditions=(RoleRow.status == RoleStatus.DELETED,),
         )
 
-        async with DBOpsProvider(db).write_ops() as w:
-            result = await w.batch_purge(BatchPurger(spec=spec, batch_size=100))
+        async with RetentionOpsProvider(db).write_ops() as w:
+            deleted_count = await w.drain(spec, batch_size=100)
 
-        assert result.deleted_count == 1
+        assert deleted_count == 1
         remaining = {name for (name,) in await self._role_names(db)}
         assert remaining == {"deleted-new", "active"}
+
+    async def test_drained_entity_takes_its_node(self, db: ExtendedAsyncSAEngine) -> None:
+        drained = RoleRow(
+            id=uuid.uuid4(),
+            scope_type=ProjectEntityType(),
+            scope_id=uuid.uuid4(),
+            name="drained",
+            status=RoleStatus.DELETED,
+            deleted_at=_OLD,
+        )
+        kept = RoleRow(
+            id=uuid.uuid4(),
+            scope_type=ProjectEntityType(),
+            scope_id=uuid.uuid4(),
+            name="kept",
+            status=RoleStatus.DELETED,
+            deleted_at=_NEW,
+        )
+        await self._insert_roles(db, [drained, kept])
+        async with db.begin_session() as sess:
+            for role in (drained, kept):
+                await VirtualEntitySeeder().provision(sess, RoleEntityType(), role.id)
+        spec = RetentionDrain(
+            RoleRow,
+            RoleRow.deleted_at,
+            _THRESHOLD,
+            conditions=(RoleRow.status == RoleStatus.DELETED,),
+            entity=RoleEntityType(),
+        )
+
+        async with RetentionOpsProvider(db).write_ops() as w:
+            deleted_count = await w.drain(spec, batch_size=100)
+
+        assert deleted_count == 1
+        async with db.begin_readonly_session() as sess:
+            nodes = set(
+                (
+                    await sess.scalars(
+                        sa.select(VirtualEntityRow.entity_id).where(
+                            VirtualEntityRow.entity_type == RoleEntityType()
+                        )
+                    )
+                ).all()
+            )
+        assert nodes == {kept.id}
+
+    async def _insert_roles(self, engine: ExtendedAsyncSAEngine, roles: list[RoleRow]) -> None:
+        """Insert roles after putting each one's scope in the graph, as the role FK requires."""
+        async with engine.begin_session() as sess:
+            for role in roles:
+                await VirtualEntitySeeder().provision(sess, role.scope_type, role.scope_id)
+            sess.add_all(roles)
 
     async def _role_names(self, engine: ExtendedAsyncSAEngine) -> list[tuple[str]]:
         async with engine.begin_readonly_session() as sess:
@@ -452,10 +623,10 @@ class TestSessionsRetention:
                 ProjectResourcePolicyRow,
                 UserResourcePolicyRow,
                 KeyPairResourcePolicyRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 SessionRow,
                 AgentRow,
                 ContainerRegistryRow,
@@ -467,6 +638,10 @@ class TestSessionsRetention:
                 RoutingRow,
                 SessionDependencyRow,
                 RetentionPolicyRow,
+                VirtualEntityRow,
+                EntityLabelRow,
+                RoleRow,
+                EntityShareRow,
             ],
         ):
             yield database_connection
@@ -501,13 +676,13 @@ class TestSessionsRetention:
                 )
             )
             sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     name=scope.sgroup_name,
                     id=scope.sgroup_id,
                     driver="static",
                     driver_opts={},
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(),
+                    scheduler_opts=ResourceGroupOpts(),
                 )
             )
             sess.add(
@@ -529,10 +704,11 @@ class TestSessionsRetention:
                     domain_name=scope.domain_name,
                     role=UserRole.USER,
                     resource_policy=scope.user_policy_name,
+                    domain_id=scope.domain_id,
                 )
             )
             sess.add(
-                GroupRow(
+                ProjectRow(
                     id=scope.group_id,
                     name="retention-group",
                     description=None,
@@ -570,8 +746,6 @@ class TestSessionsRetention:
                     scaling_group_name=scope.sgroup_name,
                     resource_group_id=scope.sgroup_id,
                     user_uuid=scope.user_uuid,
-                    occupying_slots=ResourceSlot({}),
-                    requested_slots=ResourceSlot({}),
                     status=status,
                     status_info="",
                     target_sgroup_names=[],
@@ -600,8 +774,6 @@ class TestSessionsRetention:
                     user_uuid=scope.user_uuid,
                     scaling_group=scope.sgroup_name,
                     resource_group_id=scope.sgroup_id,
-                    occupied_slots=ResourceSlot({}),
-                    requested_slots=ResourceSlot({}),
                     occupied_shares={},
                     vfolder_mounts=[],
                     status=status,
@@ -833,11 +1005,17 @@ class TestDeploymentsRetention:
             [
                 DomainRow,
                 ProjectResourcePolicyRow,
-                ScalingGroupRow,
-                GroupRow,
+                ResourceGroupRow,
+                ProjectRow,
                 EndpointRow,
                 DeploymentPolicyRow,
                 EndpointTokenRow,
+                VirtualEntityRow,
+                EntityLabelRow,
+                UserResourcePolicyRow,
+                UserRow,
+                RoleRow,
+                EntityShareRow,
             ],
         ):
             yield database_connection
@@ -860,17 +1038,17 @@ class TestDeploymentsRetention:
                 )
             )
             sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     name=scope.sgroup_name,
                     id=scope.sgroup_id,
                     driver="static",
                     driver_opts={},
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(),
+                    scheduler_opts=ResourceGroupOpts(),
                 )
             )
             sess.add(
-                GroupRow(
+                ProjectRow(
                     id=scope.group_id,
                     name="retention-group",
                     description=None,
@@ -928,26 +1106,25 @@ class TestDeploymentsRetention:
         async with db.begin_session() as sess:
             sess.add(
                 EndpointTokenRow(
-                    id=uuid.uuid4(),
+                    id=DeploymentTokenID(uuid.uuid4()),
                     token=f"tok-{uuid.uuid4()}",
                     endpoint=endpoint_id,
-                    session_owner=scope.user_uuid,
+                    session_owner=UserID(scope.user_uuid),
                     domain=scope.domain_name,
-                    project=scope.group_id,
+                    project=ProjectID(scope.group_id),
                     expires_at=expires_at,
                 )
             )
 
     async def _purge_endpoints(self, db: ExtendedAsyncSAEngine) -> int:
-        spec = RetentionPurgerSpec(
+        spec = RetentionDrain(
             EndpointRow,
             EndpointRow.destroyed_at,
             _THRESHOLD,
             conditions=(EndpointRow.lifecycle_stage == EndpointLifecycle.DESTROYED,),
         )
-        async with DBOpsProvider(db).write_ops() as w:
-            result = await w.batch_purge(BatchPurger(spec=spec, batch_size=100))
-        return result.deleted_count
+        async with RetentionOpsProvider(db).write_ops() as w:
+            return await w.drain(spec, batch_size=100)
 
     async def test_destroyed_endpoint_past_boundary_cascades_children(
         self, db: ExtendedAsyncSAEngine, scope: _Scope
@@ -979,25 +1156,27 @@ class TestDeploymentsRetention:
     async def test_endpoint_tokens_purged_by_expiry(
         self, db: ExtendedAsyncSAEngine, scope: _Scope
     ) -> None:
-        # endpoint id is irrelevant to expiry-based purge; use throwaway ids.
-        await self._add_token(db, scope, endpoint_id=DeploymentID(uuid.uuid4()), expires_at=_OLD)
-        await self._add_token(db, scope, endpoint_id=DeploymentID(uuid.uuid4()), expires_at=_NEW)
+        # Which endpoint a token belongs to is irrelevant to expiry-based purge.
+        endpoint_id = await self._add_endpoint(
+            db, scope, lifecycle=EndpointLifecycle.READY, destroyed_at=None
+        )
+        await self._add_token(db, scope, endpoint_id=endpoint_id, expires_at=_OLD)
+        await self._add_token(db, scope, endpoint_id=endpoint_id, expires_at=_NEW)
         # A never-expiring token (NULL expires_at) is preserved.
-        await self._add_token(db, scope, endpoint_id=DeploymentID(uuid.uuid4()), expires_at=None)
+        await self._add_token(db, scope, endpoint_id=endpoint_id, expires_at=None)
 
-        spec = RetentionPurgerSpec(EndpointTokenRow, EndpointTokenRow.expires_at, _THRESHOLD)
-        async with DBOpsProvider(db).write_ops() as w:
-            result = await w.batch_purge(BatchPurger(spec=spec, batch_size=100))
+        spec = RetentionDrain(EndpointTokenRow, EndpointTokenRow.expires_at, _THRESHOLD)
+        async with RetentionOpsProvider(db).write_ops() as w:
+            deleted_count = await w.drain(spec, batch_size=100)
 
-        assert result.deleted_count == 1
+        assert deleted_count == 1
         assert await _count(db, EndpointTokenRow) == 2
 
     async def test_fk_less_child_deleted_by_destroyed_endpoint(
         self, db: ExtendedAsyncSAEngine, scope: _Scope
     ) -> None:
-        # endpoint_tokens stand in for deployment_revisions: an FK-less child
-        # keyed by endpoint id, deleted when its parent endpoint is DESTROYED and
-        # past the boundary.
+        # A soft-deleted endpoint keeps its row, so ON DELETE CASCADE never fires:
+        # its children are deleted when it is DESTROYED and past the boundary.
         destroyed_id = await self._add_endpoint(
             db, scope, lifecycle=EndpointLifecycle.DESTROYED, destroyed_at=_OLD
         )
@@ -1007,7 +1186,7 @@ class TestDeploymentsRetention:
         await self._add_token(db, scope, endpoint_id=destroyed_id, expires_at=_NEW)
         await self._add_token(db, scope, endpoint_id=living_id, expires_at=_NEW)
 
-        spec = RetentionPurgerSpec(
+        spec = RetentionDrain(
             EndpointTokenRow,
             EndpointRow.destroyed_at,
             _THRESHOLD,
@@ -1015,10 +1194,10 @@ class TestDeploymentsRetention:
             source_key=EndpointRow.id,
             source_conditions=(EndpointRow.lifecycle_stage == EndpointLifecycle.DESTROYED,),
         )
-        async with DBOpsProvider(db).write_ops() as w:
-            result = await w.batch_purge(BatchPurger(spec=spec, batch_size=100))
+        async with RetentionOpsProvider(db).write_ops() as w:
+            deleted_count = await w.drain(spec, batch_size=100)
 
-        assert result.deleted_count == 1  # only the destroyed endpoint's child
+        assert deleted_count == 1  # only the destroyed endpoint's child
         assert await _count(db, EndpointTokenRow) == 1  # the living endpoint's survives
 
 
@@ -1039,14 +1218,18 @@ class TestDeploymentsTerminalChildCleanup:
                 ProjectResourcePolicyRow,
                 UserResourcePolicyRow,
                 KeyPairResourcePolicyRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 SessionRow,
                 EndpointRow,
                 ReplicaGroupRow,
                 RoutingRow,
+                VirtualEntityRow,
+                EntityLabelRow,
+                RoleRow,
+                EntityShareRow,
             ],
         ):
             yield database_connection
@@ -1078,13 +1261,13 @@ class TestDeploymentsTerminalChildCleanup:
                 )
             )
             sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     name=scope.sgroup_name,
                     id=scope.sgroup_id,
                     driver="static",
                     driver_opts={},
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(),
+                    scheduler_opts=ResourceGroupOpts(),
                 )
             )
             sess.add(
@@ -1106,10 +1289,11 @@ class TestDeploymentsTerminalChildCleanup:
                     domain_name=scope.domain_name,
                     role=UserRole.USER,
                     resource_policy=scope.user_policy_name,
+                    domain_id=scope.domain_id,
                 )
             )
             sess.add(
-                GroupRow(
+                ProjectRow(
                     id=scope.group_id,
                     name="retention-group",
                     description=None,
@@ -1178,6 +1362,7 @@ class TestDeploymentsTerminalChildCleanup:
         async with db.begin_session() as sess:
             sess.add(
                 ReplicaGroupRow(
+                    session_group_id=SessionGroupID(uuid.uuid4()),
                     id=uuid.uuid4(),
                     deployment_id=endpoint_id,
                     lifecycle=lifecycle,
@@ -1206,16 +1391,16 @@ class TestDeploymentsTerminalChildCleanup:
             db, scope, endpoint_id, status=RouteStatus.TERMINATED, updated_at=_NEW
         )
 
-        spec = RetentionPurgerSpec(
+        spec = RetentionDrain(
             RoutingRow,
             RoutingRow.updated_at,
             _THRESHOLD,
             conditions=(RoutingRow.status.in_(RouteStatus.terminal_statuses()),),
         )
-        async with DBOpsProvider(db).write_ops() as w:
-            result = await w.batch_purge(BatchPurger(spec=spec, batch_size=100))
+        async with RetentionOpsProvider(db).write_ops() as w:
+            deleted_count = await w.drain(spec, batch_size=100)
 
-        assert result.deleted_count == 2  # terminated + failed-to-start, both old
+        assert deleted_count == 2  # terminated + failed-to-start, both old
         assert await _count(db, RoutingRow) == 2  # running + recently-terminated
         assert await _count(db, EndpointRow) == 1  # the live endpoint is untouched
 
@@ -1238,18 +1423,284 @@ class TestDeploymentsTerminalChildCleanup:
             db, endpoint_id, lifecycle=ReplicaGroupLifecycle.DRAINED, updated_at=_NEW
         )
 
-        spec = RetentionPurgerSpec(
+        spec = RetentionDrain(
             ReplicaGroupRow,
             ReplicaGroupRow.updated_at,
             _THRESHOLD,
             conditions=(ReplicaGroupRow.lifecycle.in_(ReplicaGroupLifecycle.terminal_statuses()),),
         )
-        async with DBOpsProvider(db).write_ops() as w:
-            result = await w.batch_purge(BatchPurger(spec=spec, batch_size=100))
+        async with RetentionOpsProvider(db).write_ops() as w:
+            deleted_count = await w.drain(spec, batch_size=100)
 
-        assert result.deleted_count == 2  # drained + failed, both old
+        assert deleted_count == 2  # drained + failed, both old
         assert await _count(db, ReplicaGroupRow) == 2  # stable + recently-drained
         assert await _count(db, EndpointRow) == 1  # the live endpoint is untouched
+
+
+class TestDeploymentsSessionGroupCleanup:
+    """deployments closes with the placement groups its replica_group / endpoint
+    specs orphaned. session_groups is the parent side of the NO ACTION
+    replica_groups.session_group_id FK, so a group only becomes collectable once
+    nothing references it -- which is what makes the spec's position in the
+    category matter. The boundary is deleted_at, stamped when the owning replica
+    group is drained, so an active group survives however old it is. The real
+    catalog specs are drained here (in catalog order, one transaction) so a
+    reordering breaks these tests."""
+
+    # deployment_revisions / endpoint_tokens are out of this fixture's table set;
+    # every other deployments spec runs as the catalog declares it.
+    _UNLOADED = (DeploymentRevisionRow, EndpointTokenRow)
+
+    @pytest.fixture
+    async def db(
+        self, database_connection: ExtendedAsyncSAEngine
+    ) -> AsyncIterator[ExtendedAsyncSAEngine]:
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                ProjectResourcePolicyRow,
+                UserResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                ResourceGroupRow,
+                UserRow,
+                KeyPairRow,
+                ProjectRow,
+                SessionGroupRow,
+                SessionRow,
+                EndpointRow,
+                ReplicaGroupRow,
+                RoutingRow,
+                VirtualEntityRow,
+                EntityLabelRow,
+                RoleRow,
+                EntityShareRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
+    async def scope(self, db: ExtendedAsyncSAEngine) -> _Scope:
+        return await _seed_scope(db)
+
+    async def _add_endpoint(
+        self,
+        db: ExtendedAsyncSAEngine,
+        scope: _Scope,
+        *,
+        lifecycle: EndpointLifecycle = EndpointLifecycle.READY,
+        destroyed_at: datetime | None = None,
+    ) -> DeploymentID:
+        endpoint_id = DeploymentID(uuid.uuid4())
+        async with db.begin_session() as sess:
+            sess.add(
+                EndpointRow(
+                    id=endpoint_id,
+                    name=f"endpoint-{endpoint_id}",
+                    created_user=scope.user_uuid,
+                    session_owner=scope.user_uuid,
+                    domain=scope.domain_name,
+                    project=scope.group_id,
+                    resource_group=scope.sgroup_name,
+                    lifecycle_stage=lifecycle,
+                    destroyed_at=destroyed_at,
+                    replicas=0,
+                )
+            )
+        return endpoint_id
+
+    async def _add_group(
+        self,
+        db: ExtendedAsyncSAEngine,
+        scope: _Scope,
+        *,
+        created_at: datetime,
+        deleted_at: datetime | None = None,
+    ) -> SessionGroupID:
+        group_id = SessionGroupID(uuid.uuid4())
+        async with db.begin_session() as sess:
+            sess.add(
+                SessionGroupRow(
+                    id=group_id,
+                    domain_id=scope.domain_id,
+                    project_id=scope.group_id,
+                    owner_user_id=scope.user_uuid,
+                    placement_direction=SessionGroupPlacementDirection.SPREAD,
+                    placement_enforcement=SessionGroupPlacementEnforcement.PREFERRED,
+                    created_at=created_at,
+                    deleted_at=deleted_at,
+                )
+            )
+        return group_id
+
+    async def _add_replica_group(
+        self,
+        db: ExtendedAsyncSAEngine,
+        endpoint_id: DeploymentID,
+        group_id: SessionGroupID,
+        *,
+        lifecycle: ReplicaGroupLifecycle,
+        updated_at: datetime,
+    ) -> None:
+        async with db.begin_session() as sess:
+            sess.add(
+                ReplicaGroupRow(
+                    id=uuid.uuid4(),
+                    deployment_id=endpoint_id,
+                    session_group_id=group_id,
+                    lifecycle=lifecycle,
+                    rollout=ReplicaGroupRolloutSpec(
+                        max_surge=IntOrPercent(count=1),
+                        max_unavailable=IntOrPercent(count=0),
+                    ),
+                    updated_at=updated_at,
+                )
+            )
+
+    async def _add_member_session(
+        self, db: ExtendedAsyncSAEngine, scope: _Scope, group_id: SessionGroupID
+    ) -> uuid.UUID:
+        session_id = uuid.uuid4()
+        async with db.begin_session() as sess:
+            sess.add(
+                SessionRow(
+                    id=session_id,
+                    name=f"session-{session_id}",
+                    session_type=SessionTypes.INFERENCE,
+                    cluster_mode="single-node",
+                    cluster_size=1,
+                    domain_name=scope.domain_name,
+                    domain_id=scope.domain_id,
+                    group_id=scope.group_id,
+                    scaling_group_name=scope.sgroup_name,
+                    resource_group_id=scope.sgroup_id,
+                    user_uuid=scope.user_uuid,
+                    status=SessionStatus.RUNNING,
+                    status_info="",
+                    target_sgroup_names=[],
+                    vfolder_mounts=[],
+                    environ={},
+                    session_group_id=group_id,
+                )
+            )
+        return session_id
+
+    def _deployment_specs(self) -> list[RetentionDrain[Base]]:
+        specs = RetentionDBSource._catalog(_THRESHOLD)[RetentionCategory.DEPLOYMENTS]
+        return [spec for spec in specs if spec.row_class not in self._UNLOADED]
+
+    async def _drain(self, db: ExtendedAsyncSAEngine, specs: Sequence[RetentionDrain[Base]]) -> int:
+        """Drain ``specs`` in order within one transaction, as the sweep does."""
+        deleted = 0
+        async with RetentionOpsProvider(db).write_ops() as w:
+            for spec in specs:
+                deleted_count = await w.drain(spec, batch_size=100)
+                deleted += deleted_count
+        return deleted
+
+    async def test_group_of_terminal_replica_group_purged(
+        self, db: ExtendedAsyncSAEngine, scope: _Scope
+    ) -> None:
+        endpoint_id = await self._add_endpoint(db, scope)
+        group_id = await self._add_group(db, scope, created_at=_OLD, deleted_at=_OLD)
+        await self._add_replica_group(
+            db, endpoint_id, group_id, lifecycle=ReplicaGroupLifecycle.DRAINED, updated_at=_OLD
+        )
+
+        await self._drain(db, self._deployment_specs())
+
+        assert await _count(db, ReplicaGroupRow) == 0
+        assert await _count(db, SessionGroupRow) == 0  # no orphan left behind
+
+    async def test_group_of_live_replica_group_preserved(
+        self, db: ExtendedAsyncSAEngine, scope: _Scope
+    ) -> None:
+        endpoint_id = await self._add_endpoint(db, scope)
+        group_id = await self._add_group(db, scope, created_at=_OLD, deleted_at=_OLD)
+        await self._add_replica_group(
+            db, endpoint_id, group_id, lifecycle=ReplicaGroupLifecycle.STABLE, updated_at=_OLD
+        )
+
+        await self._drain(db, self._deployment_specs())
+
+        assert await _count(db, ReplicaGroupRow) == 1
+        assert await _count(db, SessionGroupRow) == 1  # still referenced -> kept
+
+    async def test_group_purged_through_destroyed_endpoint_cascade(
+        self, db: ExtendedAsyncSAEngine, scope: _Scope
+    ) -> None:
+        # The endpoint spec cascades replica_groups away; the group spec runs
+        # after it, so the freed group goes in the same drain.
+        endpoint_id = await self._add_endpoint(
+            db, scope, lifecycle=EndpointLifecycle.DESTROYED, destroyed_at=_OLD
+        )
+        group_id = await self._add_group(db, scope, created_at=_OLD, deleted_at=_OLD)
+        await self._add_replica_group(
+            db, endpoint_id, group_id, lifecycle=ReplicaGroupLifecycle.STABLE, updated_at=_NEW
+        )
+
+        await self._drain(db, self._deployment_specs())
+
+        assert await _count(db, EndpointRow) == 0
+        assert await _count(db, ReplicaGroupRow) == 0  # DB cascade
+        assert await _count(db, SessionGroupRow) == 0
+
+    async def test_active_group_without_deleted_at_preserved(
+        self, db: ExtendedAsyncSAEngine, scope: _Scope
+    ) -> None:
+        # A user group is never stamped, so an old one stays: only the owning
+        # replica group's drain fixes its retention boundary.
+        await self._add_group(db, scope, created_at=_OLD)
+
+        await self._drain(db, self._deployment_specs())
+
+        assert await _count(db, SessionGroupRow) == 1
+
+    async def test_unreferenced_group_past_deleted_at_purged(
+        self, db: ExtendedAsyncSAEngine, scope: _Scope
+    ) -> None:
+        # The boundary is deleted_at, not created_at: a group stamped long enough
+        # ago goes even when it was created recently.
+        await self._add_group(db, scope, created_at=_NEW, deleted_at=_OLD)
+
+        await self._drain(db, self._deployment_specs())
+
+        assert await _count(db, SessionGroupRow) == 0
+
+    async def test_member_session_survives_the_purged_group(
+        self, db: ExtendedAsyncSAEngine, scope: _Scope
+    ) -> None:
+        # sessions.session_group_id is ON DELETE SET NULL, so a member outliving
+        # its group keeps its row (the unbinding itself is covered by the model
+        # test); the sweep must not hold the group back for it either.
+        endpoint_id = await self._add_endpoint(db, scope)
+        group_id = await self._add_group(db, scope, created_at=_OLD, deleted_at=_OLD)
+        await self._add_replica_group(
+            db, endpoint_id, group_id, lifecycle=ReplicaGroupLifecycle.DRAINED, updated_at=_OLD
+        )
+        await self._add_member_session(db, scope, group_id)
+
+        await self._drain(db, self._deployment_specs())
+
+        assert await _count(db, SessionGroupRow) == 0
+        assert await _count(db, SessionRow) == 1
+
+    async def test_group_drained_before_its_replica_group_waits_a_tick(
+        self, db: ExtendedAsyncSAEngine, scope: _Scope
+    ) -> None:
+        # What the order buys: the unreferenced guard makes any order FK-safe,
+        # but a group visited before its replica group is simply not collectable
+        # yet and slips to the next sweep.
+        endpoint_id = await self._add_endpoint(db, scope)
+        group_id = await self._add_group(db, scope, created_at=_OLD, deleted_at=_OLD)
+        await self._add_replica_group(
+            db, endpoint_id, group_id, lifecycle=ReplicaGroupLifecycle.DRAINED, updated_at=_OLD
+        )
+
+        await self._drain(db, list(reversed(self._deployment_specs())))
+
+        assert await _count(db, ReplicaGroupRow) == 0
+        assert await _count(db, SessionGroupRow) == 1  # missed this tick
 
 
 class TestUsageBucketsRetention:
@@ -1332,8 +1783,7 @@ class TestUsageBucketsRetention:
                     bucket_id=bucket_id,
                     bucket_type=bucket_type,
                     slot_name=slot,
-                    amount=Decimal("1"),
-                    duration_seconds=1,
+                    resource_usage=Decimal("1"),
                     capacity=Decimal("1"),
                 )
             )
@@ -1371,8 +1821,75 @@ class TestUsageBucketsRetention:
 
 
 class TestCatalogCompleteness:
-    def test_every_category_is_wired(self) -> None:
-        # The sweep iterates enabled policies of any category, so every
-        # RetentionCategory must resolve to a purger spec set.
+    def test_every_drainable_category_is_wired(self) -> None:
+        # The sweep iterates enabled policies of any category, so every category it
+        # can drain must resolve to a purger spec set. ``projects`` is drained by the
+        # leader task through the project repository instead.
         catalog = RetentionDBSource._catalog(_THRESHOLD)
-        assert set(catalog) == set(RetentionCategory)
+        assert set(catalog) == set(RetentionCategory) - {RetentionCategory.PROJECTS}
+
+
+class TestSweepCategoryIsolation:
+    """A failing category is rolled back in isolation; healthy categories persist."""
+
+    @pytest.fixture
+    async def db(
+        self, database_connection: ExtendedAsyncSAEngine
+    ) -> AsyncIterator[ExtendedAsyncSAEngine]:
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                UserResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRow,
+                KeyPairRow,
+                EventLogRow,
+                AuditLogRow,
+                ErrorLogRow,
+                KernelUsageRecordRow,
+                RetentionPolicyRow,
+            ],
+        ):
+            yield database_connection
+
+    async def test_failing_category_does_not_abort_others(
+        self, db: ExtendedAsyncSAEngine, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # logs (never swept) is drained first and succeeds; usage_records (swept
+        # recently) is drained second and is forced to fail. Its savepoint rolls
+        # back without touching the already-drained logs work.
+        original_drain = RetentionDBSource._drain_specs
+
+        async def _flaky_drain(
+            self: RetentionDBSource,
+            w: object,
+            specs: object,
+            batch_size: int,
+        ) -> int:
+            if any(spec.row_class is KernelUsageRecordRow for spec in specs):  # type: ignore[attr-defined]
+                raise RuntimeError("injected category failure")
+            return await original_drain(self, w, specs, batch_size)  # type: ignore[arg-type]
+
+        monkeypatch.setattr(RetentionDBSource, "_drain_specs", _flaky_drain)
+
+        await _insert(
+            db,
+            [
+                EventLogRow(event_name="old", event_domain=EventDomain.SESSION, created_at=_OLD),
+                _usage_record(period_end=_OLD),
+                _policy_row(RetentionCategory.LOGS),
+                _policy_row(RetentionCategory.USAGE_RECORDS, last_swept_at=_NEW),
+            ],
+        )
+
+        results = await _make_db_source(db).sweep()
+
+        # Only the healthy category is reported; the sweep does not raise.
+        assert [r.category for r in results] == [RetentionCategory.LOGS]
+        # Healthy category committed even though a later category failed.
+        assert await _count(db, EventLogRow) == 0
+        assert await _swept_at(db, RetentionCategory.LOGS) is not None
+        # Failing category rolled back to its savepoint: row kept, not stamped.
+        assert await _count(db, KernelUsageRecordRow) == 1
+        assert await _swept_at(db, RetentionCategory.USAGE_RECORDS) == _NEW

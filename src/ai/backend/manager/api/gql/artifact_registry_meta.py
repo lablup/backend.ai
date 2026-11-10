@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Sequence
-from typing import Any, Self
+from collections.abc import Iterable, Sequence
+from typing import Any, Self, override
 
-from strawberry import ID
+from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
+from ai.backend.common.dto.manager.v2.artifact_registry.response import ArtifactRegistryGQLNode
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_added_field,
     gql_connection_type,
     gql_node_type,
 )
@@ -25,8 +27,14 @@ from .types import StrawberryGQLContext
         description="Represents common metadata for an artifact registry. All artifact registry nodes expose that information regardless of type.",
     ),
 )
-class ArtifactRegistryMeta(PydanticNodeMixin[Any]):
+class ArtifactRegistryMeta(PydanticNodeMixin[ArtifactRegistryGQLNode]):
     id: NodeID[str]
+    entity_id: uuid.UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="UUID of the artifact registry.",
+        ),
+    )
     name: str
     registry_id: ID
     type: ArtifactRegistryType
@@ -72,6 +80,7 @@ class ArtifactRegistryMeta(PydanticNodeMixin[Any]):
             registries.append(
                 cls(
                     id=ID(str(registry_meta.id)),
+                    entity_id=registry_meta.entity_id,
                     name=registry_meta.name,
                     registry_id=ID(str(registry_meta.registry_id)),
                     type=registry_meta.type,
@@ -79,6 +88,18 @@ class ArtifactRegistryMeta(PydanticNodeMixin[Any]):
                 )
             )
         return registries
+
+    @classmethod
+    @override
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[ArtifactRegistryMeta | None]:
+        """No read path loads a registry meta by its own row id."""
+        return [None for _ in node_ids]
 
 
 ArtifactRegistryMetaEdge = Edge[ArtifactRegistryMeta]

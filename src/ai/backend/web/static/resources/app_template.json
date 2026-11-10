@@ -272,5 +272,6 @@
         "src": "./resources/icons/check-list.svg"
       }
     ]
-  }
+  },
+  "hideAppsOnBatchSession": false
 }

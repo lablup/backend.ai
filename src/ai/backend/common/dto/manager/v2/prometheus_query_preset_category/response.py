@@ -25,6 +25,9 @@ class CategoryNode(BaseResponseModel):
     """Node representing a single prometheus query preset category."""
 
     id: UUID = Field(description="Category ID")
+    entity_id: UUID = Field(
+        description="UUID of the preset category. Added in 26.9.0.",
+    )
     name: str = Field(description="Human-readable category name")
     description: str | None = Field(default=None, description="Optional category description")
     created_at: datetime = Field(description="Creation timestamp")

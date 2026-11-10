@@ -20,6 +20,7 @@ from aiohttp import web
 from aiohttp_sse import sse_response
 
 from ai.backend.common.api_handlers import QueryParam
+from ai.backend.common.data.entity.domain import DomainName
 from ai.backend.common.dto.manager.events.request import (
     PushBackgroundTaskEventsRequest,
     PushSessionEventsRequest,
@@ -28,26 +29,21 @@ from ai.backend.common.events.hub import WILDCARD
 from ai.backend.common.events.hub.propagators.cache import WithCachePropagator
 from ai.backend.common.events.types import EventCacheDomain, EventDomain
 from ai.backend.common.json import dump_json_str
-from ai.backend.common.types import AccessKey
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.dto.context import RequestCtx, UserContext
-from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.errors.resource import NoCurrentTaskContext
 from ai.backend.manager.exceptions import InvalidArgument
-from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.services.events.actions.resolve_group_for_events import (
-    ResolveGroupForEventsAction,
-)
-from ai.backend.manager.services.events.actions.resolve_session_for_events import (
-    ResolveSessionForEventsAction,
-)
+from ai.backend.manager.services.project.actions.lookup import LookupProjectAction
+from ai.backend.manager.services.session.actions.lookup import LookupSessionAction
 
 if TYPE_CHECKING:
     from ai.backend.common.events.fetcher import EventFetcher
     from ai.backend.common.events.hub.hub import EventHub
-    from ai.backend.manager.services.events.processors import EventsProcessors
+    from ai.backend.manager.services.events.service import EventsService
+    from ai.backend.manager.services.project.processors import ProjectProcessors
+    from ai.backend.manager.services.session.processors import SessionProcessors
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @attrs.define(slots=True, auto_attribs=True)
@@ -62,12 +58,16 @@ class EventsHandler:
         self,
         *,
         private_ctx: PrivateContext,
-        events_processors: EventsProcessors,
+        events_service: EventsService,
+        session_processors: SessionProcessors,
+        project_processors: ProjectProcessors,
         event_hub: EventHub,
         event_fetcher: EventFetcher,
     ) -> None:
         self._ctx = private_ctx
-        self._events = events_processors
+        self._events = events_service
+        self._session = session_processors
+        self._project = project_processors
         self.event_hub = event_hub
         self.event_fetcher = event_fetcher
 
@@ -84,28 +84,13 @@ class EventsHandler:
         request = ctx.request
         params = query.parsed
         session_name = params.session_name
-        session_id = params.session_id
         scope = params.scope
         user_role = request["user"]["role"]
         user_uuid = user_ctx.user_uuid
-        access_key = params.owner_access_key
-        if access_key is None:
-            access_key = user_ctx.access_key
-        if user_role == UserRole.USER:
-            if access_key != user_ctx.access_key:
-                raise GenericForbidden
         group_name = params.group_name
         if scope == "*":
             scope = "session,kernel"
 
-        log.info(
-            "PUSH_SESSION_EVENTS (ak:{}, s:{} / s:{}, g:{}, scope:{})",
-            access_key,
-            session_name,
-            session_id,
-            group_name,
-            scope,
-        )
         priv_ctx = self._ctx
         current_task = asyncio.current_task()
         if current_task is None:
@@ -116,30 +101,29 @@ class EventsHandler:
         if session_name == "*":
             resolved_session_id: Any = WILDCARD
         else:
-            resolve_result = await self._events.resolve_session.wait_for_complete(
-                ResolveSessionForEventsAction(
-                    session_name=session_name, access_key=AccessKey(access_key)
-                ),
+            resolve_result = await self._session.lookup.run(
+                LookupSessionAction(user_uuid=user_uuid, name=session_name)
             )
-            resolved_session_id = resolve_result.session_id
+            resolved_session_id = resolve_result.entity_id()
 
         # Resolve group name to group ID
         if group_name == "*":
             group_id: Any = WILDCARD
         else:
-            group_result = await self._events.resolve_group.wait_for_complete(
-                ResolveGroupForEventsAction(group_name=group_name),
+            group_result = await self._project.lookup.run(
+                LookupProjectAction(
+                    domain_name=DomainName(request["user"]["domain_name"]),
+                    project_name=group_name,
+                )
             )
-            group_id = group_result.group_id
+            group_id = group_result.entity_id
 
         filters = {
             "user_role": user_role,
             "user_uuid": user_uuid,
             "domain_name": request["user"]["domain_name"],
             "group_id": group_id,
-            "session_name": session_name,
             "session_id": resolved_session_id,
-            "access_key": access_key,
         }
         aliases: list[tuple[EventDomain, str]] = []
         for item in scope.split(","):
@@ -196,8 +180,6 @@ class EventsHandler:
         request = ctx.request
         priv_ctx = self._ctx
         task_id = query.parsed.task_id
-        access_key = user_ctx.access_key
-        log.info("PUSH_BACKGROUND_TASK_EVENTS (ak:{}, t:{})", access_key, task_id)
         current_task = asyncio.current_task()
         if current_task is None:
             raise NoCurrentTaskContext(
@@ -229,8 +211,8 @@ class EventsHandler:
                     user_event = event.user_event()
                     if user_event is None:
                         log.warning(
-                            "Received unsupported user event: {}",
-                            event.event_name(),
+                            "unsupported user event received",
+                            event_name=event.event_name(),
                         )
                         continue
                     await resp.send(
@@ -239,9 +221,9 @@ class EventsHandler:
                         retry=user_event.retry_count(),
                     )
                     if user_event.is_close_event():
-                        log.debug(
-                            "Received close event: {}",
-                            user_event.event_name(),
+                        log.trace(
+                            "background task close event received",
+                            event_name=user_event.event_name(),
                         )
                         break
                 # Skip the trailing send if the client already disconnected

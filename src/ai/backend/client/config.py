@@ -210,7 +210,6 @@ class APIConfig:
         skip_sslcert_validation: bool | None = None,
         connection_timeout: float | None = None,
         read_timeout: float | None = None,
-        announcement_handler: Callable[[str], None] | None = None,
     ) -> None:
         self._endpoints = (
             _clean_urls(endpoint)
@@ -226,7 +225,7 @@ class APIConfig:
         self._domain = (
             domain if domain is not None else get_env("DOMAIN", self.DEFAULTS["domain"], clean=str)
         )
-        self._group = (
+        self._project = (
             group if group is not None else get_env("GROUP", self.DEFAULTS["group"], clean=str)
         )
         self._storage_proxy_address_map = (
@@ -278,7 +277,6 @@ class APIConfig:
             if read_timeout is not None
             else get_env("READ_TIMEOUT", self.DEFAULTS["read_timeout"], clean=float)
         )
-        self._announcement_handler = announcement_handler
 
     @property
     def is_anonymous(self) -> bool:
@@ -321,7 +319,7 @@ class APIConfig:
     @property
     def group(self) -> str:
         """The configured group."""
-        return self._group
+        return self._project
 
     @property
     def storage_proxy_address_map(self) -> Mapping[str, str]:
@@ -372,11 +370,6 @@ class APIConfig:
     def read_timeout(self) -> float:
         """The maximum allowed waiting time for the first byte of the response from the server."""
         return self._read_timeout
-
-    @property
-    def announcement_handler(self) -> Callable[[str], None] | None:
-        """The announcement handler to display server-set announcements."""
-        return self._announcement_handler
 
 
 def get_config() -> APIConfig:

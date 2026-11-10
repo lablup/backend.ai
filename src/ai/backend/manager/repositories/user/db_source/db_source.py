@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Collection, Iterable, Sequence
+from collections.abc import Sequence
 from datetime import datetime, timedelta
-from typing import Any, cast
+from typing import Any, NoReturn, cast
 from uuid import UUID, uuid4
 
 import aiotools
@@ -12,25 +12,29 @@ from dateutil.tz import tzutc
 from sqlalchemy import Row
 from sqlalchemy.ext.asyncio import AsyncConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import joinedload, load_only, noload
+from sqlalchemy.orm import load_only, noload
 from sqlalchemy.sql.expression import bindparam
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.data.permission.types import RBACElementType
-from ai.backend.common.identifier.project import ProjectID
-from ai.backend.common.identifier.user import UserID
+from ai.backend.common.data.entity.bootstrap_script import BootstrapScript
+from ai.backend.common.data.entity.entity_share import EntityShareID
+from ai.backend.common.data.entity.keypair import KeyPairID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserEntityType, UserID
+from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
+from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.common.types import AccessKey, VFolderID
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
+from ai.backend.manager.data.bootstrap_script.types import BootstrapScriptRevisionData
 from ai.backend.manager.data.common.bulk import BulkCreateFailure, BulkUpdateFailure
-from ai.backend.manager.data.common.types import SearchResult
+from ai.backend.manager.data.entity_share.types import EntityShareStatus
 from ai.backend.manager.data.keypair.types import (
-    GeneratedKeyPairData,
     KeyPairCreator,
     KeyPairData,
 )
-from ai.backend.manager.data.permission.id import ScopeId
-from ai.backend.manager.data.permission.types import EntityType, RBACElementRef, ScopeType
+from ai.backend.manager.data.model_serving.types import EndpointLifecycle
+from ai.backend.manager.data.session.types import SessionEntityData, SessionStatus
 from ai.backend.manager.data.user.types import (
     BulkUserCreateResultData,
     BulkUserUpdateResultData,
@@ -38,120 +42,176 @@ from ai.backend.manager.data.user.types import (
     UserData,
     UserSearchResult,
 )
-from ai.backend.manager.defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
+from ai.backend.manager.data.vfolder.types import (
+    VFolderStatusSet,
+    VFolderStorageTarget,
+    vfolder_status_map,
+)
+from ai.backend.manager.errors.keypair import NoDefaultKeypairResourcePolicy
+from ai.backend.manager.errors.resource import PersonalProjectNotFound
 from ai.backend.manager.errors.user import (
     KeyPairForbidden,
     KeyPairNotFound,
     UserConflict,
-    UserCreationBadRequest,
-    UserCreationFailure,
     UserModificationBadRequest,
     UserModificationFailure,
     UserNotFound,
+    UserPurgeInProgress,
 )
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow, EndpointTokenRow
-from ai.backend.manager.models.group import (
-    GroupRow,
-    ProjectType,
+from ai.backend.manager.models.bootstrap_script.creators import BootstrapScriptCreator
+from ai.backend.manager.models.bootstrap_script.purgers import BootstrapScriptPurger
+from ai.backend.manager.models.bootstrap_script.upserters import (
+    UserDefaultBootstrapScriptUpserter,
 )
-from ai.backend.manager.models.kernel import (
+from ai.backend.manager.models.bootstrap_script_revision.creators import (
+    BootstrapScriptRevisionCreator,
+)
+from ai.backend.manager.models.bootstrap_script_revision.searchable_fields import (
+    BootstrapScriptRevisionSearchableFields,
+)
+from ai.backend.manager.models.bootstrap_script_revision.searchers import (
+    DefaultBootstrapScriptRevisionSearcher,
+)
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.endpoint.purgers import UserEndpointPurger
+from ai.backend.manager.models.endpoint.row import EndpointRow, EndpointTokenRow
+from ai.backend.manager.models.entity_share.purgers import EntitySharePendingOfferBatchPurger
+from ai.backend.manager.models.entity_share.row import EntityShareRow
+from ai.backend.manager.models.entity_share.updaters import EntityShareRevokeUpdater
+from ai.backend.manager.models.kernel.row import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     RESOURCE_USAGE_KERNEL_STATUSES,
+    KernelRow,
     kernels,
 )
-from ai.backend.manager.models.keypair import (
+from ai.backend.manager.models.keypair.row import (
     KeyPairRow,
-    generate_keypair_data,
     keypairs,
 )
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
+from ai.backend.manager.models.keypair.searchable_fields import KeyPairSearchableFields
+from ai.backend.manager.models.project.lookups import PersonalProjectOfUserLookup
+from ai.backend.manager.models.project.updaters import PersonalProjectSoftDeleteUpdater
+from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
+from ai.backend.manager.models.resource_policy.row import (
+    KeyPairResourcePolicyRow,
+    UserResourcePolicyRow,
 )
-from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
-from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
-from ai.backend.manager.models.session import (
+from ai.backend.manager.models.resource_slot.aggregates import kernel_allocated_slots_expr
+from ai.backend.manager.models.routing.row import RoutingRow
+from ai.backend.manager.models.session.row import (
     AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
-    QueryCondition,
-    QueryOption,
     SessionRow,
-    by_status,
-    by_user_id,
 )
-from ai.backend.manager.models.types import join_by_related_field
-from ai.backend.manager.models.user import UserRole, UserRow, UserStatus, users
+from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
+from ai.backend.manager.models.session.searchers import SessionSearcher
+from ai.backend.manager.models.session_group.row import SessionGroupRow
+from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
+from ai.backend.manager.models.user.creators import UserCreator
+from ai.backend.manager.models.user.purgers import (
+    UserErrorLogPurger,
+    UserGroupAssociationPurger,
+    UserKeyPairPurger,
+    UserPurger,
+    UserSessionGroupPurger,
+    UserVFolderAutoMountPurger,
+)
+from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus, users
+from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
+from ai.backend.manager.models.user.searchers import UserSearcher
+from ai.backend.manager.models.user.updaters import UserUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import (
-    VFolderDeletionInfo,
+from ai.backend.manager.models.vfolder.row import (
     VFolderRow,
-    VFolderStatusSet,
-    vfolder_invitations,
-    vfolder_permissions,
-    vfolder_status_map,
     vfolders,
 )
-from ai.backend.manager.repositories.base.creator import (
-    Creator,
-    execute_creator,
+from ai.backend.manager.repositories.auth.keypair_secrets import generate_keypair_data
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.read import V2ReadOps
+from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
+    ResourcePolicyOpsProvider,
 )
-from ai.backend.manager.repositories.base.purger import execute_batch_purger
-from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
-from ai.backend.manager.repositories.base.rbac.entity_creator import (
-    RBACEntityCreator,
-    execute_rbac_entity_creator,
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
+from ai.backend.manager.repositories.ops.v2.user.provider import UserOpsProvider
+from ai.backend.manager.repositories.ops.v2.user.write import (
+    FullUserCreator,
+    V2UserWriteOps,
 )
-from ai.backend.manager.repositories.base.rbac.entity_purger import (
-    RBACEntityBatchPurger,
-    execute_rbac_entity_batch_purger,
-)
-from ai.backend.manager.repositories.base.rbac.scope_binder import (
-    RBACScopeBinder,
-    RBACScopeBindingPair,
-    execute_rbac_scope_binder,
-)
-from ai.backend.manager.repositories.base.rbac.scope_unbinder import (
-    execute_rbac_scope_entity_unbinder,
-)
-from ai.backend.manager.repositories.base.updater import Updater, execute_updater
-from ai.backend.manager.repositories.group.creators import ProjectUserMembershipCreatorSpec
-from ai.backend.manager.repositories.group.scope_binders import UserProjectEntityUnbinder
-from ai.backend.manager.repositories.keypair.creators import KeyPairCreatorSpec
-from ai.backend.manager.repositories.keypair.types import (
-    KeypairResourcePolicyKeypairSearchScope,
-    UserKeypairSearchScope,
-)
-from ai.backend.manager.repositories.ops.rbac.provider import RBACOpsProvider
-from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
-from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
-from ai.backend.manager.repositories.user.creators import UserCreateSpec, UserCreatorSpec
-from ai.backend.manager.repositories.user.purgers import (
-    UserBatchPurgerSpec,
-    create_user_error_log_purger,
-    create_user_group_association_purger,
-    create_user_keypair_purger,
-    create_user_vfolder_permission_purger,
-)
-from ai.backend.manager.repositories.user.types import (
-    DomainUserSearchScope,
-    ProjectUserSearchScope,
-    RoleUserSearchScope,
-)
-from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec, UserUpdateSpec
+from ai.backend.manager.repositories.user.creators import UserCreateSpec
 from ai.backend.manager.repositories.vfolder.deletion import initiate_vfolder_deletion
+from ai.backend.manager.secret.pool import KeyProviderPool
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class UserDBSource:
     """Database source for user-related operations."""
 
     _db: ExtendedAsyncSAEngine
-    _role_manager: RoleManager
+    _v2_ops: V2DBOpsProvider
+    _share_ops: ShareOpsProvider
+    _policy_ops: ResourcePolicyOpsProvider
+    _user_ops_provider: UserOpsProvider
+    _key_provider_pool: KeyProviderPool
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+    def __init__(
+        self,
+        db: ExtendedAsyncSAEngine,
+        v2_ops_provider: V2DBOpsProvider,
+        share_ops_provider: ShareOpsProvider,
+        policy_ops_provider: ResourcePolicyOpsProvider,
+        key_provider_pool: KeyProviderPool,
+    ) -> None:
         self._db = db
-        self._rbac_ops_provider = RBACOpsProvider(db)
-        self._role_manager = RoleManager()
+        self._v2_ops = v2_ops_provider
+        self._share_ops = share_ops_provider
+        self._policy_ops = policy_ops_provider
+        self._user_ops_provider = UserOpsProvider(db)
+        self._key_provider_pool = key_provider_pool
+
+    async def current_default_bootstrap_script(
+        self, user_id: UserID
+    ) -> BootstrapScriptRevisionData | None:
+        async with self._v2_ops.read_ops() as r:
+            return await self._current_default_revision(r, user_id)
+
+    async def add_default_bootstrap_script_revision(
+        self, user_id: UserID, script: BootstrapScript, creator_id: UserID
+    ) -> None:
+        """Append the next revision to the user's live default script. A user with no
+        default gets a new script, set as the default."""
+        async with self._v2_ops.write_ops() as w:
+            current = await self._current_default_revision(w, user_id)
+            if current is not None:
+                await w.create_dangling_field(
+                    BootstrapScriptRevisionCreator(
+                        script_id=current.script_id,
+                        script=script,
+                        creator_id=creator_id,
+                    )
+                )
+                return
+            created = await w.create_field(user_id, BootstrapScriptCreator())
+            await w.create_dangling_field(
+                BootstrapScriptRevisionCreator(
+                    script_id=created.id, script=script, creator_id=creator_id
+                )
+            )
+            await w.upsert_field_entity(
+                user_id, UserDefaultBootstrapScriptUpserter(script_id=created.id)
+            )
+
+    async def _current_default_revision(
+        self, ops: V2ReadOps, user_id: UserID
+    ) -> BootstrapScriptRevisionData | None:
+        revision = BootstrapScriptRevisionSearchableFields.own
+        result = await ops.search_in_global(
+            DefaultBootstrapScriptRevisionSearcher(
+                user_id=user_id,
+                pagination=OffsetPagination(limit=1),
+                orders=[revision.revision_number.order.apply(ascending=False)],
+            )
+        )
+        return result.items[0] if result.items else None
 
     async def get_user_by_uuid(self, user_uuid: UUID) -> UserData:
         """
@@ -160,7 +220,7 @@ class UserDBSource:
         """
         async with self._db.begin_readonly_session_read_committed() as db_session:
             user_row = await self._get_user_by_uuid(db_session, user_uuid)
-            return user_row.to_data()
+            return UserSearchableFields.own.to_data(user_row)
 
     async def get_by_email_validated(
         self,
@@ -172,259 +232,58 @@ class UserDBSource:
         """
         async with self._db.begin_readonly_session_read_committed() as session:
             user_row = await self._get_user_by_email(session, email)
-            return UserData.from_row(user_row)
+            return UserSearchableFields.own.to_data(user_row)
+
+    async def _default_keypair_resource_policy(self, session: SASession) -> str:
+        """The name of the policy a keypair gets when nothing else names one."""
+        name = await session.scalar(
+            sa.select(KeyPairResourcePolicyRow.name).where(KeyPairResourcePolicyRow.is_default)
+        )
+        if name is None:
+            raise NoDefaultKeypairResourcePolicy()
+        return name
 
     async def create_user_validated(
-        self, creator: Creator[UserRow], group_ids: list[str] | None
+        self, creator: UserCreator, group_ids: list[str] | None
     ) -> UserCreateResultData:
         """
         Create a new user with default keypair and group associations.
         """
-        spec = cast(UserCreatorSpec, creator.spec)
-        domain_name = spec.domain_name
-        email = spec.email
-        user_name = spec.username
+        async with self._db.begin_readonly_session_read_committed() as session:
+            policy = await self._default_keypair_resource_policy(session)
+        async with self._user_ops_provider.write_ops() as w:
+            return await self._create_user_with_keypair_and_groups(w, creator, group_ids, policy)
 
-        async with self._db.begin_session() as db_session:
-            # Check if domain exists before creating user
-            domain_exists = await self._check_domain_exists(db_session, domain_name)
-            if not domain_exists:
-                raise UserCreationBadRequest(f"Domain '{domain_name}' does not exist.")
-
-            # Check if user with the same email or username already exists
-            duplicate_exists = await self._check_user_exists_with_email_or_username(
-                db_session, email=email, username=user_name
-            )
-            if duplicate_exists:
-                raise UserConflict(
-                    f"User with email {email} or username {user_name} already exists."
-                )
-
-            # Collect project IDs to join (including model store project)
-            project_ids = await self._get_project_scope_ids_for_user(
-                db_session, domain_name, [UUID(gid) for gid in group_ids or []]
-            )
-            project_scope_refs = [
-                RBACElementRef(RBACElementType.PROJECT, str(pid)) for pid in project_ids
-            ]
-
-            # Insert user with RBAC scope associations (domain + projects)
-            rbac_creator = RBACEntityCreator(
-                spec=creator.spec,
-                element_type=RBACElementType.USER,
-                scope_ref=RBACElementRef(RBACElementType.DOMAIN, domain_name),
-                additional_scope_refs=project_scope_refs,
-            )
-            result = await execute_rbac_entity_creator(db_session, rbac_creator)
-            row = result.row
-
-            if not row:
-                raise UserCreationFailure("Failed to create user")
-            created_user = row.to_data()
-
-            # Create default keypair with RBAC scope association
-            email = created_user.email
-            keypair_creator = KeyPairCreator(
-                is_active=(created_user.status == UserStatus.ACTIVE),
-                is_admin=created_user.role in ["superadmin", "admin"],
-                resource_policy=DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME,
-                rate_limit=DEFAULT_KEYPAIR_RATE_LIMIT,
-            )
-            generated = generate_keypair_data()
-            kp_spec = KeyPairCreatorSpec(
-                creator=keypair_creator,
-                generated_data=generated,
-                user_id=created_user.id,
-                email=email,
-            )
-            rbac_kp_creator = RBACEntityCreator(
-                spec=kp_spec,
-                element_type=RBACElementType.KEYPAIR,
-                scope_ref=RBACElementRef(
-                    element_type=RBACElementType.USER,
-                    element_id=str(created_user.uuid),
-                ),
-            )
-            kp_result = await execute_rbac_entity_creator(db_session, rbac_kp_creator)
-            kp_data = kp_result.row.to_data()
-
-            # Update user main_access_key
-            row.main_access_key = kp_data.access_key
-            created_user.main_access_key = kp_data.access_key
-
-            # User-project membership is recorded as AssociationScopesEntitiesRow rows
-            # by RBACEntityCreator above (via additional_scope_refs).
-
-            # Create RBAC role and map user to role
-            # Note: Entity-Scope association is handled by RBACEntityCreator above
-            role = await self._role_manager.create_system_role(db_session, created_user)
-            user_role_creator = Creator(
-                spec=UserRoleCreatorSpec(user_id=created_user.uuid, role_id=role.id)
-            )
-            await execute_creator(db_session, user_role_creator)
-
-            # Provision roles from active user-scope presets and assign the
-            # auto_assign ones to the new user.
-            await self._role_manager.create_preset_roles_for_user(db_session, created_user.uuid)
-
-        return UserCreateResultData(created_user, kp_data)
-
-    async def _create_single_user_with_keypair_and_groups(
+    async def _create_user_with_keypair_and_groups(
         self,
-        db_session: SASession,
-        item: UserCreateSpec,
+        w: V2UserWriteOps,
+        creator: UserCreator,
+        group_ids: list[str] | None,
+        keypair_resource_policy: str,
     ) -> UserCreateResultData:
-        """Create a single user with keypair, group assignments, and role mappings.
-
-        This is a helper method used by bulk_create_users_validated to create
-        each individual user within a savepoint.
-
-        Args:
-            db_session: The database session to use.
-            item: The user creation specification including group assignments.
-
-        Returns:
-            The created user data together with its generated default keypair.
-
-        Raises:
-            UserCreationBadRequest: If the domain does not exist.
-            UserConflict: If email or username already exists.
-            UserCreationFailure: If user creation fails.
-        """
-        spec = cast(UserCreatorSpec, item.creator.spec)
-
-        # Validate domain
-        if not await self._check_domain_exists(db_session, spec.domain_name):
-            raise UserCreationBadRequest(f"Domain '{spec.domain_name}' does not exist")
-
-        # Validate no duplicate
-        if await self._check_user_exists_with_email_or_username(
-            db_session, email=spec.email, username=spec.username
-        ):
-            raise UserConflict(f"Email '{spec.email}' or username '{spec.username}' already exists")
-
-        # Collect project IDs to join (including model store project)
-        project_ids = await self._get_project_scope_ids_for_user(
-            db_session, spec.domain_name, [UUID(gid) for gid in item.group_ids or []]
-        )
-        project_scope_refs = [
-            RBACElementRef(RBACElementType.PROJECT, str(pid)) for pid in project_ids
-        ]
-
-        # Insert user with RBAC scope associations (domain + projects)
-        rbac_creator = RBACEntityCreator(
-            spec=item.creator.spec,
-            element_type=RBACElementType.USER,
-            scope_ref=RBACElementRef(RBACElementType.DOMAIN, spec.domain_name),
-            additional_scope_refs=project_scope_refs,
-        )
-        result = await execute_rbac_entity_creator(db_session, rbac_creator)
-        row = result.row
-        if not row:
-            raise UserCreationFailure(f"Failed to create user {spec.email}")
-
-        created_user = row.to_data()
-
-        # Create default keypair with RBAC scope association
-        keypair_creator = KeyPairCreator(
-            is_active=(created_user.status == UserStatus.ACTIVE),
-            is_admin=created_user.role in ["superadmin", "admin"],
-            resource_policy=DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME,
-            rate_limit=DEFAULT_KEYPAIR_RATE_LIMIT,
-        )
-        generated = generate_keypair_data()
-        kp_spec = KeyPairCreatorSpec(
-            creator=keypair_creator,
-            generated_data=generated,
-            user_id=created_user.id,
-            email=created_user.email,
-        )
-        rbac_kp_creator = RBACEntityCreator(
-            spec=kp_spec,
-            element_type=RBACElementType.KEYPAIR,
-            scope_ref=RBACElementRef(
-                element_type=RBACElementType.USER,
-                element_id=str(created_user.uuid),
-            ),
-        )
-        kp_result = await execute_rbac_entity_creator(db_session, rbac_kp_creator)
-        kp_data = kp_result.row.to_data()
-
-        # Update user main_access_key
-        row.main_access_key = kp_data.access_key
-        created_user.main_access_key = kp_data.access_key
-
-        # User-project membership is recorded as AssociationScopesEntitiesRow rows
-        # by RBACEntityCreator above (via additional_scope_refs).
-
-        # Create RBAC role and map user to role
-        role = await self._role_manager.create_system_role(db_session, created_user)
-        user_role_creator = Creator(
-            spec=UserRoleCreatorSpec(user_id=created_user.uuid, role_id=role.id)
-        )
-        await execute_creator(db_session, user_role_creator)
-
-        # Provision roles from active user-scope presets and assign the
-        # auto_assign ones to the new user.
-        await self._role_manager.create_preset_roles_for_user(db_session, created_user.uuid)
-
-        return UserCreateResultData(created_user, kp_data)
-
-    async def assign_users_to_scope(
-        self,
-        user_uuid: UserID,
-        domain_name: str | None,
-        project_ids: Collection[ProjectID],
-    ) -> None:
-        """Grant the auto_assign roles of a new user's initial domain/project scopes.
-
-        Maps the user to the active auto_assign roles of its domain scope and
-        each given project scope. Model-store membership is handled separately
-        by :meth:`assign_user_to_model_store`. Idempotent, so it is safe to run
-        after user creation.
-        """
-        async with self._rbac_ops_provider.write_ops() as rbac_write_ops:
-            if domain_name is not None:
-                await rbac_write_ops.add_users_to_scope(
-                    ScopeId(scope_type=ScopeType.DOMAIN, scope_id=domain_name),
-                    [user_uuid],
-                )
-            for project_id in project_ids:
-                await rbac_write_ops.add_users_to_scope(
-                    ScopeId(scope_type=ScopeType.PROJECT, scope_id=str(project_id)),
-                    [user_uuid],
-                )
-
-    async def assign_user_to_model_store(self, user_uuid: UserID, domain_name: str | None) -> None:
-        """Add a user to its domain's model-store project scope and grant its roles.
-
-        Resolves the model-store project(s) of the domain and maps the user to
-        each one's active auto_assign roles. Idempotent: the scope binding is a
-        no-op when the membership already exists.
-        """
-        if domain_name is None:
-            return
-        async with self._db.begin_session_read_committed() as db_session:
-            model_store_project_ids = await self._get_model_store_project_ids(
-                db_session, domain_name
+        """Provision a user (row, default keypair, domain/project/model-store scope
+        enrollments) within the caller's write ops transaction."""
+        if await w.user_exists(creator.email, creator.username):
+            raise UserConflict(
+                f"User with email {creator.email} or username {creator.username} already exists."
             )
-        await self.assign_users_to_scope(
-            user_uuid,
-            domain_name,
-            [ProjectID(pid) for pid in model_store_project_ids],
-        )
 
-    async def _get_model_store_project_ids(
-        self, db_session: SASession, domain_name: str
-    ) -> list[UUID]:
-        """Return the model-store project ids of the given domain."""
-        rows = await db_session.scalars(
-            sa.select(GroupRow.id).where(
-                GroupRow.domain_name == domain_name,
-                GroupRow.type == ProjectType.MODEL_STORE,
+        result = await w.create_user(
+            FullUserCreator(
+                user=creator,
+                keypair_secrets=await generate_keypair_data(self._key_provider_pool),
+                keypair_resource_policy=keypair_resource_policy,
             )
         )
-        return list(rows.all())
+        await w.join_projects(
+            UserID(result.user.id),
+            creator.domain_id,
+            [ProjectID(UUID(gid)) for gid in group_ids or []],
+        )
+        return UserCreateResultData(
+            user=result.user,
+            keypair=result.keypair,
+        )
 
     async def bulk_create_users_validated(
         self,
@@ -443,108 +302,33 @@ class UserDBSource:
         successes: list[UserCreateResultData] = []
         failures: list[BulkCreateFailure] = []
 
-        async with self._db.begin_session() as db_session:
+        async with self._db.begin_readonly_session_read_committed() as session:
+            policy = await self._default_keypair_resource_policy(session)
+        async with self._user_ops_provider.write_ops() as w:
             for idx, item in enumerate(items):
-                spec = cast(UserCreatorSpec, item.creator.spec)
                 try:
-                    async with db_session.begin_nested():
-                        created = await self._create_single_user_with_keypair_and_groups(
-                            db_session, item
+                    async with w.savepoint():
+                        successes.append(
+                            await self._create_user_with_keypair_and_groups(
+                                w, item.creator, item.group_ids, policy
+                            )
                         )
-                        successes.append(created)
                 except Exception as e:
-                    log.warning("Failed to create user {}: {}", spec.email, str(e))
+                    log.trace("user creation failed: {}", e, user_email=item.creator.email)
                     failures.append(BulkCreateFailure(index=idx, exception=e))
 
         return BulkUserCreateResultData(successes=successes, failures=failures)
 
-    async def update_user_validated(
-        self,
-        email: str,
-        updater: Updater[UserRow],
-    ) -> UserData:
-        """
-        Update user with ownership validation and handle role/group changes.
-        """
-        updater_spec = cast(UserUpdaterSpec, updater.spec)
-        to_update = updater_spec.build_values()
-        async with self._db.begin_session() as session:
-            # Get current user data for validation
-            current_user = await self._get_user_by_email_with_session(session, email)
-
-            # Check if new username is already taken by another user
-            new_username = updater_spec.username.optional_value()
-            if new_username and new_username != current_user.username:
-                username_exists = await self._check_username_exists_for_other_user(
-                    session, username=new_username, exclude_email=email
-                )
-                if username_exists:
-                    raise UserModificationBadRequest(
-                        f"Username '{new_username}' is already taken by another user."
-                    )
-
-            # Check if new domain_name exists
-            new_domain_name = updater_spec.domain_name.optional_value()
-            if new_domain_name and new_domain_name != current_user.domain_name:
-                domain_exists = await self._check_domain_exists(session, new_domain_name)
-                if not domain_exists:
-                    raise UserModificationBadRequest(f"Domain '{new_domain_name}' does not exist.")
-
-            # Check if new resource_policy exists
-            new_resource_policy = updater_spec.resource_policy.optional_value()
-            if new_resource_policy and new_resource_policy != current_user.resource_policy:
-                policy_exists = await self._check_resource_policy_exists(
-                    session, new_resource_policy
-                )
-                if not policy_exists:
-                    raise UserModificationBadRequest(
-                        f"Resource policy '{new_resource_policy}' does not exist."
-                    )
-
-            # Handle main_access_key validation
-            main_access_key = updater_spec.main_access_key.optional_value()
-            if main_access_key:
-                await self._validate_and_update_main_access_key(session, email, main_access_key)
-
-            # Update user
-            if updater_spec.password.optional_value():
-                to_update["password_changed_at"] = sa.func.now()
-            status = updater_spec.status.optional_value()
-            if status is not None and status != current_user.status:
-                to_update["status_info"] = "admin-requested"
-            update_query = (
-                sa.update(users).where(users.c.email == email).values(to_update).returning(users)
-            )
-            result = await session.execute(update_query)
-            updated_user = result.first()
-            if not updated_user:
-                raise UserModificationFailure("Failed to update user")
-
-            # Handle role changes
-            prev_role = current_user.role
-            role = updater_spec.role.optional_value()
-            if role is not None and role != prev_role:
-                await self._sync_keypair_roles(session, updated_user.uuid, role)
-
-            # Handle group updates
-            group_ids = updater_spec.group_ids_value
-            if group_ids is not None:
-                await self._update_user_groups(
-                    session, updated_user.uuid, updated_user.domain_name, group_ids
-                )
-            return UserData.from_row(updated_user)
-
     async def bulk_update_users_validated(
         self,
-        items: list[UserUpdateSpec],
+        items: list[UserUpdater],
     ) -> BulkUserUpdateResultData:
         """Update multiple users with partial failure support.
 
         Each user is updated in a savepoint - if one fails, others can still succeed.
-        Uses UUID-based lookup and reuses the same validation logic as update_user_validated.
 
         Args:
-            items: List of UserUpdateSpec for each user to update.
+            items: List of UserUpdater for each user to update.
         """
         if not items:
             return BulkUserUpdateResultData(successes=[], failures=[])
@@ -556,12 +340,10 @@ class UserDBSource:
             for idx, item in enumerate(items):
                 try:
                     async with session.begin_nested():
-                        updated_user = await self._update_single_user_validated(
-                            session, item.user_id, item.updater_spec
-                        )
+                        updated_user = await self._update_single_user_validated(session, item)
                         successes.append(updated_user)
                 except Exception as e:
-                    log.warning("Failed to update user {}: {}", item.user_id, str(e))
+                    log.trace("user update failed: {}", e, target_user_id=item.user_id)
                     failures.append(BulkUpdateFailure(index=idx, exception=e))
 
         return BulkUserUpdateResultData(successes=successes, failures=failures)
@@ -569,21 +351,18 @@ class UserDBSource:
     async def _update_single_user_validated(
         self,
         session: SASession,
-        user_id: UUID,
-        updater_spec: UserUpdaterSpec,
+        updater: UserUpdater,
     ) -> UserData:
-        """Update a single user with full validation.
-
-        Extracted from update_user_validated to be reused by both
-        single and bulk update operations.
-        """
-        to_update = updater_spec.build_values()
+        """Update a single user with full validation, shared by the single and bulk paths."""
+        user_id = updater.user_id
+        to_update = updater.build_values()
 
         # Get current user data for validation (by UUID)
         current_user = await self._get_user_by_uuid_with_session(session, user_id)
+        await self._raise_failing_guard(session, updater)
 
         # Check if new username is already taken by another user
-        new_username = updater_spec.username.optional_value()
+        new_username = updater.username.optional_value()
         if new_username and new_username != current_user.username:
             username_exists = await self._check_username_exists_for_other_user(
                 session, username=new_username, exclude_email=current_user.email
@@ -594,14 +373,14 @@ class UserDBSource:
                 )
 
         # Check if new domain_name exists
-        new_domain_name = updater_spec.domain_name.optional_value()
+        new_domain_name = updater.domain_name.optional_value()
         if new_domain_name and new_domain_name != current_user.domain_name:
             domain_exists = await self._check_domain_exists(session, new_domain_name)
             if not domain_exists:
                 raise UserModificationBadRequest(f"Domain '{new_domain_name}' does not exist.")
 
         # Check if new resource_policy exists
-        new_resource_policy = updater_spec.resource_policy.optional_value()
+        new_resource_policy = updater.resource_policy.optional_value()
         if new_resource_policy and new_resource_policy != current_user.resource_policy:
             policy_exists = await self._check_resource_policy_exists(session, new_resource_policy)
             if not policy_exists:
@@ -609,120 +388,131 @@ class UserDBSource:
                     f"Resource policy '{new_resource_policy}' does not exist."
                 )
 
-        # Handle main_access_key validation
-        main_access_key = updater_spec.main_access_key.optional_value()
-        if main_access_key:
-            await self._validate_and_update_main_access_key(
-                session, current_user.email, main_access_key
-            )
-
         # Update user
-        if updater_spec.password.optional_value():
+        if updater.password.optional_value():
             to_update["password_changed_at"] = sa.func.now()
-        status = updater_spec.status.optional_value()
+        status = updater.status.optional_value()
         if status is not None and status != current_user.status:
             to_update["status_info"] = "admin-requested"
         update_query = (
-            sa.update(users).where(users.c.uuid == user_id).values(to_update).returning(users)
+            sa.update(users)
+            .where(users.c.uuid == user_id, *[g.condition() for g in updater.guard_checks()])
+            .values(to_update)
+            .returning(users)
         )
         result = await session.execute(update_query)
         updated_user = result.first()
         if not updated_user:
+            await self._raise_failing_guard(session, updater)
             raise UserModificationFailure("Failed to update user")
 
         # Handle role changes
         prev_role = current_user.role
-        role = updater_spec.role.optional_value()
+        role = updater.role.optional_value()
         if role is not None and role != prev_role:
             await self._sync_keypair_roles(session, updated_user.uuid, role)
 
-        # Handle group updates
-        group_ids = updater_spec.group_ids_value
+        # Handle group updates through the RBAC member ops in its own transaction.
+        group_ids = updater.group_ids_value
         if group_ids is not None:
-            await self._update_user_groups(
-                session, updated_user.uuid, updated_user.domain_name, group_ids
+            await self._sync_user_project_memberships(
+                updated_user.uuid, updated_user.domain_name, group_ids
             )
+        await self._restate_user_policy_shares(UserID(updated_user.uuid))
         return UserData.from_row(updated_user)
 
-    async def update_user_by_uuid_validated(
-        self,
-        user_uuid: UUID,
-        updater: Updater[UserRow],
-    ) -> UserData:
+    async def _raise_failing_guard(self, session: SASession, updater: UserUpdater) -> None:
+        """Raise the first guard of ``updater`` the user's current row fails."""
+        guards = updater.guard_checks()
+        stmt = sa.select(*[g.condition().label(f"guard_{i}") for i, g in enumerate(guards)]).where(
+            users.c.uuid == updater.user_id
+        )
+        row = (await session.execute(stmt)).mappings().first()
+        if row is None:
+            return
+        for i, guard in enumerate(guards):
+            if not row[f"guard_{i}"]:
+                raise guard.error
+
+    async def update_user_by_uuid_validated(self, updater: UserUpdater) -> UserData:
         """Update user by UUID with validation and handle role/group changes."""
-        updater_spec = cast(UserUpdaterSpec, updater.spec)
         async with self._db.begin_session() as session:
-            return await self._update_single_user_validated(session, user_uuid, updater_spec)
+            return await self._update_single_user_validated(session, updater)
 
-    async def delete_user_by_uuid_validated(self, user_uuid: UUID) -> None:
-        """Soft delete user by UUID, setting status to DELETED and deactivating keypairs."""
-        async with self._db.begin() as conn:
-            await conn.execute(
-                sa.update(keypairs).values(is_active=False).where(keypairs.c.user == user_uuid)
-            )
-            await conn.execute(
-                sa.update(users)
-                .values(status=UserStatus.DELETED, status_info="admin-requested")
-                .where(users.c.uuid == user_uuid)
-            )
+    async def delete_user_by_uuid_validated(self, user_uuid: UUID) -> UserData:
+        """Soft delete a user by UUID, setting status to DELETED.
 
-    async def soft_delete_user_validated(self, email: str) -> None:
+        The user's keypairs are left active: what keeps a deleted account out of the
+        API is the status gate the auth middleware applies.
         """
-        Soft delete user by setting status to DELETED and deactivating keypairs.
-        Idempotent: silently succeeds if the user does not exist.
-        """
-        async with self._db.begin() as conn:
-            # Resolve email to UUID for the correct FK column (keypairs.c.user).
-            # Return early if the user doesn't exist — soft delete is idempotent.
-            result = await conn.execute(sa.select(users.c.uuid).where(users.c.email == email))
-            row = result.first()
-            if not row:
-                return
-            user_uuid = cast(UUID, row.uuid)
-            # Deactivate all user keypairs via UUID FK
-            await conn.execute(
-                sa.update(keypairs).values(is_active=False).where(keypairs.c.user == user_uuid)
-            )
-            # Soft delete user
-            await conn.execute(
-                sa.update(users)
-                .values(status=UserStatus.DELETED, status_info="admin-requested")
-                .where(users.c.email == email)
-            )
-
-    async def purge_user(self, email: str) -> None:
-        """Completely purge user and all associated data."""
         async with self._db.begin_session() as session:
-            user_uuid = await self._get_user_uuid_by_email(session, email)
-
-            # Delete all user data in proper order using purger pattern
-            await execute_batch_purger(session, create_user_error_log_purger(user_uuid))
-            await execute_batch_purger(session, create_user_keypair_purger(user_uuid))
-            await execute_batch_purger(session, create_user_vfolder_permission_purger(user_uuid))
-            await execute_batch_purger(session, create_user_group_association_purger(user_uuid))
-
-            # Finally delete the user itself with RBAC scope/permission cleanup
-            # to avoid dangling association_scopes_entities and permission rows.
-            await execute_rbac_entity_batch_purger(
-                session,
-                RBACEntityBatchPurger(spec=UserBatchPurgerSpec(user_uuid=user_uuid), batch_size=1),
+            result = await session.execute(
+                sa.update(UserRow)
+                .values(status=UserStatus.DELETED, status_info="admin-requested")
+                .where(
+                    (UserRow.uuid == user_uuid)
+                    & UserRow.status.not_in(UserStatus.purge_in_progress())
+                )
+                .returning(UserRow)
             )
+            deleted_user = result.scalars().one_or_none()
+            if deleted_user is None:
+                await self._raise_missing_or_purging(await session.connection(), user_uuid)
+            return UserSearchableFields.own.to_data(deleted_user)
+
+    async def restore_user_by_uuid_validated(self, user_uuid: UUID) -> None:
+        """Restore a soft-deleted user by UUID, setting status back to ACTIVE.
+
+        A user whose status is not DELETED is refused.
+        """
+        async with self._db.begin() as conn:
+            result = await conn.execute(
+                sa.update(users)
+                .values(status=UserStatus.ACTIVE, status_info="admin-requested")
+                .where((users.c.uuid == user_uuid) & (users.c.status == UserStatus.DELETED))
+            )
+            if result.rowcount == 0:
+                current = await conn.scalar(
+                    sa.select(users.c.status).where(users.c.uuid == user_uuid)
+                )
+                if current is not None and current not in UserStatus.purge_in_progress():
+                    raise UserModificationBadRequest(f"User is not deleted: {user_uuid}")
+                await self._raise_missing_or_purging(conn, user_uuid)
+
+    async def _raise_missing_or_purging(self, conn: AsyncConnection, user_uuid: UUID) -> NoReturn:
+        """Name why a status write touched nothing: the row is gone, or a purge holds it."""
+        current = await conn.scalar(sa.select(users.c.status).where(users.c.uuid == user_uuid))
+        if current is None:
+            raise UserNotFound(f"User with UUID {user_uuid} not found.")
+        raise UserPurgeInProgress(f"User is being purged: {user_uuid}")
 
     async def purge_user_by_uuid(self, user_uuid: UUID) -> None:
-        """Completely purge user and all associated data by UUID."""
-        async with self._db.begin_session() as session:
-            # Delete all user data in proper order using purger pattern
-            await execute_batch_purger(session, create_user_error_log_purger(user_uuid))
-            await execute_batch_purger(session, create_user_keypair_purger(user_uuid))
-            await execute_batch_purger(session, create_user_vfolder_permission_purger(user_uuid))
-            await execute_batch_purger(session, create_user_group_association_purger(user_uuid))
+        """Completely purge user and all associated data by UUID.
 
-            # Finally delete the user itself with RBAC scope/permission cleanup
-            # to avoid dangling association_scopes_entities and permission rows.
-            await execute_rbac_entity_batch_purger(
-                session,
-                RBACEntityBatchPurger(spec=UserBatchPurgerSpec(user_uuid=user_uuid), batch_size=1),
-            )
+        The user's personal project is not among it. It is marked deleted and its
+        creator column is nulled by the foreign key, leaving the project dangling for
+        the retention sweep — the resources it holds outlive the account rather than
+        going with it.
+        """
+        user_id = UserID(user_uuid)
+        await self._revoke_shared_vfolders(user_uuid)
+        async with self._v2_ops.write_ops() as w:
+            await w.batch_purge_field_entities(user_id, UserErrorLogPurger())
+            await w.batch_purge_field_entities(user_id, UserKeyPairPurger())
+            await w.batch_purge_field_entities(user_id, BootstrapScriptPurger())
+            await w.batch_purge_field_entities(user_id, UserGroupAssociationPurger())
+            # Placement groups the user still owns: their deployments were either
+            # delegated (the groups moved with them) or deleted by now.
+            # TODO: scope this purge. A user operation must not use in_global.
+            await w.batch_purge_entities_in_global(UserSessionGroupPurger(user_id=user_id))
+            # TODO: scope this purge. A user operation must not use in_global.
+            await w.batch_purge_entities_in_global(UserVFolderAutoMountPurger(user_id=user_id))
+            # Marked before the user row goes: the FK nulls the creator column on delete,
+            # after which no statement can name the project by it.
+            # TODO: scope this update. A user operation must not use in_global.
+            await w.batch_update_in_global(PersonalProjectSoftDeleteUpdater(user_id=user_id))
+            # Finally the user itself as a scope: the row and the RBAC graph it left.
+            await w.purge_entity(UserPurger(user_id=user_id))
 
     async def check_user_vfolder_mounted_to_active_kernels(self, user_uuid: UUID) -> bool:
         """Check if user's vfolders are mounted to active kernels."""
@@ -741,41 +531,118 @@ class UserDBSource:
                 conn, deleted_user_uuid, target_user_uuid, target_user_email
             )
 
-    async def retrieve_active_sessions(self, user_uuid: UUID) -> list[SessionRow]:
+    async def retrieve_active_sessions(self, user_uuid: UUID) -> list[SessionEntityData]:
         """Retrieve active sessions for a user."""
-        query_conditions: list[QueryCondition] = [
-            by_user_id(user_uuid),
-            by_status(AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES),
-        ]
-
-        query_options: list[QueryOption] = [
-            join_by_related_field(SessionRow.user),
-        ]
-
-        return await SessionRow.list_session_by_condition(
-            query_conditions, query_options, db=self._db
-        )
+        fields = SessionSearchableFields.own
+        async with self._v2_ops.read_ops() as r:
+            result = await r.search_in_global(
+                SessionSearcher(
+                    pagination=NoPagination(),
+                    conditions=[
+                        fields.user_uuid.filter.equals(
+                            UUIDEqualMatchSpec(value=user_uuid, negated=False)
+                        ),
+                        fields.status.filter.in_(AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES),
+                    ],
+                )
+            )
+        return result.items
 
     async def delegate_endpoint_ownership(
         self,
         user_uuid: UUID,
         target_user_uuid: UUID,
-        target_main_access_key: AccessKey,
     ) -> None:
         """Delegate endpoint ownership to another user."""
         async with self._db.begin_session() as session:
-            await EndpointRow.delegate_endpoint_ownership(
-                session, user_uuid, target_user_uuid, target_main_access_key
+            default_access_key = await session.scalar(
+                sa.select(KeyPairRow.access_key).where(
+                    (KeyPairRow.user == target_user_uuid) & KeyPairRow.is_default
+                )
             )
+            if default_access_key is None:
+                raise KeyPairNotFound(
+                    f"User {target_user_uuid} has no default keypair to delegate endpoints to."
+                )
+            await self._delegate_endpoint_ownership(
+                session, user_uuid, UserID(target_user_uuid), default_access_key
+            )
+
+    async def _delegate_endpoint_ownership(
+        self,
+        session: SASession,
+        owner_user_uuid: UUID,
+        target_user_uuid: UserID,
+        target_access_key: AccessKey,
+    ) -> None:
+        endpoint_ids = sa.select(EndpointRow.id).where(
+            (EndpointRow.session_owner == owner_user_uuid)
+            & (EndpointRow.lifecycle_stage == EndpointLifecycle.CREATED)
+        )
+        # The placement groups of the delegated replica groups follow their
+        # members: a group's members all belong to its owner (BEP-1064).
+        await session.execute(
+            sa.update(SessionGroupRow)
+            .where(
+                SessionGroupRow.id.in_(
+                    sa.select(ReplicaGroupRow.session_group_id).where(
+                        ReplicaGroupRow.deployment_id.in_(endpoint_ids)
+                    )
+                )
+            )
+            .values(owner_user_id=target_user_uuid)
+        )
+        await session.execute(
+            sa.update(EndpointTokenRow)
+            .where(EndpointTokenRow.endpoint.in_(endpoint_ids))
+            .values(session_owner=target_user_uuid)
+        )
+        await session.execute(
+            sa.update(RoutingRow)
+            .where(RoutingRow.endpoint.in_(endpoint_ids))
+            .values(session_owner=target_user_uuid)
+        )
+        live_session_ids = sa.select(SessionRow.id).where(
+            SessionRow.id.in_(
+                sa.select(RoutingRow.session).where(RoutingRow.endpoint.in_(endpoint_ids))
+            )
+            & SessionRow.status.not_in(SessionStatus.terminal_statuses())
+        )
+        await session.execute(
+            sa.update(KernelRow)
+            .where(KernelRow.session_id.in_(live_session_ids))
+            .values(user_uuid=target_user_uuid, access_key=target_access_key)
+        )
+        await session.execute(
+            sa.update(SessionRow)
+            .where(SessionRow.id.in_(live_session_ids))
+            .values(user_uuid=target_user_uuid, access_key=target_access_key)
+        )
+        # Last, since the statements above select the endpoints by their owner.
+        await session.execute(
+            sa.update(EndpointRow)
+            .where(EndpointRow.id.in_(endpoint_ids))
+            .values(session_owner=target_user_uuid)
+        )
 
     async def delete_endpoints(
         self,
         user_uuid: UUID,
         delete_destroyed_only: bool = False,
     ) -> None:
-        """Delete user's endpoints."""
-        async with self._db.begin_session() as session:
-            await self._delete_endpoints(session, user_uuid, delete_destroyed_only)
+        """Delete user's endpoints; their tokens cascade with them."""
+        if delete_destroyed_only:
+            lifecycle_stages = frozenset({EndpointLifecycle.DESTROYED})
+        else:
+            lifecycle_stages = frozenset(EndpointLifecycle)
+        async with self._v2_ops.write_ops() as w:
+            # TODO: scope this purge. A user operation must not use in_global.
+            await w.batch_purge_entities_in_global(
+                UserEndpointPurger(
+                    user_id=UserID(user_uuid),
+                    lifecycle_stages=lifecycle_stages,
+                )
+            )
 
     async def get_kernel_rows_for_monthly_stats(
         self,
@@ -791,7 +658,7 @@ class UserDBSource:
                     kernels.c.id,
                     kernels.c.created_at,
                     kernels.c.terminated_at,
-                    kernels.c.occupied_slots,
+                    kernel_allocated_slots_expr(kernels.c.id).label("occupied_slots"),
                 )
                 .select_from(kernels)
                 .where(
@@ -813,23 +680,20 @@ class UserDBSource:
         """
         Delete user's all virtual folders as well as their physical data.
         """
-        target_vfs: list[VFolderDeletionInfo] = []
+        target_vfs: list[VFolderStorageTarget] = []
         async with self._db.begin_session() as db_session:
-            await db_session.execute(
-                vfolder_permissions.delete().where(vfolder_permissions.c.user == user_uuid),
-            )
             result = await db_session.scalars(
                 sa.select(VFolderRow).where(
                     sa.and_(
                         VFolderRow.user == user_uuid,
-                        VFolderRow.status.in_(vfolder_status_map[VFolderStatusSet.DELETABLE]),
+                        VFolderRow.status.in_(vfolder_status_map[VFolderStatusSet.OWNER_PURGABLE]),
                     )
                 ),
             )
             rows = result.fetchall()
             for vf in rows:
                 target_vfs.append(
-                    VFolderDeletionInfo(VFolderID.from_row(vf), vf.host, vf.unmanaged_path)
+                    VFolderStorageTarget(VFolderID.from_row(vf), vf.host, vf.unmanaged_path)
                 )
 
         storage_ptask_group = aiotools.PersistentTaskGroup()
@@ -851,19 +715,6 @@ class UserDBSource:
         Delete user's all keypairs with Valkey cleanup.
         """
         async with self._db.begin() as conn:
-            ak_rows = await conn.execute(
-                sa.select(keypairs.c.access_key).where(keypairs.c.user == user_uuid),
-            )
-            if (row := ak_rows.first()) and (access_key := row.access_key):
-                # Log concurrency used only when there is at least one keypair.
-                await valkey_stat_client.delete_keypair_concurrency(
-                    access_key=access_key,
-                    is_private=False,
-                )
-                await valkey_stat_client.delete_keypair_concurrency(
-                    access_key=access_key,
-                    is_private=True,
-                )
             result = await conn.execute(
                 sa.delete(keypairs).where(keypairs.c.user == user_uuid),
             )
@@ -882,15 +733,6 @@ class UserDBSource:
         """Check if the resource policy exists."""
         query = sa.select(UserResourcePolicyRow.name).where(
             UserResourcePolicyRow.name == policy_name
-        )
-        result = await session.scalar(query)
-        return result is not None
-
-    async def _check_user_exists_with_email_or_username(
-        self, session: SASession, *, email: str, username: str
-    ) -> bool:
-        query = sa.select(UserRow.uuid).where(
-            sa.or_(UserRow.email == email, UserRow.username == username)
         )
         result = await session.scalar(query)
         return result is not None
@@ -919,23 +761,12 @@ class UserDBSource:
             raise UserNotFound(f"User with UUID {user_uuid} not found.")
         return res
 
-    async def _get_user_by_email_with_session(self, session: SASession, email: str) -> UserRow:
-        """Private method to get user by email using a session.
-
-        Uses a Core-level select on the ``users`` table so that the returned
-        row exposes column attributes without requiring ORM mapping. Callers
-        treat the result as a read-only snapshot.
-        """
-        result = await session.execute(sa.select(users).where(users.c.email == email))
-        res = result.first()
-        if res is None:
-            raise UserNotFound(f"User with email {email} not found.")
-        return cast(UserRow, res)
-
     async def _get_user_by_uuid_with_session(self, session: SASession, user_uuid: UUID) -> UserRow:
         """Private method to get user by UUID using a session.
 
-        See ``_get_user_by_email_with_session`` for the Core-level rationale.
+        Uses a Core-level select on the ``users`` table so that the returned row exposes
+        column attributes without requiring ORM mapping. Callers treat the result as a
+        read-only snapshot.
         """
         result = await session.execute(sa.select(users).where(users.c.uuid == user_uuid))
         res = result.first()
@@ -943,48 +774,34 @@ class UserDBSource:
             raise UserNotFound(f"User with UUID {user_uuid} not found.")
         return cast(UserRow, res)
 
-    async def _get_project_scope_ids_for_user(
-        self, db_session: SASession, domain_name: str, project_ids: Iterable[UUID]
-    ) -> list[UUID]:
-        """Get project scope ids for user including model store project."""
-        # Check for model store project
-        rows = await db_session.scalars(
-            sa.select(GroupRow.id).where(
-                sa.or_(
-                    sa.and_(
-                        GroupRow.domain_name == domain_name,
-                        sa.or_(
-                            GroupRow.id.in_(project_ids),
-                            GroupRow.type == ProjectType.MODEL_STORE,
-                        ),
-                    ),
-                ),
-            )
-        )
-        gids_to_join = rows.all()
-        return list(gids_to_join)
-
-    async def _validate_and_update_main_access_key(
-        self, session: SASession, email: str, main_access_key: str
+    async def _switch_default_keypair(
+        self, session: SASession, user_id: UserID, access_key: str
     ) -> None:
-        """Private method to validate and update main access key."""
-        keypair_query = (
-            sa.select(KeyPairRow)
-            .where(KeyPairRow.access_key == main_access_key)
-            .options(
-                noload("*"),
-                joinedload(KeyPairRow.user_row).options(load_only(UserRow.email)),
-            )
-        )
-        keypair_row = (await session.scalars(keypair_query)).first()
-        if not keypair_row:
-            raise KeyPairNotFound("Cannot set non-existing access key as the main access key.")
-        if keypair_row.user_row.email != email:
-            raise KeyPairForbidden("Cannot set another user's access key as the main access key.")
+        """Move the default marker onto ``access_key``, which must still be an active
+        key of the user.
 
+        Clearing the previous marker needs its own statement: a partial unique index
+        allows a user only one marked keypair.
+        """
         await session.execute(
-            sa.update(users).where(users.c.email == email).values(main_access_key=main_access_key)
+            sa.update(KeyPairRow)
+            .where((KeyPairRow.user == user_id) & KeyPairRow.is_default)
+            .values(is_default=False)
         )
+        switched = await session.scalar(
+            sa.update(KeyPairRow)
+            .where(
+                (KeyPairRow.user == user_id)
+                & (KeyPairRow.access_key == access_key)
+                & KeyPairRow.is_active
+            )
+            .values(is_default=True)
+            .returning(KeyPairRow.access_key)
+        )
+        if switched is None:
+            # The target stopped being an active key of the user between the two
+            # statements; the same transaction carries the cleared marker back.
+            raise KeyPairForbidden("The access key is no longer an active key of this user.")
 
     async def _sync_keypair_roles(
         self, session: SASession, user_uuid: UUID, new_role: UserRole
@@ -1046,124 +863,34 @@ class UserDBSource:
                     kp_updates,
                 )
 
-    async def _update_user_groups(
+    async def _sync_user_project_memberships(
         self,
-        session: SASession,
         user_uuid: UUID,
         domain_name: str,
         group_ids: list[str],
     ) -> None:
         """Sync the user's project memberships to match ``group_ids``.
 
-        Produces the same business association + RBAC scope binding + member
-        role mapping as the modifyGroup path (BA-5745) so that membership
-        changes made through modify_user stay consistent with RBAC state.
-        Uses a diff-based approach: only projects entering or leaving the
-        target set are touched, preserving existing rows for unchanged
-        memberships.
-        """
-        # Expand target to include the domain's model-store project(s), matching
-        # the previous behavior of _get_project_scope_ids_for_user.
-        target_project_ids = set(
-            await self._get_project_scope_ids_for_user(
-                session, domain_name, [UUID(gid) for gid in group_ids]
+        Leaving a project takes that project's roles back with it, so this is one
+        transaction and not a membership write followed by a role sweep that a crash
+        could leave undone."""
+        async with self._user_ops_provider.write_ops() as w:
+            await w.replace_user_projects(
+                UserID(user_uuid), domain_name, [ProjectID(UUID(gid)) for gid in group_ids]
             )
-        )
 
-        current_entity_ids = (
-            await session.scalars(
-                sa.select(AssociationScopesEntitiesRow.scope_id).where(
-                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                    AssociationScopesEntitiesRow.entity_id == str(user_uuid),
-                )
-            )
-        ).all()
-        current_project_ids = {UUID(sid) for sid in current_entity_ids}
+    async def _restate_user_policy_shares(self, user_id: UserID) -> None:
+        """Lend the user the user and keypair policies they are now subject to — the
+        write above may have moved either one."""
+        async with self._policy_ops.write_ops() as w:
+            await w.restate_user_resource_policy_share(user_id)
+            await w.restate_keypair_resource_policy_share(user_id)
 
-        to_remove = current_project_ids - target_project_ids
-        to_add = target_project_ids - current_project_ids
-
-        for project_id in to_remove:
-            await self._remove_user_from_project_in_session(session, user_uuid, project_id)
-        for project_id in to_add:
-            await self._add_user_to_project_in_session(session, user_uuid, project_id)
-
-    async def assign_project_membership(
-        self,
-        user_uuid: UUID,
-        project_id: ProjectID,
-    ) -> None:
-        """Add a user to a project, mapping the user to the project's member role."""
-        async with self._db.begin_session_read_committed() as session:
-            await self._add_user_to_project_in_session(session, user_uuid, project_id)
-
-    async def _add_user_to_project_in_session(
-        self,
-        session: SASession,
-        user_uuid: UUID,
-        project_id: UUID,
-    ) -> None:
-        """Add a user to a project within an existing session.
-
-        Mirrors GroupDBSource._add_users_to_project_in_session for the
-        single-user case: inserts the RBAC scope binding (ASE) via
-        ``RBACScopeBinder`` and maps the user to every active ``auto_assign``
-        role bound to the project scope.
-        """
-        project_scope_ref = RBACElementRef(RBACElementType.PROJECT, str(project_id))
-        pair = RBACScopeBindingPair(
-            spec=ProjectUserMembershipCreatorSpec(user_id=user_uuid, project_id=project_id),
-            entity_ref=RBACElementRef(RBACElementType.USER, str(user_uuid)),
-            scope_ref=project_scope_ref,
-        )
-        await execute_rbac_scope_binder(session, RBACScopeBinder(pairs=[pair]))
-
-        await self._role_manager.assign_auto_assign_roles(
-            session,
-            [user_uuid],
-            ScopeId(scope_type=ScopeType.PROJECT, scope_id=str(project_id)),
-        )
-
-    async def _remove_user_from_project_in_session(
-        self,
-        session: SASession,
-        user_uuid: UUID,
-        project_id: UUID,
-    ) -> None:
-        """Remove a user from a project within an existing session.
-
-        Mirrors GroupDBSource._remove_users_from_project_in_session for the
-        single-user case: deletes the RBAC scope binding (ASE) via the
-        unbinder API and unmaps the user from any project-scoped roles.
-        """
-        unbinder = UserProjectEntityUnbinder(
-            user_uuids=[user_uuid],
-            project_id=project_id,
-        )
-        await execute_rbac_scope_entity_unbinder(session, unbinder)
-
-        project_role_ids_subq = sa.select(
-            AssociationScopesEntitiesRow.entity_id,
-        ).where(
-            AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-            AssociationScopesEntitiesRow.scope_id == str(project_id),
-            AssociationScopesEntitiesRow.entity_type == EntityType.ROLE,
-        )
-        await session.execute(
-            sa.delete(UserRoleRow).where(
-                UserRoleRow.user_id == user_uuid,
-                sa.cast(UserRoleRow.role_id, sa.String).in_(project_role_ids_subq),
-            )
-        )
-
-    async def _get_user_uuid_by_email(self, session: SASession, email: str) -> UUID:
-        """Get user UUID by email."""
-        result = await session.execute(sa.select(UserRow.uuid).where(UserRow.email == email))
-        row = result.first()
-        if not row:
-            raise UserNotFound()
-        return cast(UUID, row.uuid)
+    async def _restate_keypair_policy_share(self, user_id: UserID) -> None:
+        """Lend the user the keypair policy the key they now authorize with is subject
+        to."""
+        async with self._policy_ops.write_ops() as w:
+            await w.restate_keypair_resource_policy_share(user_id)
 
     async def _get_user_uuid_by_email_with_conn(self, conn: AsyncConnection, email: str) -> UUID:
         """Get user UUID by email using an existing connection."""
@@ -1201,6 +928,51 @@ class UserDBSource:
                     pass
         return False
 
+    async def _revoke_shared_vfolders(
+        self, user_uuid: UUID, vfolder_ids: Sequence[UUID] | None = None
+    ) -> None:
+        """Take back what a user was lent: the shares settled from invitations and the
+        share caps. Their mount policy rows stay.
+
+        Without ``vfolder_ids`` every folder they hold goes. What a person is lent lands
+        in the project that is theirs alone (BEP-1077 5.5), which is the scope the caps
+        come off.
+        """
+        user_id = UserID(user_uuid)
+        if vfolder_ids is not None and not vfolder_ids:
+            return
+        held = sa.select(EntityShareRow.id, EntityShareRow.target_entity_id).where(
+            EntityShareRow.target_entity_type == VFolderEntityType(),
+            EntityShareRow.status == EntityShareStatus.ACCEPTED,
+            EntityShareRow.recipient_entity_type == UserEntityType(),
+            EntityShareRow.recipient_entity_id == user_id,
+        )
+        if vfolder_ids is not None:
+            held = held.where(EntityShareRow.target_entity_id.in_(vfolder_ids))
+        async with self._db.begin_readonly_session() as session:
+            shares = [
+                (EntityShareID(row.id), VFolderUUID(row.target_entity_id))
+                for row in (await session.execute(held)).all()
+            ]
+        async with self._share_ops.write_ops() as w:
+            taken: list[VFolderUUID] = (
+                [VFolderUUID(vfolder_id) for vfolder_id in vfolder_ids]
+                if vfolder_ids is not None
+                else []
+            )
+            for share_id, target in shares:
+                await w.revoke_share(EntityShareRevokeUpdater(share_id=share_id))
+                if target not in taken:
+                    taken.append(target)
+            if not taken:
+                return
+            personal_project = await w.lookup_entity_id(
+                PersonalProjectOfUserLookup(user_id=user_id)
+            )
+            if personal_project is None:
+                raise PersonalProjectNotFound(f"User '{user_uuid}' has no personal project.")
+            await w.unshare(personal_project, taken)
+
     async def _migrate_shared_vfolders(
         self,
         conn: AsyncConnection,
@@ -1224,14 +996,15 @@ class UserDBSource:
         # Migrate shared virtual folders.
         # If virtual folder's name collides with target user's folder,
         # append random string to the name of the migrating folder.
-        j = vfolder_permissions.join(
-            vfolders,
-            vfolder_permissions.c.vfolder == vfolders.c.id,
+        lent = sa.select(sa.literal(1)).where(
+            EntityShareRow.target_entity_type == VFolderEntityType(),
+            EntityShareRow.target_entity_id == vfolders.c.id,
+            EntityShareRow.status == EntityShareStatus.ACCEPTED,
         )
         query = (
             sa.select(vfolders.c.id, vfolders.c.name)
-            .select_from(j)
-            .where(vfolders.c.user == deleted_user_uuid)
+            .select_from(vfolders)
+            .where(vfolders.c.user == deleted_user_uuid, lent.exists())
         )
         migrate_updates = []
         async for row in await conn.stream(query):
@@ -1241,20 +1014,19 @@ class UserDBSource:
             migrate_updates.append({"vid": row.id, "vname": name})
 
         if migrate_updates:
-            # Remove invitations and vfolder_permissions from target user.
             # Target user will be the new owner, and it does not make sense to have
             # invitation and shared permission for its own folder.
             migrate_vfolder_ids = [item["vid"] for item in migrate_updates]
-            delete_query = sa.delete(vfolder_invitations).where(
-                (vfolder_invitations.c.invitee == target_user_email)
-                & (vfolder_invitations.c.vfolder.in_(migrate_vfolder_ids))
-            )
-            await conn.execute(delete_query)
-            delete_query = sa.delete(vfolder_permissions).where(
-                (vfolder_permissions.c.user == target_user_uuid)
-                & (vfolder_permissions.c.vfolder.in_(migrate_vfolder_ids))
-            )
-            await conn.execute(delete_query)
+            async with self._v2_ops.write_ops() as w:
+                # TODO: scope this purge. A user operation must not use in_global.
+                await w.batch_purge_entities_in_global(
+                    EntitySharePendingOfferBatchPurger(
+                        entity_type=VFolderEntityType(),
+                        entity_ids=migrate_vfolder_ids,
+                        recipient_email=target_user_email,
+                    )
+                )
+            await self._revoke_shared_vfolders(target_user_uuid, migrate_vfolder_ids)
 
             rowcount = 0
             for item in migrate_updates:
@@ -1271,245 +1043,48 @@ class UserDBSource:
             return rowcount
         return 0
 
-    async def _delete_endpoints(
-        self,
-        session: SASession,
-        user_uuid: UUID,
-        delete_destroyed_only: bool = False,
-    ) -> None:
-        """Private method to delete user's endpoints."""
-        if delete_destroyed_only:
-            status_filter = {EndpointLifecycle.DESTROYED}
-        else:
-            status_filter = {status for status in EndpointLifecycle}
-
-        endpoint_rows = await EndpointRow.list_endpoint(
-            session, user_uuid=user_uuid, load_tokens=True, status_filter=status_filter
-        )
-
-        token_ids_to_delete = []
-        endpoint_ids_to_delete = []
-        for row in endpoint_rows:
-            token_ids_to_delete.extend([token.id for token in row.tokens])
-            endpoint_ids_to_delete.append(row.id)
-
-        if token_ids_to_delete:
-            await session.execute(
-                sa.delete(EndpointTokenRow).where(EndpointTokenRow.id.in_(token_ids_to_delete))
-            )
-
-        if endpoint_ids_to_delete:
-            await session.execute(
-                sa.delete(EndpointRow).where(EndpointRow.id.in_(endpoint_ids_to_delete))
-            )
-
     # ==================== Search Methods ====================
 
     async def search_users(
         self,
-        querier: BatchQuerier,
+        searcher: UserSearcher,
     ) -> UserSearchResult:
-        """Search all users with pagination and filters (admin only).
+        """Search all users with pagination and filters (admin only)."""
+        async with self._v2_ops.read_ops() as r:
+            result = await r.search_in_global(searcher)
+        return UserSearchResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
-        Args:
-            querier: BatchQuerier containing conditions, orders, and pagination.
-
-        Returns:
-            UserSearchResult with matching users and pagination info.
-        """
-        async with self._db.begin_readonly_session() as db_session:
-            query = sa.select(UserRow)
-            result = await execute_batch_querier(db_session, query, querier)
-
-            items = [row.UserRow.to_data() for row in result.rows]
-            return UserSearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
-    async def search_users_by_domain(
-        self,
-        scope: DomainUserSearchScope,
-        querier: BatchQuerier,
-    ) -> UserSearchResult:
-        """Search users within a domain.
-
-        Args:
-            scope: DomainUserSearchScope defining the domain to search within.
-            querier: BatchQuerier containing conditions, orders, and pagination.
-
-        Returns:
-            UserSearchResult with matching users and pagination info.
-        """
-        async with self._db.begin_readonly_session() as db_session:
-            query = sa.select(UserRow)
-            result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
-
-            items = [row.UserRow.to_data() for row in result.rows]
-            return UserSearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
-    async def search_users_by_project(
-        self,
-        scope: ProjectUserSearchScope,
-        querier: BatchQuerier,
-    ) -> UserSearchResult:
-        """Search users within a project.
-
-        Joins with association_scopes_entities (PROJECT scope, USER entity)
-        to find project members.
-
-        Args:
-            scope: ProjectUserSearchScope defining the project to search within.
-            querier: BatchQuerier containing conditions, orders, and pagination.
-
-        Returns:
-            UserSearchResult with matching users and pagination info.
-        """
-        async with self._db.begin_readonly_session() as db_session:
-            query = (
-                sa.select(UserRow)
-                .select_from(UserRow)
-                .join(
-                    AssociationScopesEntitiesRow,
-                    sa.and_(
-                        sa.cast(UserRow.uuid, sa.String) == AssociationScopesEntitiesRow.entity_id,
-                        AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                        AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                    ),
-                )
-            )
-            result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
-
-            items = [row.UserRow.to_data() for row in result.rows]
-            return UserSearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
-    async def search_users_by_role(
-        self,
-        scope: RoleUserSearchScope,
-        querier: BatchQuerier,
-    ) -> UserSearchResult:
-        """Search users assigned to a role.
-
-        Joins with user_roles to find users assigned to the role.
-        """
-        async with self._db.begin_readonly_session() as db_session:
-            query = (
-                sa.select(UserRow)
-                .select_from(UserRow)
-                .join(
-                    UserRoleRow,
-                    UserRow.uuid == UserRoleRow.user_id,
-                )
-            )
-            result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
-
-            items = [row.UserRow.to_data() for row in result.rows]
-            return UserSearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
-    async def issue_my_keypair(self, user_uuid: UUID) -> GeneratedKeyPairData:
-        """Issue a new keypair for the current user, inheriting settings from main keypair."""
-        async with self._db.begin_session() as session:
-            user_row = (
-                await session.scalars(
-                    sa.select(UserRow)
-                    .where(UserRow.uuid == user_uuid)
-                    .options(load_only(UserRow.main_access_key, UserRow.email))
-                )
-            ).first()
-            if not user_row:
-                raise UserNotFound(f"User {user_uuid} not found")
-
-            main_kp_row: KeyPairRow | None = None
-            if user_row.main_access_key:
-                main_kp_row = (
-                    await session.scalars(
-                        sa.select(KeyPairRow)
-                        .where(KeyPairRow.access_key == user_row.main_access_key)
-                        .options(noload("*"))
-                    )
-                ).first()
-
-            if main_kp_row:
-                keypair_creator = KeyPairCreator(
-                    is_active=True,
-                    is_admin=main_kp_row.is_admin or False,
-                    resource_policy=main_kp_row.resource_policy,
-                    rate_limit=main_kp_row.rate_limit or DEFAULT_KEYPAIR_RATE_LIMIT,
-                )
-            else:
-                keypair_creator = KeyPairCreator(
-                    is_active=True,
-                    is_admin=False,
-                    resource_policy=DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME,
-                    rate_limit=DEFAULT_KEYPAIR_RATE_LIMIT,
-                )
-
-            secrets = generate_keypair_data()
-            kp_spec = KeyPairCreatorSpec(
-                creator=keypair_creator,
-                generated_data=secrets,
-                user_id=user_uuid,
-                email=user_row.email,
-            )
-            rbac_kp_creator = RBACEntityCreator(
-                spec=kp_spec,
-                element_type=RBACElementType.KEYPAIR,
-                scope_ref=RBACElementRef(
-                    element_type=RBACElementType.USER,
-                    element_id=str(user_uuid),
-                ),
-            )
-            result = await execute_rbac_entity_creator(session, rbac_kp_creator)
-            return GeneratedKeyPairData(keypair=result.row.to_data())
-
-    async def revoke_my_keypair(self, user_uuid: UUID, access_key: str) -> None:
-        """Revoke a keypair owned by the current user."""
-        async with self._db.begin_session() as session:
-            kp_row = (
+    async def keypair_settings_to_inherit(self, user_uuid: UUID) -> KeyPairCreator:
+        """The settings a newly issued keypair takes from the user's default keypair,
+        falling back to the marked resource policy when they have none."""
+        async with self._db.begin_readonly_session() as session:
+            default_kp_row = (
                 await session.scalars(
                     sa.select(KeyPairRow)
-                    .where(KeyPairRow.access_key == access_key)
+                    .where((KeyPairRow.user == user_uuid) & KeyPairRow.is_default)
                     .options(noload("*"))
                 )
             ).first()
-            if not kp_row:
-                raise KeyPairNotFound(f"Keypair {access_key} not found")
-            if kp_row.user != user_uuid:
-                raise KeyPairForbidden("Cannot revoke another user's keypair")
-
-            user_row = (
-                await session.scalars(
-                    sa.select(UserRow)
-                    .where(UserRow.uuid == user_uuid)
-                    .options(load_only(UserRow.main_access_key))
+            if default_kp_row is None:
+                return KeyPairCreator(
+                    is_active=True,
+                    is_admin=False,
+                    resource_policy=await self._default_keypair_resource_policy(session),
                 )
-            ).first()
-            if user_row and user_row.main_access_key == access_key:
-                raise KeyPairForbidden(
-                    "Cannot revoke the main access key. Switch main access key first."
-                )
+            return KeyPairCreator(
+                is_active=True,
+                is_admin=default_kp_row.is_admin,
+                resource_policy=default_kp_row.resource_policy,
+                rate_limit=default_kp_row.rate_limit,
+            )
 
-            await session.execute(sa.delete(keypairs).where(keypairs.c.access_key == access_key))
-
-    async def switch_my_main_access_key(self, user_uuid: UUID, access_key: str) -> None:
-        """Switch the main access key for the current user."""
+    async def switch_default_access_key(self, user_id: UserID, access_key: AccessKey) -> None:
+        """Move the ``is_default`` marker among the user's keypairs onto ``access_key``."""
         async with self._db.begin_session() as session:
             kp_row = (
                 await session.scalars(
@@ -1520,179 +1095,36 @@ class UserDBSource:
                             KeyPairRow.access_key,
                             KeyPairRow.user,
                             KeyPairRow.is_active,
+                            KeyPairRow.is_default,
                         ),
                     )
                 )
             ).first()
             if not kp_row:
-                raise KeyPairNotFound("Cannot set non-existing access key as the main access key.")
-            if kp_row.user != user_uuid:
+                raise KeyPairNotFound(
+                    "Cannot set a non-existing access key as the default access key."
+                )
+            if kp_row.user != user_id:
                 raise KeyPairForbidden(
-                    "Cannot set another user's access key as the main access key."
+                    "Cannot set another user's access key as the default access key."
                 )
             if not kp_row.is_active:
-                raise KeyPairForbidden("Cannot set an inactive keypair as the main access key.")
+                raise KeyPairForbidden("Cannot set an inactive keypair as the default access key.")
 
-            await session.execute(
-                sa.update(users).where(users.c.uuid == user_uuid).values(main_access_key=access_key)
-            )
+            await self._switch_default_keypair(session, user_id, access_key)
+        await self._restate_keypair_policy_share(user_id)
 
-    async def update_my_keypair(self, user_uuid: UUID, updater: Updater[KeyPairRow]) -> KeyPairData:
-        """Update a keypair owned by the current user."""
-        access_key = str(updater.pk_value)
-        async with self._db.begin_session() as session:
-            # Use a scalar-only query to avoid loading the full ORM object into the
-            # session identity map. Loading the full row here would cause execute_updater's
-            # UPDATE...RETURNING to return the stale cached object instead of the fresh
-            # post-update values.
-            user_of_keypair = await session.scalar(
-                sa.select(KeyPairRow.user).where(KeyPairRow.access_key == access_key)
-            )
-            if user_of_keypair is None:
-                raise KeyPairNotFound(f"Keypair {access_key} not found")
-            if user_of_keypair != user_uuid:
-                raise KeyPairForbidden("Cannot update another user's keypair")
-
-            update_result = await execute_updater(session, updater)
-            if update_result is None:
-                raise KeyPairNotFound(f"Keypair {access_key} not found after update")
-            return update_result.row.to_data()
-
-    async def search_my_keypairs(
-        self,
-        scope: UserKeypairSearchScope,
-        querier: BatchQuerier,
-    ) -> SearchResult[KeyPairData]:
-        """Search keypairs owned by the scoped user.
-
-        Args:
-            scope: Search scope containing the user UUID whose keypairs to retrieve.
-            querier: BatchQuerier containing conditions, orders, and pagination.
-
-        Returns:
-            SearchResult with matching keypairs and pagination info.
-        """
+    async def keypair(self, keypair_id: KeyPairID) -> KeyPairData:
+        """Read one keypair by its id."""
         async with self._db.begin_readonly_session() as db_session:
-            query = sa.select(KeyPairRow)
-            result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
-            items = [row.KeyPairRow.to_data() for row in result.rows]
-            return SearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
-    async def search_keypairs_by_resource_policy(
-        self,
-        scope: KeypairResourcePolicyKeypairSearchScope,
-        querier: BatchQuerier,
-    ) -> SearchResult[KeyPairData]:
-        """Search keypairs assigned to a keypair resource policy.
-
-        Args:
-            scope: Search scope containing the resource policy name to filter by.
-            querier: BatchQuerier containing conditions, orders, and pagination.
-
-        Returns:
-            SearchResult with matching keypairs and pagination info.
-        """
-        async with self._db.begin_readonly_session() as db_session:
-            query = sa.select(KeyPairRow)
-            result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
-            items = [row.KeyPairRow.to_data() for row in result.rows]
-            return SearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
-    # ------------------------------------------------------------------ admin keypair operations
-
-    async def admin_create_keypair(
-        self, user_id: UUID, creator: KeyPairCreator
-    ) -> GeneratedKeyPairData:
-        """Admin creates a keypair for a given user."""
-        async with self._db.begin_session() as session:
-            user_row = (
-                await session.scalars(
-                    sa.select(UserRow)
-                    .where(UserRow.uuid == user_id)
-                    .options(load_only(UserRow.email))
-                )
-            ).first()
-            if not user_row:
-                raise UserNotFound(f"User {user_id} not found")
-
-            secrets = generate_keypair_data()
-            kp_spec = KeyPairCreatorSpec(
-                creator=creator,
-                generated_data=secrets,
-                user_id=user_id,
-                email=user_row.email,
-            )
-            rbac_kp_creator = RBACEntityCreator(
-                spec=kp_spec,
-                element_type=RBACElementType.KEYPAIR,
-                scope_ref=RBACElementRef(
-                    element_type=RBACElementType.USER,
-                    element_id=str(user_id),
-                ),
-            )
-            result = await execute_rbac_entity_creator(session, rbac_kp_creator)
-            return GeneratedKeyPairData(keypair=result.row.to_data())
-
-    async def admin_update_keypair(self, updater: Updater[KeyPairRow]) -> KeyPairData:
-        """Admin updates any keypair by access key."""
-        access_key = str(updater.pk_value)
-        async with self._db.begin_session() as session:
-            update_result = await execute_updater(session, updater)
-            if update_result is None:
-                raise KeyPairNotFound(f"Keypair {access_key} not found")
-            return update_result.row.to_data()
-
-    async def admin_delete_keypair(self, access_key: str) -> None:
-        """Admin deletes any keypair by access key."""
-        async with self._db.begin_session() as session:
             kp_row = (
-                await session.scalars(
-                    sa.select(KeyPairRow)
-                    .where(KeyPairRow.access_key == access_key)
-                    .options(load_only(KeyPairRow.access_key, KeyPairRow.user))
+                await db_session.scalars(
+                    sa.select(KeyPairRow).where(KeyPairRow.id == keypair_id).options(noload("*"))
                 )
             ).first()
             if not kp_row:
-                raise KeyPairNotFound(f"Keypair {access_key} not found")
-
-            # Prevent deleting a keypair that is set as main access key
-            user_row = (
-                await session.scalars(
-                    sa.select(UserRow)
-                    .where(UserRow.uuid == kp_row.user)
-                    .options(load_only(UserRow.main_access_key))
-                )
-            ).first()
-            if user_row and user_row.main_access_key == access_key:
-                raise KeyPairForbidden("Cannot delete a keypair set as the user's main access key.")
-
-            await session.execute(sa.delete(keypairs).where(keypairs.c.access_key == access_key))
-
-    async def admin_search_keypairs(
-        self,
-        querier: BatchQuerier,
-    ) -> SearchResult[KeyPairData]:
-        """Admin search all keypairs without scope restriction."""
-        async with self._db.begin_readonly_session() as db_session:
-            query = sa.select(KeyPairRow)
-            result = await execute_batch_querier(db_session, query, querier)
-            items = [row.KeyPairRow.to_data() for row in result.rows]
-            return SearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
+                raise KeyPairNotFound(f"Keypair {keypair_id} not found")
+            return KeyPairSearchableFields.own.to_data(kp_row)
 
     async def admin_get_keypair(self, access_key: str) -> KeyPairData:
         """Admin retrieves a single keypair by access key."""
@@ -1706,7 +1138,7 @@ class UserDBSource:
             ).first()
             if not kp_row:
                 raise KeyPairNotFound(f"Keypair {access_key} not found")
-            return kp_row.to_data()
+            return KeyPairSearchableFields.own.to_data(kp_row)
 
     async def admin_update_ssh_keypair(
         self,

@@ -1,0 +1,395 @@
+"""Write primitives every v2 write concern shares.
+
+Row insert/delete/upsert with spec-declared check execution, and integrity-error
+parsing and matching. No public operation and no graph relation lives here — the
+per-concern write ops inherit these on top of :class:`~.base.V2OpsBase`; the graph
+is :class:`~.graph_write.V2GraphWriteOpsBase`, and the relations over existing
+entities are the share and relation write ops.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Callable, Collection, Mapping, Sequence
+from typing import Any, ClassVar, NoReturn, cast
+
+import sqlalchemy as sa
+from asyncpg.exceptions import PostgresError
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.orm import InstrumentedAttribute
+
+from ai.backend.manager.errors.repository import (
+    CheckConstraintViolationError,
+    ExclusionViolationError,
+    ForeignKeyViolationError,
+    NotNullViolationError,
+    RepositoryIntegrityError,
+    UniqueConstraintViolationError,
+    UpsertEmptyResultError,
+)
+from ai.backend.manager.models.base import Base
+from ai.backend.manager.models.specs.types import (
+    ConflictCheck,
+    GuardCheck,
+    IntegrityErrorCheck,
+    PreconditionCheck,
+)
+from ai.backend.manager.repositories.ops.v2.base import V2OpsBase
+
+
+class V2WriteOpsBase(V2OpsBase):
+    """The shared write primitives, bound to a single session."""
+
+    _SQLSTATE_TO_ERROR: ClassVar[Mapping[str, type[RepositoryIntegrityError]]] = {
+        "23505": UniqueConstraintViolationError,
+        "23503": ForeignKeyViolationError,
+        "23514": CheckConstraintViolationError,
+        "23502": NotNullViolationError,
+        "23P01": ExclusionViolationError,
+    }
+
+    _MESSAGE_KEYWORDS: ClassVar[Sequence[tuple[str, type[RepositoryIntegrityError]]]] = (
+        ("unique constraint", UniqueConstraintViolationError),
+        ("unique violation", UniqueConstraintViolationError),
+        ("foreign key", ForeignKeyViolationError),
+        ("not-null constraint", NotNullViolationError),
+        ("null value in column", NotNullViolationError),
+        ("check constraint", CheckConstraintViolationError),
+        ("exclusion constraint", ExclusionViolationError),
+    )
+
+    async def _validate_precondition_checks(self, checks: Sequence[PreconditionCheck]) -> None:
+        """Refuse the write where the spec named a row that must not be there. What the
+        database cannot state for itself is stated here, each with its own error."""
+        for check in checks:
+            if (await self._sess.execute(check.finder)).first() is not None:
+                raise check.error
+
+    async def _validate_conflict_checks(self, checks: Sequence[ConflictCheck]) -> None:
+        """Validate the spec-declared conflict checks in a single query, raising the
+        first failing check's error. The declarations live in ``models/specs``; this
+        provider is their only executor on the v2 path."""
+        if not checks:
+            return
+        select_clauses = [
+            sa.exists().where(check.condition()).label(f"conflict_{i}")
+            for i, check in enumerate(checks)
+        ]
+        result = await self._sess.execute(sa.select(*select_clauses))
+        row = result.mappings().one()
+        for i, check in enumerate(checks):
+            if row[f"conflict_{i}"]:
+                raise check.error
+
+    def _parse_integrity_error(self, e: sa.exc.IntegrityError) -> RepositoryIntegrityError:
+        """Parse a SQLAlchemy IntegrityError into a structured RepositoryIntegrityError.
+
+        Classification: the SQLSTATE code from asyncpg first, keyword matching on the
+        message as fallback. Diagnostic attributes (constraint_name, table_name,
+        column_name, detail) come from asyncpg's ``PostgresError`` when available.
+        """
+        orig = e.orig
+        pgcode: str | None = None
+        constraint_name: str | None = None
+        table_name: str | None = None
+        column_name: str | None = None
+        detail: str | None = None
+
+        # SA asyncpg dialect wraps the asyncpg PostgresError in a dbapi-level
+        # IntegrityError. The original asyncpg error is chained as __cause__.
+        pg_error: PostgresError | None = None
+        if isinstance(orig, PostgresError):
+            pg_error = orig
+        elif orig is not None and isinstance(orig.__cause__, PostgresError):
+            pg_error = orig.__cause__
+
+        if pg_error is not None:
+            pgcode = pg_error.sqlstate
+            constraint_name = pg_error.constraint_name
+            table_name = pg_error.table_name
+            column_name = pg_error.column_name
+            detail = pg_error.detail
+
+        error_msg = str(e.orig) if e.orig is not None else str(e)
+        kwargs = {
+            "constraint_name": constraint_name,
+            "table_name": table_name,
+            "column_name": column_name,
+            "detail": detail,
+            "pgcode": pgcode,
+        }
+
+        if pgcode is not None:
+            error_cls = self._SQLSTATE_TO_ERROR.get(pgcode)
+            if error_cls is not None:
+                return error_cls(extra_msg=error_msg, **kwargs)
+
+        msg_lower = error_msg.lower()
+        for keyword, keyword_error_cls in self._MESSAGE_KEYWORDS:
+            if keyword in msg_lower:
+                return keyword_error_cls(extra_msg=error_msg, **kwargs)
+
+        return RepositoryIntegrityError(extra_msg=error_msg, **kwargs)
+
+    def _match_integrity_error(
+        self,
+        parsed: RepositoryIntegrityError,
+        checks: Sequence[IntegrityErrorCheck],
+    ) -> NoReturn:
+        """Match a parsed integrity error against the spec-declared checks and raise
+        the first matching domain error; without a match, the parsed error itself."""
+        for check in checks:
+            if not isinstance(parsed, check.violation_type):
+                continue
+            if (
+                check.constraint_name is not None
+                and parsed.constraint_name != check.constraint_name
+            ):
+                continue
+            raise check.error from parsed
+        raise parsed
+
+    async def _insert_row(self, row: Base, checks: Sequence[IntegrityErrorCheck]) -> None:
+        await self._insert_rows((row,), checks)
+
+    async def _insert_rows(
+        self, rows: Sequence[Base], checks: Sequence[IntegrityErrorCheck]
+    ) -> None:
+        """Flush rows in one batch, then read back whatever the database computed.
+
+        Each row is refreshed on its own: the values differ per row, and ``refresh``
+        is what keeps composite keys and the identity map right. Rows that left
+        nothing to SQL — every ordinary insert — are skipped, so this costs nothing
+        until a spec asks for it.
+        """
+        computed = [self._sql_valued_columns(row) for row in rows]
+        self._sess.add_all(rows)
+        try:
+            await self._sess.flush()
+        except sa.exc.IntegrityError as e:
+            self._match_integrity_error(self._parse_integrity_error(e), checks)
+        for row, names in zip(rows, computed, strict=True):
+            if names:
+                await self._sess.refresh(row, names)
+
+    def _sql_valued_columns(self, row: Base) -> list[str]:
+        """The columns the spec left to SQL, read before the insert.
+
+        A value given as an expression is computed by the database, so reading it back
+        needs a SELECT — and after the flush the attribute is expired, which in an
+        async session raises rather than loading.
+        """
+        return [
+            attr.key
+            for attr in sa.inspect(type(row)).column_attrs
+            if isinstance(getattr(row, attr.key, None), sa.sql.ColumnElement)
+        ]
+
+    async def _update_row_returning[TRow: Base](
+        self,
+        row_class: type[TRow],
+        id_column: InstrumentedAttribute[Any],
+        id_value: Any,
+        guards: Sequence[GuardCheck],
+        values: dict[str, Any],
+        checks: Sequence[IntegrityErrorCheck],
+    ) -> TRow | None:
+        """Update the row the id names while its guards hold and return it; ``None``
+        if the row is gone, the first failing guard's error if it refused.
+
+        The guards ride on the statement, so no separate read and no row lock stand
+        between the check and the write. With nothing to set, reads the current row
+        instead, so callers can tell "nothing to change" apart from "row not found".
+        """
+        table = row_class.__table__
+        if not values:
+            existing = await self._sess.execute(sa.select(row_class).where(id_column == id_value))
+            return existing.scalar_one_or_none()
+        stmt = sa.update(table).values(values).where(id_column == id_value)
+        for guard in guards:
+            stmt = stmt.where(guard.condition())
+        # from_statement lets SQLAlchemy map the RETURNING columns onto the ORM class.
+        select_stmt = sa.select(row_class).from_statement(stmt.returning(*table.columns))
+        try:
+            result = await self._sess.execute(select_stmt)
+        except sa.exc.IntegrityError as e:
+            self._match_integrity_error(self._parse_integrity_error(e), checks)
+        row = result.scalar_one_or_none()
+        if row is None:
+            await self._raise_failing_guard(row_class, id_column, id_value, guards)
+        return row
+
+    async def _raise_failing_guard(
+        self,
+        row_class: type[Base],
+        id_column: InstrumentedAttribute[Any],
+        id_value: Any,
+        guards: Sequence[GuardCheck],
+    ) -> None:
+        """Tell a missing row from a refusing one after a write touched nothing.
+
+        One read of the named row, evaluating every guard beside it. Returns when the
+        row is gone; raises the first failing guard's error otherwise. A row every guard
+        now passes changed under the write, so the first guard answers for it.
+        """
+        if not guards:
+            return
+        stmt = (
+            sa.select(*[guard.condition().label(f"guard_{i}") for i, guard in enumerate(guards)])
+            .select_from(row_class.__table__)
+            .where(id_column == id_value)
+        )
+        row = (await self._sess.execute(stmt)).mappings().first()
+        if row is None:
+            return
+        for i, guard in enumerate(guards):
+            if not row[f"guard_{i}"]:
+                raise guard.error
+        raise guards[0].error
+
+    async def _delete_row_returning[TRow: Base](
+        self,
+        row_class: type[TRow],
+        id_column: InstrumentedAttribute[Any],
+        id_value: Any,
+        guards: Sequence[GuardCheck],
+    ) -> TRow | None:
+        """Delete the row the id names while its guards hold and return it; ``None``
+        if the row is gone, the first failing guard's error if it refused."""
+        table = row_class.__table__
+        stmt = sa.delete(table).where(id_column == id_value)
+        for guard in guards:
+            stmt = stmt.where(guard.condition())
+        # from_statement lets SQLAlchemy map the RETURNING columns onto the ORM class.
+        # Calling the row class instead would go through its __init__, which many rows
+        # narrow to the caller-supplied columns — a server-generated one then arrives as
+        # an unexpected keyword and the purge fails on rows it can read back perfectly.
+        select_stmt = sa.select(row_class).from_statement(stmt.returning(*table.columns))
+        try:
+            result = await self._sess.execute(select_stmt)
+        except sa.exc.IntegrityError as e:
+            raise self._parse_integrity_error(e) from e
+        row = result.scalar_one_or_none()
+        if row is None:
+            await self._raise_failing_guard(row_class, id_column, id_value, guards)
+        return row
+
+    async def _upsert_row_returning[TRow: Base](
+        self,
+        row_class: type[TRow],
+        index_elements: list[str],
+        insert_values: dict[str, Any],
+        update_values: dict[str, Any],
+        checks: Sequence[IntegrityErrorCheck],
+    ) -> TRow:
+        """Insert the row, or update it with ``update_values`` where a row holds its
+        ``index_elements``. With no update values the row there is left as it stands."""
+        if not update_values:
+            inserted = await self._insert_row_if_absent(
+                row_class, index_elements, insert_values, checks
+            )
+            if inserted is not None:
+                return inserted
+            return await self._row_holding_key(row_class, index_elements, insert_values)
+        stmt = (
+            pg_insert(row_class.__table__)
+            .values(insert_values)
+            .on_conflict_do_update(index_elements=index_elements, set_=update_values)
+            .returning(*row_class.__table__.columns)
+        )
+        row = await self._returned_row(row_class, stmt, checks)
+        if row is None:
+            raise UpsertEmptyResultError
+        return row
+
+    async def _insert_row_if_absent[TRow: Base](
+        self,
+        row_class: type[TRow],
+        index_elements: list[str],
+        insert_values: dict[str, Any],
+        checks: Sequence[IntegrityErrorCheck],
+    ) -> TRow | None:
+        """Insert the row unless a row holds its ``index_elements``, answering the row
+        inserted, or ``None`` where it was left out."""
+        stmt = (
+            pg_insert(row_class.__table__)
+            .values(insert_values)
+            .on_conflict_do_nothing(index_elements=index_elements)
+            .returning(*row_class.__table__.columns)
+        )
+        return await self._returned_row(row_class, stmt, checks)
+
+    async def _row_holding_key[TRow: Base](
+        self, row_class: type[TRow], index_elements: list[str], insert_values: dict[str, Any]
+    ) -> TRow:
+        """The row holding the ``index_elements`` values an insert named."""
+        table = row_class.__table__
+        stmt = (
+            sa.select(row_class)
+            .where(*(table.c[column] == insert_values[column] for column in index_elements))
+            .execution_options(populate_existing=True)
+        )
+        return (await self._sess.scalars(stmt)).one()
+
+    async def _returned_row[TRow: Base](
+        self, row_class: type[TRow], stmt: Any, checks: Sequence[IntegrityErrorCheck]
+    ) -> TRow | None:
+        # from_statement maps the RETURNING columns onto the ORM class, as the purge does.
+        select_stmt = (
+            sa.select(row_class).from_statement(stmt).execution_options(populate_existing=True)
+        )
+        try:
+            row: TRow | None = (await self._sess.execute(select_stmt)).scalar_one_or_none()
+        except sa.exc.IntegrityError as e:
+            self._match_integrity_error(self._parse_integrity_error(e), checks)
+        return row
+
+    async def _bulk_insert_ignore_conflicts(self, rows: Collection[Base]) -> None:
+        """Insert the given rows in one statement, skipping rows that conflict with
+        existing ones (``ON CONFLICT DO NOTHING``); existing rows are kept as-is."""
+        if not rows:
+            return
+        row_cls = type(next(iter(rows)))
+        mapper = sa.inspect(row_cls)
+        column_keys = {c.key for c in mapper.columns}
+        values_list = [{k: v for k, v in row.__dict__.items() if k in column_keys} for row in rows]
+        stmt = pg_insert(row_cls).values(values_list).on_conflict_do_nothing()
+        await self._sess.execute(stmt)
+        await self._sess.flush()
+
+    async def _batch_purge_returning[TRow: Base, TData](
+        self,
+        scope_condition: sa.ColumnElement[bool] | None,
+        build_subquery: Callable[[], sa.sql.Select[Any]],
+        conflict_checks: Sequence[ConflictCheck],
+        to_data: Callable[[TRow], TData],
+        batch_size: int = 1000,
+    ) -> list[TData]:
+        base_subquery = build_subquery()
+        entity = base_subquery.column_descriptions[0]["entity"]
+        table = sa.inspect(entity).local_table
+        pk_columns = list(table.primary_key.columns)
+        row_class = cast("type[TRow]", entity)
+
+        await self._validate_conflict_checks(conflict_checks)
+
+        removed: list[TData] = []
+        while True:
+            selecting = build_subquery()
+            if scope_condition is not None:
+                selecting = selecting.where(scope_condition)
+            sub = selecting.subquery()
+            pk_subquery = sa.select(*[sub.c[pk.key] for pk in pk_columns]).limit(batch_size)
+            stmt = (
+                sa.delete(table)
+                .where(sa.tuple_(*pk_columns).in_(pk_subquery))
+                .returning(*table.columns)
+            )
+            try:
+                result = await self._sess.execute(stmt)
+            except sa.exc.IntegrityError as e:
+                raise self._parse_integrity_error(e) from e
+            rows = result.fetchall()
+            removed.extend(to_data(row_class(**dict(r._mapping))) for r in rows)
+            if len(rows) < batch_size:
+                break
+        return removed

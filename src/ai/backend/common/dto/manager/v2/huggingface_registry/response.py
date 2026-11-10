@@ -13,6 +13,7 @@ __all__ = (
     "CreateHuggingFaceRegistryPayload",
     "DeleteHuggingFaceRegistryPayload",
     "HuggingFaceRegistryNode",
+    "PurgeHuggingFaceRegistryPayload",
     "UpdateHuggingFaceRegistryPayload",
 )
 
@@ -21,9 +22,15 @@ class HuggingFaceRegistryNode(BaseResponseModel):
     """Node model representing a HuggingFace registry."""
 
     id: UUID = Field(description="Registry ID")
+    entity_id: UUID = Field(
+        description="UUID of the HuggingFace registry. Added in 26.9.0.",
+    )
     name: str = Field(description="Registry name")
     url: str = Field(description="HuggingFace Hub URL")
-    token: str | None = Field(default=None, description="Access token for the registry")
+    token: str | None = Field(
+        default=None,
+        description="Access token for the registry. Masked unless the caller is a superadmin.",
+    )
 
 
 class CreateHuggingFaceRegistryPayload(BaseResponseModel):
@@ -46,6 +53,18 @@ class DeleteHuggingFaceRegistryPayload(BaseResponseModel):
     """Payload for HuggingFace registry deletion mutation result."""
 
     id: UUID = Field(description="ID of the deleted HuggingFace registry")
+    entity_id: UUID = Field(
+        description="UUID of the deleted HuggingFace registry. Added in 26.10.0."
+    )
+
+
+class PurgeHuggingFaceRegistryPayload(BaseResponseModel):
+    """Payload for HuggingFace registry purge result."""
+
+    id: UUID = Field(description="ID of the purged HuggingFace registry")
+    entity_id: UUID = Field(
+        description="UUID of the purged HuggingFace registry. Added in 26.10.0."
+    )
 
 
 class AdminSearchHuggingFaceRegistriesPayload(BaseResponseModel):

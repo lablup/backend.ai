@@ -6,6 +6,7 @@ Also provides data-to-DTO conversion functions.
 
 from __future__ import annotations
 
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.dto.manager.domain import (
     DomainDTO,
     DomainFilter,
@@ -18,13 +19,11 @@ from ai.backend.common.dto.manager.domain import (
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.domain.conditions import DomainConditions
-from ai.backend.manager.models.domain.orders import DomainOrders
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.models.domain.searchable_fields import DomainSearchableFields
+from ai.backend.manager.models.domain.searchers import DomainSearcher
+from ai.backend.manager.models.domain.updaters import DomainUpdater
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.domain.updaters import DomainUpdaterSpec
 from ai.backend.manager.types import OptionalState, TriState
 
 __all__ = ("DomainAdapter",)
@@ -40,18 +39,17 @@ class DomainAdapter(BaseFilterAdapter):
             description=data.description,
             is_active=data.is_active,
             created_at=data.created_at,
-            modified_at=data.modified_at,
+            modified_at=data.updated_at,
             total_resource_slots=dict(data.total_resource_slots),
             allowed_vfolder_hosts=dict(data.allowed_vfolder_hosts),
             allowed_docker_registries=data.allowed_docker_registries,
             integration_id=data.integration_name,  # data type uses integration_name, v1 DTO uses integration_id
         )
 
-    def build_updater(self, request: UpdateDomainRequest, domain_name: str) -> Updater[DomainRow]:
+    def build_updater(self, request: UpdateDomainRequest, domain_id: DomainID) -> DomainUpdater:
         """Convert update request to updater."""
         name = OptionalState[str].nop()
         description = TriState[str].nop()
-        is_active = OptionalState[bool].nop()
         total_resource_slots: TriState[ResourceSlot] = TriState.nop()
         allowed_vfolder_hosts: OptionalState[dict[str, list[str]]] = OptionalState.nop()
         allowed_docker_registries: OptionalState[list[str]] = OptionalState.nop()
@@ -61,8 +59,6 @@ class DomainAdapter(BaseFilterAdapter):
             name = OptionalState.update(request.name)
         if request.description is not None:
             description = TriState.update(request.description)
-        if request.is_active is not None:
-            is_active = OptionalState.update(request.is_active)
         if request.total_resource_slots is not None:
             total_resource_slots = TriState.update(ResourceSlot(request.total_resource_slots))
         if request.allowed_vfolder_hosts is not None:
@@ -72,56 +68,43 @@ class DomainAdapter(BaseFilterAdapter):
         if request.integration_id is not None:
             integration_name = TriState.update(request.integration_id)
 
-        updater_spec = DomainUpdaterSpec(
-            name=name,
+        return DomainUpdater(
+            domain_id=domain_id,
+            new_name=name,
             description=description,
-            is_active=is_active,
             total_resource_slots=total_resource_slots,
             allowed_vfolder_hosts=allowed_vfolder_hosts,
             allowed_docker_registries=allowed_docker_registries,
             integration_name=integration_name,
         )
-        return Updater(spec=updater_spec, pk_value=domain_name)
 
-    def build_querier(self, request: SearchDomainsRequest) -> BatchQuerier:
-        """Build a BatchQuerier for domains from search request."""
+    def build_searcher(self, request: SearchDomainsRequest) -> DomainSearcher:
+        """Build a domain searcher from the search request."""
         conditions = self._convert_filter(request.filter) if request.filter else []
         orders = [self._convert_order(o) for o in request.order] if request.order else []
         pagination = self._build_pagination(request.limit, request.offset)
 
-        return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
+        return DomainSearcher(conditions=conditions, orders=orders, pagination=pagination)
 
     def _convert_filter(self, filter_req: DomainFilter) -> list[QueryCondition]:
         """Convert domain filter to list of query conditions."""
-        conditions: list[QueryCondition] = []
-
-        if filter_req.name is not None:
-            condition = self.convert_string_filter(
-                filter_req.name,
-                contains_factory=DomainConditions.by_name_contains,
-                equals_factory=DomainConditions.by_name_equals,
-                starts_with_factory=DomainConditions.by_name_starts_with,
-                ends_with_factory=DomainConditions.by_name_ends_with,
-                in_factory=DomainConditions.by_name_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.is_active is not None:
-            conditions.append(DomainConditions.by_is_active(filter_req.is_active))
-
-        return conditions
+        fields = DomainSearchableFields.own
+        return [
+            *self.apply_string_filter(filter_req.name, fields.name.filter),
+            *self.apply_bool_filter(filter_req.is_active, fields.is_active.filter),
+        ]
 
     def _convert_order(self, order: DomainOrder) -> QueryOrder:
         """Convert domain order specification to query order."""
+        fields = DomainSearchableFields.own
         ascending = order.direction == OrderDirection.ASC
 
         if order.field == DomainOrderField.NAME:
-            return DomainOrders.name(ascending=ascending)
+            return fields.name.order.apply(ascending)
         if order.field == DomainOrderField.CREATED_AT:
-            return DomainOrders.created_at(ascending=ascending)
+            return fields.created_at.order.apply(ascending)
         if order.field == DomainOrderField.MODIFIED_AT:
-            return DomainOrders.modified_at(ascending=ascending)
+            return fields.updated_at.order.apply(ascending)
         raise ValueError(f"Unknown order field: {order.field}")
 
     def _build_pagination(self, limit: int, offset: int) -> OffsetPagination:

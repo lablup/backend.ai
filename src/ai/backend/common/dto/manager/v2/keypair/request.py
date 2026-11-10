@@ -14,6 +14,7 @@ from ai.backend.common.dto.manager.defs import MAX_PAGE_LIMIT
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.keypair.types import KeypairOrderField
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "AdminCreateKeypairInput",
@@ -37,6 +38,10 @@ class KeypairFilter(BaseRequestModel):
 
     is_active: bool | None = None
     is_admin: bool | None = None
+    is_default: bool | None = Field(
+        default=None,
+        description="Filter by whether the keypair is its owner's default one.",
+    )
     access_key: StringFilter | None = None
     resource_policy: StringFilter | None = None
     user_id: UUIDFilter | None = Field(
@@ -45,6 +50,10 @@ class KeypairFilter(BaseRequestModel):
     )
     created_at: DateTimeFilter | None = None
     last_used: DateTimeFilter | None = None
+    field_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by keypair ID.",
+    )
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None

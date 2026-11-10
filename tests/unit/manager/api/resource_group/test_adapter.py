@@ -20,10 +20,11 @@ from ai.backend.common.dto.manager.v2.resource_group.types import (
 )
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.resource_group.adapter import ResourceGroupAdapter
-from ai.backend.manager.models.scaling_group.conditions import ScalingGroupConditions
-from ai.backend.manager.models.scaling_group.orders import ScalingGroupOrders
-from ai.backend.manager.models.scaling_group.row import ScalingGroupRow
-from ai.backend.manager.repositories.base import OffsetPagination
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_group.searchable_fields import (
+    ResourceGroupSearchableFields,
+)
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 
 
 def _get_pagination_spec() -> PaginationSpec:
@@ -34,18 +35,17 @@ def _get_pagination_spec() -> PaginationSpec:
     - Backward (last/before): ASC order, fetches older items first (reversed for display)
     """
     return PaginationSpec(
-        forward_order=ScalingGroupOrders.created_at(ascending=False),
-        backward_order=ScalingGroupOrders.created_at(ascending=True),
-        forward_condition_factory=ScalingGroupConditions.by_cursor_forward,
-        backward_condition_factory=ScalingGroupConditions.by_cursor_backward,
-        tiebreaker_order=ScalingGroupRow.name.asc(),
+        forward_order=ResourceGroupSearchableFields.own.created_at.order.apply(ascending=False),
+        cursor_column=ResourceGroupRow.id,
     )
 
 
 def _make_adapter() -> ResourceGroupAdapter:
     """Create a ResourceGroupAdapter with a mock processors."""
     return ResourceGroupAdapter(
-        processors=MagicMock(),
+        resource_group=MagicMock(),
+        rbac=MagicMock(),
+        domain=MagicMock(),
         deployment_coordinator=MagicMock(),
         schedule_coordinator=MagicMock(),
     )

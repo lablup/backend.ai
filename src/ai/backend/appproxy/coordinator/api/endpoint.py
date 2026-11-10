@@ -27,6 +27,7 @@ from ai.backend.appproxy.coordinator.errors import InvalidCircuitStateError
 from ai.backend.appproxy.coordinator.models import Circuit
 from ai.backend.appproxy.coordinator.types import RootContext
 from ai.backend.common.config import ModelHealthCheck
+from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.request import (
     BulkCreateEndpointRequest,
     BulkDeleteEndpointRequest,
@@ -47,7 +48,6 @@ from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.types import (
     SessionTagsModel,
     TagsModel,
 )
-from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.types import BackendAISchema
 
 from .types import StubResponseModel
@@ -117,8 +117,8 @@ def _request_model_to_item(
         version=params.version,
         service_name=params.service_name,
         tags=TagsModel(
-            session=SessionTagsModel.model_validate(params.tags.session.model_dump()),
-            endpoint=EndpointTagsModel.model_validate(params.tags.endpoint.model_dump()),
+            session=SessionTagsModel.model_validate(params.tags.session.model_dump(mode="json")),
+            endpoint=EndpointTagsModel.model_validate(params.tags.endpoint.model_dump(mode="json")),
         ),
         open_to_public=params.open_to_public,
         health_check=params.health_check,

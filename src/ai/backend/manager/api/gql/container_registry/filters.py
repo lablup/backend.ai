@@ -14,9 +14,11 @@ from ai.backend.common.dto.manager.v2.container_registry.request import (
 from ai.backend.common.dto.manager.v2.container_registry.types import (
     ContainerRegistryTypeFilter as ContainerRegistryTypeFilterDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     OrderDirection,
     StringFilter,
+    UUIDFilter,
 )
 from ai.backend.manager.api.gql.container_registry.types import ContainerRegistryTypeGQL
 from ai.backend.manager.api.gql.decorators import (
@@ -54,6 +56,12 @@ class ContainerRegistryV2Filter(PydanticInputMixin[ContainerRegistryFilterDTO]):
     registry_name: StringFilter | None = None
     type: ContainerRegistryTypeFilterGQL | None = None
     is_global: bool | None = None
+    entity_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by container registry ID."
+        ),
+        default=None,
+    )
     AND: list[Self] | None = gql_added_field(
         BackendAIGQLMeta(added_version="26.7.0", description="Match all of the given sub-filters."),
         default=None,

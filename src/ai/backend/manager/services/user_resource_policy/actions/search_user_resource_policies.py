@@ -1,36 +1,33 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.resource.types import UserResourcePolicyData
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.services.user_resource_policy.actions.base import (
-    UserResourcePolicyAction,
+from ai.backend.common.data.entity.resource_policy import (
+    UserResourcePolicyEntityType,
 )
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import ScopedSearchOpsAction
+from ai.backend.manager.data.resource.types import UserResourcePolicyData
+from ai.backend.manager.models.resource_policy.row import UserResourcePolicyRow
 
 
-@dataclass
-class SearchUserResourcePoliciesAction(UserResourcePolicyAction):
-    querier: BatchQuerier
+@dataclass(frozen=True)
+class SearchUserResourcePoliciesAction(
+    ScopedSearchOpsAction[UserResourcePolicyRow, UserResourcePolicyData]
+):
+    """Page through the user resource policies the named scopes reach, combined with
+    OR.
 
-    @override
-    def entity_id(self) -> str | None:
-        return None
+    Which users those are, is the caller's business: the scopes are an argument.
+    """
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
-
-
-@dataclass
-class SearchUserResourcePoliciesActionResult(BaseActionResult):
-    items: list[UserResourcePolicyData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
+    def entity_type(cls) -> EntityType:
+        return UserResourcePolicyEntityType()
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "search_user_resource_policies"

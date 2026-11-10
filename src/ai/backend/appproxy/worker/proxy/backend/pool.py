@@ -8,24 +8,20 @@ import time
 from dataclasses import dataclass
 
 from ai.backend.appproxy.common.errors import WorkerNotAvailable
-from ai.backend.appproxy.common.types import RouteInfo
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.common.dto.appproxy.v2.ingress.types import (
+    IngressBackend,
+    IngressTarget,
+    IngressTargetID,
+)
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @dataclass(slots=True)
-class _PoolEntry:
-    """Per-endpoint health/state entry keyed by ``(host, port)``.
+class _TargetHealth:
+    """Health state of a target, kept while the target keeps its id and address."""
 
-    ``route`` carries the currently cached :class:`RouteInfo` for this
-    endpoint; when a route update arrives with the same ``(host, port)``
-    but a different ``route_id`` we treat it as a fresh kernel and reset
-    the entry, avoiding false-positive unhealthy carry-over from a
-    previously terminated kernel on the same host/port.
-    """
-
-    route: RouteInfo
     is_healthy: bool = True
     failure_count: int = 0
     unhealthy_since: float | None = None
@@ -42,41 +38,40 @@ class RoutePoolSpec:
 
 
 class RoutePool:
-    """Per-backend route pool with TCP-reachability health checks.
+    """Health-checked targets of an Ingress backend.
 
-    Entries are keyed by ``(host, port)``. Selection picks a healthy
-    entry via ``traffic_ratio``-weighted random. TCP connect probes run
-    in the background and flip entries between healthy / unhealthy;
-    after ``recovery_timeout`` without recovery the entry is evicted.
+    Selection picks a target group by weight among the groups with a healthy target, then a
+    healthy target of that group evenly. TCP connect probes run in the background and flip
+    targets between healthy and unhealthy; a target that stays unreachable for
+    ``recovery_timeout`` is evicted.
 
-    Manager-issued route updates are applied via :meth:`update`:
+    :meth:`update` applies a new Ingress backend:
 
-    - ``(host, port)`` newly present → insert a fresh entry
-    - ``(host, port)`` missing from the update → drop the entry
-    - ``(host, port)`` present with a different ``route_id`` → treated
-      as a kernel swap: reset to a fresh entry (prior health state is
-      assumed stale and must not leak into the new kernel)
-    - ``(host, port)`` present with the same ``route_id`` → update only
-      the cached route metadata (``traffic_ratio`` etc.)
+    - a target with a new id, or a known id at a new address → a fresh health state
+    - a target missing from the update → dropped
+    - a known id at the same address → keeps its health state
     """
 
-    _entries: dict[tuple[str, int], _PoolEntry]
+    _ingress_backend: IngressBackend
+    _health_by_target_id: dict[IngressTargetID, _TargetHealth]
     _lock: asyncio.Lock
     _health_check_task: asyncio.Task[None] | None
     _spec: RoutePoolSpec
+    _no_healthy_target: bool
 
     def __init__(
         self,
-        initial_routes: list[RouteInfo] | None = None,
+        ingress_backend: IngressBackend,
         *,
         spec: RoutePoolSpec | None = None,
     ) -> None:
-        self._entries = {}
+        self._ingress_backend = ingress_backend
+        self._health_by_target_id = {
+            target.id: _TargetHealth() for target in self._targets_of(ingress_backend)
+        }
         self._lock = asyncio.Lock()
         self._spec = spec or RoutePoolSpec()
-        if initial_routes:
-            for r in initial_routes:
-                self._entries[(r.current_kernel_host, r.kernel_port)] = _PoolEntry(route=r)
+        self._no_healthy_target = False
         self._health_check_task = asyncio.create_task(
             self._health_check_loop(),
             name="RoutePool._health_check_loop",
@@ -90,109 +85,140 @@ class RoutePool:
                 await task
             self._health_check_task = None
 
-    async def update(self, new_routes: list[RouteInfo]) -> None:
+    async def update(self, ingress_backend: IngressBackend) -> None:
         async with self._lock:
-            new_by_hp: dict[tuple[str, int], RouteInfo] = {
-                (r.current_kernel_host, r.kernel_port): r for r in new_routes
+            known_target_by_id = {
+                target.id: target for target in self._targets_of(self._ingress_backend)
             }
-            for hp in list(self._entries.keys()):
-                if hp not in new_by_hp:
-                    del self._entries[hp]
-            for hp, new_route in new_by_hp.items():
-                existing = self._entries.get(hp)
-                if existing is None:
-                    self._entries[hp] = _PoolEntry(route=new_route)
-                elif existing.route.route_id != new_route.route_id:
-                    # Same host:port but route_id changed → treat as kernel
-                    # swap; start the new entry from a clean slate so the
-                    # old kernel's unhealthy state cannot taint the new one.
-                    self._entries[hp] = _PoolEntry(route=new_route)
-                else:
-                    existing.route = new_route
+            health_by_target_id: dict[IngressTargetID, _TargetHealth] = {}
+            for target in self._targets_of(ingress_backend):
+                health = self._health_by_target_id.get(target.id)
+                if health is None or known_target_by_id.get(target.id) != target:
+                    health = _TargetHealth()
+                health_by_target_id[target.id] = health
+            self._ingress_backend = ingress_backend
+            self._health_by_target_id = health_by_target_id
 
-    async def select(self) -> RouteInfo:
+    async def select(self) -> IngressTarget:
         async with self._lock:
-            candidates = [
-                entry.route
-                for entry in self._entries.values()
-                if entry.is_healthy and entry.route.traffic_ratio > 0
-            ]
-        if not candidates:
+            healthy_targets_by_group: list[tuple[int, list[IngressTarget]]] = []
+            for target_group in self._ingress_backend.target_groups:
+                if target_group.weight <= 0:
+                    continue
+                healthy_targets: list[IngressTarget] = [
+                    target
+                    for target in target_group.targets
+                    if (health := self._health_by_target_id.get(target.id)) is not None
+                    and health.is_healthy
+                ]
+                if healthy_targets:
+                    healthy_targets_by_group.append((target_group.weight, healthy_targets))
+        if not healthy_targets_by_group:
+            if not self._no_healthy_target:
+                self._no_healthy_target = True
+                log.warning(
+                    "no healthy target available", target_count=len(self._health_by_target_id)
+                )
+            else:
+                log.trace("no healthy target available")
             raise WorkerNotAvailable
-        if len(candidates) == 1:
-            return candidates[0]
-        ratios = [r.traffic_ratio for r in candidates]
-        return random.choices(candidates, weights=ratios, k=1)[0]
+        self._no_healthy_target = False
+        _, healthy_targets = random.choices(
+            healthy_targets_by_group,
+            weights=[weight for weight, _ in healthy_targets_by_group],
+            k=1,
+        )[0]
+        return random.choice(healthy_targets)
 
-    def record_failure(self, route: RouteInfo) -> None:
-        entry = self._entries.get((route.current_kernel_host, route.kernel_port))
-        if entry is None or entry.route.route_id != route.route_id:
+    def record_failure(self, target: IngressTarget) -> None:
+        health = self._health_of(target)
+        if health is None:
             return
-        entry.failure_count += 1
-        if entry.failure_count >= self._spec.failure_threshold:
-            entry.is_healthy = False
-            if entry.unhealthy_since is None:
-                entry.unhealthy_since = time.perf_counter()
-            log.debug(
-                "Route {}:{} marked unhealthy after {} failures",
-                route.current_kernel_host,
-                route.kernel_port,
-                entry.failure_count,
-            )
+        health.failure_count += 1
+        if health.failure_count >= self._spec.failure_threshold:
+            if health.is_healthy:
+                log.warning(
+                    "target marked unhealthy after request failures",
+                    target_id=target.id,
+                    failure_count=health.failure_count,
+                )
+            health.is_healthy = False
+            if health.unhealthy_since is None:
+                health.unhealthy_since = time.perf_counter()
 
-    def record_success(self, route: RouteInfo) -> None:
-        entry = self._entries.get((route.current_kernel_host, route.kernel_port))
-        if entry is None or entry.route.route_id != route.route_id:
+    def record_success(self, target: IngressTarget) -> None:
+        health = self._health_of(target)
+        if health is None:
             return
-        entry.failure_count = 0
-        entry.is_healthy = True
-        entry.unhealthy_since = None
+        if not health.is_healthy:
+            log.debug("target recovered", target_id=target.id)
+        health.failure_count = 0
+        health.is_healthy = True
+        health.unhealthy_since = None
+
+    def _health_of(self, target: IngressTarget) -> _TargetHealth | None:
+        if not any(target in group.targets for group in self._ingress_backend.target_groups):
+            return None
+        return self._health_by_target_id.get(target.id)
+
+    @staticmethod
+    def _targets_of(ingress_backend: IngressBackend) -> list[IngressTarget]:
+        return [
+            target
+            for target_group in ingress_backend.target_groups
+            for target in target_group.targets
+        ]
 
     async def _health_check_loop(self) -> None:
         try:
             while True:
                 await asyncio.sleep(self._spec.health_check_interval)
                 try:
-                    await self._check_all()
+                    await self._probe_all_targets()
                 except Exception:
-                    log.exception("RoutePool health check iteration failed")
+                    log.exception("target health check failed")
         except asyncio.CancelledError:
             raise
 
-    async def _check_all(self) -> None:
+    async def _probe_all_targets(self) -> None:
         async with self._lock:
-            snapshot = list(self._entries.items())
-        if not snapshot:
+            targets_with_health = [
+                (target, health)
+                for target in self._targets_of(self._ingress_backend)
+                if (health := self._health_by_target_id.get(target.id)) is not None
+            ]
+        if not targets_with_health:
             return
         await asyncio.gather(
-            *(self._probe_one(hp, entry) for hp, entry in snapshot),
+            *(self._probe_target(target, health) for target, health in targets_with_health),
             return_exceptions=True,
         )
 
-    async def _probe_one(self, hp: tuple[str, int], entry: _PoolEntry) -> None:
-        host, port = hp
-        ok = await self._tcp_probe(host, port)
+    async def _probe_target(self, target: IngressTarget, health: _TargetHealth) -> None:
+        ok = await self._tcp_probe(target.host, target.port)
         if ok:
-            entry.is_healthy = True
-            entry.failure_count = 0
-            entry.unhealthy_since = None
+            if not health.is_healthy:
+                log.debug("target recovered", target_id=target.id)
+            health.is_healthy = True
+            health.failure_count = 0
+            health.unhealthy_since = None
             return
-        entry.is_healthy = False
-        if entry.unhealthy_since is None:
-            entry.unhealthy_since = time.perf_counter()
+        if health.is_healthy:
+            log.warning("target marked unhealthy by the health check", target_id=target.id)
+        health.is_healthy = False
+        if health.unhealthy_since is None:
+            health.unhealthy_since = time.perf_counter()
         if (
-            entry.unhealthy_since is not None
-            and time.perf_counter() - entry.unhealthy_since > self._spec.recovery_timeout
+            health.unhealthy_since is not None
+            and time.perf_counter() - health.unhealthy_since > self._spec.recovery_timeout
         ):
             async with self._lock:
-                cached = self._entries.get(hp)
-                if cached is not None and cached.route.route_id == entry.route.route_id:
-                    del self._entries[hp]
-                    log.info(
-                        "Evicted unreachable route {}:{} after {}s",
-                        host,
-                        port,
-                        self._spec.recovery_timeout,
+                if self._health_by_target_id.get(target.id) is health:
+                    del self._health_by_target_id[target.id]
+                    log.warning(
+                        "unreachable target evicted",
+                        target_id=target.id,
+                        recovery_timeout_sec=self._spec.recovery_timeout,
                     )
 
     async def _tcp_probe(self, host: str, port: int) -> bool:

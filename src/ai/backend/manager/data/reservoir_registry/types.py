@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
+from typing import override
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.artifact_registry.types import ReservoirRegistryStatefulData
+from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
+from ai.backend.common.data.entity.types import EntityData
 
 
 @dataclass
@@ -15,6 +18,21 @@ class ReservoirRegistryListResult:
     total_count: int
     has_next_page: bool
     has_previous_page: bool
+
+
+@dataclass
+class ReservoirRegistryConnectionData(EntityData):
+    """A Reservoir registry's own columns, without the name its artifact registry row holds."""
+
+    id: ArtifactRegistryID
+    endpoint: str
+    access_key: str
+    secret_key: str
+    api_version: str
+
+    @override
+    def entity_id(self) -> ArtifactRegistryID:
+        return self.id
 
 
 @dataclass

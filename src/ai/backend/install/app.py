@@ -36,7 +36,7 @@ from ai.backend.install.widgets import InputDialog, SetupLog
 from ai.backend.plugin.entrypoint import find_build_root
 
 from .common import detect_os
-from .context import DevContext, PackageContext, current_log
+from .context import DevContext, DockerContext, PackageContext, current_log
 from .types import (
     Accelerator,
     CliArgs,
@@ -77,6 +77,7 @@ class DevSetup(Static):
     async def install(self, dist_info: DistInfo, install_variable: InstallVariable) -> None:
         _log = self.query_one(".log", SetupLog)
         _log_token = current_log.set(_log)
+        failed = False
         ctx = DevContext(
             dist_info,
             install_variable,
@@ -102,13 +103,17 @@ class DevSetup(Static):
             await asyncio.sleep(1)
             raise
         except PrerequisiteError as e:
+            failed = True
             _log.write(Text.from_markup("[red]:warning: A prerequisite check has failed."))
             _log.write(e)
         except Exception as e:
+            failed = True
             _log.write(Text.from_markup("[red]:warning: Unexpected error!"))
             _log.write(e)
             _log.write(Traceback())
         finally:
+            if failed:
+                cast("InstallerApp", self.app).install_failed = True
             _log.write("")
             _log.write(Text.from_markup("[bright_cyan]All tasks finished. Press q/Q to exit."))
             if self._non_interactive:
@@ -141,6 +146,137 @@ class PackageSetup(Static):
     async def install(self, dist_info: DistInfo, install_variable: InstallVariable) -> None:
         _log = self.query_one(".log", SetupLog)
         _log_token = current_log.set(_log)
+        failed = False
+        try:
+            # prerequisites
+            if self._non_interactive:
+                if dist_info.target_path is None:
+                    raise ValueError("Target path must be specified in non-interactive mode")
+            else:
+                if dist_info.target_path.exists():
+                    input_box = InputDialog(
+                        f"The target path {dist_info.target_path} already exists. "
+                        "Please set a different target path below, or "
+                        "leave the box as blank to overwrite the folder.",
+                        str(dist_info.target_path),
+                        allow_cancel=False,
+                    )
+                    _log.mount(input_box)
+                    value = await input_box.wait()
+                    if value is None:
+                        raise ValueError("Target path input was cancelled")
+                    dist_info.target_path = Path(value)
+            ctx = PackageContext(
+                dist_info,
+                install_variable,
+                cast(App[None], self.app),
+                non_interactive=self._non_interactive,
+            )
+            await ctx.check_prerequisites()
+            # install
+            await ctx.install()
+            # configure
+            await ctx.configure()
+            # post-setup
+            await ctx.populate_images()
+            await ctx.dump_install_info()
+            install_report = InstallReport(ctx.install_info, id="install-report")
+            self.query_one("TabPane#tab-pkg-report Label").remove()
+            self.query_one("TabPane#tab-pkg-report").mount(install_report)
+            self.query_one("TabbedContent", TabbedContent).active = "tab-pkg-report"
+        except asyncio.CancelledError:
+            _log.write(Text.from_markup("[red]Interrupted!"))
+            await asyncio.sleep(1)
+            raise
+        except PrerequisiteError as e:
+            failed = True
+            _log.write(Text.from_markup("[red]:warning: A prerequisite check has failed."))
+            _log.write(e)
+        except Exception as e:
+            failed = True
+            _log.write(Text.from_markup("[red]:warning: Unexpected error!"))
+            _log.write(e)
+            _log.write(Traceback())
+        finally:
+            if failed:
+                cast("InstallerApp", self.app).install_failed = True
+            _log.write("")
+            _log.write(Text.from_markup("[bright_cyan]All tasks finished. Press q/Q to exit."))
+            if self._non_interactive:
+                self.app.post_message(Key("q", "q"))
+            current_log.reset(_log_token)
+
+
+class DockerInstallReport(Static):
+    _install_info: InstallInfo
+
+    def __init__(self, install_info: InstallInfo, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self._install_info = install_info
+
+    @override
+    def compose(self) -> ComposeResult:
+        install_info = self._install_info
+        service = install_info.service_config
+        base_path = install_info.base_path
+        yield Markdown(
+            textwrap.dedent(
+                f"""
+        All Backend.AI services are now running as containers of the
+        `lablup/backend.ai-*:{install_info.version}` images.
+
+        Connect to `http://{service.webserver_addr.face.host}:{service.webserver_addr.face.port}`
+        with the admin credentials:
+        - Username: `admin@lablup.com`
+        - Password: `wJalrXUt`
+
+        The deployment lives in `{base_path}` and runs as ONE compose
+        project (`backendai-services`) from ONE standard compose file:
+        - `docker-compose.yaml` — the whole deployment, halfstack
+          (PostgreSQL / Redis / etcd) included; a bare `docker compose ps`
+          in the directory shows all of it
+        - `*.toml` / `webserver.conf` — the per-service configurations,
+          bind-mounted into the containers
+
+        To stop or restart everything (halfstack included):
+        ```console
+        $ cd {base_path}
+        $ docker compose down
+        $ docker compose up -d
+        ```
+
+        To see this guide again, run './backendai-install-<platform> install --show-guide'.
+        """
+            )
+        )
+
+
+class DockerSetup(Static):
+    _non_interactive: bool
+
+    def __init__(self, *, non_interactive: bool = False, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self._non_interactive = non_interactive
+
+    @override
+    def compose(self) -> ComposeResult:
+        yield Label("Docker Compose Setup", classes="mode-title")
+        with TabbedContent():
+            with TabPane("Install Log", id="tab-docker-log"):
+                yield SetupLog(
+                    wrap=True,
+                    classes="log",
+                )
+            with TabPane("Install Report", id="tab-docker-report"):
+                yield Label("Installation is not complete.")
+
+    def begin_install(self, dist_info: DistInfo, install_variable: InstallVariable) -> None:
+        self.query_one("SetupLog.log").focus()
+        top_tasks.add(asyncio.create_task(self.install(dist_info, install_variable)))
+
+    async def install(self, dist_info: DistInfo, install_variable: InstallVariable) -> None:
+        _log = self.query_one(".log", SetupLog)
+        _log_token = current_log.set(_log)
         # prerequisites
         if self._non_interactive:
             if dist_info.target_path is None:
@@ -159,7 +295,7 @@ class PackageSetup(Static):
                 if value is None:
                     raise ValueError("Target path input was cancelled")
                 dist_info.target_path = Path(value)
-        ctx = PackageContext(
+        ctx = DockerContext(
             dist_info,
             install_variable,
             cast(App[None], self.app),
@@ -173,11 +309,12 @@ class PackageSetup(Static):
             await ctx.configure()
             # post-setup
             await ctx.populate_images()
+            await ctx.start_services()
             await ctx.dump_install_info()
-            install_report = InstallReport(ctx.install_info, id="install-report")
-            self.query_one("TabPane#tab-pkg-report Label").remove()
-            self.query_one("TabPane#tab-pkg-report").mount(install_report)
-            self.query_one("TabbedContent", TabbedContent).active = "tab-pkg-report"
+            install_report = DockerInstallReport(ctx.install_info, id="install-report")
+            self.query_one("TabPane#tab-docker-report Label").remove()
+            self.query_one("TabPane#tab-docker-report").mount(install_report)
+            self.query_one("TabbedContent", TabbedContent).active = "tab-docker-report"
         except asyncio.CancelledError:
             _log.write(Text.from_markup("[red]Interrupted!"))
             await asyncio.sleep(1)
@@ -486,9 +623,11 @@ class InstallReport(Static):
                 - Password: `{harbor.admin_password}`
 
                 The Harbor instance is also pre-registered as a Backend.AI
-                container registry named `local-harbor` (project `library`)
-                with the same admin credentials, so it appears in
-                `mgr image rescan` / the manager UI as soon as you start it.
+                container registry named `{harbor.hostname}:{harbor.http_port}`
+                (project `library`) with the same admin credentials, so it
+                appears in `mgr image rescan` / the manager UI as soon as you
+                start it. Push images to it with
+                `docker push {harbor.hostname}:{harbor.http_port}/library/<image>:<tag>`.
 
                 Note: Harbor may take 30-60 seconds to become fully ready
                 after `./dev harbor start`.
@@ -558,6 +697,7 @@ class ModeMenu(Static):
             self._dist_info = DistInfo()
         self._enabled_menus = set()
         self._enabled_menus.add(InstallModes.PACKAGE)
+        self._enabled_menus.add(InstallModes.DOCKER)
         self._non_interactive = args.non_interactive
         if args.target_path is not None and args.target_path != str(Path.home() / "backendai"):
             self._dist_info.target_path = Path(args.target_path)
@@ -622,9 +762,11 @@ class ModeMenu(Static):
             # maintain_desc = "Could not find an existing setup (missing INSTALL-INFO)"
             maintain_desc = "Coming soon!"
         configure_desc = "Configure setup variables before installation."
+        docker_desc = "Deploy the published service container images with docker compose"
         mode_desc: dict[InstallModes, str] = {
             InstallModes.DEVELOP: develop_desc,
             InstallModes.PACKAGE: package_desc,
+            InstallModes.DOCKER: docker_desc,
             InstallModes.MAINTAIN: maintain_desc,
             InstallModes.CONFIGURE: configure_desc,
         }
@@ -696,6 +838,16 @@ class ModeMenu(Static):
             li = self.app.query_one("#pkg-type-release", ListItem)
             lv.post_message(ListView.Selected(lv, li, list(lv.children).index(li)))
 
+    @on(ListView.Selected, "#mode-list", item="#mode-docker")
+    def start_docker_mode(self) -> None:
+        if InstallModes.DOCKER not in self._enabled_menus:
+            return
+        self.app.sub_title = "Docker Compose Setup"
+        switcher = self.app.query_one("#top", ContentSwitcher)
+        switcher.current = "docker-setup"
+        docker_setup = self.app.query_one("#docker-setup", DockerSetup)
+        self.app.call_later(docker_setup.begin_install, self._dist_info, self.install_variable)
+
     @on(ListView.Selected, "#mode-list", item="#mode-maintain")
     def start_maintain_mode(self) -> None:
         if InstallModes.MAINTAIN not in self._enabled_menus:
@@ -725,9 +877,11 @@ class InstallerApp(App[None]):
     CSS_PATH = "app.tcss"
 
     _args: CliArgs
+    install_failed: bool
 
     def __init__(self, args: CliArgs | None = None) -> None:
         super().__init__()
+        self.install_failed = False
         if args is None:  # when run as textual dev mode
             args = CliArgs(
                 mode=None,
@@ -772,6 +926,7 @@ class InstallerApp(App[None]):
                     id="pkg-type-menu",
                 )
                 yield PackageSetup(id="pkg-setup", non_interactive=self._args.non_interactive)
+                yield DockerSetup(id="docker-setup", non_interactive=self._args.non_interactive)
                 yield Configure(id="configure")
         yield Footer()
 
@@ -841,4 +996,7 @@ class InstallerApp(App[None]):
         if not had_cancelled_tasks:
             # Let the user shutdown twice if there were cancelled tasks,
             # so that the user could inspect what happened.
-            self.exit(return_code=exit_code, message=message)
+            self.exit(
+                return_code=exit_code or (1 if self.install_failed else 0),
+                message=message,
+            )

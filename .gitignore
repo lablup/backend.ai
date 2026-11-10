@@ -147,11 +147,12 @@ ENV/
 /.tmp/
 /tmp/
 /volumes/
-/vfroot/
-/var/
+/vfroot
+/var
 /ipc/
-/scratches/
+/scratches
 logs/
+/logs
 /*.pid
 /.postgres-volume-backup
 
@@ -160,6 +161,7 @@ logs/
 
 # Release artifacts
 /CHANGELOG_RELEASE.md
+/.towncrier.generated.toml
 
 # macOS specific
 .DS_Store
@@ -172,3 +174,4 @@ backup.*.json
 /INSTALL-INFO
 .serena/
 .claude/worktrees/
+/fixtures/agent/

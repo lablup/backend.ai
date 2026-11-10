@@ -2,27 +2,27 @@
 
 ## Service Overview
 
-The User Service is a core component of Backend.AI that handles comprehensive user account management operations. It provides a robust, action-based architecture for creating, modifying, deleting, and managing user accounts, along with advanced features like resource usage statistics and user data purging.
+The User Service is a core component of Backend.AI that handles user account management operations. It provides an action-based architecture for creating, modifying, deleting and managing user accounts, with resource usage statistics and user data purging.
 
 ## Key Features and Capabilities
 
 ### Core User Management
 - **User Creation**: Create new user accounts with customizable properties
-- **User Modification**: Update user information, roles, and permissions
-- **User Deletion**: Soft delete users while preserving audit trails
-- **User Purging**: Permanently remove users and all associated resources
+- **User Modification**: Update user information, roles and permissions
+- **User Deletion**: Delete users while preserving audit trails
+- **User Purging**: Remove users and all associated resources permanently
 
 ### Advanced Features
 - **Resource Usage Statistics**: Detailed monthly usage tracking per user
 - **Admin Statistics**: System-wide usage analytics and monitoring
 - **Container Configuration**: Support for custom UID/GID settings
-- **Security Features**: TOTP authentication, IP restrictions, and sudo session control
+- **Security Features**: TOTP authentication, IP restrictions and sudo session control
 
 ### Architecture
-- **Action-Based Design**: Each operation is encapsulated in typed action classes
-- **Repository Pattern**: Clean separation between business logic and data access
+- **Action-Based Design**: Each operation is wrapped in typed action classes
+- **Repository Pattern**: Separation between business logic and data access
 - **Processor Pattern**: Asynchronous processing with monitoring capabilities
-- **Type Safety**: Comprehensive type definitions for all operations
+- **Type Safety**: Type definitions for all operations
 
 ## Operation Scenarios
 
@@ -31,10 +31,11 @@ The User Service is a core component of Backend.AI that handles comprehensive us
 #### Basic User Creation
 ```python
 from ai.backend.manager.services.user.actions.create_user import CreateUserAction
-from ai.backend.manager.services.user.type import UserCreator
+from ai.backend.manager.models.user.creators import UserCreator
 
 action = CreateUserAction(
-    input=UserCreator(
+    domain_id=domain_id,
+    creator=UserCreator(
         email="user@example.com",
         password="SecurePassword123!",
         username="newuser",
@@ -52,7 +53,8 @@ result = await user_processor.create_user.wait_for_complete(action)
 #### Admin User with Special Permissions
 ```python
 action = CreateUserAction(
-    input=UserCreator(
+    domain_id=domain_id,
+    creator=UserCreator(
         email="admin@example.com",
         password="AdminPass123!",
         username="admin",
@@ -69,7 +71,8 @@ action = CreateUserAction(
 #### User with Container Configuration
 ```python
 action = CreateUserAction(
-    input=UserCreator(
+    domain_id=domain_id,
+    creator=UserCreator(
         email="container@example.com",
         password="ContainerPass123!",
         username="containeruser",
@@ -87,12 +90,13 @@ action = CreateUserAction(
 
 #### Basic Information Updates
 ```python
-from ai.backend.manager.services.user.actions.modify_user import ModifyUserAction, UserModifier
+from ai.backend.manager.models.user.updaters import UserUpdater
+from ai.backend.manager.services.user.actions.update_user import UpdateUserAction
 from ai.backend.manager.types import OptionalState
 
-action = ModifyUserAction(
-    email="user@example.com",
-    modifier=UserModifier(
+action = UpdateUserAction(
+    updater=UserUpdater(
+        user_id=user_id,
         full_name=OptionalState.update("Updated Name"),
         description=OptionalState.update("Senior Developer"),
     ),
@@ -101,9 +105,9 @@ action = ModifyUserAction(
 
 #### Role and Permission Changes
 ```python
-action = ModifyUserAction(
-    email="user@example.com",
-    modifier=UserModifier(
+action = UpdateUserAction(
+    updater=UserUpdater(
+        user_id=user_id,
         role=OptionalState.update(UserRole.ADMIN),
         sudo_session_enabled=OptionalState.update(True),
     ),
@@ -112,9 +116,9 @@ action = ModifyUserAction(
 
 #### Security Settings
 ```python
-action = ModifyUserAction(
-    email="user@example.com",
-    modifier=UserModifier(
+action = UpdateUserAction(
+    updater=UserUpdater(
+        user_id=user_id,
         totp_activated=OptionalState.update(True),
         need_password_change=OptionalState.update(True),
         status=OptionalState.update(UserStatus.ACTIVE),
@@ -124,7 +128,7 @@ action = ModifyUserAction(
 
 ### 3. User Deletion
 
-#### Soft Delete (Preserves Data)
+#### Delete (Preserves Data)
 ```python
 from ai.backend.manager.services.user.actions.delete_user import DeleteUserAction
 
@@ -136,15 +140,14 @@ result = await user_processor.delete_user.wait_for_complete(action)
 
 #### Complete User Removal
 ```python
+from ai.backend.manager.data.user.types import UserInfoContext
 from ai.backend.manager.services.user.actions.purge_user import PurgeUserAction
-from ai.backend.manager.services.user.type import UserInfoContext
 
 action = PurgeUserAction(
     email="user@example.com",
     user_info_ctx=UserInfoContext(
         uuid=user_uuid,
         email="user@example.com",
-        main_access_key=user_access_key,
     ),
 )
 ```
@@ -206,19 +209,19 @@ except Exception as e:
 ## Integration Points
 
 ### Database Integration
-- **User Repository**: Handles user CRUD operations
+- **User Repository**: Handles user create, get, update and delete operations
 - **Admin Repository**: Manages admin-level operations and force operations
 - **Transaction Management**: Supports database transactions for data consistency
 
 ### External Service Integration
-- **Valkey/Redis**: Usage statistics and caching
+- **Valkey**: Usage statistics and caching
 - **Agent Registry**: Session management and resource allocation
-- **Storage Manager**: VFolder management and storage operations
+- **Storage Manager**: vfolder management and storage operations
 
 ### Security Integration
-- **TOTP**: Two-factor authentication support
+- **TOTP**: 2FA support
 - **IP Restrictions**: Client IP-based access control
-- **Role-Based Access**: Admin, user, and monitor role management
+- **Role-Based Access**: Admin, user and monitor role management
 
 ## Testing Guidelines
 
@@ -261,21 +264,21 @@ def mock_dependencies():
 
 ### Required Dependencies
 - Database connection (PostgreSQL)
-- Valkey/Redis client for statistics
+- Valkey client for statistics
 - Agent registry for session management
-- Storage manager for VFolder operations
+- Storage manager for vfolder operations
 
 ### Environment Variables
 - Database connection settings
-- Redis/Valkey connection configuration
+- Valkey connection configuration
 - Security settings (TOTP, IP restrictions)
 
 ## Best Practices
 
 1. **Always use transactions** for multi-step operations
 2. **Validate input data** before processing
-3. **Handle exceptions gracefully** with proper error messages
-4. **Use soft delete** for user removal unless purging is explicitly required
+3. **Handle exceptions gracefully** with error messages
+4. **Use delete** for user removal unless purging is explicitly required
 5. **Monitor performance** for statistics operations
 6. **Test all edge cases** including concurrent operations
 
@@ -284,8 +287,8 @@ def mock_dependencies():
 ### Common Issues
 - **Permission denied**: Check user roles and domain access
 - **Database constraints**: Verify unique constraints (email, username)
-- **Resource cleanup**: Ensure proper cleanup of user resources during purging
-- **Statistics errors**: Check Valkey/Redis connection and data consistency
+- **Resource cleanup**: Ensure cleanup of user resources during purging
+- **Statistics errors**: Check the Valkey connection and data consistency
 
 ### Debugging
 - Enable debug logging for detailed operation traces

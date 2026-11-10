@@ -10,12 +10,17 @@ from uuid import uuid4
 import pytest
 from dateutil.tz import tzutc
 
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
+    ArchName,
     ClusterMode,
     KernelId,
+    PreemptionMode,
     ResourceSlot,
     SessionId,
     SessionResult,
@@ -55,8 +60,10 @@ from ai.backend.manager.data.session.types import (
     SessionNetwork,
     SessionStatus,
 )
-from ai.backend.manager.data.sokovan import (
-    ImageConfigData,
+from ai.backend.manager.defs import DEFAULT_ROLE
+from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
+from ai.backend.manager.views.sokovan.image import ImageConfigData
+from ai.backend.manager.views.sokovan.lifecycle import (
     KernelBindingData,
     SessionDataForPull,
     SessionDataForStart,
@@ -64,12 +71,10 @@ from ai.backend.manager.data.sokovan import (
     SessionsForStartWithImages,
     SessionWithKernels,
 )
-from ai.backend.manager.defs import DEFAULT_ROLE
-from ai.backend.manager.repositories.scheduler.types.session import (
+from ai.backend.manager.views.sokovan.session import (
     TerminatingKernelData,
     TerminatingSessionData,
 )
-from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
 
 # =============================================================================
 # Internal Helper Functions (not fixtures)
@@ -79,14 +84,12 @@ from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
 def _create_session(
     session_id: SessionId | None = None,
     status: SessionStatus = SessionStatus.PENDING,
-    scaling_group: str = "default",
+    resource_group: str = "default",
     access_key: str = "test-access-key",
     kernel_count: int = 1,
     kernel_status: KernelStatus = KernelStatus.PENDING,
     session_type: SessionTypes = SessionTypes.INTERACTIVE,
     cluster_mode: ClusterMode = ClusterMode.SINGLE_NODE,
-    phase_attempts: int = 0,
-    phase_started_at: datetime | None = None,
 ) -> SessionWithKernels:
     """Create SessionWithKernels with sensible defaults."""
     sid = session_id or SessionId(uuid4())
@@ -117,9 +120,7 @@ def _create_session(
         resource=ResourceSpec(
             cluster_mode=cluster_mode.value,
             cluster_size=kernel_count,
-            occupying_slots=ResourceSlot(),
-            requested_slots=ResourceSlot(),
-            scaling_group_name=scaling_group,
+            resource_group_name=resource_group,
             target_sgroup_names=None,
             agent_ids=None,
         ),
@@ -196,13 +197,11 @@ def _create_session(
                 cluster_hostname=f"kernel-{i}",
             ),
             resource=ResourceInfo(
-                scaling_group=scaling_group,
+                resource_group=resource_group,
                 resource_group_id=ResourceGroupID(uuid4()),
                 agent=agent_id,
                 agent_addr=f"tcp://agent-{i}:5001",
                 container_id=f"container-{kernel_id}",
-                occupied_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
                 occupied_shares={},
                 attached_devices={},
                 resource_opts={},
@@ -230,14 +229,13 @@ def _create_session(
             ),
             metrics=KernelMetrics(num_queries=0, last_stat=None, container_log=None),
             metadata=KernelMetadata(callback_url=None, internal_data=None),
+            kernel_group_id=None,
         )
         kernel_infos.append(kernel_info)
 
     return SessionWithKernels(
         session_info=session_info,
         kernel_infos=kernel_infos,
-        phase_attempts=phase_attempts,
-        phase_started_at=phase_started_at,
     )
 
 
@@ -246,7 +244,7 @@ def _create_kernel(
     status: KernelStatus = KernelStatus.RUNNING,
     agent_id: AgentId | None = None,
     agent_addr: str | None = None,
-    scaling_group: str = "default",
+    resource_group: str = "default",
 ) -> KernelInfo:
     """Create KernelInfo with sensible defaults."""
     kid = kernel_id or KernelId(uuid4())
@@ -299,13 +297,11 @@ def _create_kernel(
             cluster_hostname="kernel-0",
         ),
         resource=ResourceInfo(
-            scaling_group=scaling_group,
+            resource_group=resource_group,
             resource_group_id=ResourceGroupID(uuid4()),
             agent=aid,
             agent_addr=agent_addr or f"tcp://{aid}:5001",
             container_id=f"container-{kid}",
-            occupied_slots=ResourceSlot(),
-            requested_slots=ResourceSlot(),
             occupied_shares={},
             attached_devices={},
             resource_opts={},
@@ -333,6 +329,7 @@ def _create_kernel(
         ),
         metrics=KernelMetrics(num_queries=0, last_stat=None, container_log=None),
         metadata=KernelMetadata(callback_url=None, internal_data=None),
+        kernel_group_id=None,
     )
 
 
@@ -345,8 +342,13 @@ def _create_kernel(
 def mock_provisioner() -> AsyncMock:
     """Mock SessionProvisioner for ScheduleSessionsLifecycleHandler tests."""
     provisioner = AsyncMock()
-    provisioner.schedule_scaling_group = AsyncMock(
-        return_value=ScheduleResult(scheduled_session_ids=[], scheduling_failures=[])
+    provisioner.schedule_resource_group = AsyncMock(
+        return_value=ScheduleResult(
+            scheduled_session_ids=[],
+            scheduling_failures=[],
+            reserved_session_ids=[],
+            preemption_plan=[],
+        )
     )
     return provisioner
 
@@ -381,7 +383,19 @@ def mock_repository() -> AsyncMock:
         return_value=SessionsForStartWithImages(sessions=[], image_configs={})
     )
     repository.get_terminating_sessions_by_ids = AsyncMock(return_value=[])
+    repository.reset_kernels_to_pending_for_sessions = AsyncMock(return_value=0)
+    repository.get_resource_group_preemption_mode = AsyncMock(return_value=PreemptionMode.TERMINATE)
     return repository
+
+
+@pytest.fixture
+def mock_scheduling_controller() -> AsyncMock:
+    """Mock SchedulingController for PreemptSessionsLifecycleHandler tests."""
+    controller = AsyncMock()
+    controller.mark_sessions_for_termination = AsyncMock(return_value=None)
+    controller.mark_sessions_status = AsyncMock(return_value=[])
+    controller.mark_scheduling_needed = AsyncMock(return_value=None)
+    return controller
 
 
 # =============================================================================
@@ -484,6 +498,43 @@ def terminating_sessions_multiple() -> list[SessionWithKernels]:
 
 
 # =============================================================================
+# Pre-created Session Fixtures for PreemptSessionsLifecycleHandler
+# =============================================================================
+
+
+@pytest.fixture
+def preempted_sessions_multiple() -> list[SessionWithKernels]:
+    """Multiple PREEMPTED victims with RUNNING kernels."""
+    return [
+        _create_session(status=SessionStatus.PREEMPTED, kernel_status=KernelStatus.RUNNING),
+        _create_session(status=SessionStatus.PREEMPTED, kernel_status=KernelStatus.RUNNING),
+    ]
+
+
+# =============================================================================
+# Pre-created Session Fixtures for RescheduleSessionsLifecycleHandler
+# =============================================================================
+
+
+@pytest.fixture
+def rescheduling_session_live_kernels() -> SessionWithKernels:
+    """RESCHEDULING session whose kernels are still tearing down."""
+    return _create_session(
+        status=SessionStatus.RESCHEDULING,
+        kernel_status=KernelStatus.TERMINATING,
+    )
+
+
+@pytest.fixture
+def rescheduling_session_terminated_kernels() -> SessionWithKernels:
+    """RESCHEDULING session whose kernels are all gone (ready to requeue)."""
+    return _create_session(
+        status=SessionStatus.RESCHEDULING,
+        kernel_status=KernelStatus.TERMINATED,
+    )
+
+
+# =============================================================================
 # Pre-created Kernel Fixtures for SweepStaleKernelsKernelHandler
 # =============================================================================
 
@@ -529,13 +580,11 @@ def kernel_without_agent() -> KernelInfo:
         network=kernel.network,
         cluster=kernel.cluster,
         resource=ResourceInfo(
-            scaling_group=kernel.resource.scaling_group,
+            resource_group=kernel.resource.resource_group,
             resource_group_id=kernel.resource.resource_group_id,
             agent=None,  # No agent assigned
             agent_addr=None,
             container_id=None,
-            occupied_slots=ResourceSlot(),
-            requested_slots=ResourceSlot(),
             occupied_shares={},
             attached_devices={},
             resource_opts={},
@@ -544,6 +593,7 @@ def kernel_without_agent() -> KernelInfo:
         lifecycle=kernel.lifecycle,
         metrics=kernel.metrics,
         metadata=kernel.metadata,
+        kernel_group_id=None,
     )
 
 
@@ -560,6 +610,8 @@ def schedule_result_success_factory() -> Callable[..., ScheduleResult]:
         return ScheduleResult(
             scheduled_session_ids=[s.session_info.identity.id for s in sessions],
             scheduling_failures=[],
+            reserved_session_ids=[],
+            preemption_plan=[],
         )
 
     return _create
@@ -580,10 +632,10 @@ def sessions_for_pull_factory() -> Callable[..., SessionsForPullWithImages]:
                         kernel_id=KernelId(k.id),
                         agent_id=AgentId(k.resource.agent) if k.resource.agent else None,
                         agent_addr=k.resource.agent_addr,
-                        scaling_group=s.session_info.resource.scaling_group_name or "default",
+                        resource_group=s.session_info.resource.resource_group_name or "default",
                         image="test-image:latest",
                         image_id=None,
-                        architecture=k.image.architecture or "x86_64",
+                        architecture=ArchName(k.image.architecture or "x86_64"),
                     )
                     for k in s.kernel_infos
                 ],
@@ -597,7 +649,7 @@ def sessions_for_pull_factory() -> Callable[..., SessionsForPullWithImages]:
                 _image_id: ImageConfigData(
                     id=_image_id,
                     canonical="test-image:latest",
-                    architecture="x86_64",
+                    architecture=ArchName("x86_64"),
                     project=None,
                     is_local=False,
                     digest="sha256:abc123",
@@ -631,16 +683,18 @@ def sessions_for_start_factory() -> Callable[..., SessionsForStartWithImages]:
                         kernel_id=KernelId(k.id),
                         agent_id=AgentId(k.resource.agent) if k.resource.agent else None,
                         agent_addr=k.resource.agent_addr,
-                        scaling_group=s.session_info.resource.scaling_group_name or "default",
+                        resource_group=s.session_info.resource.resource_group_name or "default",
                         image="test-image:latest",
                         image_id=None,
-                        architecture=k.image.architecture or "x86_64",
+                        architecture=ArchName(k.image.architecture or "x86_64"),
                     )
                     for k in s.kernel_infos
                 ],
-                user_uuid=s.session_info.metadata.user_uuid,
+                user_uuid=s.session_info.metadata.user_uuid or uuid4(),
                 user_email="test@example.com",
                 user_name="test-user",
+                domain_id=DomainID(uuid4()),
+                project_id=ProjectID(uuid4()),
                 environ={},
             )
             for s in sessions
@@ -652,7 +706,7 @@ def sessions_for_start_factory() -> Callable[..., SessionsForStartWithImages]:
                 _image_id: ImageConfigData(
                     id=_image_id,
                     canonical="test-image:latest",
-                    architecture="x86_64",
+                    architecture=ArchName("x86_64"),
                     project=None,
                     is_local=False,
                     digest="sha256:abc123",
@@ -679,7 +733,7 @@ def terminating_session_data_factory() -> Callable[..., list[TerminatingSessionD
                 access_key=AccessKey(s.session_info.metadata.access_key),
                 creation_id=s.session_info.identity.creation_id,
                 status=s.session_info.lifecycle.status,
-                status_info="user-requested",
+                status_info=KernelLifecycleEventReason.USER_REQUESTED,
                 session_type=s.session_info.identity.session_type,
                 kernels=[
                     TerminatingKernelData(
@@ -688,7 +742,7 @@ def terminating_session_data_factory() -> Callable[..., list[TerminatingSessionD
                         container_id=k.resource.container_id,
                         agent_id=AgentId(k.resource.agent) if k.resource.agent else None,
                         agent_addr=k.resource.agent_addr,
-                        occupied_slots=k.resource.occupied_slots or ResourceSlot(),
+                        occupied_slots=ResourceSlot(),
                     )
                     for k in s.kernel_infos
                 ],

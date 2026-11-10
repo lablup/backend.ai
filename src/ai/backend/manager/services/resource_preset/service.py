@@ -1,13 +1,14 @@
 import logging
 from collections.abc import Mapping
-from typing import Any, cast
+from typing import Any
 
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import LegacyResourceSlotState as ResourceSlotState
-from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.repositories.resource_preset import ResourcePresetRepository
-from ai.backend.manager.repositories.resource_preset.creators import ResourcePresetCreatorSpec
-from ai.backend.manager.repositories.resource_preset.updaters import ResourcePresetUpdaterSpec
+from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.models.resource_preset.updaters import (
+    ResourcePresetResourceGroupUpdater,
+)
+from ai.backend.manager.repositories.resource_preset.repository import ResourcePresetRepository
 from ai.backend.manager.services.resource_preset.actions.check_presets import (
     CheckResourcePresetsAction,
     CheckResourcePresetsActionResult,
@@ -24,16 +25,16 @@ from ai.backend.manager.services.resource_preset.actions.list_presets import (
     ListResourcePresetsAction,
     ListResourcePresetsResult,
 )
-from ai.backend.manager.services.resource_preset.actions.modify_preset import (
-    ModifyResourcePresetAction,
-    ModifyResourcePresetActionResult,
+from ai.backend.manager.services.resource_preset.actions.set_preset_resource_group import (
+    SetResourcePresetResourceGroupAction,
+    SetResourcePresetResourceGroupActionResult,
 )
-from ai.backend.manager.services.resource_preset.actions.search_presets import (
-    SearchResourcePresetsV2Action,
-    SearchResourcePresetsV2ActionResult,
+from ai.backend.manager.services.resource_preset.actions.update_preset import (
+    UpdateResourcePresetAction,
+    UpdateResourcePresetActionResult,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ResourcePresetService:
@@ -49,61 +50,51 @@ class ResourcePresetService:
         self, action: CreateResourcePresetAction
     ) -> CreateResourcePresetActionResult:
         creator = action.creator
-        spec = cast(ResourcePresetCreatorSpec, creator.spec)
-
-        if not spec.resource_slots.has_intrinsic_slots():
+        if not creator.resource_slots.has_intrinsic_slots():
             raise InvalidAPIParameters("ResourceSlot must have all intrinsic resource slots.")
 
         preset_data = await self._resource_preset_repository.create_preset_validated(creator)
         return CreateResourcePresetActionResult(resource_preset=preset_data)
 
-    async def modify_preset(
-        self, action: ModifyResourcePresetAction
-    ) -> ModifyResourcePresetActionResult:
-        name = action.name
-        preset_id = action.id
-        spec = cast(ResourcePresetUpdaterSpec, action.updater.spec)
-
-        if preset_id is None and name is None:
-            raise InvalidAPIParameters("One of (`id` or `name`) parameter should not be null")
-
-        if resource_slots := spec.resource_slots.optional_value():
+    async def update_preset(
+        self, action: UpdateResourcePresetAction
+    ) -> UpdateResourcePresetActionResult:
+        if resource_slots := action.updater.resource_slots.optional_value():
             if not resource_slots.has_intrinsic_slots():
                 raise InvalidAPIParameters("ResourceSlot must have all intrinsic resource slots.")
 
-        # Ensure the Updater has the correct pk_value
-        if preset_id is not None:
-            action.updater.pk_value = preset_id
-        else:
-            # Need to look up the preset to get its id
-            preset = await self._resource_preset_repository.get_preset_by_name(name)  # type: ignore[arg-type]
-            action.updater.pk_value = preset.id
-
         preset_data = await self._resource_preset_repository.modify_preset_validated(action.updater)
+        return UpdateResourcePresetActionResult(resource_preset=preset_data)
 
-        return ModifyResourcePresetActionResult(resource_preset=preset_data)
+    async def set_preset_resource_group(
+        self, action: SetResourcePresetResourceGroupAction
+    ) -> SetResourcePresetResourceGroupActionResult:
+        preset_data = await self._resource_preset_repository.set_preset_resource_group(
+            ResourcePresetResourceGroupUpdater(
+                preset_id=action.preset_id, resource_group_name=action.resource_group_name
+            )
+        )
+        return SetResourcePresetResourceGroupActionResult(resource_preset=preset_data)
 
     async def delete_preset(
         self, action: DeleteResourcePresetAction
     ) -> DeleteResourcePresetActionResult:
-        name = action.name
-        preset_id = action.id
-
-        if preset_id is None and name is None:
-            raise InvalidAPIParameters("One of (`id` or `name`) parameter should not be null")
-
         preset_data = await self._resource_preset_repository.delete_preset_validated(
-            preset_id, name
+            action.preset_id
         )
-
         return DeleteResourcePresetActionResult(resource_preset=preset_data)
 
     async def list_presets(self, action: ListResourcePresetsAction) -> ListResourcePresetsResult:
-        preset_data_list = await self._resource_preset_repository.list_presets(action.scaling_group)
+        preset_data_list = await self._resource_preset_repository.list_presets(
+            action.resource_group
+        )
+        known_slot_types = await self._resource_preset_repository.known_slot_types()
 
         presets = []
         for preset_data in preset_data_list:
-            preset_slots = preset_data.resource_slots.normalize_slots(ignore_unknown=True)
+            preset_slots = preset_data.resource_slots.normalize_slots_by_known_slots(
+                known_slot_types, ignore_unknown=True
+            )
             presets.append({
                 "id": str(preset_data.id),
                 "name": preset_data.name,
@@ -115,36 +106,25 @@ class ResourcePresetService:
 
         return ListResourcePresetsResult(presets=presets)
 
-    async def search_presets_v2(
-        self,
-        action: SearchResourcePresetsV2Action,
-    ) -> SearchResourcePresetsV2ActionResult:
-        """Search resource presets with filter/order/pagination."""
-        result = await self._resource_preset_repository.search_presets(action.querier)
-        return SearchResourcePresetsV2ActionResult(
-            presets=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
-
     async def check_presets(
         self, action: CheckResourcePresetsAction
     ) -> CheckResourcePresetsActionResult:
         result = await self._resource_preset_repository.check_presets(
-            access_key=action.access_key,
             user_id=action.user_id,
             group_name=action.group,
             domain_name=action.domain_name,
-            resource_policy=action.resource_policy,
-            scaling_group=action.scaling_group,
+            resource_group=action.resource_group,
         )
+
+        known_slot_types = await self._resource_preset_repository.known_slot_types()
 
         # Convert repository result to action result
         # Process presets to JSON format
         presets: list[Mapping[str, Any]] = []
         for preset_data in result.presets:
-            preset_slots = preset_data.preset.resource_slots.normalize_slots(ignore_unknown=True)
+            preset_slots = preset_data.preset.resource_slots.normalize_slots_by_known_slots(
+                known_slot_types, ignore_unknown=True
+            )
             presets.append({
                 "id": str(preset_data.preset.id),
                 "name": preset_data.preset.name,
@@ -159,7 +139,7 @@ class ResourcePresetService:
 
         # Convert per scaling group data to appropriate format
         per_sgroup_dict = {}
-        for sgname, sg_data in result.scaling_groups.items():
+        for sgname, sg_data in result.resource_groups.items():
             per_sgroup_dict[sgname] = {
                 ResourceSlotState.OCCUPIED: sg_data.using,
                 ResourceSlotState.AVAILABLE: sg_data.remaining,
@@ -173,6 +153,6 @@ class ResourcePresetService:
             group_limits=result.group_limits,
             group_using=result.group_using,
             group_remaining=result.group_remaining,
-            scaling_group_remaining=result.scaling_group_remaining,
-            scaling_groups=per_sgroup_dict,
+            resource_group_remaining=result.resource_group_remaining,
+            resource_groups=per_sgroup_dict,
         )

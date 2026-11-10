@@ -114,7 +114,7 @@ Example:
        "resources": {
          "cpu": "2",
          "mem": "4g",
-         "cuda.devices": "1",
+         "cuda.device": "1",
        }
      },
      "tag": "example-tag"

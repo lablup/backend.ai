@@ -5,6 +5,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from ai.backend.client.v2.base_domain import BaseDomainClient
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.resource_allocation.request import (
     CheckPresetAvailabilityInput,
 )
@@ -14,6 +15,8 @@ from ai.backend.common.dto.manager.v2.resource_allocation.response import (
 from ai.backend.common.dto.manager.v2.resource_preset.request import (
     AdminSearchResourcePresetsInput,
     CreateResourcePresetInput,
+    PartialBulkPurgeResourcePresetsInput,
+    PartialBulkUpdateResourcePresetsInput,
     UpdateResourcePresetInput,
 )
 from ai.backend.common.dto.manager.v2.resource_preset.response import (
@@ -69,12 +72,38 @@ class V2ResourcePresetClient(BaseDomainClient):
             response_model=UpdateResourcePresetPayload,
         )
 
-    async def delete(self, preset_id: UUID) -> DeleteResourcePresetPayload:
-        """Delete a resource preset by ID."""
+    async def purge(self, preset_id: UUID) -> DeleteResourcePresetPayload:
+        """Permanently delete a resource preset by ID."""
         return await self._client.typed_request(
             "DELETE",
             f"{_PATH}/{preset_id}",
             response_model=DeleteResourcePresetPayload,
+        )
+
+    async def delete(self, preset_id: UUID) -> DeleteResourcePresetPayload:
+        """Deprecated. Use :meth:`purge`."""
+        return await self.purge(preset_id)
+
+    async def partial_bulk_update(
+        self, request: PartialBulkUpdateResourcePresetsInput
+    ) -> PartialBulkPayload[ResourcePresetNode]:
+        """Update several resource presets, answering for each one."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/partial-bulk-update",
+            request=request,
+            response_model=PartialBulkPayload[ResourcePresetNode],
+        )
+
+    async def partial_bulk_purge(
+        self, request: PartialBulkPurgeResourcePresetsInput
+    ) -> PartialBulkPayload[ResourcePresetNode]:
+        """Permanently delete several resource presets, answering for each one."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/partial-bulk-purge",
+            request=request,
+            response_model=PartialBulkPayload[ResourcePresetNode],
         )
 
     async def check_availability(

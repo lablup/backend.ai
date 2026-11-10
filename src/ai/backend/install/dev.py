@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .tomltool import toml_set
+from .types import PrerequisiteError
 
 if TYPE_CHECKING:
     from .context import Context
@@ -26,6 +27,19 @@ async def install_git_lfs(ctx: Context) -> None:
         "Darwin": ["git-lfs"],
     })
     await ctx.run_shell("git lfs install", stderr=asyncio.subprocess.DEVNULL)
+
+
+async def pull_git_lfs(ctx: Context) -> None:
+    ctx.log_header("Checking out the Git LFS files")
+    exit_code = await ctx.run_shell("git lfs pull")
+    if exit_code != 0:
+        raise PrerequisiteError(
+            f"Failed to check out the Git LFS files (git lfs pull exit {exit_code}).",
+            instruction=(
+                "Run [bold]git lfs pull[/] in the repository and retry. "
+                "Without it the agent's runner binaries stay as pointer files."
+            ),
+        )
 
 
 async def install_git_hooks(ctx: Context) -> None:
@@ -94,13 +108,11 @@ async def install_editable_webui(ctx: Context) -> None:
       git clone https://github.com/lablup/backend.ai-webui ./src/ai/backend/webui
       cd src/ai/backend/webui
       cp configs/default.toml config.toml
-      local site_name=$(basename $(pwd))
       # The debug mode here is only for 'hard-core' debugging scenarios -- it changes lots of behaviors.
       # (e.g., separate debugging of Electron's renderer and main threads)
       sed_inplace "s@debug = true@debug = false@" config.toml
       # The webserver endpoint to use in the session mode.
       sed_inplace "s@#[[:space:]]*apiEndpoint =.*@apiEndpoint = "'"'"http://127.0.0.1:${WEBSERVER_PORT}"'"@' config.toml
-      sed_inplace "s@#[[:space:]]*apiEndpointText =.*@apiEndpointText = "'"'"${site_name}"'"@' config.toml
       # webServerURL lets the electron app use the web UI contents from the server.
       # The server may be either a `npm run server:d` instance or a `./py -m ai.backend.web.server` instance.
       # In the former case, you may live-edit the webui sources while running them in the electron app.

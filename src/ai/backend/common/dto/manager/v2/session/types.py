@@ -7,10 +7,13 @@ from __future__ import annotations
 from enum import StrEnum
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.dto.manager.query import EnumFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "ClusterModeEnum",
@@ -20,8 +23,14 @@ __all__ = (
     "SessionOrderField",
     "SessionResultEnum",
     "SessionStatusEnum",
+    "SessionTerminationStatusEnum",
+    "SessionResultFilter",
     "SessionStatusFilter",
     "SessionTypeEnum",
+    "SessionTypeFilter",
+    "SessionUsage",
+    "SessionUsedBy",
+    "SessionUses",
 )
 
 
@@ -38,11 +47,22 @@ class SessionStatusEnum(StrEnum):
     RESTARTING = "RESTARTING"
     RUNNING_DEGRADED = "RUNNING_DEGRADED"
     DEPRIORITIZING = "DEPRIORITIZING"
+    RESERVED = "RESERVED"
     PREEMPTED = "PREEMPTED"
+    RESCHEDULING = "RESCHEDULING"
     TERMINATING = "TERMINATING"
     TERMINATED = "TERMINATED"
     ERROR = "ERROR"
     CANCELLED = "CANCELLED"
+
+
+class SessionTerminationStatusEnum(StrEnum):
+    """What a termination request did to one session."""
+
+    CANCELLED = "cancelled"
+    TERMINATING = "terminating"
+    FORCE_TERMINATED = "force-terminated"
+    SKIPPED = "skipped"
 
 
 class SessionTypeEnum(StrEnum):
@@ -71,6 +91,28 @@ class SessionOrderField(StrEnum):
     STATUS = "status"
     ID = "id"
     NAME = "name"
+    CREATION_ID = "creation_id"
+    SESSION_TYPE = "session_type"
+    PRIORITY = "priority"
+    TIER = "tier"
+    JOB_PRIORITY = "job_priority"
+    IS_PREEMPTIBLE = "is_preemptible"
+    CLUSTER_SIZE = "cluster_size"
+    RESOURCE_GROUP_NAME = "resource_group_name"
+    DOMAIN_NAME = "domain_name"
+    PROJECT_ID = "project_id"
+    USER_ID = "user_id"
+    ACCESS_KEY = "access_key"
+    TAG = "tag"
+    USE_HOST_NETWORK = "use_host_network"
+    BATCH_TIMEOUT = "batch_timeout"
+    STARTS_AT = "starts_at"
+    RESULT = "result"
+    NETWORK_TYPE = "network_type"
+    NETWORK_ID = "network_id"
+    REPLICA_ID = "replica_id"
+    SESSION_GROUP_ID = "session_group_id"
+    REQUESTED_STARTS_AT = "requested_starts_at"
 
 
 class CreateSessionTypeEnum(StrEnum):
@@ -87,16 +129,96 @@ class ClusterModeEnum(StrEnum):
     MULTI_NODE = "multi-node"
 
 
-class SessionStatusFilter(BaseRequestModel):
+class SessionStatusFilter(EnumFilter[SessionStatusEnum]):
     """Filter for session status values."""
 
-    equals: SessionStatusEnum | None = None
-    in_: list[SessionStatusEnum] | None = None
-    not_equals: SessionStatusEnum | None = None
-    not_in: list[SessionStatusEnum] | None = None
+
+class SessionTypeFilter(EnumFilter[SessionTypeEnum]):
+    """Filter for session type values."""
+
+
+class SessionResultFilter(EnumFilter[SessionResultEnum]):
+    """Filter for session result values."""
+
+
+class NetworkTypeEnum(StrEnum):
+    """Inter-container network types a session may use."""
+
+    VOLATILE = "volatile"
+    PERSISTENT = "persistent"
+    HOST = "host"
+
+
+class NetworkTypeFilter(EnumFilter[NetworkTypeEnum]):
+    """Filter for session network type values."""
+
+
+class SessionUsedBy(BaseRequestModel):
+    """Entities whose use of the session narrows the result."""
+
+    deployment: list[UUID] | None = Field(
+        default=None, description="Deployments whose route rows the session serves as a replica"
+    )
+
+
+class SessionUses(BaseRequestModel):
+    """Entities the session uses, whose ids narrow the result."""
+
+    image: list[UUID] | None = Field(default=None, description="Images the session's kernels run")
+    agent: list[UUID] | None = Field(
+        default=None, description="Agents running a kernel of the session"
+    )
+    resource_group: list[UUID] | None = Field(
+        default=None, description="Resource groups the session runs in"
+    )
+    vfolder: list[UUID] | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Vfolders the session's kernel groups mount",
+    )
+
+
+class SessionUsage(BaseRequestModel):
+    """Uses narrowing the sessions read; every id is AND-ed.
+
+    An entity the caller cannot read refuses the request. Sessions the caller cannot read
+    are left out even when a listed entity is tied to them.
+    """
+
+    used_by: SessionUsedBy | None = Field(
+        default=None, description="Entities whose use of the session narrows the result"
+    )
+    uses: SessionUses | None = Field(
+        default=None, description="Entities the session uses, whose ids narrow the result"
+    )
 
 
 class ProjectSessionScope(BaseRequestModel):
     """Scope for project-level session operations."""
 
     project_id: UUID = Field(description="Project UUID to scope the operation.")
+
+
+class SessionScope(BaseRequestModel):
+    """Scope for the scoped session query.
+
+    Each list is OR'd internally and across lists. Raises an error if every field is
+    empty.
+    """
+
+    domain: list[UUIDScope] | None = Field(
+        default=None, description="Domains whose sessions are being read"
+    )
+    project: list[UUIDScope] | None = Field(
+        default=None, description="Projects whose sessions are being read"
+    )
+    user: list[UUIDScope] | None = Field(
+        default=None, description="Users whose sessions are being read"
+    )
+
+    @model_validator(mode="after")
+    def _require_non_empty(self) -> SessionScope:
+        if not self.domain and not self.project and not self.user:
+            raise ValueError(
+                "SessionScope requires a non-empty value for 'domain', 'project' or 'user'"
+            )
+        return self

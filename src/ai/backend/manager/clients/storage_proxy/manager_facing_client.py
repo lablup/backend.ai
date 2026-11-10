@@ -37,6 +37,8 @@ from ai.backend.common.dto.storage.response import (
     VFolderCloneResponse,
     VFSListFilesResponse,
 )
+from ai.backend.common.endpoint_pool.exceptions import NoHealthyEndpointError
+from ai.backend.common.endpoint_pool.pool import HealthyEndpointPool
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -45,7 +47,11 @@ from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.clients.storage_proxy.base import StorageProxyHTTPClient
 from ai.backend.manager.config.unified import StorageProxyClientTimeoutConfig
 from ai.backend.manager.defs import DEFAULT_CHUNK_SIZE
-from ai.backend.manager.errors.storage import UnexpectedStorageProxyResponseError
+from ai.backend.manager.errors.storage import (
+    StorageProxyConnectionError,
+    StorageProxyTimeoutError,
+    UnexpectedStorageProxyResponseError,
+)
 
 storage_proxy_client_resilience = Resilience(
     policies=[
@@ -69,6 +75,8 @@ class StorageProxyManagerFacingClient:
     folder creation/deletion, quota management, and performance metrics.
     """
 
+    _endpoint_pool: HealthyEndpointPool
+    _proxy_name: str
     _client: StorageProxyHTTPClient
     _timeout_config: StorageProxyClientTimeoutConfig
 
@@ -76,9 +84,91 @@ class StorageProxyManagerFacingClient:
         self,
         client: StorageProxyHTTPClient,
         timeout_config: StorageProxyClientTimeoutConfig,
+        *,
+        endpoint_pool: HealthyEndpointPool,
+        proxy_name: str,
     ) -> None:
+        self._endpoint_pool = endpoint_pool
+        self._proxy_name = proxy_name
         self._client = client
         self._timeout_config = timeout_config
+
+    @actxmgr
+    async def _acquire_endpoint(self) -> AsyncIterator[str]:
+        try:
+            async with self._endpoint_pool.acquire() as acquired:
+                yield acquired.endpoint
+        except NoHealthyEndpointError as e:
+            raise StorageProxyConnectionError(
+                extra_msg=f"Storage proxy {self._proxy_name!r}: {e.extra_msg}",
+            ) from e
+        except TimeoutError as e:
+            raise StorageProxyTimeoutError(
+                extra_msg="Request to storage proxy timed out",
+            ) from e
+        except (aiohttp.ClientConnectionError, OSError) as e:
+            raise StorageProxyConnectionError(
+                extra_msg="Failed to connect to storage proxy",
+            ) from e
+
+    async def _request(
+        self,
+        method: str,
+        url: str,
+        *,
+        body: Mapping[str, Any] | None = None,
+        params: Mapping[str, Any] | None = None,
+        request_timeout: aiohttp.ClientTimeout,
+    ) -> Mapping[str, Any] | None:
+        async with self._acquire_endpoint() as endpoint:
+            return await self._client.request(
+                method,
+                url,
+                endpoint=endpoint,
+                body=body,
+                params=params,
+                request_timeout=request_timeout,
+            )
+
+    async def _request_with_response(
+        self,
+        method: str,
+        url: str,
+        *,
+        body: Mapping[str, Any] | None = None,
+        params: Mapping[str, Any] | None = None,
+        request_timeout: aiohttp.ClientTimeout,
+    ) -> Mapping[str, Any]:
+        async with self._acquire_endpoint() as endpoint:
+            return await self._client.request_with_response(
+                method,
+                url,
+                endpoint=endpoint,
+                body=body,
+                params=params,
+                request_timeout=request_timeout,
+            )
+
+    @actxmgr
+    async def _request_stream_response(
+        self,
+        method: str,
+        url: str,
+        *,
+        body: Mapping[str, Any] | None = None,
+        params: Mapping[str, Any] | None = None,
+        request_timeout: aiohttp.ClientTimeout,
+    ) -> AsyncIterator[aiohttp.ClientResponse]:
+        async with self._acquire_endpoint() as endpoint:
+            async with self._client.request_stream_response(
+                method,
+                url,
+                endpoint=endpoint,
+                body=body,
+                params=params,
+                request_timeout=request_timeout,
+            ) as response:
+                yield response
 
     @storage_proxy_client_resilience.apply()
     async def get_volumes(self) -> Mapping[str, Any]:
@@ -87,7 +177,7 @@ class StorageProxyManagerFacingClient:
 
         :return: Response containing volume information
         """
-        return await self._client.request_with_response(
+        return await self._request_with_response(
             "GET",
             "volumes",
             request_timeout=self._timeout_config.get_volumes.to_client_timeout(),
@@ -119,7 +209,7 @@ class StorageProxyManagerFacingClient:
         }
         if mode is not None:
             body["mode"] = mode
-        await self._client.request(
+        await self._request(
             "POST",
             "folder/create",
             body=body,
@@ -138,7 +228,7 @@ class StorageProxyManagerFacingClient:
         :param volume: Volume name
         :param vfid: Virtual folder ID
         """
-        await self._client.request(
+        await self._request(
             "POST",
             "folder/delete",
             body={
@@ -170,7 +260,7 @@ class StorageProxyManagerFacingClient:
             "dst_volume": dst_volume,
             "dst_vfid": dst_vfid,
         }
-        data = await self._client.request_with_response(
+        data = await self._request_with_response(
             "POST",
             "folder/clone",
             body=body,
@@ -193,7 +283,7 @@ class StorageProxyManagerFacingClient:
         :param subpath: Subpath within the folder (default: ".")
         :return: Response containing the mount path
         """
-        return await self._client.request_with_response(
+        return await self._request_with_response(
             "GET",
             "folder/mount",
             body={
@@ -215,7 +305,7 @@ class StorageProxyManagerFacingClient:
         :param volume: Volume name
         :return: Response containing hardware information
         """
-        return await self._client.request_with_response(
+        return await self._request_with_response(
             "GET",
             "volume/hwinfo",
             body={
@@ -235,7 +325,7 @@ class StorageProxyManagerFacingClient:
         :param volume: Volume name
         :return: Response containing performance metrics
         """
-        return await self._client.request_with_response(
+        return await self._request_with_response(
             "GET",
             "volume/performance-metric",
             body={
@@ -255,7 +345,7 @@ class StorageProxyManagerFacingClient:
         :param volume: Volume name
         :return: Response containing filesystem usage
         """
-        return await self._client.request_with_response(
+        return await self._request_with_response(
             "GET",
             "folder/fs-usage",
             body={
@@ -277,7 +367,7 @@ class StorageProxyManagerFacingClient:
         :param vfid: Virtual folder ID
         :return: Response containing quota information
         """
-        return await self._client.request_with_response(
+        return await self._request_with_response(
             "GET",
             "volume/quota",
             body={
@@ -307,7 +397,7 @@ class StorageProxyManagerFacingClient:
             "vfid": vfid,
             "size_bytes": quota_scope_size,
         }
-        await self._client.request(
+        await self._request(
             "PATCH",
             "volume/quota",
             body=body,
@@ -327,7 +417,7 @@ class StorageProxyManagerFacingClient:
         :param qsid: Quota scope ID
         :return: Response containing quota scope information
         """
-        return await self._client.request_with_response(
+        return await self._request_with_response(
             "GET",
             "quota-scope",
             body={
@@ -358,7 +448,7 @@ class StorageProxyManagerFacingClient:
                 "limit_bytes": max_vfolder_size,
             },
         }
-        await self._client.request(
+        await self._request(
             "PATCH",
             "quota-scope",
             body=body,
@@ -377,7 +467,7 @@ class StorageProxyManagerFacingClient:
         :param volume: Volume name
         :param qsid: Quota scope ID
         """
-        await self._client.request(
+        await self._request(
             "DELETE",
             "quota-scope/quota",
             body={
@@ -415,7 +505,7 @@ class StorageProxyManagerFacingClient:
         }
         if parents is not None:
             body["parents"] = parents
-        return await self._client.request_with_response(
+        return await self._request_with_response(
             "POST",
             "folder/file/mkdir",
             body=body,
@@ -438,7 +528,7 @@ class StorageProxyManagerFacingClient:
         :param relpath: Current relative path of the file/directory
         :param new_name: New name for the file/directory
         """
-        await self._client.request(
+        await self._request(
             "POST",
             "folder/file/rename",
             body={
@@ -467,7 +557,7 @@ class StorageProxyManagerFacingClient:
         :param recursive: Whether to delete directories recursively
         :return: Response from the storage proxy
         """
-        return await self._client.request_with_response(
+        return await self._request_with_response(
             "POST",
             "folder/file/delete",
             body={
@@ -490,7 +580,7 @@ class StorageProxyManagerFacingClient:
         :param request: Request containing volume, vfid, relpaths, and recursive flag
         :return: Response containing background task ID
         """
-        response = await self._client.request_with_response(
+        response = await self._request_with_response(
             "POST",
             "folder/file/delete-async",
             body=request.model_dump(mode="json"),
@@ -514,7 +604,7 @@ class StorageProxyManagerFacingClient:
         :param src: Source relative path
         :param dst: Destination relative path
         """
-        await self._client.request(
+        await self._request(
             "POST",
             "folder/file/move",
             body={
@@ -543,7 +633,7 @@ class StorageProxyManagerFacingClient:
         :param size: Size of the file
         :return: Response from the storage proxy
         """
-        return await self._client.request_with_response(
+        return await self._request_with_response(
             "POST",
             "folder/file/upload",
             body={
@@ -575,7 +665,7 @@ class StorageProxyManagerFacingClient:
         :param unmanaged_path: Optional unmanaged path for the file
         :return: Response from the storage proxy containing file data
         """
-        return await self._client.request_with_response(
+        return await self._request_with_response(
             "POST",
             "folder/file/download",
             body={
@@ -613,7 +703,7 @@ class StorageProxyManagerFacingClient:
         }
         if filename is not None:
             body["filename"] = filename
-        return await self._client.request_with_response(
+        return await self._request_with_response(
             "POST",
             "folder/file/archive-download-token",
             body=body,
@@ -635,7 +725,7 @@ class StorageProxyManagerFacingClient:
         :param relpath: Relative path of the directory
         :return: Response from the storage proxy containing file list
         """
-        return await self._client.request_with_response(
+        return await self._request_with_response(
             "POST",
             "folder/file/list",
             body={
@@ -661,7 +751,7 @@ class StorageProxyManagerFacingClient:
         :param relpath: Relative path of the file
         :return: Response from the storage proxy containing file content
         """
-        async with self._client.request_stream_response(
+        async with self._request_stream_response(
             "POST",
             "folder/file/fetch",
             body={
@@ -745,7 +835,7 @@ class StorageProxyManagerFacingClient:
         :param vfid: Virtual folder ID
         :return: Response from the storage proxy containing usage information
         """
-        return await self._client.request_with_response(
+        return await self._request_with_response(
             "GET",
             "folder/usage",
             body={
@@ -768,7 +858,7 @@ class StorageProxyManagerFacingClient:
         :param vfid: Virtual folder ID
         :return: Response from the storage proxy containing used bytes
         """
-        return await self._client.request_with_response(
+        return await self._request_with_response(
             "GET",
             "folder/used-bytes",
             body={
@@ -786,7 +876,7 @@ class StorageProxyManagerFacingClient:
         """
         Scan HuggingFace models in the specified registry.
         """
-        resp = await self._client.request_with_response(
+        resp = await self._request_with_response(
             "POST",
             "v1/registries/huggingface/scan",
             body=req.model_dump(by_alias=True),
@@ -802,7 +892,7 @@ class StorageProxyManagerFacingClient:
         """
         Retreive HuggingFace models in the specified registry.
         """
-        resp = await self._client.request_with_response(
+        resp = await self._request_with_response(
             "POST",
             "v1/registries/huggingface/models/batch",
             body=req.model_dump(by_alias=True),
@@ -821,7 +911,7 @@ class StorageProxyManagerFacingClient:
         """
         encoded_model_id = quote(path.model_id, safe="")
 
-        resp = await self._client.request_with_response(
+        resp = await self._request_with_response(
             "GET",
             f"v1/registries/huggingface/model/{encoded_model_id}",
             params={
@@ -840,7 +930,7 @@ class StorageProxyManagerFacingClient:
         """
         Import multiple HuggingFace models into the specified registry.
         """
-        resp = await self._client.request_with_response(
+        resp = await self._request_with_response(
             "POST",
             "v1/registries/huggingface/import",
             body=req.model_dump(by_alias=True),
@@ -862,7 +952,7 @@ class StorageProxyManagerFacingClient:
             params["revision"] = query.revision
 
         encoded_model_id = quote(path.model_id, safe="")
-        resp = await self._client.request_with_response(
+        resp = await self._request_with_response(
             "GET",
             f"v1/registries/huggingface/model/{encoded_model_id}/commit-hash",
             params=params,
@@ -879,7 +969,7 @@ class StorageProxyManagerFacingClient:
         """
         Import multiple Reservoir models into the specified registry.
         """
-        resp = await self._client.request(
+        resp = await self._request(
             "POST",
             "v1/registries/reservoir/import",
             body=req.model_dump(by_alias=True),
@@ -897,7 +987,7 @@ class StorageProxyManagerFacingClient:
         """
         Download a file from S3 storage.
         """
-        await self._client.request_with_response(
+        await self._request_with_response(
             "POST",
             f"v1/storages/s3/{storage_name}/buckets/{bucket_name}/object/download",
             body=req.model_dump(by_alias=True),
@@ -914,7 +1004,7 @@ class StorageProxyManagerFacingClient:
         """
         Get a presigned URL for downloading an object from storage.
         """
-        resp = await self._client.request_with_response(
+        resp = await self._request_with_response(
             "POST",
             f"v1/storages/s3/{storage_name}/buckets/{bucket_name}/object/presigned/download",
             body=req.model_dump(by_alias=True),
@@ -932,7 +1022,7 @@ class StorageProxyManagerFacingClient:
         """
         Get a presigned URL for uploading an object to storage.
         """
-        resp = await self._client.request_with_response(
+        resp = await self._request_with_response(
             "POST",
             f"v1/storages/s3/{storage_name}/buckets/{bucket_name}/object/presigned/upload",
             body=req.model_dump(by_alias=True),
@@ -950,7 +1040,7 @@ class StorageProxyManagerFacingClient:
         """
         Delete a file from S3 storage.
         """
-        await self._client.request(
+        await self._request(
             "DELETE",
             f"v1/storages/s3/{storage_name}/buckets/{bucket_name}/object",
             body=req.model_dump(by_alias=True),
@@ -971,7 +1061,7 @@ class StorageProxyManagerFacingClient:
         :param req: VFS download file request
         :return: Streaming response from the storage proxy
         """
-        async with self._client.request_stream_response(
+        async with self._request_stream_response(
             "POST",
             f"v1/storages/vfs/{storage_name}/download",
             body=req.model_dump(by_alias=True),
@@ -992,7 +1082,7 @@ class StorageProxyManagerFacingClient:
         :param req: VFS list files request
         :return: Response containing list of files with metadata
         """
-        resp = await self._client.request_with_response(
+        resp = await self._request_with_response(
             "GET",
             f"v1/storages/vfs/{storage_name}/files",
             body=req.model_dump(by_alias=True),

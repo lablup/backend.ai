@@ -16,13 +16,25 @@ from ai.backend.common.cli import LazyGroup
 from .admin import admin
 from .config_cmd import config
 from .gql_cmd import gql
+from .helpers import PROFILE_META_KEY
 from .login_cmd import login, logout
 from .my import my
+from .profile_cmd import profile
+from .public import public
 
 
 @click.group()
-def v2() -> None:
+@click.option(
+    "--profile",
+    "profile_name",
+    default=None,
+    metavar="NAME",
+    help="Profile to use. Overrides BACKEND_PROFILE and the current profile.",
+)
+@click.pass_context
+def v2(ctx: click.Context, profile_name: str | None) -> None:
     """V2 REST API commands."""
+    ctx.meta[PROFILE_META_KEY] = profile_name
     # The real entry point for `./bai v2 ...` is the `LazyGroup` wrapper in
     # `client/cli/__init__.py`, because `LazyGroup` does not delegate
     # `MultiCommand.invoke` to the underlying group. This callback only runs
@@ -36,6 +48,7 @@ def v2() -> None:
 
 # Infrastructure commands
 v2.add_command(config)
+v2.add_command(profile)
 v2.add_command(login)
 v2.add_command(logout)
 v2.add_command(gql)
@@ -46,9 +59,21 @@ v2.add_command(admin)
 # My group — contains self-service commands per entity
 v2.add_command(my)
 
+# Public group — contains anonymous commands per entity, usable without credentials
+v2.add_command(public)
+
 
 # Entity sub-groups — lazy loaded to avoid heavy imports at startup.
 # Names are singular following the pattern: ./bai [admin] {entity} {operation}
+
+
+@v2.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.app_config_fragment:app_config_fragment",
+    name="app-config-fragment",
+)
+def app_config_fragment() -> None:
+    """App config fragment commands."""
 
 
 @v2.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.domain:domain")
@@ -155,6 +180,15 @@ def runtime_variant_preset() -> None:
     """Runtime variant preset commands."""
 
 
+@v2.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.system_session_environ:system_session_environ",
+    name="system-session-environ",
+)
+def system_session_environ() -> None:
+    """System session environ commands."""
+
+
 # ------------------------------------------------------------------ Model Store
 
 
@@ -198,11 +232,29 @@ def object_storage() -> None:
 
 @v2.group(
     cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.entity_label:entity_label",
+    name="entity-label",
+)
+def entity_label() -> None:
+    """Entity label commands."""
+
+
+@v2.group(
+    cls=LazyGroup,
     import_name="ai.backend.client.cli.v2.login_client_type.commands:login_client_type",
     name="login-client-type",
 )
 def login_client_type() -> None:
     """Read-only commands for inspecting registered login client types."""
+
+
+@v2.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.entity_type.commands:entity_type",
+    name="entity-type",
+)
+def entity_type() -> None:
+    """Read-only commands for inspecting the entity types a request may name."""
 
 
 @v2.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.rbac:rbac")
@@ -240,6 +292,24 @@ def resource_usage() -> None:
 @v2.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.audit_log:audit_log")
 def audit_log() -> None:
     """Audit log commands."""
+
+
+@v2.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.entity_share:entity_share",
+    name="entity-share",
+)
+def entity_share() -> None:
+    """Entity invitation commands."""
+
+
+@v2.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.idle_checker_assignment:idle_checker_assignment",
+    name="idle-checker-assignment",
+)
+def idle_checker_assignment() -> None:
+    """Idle checker assignment commands."""
 
 
 @v2.group(

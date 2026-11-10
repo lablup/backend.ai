@@ -1,0 +1,130 @@
+"""Write spec for one audit record.
+
+A record is laid the way the monitors write one: through the field creator, under the
+entity it is about. No adapter call makes one, so a scenario that needs a record to read
+lays it here. Its ``triggered_by`` is set from a user an earlier step laid, never a
+literal, so the two stay in step.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any, override
+from uuid import UUID, uuid4
+
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.manager.actions.types import OperationStatus
+from ai.backend.manager.data.audit_log.types import AuditLogData
+from ai.backend.manager.models.audit_log.creators import (
+    AuditLogScopeCreator,
+    ScopeAuditLogCreator,
+    SingleEntityAuditLogCreator,
+)
+from ai.backend.manager.models.specs.creator import NestedFieldCreator
+from ai.backend.testutils.scenario_steps import Says
+from bai_scenario.seeds.seeder import TestSeedFieldCreator, TestSeedFieldWithNestedRows, joined
+
+
+@dataclass(frozen=True)
+class TestSeedAuditRecord[Owner](TestSeedFieldCreator[Owner, AuditLogData]):
+    """One record of an operation on the entity ``owner_of`` reads off the laid row.
+
+    The record's ``triggered_by`` is a user id, or none; the actor axis of a scoped read
+    matches on it while the entity axis matches on the owner. Records given the same
+    ``action_id`` are rows of one run; without one, each record is its own run.
+    """
+
+    owner_of: Callable[[Owner], EntityIdentifier]
+    operation: str
+    created_at: datetime
+    status: OperationStatus = OperationStatus.SUCCESS
+    triggered_by: UserID | None = None
+    action_id: UUID | None = None
+
+    @override
+    def kind(self) -> str:
+        parts = [Says(f"'{self.operation}' 기록", english=f"'{self.operation}' record")]
+        if self.status is not OperationStatus.SUCCESS:
+            parts.append(Says(f"{self.status.value} 상태", english=f"status {self.status.value}"))
+        if self.triggered_by is not None:
+            parts.append(Says("실행한 사용자를 지정함", english="the user who ran it is specified"))
+        if self.action_id is not None:
+            parts.append(
+                Says(
+                    "다른 기록과 같은 실행에서 남음",
+                    english="recorded in the same run as another record",
+                )
+            )
+        return joined(parts)
+
+    @override
+    def owner_id(self, owner: Owner) -> EntityIdentifier:
+        return self.owner_of(owner)
+
+    @override
+    def seed(self) -> SingleEntityAuditLogCreator:
+        return SingleEntityAuditLogCreator(
+            action_id=self.action_id if self.action_id is not None else uuid4(),
+            operation=self.operation,
+            action_name=self.operation,
+            created_at=self.created_at,
+            description=f"{self.operation} was recorded",
+            status=self.status,
+            request_id=None,
+            triggered_by=str(self.triggered_by) if self.triggered_by is not None else None,
+            acted_as=None,
+            duration=None,
+            client_ip=None,
+        )
+
+
+@dataclass(frozen=True)
+class TestSeedScopedAuditRecord[Owner](TestSeedFieldWithNestedRows[Owner, AuditLogData]):
+    """A scope-action record: written under the entity it affected, tagged with the scopes
+    the run covered. A search by one of those scopes finds it through ``audit_log_scopes``,
+    not through the record's own entity.
+    """
+
+    owner_of: Callable[[Owner], EntityIdentifier]
+    operation: str
+    created_at: datetime
+    status: OperationStatus = OperationStatus.SUCCESS
+    triggered_by: UserID | None = None
+    scopes: tuple[tuple[EntityType, UUID], ...] = field(default_factory=tuple)
+
+    @override
+    def kind(self) -> str:
+        return joined([
+            Says(f"'{self.operation}' 기록", english=f"'{self.operation}' record"),
+            Says(f"스코프 {len(self.scopes)}개 추가됨", english=f"{len(self.scopes)} scopes added"),
+        ])
+
+    @override
+    def owner_id(self, owner: Owner) -> EntityIdentifier:
+        return self.owner_of(owner)
+
+    @override
+    def field(self) -> ScopeAuditLogCreator:
+        return ScopeAuditLogCreator(
+            action_id=uuid4(),
+            operation=self.operation,
+            action_name=self.operation,
+            created_at=self.created_at,
+            description=f"{self.operation} was recorded",
+            status=self.status,
+            request_id=None,
+            triggered_by=str(self.triggered_by) if self.triggered_by is not None else None,
+            acted_as=None,
+            duration=None,
+            client_ip=None,
+        )
+
+    @override
+    def nested(self) -> Sequence[NestedFieldCreator[Any, Any, Any]]:
+        return [
+            AuditLogScopeCreator(scope_type=scope_type, scope_id=scope_id)
+            for scope_type, scope_id in self.scopes
+        ]

@@ -9,7 +9,6 @@ import signal
 import socket
 import ssl
 import sys
-import time
 import traceback
 import uuid
 from collections.abc import (
@@ -26,13 +25,14 @@ from functools import partial
 from http import HTTPStatus
 from pathlib import Path
 from pprint import pprint
-from typing import Any, cast
+from typing import Any, Final, cast
 
 import aiohttp
 import aiohttp_cors
 import aiotools
 import click
 import jinja2
+import jwt
 import tomli
 import uvloop
 from aiohttp import web
@@ -41,14 +41,17 @@ from yarl import URL
 
 from ai.backend.client.config import APIConfig
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
+from ai.backend.client.request import Request
 from ai.backend.client.session import AsyncSession as APISession
 from ai.backend.client.v2.auth import NoAuth
 from ai.backend.client.v2.config import ClientConfig as V2ClientConfig
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common import config
 from ai.backend.common.clients.http_client.client_pool import ClientPool
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
+from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
-from ai.backend.common.defs import REDIS_STATISTICS_DB, RedisRole
+from ai.backend.common.defs import REDIS_RATE_LIMIT_DB, REDIS_STATISTICS_DB, RedisRole
 from ai.backend.common.dto.internal.health import (
     ConnectivityCheckResponse,
     HealthResponse,
@@ -61,11 +64,19 @@ from ai.backend.common.dto.manager.auth.types import (
     RequireTwoFactorAuthResponse,
     RequireTwoFactorRegistrationResponse,
 )
+from ai.backend.common.endpoint_pool.exceptions import NoHealthyEndpointError
+from ai.backend.common.endpoint_pool.pool import HealthyEndpointPool
+from ai.backend.common.endpoint_pool.strategy import build_endpoint_selection_strategy
+from ai.backend.common.endpoint_pool.types import AcquiredEndpoint, EndpointPoolSpec
+from ai.backend.common.exception import MalformedRequestBody
 from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
 from ai.backend.common.health_checker.probe import HealthProbe, HealthProbeOptions
 from ai.backend.common.health_checker.types import ComponentId
+from ai.backend.common.json import load_json
 from ai.backend.common.middlewares.exception import general_exception_middleware
+from ai.backend.common.middlewares.request_id import request_id_middleware
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
+from ai.backend.common.networking import force_threaded_dns_resolver
 from ai.backend.common.web.session import (
     Session,
     extra_config_headers,
@@ -74,42 +85,61 @@ from ai.backend.common.web.session import (
 )
 from ai.backend.common.web.session import setup as setup_session
 from ai.backend.common.web.session.redis_storage import RedisStorage
-from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
-from ai.backend.logging.otel import OpenTelemetrySpec
+from ai.backend.logging import Logger, LogLevel
+from ai.backend.logging.otel import (
+    LegacyOtelLogging,
+    OpenTelemetrySpec,
+    apply_otel_tracer,
+    build_otel_server_middleware,
+    instrument_aiohttp_client,
+)
+from ai.backend.logging.structured import StructuredLogger
+from ai.backend.logging.structured_otel import StructuredOtelLogging
 from ai.backend.web.clients.apollo_router_pool import (
     ApolloRouterEndpointsHealthChecker,
     ApolloRouterPoolGateHealthChecker,
-)
-from ai.backend.web.clients.endpoint_pool import (
-    AcquiredEndpoint,
-    EndpointPoolSpec,
-    HealthyEndpointPool,
-    build_endpoint_selection_strategy,
 )
 from ai.backend.web.clients.manager_pool import (
     ManagerEndpointsHealthChecker,
     ManagerPoolGateHealthChecker,
 )
 from ai.backend.web.config.unified import EventLoopType, ServiceMode, WebServerUnifiedConfig
+from ai.backend.web.errors import ManagerConnectionUnavailable, UnauthenticatedError
+from ai.backend.web.ratelimit import manager_proxy_rate_limited
 from ai.backend.web.security import SecurityPolicy, csp_nonce_var, security_policy_middleware
 
 from . import __version__, user_agent
-from .auth import build_forwarding_headers, fill_forwarding_hdrs_to_api_session, get_client_ip
-from .errors import InvalidAPIConfigurationError, UnexpectedAuthResponseError
+from .auth import (
+    build_forwarding_headers,
+    fill_forwarding_hdrs_to_api_session,
+    get_api_session,
+    get_client_ip,
+)
+from .errors import (
+    AlreadyLoggedInError,
+    InvalidAPIConfigurationError,
+    LoginBlockedError,
+    MissingAuthTokenError,
+    MissingRequestParameterError,
+    ProxyTargetUnreachableError,
+    StaticFileNotFoundError,
+    UnexpectedAuthResponseError,
+)
 from .proxy import (
+    apollo_router_handler,
     decrypt_payload,
     web_handler,
-    web_handler_with_jwt,
     web_plugin_handler,
     websocket_handler,
 )
 from .proxy import (
     pipeline_handler as pipeline_request_handler,
 )
-from .stats import WebStats, track_active_handlers, view_stats
-from .template import toml_scalar
+from .template import build_template_environment
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
+
+PROXIED_HTTP_METHODS: Final = ("HEAD", "GET", "PUT", "POST", "PATCH", "DELETE")
 
 
 cache_patterns = {
@@ -142,54 +172,32 @@ def apply_cache_headers(response: web.StreamResponse, path: str) -> web.StreamRe
 
 
 async def static_handler(request: web.Request) -> web.StreamResponse:
-    stats: WebStats = request.app["stats"]
-    stats.active_static_handlers.add(asyncio.current_task())
     request_path = request.match_info["path"]
     config = cast(WebServerUnifiedConfig, request.app["config"])
     static_path = config.service.static_path
     file_path = (static_path / request_path).resolve()
     try:
-        file_path.relative_to(static_path)
-    except (ValueError, FileNotFoundError):
-        return web.HTTPNotFound(
-            text=json.dumps({
-                "type": "https://api.backend.ai/probs/generic-not-found",
-                "title": "Not Found",
-            }),
-            content_type="application/problem+json",
-        )
+        relative_path = file_path.relative_to(static_path)
+    except (ValueError, FileNotFoundError) as e:
+        raise StaticFileNotFoundError() from e
+    if relative_path.as_posix() in {
+        "stats",
+        "config.ini",
+        "version.json",
+    } or file_path.name.endswith((
+        ".js.map",
+        ".css.map",
+    )):
+        raise StaticFileNotFoundError()
     if file_path.is_file():
         return apply_cache_headers(web.FileResponse(file_path), request_path)
-    return web.HTTPNotFound(
-        text=json.dumps({
-            "type": "https://api.backend.ai/probs/generic-not-found",
-            "title": "Not Found",
-        }),
-        content_type="application/problem+json",
-    )
-
-
-async def config_ini_handler(request: web.Request) -> web.Response:
-    stats: WebStats = request.app["stats"]
-    stats.active_config_handlers.add(asyncio.current_task())
-    config = cast(WebServerUnifiedConfig, request.app["config"])
-    force_protocol = config.service.force_endpoint_protocol
-    if force_protocol is None:
-        scheme = request.scheme
-    else:
-        scheme = str(force_protocol)
-    j2env: jinja2.Environment = request.app["j2env"]
-    tpl = j2env.get_template("config_ini.toml.j2")
-    config_content = tpl.render({
-        "endpoint_url": f"{scheme}://{request.host}",  # must be absolute
-        "config": config.model_dump(by_alias=True),
-    })
-    return web.Response(text=config_content, content_type="text/plain")
+    raise StaticFileNotFoundError()
 
 
 async def config_toml_handler(request: web.Request) -> web.Response:
-    stats: WebStats = request.app["stats"]
-    stats.active_config_handlers.add(asyncio.current_task())
+    """Serve the WebUI config. Before login only the fields the login screen reads are
+    rendered; the rest appears once the session is authenticated."""
+    session = await get_session(request)
     config = cast(WebServerUnifiedConfig, request.app["config"])
     force_protocol = config.service.force_endpoint_protocol
     if force_protocol is None:
@@ -201,20 +209,32 @@ async def config_toml_handler(request: web.Request) -> web.Response:
     config_content = tpl.render({
         "endpoint_url": f"{scheme}://{request.host}",  # must be absolute
         "config": config.model_dump(by_alias=True),
+        "authenticated": bool(session.get("authenticated", False)),
     })
-    return web.Response(text=config_content, content_type="text/plain")
+    response = web.Response(text=config_content, content_type="text/plain")
+    # The body depends on the session, so a shared cache must not keep it.
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+async def version_json_handler(request: web.Request) -> web.StreamResponse:
+    session = await get_session(request)
+    if not session.get("authenticated", False):
+        raise UnauthenticatedError()
+    config = cast(WebServerUnifiedConfig, request.app["config"])
+    return apply_cache_headers(
+        web.FileResponse(config.service.static_path / "version.json"), "version.json"
+    )
 
 
 async def console_handler(request: web.Request) -> web.StreamResponse:
-    stats: WebStats = request.app["stats"]
-    stats.active_webui_handlers.add(asyncio.current_task())
     request_path = request.match_info["path"]
     config = cast(WebServerUnifiedConfig, request.app["config"])
     static_path = config.service.static_path
     file_path = (static_path / request_path).resolve()
     # SECURITY: only allow reading files under static_path
     try:
-        file_path.relative_to(static_path)
+        relative_path = file_path.relative_to(static_path)
     except (ValueError, FileNotFoundError) as e:
         raise web.HTTPNotFound(
             text=json.dumps({
@@ -223,6 +243,15 @@ async def console_handler(request: web.Request) -> web.StreamResponse:
             }),
             content_type="application/problem+json",
         ) from e
+    if relative_path.as_posix() in {
+        "stats",
+        "config.ini",
+        "version.json",
+    } or file_path.name.endswith((
+        ".js.map",
+        ".css.map",
+    )):
+        raise StaticFileNotFoundError()
     index_path = (static_path / "index.html").resolve()
     if file_path.is_file() and file_path != index_path:
         return apply_cache_headers(web.FileResponse(file_path), request_path)
@@ -242,23 +271,12 @@ async def update_password_no_auth(request: web.Request) -> web.Response:
         text = await request.text()
         creds = json.loads(text)
     except json.JSONDecodeError as e:
-        log.error("Login: JSON decoding error: {}", e)
+        log.trace("login request body is not valid JSON: {}", e)
         creds = {}
 
-    def _check_params(param_names: list[str]) -> web.Response | None:
-        for param in param_names:
-            if creds.get(param) is None:
-                return web.HTTPBadRequest(
-                    text=json.dumps({
-                        "type": "https://api.backend.ai/probs/invalid-api-params",
-                        "title": f"You must provide the {param} field.",
-                    }),
-                    content_type="application/problem+json",
-                )
-        return None
-
-    if (fail_resp := _check_params(["username", "current_password", "new_password"])) is not None:
-        return fail_resp
+    for param in ("username", "current_password", "new_password"):
+        if creds.get(param) is None:
+            raise MissingRequestParameterError(param)
 
     result: dict[str, Any] = {
         "data": None,
@@ -283,24 +301,19 @@ async def update_password_no_auth(request: web.Request) -> web.Response:
                 extra_headers=build_forwarding_headers(request),
             )
         result["password_changed_at"] = resp.password_changed_at
-        log.info(
-            "UPDATE_PASSWORD_NO_AUTH: Authorization succeeded for (email:{}, ip:{})",
+        log.trace(
+            "password update succeeded (email: {}, ip: {})",
             creds["username"],
             client_ip,
         )
+    except NoHealthyEndpointError as e:
+        raise ManagerConnectionUnavailable(extra_msg=e.extra_msg) from e
     except BackendClientError as e:
         # This is error, not failed login, so we should not update login history.
-        return web.HTTPBadGateway(
-            text=json.dumps({
-                "type": "https://api.backend.ai/probs/bad-gateway",
-                "title": "The proxy target server is inaccessible.",
-                "details": str(e),
-            }),
-            content_type="application/problem+json",
-        )
+        raise ProxyTargetUnreachableError(str(e)) from e
     except BackendAPIError as e:
-        log.info(
-            "LOGIN_HANDLER: Authorization failed (email:{}, ip:{}) - {}",
+        log.trace(
+            "password update failed (email: {}, ip: {}): {}",
             creds["username"],
             client_ip,
             e,
@@ -310,6 +323,7 @@ async def update_password_no_auth(request: web.Request) -> web.Response:
             "title": e.data.get("title"),
             "details": e.data.get("msg"),
         }
+        return web.json_response(result, status=e.status)
     return web.json_response(result)
 
 
@@ -324,10 +338,20 @@ def _bind_session_to_manager_token(session: Session, session_token: str | None) 
     session._new = True
 
 
+def build_cors_options(
+    allowed_origins: Sequence[str], *, allow_all_origins: bool = False
+) -> dict[str, aiohttp_cors.ResourceOptions]:
+    origins: Sequence[str] = ["*"] if allow_all_origins else allowed_origins
+    return {
+        origin: aiohttp_cors.ResourceOptions(  # type: ignore[no-untyped-call]
+            allow_credentials=True, allow_methods="*", expose_headers="*", allow_headers="*"
+        )
+        for origin in origins
+    }
+
+
 async def login_check_handler(request: web.Request) -> web.Response:
     session = await get_session(request)
-    stats: WebStats = request.app["stats"]
-    stats.active_login_check_handlers.add(asyncio.current_task())
     authenticated = bool(session.get("authenticated", False))
     public_data = None
     if authenticated:
@@ -380,8 +404,6 @@ async def _authorize_via_anonymous_session(
 
 async def login_handler(request: web.Request) -> web.Response:
     config = cast(WebServerUnifiedConfig, request.app["config"])
-    stats: WebStats = request.app["stats"]
-    stats.active_login_handlers.add(asyncio.current_task())
     session = await get_session(request)
     if session.get("authenticated", False):
         raise web.HTTPBadRequest(
@@ -402,7 +424,7 @@ async def login_handler(request: web.Request) -> web.Response:
     try:
         creds = json.loads(request["payload"])
     except json.JSONDecodeError as e:
-        log.error("Login: JSON decoding error: {}", e)
+        log.trace("login request body is not valid JSON: {}", e)
         creds = {}
     if "username" not in creds or not creds["username"]:
         raise web.HTTPBadRequest(
@@ -428,56 +450,22 @@ async def login_handler(request: web.Request) -> web.Response:
     valkey_client: ValkeySessionClient = request.app["redis"]
     BLOCK_TIME = config.session.login_block_time
 
-    async def _get_login_history() -> dict[str, float | int]:
-        login_history_bytes = await valkey_client.get_login_history(creds["username"])
-        if not login_history_bytes:
-            login_history: dict[str, float | int] = {
-                "last_login_attempt": 0,
-                "login_fail_count": 0,
-            }
-        else:
-            login_history = json.loads(login_history_bytes)
-        if login_history["last_login_attempt"] < 0:
-            login_history["last_login_attempt"] = 0
-        if login_history["login_fail_count"] < 0:
-            login_history["login_fail_count"] = 0
-        return login_history
-
-    async def _set_login_history(last_login_attempt: float, login_fail_count: float | int) -> None:
-        """
-        Set login history per email (not in browser session).
-        """
-        value = json.dumps({
-            "last_login_attempt": last_login_attempt,
-            "login_fail_count": login_fail_count,
-        })
-        await valkey_client.set_login_block(creds["username"], value, BLOCK_TIME)
-
-    # Block login if there are too many consecutive failed login attempts.
+    # Block login after too many failures. The history key expires BLOCK_TIME
+    # after the last counted failure, so an existing key is never stale.
     ALLOWED_FAIL_COUNT = config.session.login_allowed_fail_count
-    login_time = time.time()
-    login_history = await _get_login_history()
-    last_login_attempt = login_history.get("last_login_attempt", 0)
-    login_fail_count = login_history.get("login_fail_count", 0)
-    if login_time - last_login_attempt > BLOCK_TIME:
-        # If last attempt is far past, allow login again.
-        login_fail_count = 0
-    last_login_attempt = login_time
+    login_history_bytes = await valkey_client.get_login_history(creds["username"])
+    login_fail_count = 0
+    if login_history_bytes:
+        login_history = load_json(login_history_bytes)
+        login_fail_count = login_history.get("login_fail_count", 0)
     if login_fail_count >= ALLOWED_FAIL_COUNT:
-        log.info(
-            "LOGIN_HANDLER: Too many consecutive login fails (email:{}, count:{}, ip:{})",
+        log.trace(
+            "login blocked after consecutive failures (email: {}, count: {}, ip: {})",
             creds["username"],
             login_fail_count,
             client_ip,
         )
-        await _set_login_history(last_login_attempt, login_fail_count)
-        raise web.HTTPTooManyRequests(
-            text=json.dumps({
-                "type": "https://api.backend.ai/probs/too-many-requests",
-                "title": "Too many failed login attempts",
-            }),
-            content_type="application/problem+json",
-        )
+        raise LoginBlockedError()
 
     manager_pool = cast(HealthyEndpointPool, request.app["manager_pool"])
     try:
@@ -503,6 +491,7 @@ async def login_handler(request: web.Request) -> web.Response:
                     "secret_key": token.secret_key,
                     "role": token.role,
                     "status": token.status,
+                    "user_id": str(token.user_id),
                 }
                 public_return = {
                     "access_key": token.access_key,
@@ -514,10 +503,9 @@ async def login_handler(request: web.Request) -> web.Response:
                 session["token"] = stored_token  # store full token
                 result["authenticated"] = True
                 result["data"] = public_return  # store public info from token
-                login_fail_count = 0
-                await _set_login_history(last_login_attempt, login_fail_count)
-                log.info(
-                    "LOGIN_HANDLER: Authorization succeeded for (email:{}, ip:{})",
+                await valkey_client.clear_login_block(creds["username"])
+                log.trace(
+                    "login succeeded (email: {}, ip: {})",
                     creds["username"],
                     client_ip,
                 )
@@ -542,19 +530,14 @@ async def login_handler(request: web.Request) -> web.Response:
                 raise UnexpectedAuthResponseError(
                     f"Unexpected auth result type: {type(auth_result)}"
                 )
+    except NoHealthyEndpointError as e:
+        raise ManagerConnectionUnavailable(extra_msg=e.extra_msg) from e
     except BackendClientError as e:
         # This is error, not failed login, so we should not update login history.
-        return web.HTTPBadGateway(
-            text=json.dumps({
-                "type": "https://api.backend.ai/probs/bad-gateway",
-                "title": "The proxy target server is inaccessible.",
-                "details": str(e),
-            }),
-            content_type="application/problem+json",
-        )
+        raise ProxyTargetUnreachableError(str(e)) from e
     except BackendAPIError as e:
-        log.info(
-            "LOGIN_HANDLER: Authorization failed (email:{}, ip:{}) - {}",
+        log.trace(
+            "login failed (email: {}, ip: {}): {}",
             creds["username"],
             client_ip,
             e,
@@ -567,37 +550,35 @@ async def login_handler(request: web.Request) -> web.Response:
         }
         session["authenticated"] = False
         if e.status == 401:
-            login_fail_count += 1
-            await _set_login_history(last_login_attempt, login_fail_count)
+            await valkey_client.record_login_failure(
+                creds["username"], BLOCK_TIME, ALLOWED_FAIL_COUNT
+            )
         return web.json_response(result, status=e.status)
     return web.json_response(result)
 
 
 async def logout_handler(request: web.Request) -> web.Response:
-    stats: WebStats = request.app["stats"]
-    stats.active_logout_handlers.add(asyncio.current_task())
     session = await get_session(request)
     session_token = session.identity
-    session.invalidate()
 
-    # Invalidate login session in Manager DB
-    if session_token:
-        config = cast(WebServerUnifiedConfig, request.app["config"])
+    # The manager authenticates /auth/logout, so sign it with the session's keypair
+    # before invalidating the session drops that keypair.
+    if session_token and session.get("authenticated", False):
         manager_pool = cast(HealthyEndpointPool, request.app["manager_pool"])
         try:
             async with manager_pool.acquire() as acquired:
-                async with aiohttp.ClientSession() as http_session:
-                    await http_session.post(
-                        f"{acquired.endpoint}/auth/logout",
-                        json={"session_token": session_token},
-                        ssl=config.api.ssl_verify,
-                    )
+                api_session = await get_api_session(request, acquired)
+                async with api_session:
+                    fill_forwarding_hdrs_to_api_session(request, api_session)
+                    rqst = Request("POST", "/auth/logout")
+                    rqst.set_json({"session_token": session_token})
+                    async with rqst.fetch():
+                        pass
         except Exception:
-            log.exception(
-                "Failed to invalidate login session in Manager DB (token={})", session_token
-            )
+            log.warning("failed to invalidate the login session on the manager", exc_info=True)
 
-    return web.HTTPOk()
+    session.invalidate()
+    return web.Response()
 
 
 async def extend_login_session(request: web.Request) -> web.Response:
@@ -606,6 +587,8 @@ async def extend_login_session(request: web.Request) -> web.Response:
 
     current = get_time()
     session = await get_session(request)
+    if not session.get("authenticated", False):
+        raise UnauthenticatedError()
 
     session.expiration_dt = current + login_session_extension_sec
     expires = datetime.fromtimestamp(session.expiration_dt, tz=UTC).isoformat()
@@ -619,7 +602,6 @@ def _build_web_health_response(connectivity: ConnectivityCheckResponse) -> web.R
     DEGRADED in the body but not surfaced via HTTP status."""
     response = HealthResponse(
         status=HealthStatus.OK if connectivity.overall_healthy else HealthStatus.DEGRADED,
-        version=__version__,
         component="webserver",
         connectivity=connectivity,
     )
@@ -631,7 +613,6 @@ def _build_web_probe_response(connectivity: ConnectivityCheckResponse) -> web.Re
     is_healthy = connectivity.overall_healthy
     response = HealthResponse(
         status=HealthStatus.OK if is_healthy else HealthStatus.ERROR,
-        version=__version__,
         component="webserver",
         connectivity=connectivity,
     )
@@ -665,46 +646,39 @@ async def check_readyz(request: web.Request) -> web.Response:
     return _build_web_probe_response(connectivity)
 
 
-async def webserver_healthcheck(request: web.Request) -> web.Response:
-    stats: WebStats = request.app["stats"]
-    stats.active_healthcheck_handlers.add(asyncio.current_task())
-    result = {
-        "version": __version__,
-        "details": "Success",
-    }
-    return web.json_response(result)
+async def webserver_healthcheck(_request: web.Request) -> web.Response:
+    return web.json_response({"details": "Success"})
+
+
+def _claimed_user_id(auth_token: str) -> uuid.UUID | None:
+    try:
+        # Skip signature verification only to read the claimed user ID for logging.
+        payload = jwt.decode(auth_token, options={"verify_signature": False})
+        return uuid.UUID(payload["user"])
+    except (jwt.PyJWTError, KeyError, ValueError, TypeError, AttributeError):
+        return None
 
 
 async def token_login_handler(request: web.Request) -> web.Response:
     config = cast(WebServerUnifiedConfig, request.app["config"])
-    stats: WebStats = request.app["stats"]
-    stats.active_token_login_handlers.add(asyncio.current_task())
 
     # Check browser session exists.
     session = await get_session(request)
     if session.get("authenticated", False):
-        return web.HTTPBadRequest(
-            text=json.dumps({
-                "type": "https://api.backend.ai/probs/generic-bad-request",
-                "title": "You have already logged in.",
-            }),
-            content_type="application/problem+json",
-        )
+        raise AlreadyLoggedInError()
 
     # Check if auth token is delivered via request body or cookie.
-    rqst_data: dict[str, Any] = await request.json()
+    try:
+        rqst_data: dict[str, Any] = await request.json()
+    except json.JSONDecodeError as e:
+        log.trace("token login request body is not valid JSON: {}", e)
+        raise MalformedRequestBody() from e
     auth_token_name = config.api.auth_token_name
     auth_token = rqst_data.get(auth_token_name)
     if not auth_token:
         auth_token = request.cookies.get(auth_token_name)
     if not auth_token:
-        return web.HTTPBadRequest(
-            text=json.dumps({
-                "type": "https://api.backend.ai/probs/invalid-api-params",
-                "title": "You must provide cookie-based authentication token",
-            }),
-            content_type="application/problem+json",
-        )
+        raise MissingAuthTokenError()
 
     # Login with the token.
     # We do not pose consecutive login failure for this handler since
@@ -764,6 +738,7 @@ async def token_login_handler(request: web.Request) -> web.Response:
             "secret_key": token.secret_key,
             "role": token.role,
             "status": token.status,
+            "user_id": str(token.user_id),
         }
         public_return = {
             "access_key": token.access_key,
@@ -775,17 +750,14 @@ async def token_login_handler(request: web.Request) -> web.Response:
         session["token"] = stored_token  # store full token
         result["authenticated"] = True
         result["data"] = public_return  # store public info from token
+    except NoHealthyEndpointError as e:
+        raise ManagerConnectionUnavailable(extra_msg=e.extra_msg) from e
     except BackendClientError as e:
-        return web.HTTPBadGateway(
-            text=json.dumps({
-                "type": "https://api.backend.ai/probs/bad-gateway",
-                "title": "The proxy target server is inaccessible.",
-                "details": str(e),
-            }),
-            content_type="application/problem+json",
-        )
+        raise ProxyTargetUnreachableError(str(e)) from e
     except BackendAPIError as e:
-        log.info("Authorization failed for token {}: {}", auth_token, e)
+        log.trace(
+            "token login failed", status=e.status, claimed_user_id=_claimed_user_id(auth_token)
+        )
         result["authenticated"] = False
         result["data"] = {
             "type": e.data.get("type"),
@@ -840,32 +812,48 @@ async def redis_ctx(
 
     valkey_profile_target = config.session.redis.to_valkey_profile_target()
     valkey_target = valkey_profile_target.profile_target(RedisRole.STATISTICS)
-
-    # Create ValkeySessionClient for session management
-    valkey_session_client = await ValkeySessionClient.create(
-        valkey_target=valkey_target,
-        db_id=REDIS_STATISTICS_DB,  # Use default database for session storage
-        human_readable_name="web.session",
-    )
-    # Keep app["redis"] key for compatibility
-    app["redis"] = valkey_session_client
-
-    if pidx == 0 and config.session.flush_on_startup:
-        await valkey_session_client.flush_all_sessions()
-        log.info("flushed session storage.")
-
-    if config.session.login_session_extension_sec is None:
-        config.session.login_session_extension_sec = config.session.max_age
-    redis_storage = RedisStorage(
-        valkey_session_client,
-        max_age=config.session.max_age,
-        secure=config.security.cookie_secure,
-    )
-    setup_session(app, redis_storage)
+    rate_limit_valkey_target = valkey_profile_target.profile_target(RedisRole.RATE_LIMIT)
+    sentinel_monitors = SentinelMonitorSet(valkey_profile_target.targets())
+    await sentinel_monitors.start()
     try:
-        yield
+        # Create ValkeySessionClient for session management
+        valkey_session_client = await ValkeySessionClient.create(
+            valkey_target=valkey_target,
+            db_id=REDIS_STATISTICS_DB,  # Use default database for session storage
+            human_readable_name="web.session",
+            sentinel_monitor=sentinel_monitors.monitor_for(valkey_target),
+        )
+        # Keep app["redis"] key for compatibility
+        app["redis"] = valkey_session_client
+
+        valkey_rate_limit_client = await ValkeyRateLimitClient.create(
+            valkey_target=rate_limit_valkey_target,
+            db_id=REDIS_RATE_LIMIT_DB,
+            human_readable_name="web.ratelimit",
+            sentinel_monitor=sentinel_monitors.monitor_for(rate_limit_valkey_target),
+        )
+        app["valkey_rate_limit"] = valkey_rate_limit_client
+
+        if pidx == 0 and config.session.flush_on_startup:
+            await valkey_session_client.flush_all_sessions()
+            log.info("session storage flushed")
+
+        if config.session.login_session_extension_sec is None:
+            config.session.login_session_extension_sec = config.session.max_age
+        redis_storage = RedisStorage(
+            valkey_session_client,
+            max_age=config.session.max_age,
+            secure=config.security.cookie_secure,
+            samesite=config.security.cookie_samesite.value,
+        )
+        setup_session(app, redis_storage)
+        try:
+            yield
+        finally:
+            await valkey_rate_limit_client.close()
+            await valkey_session_client.close()
     finally:
-        await valkey_session_client.close()
+        await sentinel_monitors.close()
 
 
 @asynccontextmanager
@@ -881,6 +869,7 @@ async def client_ctx(
             ),
             base_url=key.endpoint,
             auto_decompress=False,
+            cookie_jar=aiohttp.DummyCookieJar(),
         )
     )
 
@@ -1024,24 +1013,21 @@ async def webapp_ctx(
     app["security_policy"] = SecurityPolicy.from_config(
         request_policy_config, response_policy_config, csp_policy_config
     )
-    j2env = jinja2.Environment(
-        extensions=[
-            "ai.backend.web.template.TOMLField",
-            "ai.backend.web.template.TOMLStringListField",
-        ],
-        loader=jinja2.PackageLoader("ai.backend.web", "templates"),
-    )
-    j2env.filters["toml_scalar"] = toml_scalar
-    app["j2env"] = j2env
+    app["j2env"] = build_template_environment()
 
     manager_pool = cast(HealthyEndpointPool, app["manager_pool"])
 
-    manager_web_handler = partial(web_handler, endpoint_pool=manager_pool)
-    manager_websocket_handler = partial(websocket_handler, endpoint_pool=manager_pool)
+    manager_proxy_handler = partial(web_handler, endpoint_pool=manager_pool)
+    manager_web_handler = manager_proxy_rate_limited(manager_proxy_handler)
+    manager_websocket_handler = manager_proxy_rate_limited(
+        partial(websocket_handler, endpoint_pool=manager_pool)
+    )
     manager_web_plugin_handler = partial(web_plugin_handler, endpoint_pool=manager_pool)
 
-    anon_web_handler = partial(manager_web_handler, is_anonymous=True)
-    anon_web_plugin_handler = partial(manager_web_plugin_handler, is_anonymous=True)
+    anon_web_handler = manager_proxy_rate_limited(partial(manager_proxy_handler, is_anonymous=True))
+    anon_web_plugin_handler = manager_proxy_rate_limited(
+        partial(manager_web_plugin_handler, is_anonymous=True)
+    )
 
     # Pipeline is a separate upstream — no health-aware pool here. A follow-up
     # will introduce one alongside ApolloRouterClientPool.
@@ -1063,12 +1049,18 @@ async def webapp_ctx(
         static_endpoint=pipeline_api_endpoint,
     )
 
-    cors_options = {
-        "*": aiohttp_cors.ResourceOptions(  # type: ignore[no-untyped-call]
-            allow_credentials=True, allow_methods="*", expose_headers="*", allow_headers="*"
+    if config.security.cors_allow_all_origins:
+        log.warning(
+            "CORS accepts all origins with credentials; development environments only, "
+            "do not enable this in production"
+        )
+    cors = aiohttp_cors.setup(
+        app,
+        defaults=build_cors_options(
+            config.security.cors_allowed_origins,
+            allow_all_origins=config.security.cors_allow_all_origins,
         ),
-    }
-    cors = aiohttp_cors.setup(app, defaults=cors_options)
+    )
     app.router.add_route("HEAD", "/func/{path:folders/_/tus/upload/.*$}", anon_web_plugin_handler)
     app.router.add_route("PATCH", "/func/{path:folders/_/tus/upload/.*$}", anon_web_plugin_handler)
     app.router.add_route(
@@ -1082,7 +1074,6 @@ async def webapp_ctx(
         app.router.add_route("POST", "/server/update-password-no-auth", update_password_no_auth)
     )
     cors.add(app.router.add_route("POST", "/server/extend-login-session", extend_login_session))
-    cors.add(app.router.add_route("GET", "/stats", view_stats))
     cors.add(app.router.add_route("GET", "/health", check_health))
     cors.add(app.router.add_route("GET", "/livez", check_livez))
     cors.add(app.router.add_route("GET", "/readyz", check_readyz))
@@ -1099,6 +1090,11 @@ async def webapp_ctx(
     )
     cors.add(app.router.add_route("POST", "/func/{path:auth/signup}", anon_web_plugin_handler))
     cors.add(app.router.add_route("POST", "/func/{path:auth/signout}", manager_web_handler))
+    # `public` is a reserved anonymous segment in v2 paths (manager `api/rest/v2/AGENTS.md`).
+    for method in PROXIED_HTTP_METHODS:
+        cors.add(
+            app.router.add_route(method, "/func/{path:v2/[^/]+/public/[^/]+$}", anon_web_handler)
+        )
     cors.add(
         app.router.add_route("GET", "/func/{path:stream/kernel/_/events}", manager_web_handler)
     )
@@ -1106,24 +1102,21 @@ async def webapp_ctx(
         app.router.add_route("GET", "/func/{path:stream/session/[^/]+/apps$}", manager_web_handler)
     )
     cors.add(app.router.add_route("GET", "/func/{path:stream/.*$}", manager_websocket_handler))
-    cors.add(app.router.add_route("GET", "/func/", anon_web_handler))
+    cors.add(app.router.add_route("GET", "/func/health", anon_web_handler))
 
     # Feature flag for using Apollo Router(Graphql Federation)
     if config.apollo_router.enabled:
-        # Use JWT authentication for Apollo Router if enabled, otherwise use HMAC
-        supergraph_handler = partial(
-            web_handler_with_jwt,
-            endpoint_pool=cast(HealthyEndpointPool, app["apollo_router_pool"]),
+        supergraph_handler = manager_proxy_rate_limited(
+            partial(
+                apollo_router_handler,
+                endpoint_pool=cast(HealthyEndpointPool, app["apollo_router_pool"]),
+            )
         )
         cors.add(app.router.add_route("GET", "/func/admin/gql", supergraph_handler))
         cors.add(app.router.add_route("POST", "/func/admin/gql", supergraph_handler))
 
-    cors.add(app.router.add_route("HEAD", "/func/{path:.*$}", manager_web_handler))
-    cors.add(app.router.add_route("GET", "/func/{path:.*$}", manager_web_handler))
-    cors.add(app.router.add_route("PUT", "/func/{path:.*$}", manager_web_handler))
-    cors.add(app.router.add_route("POST", "/func/{path:.*$}", manager_web_handler))
-    cors.add(app.router.add_route("PATCH", "/func/{path:.*$}", manager_web_handler))
-    cors.add(app.router.add_route("DELETE", "/func/{path:.*$}", manager_web_handler))
+    for method in PROXIED_HTTP_METHODS:
+        cors.add(app.router.add_route(method, "/func/{path:.*$}", manager_web_handler))
     cors.add(app.router.add_route("GET", "/pipeline/{path:stream/.*$}", pipeline_websocket_handler))
     cors.add(app.router.add_route("POST", "/pipeline/{path:.*login/$}", pipeline_login_handler))
     cors.add(app.router.add_route("GET", "/pipeline/{path:.*$}", pipeline_handler))
@@ -1131,8 +1124,8 @@ async def webapp_ctx(
     cors.add(app.router.add_route("POST", "/pipeline/{path:.*$}", pipeline_handler))
     cors.add(app.router.add_route("PATCH", "/pipeline/{path:.*$}", pipeline_handler))
     cors.add(app.router.add_route("DELETE", "/pipeline/{path:.*$}", pipeline_handler))
+    cors.add(app.router.add_route("GET", "/version.json", version_json_handler))
     if config.service.mode == ServiceMode.WEBUI:
-        cors.add(app.router.add_route("GET", "/config.ini", config_ini_handler))
         cors.add(app.router.add_route("GET", "/config.toml", config_toml_handler))
         app["webui_index_template"] = (config.service.static_path / "index.html").read_text()
         fallback_handler = console_handler
@@ -1178,7 +1171,9 @@ async def service_discovery_ctx(config: WebServerUnifiedConfig) -> AsyncGenerato
             max_queue_size=config.otel.max_queue_size,
             max_export_batch_size=config.otel.max_export_batch_size,
         )
-        BraceStyleAdapter.apply_otel(otel_spec)
+        LegacyOtelLogging(otel_spec).attach()
+        apply_otel_tracer(otel_spec)
+        StructuredOtelLogging(otel_spec).attach(config.logging.pkg_ns.keys())
     yield
 
 
@@ -1194,14 +1189,18 @@ async def server_main(
     try:
         app = web.Application(
             middlewares=[
+                request_id_middleware,
                 decrypt_payload,
-                track_active_handlers,
                 security_policy_middleware,
                 general_exception_middleware,
             ],
         )
+        if config.otel.enabled:
+            instrument_aiohttp_client()
+            app.middlewares.insert(
+                0, build_otel_server_middleware(untraced_handlers={console_handler, static_handler})
+            )
         app["config"] = config
-        app["stats"] = WebStats()
         app["client_pool"] = await web_init_stack.enter_async_context(client_ctx(config, app))
         app["manager_pool"] = await web_init_stack.enter_async_context(
             manager_pool_ctx(config, app)
@@ -1249,14 +1248,14 @@ async def server_main(
 
         await web_init_stack.enter_async_context(webapp_ctx(config, app))
         await web_init_stack.enter_async_context(service_discovery_ctx(config))
-        log.info("Started the web gateway service.")
+        log.info("started the web gateway service")
     except Exception:
-        log.exception("Server initialization failure; triggering shutdown...")
+        log.exception("server initialization failed; triggering shutdown")
         loop.call_later(0.2, os.kill, 0, signal.SIGINT)
     try:
         yield
     finally:
-        log.info("shutting down...")
+        log.info("shutting down")
         await web_init_stack.__aexit__(None, None, None)
 
 
@@ -1289,6 +1288,7 @@ def main(
     debug: bool,
 ) -> None:
     """Start the webui host service as a foreground process."""
+    force_threaded_dns_resolver()
     # Delete this part when you remove --debug option
     raw_cfg = tomli.loads(Path(config_path).read_text(encoding="utf-8"))
 
@@ -1323,20 +1323,23 @@ def main(
                 setproctitle(
                     f"backend.ai: webserver {server_config.service.ip}:{server_config.service.port}"
                 )
-                log.info("Backend.AI Web Server {0}", __version__)
-                log.info("runtime: {0}", sys.prefix)
+                log.info("Backend.AI Web Server starting", version=__version__)
+                log.info("runtime environment", runtime_path=sys.prefix)
 
                 log_config = logging.getLogger("ai.backend.web.config")
                 if log_level == LogLevel.DEBUG:
                     log_config.debug("debug mode enabled.")
                     print("== Web Server configuration ==")
                     pprint(server_config.model_dump())
-                log.info("serving at {0}:{1}", server_config.service.ip, server_config.service.port)
+                log.info(
+                    "serving",
+                    service_addr=f"{server_config.service.ip}:{server_config.service.port}",
+                )
                 runner: Callable[..., Any]
                 match server_config.webserver.event_loop:
                     case EventLoopType.UVLOOP:
                         runner = uvloop.run
-                        log.info("Using uvloop as the event loop backend")
+                        log.info("using uvloop as the event loop backend")
                     case EventLoopType.ASYNCIO:
                         runner = asyncio.run
                 try:
@@ -1347,7 +1350,7 @@ def main(
                         runner=runner,
                     )
                 finally:
-                    log.info("terminated.")
+                    log.info("terminated")
         finally:
             if server_config.webserver.pid_file.is_file():
                 # check is_file() to prevent deleting /dev/null!

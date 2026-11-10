@@ -2,17 +2,24 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from ai.backend.common.api_handlers import SENTINEL
+from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
+from ai.backend.common.data.entity.resource_preset import ResourcePresetID
 from ai.backend.common.dto.manager.v2.common import (
     BinarySizeInput,
+    PartialBulkFailure,
+    PartialBulkPayload,
     ResourceSlotEntryInfo,
 )
 from ai.backend.common.dto.manager.v2.resource_preset.request import (
     AdminSearchResourcePresetsInput,
+    PartialBulkPurgeResourcePresetsInput,
+    PartialBulkUpdateResourcePresetItemInput,
+    PartialBulkUpdateResourcePresetsInput,
     ResourcePresetFilter,
     ResourcePresetOrder,
     UpdateResourcePresetInput,
@@ -28,37 +35,59 @@ from ai.backend.common.dto.manager.v2.resource_preset.types import (
     ResourcePresetOrderDirection,
     ResourcePresetOrderField,
 )
+from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.tristate.unset import Unset
 from ai.backend.common.types import BinarySize, ResourceSlot
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkResult
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
+from ai.backend.manager.errors.base.not_found import NotFoundError
 from ai.backend.manager.errors.resource import ResourcePresetNotFound
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.resource_preset.conditions import ResourcePresetConditions
-from ai.backend.manager.models.resource_preset.orders import ResourcePresetOrders
-from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    OffsetPagination,
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
     combine_conditions_or,
     negate_conditions,
 )
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.resource_preset.creators import ResourcePresetCreatorSpec
-from ai.backend.manager.repositories.resource_preset.updaters import ResourcePresetUpdaterSpec
+from ai.backend.manager.models.resource_preset.creators import ResourcePresetCreator
+from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
+from ai.backend.manager.models.resource_preset.searchable_fields import (
+    ResourcePresetSearchableFields,
+)
+from ai.backend.manager.models.resource_preset.searchers import ResourcePresetSearcher
+from ai.backend.manager.models.resource_preset.updaters import ResourcePresetUpdater
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
+from ai.backend.manager.services.resource_group.actions.lookup import LookupResourceGroupAction
+from ai.backend.manager.services.resource_group.processors import ResourceGroupProcessors
+from ai.backend.manager.services.resource_preset.actions.bulk_get import (
+    BulkGetResourcePresetsAction,
+)
 from ai.backend.manager.services.resource_preset.actions.create_preset import (
     CreateResourcePresetAction,
 )
 from ai.backend.manager.services.resource_preset.actions.delete_preset import (
     DeleteResourcePresetAction,
 )
-from ai.backend.manager.services.resource_preset.actions.modify_preset import (
-    ModifyResourcePresetAction,
+from ai.backend.manager.services.resource_preset.actions.get_preset import (
+    GetResourcePresetAction,
+)
+from ai.backend.manager.services.resource_preset.actions.partial_bulk_purge_presets import (
+    PartialBulkPurgeResourcePresetsAction,
+)
+from ai.backend.manager.services.resource_preset.actions.partial_bulk_update_presets import (
+    PartialBulkUpdateResourcePresetsAction,
 )
 from ai.backend.manager.services.resource_preset.actions.search_presets import (
     SearchResourcePresetsV2Action,
 )
+from ai.backend.manager.services.resource_preset.actions.set_preset_resource_group import (
+    SetResourcePresetResourceGroupAction,
+)
+from ai.backend.manager.services.resource_preset.actions.update_preset import (
+    UpdateResourcePresetAction,
+)
+from ai.backend.manager.services.resource_preset.processors import ResourcePresetProcessors
 from ai.backend.manager.types import OptionalState, TriState
 
 
@@ -78,16 +107,34 @@ def _resource_slot_entries_to_slot(
 
 def _resource_preset_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=ResourcePresetOrders.id(ascending=False),
-        backward_order=ResourcePresetOrders.id(ascending=True),
-        forward_condition_factory=ResourcePresetConditions.by_cursor_forward,
-        backward_condition_factory=ResourcePresetConditions.by_cursor_backward,
-        tiebreaker_order=ResourcePresetRow.name.asc(),
+        forward_order=ResourcePresetSearchableFields.own.name.order.apply(ascending=True),
+        cursor_column=ResourcePresetRow.id,
     )
 
 
 class ResourcePresetAdapter(BaseAdapter):
     """Adapter for resource preset operations."""
+
+    _resource_preset: ResourcePresetProcessors
+    _resource_group: ResourceGroupProcessors
+
+    def __init__(
+        self,
+        resource_preset: ResourcePresetProcessors,
+        resource_group: ResourceGroupProcessors,
+    ) -> None:
+        self._resource_preset = resource_preset
+        self._resource_group = resource_group
+
+    async def _resource_group_id(self, name: str | None) -> ResourceGroupID | None:
+        """The id of the group a preset is bound to; the preset row records only its
+        name, and what the preset belongs to is named by id."""
+        if name is None:
+            return None
+        lookup = await self._resource_group.lookup.run(
+            LookupResourceGroupAction(name=ResourceGroupName(name))
+        )
+        return lookup.resolved_entity_id
 
     async def search(
         self,
@@ -108,11 +155,20 @@ class ResourcePresetAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._processors.resource_preset.search_presets_v2.wait_for_complete(
-            SearchResourcePresetsV2Action(querier=querier)
+        result = await self._resource_preset.search_presets_v2.run(
+            SearchResourcePresetsV2Action(
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=ResourcePresetSearcher(
+                        pagination=querier.pagination,
+                        conditions=querier.conditions,
+                        orders=querier.orders,
+                    ),
+                )
+            )
         )
         return AdminSearchResourcePresetsPayload(
-            items=[self._data_to_node(p) for p in result.presets],
+            items=[self._data_to_node(p) for p in result.items],
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
@@ -120,16 +176,29 @@ class ResourcePresetAdapter(BaseAdapter):
 
     async def get(self, preset_id: UUID) -> ResourcePresetNode:
         """Get a single resource preset by ID."""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=1),
-            conditions=[lambda: ResourcePresetRow.id == preset_id],
-        )
-        result = await self._processors.resource_preset.search_presets_v2.wait_for_complete(
-            SearchResourcePresetsV2Action(querier=querier)
-        )
-        if not result.presets:
-            raise ResourcePresetNotFound()
-        return self._data_to_node(result.presets[0])
+        try:
+            result = await self._resource_preset.get_preset.run(
+                GetResourcePresetAction(preset_id=ResourcePresetID(preset_id))
+            )
+        except NotFoundError as e:
+            # The generic repository names no domain; the route answered with the
+            # preset's own error before and keeps doing so.
+            raise ResourcePresetNotFound() from e
+        return self._data_to_node(result.data)
+
+    async def batch_load_by_ids(
+        self, ids: Sequence[ResourcePresetID]
+    ) -> list[ResourcePresetNode | Exception | None]:
+        """Batch load resource presets by id for DataLoader use, one answer per id."""
+        if not ids:
+            return []
+        result = await self._resource_preset.bulk_get.run(BulkGetResourcePresetsAction(ids=ids))
+        return [
+            self._data_to_node(item.value)
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
 
     async def create(
         self,
@@ -140,15 +209,14 @@ class ResourcePresetAdapter(BaseAdapter):
     ) -> CreateResourcePresetPayload:
         """Create a new resource preset."""
         shared_memory_str = str(shared_memory) if shared_memory is not None else None
-        creator = Creator(
-            spec=ResourcePresetCreatorSpec(
-                name=name,
-                resource_slots=resource_slots,
-                shared_memory=shared_memory_str,
-                scaling_group_name=resource_group_name,
-            )
+        creator = ResourcePresetCreator(
+            name=name,
+            resource_slots=resource_slots,
+            shared_memory=shared_memory_str,
+            resource_group_name=resource_group_name,
+            resource_group_id=await self._resource_group_id(resource_group_name),
         )
-        result = await self._processors.resource_preset.create_preset.wait_for_complete(
+        result = await self._resource_preset.create_preset.run(
             CreateResourcePresetAction(creator=creator)
         )
         return CreateResourcePresetPayload(
@@ -160,96 +228,131 @@ class ResourcePresetAdapter(BaseAdapter):
         input: UpdateResourcePresetInput,
     ) -> UpdateResourcePresetPayload:
         """Update an existing resource preset."""
-        resource_slots_state: OptionalState[ResourceSlot] = OptionalState.nop()
-        if input.resource_slots is not None:
-            resource_slots_state = OptionalState.update(
-                _resource_slot_entries_to_slot(input.resource_slots)
+        result = await self._resource_preset.update_preset.run(
+            UpdateResourcePresetAction(updater=self._to_updater(input))
+        )
+        preset = result.resource_preset
+        if not isinstance(input.resource_group_name, Unset):
+            preset = await self.apply_resource_group(
+                ResourcePresetID(input.id), input.resource_group_name
             )
-
-        shared_memory_value = _resolve_shared_memory_for_update(input.shared_memory)
-
-        name_state: OptionalState[str] = OptionalState.nop()
-        if input.name is not None:
-            name_state = OptionalState.update(input.name)
-
-        resource_group_state: TriState[str] = TriState.nop()
-        if input.resource_group_name is not SENTINEL:
-            if input.resource_group_name is None:
-                resource_group_state = TriState.nullify()
-            else:
-                resource_group_state = TriState.update(input.resource_group_name)
-
-        updater_spec = ResourcePresetUpdaterSpec(
-            resource_slots=resource_slots_state,
-            name=name_state,
-            shared_memory=shared_memory_value,
-            scaling_group_name=resource_group_state,
-        )
-        updater = Updater(spec=updater_spec, pk_value=input.id)
-        result = await self._processors.resource_preset.modify_preset.wait_for_complete(
-            ModifyResourcePresetAction(updater=updater, id=input.id, name=None)
-        )
         return UpdateResourcePresetPayload(
-            resource_preset=self._data_to_node(result.resource_preset),
+            resource_preset=self._data_to_node(preset),
         )
 
-    async def delete(self, preset_id: UUID) -> DeleteResourcePresetPayload:
-        """Delete a resource preset by ID."""
-        result = await self._processors.resource_preset.delete_preset.wait_for_complete(
-            DeleteResourcePresetAction(id=preset_id, name=None)
+    async def apply_resource_group(
+        self, preset_id: ResourcePresetID, resource_group_name: str | None
+    ) -> ResourcePresetData:
+        """Bind the preset to a resource group or to none, as its own run: that changes
+        who is offered the preset, which a retune does not."""
+        result = await self._resource_preset.set_preset_resource_group.run(
+            SetResourcePresetResourceGroupAction(
+                preset_id=preset_id, resource_group_name=resource_group_name
+            )
         )
-        return DeleteResourcePresetPayload(id=result.resource_preset.id)
+        return result.resource_preset
+
+    async def purge(self, preset_id: UUID) -> DeleteResourcePresetPayload:
+        """Permanently delete a resource preset by ID."""
+        result = await self._resource_preset.delete_preset.run(
+            DeleteResourcePresetAction(preset_id=ResourcePresetID(preset_id))
+        )
+        return DeleteResourcePresetPayload(
+            id=result.resource_preset.id, entity_id=result.resource_preset.id
+        )
+
+    async def partial_bulk_update(
+        self, input: PartialBulkUpdateResourcePresetsInput
+    ) -> PartialBulkPayload[ResourcePresetNode]:
+        """Update several resource presets, answering for each one."""
+        updaters = [self._to_updater(item) for item in input.items]
+        for updater in updaters:
+            if resource_slots := updater.resource_slots.optional_value():
+                if not resource_slots.has_intrinsic_slots():
+                    raise InvalidAPIParameters(
+                        "ResourceSlot must have all intrinsic resource slots."
+                    )
+        result = await self._resource_preset.partial_bulk_update.run(
+            PartialBulkUpdateResourcePresetsAction(updaters=updaters)
+        )
+        return self._to_partial_bulk_payload(result)
+
+    async def partial_bulk_purge(
+        self, input: PartialBulkPurgeResourcePresetsInput
+    ) -> PartialBulkPayload[ResourcePresetNode]:
+        """Permanently delete several resource presets, answering for each one."""
+        result = await self._resource_preset.partial_bulk_purge.run(
+            PartialBulkPurgeResourcePresetsAction(
+                ids=[ResourcePresetID(preset_id) for preset_id in input.ids]
+            )
+        )
+        return self._to_partial_bulk_payload(result)
+
+    def _to_updater(
+        self, input: UpdateResourcePresetInput | PartialBulkUpdateResourcePresetItemInput
+    ) -> ResourcePresetUpdater:
+        return ResourcePresetUpdater(
+            preset_id=ResourcePresetID(input.id),
+            resource_slots=OptionalState.from_unset(input.resource_slots).map(
+                _resource_slot_entries_to_slot
+            ),
+            name=OptionalState.from_unset(input.name),
+            shared_memory=TriState.from_unset(input.shared_memory).map(
+                lambda v: BinarySize(v.bytes)
+            ),
+        )
+
+    def _to_partial_bulk_payload(
+        self, result: PartialBulkResult[ResourcePresetData]
+    ) -> PartialBulkPayload[ResourcePresetNode]:
+        return PartialBulkPayload[ResourcePresetNode](
+            successes=[
+                self._data_to_node(item.value) for item in result.items if item.value is not None
+            ],
+            failed=[
+                PartialBulkFailure(id=item.entity_id, message=str(item.error))
+                for item in result.items
+                if item.error is not None
+            ],
+        )
 
     def _convert_filter(self, filter_: ResourcePresetFilter) -> list[QueryCondition]:
         """Convert ResourcePresetFilter DTO to QueryConditions."""
-        conditions: list[QueryCondition] = []
-        if filter_.name:
-            cond = self.convert_string_filter(
-                filter_.name,
-                contains_factory=ResourcePresetConditions.by_name_contains,
-                equals_factory=ResourcePresetConditions.by_name_equals,
-                starts_with_factory=ResourcePresetConditions.by_name_starts_with,
-                ends_with_factory=ResourcePresetConditions.by_name_ends_with,
-                in_factory=ResourcePresetConditions.by_name_in,
-            )
-            if cond:
-                conditions.append(cond)
-        if filter_.resource_group_name:
-            cond = self.convert_string_filter(
-                filter_.resource_group_name,
-                contains_factory=ResourcePresetConditions.by_resource_group_name_contains,
-                equals_factory=ResourcePresetConditions.by_resource_group_name_equals,
-                starts_with_factory=ResourcePresetConditions.by_resource_group_name_starts_with,
-                ends_with_factory=ResourcePresetConditions.by_resource_group_name_ends_with,
-                in_factory=ResourcePresetConditions.by_resource_group_name_in,
-            )
-            if cond:
-                conditions.append(cond)
+        fields = ResourcePresetSearchableFields.own
+        conditions: list[QueryCondition] = [
+            *self.apply_string_filter(filter_.name, fields.name.filter),
+            *self.apply_string_filter(
+                filter_.resource_group_name, fields.resource_group_name.filter
+            ),
+            *self.apply_uuid_filter(filter_.entity_id, fields.id.filter),
+        ]
         if filter_.AND:
             for sub in filter_.AND:
                 conditions.extend(self._convert_filter(sub))
         if filter_.OR:
             or_conds: list[QueryCondition] = []
             for sub in filter_.OR:
-                or_conds.extend(self._convert_filter(sub))
+                sub_conditions = self._convert_filter(sub)
+                if sub_conditions:
+                    or_conds.append(combine_conditions_and(sub_conditions))
             if or_conds:
                 conditions.append(combine_conditions_or(or_conds))
         if filter_.NOT:
-            not_conds: list[QueryCondition] = []
             for sub in filter_.NOT:
-                not_conds.extend(self._convert_filter(sub))
-            if not_conds:
-                conditions.append(negate_conditions(not_conds))
+                sub_conditions = self._convert_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     def _convert_orders(self, orders: list[ResourcePresetOrder]) -> list[Any]:
         """Convert ResourcePresetOrder DTOs to QueryOrders."""
+        fields = ResourcePresetSearchableFields.own
         result = []
         for order in orders:
             ascending = order.direction == ResourcePresetOrderDirection.ASC
             match order.field:
                 case ResourcePresetOrderField.NAME:
-                    result.append(ResourcePresetOrders.name(ascending))
+                    result.append(fields.name.order.apply(ascending))
         return result
 
     @staticmethod
@@ -257,6 +360,7 @@ class ResourcePresetAdapter(BaseAdapter):
         """Convert ResourcePresetData to ResourcePresetNode DTO."""
         return ResourcePresetNode(
             id=data.id,
+            entity_id=data.entity_id(),
             name=data.name,
             resource_slots=[
                 ResourceSlotEntryInfo(resource_type=k, quantity=v)
@@ -267,18 +371,5 @@ class ResourcePresetAdapter(BaseAdapter):
                 if data.shared_memory is not None
                 else None
             ),
-            resource_group_name=data.scaling_group_name,
+            resource_group_name=data.resource_group_name,
         )
-
-
-def _resolve_shared_memory_for_update(
-    shared_memory: BinarySizeInput | object | None,
-) -> TriState[BinarySize]:
-    """Resolve shared_memory BinarySizeInput for update operations."""
-    if shared_memory is SENTINEL:
-        return TriState.nop()
-    if shared_memory is None:
-        return TriState.nullify()
-    if not isinstance(shared_memory, BinarySizeInput):
-        return TriState.nop()
-    return TriState.update(BinarySize(shared_memory.bytes))

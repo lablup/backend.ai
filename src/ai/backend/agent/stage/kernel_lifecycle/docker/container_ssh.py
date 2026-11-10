@@ -4,12 +4,13 @@ Container SSH stage for kernel lifecycle.
 This stage handles SSH key setup inside containers for inter-container communication.
 """
 
-import asyncio
 from dataclasses import dataclass
 from pathlib import Path
 from typing import override
 
 from ai.backend.agent.resources import Mount
+from ai.backend.agent.utils import ContainerSSHFileWriter
+from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.stage.types import ArgsSpecGenerator, Provisioner, ProvisionStage
 from ai.backend.common.types import ContainerSSHKeyPair
 
@@ -26,7 +27,7 @@ class AgentConfig:
 @dataclass
 class ContainerSSHSpec:
     work_dir: Path
-    ssh_keypair: ContainerSSHKeyPair
+    ssh_keypair: ContainerSSHKeyPair | None
     mounts: list[Mount]
 
     # Override UID/GID settings
@@ -60,7 +61,8 @@ class ContainerSSHProvisioner(Provisioner[ContainerSSHSpec, ContainerSSHResult])
 
     @override
     async def setup(self, spec: ContainerSSHSpec) -> ContainerSSHResult:
-        if not spec.ssh_keypair:
+        ssh_keypair = spec.ssh_keypair
+        if ssh_keypair is None:
             return ContainerSSHResult(ssh_dir=None)
 
         # Check if /home/work/.ssh is already mounted
@@ -70,40 +72,19 @@ class ContainerSSHProvisioner(Provisioner[ContainerSSHSpec, ContainerSSHResult])
                 # SSH directory is already mounted, skip setup
                 return ContainerSSHResult(ssh_dir=None)
 
-        loop = asyncio.get_running_loop()
-
-        ssh_dir = await loop.run_in_executor(None, self._populate_ssh_config, spec)
+        ssh_dir = await run_in_executor_with_context(
+            None, self._populate_ssh_config, spec, ssh_keypair
+        )
         return ContainerSSHResult(ssh_dir=ssh_dir)
 
-    def _populate_ssh_config(self, spec: ContainerSSHSpec) -> Path:
-        pubkey = spec.ssh_keypair.public_key.encode("ascii")
-        privkey = spec.ssh_keypair.private_key.encode("ascii")
-        ssh_dir = spec.work_dir / ".ssh"
-
-        # Create SSH directory
-        ssh_dir.mkdir(parents=True, exist_ok=True)
-        ssh_dir.chmod(0o700)
-
-        # Write SSH keys
-        (ssh_dir / "authorized_keys").write_bytes(pubkey)
-        (ssh_dir / "authorized_keys").chmod(0o600)
-
-        if not (ssh_dir / "id_rsa").is_file():
-            (ssh_dir / "id_rsa").write_bytes(privkey)
-            (ssh_dir / "id_rsa").chmod(0o600)
-
-        # Write container key for backward compatibility
-        (spec.work_dir / "id_container").write_bytes(privkey)
-        (spec.work_dir / "id_container").chmod(0o600)
+    def _populate_ssh_config(
+        self, spec: ContainerSSHSpec, ssh_keypair: ContainerSSHKeyPair
+    ) -> Path:
+        pubkey = ssh_keypair.public_key.encode("ascii")
+        privkey = ssh_keypair.private_key.encode("ascii")
+        paths = ContainerSSHFileWriter(spec.work_dir, pubkey, privkey).write()
 
         # Set proper ownership
-        paths = [
-            ssh_dir,
-            ssh_dir / "authorized_keys",
-            ssh_dir / "id_rsa",
-            spec.work_dir / "id_container",
-        ]
-
         chowner = ChownUtil()
         owner_determiner = PathOwnerDeterminer.by_kernel_features(
             spec.agent_config.kernel_uid,
@@ -116,7 +97,7 @@ class ContainerSSHProvisioner(Provisioner[ContainerSSHSpec, ContainerSSHResult])
             )
             chowner.chown_path(path, uid, gid)
 
-        return ssh_dir
+        return spec.work_dir / ".ssh"
 
     @override
     async def teardown(self, resource: ContainerSSHResult) -> None:

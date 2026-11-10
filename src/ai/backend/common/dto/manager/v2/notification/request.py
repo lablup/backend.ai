@@ -9,8 +9,11 @@ from uuid import UUID
 
 from pydantic import Field, field_validator
 
-from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
-from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.v2.common import NonEmptyList
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 from .types import (
     NotificationChannelOrderField,
@@ -34,6 +37,12 @@ __all__ = (
     "NotificationRuleFilter",
     "NotificationRuleOrder",
     "NotificationRuleTypeFilter",
+    "PartialBulkPurgeNotificationChannelsInput",
+    "PartialBulkPurgeNotificationRulesInput",
+    "PartialBulkUpdateNotificationChannelItemInput",
+    "PartialBulkUpdateNotificationChannelsInput",
+    "PartialBulkUpdateNotificationRuleItemInput",
+    "PartialBulkUpdateNotificationRulesInput",
     "SearchNotificationChannelsInput",
     "SearchNotificationRulesInput",
     "SMTPAuthInputDTO",
@@ -112,20 +121,20 @@ class CreateNotificationChannelInput(BaseRequestModel):
 class UpdateNotificationChannelInput(BaseRequestModel):
     """Input for updating a notification channel."""
 
-    name: str | None = Field(default=None, description="Updated channel name")
-    description: str | Sentinel | None = Field(
-        default=SENTINEL,
-        description="Updated channel description. Use SENTINEL to clear.",
+    name: str | None | Unset = Field(default=UNSET, description="Updated channel name")
+    description: str | None | Unset = Field(
+        default=UNSET,
+        description="Updated channel description. Omit to leave unchanged; null clears.",
     )
-    spec: NotificationChannelSpecInputDTO | None = Field(
-        default=None, description="Updated channel specification"
+    spec: NotificationChannelSpecInputDTO | None | Unset = Field(
+        default=UNSET, description="Updated channel specification"
     )
-    enabled: bool | None = Field(default=None, description="Updated enabled status")
+    enabled: bool | None | Unset = Field(default=UNSET, description="Updated enabled status")
 
     @field_validator("name")
     @classmethod
-    def name_must_not_be_blank(cls, v: str | None) -> str | None:
-        if v is None:
+    def name_must_not_be_blank(cls, v: str | None | Unset) -> str | None | Unset:
+        if not isinstance(v, str):
             return v
         stripped = v.strip()
         if not stripped:
@@ -137,6 +146,26 @@ class DeleteNotificationChannelInput(BaseRequestModel):
     """Input for deleting a notification channel."""
 
     id: UUID = Field(description="Channel ID to delete")
+
+
+class PartialBulkUpdateNotificationChannelItemInput(UpdateNotificationChannelInput):
+    """One notification channel of a partial bulk update and the fields to update on it."""
+
+    id: UUID = Field(description="ID of the channel to update.")
+
+
+class PartialBulkUpdateNotificationChannelsInput(BaseRequestModel):
+    """Input for updating several notification channels, each answered for separately."""
+
+    items: NonEmptyList[PartialBulkUpdateNotificationChannelItemInput] = Field(
+        description="The channels to update, each with its fields."
+    )
+
+
+class PartialBulkPurgeNotificationChannelsInput(BaseRequestModel):
+    """Input for purging several notification channels, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the channels to purge.")
 
 
 class CreateNotificationRuleInput(BaseRequestModel):
@@ -164,22 +193,22 @@ class CreateNotificationRuleInput(BaseRequestModel):
 class UpdateNotificationRuleInput(BaseRequestModel):
     """Input for updating a notification rule."""
 
-    name: str | None = Field(default=None, description="Updated rule name")
-    description: str | Sentinel | None = Field(
-        default=SENTINEL,
-        description="Updated rule description. Use SENTINEL to clear.",
+    name: str | None | Unset = Field(default=UNSET, description="Updated rule name")
+    description: str | None | Unset = Field(
+        default=UNSET,
+        description="Updated rule description. Omit to leave unchanged; null clears.",
     )
-    message_template: str | None = Field(
-        default=None,
+    message_template: str | None | Unset = Field(
+        default=UNSET,
         max_length=65536,
         description="Updated message template (max 64KB)",
     )
-    enabled: bool | None = Field(default=None, description="Updated enabled status")
+    enabled: bool | None | Unset = Field(default=UNSET, description="Updated enabled status")
 
     @field_validator("name")
     @classmethod
-    def name_must_not_be_blank(cls, v: str | None) -> str | None:
-        if v is None:
+    def name_must_not_be_blank(cls, v: str | None | Unset) -> str | None | Unset:
+        if not isinstance(v, str):
             return v
         stripped = v.strip()
         if not stripped:
@@ -191,6 +220,26 @@ class DeleteNotificationRuleInput(BaseRequestModel):
     """Input for deleting a notification rule."""
 
     id: UUID = Field(description="Rule ID to delete")
+
+
+class PartialBulkUpdateNotificationRuleItemInput(UpdateNotificationRuleInput):
+    """One notification rule of a partial bulk update and the fields to update on it."""
+
+    id: UUID = Field(description="ID of the rule to update.")
+
+
+class PartialBulkUpdateNotificationRulesInput(BaseRequestModel):
+    """Input for updating several notification rules, each answered for separately."""
+
+    items: NonEmptyList[PartialBulkUpdateNotificationRuleItemInput] = Field(
+        description="The rules to update, each with its fields."
+    )
+
+
+class PartialBulkPurgeNotificationRulesInput(BaseRequestModel):
+    """Input for purging several notification rules, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the rules to purge.")
 
 
 class ValidateNotificationChannelInput(BaseRequestModel):
@@ -241,6 +290,10 @@ class NotificationChannelFilter(BaseRequestModel):
         default=None, description="Filter by channel type"
     )
     enabled: bool | None = Field(default=None, description="Filter by enabled status")
+    entity_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by channel ID",
+    )
     AND: list[NotificationChannelFilter] | None = Field(
         default=None, description="Combine with AND logic"
     )
@@ -298,6 +351,10 @@ class NotificationRuleFilter(BaseRequestModel):
         default=None, description="Filter by rule type"
     )
     enabled: bool | None = Field(default=None, description="Filter by enabled status")
+    entity_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by rule ID",
+    )
     AND: list[NotificationRuleFilter] | None = Field(
         default=None, description="Combine with AND logic"
     )

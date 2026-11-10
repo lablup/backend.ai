@@ -9,14 +9,16 @@ from ai.backend.common.dto.clients.prometheus import (
     PrometheusResponse,
     QueryTimeRange,
 )
-from ai.backend.common.exception import FailedToGetMetric, PrometheusConnectionError
-from ai.backend.manager.clients.prometheus import (
+from ai.backend.common.exception import (
+    FailedToGetMetric,
+    PrometheusConnectionError,
+)
+from ai.backend.manager.clients.prometheus.client import PrometheusClient
+from ai.backend.manager.clients.prometheus.fixed_query_builder import (
     ContainerLiveStatQueryBuilder,
     ContainerMetricQueryBuilder,
-    LabelMatcher,
-    MetricPreset,
-    PrometheusClient,
 )
+from ai.backend.manager.clients.prometheus.preset import LabelMatcher, MetricPreset
 
 
 def create_mock_response(
@@ -70,7 +72,7 @@ class TestQueryRange:
     @pytest.fixture
     def sample_preset(self) -> MetricPreset:
         return MetricPreset(
-            template="sum(my_metric{{{labels}}}) by ({group_by})",
+            template="sum(my_metric{${{labels}}}) by (${{group_by}})",
             labels={
                 "container_metric_name": LabelMatcher.exact("mem"),
                 "value_type": LabelMatcher.exact("current"),
@@ -182,7 +184,7 @@ class TestQueryInstant:
     @pytest.fixture
     def sample_preset(self) -> MetricPreset:
         return MetricPreset(
-            template="sum(my_metric{{{labels}}}) by ({group_by})",
+            template="sum(my_metric{${{labels}}}) by (${{group_by}})",
             labels={
                 "container_metric_name": LabelMatcher.exact("mem"),
                 "value_type": LabelMatcher.exact("current"),
@@ -326,10 +328,12 @@ class TestExecutePreset:
         )
 
         result = await prometheus_client.execute_preset(
-            query_template="sum(my_metric{{{labels}}}) by ({group_by})",
-            filter_labels={"kernel_id": "kernel-1"},
-            group_labels=["kernel_id"],
-            time_window="5m",
+            MetricPreset(
+                template="sum(my_metric{${{labels}}}) by (${{group_by}})",
+                labels={"kernel_id": LabelMatcher.exact("kernel-1")},
+                group_by={"kernel_id"},
+                window="5m",
+            ),
             time_range=time_range,
         )
 
@@ -371,10 +375,12 @@ class TestExecutePreset:
         instant_response: AsyncMock,
     ) -> None:
         result = await prometheus_client.execute_preset(
-            query_template="sum(my_metric{{{labels}}}) by ({group_by})",
-            filter_labels={"kernel_id": "kernel-1"},
-            group_labels=["kernel_id"],
-            time_window="5m",
+            MetricPreset(
+                template="sum(my_metric{${{labels}}}) by (${{group_by}})",
+                labels={"kernel_id": LabelMatcher.exact("kernel-1")},
+                group_by={"kernel_id"},
+                window="5m",
+            ),
             time_range=None,
         )
 
@@ -410,7 +416,7 @@ class TestTimeout:
     @pytest.fixture
     def sample_preset(self) -> MetricPreset:
         return MetricPreset(
-            template="sum(my_metric{{{labels}}})",
+            template="sum(my_metric{${{labels}}})",
             labels={},
             group_by=frozenset(),
         )

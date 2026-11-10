@@ -11,23 +11,27 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDInMatchSpec
 from ai.backend.manager.clients.prometheus.client import PrometheusClient
-from ai.backend.manager.models.prometheus_query_preset import PrometheusQueryPresetRow
-from ai.backend.manager.models.prometheus_query_preset.conditions import (
-    PrometheusQueryPresetConditions,
+from ai.backend.manager.data.prometheus_query_preset.types import PrometheusQueryPresetData
+from ai.backend.manager.models.prometheus_query_preset.row import (
+    PresetOptions,
+    PrometheusQueryPresetRow,
 )
-from ai.backend.manager.models.prometheus_query_preset.orders import PrometheusQueryPresetOrders
-from ai.backend.manager.models.prometheus_query_preset.row import PresetOptions
-from ai.backend.manager.models.prometheus_query_preset_category import (
+from ai.backend.manager.models.prometheus_query_preset.searchable_fields import (
+    PrometheusQueryPresetSearchableFields,
+)
+from ai.backend.manager.models.prometheus_query_preset.searchers import (
+    PrometheusQueryPresetSearcher,
+)
+from ai.backend.manager.models.prometheus_query_preset_category.row import (
     PrometheusQueryPresetCategoryRow,
 )
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    OffsetPagination,
-)
-from ai.backend.manager.repositories.prometheus_query_preset import (
+from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.prometheus_query_preset.repository import (
     PrometheusQueryPresetRepository,
 )
 from ai.backend.testutils.db import with_tables
@@ -39,7 +43,7 @@ class PresetSeed:
 
     name: str
     metric_name: str = "backendai_metric"
-    query_template: str = "{metric_name}{{{labels}}}"
+    query_template: str = "{metric_name}{${{labels}}}"
     time_window: str | None = "5m"
     filter_labels: tuple[str, ...] = ()
     group_labels: tuple[str, ...] = ()
@@ -97,6 +101,14 @@ class TestPrometheusQueryPresetOptions:
             yield database_connection
 
     @pytest.fixture
+    def preset_ops(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> OpsRepository[PrometheusQueryPresetData]:
+        """Writes and searches run through the generic ops repository."""
+        return OpsRepository(V2DBOpsProvider(database_connection))
+
+    @pytest.fixture
     def preset_repository(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -104,6 +116,7 @@ class TestPrometheusQueryPresetOptions:
         return PrometheusQueryPresetRepository(
             db=db_with_cleanup,
             prometheus_client=MagicMock(spec=PrometheusClient),
+            v2_ops_provider=V2DBOpsProvider(db_with_cleanup),
         )
 
     async def _seed_presets(
@@ -154,7 +167,7 @@ class TestPrometheusQueryPresetOptions:
                     PresetSeed(name="GPU Memory Usage", metric_name="backendai_gpu"),
                 ),
                 conditions=[
-                    PrometheusQueryPresetConditions.by_name_contains(
+                    PrometheusQueryPresetSearchableFields.own.name.filter.contains(
                         StringMatchSpec("Container", case_insensitive=False, negated=False)
                     )
                 ],
@@ -168,7 +181,7 @@ class TestPrometheusQueryPresetOptions:
                     PresetSeed(name="GPU Memory Usage", metric_name="backendai_gpu"),
                 ),
                 conditions=[
-                    PrometheusQueryPresetConditions.by_name_contains(
+                    PrometheusQueryPresetSearchableFields.own.name.filter.contains(
                         StringMatchSpec("container", case_insensitive=True, negated=False)
                     )
                 ],
@@ -181,7 +194,7 @@ class TestPrometheusQueryPresetOptions:
                     PresetSeed(name="container cpu rate"),
                 ),
                 conditions=[
-                    PrometheusQueryPresetConditions.by_name_equals(
+                    PrometheusQueryPresetSearchableFields.own.name.filter.equals(
                         StringMatchSpec("Container CPU Rate", case_insensitive=False, negated=False)
                     )
                 ],
@@ -191,7 +204,7 @@ class TestPrometheusQueryPresetOptions:
             ConditionCase(
                 seeds=(PresetSeed(name="Existing Preset"),),
                 conditions=[
-                    PrometheusQueryPresetConditions.by_name_equals(
+                    PrometheusQueryPresetSearchableFields.own.name.filter.equals(
                         StringMatchSpec("NonexistentPreset", case_insensitive=False, negated=False)
                     )
                 ],
@@ -203,18 +216,19 @@ class TestPrometheusQueryPresetOptions:
     )
     async def test_search_by_condition(
         self,
+        preset_ops: OpsRepository[PrometheusQueryPresetData],
         preset_repository: PrometheusQueryPresetRepository,
         test_case: SearchContext,
     ) -> None:
         assert isinstance(
             test_case.case, ConditionCase
         )  # ensure type checker understands the case type for accessing expected fields
-        querier = BatchQuerier(
+        searcher = PrometheusQueryPresetSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=test_case.case.conditions,
             orders=[],
         )
-        result = await preset_repository.search(querier=querier)
+        result = await preset_ops.search_in_global(searcher)
 
         assert len(result.items) == test_case.case.expected_count
         assert result.total_count == test_case.case.expected_count
@@ -232,16 +246,21 @@ class TestPrometheusQueryPresetOptions:
 
     async def test_search_by_ids(
         self,
+        preset_ops: OpsRepository[PrometheusQueryPresetData],
         preset_repository: PrometheusQueryPresetRepository,
         ids_presets: list[uuid.UUID],
     ) -> None:
         target_ids = ids_presets[:2]
-        querier = BatchQuerier(
+        searcher = PrometheusQueryPresetSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
-            conditions=[PrometheusQueryPresetConditions.by_ids(target_ids)],
+            conditions=[
+                PrometheusQueryPresetSearchableFields.own.id.filter.in_(
+                    UUIDInMatchSpec(values=target_ids, negated=False)
+                )
+            ],
             orders=[],
         )
-        result = await preset_repository.search(querier=querier)
+        result = await preset_ops.search_in_global(searcher)
 
         assert len(result.items) == 2
         assert {p.id for p in result.items} == set(target_ids)
@@ -255,7 +274,7 @@ class TestPrometheusQueryPresetOptions:
                     PresetSeed(name="Alpha Preset", created_at=_base_time - timedelta(days=2)),
                     PresetSeed(name="Beta Preset", created_at=_base_time - timedelta(days=1)),
                 ),
-                orders=[PrometheusQueryPresetOrders.name(ascending=True)],
+                orders=[PrometheusQueryPresetSearchableFields.own.name.order.apply(True)],
                 expected_ordered_names=("Alpha Preset", "Beta Preset", "Zebra Preset"),
             ),
             OrderCase(
@@ -264,7 +283,7 @@ class TestPrometheusQueryPresetOptions:
                     PresetSeed(name="Alpha Preset", created_at=_base_time - timedelta(days=2)),
                     PresetSeed(name="Beta Preset", created_at=_base_time - timedelta(days=1)),
                 ),
-                orders=[PrometheusQueryPresetOrders.name(ascending=False)],
+                orders=[PrometheusQueryPresetSearchableFields.own.name.order.apply(False)],
                 expected_ordered_names=("Zebra Preset", "Beta Preset", "Alpha Preset"),
             ),
             OrderCase(
@@ -273,7 +292,7 @@ class TestPrometheusQueryPresetOptions:
                     PresetSeed(name="Alpha Preset", created_at=_base_time - timedelta(days=2)),
                     PresetSeed(name="Beta Preset", created_at=_base_time - timedelta(days=1)),
                 ),
-                orders=[PrometheusQueryPresetOrders.created_at(ascending=True)],
+                orders=[PrometheusQueryPresetSearchableFields.own.created_at.order.apply(True)],
                 expected_ordered_names=("Zebra Preset", "Alpha Preset", "Beta Preset"),
             ),
             OrderCase(
@@ -282,7 +301,7 @@ class TestPrometheusQueryPresetOptions:
                     PresetSeed(name="Alpha Preset", created_at=_base_time - timedelta(days=2)),
                     PresetSeed(name="Beta Preset", created_at=_base_time - timedelta(days=1)),
                 ),
-                orders=[PrometheusQueryPresetOrders.created_at(ascending=False)],
+                orders=[PrometheusQueryPresetSearchableFields.own.created_at.order.apply(False)],
                 expected_ordered_names=("Beta Preset", "Alpha Preset", "Zebra Preset"),
             ),
         ],
@@ -290,17 +309,18 @@ class TestPrometheusQueryPresetOptions:
     )
     async def test_search_with_order(
         self,
+        preset_ops: OpsRepository[PrometheusQueryPresetData],
         preset_repository: PrometheusQueryPresetRepository,
         test_case: SearchContext,
     ) -> None:
         assert isinstance(test_case.case, OrderCase), (
             f"Expected OrderCase but got {type(test_case.case).__name__}"
         )
-        querier = BatchQuerier(
+        searcher = PrometheusQueryPresetSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
             orders=test_case.case.orders,
         )
-        result = await preset_repository.search(querier=querier)
+        result = await preset_ops.search_in_global(searcher)
 
         assert tuple(p.name for p in result.items) == test_case.case.expected_ordered_names

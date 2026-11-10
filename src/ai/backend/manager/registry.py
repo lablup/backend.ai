@@ -12,7 +12,6 @@ from collections.abc import (
     Sequence,
 )
 from datetime import datetime, timedelta
-from decimal import Decimal
 from typing import (
     Any,
     cast,
@@ -28,9 +27,8 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from dateutil.parser import isoparse
 from dateutil.tz import tzutc
-from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import load_only, noload, selectinload
+from sqlalchemy.orm import noload, selectinload
 from typeguard import check_type
 from yarl import URL
 
@@ -45,6 +43,14 @@ from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyIm
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.config import ModelHealthCheck
+from ai.backend.common.data.entity.domain import DomainName
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.resource_group import ResourceGroupName
+from ai.backend.common.data.entity.resource_slot import ResourceSlotName
+from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.defs.session import JOB_PRIORITY_DEFAULT, SESSION_PRIORITY_DEFAULT
 from ai.backend.common.docker import ImageRef, LabelName
 from ai.backend.common.dto.agent.response import (
@@ -67,25 +73,16 @@ from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.events.hub.propagators.cache import WithCachePropagator
 from ai.backend.common.events.types import EventCacheDomain, EventDomain
-from ai.backend.common.exception import AliasResolutionFailed
-from ai.backend.common.identifier.domain import DomainName
-from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.identifier.project import ProjectID
-from ai.backend.common.identifier.resource_group import ResourceGroupName
-from ai.backend.common.identifier.session import SessionID
-from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.common.exception import AliasResolutionFailed, UserNotFound
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import (
     AbuseReport,
     AccessKey,
     AgentId,
-    BinarySize,
     ClusterMode,
     ClusterSSHKeyPair,
     CommitStatus,
-    DeviceId,
     HardwareMetadata,
-    ImageAlias,
     ImageRegistry,
     KernelEnqueueingConfig,
     KernelId,
@@ -96,21 +93,23 @@ from ai.backend.common.types import (
     SessionEnqueueingConfig,
     SessionId,
     SessionTypes,
-    SlotName,
 )
 from ai.backend.common.utils import str_to_timedelta
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger, with_log_context
+from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.clients.appproxy.types import CreateEndpointRequestBody
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.agent.types import AgentStatus
-from ai.backend.manager.data.image.types import ImageIdentifier
+from ai.backend.manager.data.image.types import ImageData, ImageStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.model_serving.types import EndpointData
+from ai.backend.manager.data.resource_group.types import ResourceGroupData
 from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
     KernelGroupDraft,
     KernelResourceInput,
+    ResourceSpecDraft,
     SchedulingTargetDraft,
     SessionClassificationDraft,
     SessionIdentityDraft,
@@ -125,17 +124,51 @@ from ai.backend.manager.data.session.options import (
     ResourceOpts,
 )
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.models.resource_slot import ResourceAllocationRow
+from ai.backend.manager.data.vfolder.types import verify_mount_destination
+from ai.backend.manager.models.agent.row import AgentRow, agents
+from ai.backend.manager.models.bootstrap_script_revision.searchable_fields import (
+    BootstrapScriptRevisionSearchableFields,
+)
+from ai.backend.manager.models.bootstrap_script_revision.searchers import (
+    DefaultBootstrapScriptRevisionSearcher,
+)
+from ai.backend.manager.models.domain.row import domains
+from ai.backend.manager.models.endpoint.row import EndpointRow
+from ai.backend.manager.models.image.searchers import (
+    CanonicalImageSearcher,
+    ImageSearcher,
+    ReferenceImageSearcher,
+)
+from ai.backend.manager.models.kernel.row import (
+    AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+    USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+    KernelRow,
+    kernels,
+)
+from ai.backend.manager.models.network.row import NetworkRow, NetworkType
+from ai.backend.manager.models.resource_group.row import resource_groups
+from ai.backend.manager.models.resource_slot.row import ResourceAllocationRow
+from ai.backend.manager.models.session.row import (
+    PRIVATE_SESSION_TYPES,
+    KernelLoadingStrategy,
+    SessionRow,
+    handle_session_exception,
+)
+from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.plugin.network import NetworkPluginContext
-from ai.backend.manager.repositories.resource_slot import ResourceSlotRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.resource_slot.repository import ResourceSlotRepository
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
-from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.sokovan.scheduling_controller.resource_parse import parse_quantity
+from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
+    SchedulingController,
+)
 
 from .agent_cache import AgentRPCCache
-from .clients.agent import AgentClientPool
 from .clients.appproxy.client import AppProxyClient
 from .defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE
+from .errors.agent import AgentNotAllocated, AgentNotFound
 from .errors.api import InvalidAPIParameters
 from .errors.image import ImageNotFound
 from .errors.kernel import (
@@ -145,52 +178,22 @@ from .errors.kernel import (
     TooManySessionsMatched,
 )
 from .errors.resource import (
-    AgentNotAllocated,
-    DatabaseConnectionUnavailable,
-    InstanceNotFound,
     NoCurrentTaskContext,
-    ScalingGroupNotFound,
-    ScalingGroupSessionTypeNotAllowed,
+    ResourceGroupNotFound,
+    ResourceGroupSessionTypeNotAllowed,
 )
-from .models.agent import AgentRow, agents
-from .models.domain import domains
-from .models.endpoint import EndpointRow
-from .models.image import (
-    ImageRow,
-)
-from .models.kernel import (
-    AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
-    USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
-    KernelRow,
-    kernels,
-)
-from .models.keypair import query_bootstrap_script
-from .models.network import NetworkRow, NetworkType
 from .models.runtime_variant.row import RuntimeVariantRow
-from .models.scaling_group import query_allowed_sgroups, scaling_groups
-from .models.session import (
-    PRIVATE_SESSION_TYPES,
-    USER_RESOURCE_OCCUPYING_SESSION_STATUSES,
-    ConcurrencyUsed,
-    KernelLoadingStrategy,
-    SessionRow,
-    handle_session_exception,
-)
-from .models.user import UserRow
 from .models.utils import (
     ExtendedAsyncSAEngine,
     execute_with_retry,
     reenter_txn_session,
 )
-from .models.vfolder import (
-    verify_vfolder_name,
-)
 from .types import UserScope
 
 type MSetType = Mapping[str | bytes, bytes | float | int | str]
-__all__ = ["AgentRegistry", "InstanceNotFound"]
+__all__ = ["AgentRegistry"]
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 SESSION_NAME_LEN_LIMIT = 10
 DEFAULT_WAIT_TIMEOUT_SECONDS = 60
@@ -274,13 +277,19 @@ class AgentRegistry:
         ``"1g"``) for memory-like slots; normalise them to plain decimal
         strings so downstream ``Decimal(quantity)`` calls in the scheduler
         and ``ResourceSlotEntry.to_resource_slot`` keep working unchanged.
+        Zero-quantity slots are dropped.
         """
         if not resources:
             return ()
-        return tuple(
-            ResourceSlotEntry(resource_type=str(k), quantity=str(parse_quantity(v)))
-            for k, v in resources.items()
-        )
+        entries: list[ResourceSlotEntry] = []
+        for k, v in resources.items():
+            quantity = parse_quantity(v)
+            if quantity == 0:
+                continue
+            entries.append(
+                ResourceSlotEntry(resource_type=ResourceSlotName(str(k)), quantity=str(quantity))
+            )
+        return tuple(entries)
 
     def __init__(
         self,
@@ -298,11 +307,13 @@ class AgentRegistry:
         network_plugin_ctx: NetworkPluginContext,
         scheduling_controller: SchedulingController,
         scheduler_repository: SchedulerRepository,
+        ops_provider: V2DBOpsProvider,
         *,
         debug: bool = False,
         manager_public_key: PublicKey,
         manager_secret_key: SecretKey,
     ) -> None:
+        self._ops_provider = ops_provider
         self.config_provider = config_provider
         self.docker = aiodocker.Docker()
         self.db = db
@@ -324,6 +335,19 @@ class AgentRegistry:
         self.rpc_auth_manager_public_key = manager_public_key
         self.rpc_auth_manager_secret_key = manager_secret_key
         self._client_pool = ClientPool(tcp_client_session_factory)
+
+    def _canonical_image_searcher(self, canonical: str, architecture: str) -> ImageSearcher:
+        return CanonicalImageSearcher(canonical, architecture, [ImageStatus.ALIVE])
+
+    def _reference_image_searcher(self, reference: str, architecture: str) -> ImageSearcher:
+        return ReferenceImageSearcher(reference, architecture, [ImageStatus.ALIVE])
+
+    async def _first_image(self, searcher: ImageSearcher) -> ImageData:
+        async with self._ops_provider.read_ops() as r:
+            result = await r.search_in_global(searcher)
+        if not result.items:
+            raise ImageNotFound()
+        return result.items[0]
 
     async def init(self) -> None:
         self.heartbeat_lock = asyncio.Lock()
@@ -353,7 +377,7 @@ class AgentRegistry:
             result = await db_sess.execute(query)
             row = result.scalar_one_or_none()
             if row is None:
-                raise InstanceNotFound(inst_id)
+                raise AgentNotFound(inst_id)
             return AgentId(row)
 
     async def enumerate_instances(self, check_shadow: bool = True) -> list[AgentId]:
@@ -454,7 +478,7 @@ class AgentRegistry:
         route_id: uuid.UUID | None = None,
         sudo_session_enabled: bool = False,
     ) -> Mapping[str, Any]:
-        log.debug("create_session():")
+        log.debug("session creating")
         resp: MutableMapping[str, Any] = {}
 
         current_task = asyncio.current_task()
@@ -483,7 +507,7 @@ class AgentRegistry:
                 alias_name = alias_name.replace("/home/work/", "")
             if alias_name == "":
                 raise InvalidAPIParameters("Alias name cannot be empty.")
-            if not verify_vfolder_name(alias_name):
+            if not verify_mount_destination(alias_name):
                 raise InvalidAPIParameters(str(alias_name) + " is reserved for internal path.")
             if alias_name in original_folders:
                 raise InvalidAPIParameters(
@@ -501,14 +525,10 @@ class AgentRegistry:
 
         # Resolve the image reference.
         try:
-            async with self.db.begin_readonly_session() as session:
-                image_row = await ImageRow.resolve(
-                    session,
-                    [image_ref],
-                )
-            if (
-                _owner_id := image_row.labels.get("ai.backend.customized-image.owner")
-            ) and _owner_id != f"user:{user_scope.user_uuid}":
+            image = await self._first_image(
+                self._canonical_image_searcher(image_ref.canonical, image_ref.architecture)
+            )
+            if image.customized and image.creator_id != user_scope.user_uuid:
                 raise ImageNotFound
             if not image_ref.is_local:
                 async with self.db.begin_readonly() as conn:
@@ -539,11 +559,10 @@ class AgentRegistry:
                 if sess.main_kernel.architecture is None:
                     raise InvalidKernelConfig("Session main kernel has no architecture specified")
                 running_image_ref = (
-                    await ImageRow.resolve(
-                        db_session,
-                        [
-                            ImageIdentifier(sess.main_kernel.image, sess.main_kernel.architecture),
-                        ],
+                    await self._first_image(
+                        self._canonical_image_searcher(
+                            sess.main_kernel.image, sess.main_kernel.architecture
+                        )
                     )
                 ).image_ref
             if running_image_ref != image_ref:
@@ -586,10 +605,12 @@ class AgentRegistry:
                 starts_at = isoparse(starts_at_timestamp)
             except ValueError:
                 _td = str_to_timedelta(starts_at_timestamp)
-                starts_at = datetime.now(tzutc()) + _td
+                # Resolve the relative offset against DB time so the base
+                # point is consistent across managers (HA clock-skew safety)
+                starts_at = await self._scheduler_repository.get_db_now() + _td
 
         if cluster_size > 1:
-            log.debug(" -> cluster_mode:{} (replicate)", cluster_mode)
+            log.debug("session cluster mode replicating", cluster_mode=cluster_mode)
 
         if dependencies is None:
             dependencies = []
@@ -597,24 +618,28 @@ class AgentRegistry:
         session_creation_id = secrets.token_urlsafe(16)
 
         async with self.db.begin_readonly_session() as db_session:
-            conn = await db_session.connection()
-            if conn is None:
-                raise DatabaseConnectionUnavailable("Database connection not available")
             # check if network exists
             if _network_id := config.get("attach_network"):
                 network = await NetworkRow.get(db_session, _network_id)
             else:
                 network = None
 
-            # Use keypair bootstrap_script if it is not delivered as a parameter
-            if not bootstrap_script:
-                script, _ = await query_bootstrap_script(conn, owner_access_key)
-                bootstrap_script = script
-
             user_row = await db_session.scalar(
                 sa.select(UserRow).where(UserRow.uuid == user_scope.user_uuid)
             )
-            user_row = cast(UserRow, user_row)
+            if not user_row:
+                raise UserNotFound(f"User with UUID {user_scope.user_uuid} not found.")
+        if not bootstrap_script:
+            revision = BootstrapScriptRevisionSearchableFields.own
+            async with self._ops_provider.read_ops() as r:
+                revisions = await r.search_in_global(
+                    DefaultBootstrapScriptRevisionSearcher(
+                        user_id=UserID(user_scope.user_uuid),
+                        pagination=OffsetPagination(limit=1),
+                        orders=[revision.revision_number.order.apply(ascending=False)],
+                    )
+                )
+            bootstrap_script = revisions.items[0].script if revisions.items else ""
 
         public_sgroup_only = session_type not in PRIVATE_SESSION_TYPES
         if dry_run:
@@ -737,7 +762,7 @@ class AgentRegistry:
         user_scope: UserScope,
         owner_access_key: AccessKey,
         resource_policy: dict[str, Any],
-        scaling_group: str,
+        resource_group: str,
         sess_type: SessionTypes,
         tag: str,
         enqueue_only: bool = False,
@@ -840,15 +865,12 @@ class AgentRegistry:
 
             # Resolve the image reference.
             try:
-                async with self.db.begin_readonly_session() as session:
-                    image_row = await ImageRow.resolve(
-                        session,
-                        [
-                            ImageIdentifier(kernel_config["image"], kernel_config["architecture"]),
-                            ImageAlias(kernel_config["image"]),
-                        ],
+                image = await self._first_image(
+                    self._reference_image_searcher(
+                        kernel_config["image"], kernel_config["architecture"]
                     )
-                requested_image_ref = image_row.image_ref
+                )
+                requested_image_ref = image.image_ref
                 async with self.db.begin_readonly() as conn:
                     query = (
                         sa.select(domains.c.allowed_docker_registries)
@@ -896,7 +918,7 @@ class AgentRegistry:
                             },
                             "kernel_configs": kernel_configs,
                         },
-                        scaling_group,
+                        resource_group,
                         sess_type,
                         resource_policy,
                         user_scope=user_scope,
@@ -978,7 +1000,7 @@ class AgentRegistry:
         session_name: str,
         access_key: AccessKey,
         session_enqueue_configs: SessionEnqueueingConfig,
-        scaling_group: str | None,
+        resource_group: str | None,
         session_type: SessionTypes,
         resource_policy: dict[str, Any],
         *,
@@ -1063,13 +1085,14 @@ class AgentRegistry:
         # ``image_id`` already populated (task #29 migrates the read path
         # to persist ``ImageID`` end-to-end).
         image_id_by_ref: dict[ImageRef, ImageID] = {}
-        async with self.db.begin_readonly_session() as db_sess:
-            for kernel in kernel_enqueue_configs:
-                image_ref = kernel["image_ref"]
-                if image_ref in image_id_by_ref:
-                    continue
-                image_row = await ImageRow.resolve(db_sess, [image_ref])
-                image_id_by_ref[image_ref] = ImageID(image_row.id)
+        for kernel in kernel_enqueue_configs:
+            image_ref = kernel["image_ref"]
+            if image_ref in image_id_by_ref:
+                continue
+            image = await self._first_image(
+                self._canonical_image_searcher(image_ref.canonical, image_ref.architecture)
+            )
+            image_id_by_ref[image_ref] = image.id
 
         def _build_execution_spec(
             kernel: KernelEnqueueingConfig,
@@ -1130,16 +1153,16 @@ class AgentRegistry:
 
         domain_name = DomainName(user_scope.domain_name)
         domain_id = await self._scheduler_repository.get_domain_id_by_name(domain_name)
-        if scaling_group:
-            resource_group_name = ResourceGroupName(scaling_group)
+        if resource_group:
+            resource_group_name = ResourceGroupName(resource_group)
             resource_group_id = await self._scheduler_repository.get_resource_group_id_by_name(
                 resource_group_name
             )
         else:
             resource_group_id = await self._scheduler_repository.pick_default_resource_group(
-                access_key=access_key,
-                domain_name=user_scope.domain_name,
+                domain_id=domain_id,
                 project_id=ProjectID(user_scope.group_id),
+                user_id=UserID(user_scope.user_uuid),
             )
             resource_group_name = await self._scheduler_repository.get_resource_group_name_by_id(
                 resource_group_id
@@ -1161,17 +1184,19 @@ class AgentRegistry:
                 network=SessionNetworkDraft(network_id=network_id),
                 callback_url=callback_url,
                 dependencies=dependencies,
-                options=SessionOptionsDraft(
-                    priority=priority,
-                    job_priority=job_priority,
-                    is_preemptible=is_preemptible,
-                    cluster_mode=cluster_mode,
-                    cluster_size=cluster_size,
-                    scheduling_target=SchedulingTargetDraft(
-                        designated_agents=tuple(AgentId(a) for a in (agent_list or ())),
+                resource=ResourceSpecDraft(
+                    options=SessionOptionsDraft(
+                        priority=priority,
+                        job_priority=job_priority,
+                        is_preemptible=is_preemptible,
+                        cluster_mode=cluster_mode,
+                        cluster_size=cluster_size,
+                        scheduling_target=SchedulingTargetDraft(
+                            designated_agents=tuple(AgentId(a) for a in (agent_list or ())),
+                        ),
+                        kernel_groups=tuple(groups_by_role.values()),
+                        handler_options=None,
                     ),
-                    kernel_groups=tuple(groups_by_role.values()),
-                    handler_options=None,
                 ),
                 internal_data_extras=InternalDataExtras(
                     sudo_session_enabled=sudo_session_enabled,
@@ -1194,7 +1219,7 @@ class AgentRegistry:
         session_name: str,
         access_key: AccessKey,
         session_enqueue_configs: SessionEnqueueingConfig,
-        scaling_group: str | None,
+        resource_group: str | None,
         session_type: SessionTypes,
         resource_policy: dict[str, Any],
         *,
@@ -1222,7 +1247,7 @@ class AgentRegistry:
             session_name=session_name,
             access_key=access_key,
             session_enqueue_configs=session_enqueue_configs,
-            scaling_group=scaling_group,
+            resource_group=resource_group,
             session_type=session_type,
             resource_policy=resource_policy,
             user_scope=user_scope,
@@ -1244,29 +1269,6 @@ class AgentRegistry:
             network=network,
             startup_command=startup_command,
         )
-
-    def convert_resource_spec_to_resource_slot(
-        self,
-        allocations: Mapping[str, Mapping[SlotName, Mapping[DeviceId, str]]],
-    ) -> ResourceSlot:
-        """
-        Convert per-device resource spec allocations (agent-side format)
-        back into a resource slot (manager-side format).
-        """
-        slots = ResourceSlot()
-        for alloc_map in allocations.values():
-            for slot_name, allocation_by_device in alloc_map.items():
-                total_allocs: list[Decimal] = []
-                for allocation in allocation_by_device.values():
-                    if (
-                        isinstance(allocation, (BinarySize, str))
-                        and BinarySize.suffix_map.get(allocation[-1].lower()) is not None
-                    ):
-                        total_allocs.append(Decimal(BinarySize.from_str(allocation)))
-                    else:  # maybe Decimal("Infinity"), etc.
-                        total_allocs.append(Decimal(allocation))
-                slots[slot_name] = str(sum(total_allocs))
-        return slots
 
     async def create_cluster_ssh_keypair(self) -> ClusterSSHKeyPair:
         key = rsa.generate_private_key(
@@ -1401,47 +1403,12 @@ class AgentRegistry:
 
         return await execute_with_retry(_query)
 
-    async def update_scaling_group(self, agent_id: AgentId, scaling_group: str) -> None:
-        verified_agent_id = await self.get_instance(agent_id)
-        async with self._agent_client_pool.acquire(verified_agent_id) as client:
-            await client.update_scaling_group(scaling_group)
+    async def recalc_resource_usage(self) -> None:
+        """Reconcile normalized resource records against actual kernel state.
 
-    async def recalc_resource_usage(self, do_fullscan: bool = False) -> None:
-        async def _recalc() -> Mapping[AccessKey, ConcurrencyUsed]:
-            access_key_to_concurrency_used: dict[AccessKey, ConcurrencyUsed] = {}
-
-            async with self.db.begin_session() as db_sess:
-                # Query running containers and calculate concurrency_used per AK.
-                # Agent occupied slots are now managed by the normalized
-                # agent_resources table, so only concurrency tracking remains here.
-                session_query = (
-                    sa.select(SessionRow)
-                    .where(SessionRow.status.in_(USER_RESOURCE_OCCUPYING_SESSION_STATUSES))
-                    .options(
-                        load_only(
-                            SessionRow.id,
-                            SessionRow.access_key,
-                            SessionRow.status,
-                            SessionRow.session_type,
-                        ),
-                    )
-                )
-                async for session_row in await db_sess.stream_scalars(session_query):
-                    access_key = cast(AccessKey, session_row.access_key)
-                    if access_key not in access_key_to_concurrency_used:
-                        access_key_to_concurrency_used[access_key] = ConcurrencyUsed(access_key)
-                    if session_row.session_type in PRIVATE_SESSION_TYPES:
-                        access_key_to_concurrency_used[access_key].system_session_ids.add(
-                            session_row.id
-                        )
-                    else:
-                        access_key_to_concurrency_used[access_key].compute_session_ids.add(
-                            session_row.id
-                        )
-            return access_key_to_concurrency_used
-
-        access_key_to_concurrency_used = await execute_with_retry(_recalc)
-        await self._update_concurrency(access_key_to_concurrency_used, do_fullscan)
+        Concurrency is counted directly from the database wherever it is
+        consumed, so only the agent_resources reconciliation remains here.
+        """
         await self._reconcile_agent_resources()
 
     async def _reconcile_agent_resources(self) -> None:
@@ -1454,65 +1421,32 @@ class AgentRegistry:
         result = await repo.reconcile_agent_resources()
         for r in result.reconciled_terminal_kernels:
             log.warning(
-                "reconciled terminal-session kernel drift: kernel={}, session={}, {} -> CANCELLED",
-                r.kernel_id,
-                r.session_id,
-                r.from_kernel_status,
+                "terminal session kernel drift reconciled to cancelled",
+                kernel_id=r.kernel_id,
+                session_id=r.session_id,
+                from_kernel_status=r.from_kernel_status,
             )
         for o in result.orphaned_allocations:
             log.warning(
-                "freed orphaned resource allocation: kernel={}, slot={}",
-                o.kernel_id,
-                o.slot_name,
+                "orphaned resource allocation freed", kernel_id=o.kernel_id, slot_name=o.slot_name
             )
         for d in result.agent_resource_drifts:
             log.warning(
-                "agent_resources drift detected for {}:{}: tracked={}, actual={}",
-                d.agent_id,
-                d.slot_name,
-                d.tracked,
-                d.actual,
+                "agent resource drift detected",
+                agent_id=d.agent_id,
+                slot_name=d.slot_name,
+                tracked_amount=d.tracked,
+                actual_amount=d.actual,
             )
 
-    async def _update_concurrency(
-        self,
-        access_key_to_concurrency_used: Mapping[AccessKey, ConcurrencyUsed],
-        do_fullscan: bool,
-    ) -> None:
-        """Update concurrency values in valkey based on the current state."""
-        # Do full scan if the entire system does not have ANY sessions/sftp-sessions
-        # to set all concurrency_used to 0
-        _do_fullscan = do_fullscan or not access_key_to_concurrency_used
-        if _do_fullscan:
-            # Convert ConcurrencyUsed objects to simple access_key -> count mapping
-            # For fullscan, we need both compute and system concurrency counts
-            access_key_to_count = {
-                str(ak): len(concurrency.compute_session_ids)
-                for ak, concurrency in access_key_to_concurrency_used.items()
-            }
-            await self.valkey_stat.update_concurrency_by_fullscan(access_key_to_count)
-        else:
-            # Update keypair resource usage for keypairs with running containers.
-            # Prepare separate maps for compute and system concurrency
-            compute_concurrency_map = {}
-            system_concurrency_map = {}
-            for concurrency in access_key_to_concurrency_used.values():
-                compute_concurrency_map[str(concurrency.access_key)] = len(
-                    concurrency.compute_session_ids
-                )
-                system_concurrency_map[str(concurrency.access_key)] = len(
-                    concurrency.system_session_ids
-                )
-
-            # Update compute concurrency
-            if compute_concurrency_map:
-                await self.valkey_stat.update_compute_concurrency_by_map(compute_concurrency_map)
-
-            # Update system concurrency
-            if system_concurrency_map:
-                await self.valkey_stat.update_system_concurrency_by_map(system_concurrency_map)
-
     async def clean_session(
+        self,
+        session_id: SessionId,
+    ) -> None:
+        with with_log_context(session_id=session_id):
+            await self._clean_session_in_scope(session_id)
+
+    async def _clean_session_in_scope(
         self,
         session_id: SessionId,
     ) -> None:
@@ -1546,8 +1480,8 @@ class AgentRegistry:
                     agent_id = session.main_kernel.agent
                     if agent_id is None:
                         log.warning(
-                            "Cannot destroy network {}: main kernel has no agent allocated",
-                            network_ref_name,
+                            "network destroy skipped, main kernel has no agent allocated",
+                            network_ref_name=network_ref_name,
                         )
                     else:
                         try:
@@ -1555,7 +1489,9 @@ class AgentRegistry:
                                 await client.destroy_local_network(network_ref_name)
                         except Exception:
                             log.exception(
-                                "Failed to destroy the agent-local network {}", network_ref_name
+                                "agent-local network destroy failed",
+                                network_ref_name=network_ref_name,
+                                agent_id=agent_id,
                             )
             elif ClusterMode(session.cluster_mode) == ClusterMode.MULTI_NODE:
                 if network_ref_name is None:
@@ -1569,7 +1505,9 @@ class AgentRegistry:
                 try:
                     await network_plugin.destroy_network(network_ref_name)
                 except Exception:
-                    log.exception("Failed to destroy the overlay network {}", network_ref_name)
+                    log.exception(
+                        "overlay network destroy failed", network_ref_name=network_ref_name
+                    )
             else:
                 pass
 
@@ -1734,7 +1672,7 @@ class AgentRegistry:
                 else session.main_kernel
             )
             if kernel.agent is None:
-                raise InstanceNotFound(
+                raise AgentNotFound(
                     "Kernel has not been assigned to an agent.", extra_data={"kernel_id": kernel_id}
                 )
             async with self._agent_client_pool.acquire(AgentId(kernel.agent)) as client:
@@ -1935,9 +1873,9 @@ class AgentRegistry:
         endpoint: EndpointData,
     ) -> str:
         query = (
-            sa.select(scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token)
-            .select_from(scaling_groups)
-            .where(scaling_groups.c.name == endpoint.resource_group)
+            sa.select(resource_groups.c.wsproxy_addr, resource_groups.c.wsproxy_api_token)
+            .select_from(resource_groups)
+            .where(resource_groups.c.name == endpoint.resource_group)
         )
 
         result = await db_sess.execute(query)
@@ -1988,9 +1926,9 @@ class AgentRegistry:
 
     async def delete_appproxy_endpoint(self, db_sess: AsyncSession, endpoint: EndpointRow) -> None:
         query = (
-            sa.select(scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token)
-            .select_from(scaling_groups)
-            .where(scaling_groups.c.name == endpoint.resource_group)
+            sa.select(resource_groups.c.wsproxy_addr, resource_groups.c.wsproxy_api_token)
+            .select_from(resource_groups)
+            .where(resource_groups.c.name == endpoint.resource_group)
         )
 
         result = await db_sess.execute(query)
@@ -2004,60 +1942,51 @@ class AgentRegistry:
         await wsproxy_client.delete_endpoint(endpoint.id)
 
 
-async def check_scaling_group(
-    conn: SAConnection,
-    scaling_group: str | None,
+def check_resource_group(
+    candidates: Sequence[ResourceGroupData],
+    resource_group: str | None,
     session_type: SessionTypes,
-    access_key: AccessKey,
-    domain_name: str,
-    group_id: ProjectID | str,
     public_sgroup_only: bool = False,
 ) -> str:
-    # Check scaling group availability if scaling_group parameter is given.
-    # If scaling_group is not provided, it will be selected as the first one among
+    # Check scaling group availability if resource_group parameter is given.
+    # If resource_group is not provided, it will be selected as the first one among
     # the list of allowed scaling groups.
-    candidates = await query_allowed_sgroups(
-        conn,
-        domain_name,
-        group_id,
-        access_key,
-    )
     if public_sgroup_only:
-        candidates = [sgroup for sgroup in candidates if sgroup.is_public]
+        candidates = [sgroup for sgroup in candidates if sgroup.status.is_public]
     if not candidates:
-        raise ScalingGroupNotFound("You have no scaling groups allowed to use.")
+        raise ResourceGroupNotFound("You have no scaling groups allowed to use.")
 
     stype = session_type.value.lower()
-    if scaling_group is None:
+    if resource_group is None:
         for sgroup in candidates:
-            allowed_session_types = sgroup.scheduler_opts.allowed_session_types
+            allowed_session_types = sgroup.scheduler.options.allowed_session_types
             if stype in allowed_session_types:
-                scaling_group = sgroup.name
+                resource_group = sgroup.name
                 break
         else:
-            raise ScalingGroupNotFound(
+            raise ResourceGroupNotFound(
                 f"No scaling groups accept the session type '{session_type}'.",
             )
     else:
-        scaling_group_found = False
+        resource_group_found = False
         for sgroup in candidates:
-            if scaling_group == sgroup.name:
-                # scaling_group's unique key is 'name' field for now,
-                # but we will change scaling_group's unique key to new 'id' field.
-                scaling_group_found = True
-                allowed_session_types = sgroup.scheduler_opts.allowed_session_types
+            if resource_group == sgroup.name:
+                # resource_group's unique key is 'name' field for now,
+                # but we will change resource_group's unique key to new 'id' field.
+                resource_group_found = True
+                allowed_session_types = sgroup.scheduler.options.allowed_session_types
                 if stype in allowed_session_types:
                     break
         else:
-            if scaling_group_found:
-                raise ScalingGroupSessionTypeNotAllowed(
-                    f"The scaling group '{scaling_group}' does not accept "
+            if resource_group_found:
+                raise ResourceGroupSessionTypeNotAllowed(
+                    f"The scaling group '{resource_group}' does not accept "
                     f"the session type '{session_type}'."
                 )
-            raise ScalingGroupNotFound(
-                f"The scaling group '{scaling_group}' does not exist "
-                f"or you do not have access to the scaling group '{scaling_group}'."
+            raise ResourceGroupNotFound(
+                f"The scaling group '{resource_group}' does not exist "
+                f"or you do not have access to the scaling group '{resource_group}'."
             )
-    if scaling_group is None:
-        raise ScalingGroupNotFound("Scaling group not found")
-    return scaling_group
+    if resource_group is None:
+        raise ResourceGroupNotFound("Scaling group not found")
+    return resource_group

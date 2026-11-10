@@ -20,6 +20,7 @@ from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.exceptions import InvalidRequestError, PermissionDeniedError
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.rbac.request import (
     AdminSearchPermissionsGQLInput,
@@ -34,10 +35,7 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
     BulkRemoveRolePermissionsPayload,
     ReplaceRolePermissionsPayload,
 )
-from ai.backend.common.dto.manager.v2.rbac.types import (
-    RBACElementTypeDTO,
-    RBACElementTypeFilter,
-)
+from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO
 from ai.backend.manager.api.adapters.rbac.adapter import RBACAdapter
 from ai.backend.manager.api.rest.admin.handler import AdminHandler
 from ai.backend.manager.api.rest.admin.registry import register_admin_routes
@@ -50,6 +48,7 @@ from ai.backend.manager.api.rest.v2.rbac.registry import register_v2_rbac_routes
 from ai.backend.manager.services.permission_contoller.processors import (
     PermissionControllerProcessors,
 )
+from ai.backend.manager.services.rbac.processors import RbacProcessors
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 if TYPE_CHECKING:
@@ -62,10 +61,12 @@ if TYPE_CHECKING:
 def server_module_registries(
     route_deps: RouteDeps,
     permission_controller_processors: PermissionControllerProcessors,
+    rbac_processors: RbacProcessors,
 ) -> list[RouteRegistry]:
     """Register both v1 RBAC (for role/permission setup) and v2 RBAC routes."""
     rbac_registry = register_rbac_routes(
-        RBACHandler(permission_controller=permission_controller_processors), route_deps
+        RBACHandler(permission_controller=permission_controller_processors, rbac=rbac_processors),
+        route_deps,
     )
     admin_registry = register_admin_routes(
         AdminHandler(
@@ -81,7 +82,8 @@ def server_module_registries(
 
     processors = MagicMock()
     processors.permission_controller = permission_controller_processors
-    adapter = RBACAdapter(processors)
+    processors.rbac = rbac_processors
+    adapter = RBACAdapter(processors.rbac, processors.permission_controller)
     handler = V2RBACHandler(adapter=adapter)
     v2_reg = RouteRegistry.create("v2", route_deps.cors_options)
     v2_reg.add_subregistry(register_v2_rbac_routes(handler, route_deps))
@@ -126,17 +128,12 @@ async def user_v2_registry(
 
 
 def _entry(
-    role_id: uuid.UUID,
-    domain_name: str,
-    entity_type: str,
-    operation: str,
+    role_id: uuid.UUID, entity_type: str, permission: PermissionBitDTO
 ) -> CreatePermissionInput:
     return CreatePermissionInput(
         role_id=role_id,
-        scope_type="domain",
-        scope_id=domain_name,
-        entity_type=entity_type,
-        operation=operation,
+        entity_type=EntityType.from_name(entity_type),
+        permission=permission,
     )
 
 
@@ -152,15 +149,15 @@ class TestBulkAddRolePermissionsV2:
         result = await admin_v2_registry.rbac.bulk_add_role_permissions(
             BulkAddRolePermissionsInput(
                 permissions=[
-                    _entry(target_role.role.id, domain_fixture.domain_name, "session", "read"),
-                    _entry(target_role.role.id, domain_fixture.domain_name, "image", "read"),
+                    _entry(target_role.role.id, "session", PermissionBitDTO.READ),
+                    _entry(target_role.role.id, "image", PermissionBitDTO.READ),
                 ],
             ),
         )
         assert isinstance(result, BulkAddRolePermissionsPayload)
         assert len(result.items) == 2
         assert result.failed == []
-        entity_ops = {(item.entity_type.value, item.operation.value) for item in result.items}
+        entity_ops = {(item.entity_type, item.permission.value) for item in result.items}
         assert entity_ops == {("session", "read"), ("image", "read")}
 
     async def test_duplicate_entry_appears_in_failed(
@@ -173,7 +170,7 @@ class TestBulkAddRolePermissionsV2:
         first = await admin_v2_registry.rbac.bulk_add_role_permissions(
             BulkAddRolePermissionsInput(
                 permissions=[
-                    _entry(target_role.role.id, domain_fixture.domain_name, "vfolder", "read"),
+                    _entry(target_role.role.id, "vfolder", PermissionBitDTO.READ),
                 ],
             ),
         )
@@ -183,16 +180,16 @@ class TestBulkAddRolePermissionsV2:
         result = await admin_v2_registry.rbac.bulk_add_role_permissions(
             BulkAddRolePermissionsInput(
                 permissions=[
-                    _entry(target_role.role.id, domain_fixture.domain_name, "vfolder", "read"),
-                    _entry(target_role.role.id, domain_fixture.domain_name, "agent", "read"),
+                    _entry(target_role.role.id, "vfolder", PermissionBitDTO.READ),
+                    _entry(target_role.role.id, "agent", PermissionBitDTO.READ),
                 ],
             ),
         )
         assert len(result.items) == 1
-        assert result.items[0].entity_type.value == "agent"
+        assert result.items[0].entity_type == "agent"
         assert len(result.failed) == 1
         assert result.failed[0].entity_type == "vfolder"
-        assert result.failed[0].operation == "read"
+        assert result.failed[0].permission == PermissionBitDTO.READ
 
     async def test_empty_input_is_ok(
         self,
@@ -215,7 +212,7 @@ class TestBulkAddRolePermissionsV2:
             await user_v2_registry.rbac.bulk_add_role_permissions(
                 BulkAddRolePermissionsInput(
                     permissions=[
-                        _entry(target_role.role.id, domain_fixture.domain_name, "session", "read"),
+                        _entry(target_role.role.id, "session", PermissionBitDTO.READ),
                     ],
                 ),
             )
@@ -233,8 +230,8 @@ class TestBulkRemoveRolePermissionsV2:
         added = await admin_v2_registry.rbac.bulk_add_role_permissions(
             BulkAddRolePermissionsInput(
                 permissions=[
-                    _entry(target_role.role.id, domain_fixture.domain_name, "session", "read"),
-                    _entry(target_role.role.id, domain_fixture.domain_name, "image", "read"),
+                    _entry(target_role.role.id, "session", PermissionBitDTO.READ),
+                    _entry(target_role.role.id, "image", PermissionBitDTO.READ),
                 ],
             ),
         )
@@ -267,7 +264,7 @@ class TestBulkRemoveRolePermissionsV2:
         added = await admin_v2_registry.rbac.bulk_add_role_permissions(
             BulkAddRolePermissionsInput(
                 permissions=[
-                    _entry(target_role.role.id, domain_fixture.domain_name, "session", "read"),
+                    _entry(target_role.role.id, "session", PermissionBitDTO.READ),
                 ],
             ),
         )
@@ -312,8 +309,8 @@ class TestReplaceRolePermissionsV2:
         await admin_v2_registry.rbac.bulk_add_role_permissions(
             BulkAddRolePermissionsInput(
                 permissions=[
-                    _entry(target_role.role.id, domain_fixture.domain_name, "session", "read"),
-                    _entry(target_role.role.id, domain_fixture.domain_name, "image", "read"),
+                    _entry(target_role.role.id, "session", PermissionBitDTO.READ),
+                    _entry(target_role.role.id, "image", PermissionBitDTO.READ),
                 ],
             ),
         )
@@ -323,13 +320,13 @@ class TestReplaceRolePermissionsV2:
             ReplaceRolePermissionsInput(
                 role_id=target_role.role.id,
                 permissions=[
-                    _entry(target_role.role.id, domain_fixture.domain_name, "vfolder", "read"),
-                    _entry(target_role.role.id, domain_fixture.domain_name, "agent", "read"),
+                    _entry(target_role.role.id, "vfolder", PermissionBitDTO.READ),
+                    _entry(target_role.role.id, "agent", PermissionBitDTO.READ),
                 ],
             ),
         )
         assert isinstance(result, ReplaceRolePermissionsPayload)
-        assert {(it.entity_type.value, it.operation.value) for it in result.items} == {
+        assert {(it.entity_type, it.permission.value) for it in result.items} == {
             ("vfolder", "read"),
             ("agent", "read"),
         }
@@ -344,7 +341,7 @@ class TestReplaceRolePermissionsV2:
         await admin_v2_registry.rbac.bulk_add_role_permissions(
             BulkAddRolePermissionsInput(
                 permissions=[
-                    _entry(target_role.role.id, domain_fixture.domain_name, "session", "read"),
+                    _entry(target_role.role.id, "session", PermissionBitDTO.READ),
                 ],
             ),
         )
@@ -366,7 +363,7 @@ class TestReplaceRolePermissionsV2:
                 ReplaceRolePermissionsInput(
                     role_id=target_role.role.id,
                     permissions=[
-                        _entry(wrong_role_id, domain_fixture.domain_name, "session", "read"),
+                        _entry(wrong_role_id, "session", PermissionBitDTO.READ),
                     ],
                 ),
             )
@@ -385,48 +382,8 @@ class TestReplaceRolePermissionsV2:
             )
 
 
-class TestPermissionFilterScopeIdNarrowing:
-    """Verify the new ``PermissionFilter.scope_id`` narrows search results server-side.
-
-    Regression coverage for the wiring chain
-    ``PermissionFilter.scope_id`` → ``ScopedPermissionConditions.by_scope_id_*``.
-    """
-
-    async def test_scope_id_equals_narrows_results(
-        self,
-        admin_v2_registry: V2ClientRegistry,
-        target_role: CreateRoleResponse,
-        domain_fixture: DomainFixtureData,
-    ) -> None:
-        # Seed two permissions in the same scope and an unrelated one in another scope.
-        scope_b = f"{domain_fixture.domain_name}-other"
-        await admin_v2_registry.rbac.bulk_add_role_permissions(
-            BulkAddRolePermissionsInput(
-                permissions=[
-                    _entry(target_role.role.id, domain_fixture.domain_name, "session", "read"),
-                    _entry(target_role.role.id, domain_fixture.domain_name, "image", "read"),
-                    CreatePermissionInput(
-                        role_id=target_role.role.id,
-                        scope_type="domain",
-                        scope_id=scope_b,
-                        entity_type="session",
-                        operation="read",
-                    ),
-                ],
-            ),
-        )
-
-        result = await admin_v2_registry.rbac.search_permissions(
-            AdminSearchPermissionsGQLInput(
-                filter=PermissionFilter(
-                    role_id=UUIDFilter(equals=target_role.role.id),
-                    scope_id=StringFilter(equals=domain_fixture.domain_name),
-                ),
-                limit=100,
-            ),
-        )
-        assert {item.scope_id for item in result.items} == {domain_fixture.domain_name}
-        assert len(result.items) == 2
+class TestPermissionFilters:
+    """The filters a permission row answers: its role and the entity type it names."""
 
     async def test_role_id_in_filter_returns_matching_rows(
         self,
@@ -437,7 +394,7 @@ class TestPermissionFilterScopeIdNarrowing:
         await admin_v2_registry.rbac.bulk_add_role_permissions(
             BulkAddRolePermissionsInput(
                 permissions=[
-                    _entry(target_role.role.id, domain_fixture.domain_name, "session", "read"),
+                    _entry(target_role.role.id, "session", PermissionBitDTO.READ),
                 ],
             ),
         )
@@ -456,17 +413,13 @@ class TestPermissionFilterScopeIdNarrowing:
         target_role: CreateRoleResponse,
         domain_fixture: DomainFixtureData,
     ) -> None:
-        """``PermissionRow.entity_type`` is a ``StrEnumType``-wrapped column.
-
-        ``RBACElementTypeFilter.equals`` carries an ``RBACElementTypeDTO`` enum
-        instance, which lets ``StrEnumType.process_bind_param`` accept the value
-        as-is without any column-cast workaround.
-        """
+        """``StringFilter.equals`` carries the entity type's name, which the
+        column takes as-is."""
         await admin_v2_registry.rbac.bulk_add_role_permissions(
             BulkAddRolePermissionsInput(
                 permissions=[
-                    _entry(target_role.role.id, domain_fixture.domain_name, "session", "read"),
-                    _entry(target_role.role.id, domain_fixture.domain_name, "image", "read"),
+                    _entry(target_role.role.id, "session", PermissionBitDTO.READ),
+                    _entry(target_role.role.id, "image", PermissionBitDTO.READ),
                 ],
             ),
         )
@@ -474,12 +427,12 @@ class TestPermissionFilterScopeIdNarrowing:
             AdminSearchPermissionsGQLInput(
                 filter=PermissionFilter(
                     role_id=UUIDFilter(equals=target_role.role.id),
-                    entity_type=RBACElementTypeFilter(equals=RBACElementTypeDTO.SESSION),
+                    entity_type=StringFilter(equals="session"),
                 ),
                 limit=100,
             ),
         )
-        assert {item.entity_type.value for item in result.items} == {"session"}
+        assert {item.entity_type for item in result.items} == {"session"}
 
     async def test_entity_type_in_filter(
         self,
@@ -487,13 +440,13 @@ class TestPermissionFilterScopeIdNarrowing:
         target_role: CreateRoleResponse,
         domain_fixture: DomainFixtureData,
     ) -> None:
-        """``RBACElementTypeFilter.in_`` returns rows whose entity_type is in the list."""
+        """``StringFilter.in_`` returns rows whose entity_type is in the list."""
         await admin_v2_registry.rbac.bulk_add_role_permissions(
             BulkAddRolePermissionsInput(
                 permissions=[
-                    _entry(target_role.role.id, domain_fixture.domain_name, "session", "read"),
-                    _entry(target_role.role.id, domain_fixture.domain_name, "image", "read"),
-                    _entry(target_role.role.id, domain_fixture.domain_name, "vfolder", "read"),
+                    _entry(target_role.role.id, "session", PermissionBitDTO.READ),
+                    _entry(target_role.role.id, "image", PermissionBitDTO.READ),
+                    _entry(target_role.role.id, "vfolder", PermissionBitDTO.READ),
                 ],
             ),
         )
@@ -501,11 +454,9 @@ class TestPermissionFilterScopeIdNarrowing:
             AdminSearchPermissionsGQLInput(
                 filter=PermissionFilter(
                     role_id=UUIDFilter(equals=target_role.role.id),
-                    entity_type=RBACElementTypeFilter(
-                        in_=[RBACElementTypeDTO.SESSION, RBACElementTypeDTO.IMAGE]
-                    ),
+                    entity_type=StringFilter(in_=["session", "image"]),
                 ),
                 limit=100,
             ),
         )
-        assert {item.entity_type.value for item in result.items} == {"session", "image"}
+        assert {item.entity_type for item in result.items} == {"session", "image"}

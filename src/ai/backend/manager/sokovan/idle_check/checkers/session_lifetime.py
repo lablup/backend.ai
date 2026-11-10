@@ -2,18 +2,19 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
+from datetime import timedelta
 from decimal import Decimal
 from typing import override
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.sokovan.idle_check.checkers.base import (
     CheckerAssignment,
+    IdleActivityDecision,
     IdleChecker,
     IdleCheckerContext,
-    IdleJudgment,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 
 class SessionLifetimeChecker(IdleChecker):
@@ -25,18 +26,16 @@ class SessionLifetimeChecker(IdleChecker):
         assignments: Sequence[CheckerAssignment],
         *,
         context: IdleCheckerContext,
-    ) -> Sequence[IdleJudgment]:
-        judgments: list[IdleJudgment] = []
+    ) -> Sequence[IdleActivityDecision]:
+        decisions: list[IdleActivityDecision] = []
         for assignment in assignments:
             lifetime_spec = assignment.definition.spec.session_lifetime
             if lifetime_spec is None:
                 log.error(
-                    "Session lifetime checker {} has mismatched spec type: {}",
-                    assignment.definition.checker_id,
-                    assignment.definition.spec.type,
+                    "session lifetime checker has mismatched spec type",
+                    idle_checker_id=assignment.definition.checker_id,
+                    spec_type=assignment.definition.spec.type,
                 )
-                continue
-            if lifetime_spec.max_lifetime_seconds == 0:
                 continue
             max_lifetime_seconds = Decimal(lifetime_spec.max_lifetime_seconds)
             for session in assignment.sessions:
@@ -45,16 +44,20 @@ class SessionLifetimeChecker(IdleChecker):
                 running_seconds = Decimal(
                     str((context.current_time - session.starts_at).total_seconds())
                 ).normalize()
-                judgments.append(
-                    IdleJudgment(
+                expires_at = session.starts_at + timedelta(
+                    seconds=lifetime_spec.max_lifetime_seconds
+                )
+                decisions.append(
+                    IdleActivityDecision(
                         checker_id=assignment.definition.checker_id,
                         session_id=session.session_id,
-                        is_idle=running_seconds >= max_lifetime_seconds,
+                        expire_at=expires_at,
+                        is_active=False,
                         message=(
-                            "Session lifetime exceeded: "
+                            "Session lifetime check: "
                             f"max_lifetime_seconds={max_lifetime_seconds:f}, "
                             f"running_seconds={running_seconds:f}"
                         ),
                     )
                 )
-        return judgments
+        return decisions

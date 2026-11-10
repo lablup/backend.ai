@@ -9,30 +9,56 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncConnection
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
-from ai.backend.client.v2.exceptions import ConflictError, InvalidRequestError, NotFoundError
+from ai.backend.client.v2.exceptions import ConflictError, NotFoundError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
-from ai.backend.common.data.permission.types import RelationType
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.role import RoleEntityType
+from ai.backend.common.data.entity.user import UserEntityType
+from ai.backend.common.data.entity.virtual_entity import VirtualEntityID
+from ai.backend.common.data.permission.id import EntityMembershipID
 from ai.backend.common.dto.manager.user import (
     CreateUserRequest,
     CreateUserResponse,
     DeleteUserRequest,
     DeleteUserResponse,
     GetUserResponse,
+    PurgeUserRequest,
     UserStatus,
 )
 from ai.backend.manager.data.permission.status import RoleStatus
-from ai.backend.manager.data.permission.types import EntityType, ScopeType
-from ai.backend.manager.models.group import GroupRow, ProjectType
-from ai.backend.manager.models.keypair import keypairs
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
-from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
-from ai.backend.manager.models.user import users
+from ai.backend.manager.models.keypair.row import KeyPairRow, keypairs
+from ai.backend.manager.models.project.row import ProjectRow, ProjectType
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
+from ai.backend.manager.models.user.row import users
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 from .conftest import UserFactory
+
+
+def _node_id(entity_type: str, entity_id: uuid.UUID) -> sa.ScalarSelect[VirtualEntityID]:
+    """The virtual entity node of an entity, as a scalar subquery."""
+    return (
+        sa.select(VirtualEntityRow.id)
+        .where(
+            VirtualEntityRow.entity_type == entity_type,
+            VirtualEntityRow.entity_id == entity_id,
+        )
+        .scalar_subquery()
+    )
+
+
+def _membership_query(
+    scope_type: str, scope_id: uuid.UUID, member_type: str, member_id: uuid.UUID
+) -> sa.Select[tuple[EntityMembershipID]]:
+    """The edge listing the member in the scope's virtual entity."""
+    return sa.select(EntityMembershipRow.id).where(
+        EntityMembershipRow.virtual_entity_id == _node_id(scope_type, scope_id),
+        EntityMembershipRow.member_entity_id == _node_id(member_type, member_id),
+    )
 
 
 class TestUserCreateCrud:
@@ -61,28 +87,125 @@ class TestUserCreateCrud:
         assert kp is not None, "Keypair should be auto-created for new user"
         assert kp.is_active is True
 
+    async def test_s6_create_marks_the_default_keypair_as_main(
+        self,
+        user_factory: UserFactory,
+        db_engine: SAEngine,
+    ) -> None:
+        """S-6: Exactly the auto-created keypair is marked as the user's main one."""
+        result = await user_factory()
+
+        async with db_engine.begin() as conn:
+            marked = (
+                await conn.execute(
+                    sa.select(KeyPairRow.access_key).where(
+                        (KeyPairRow.user == str(result.user.id)) & KeyPairRow.is_default
+                    )
+                )
+            ).scalars()
+            owned = (
+                await conn.execute(
+                    sa.select(KeyPairRow.access_key).where(KeyPairRow.user == str(result.user.id))
+                )
+            ).scalars()
+        assert marked.all() == owned.all()
+
     async def test_s3_create_with_group_ids(
         self,
         user_factory: UserFactory,
         group_fixture: uuid.UUID,
         db_engine: SAEngine,
     ) -> None:
-        """S-3: User created with group_ids → verify association_scopes_entities mapping in DB."""
+        """S-3: User created with group_ids → the group's virtual entity lists the user."""
         result = await user_factory(group_ids=[str(group_fixture)])
 
         async with db_engine.begin() as conn:
-            row = await conn.execute(
-                sa.select(AssociationScopesEntitiesRow).where(
-                    sa.and_(
-                        AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                        AssociationScopesEntitiesRow.scope_id == str(group_fixture),
-                        AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                        AssociationScopesEntitiesRow.entity_id == str(result.user.id),
+            membership = (
+                await conn.execute(
+                    _membership_query(
+                        ProjectEntityType(), group_fixture, UserEntityType(), result.user.id
                     )
                 )
+            ).fetchone()
+        assert membership is not None, "User should be on the given group's roster"
+
+    async def test_s7_create_makes_a_personal_project_with_the_user_alone(
+        self,
+        user_factory: UserFactory,
+        domain_fixture: DomainFixtureData,
+        db_engine: SAEngine,
+    ) -> None:
+        """S-7: Creating a user through the REST path creates its personal project,
+        named after the username, with that user as its only member."""
+        result = await user_factory()
+
+        async with db_engine.begin() as conn:
+            project_id = await conn.scalar(
+                sa.select(ProjectRow.id).where(
+                    ProjectRow.domain_name == domain_fixture.domain_name,
+                    ProjectRow.type == ProjectType.PERSONAL,
+                    ProjectRow.name == result.user.username,
+                )
             )
-            assoc = row.fetchone()
-        assert assoc is not None, "User should be associated with the given group"
+            assert project_id is not None, "A personal project should be created"
+            member = sa.orm.aliased(VirtualEntityRow, name="member_node")
+            member_ids = (
+                await conn.scalars(
+                    sa.select(member.entity_id)
+                    .join(EntityMembershipRow, EntityMembershipRow.member_entity_id == member.id)
+                    .where(
+                        EntityMembershipRow.virtual_entity_id
+                        == _node_id(ProjectEntityType(), project_id),
+                        member.entity_type == UserEntityType(),
+                    )
+                )
+            ).all()
+            creator_id = await conn.scalar(
+                sa.select(ProjectRow.creator_id).where(ProjectRow.id == project_id)
+            )
+        assert list(member_ids) == [result.user.id]
+        assert creator_id == result.user.id
+
+    async def test_s8_purging_the_user_leaves_its_personal_project_dangling(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        domain_fixture: DomainFixtureData,
+        resource_policy_fixture: str,
+        db_engine: SAEngine,
+    ) -> None:
+        """S-8: What the personal project holds outlives the account. The project stays
+        with no creator, which is what marks it for the retention sweep."""
+        unique = secrets.token_hex(4)
+        created = await admin_registry.user.create(
+            CreateUserRequest(
+                email=f"purge-personal-{unique}@test.local",
+                username=f"purge-personal-{unique}",
+                password="test-password-1234",
+                domain_name=domain_fixture.domain_name,
+                resource_policy=resource_policy_fixture,
+                status=UserStatus.ACTIVE,
+            )
+        )
+        async with db_engine.begin() as conn:
+            project_id = await conn.scalar(
+                sa.select(ProjectRow.id).where(
+                    ProjectRow.name == f"purge-personal-{unique}",
+                    ProjectRow.type == ProjectType.PERSONAL,
+                    ProjectRow.creator_id == str(created.user.id),
+                )
+            )
+        assert project_id is not None
+
+        await admin_registry.user.purge(PurgeUserRequest(user_id=created.user.id))
+
+        async with db_engine.begin() as conn:
+            row = (
+                await conn.execute(
+                    sa.select(ProjectRow.creator_id).where(ProjectRow.id == project_id)
+                )
+            ).first()
+        assert row is not None, "The personal project should outlive its user"
+        assert row.creator_id is None, "Its creator should be cleared"
 
     async def test_s4_create_with_status_inactive(
         self,
@@ -146,8 +269,8 @@ class TestUserCreateCrud:
         resource_policy_fixture: str,
         admin_registry: BackendAIClientRegistry,
     ) -> None:
-        """F-BIZ-2: Non-existent domain → InvalidRequestError (400)."""
-        with pytest.raises(InvalidRequestError):
+        """F-BIZ-2: Non-existent domain → NotFoundError (404)."""
+        with pytest.raises(NotFoundError):
             await admin_registry.user.create(
                 CreateUserRequest(
                     email="no-domain@test.local",
@@ -255,7 +378,7 @@ class TestUserDeleteCrud:
         user_factory: UserFactory,
         db_engine: SAEngine,
     ) -> None:
-        """S-1: Admin soft deletes ACTIVE user → success=True, DB status=DELETED, keypairs deactivated."""
+        """S-1: Admin soft deletes ACTIVE user → success=True, DB status=DELETED, keypairs untouched."""
         created = await user_factory()
 
         result = await admin_registry.user.delete(DeleteUserRequest(user_id=created.user.id))
@@ -271,15 +394,14 @@ class TestUserDeleteCrud:
             user_status = user_row.scalar()
             assert user_status == UserStatus.DELETED
 
-            # Verify all keypairs deactivated
+            # Keypairs stay active: the auth status gate keeps a deleted user out,
+            # so restore does not have to re-activate them.
             kp_row = await conn.execute(
                 sa.select(keypairs.c.is_active).where(keypairs.c.user == str(created.user.id))
             )
             kp_actives = kp_row.scalars().all()
             assert len(kp_actives) > 0, "Should have at least one keypair"
-            assert all(not active for active in kp_actives), (
-                "All keypairs should be deactivated after soft delete"
-            )
+            assert all(kp_actives), "Keypairs should stay active after soft delete"
 
     async def test_s2_soft_delete_inactive_user(
         self,
@@ -350,15 +472,23 @@ class TestUserCreateAutoAssignRoles:
                 name=name,
                 status=RoleStatus.ACTIVE,
                 auto_assign=True,
+                scope_type=ProjectEntityType(),
+                scope_id=project_id,
+            )
+        )
+        role_node_id = uuid.uuid4()
+        await conn.execute(
+            sa.insert(VirtualEntityRow.__table__).values(
+                id=role_node_id,
+                entity_type=RoleEntityType(),
+                entity_id=role_id,
             )
         )
         await conn.execute(
-            sa.insert(AssociationScopesEntitiesRow.__table__).values(
-                scope_type=ScopeType.PROJECT,
-                scope_id=str(project_id),
-                entity_type=EntityType.ROLE,
-                entity_id=str(role_id),
-                relation_type=RelationType.AUTO,
+            sa.insert(EntityMembershipRow.__table__).values(
+                virtual_entity_id=_node_id(ProjectEntityType(), project_id),
+                member_entity_id=role_node_id,
+                capped=False,
             )
         )
         return role_id
@@ -369,11 +499,9 @@ class TestUserCreateAutoAssignRoles:
             UserRoleRow.__table__.delete().where(UserRoleRow.__table__.c.role_id == role_id)
         )
         await conn.execute(
-            AssociationScopesEntitiesRow.__table__.delete().where(
-                sa.and_(
-                    AssociationScopesEntitiesRow.__table__.c.entity_type == EntityType.ROLE,
-                    AssociationScopesEntitiesRow.__table__.c.entity_id == str(role_id),
-                )
+            VirtualEntityRow.__table__.delete().where(
+                VirtualEntityRow.__table__.c.entity_type == RoleEntityType(),
+                VirtualEntityRow.__table__.c.entity_id == role_id,
             )
         )
         await conn.execute(RoleRow.__table__.delete().where(RoleRow.__table__.c.id == role_id))
@@ -404,7 +532,7 @@ class TestUserCreateAutoAssignRoles:
         project_id = uuid.uuid4()
         async with db_engine.begin() as conn:
             await conn.execute(
-                sa.insert(GroupRow.__table__).values(
+                sa.insert(ProjectRow.__table__).values(
                     id=project_id,
                     name=f"model-store-{secrets.token_hex(4)}",
                     description="Model Store",
@@ -414,10 +542,38 @@ class TestUserCreateAutoAssignRoles:
                     type=ProjectType.MODEL_STORE,
                 )
             )
+            virtual_entity_id = uuid.uuid4()
+            await conn.execute(
+                sa.insert(VirtualEntityRow.__table__).values(
+                    id=virtual_entity_id,
+                    entity_type=ProjectEntityType(),
+                    entity_id=project_id,
+                )
+            )
+            await conn.execute(
+                sa.insert(EntityMembershipRow.__table__).values(
+                    virtual_entity_id=virtual_entity_id,
+                    member_entity_id=virtual_entity_id,
+                    capped=False,
+                )
+            )
+            await conn.execute(
+                sa.insert(ScopeBindingRow.__table__).values(
+                    virtual_entity_id=virtual_entity_id,
+                    scope_entity_id=virtual_entity_id,
+                    permission_cap=None,
+                )
+            )
         yield project_id
         async with db_engine.begin() as conn:
             await conn.execute(
-                GroupRow.__table__.delete().where(GroupRow.__table__.c.id == project_id)
+                VirtualEntityRow.__table__.delete().where(
+                    VirtualEntityRow.__table__.c.entity_type == ProjectEntityType(),
+                    VirtualEntityRow.__table__.c.entity_id == project_id,
+                )
+            )
+            await conn.execute(
+                ProjectRow.__table__.delete().where(ProjectRow.__table__.c.id == project_id)
             )
 
     @pytest.fixture()
@@ -448,11 +604,8 @@ class TestUserCreateAutoAssignRoles:
         async with db_engine.begin() as conn:
             membership = (
                 await conn.execute(
-                    sa.select(AssociationScopesEntitiesRow).where(
-                        AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                        AssociationScopesEntitiesRow.scope_id == str(group_fixture),
-                        AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                        AssociationScopesEntitiesRow.entity_id == str(result.user.id),
+                    _membership_query(
+                        ProjectEntityType(), group_fixture, UserEntityType(), result.user.id
                     )
                 )
             ).fetchone()
@@ -481,11 +634,8 @@ class TestUserCreateAutoAssignRoles:
         async with db_engine.begin() as conn:
             membership = (
                 await conn.execute(
-                    sa.select(AssociationScopesEntitiesRow).where(
-                        AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                        AssociationScopesEntitiesRow.scope_id == str(model_store_project),
-                        AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                        AssociationScopesEntitiesRow.entity_id == str(result.user.id),
+                    _membership_query(
+                        ProjectEntityType(), model_store_project, UserEntityType(), result.user.id
                     )
                 )
             ).fetchone()

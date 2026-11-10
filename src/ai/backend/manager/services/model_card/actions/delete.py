@@ -3,32 +3,33 @@ from typing import override
 from uuid import UUID
 
 from ai.backend.common.dto.manager.v2.model_card.request import DeleteModelCardOptions
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.models.model_card.row import ModelCardRow
-from ai.backend.manager.repositories.base.purger import Purger
-from ai.backend.manager.services.model_card.actions.base import ModelCardAction
+from ai.backend.manager.models.model_card.purgers import ModelCardPurger
+from ai.backend.manager.services.model_card.actions.base import ModelCardSingleEntityAction
 
 
 @dataclass
-class DeleteModelCardAction(ModelCardAction):
-    purger: Purger[ModelCardRow]
+class DeleteModelCardAction(ModelCardSingleEntityAction):
+    """Delete one model card.
+
+    ``PURGE`` because the row is removed rather than marked deleted, matching the
+    bulk form of the same operation.
+    """
+
+    purger: ModelCardPurger
     options: DeleteModelCardOptions
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.purger.pk_value)
+    @classmethod
+    def action_name(cls) -> str:
+        return "delete_model_card"
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.DELETE
+        return ActionOperationType.PURGE
 
 
 @dataclass
-class DeleteModelCardActionResult(BaseActionResult):
+class DeleteModelCardActionResult:
     id: UUID
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.id)

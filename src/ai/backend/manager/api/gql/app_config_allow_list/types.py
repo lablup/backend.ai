@@ -8,10 +8,12 @@ from enum import StrEnum
 from typing import Any, Self, cast, override
 from uuid import UUID
 
+import strawberry
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.data.entity.app_config_allow_list import AppConfigAllowListID
 from ai.backend.common.dto.manager.v2.app_config_allow_list.request import (
     AppConfigAllowListFilter as AppConfigAllowListFilterDTO,
 )
@@ -20,6 +22,12 @@ from ai.backend.common.dto.manager.v2.app_config_allow_list.request import (
 )
 from ai.backend.common.dto.manager.v2.app_config_allow_list.request import (
     CreateAppConfigAllowListInput as CreateAppConfigAllowListInputDTO,
+)
+from ai.backend.common.dto.manager.v2.app_config_allow_list.request import (
+    PartialBulkPurgeAppConfigAllowListsInput as PartialBulkPurgeAppConfigAllowListsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.app_config_allow_list.request import (
+    PartialBulkUpdateAppConfigAllowListsInput as PartialBulkUpdateAppConfigAllowListsInputDTO,
 )
 from ai.backend.common.dto.manager.v2.app_config_allow_list.request import (
     PurgeAppConfigAllowListInput as PurgeAppConfigAllowListInputDTO,
@@ -42,9 +50,10 @@ from ai.backend.common.dto.manager.v2.app_config_allow_list.response import (
 from ai.backend.common.dto.manager.v2.app_config_allow_list.types import (
     AppConfigScopeTypeFilter as AppConfigScopeTypeFilterDTO,
 )
-from ai.backend.common.identifier.app_config_allow_list import AppConfigAllowListID
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter
+from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter, UUIDFilter
+from ai.backend.manager.api.gql.common_types import PartialBulkFailureGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -92,13 +101,19 @@ class AppConfigAllowListGQL(PydanticNodeMixin[AppConfigAllowListNode]):
     id: NodeID[str] = gql_field(
         description="Relay-style global node identifier for the app config allow-list entry."
     )
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="UUID of the app config allow list.",
+        ),
+    )
     config_name: str = gql_field(description="The config name this entry permits writes for.")
     scope_type: AppConfigScopeType = gql_field(
         description="Scope type the entry permits writes at (public | domain | user)."
     )
     rank: int = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.8.0",
             description=(
                 "Merge rank applied to fragments under this entry (low to high; higher wins)."
             ),
@@ -186,6 +201,12 @@ class AppConfigAllowListFilterGQL(PydanticInputMixin[AppConfigAllowListFilterDTO
     updated_at: DateTimeFilter | None = gql_field(
         description="Filter by last update datetime.", default=None
     )
+    entity_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by allow-list entry ID."
+        ),
+        default=None,
+    )
     AND: list[Self] | None = gql_added_field(
         BackendAIGQLMeta(added_version="26.7.0", description="Match all of the given sub-filters."),
         default=None,
@@ -246,7 +267,7 @@ class CreateAppConfigAllowListInputGQL(PydanticInputMixin[CreateAppConfigAllowLi
     )
     rank: int | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.8.0",
             description=(
                 "Merge rank applied to fragments under this entry (low to high; higher wins). "
                 "Defaults to the scope type's default rank (public=100, domain=200, user=300)."
@@ -273,7 +294,7 @@ class CreateAppConfigAllowListPayloadGQL(PydanticOutputMixin[CreateAppConfigAllo
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Input for updating an app config allow-list entry (rank only).",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
     ),
     name="UpdateAppConfigAllowListInput",
 )
@@ -290,7 +311,7 @@ class UpdateAppConfigAllowListInputGQL(PydanticInputMixin[UpdateAppConfigAllowLi
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description="Payload for app config allow-list entry update.",
     ),
     model=UpdateAppConfigAllowListPayloadDTO,
@@ -319,8 +340,74 @@ class PurgeAppConfigAllowListInputGQL(PydanticInputMixin[PurgeAppConfigAllowList
         description="Payload for app config allow-list entry purge.",
     ),
     model=PurgeAppConfigAllowListPayloadDTO,
-    all_fields=True,
     name="PurgeAppConfigAllowListPayload",
 )
 class PurgeAppConfigAllowListPayloadGQL(PydanticOutputMixin[PurgeAppConfigAllowListPayloadDTO]):
-    pass
+    id: UUID = gql_field(
+        description="UUID of the purged app config allow-list entry.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `purgedId` or `entityId`.",
+    )
+    purged_id: strawberry.ID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Global ID of the purged app config allow-list entry.",
+        ),
+    )
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the purged app config allow-list entry.",
+        ),
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for updating several allow-list entries, each answered for separately.",
+    ),
+    name="PartialBulkUpdateAppConfigAllowListsInput",
+)
+class PartialBulkUpdateAppConfigAllowListsInputGQL(
+    PydanticInputMixin[PartialBulkUpdateAppConfigAllowListsInputDTO]
+):
+    items: list[UpdateAppConfigAllowListInputGQL] = gql_field(
+        description="The allow-list entries to update, each with its id and fields."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for purging several allow-list entries, each answered for separately.",
+    ),
+    name="PartialBulkPurgeAppConfigAllowListsInput",
+)
+class PartialBulkPurgeAppConfigAllowListsInputGQL(
+    PydanticInputMixin[PartialBulkPurgeAppConfigAllowListsInputDTO]
+):
+    ids: list[UUID] = gql_field(description="IDs of the allow-list entries to purge.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Result of a partial bulk allow-list operation: the entries processed and the ones "
+            "that failed."
+        ),
+    ),
+    model=PartialBulkPayload[AppConfigAllowListNode],
+    name="PartialBulkAppConfigAllowListsPayload",
+)
+class PartialBulkAppConfigAllowListsPayloadGQL(
+    PydanticOutputMixin[PartialBulkPayload[AppConfigAllowListNode]]
+):
+    """Payload for partial bulk allow-list mutations."""
+
+    successes: list[AppConfigAllowListGQL] = gql_field(
+        description="The allow-list entries processed, as they stood when processed."
+    )
+    failed: list[PartialBulkFailureGQL] = gql_field(
+        description="The allow-list entries not processed, each with the reason."
+    )

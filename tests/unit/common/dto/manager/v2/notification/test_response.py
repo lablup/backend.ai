@@ -62,6 +62,7 @@ def _make_channel_node(
     now = datetime.now(tz=UTC)
     return NotificationChannelNode(
         id=uuid.uuid4(),
+        entity_id=uuid.uuid4(),
         name="Test Channel",
         channel_type=channel_type,
         spec=spec or _make_webhook_spec_info(),
@@ -81,6 +82,7 @@ class TestNotificationChannelNodeCreation:
         now = datetime.now(tz=UTC)
         node = NotificationChannelNode(
             id=channel_id,
+            entity_id=channel_id,
             name="Webhook Channel",
             description="A webhook channel",
             channel_type=NotificationChannelTypeDTO.WEBHOOK,
@@ -101,6 +103,7 @@ class TestNotificationChannelNodeCreation:
         now = datetime.now(tz=UTC)
         node = NotificationChannelNode(
             id=uuid.uuid4(),
+            entity_id=uuid.uuid4(),
             name="Email Channel",
             channel_type=NotificationChannelTypeDTO.EMAIL,
             spec=_make_email_spec_info(),
@@ -120,6 +123,7 @@ class TestNotificationChannelNodeCreation:
         now = datetime.now(tz=UTC)
         node = NotificationChannelNode(
             id=uuid.uuid4(),
+            entity_id=uuid.uuid4(),
             name="Channel",
             description=None,
             channel_type=NotificationChannelTypeDTO.WEBHOOK,
@@ -198,17 +202,18 @@ class TestNotificationChannelNodeSerialization:
 class TestNotificationRuleNodeCreation:
     """Tests for NotificationRuleNode model creation."""
 
-    def test_creation_with_embedded_channel_node(self) -> None:
+    def test_creation_names_its_channel_by_id(self) -> None:
         rule_id = uuid.uuid4()
         creator_id = uuid.uuid4()
         now = datetime.now(tz=UTC)
         channel_node = _make_channel_node()
         node = NotificationRuleNode(
             id=rule_id,
+            entity_id=rule_id,
             name="Session Alert Rule",
             description="Alert on session events",
             rule_type=NotificationRuleTypeDTO.SESSION_STARTED,
-            channel=channel_node,
+            channel_id=channel_node.id,
             message_template="Session {{ session_id }} started",
             enabled=True,
             created_at=now,
@@ -218,16 +223,17 @@ class TestNotificationRuleNodeCreation:
         assert node.id == rule_id
         assert node.name == "Session Alert Rule"
         assert node.rule_type == NotificationRuleTypeDTO.SESSION_STARTED
-        assert node.channel.name == "Test Channel"
+        assert node.channel_id == channel_node.id
         assert node.enabled is True
 
     def test_description_defaults_to_none(self) -> None:
         now = datetime.now(tz=UTC)
         node = NotificationRuleNode(
             id=uuid.uuid4(),
+            entity_id=uuid.uuid4(),
             name="Rule",
             rule_type=NotificationRuleTypeDTO.SESSION_TERMINATED,
-            channel=_make_channel_node(),
+            channel_id=_make_channel_node().id,
             message_template="template",
             enabled=True,
             created_at=now,
@@ -236,30 +242,31 @@ class TestNotificationRuleNodeCreation:
         )
         assert node.description is None
 
-    def test_embedded_channel_node_accessible(self) -> None:
+    def test_channel_id_round_trips(self) -> None:
         channel_node = _make_channel_node()
         now = datetime.now(tz=UTC)
         rule_node = NotificationRuleNode(
             id=uuid.uuid4(),
+            entity_id=uuid.uuid4(),
             name="Rule",
             rule_type=NotificationRuleTypeDTO.SESSION_STARTED,
-            channel=channel_node,
+            channel_id=channel_node.id,
             message_template="template",
             enabled=True,
             created_at=now,
             created_by=uuid.uuid4(),
             updated_at=now,
         )
-        assert rule_node.channel.id == channel_node.id
-        assert rule_node.channel.channel_type == NotificationChannelTypeDTO.WEBHOOK
+        assert rule_node.channel_id == channel_node.id
 
     def test_rule_type_artifact_download(self) -> None:
         now = datetime.now(tz=UTC)
         node = NotificationRuleNode(
             id=uuid.uuid4(),
+            entity_id=uuid.uuid4(),
             name="Download Alert",
             rule_type=NotificationRuleTypeDTO.ARTIFACT_DOWNLOAD_COMPLETED,
-            channel=_make_channel_node(),
+            channel_id=_make_channel_node().id,
             message_template="Download done",
             enabled=True,
             created_at=now,
@@ -277,9 +284,10 @@ class TestNotificationRuleNodeSerialization:
         now = datetime.now(tz=UTC)
         rule_node = NotificationRuleNode(
             id=uuid.uuid4(),
+            entity_id=uuid.uuid4(),
             name="Alert Rule",
             rule_type=NotificationRuleTypeDTO.SESSION_STARTED,
-            channel=channel_node,
+            channel_id=channel_node.id,
             message_template="{{ session_id }} started",
             enabled=True,
             created_at=now,
@@ -289,17 +297,17 @@ class TestNotificationRuleNodeSerialization:
         json_str = rule_node.model_dump_json()
         restored = NotificationRuleNode.model_validate_json(json_str)
         assert restored.id == rule_node.id
-        assert restored.channel.id == channel_node.id
-        assert restored.channel.name == "Test Channel"
+        assert restored.channel_id == channel_node.id
 
-    def test_nested_channel_spec_preserved_in_json(self) -> None:
+    def test_channel_id_survives_json(self) -> None:
         channel_node = _make_channel_node()
         now = datetime.now(tz=UTC)
         rule_node = NotificationRuleNode(
             id=uuid.uuid4(),
+            entity_id=uuid.uuid4(),
             name="Rule",
             rule_type=NotificationRuleTypeDTO.SESSION_TERMINATED,
-            channel=channel_node,
+            channel_id=channel_node.id,
             message_template="template",
             enabled=True,
             created_at=now,
@@ -307,9 +315,9 @@ class TestNotificationRuleNodeSerialization:
             updated_at=now,
         )
         data = json.loads(rule_node.model_dump_json())
-        assert "channel" in data
-        assert "spec" in data["channel"]
-        assert "url" in data["channel"]["spec"]
+        # The rule names its channel; the channel itself is fetched by whoever needs it.
+        assert data["channel_id"] == str(channel_node.id)
+        assert "channel" not in data
 
 
 class TestCreateNotificationChannelPayload:
@@ -337,6 +345,7 @@ class TestUpdateNotificationChannelPayload:
         now = datetime.now(tz=UTC)
         node = NotificationChannelNode(
             id=uuid.uuid4(),
+            entity_id=uuid.uuid4(),
             name="Updated Channel",
             channel_type=NotificationChannelTypeDTO.WEBHOOK,
             spec=_make_webhook_spec_info(),
@@ -362,22 +371,25 @@ class TestDeleteNotificationChannelPayload:
 
     def test_creation_with_uuid(self) -> None:
         channel_id = uuid.uuid4()
-        payload = DeleteNotificationChannelPayload(id=channel_id)
+        payload = DeleteNotificationChannelPayload(id=channel_id, entity_id=channel_id)
         assert payload.id == channel_id
 
     def test_id_is_uuid_instance(self) -> None:
         channel_id = uuid.uuid4()
-        payload = DeleteNotificationChannelPayload(id=channel_id)
+        payload = DeleteNotificationChannelPayload(id=channel_id, entity_id=channel_id)
         assert isinstance(payload.id, uuid.UUID)
 
     def test_creation_from_uuid_string(self) -> None:
         channel_id = uuid.uuid4()
-        payload = DeleteNotificationChannelPayload.model_validate({"id": str(channel_id)})
+        payload = DeleteNotificationChannelPayload.model_validate({
+            "id": str(channel_id),
+            "entity_id": str(channel_id),
+        })
         assert payload.id == channel_id
 
     def test_round_trip_serialization(self) -> None:
         channel_id = uuid.uuid4()
-        payload = DeleteNotificationChannelPayload(id=channel_id)
+        payload = DeleteNotificationChannelPayload(id=channel_id, entity_id=channel_id)
         json_str = payload.model_dump_json()
         restored = DeleteNotificationChannelPayload.model_validate_json(json_str)
         assert restored.id == channel_id
@@ -390,9 +402,10 @@ class TestCreateNotificationRulePayload:
         now = datetime.now(tz=UTC)
         return NotificationRuleNode(
             id=uuid.uuid4(),
+            entity_id=uuid.uuid4(),
             name="Alert Rule",
             rule_type=NotificationRuleTypeDTO.SESSION_STARTED,
-            channel=_make_channel_node(),
+            channel_id=_make_channel_node().id,
             message_template="template",
             enabled=True,
             created_at=now,
@@ -412,7 +425,7 @@ class TestCreateNotificationRulePayload:
         json_str = payload.model_dump_json()
         restored = CreateNotificationRulePayload.model_validate_json(json_str)
         assert restored.rule.id == rule_node.id
-        assert restored.rule.channel.name == "Test Channel"
+        assert restored.rule.channel_id == rule_node.channel_id
 
 
 class TestUpdateNotificationRulePayload:
@@ -422,9 +435,10 @@ class TestUpdateNotificationRulePayload:
         now = datetime.now(tz=UTC)
         rule_node = NotificationRuleNode(
             id=uuid.uuid4(),
+            entity_id=uuid.uuid4(),
             name="Updated Rule",
             rule_type=NotificationRuleTypeDTO.SESSION_TERMINATED,
-            channel=_make_channel_node(),
+            channel_id=_make_channel_node().id,
             message_template="updated template",
             enabled=False,
             created_at=now,
@@ -439,9 +453,10 @@ class TestUpdateNotificationRulePayload:
         now = datetime.now(tz=UTC)
         rule_node = NotificationRuleNode(
             id=uuid.uuid4(),
+            entity_id=uuid.uuid4(),
             name="Rule",
             rule_type=NotificationRuleTypeDTO.SESSION_STARTED,
-            channel=_make_channel_node(),
+            channel_id=_make_channel_node().id,
             message_template="template",
             enabled=True,
             created_at=now,
@@ -459,22 +474,25 @@ class TestDeleteNotificationRulePayload:
 
     def test_creation_with_uuid(self) -> None:
         rule_id = uuid.uuid4()
-        payload = DeleteNotificationRulePayload(id=rule_id)
+        payload = DeleteNotificationRulePayload(id=rule_id, entity_id=rule_id)
         assert payload.id == rule_id
 
     def test_id_is_uuid_instance(self) -> None:
         rule_id = uuid.uuid4()
-        payload = DeleteNotificationRulePayload(id=rule_id)
+        payload = DeleteNotificationRulePayload(id=rule_id, entity_id=rule_id)
         assert isinstance(payload.id, uuid.UUID)
 
     def test_creation_from_uuid_string(self) -> None:
         rule_id = uuid.uuid4()
-        payload = DeleteNotificationRulePayload.model_validate({"id": str(rule_id)})
+        payload = DeleteNotificationRulePayload.model_validate({
+            "id": str(rule_id),
+            "entity_id": str(rule_id),
+        })
         assert payload.id == rule_id
 
     def test_round_trip_serialization(self) -> None:
         rule_id = uuid.uuid4()
-        payload = DeleteNotificationRulePayload(id=rule_id)
+        payload = DeleteNotificationRulePayload(id=rule_id, entity_id=rule_id)
         json_str = payload.model_dump_json()
         restored = DeleteNotificationRulePayload.model_validate_json(json_str)
         assert restored.id == rule_id

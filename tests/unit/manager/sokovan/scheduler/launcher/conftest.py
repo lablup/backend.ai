@@ -4,15 +4,21 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from dataclasses import replace
+from datetime import UTC, datetime
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
 import pytest
 
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.network import NetworkID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
+    ArchName,
     AutoPullBehavior,
     ClusterMode,
     KernelId,
@@ -20,16 +26,17 @@ from ai.backend.common.types import (
     SessionId,
     SessionTypes,
 )
-from ai.backend.manager.data.sokovan import (
-    ImageConfigData,
-    KernelBindingData,
-    SessionDataForPull,
-    SessionDataForStart,
-)
-from ai.backend.manager.models.network import NetworkType
+from ai.backend.manager.data.network.types import NetworkData
+from ai.backend.manager.models.network.row import NetworkType
 from ai.backend.manager.sokovan.scheduler.launcher.launcher import (
     SessionLauncher,
     SessionLauncherArgs,
+)
+from ai.backend.manager.views.sokovan.image import ImageConfigData
+from ai.backend.manager.views.sokovan.lifecycle import (
+    KernelBindingData,
+    SessionDataForPull,
+    SessionDataForStart,
 )
 
 # Shared image IDs for linking kernel <-> image config in tests
@@ -37,9 +44,30 @@ _DEFAULT_IMAGE_ID = UUID("00000000-0000-0000-0000-000000000001")
 _IMAGE_ID_1 = UUID("00000000-0000-0000-0000-000000000002")
 _IMAGE_ID_2 = UUID("00000000-0000-0000-0000-000000000003")
 
+# A persistent network row: the id stored on the session and the plugin-generated
+# container network name are unrelated values.
+_PERSISTENT_NETWORK_ID = NetworkID(UUID("00000000-0000-0000-0000-0000000000a1"))
+_PERSISTENT_NETWORK_REF_NAME = "bai-multinode-00000000-0000-0000-0000-0000000000b2-nw"
+
 # =============================================================================
 # Mock Dependencies
 # =============================================================================
+
+
+@pytest.fixture
+def mock_system_session_environ_repository() -> AsyncMock:
+    repository = AsyncMock()
+    repository.resolve = AsyncMock(
+        side_effect=lambda sessions, searcher: {session.session_id: {} for session in sessions}
+    )
+    return repository
+
+
+@pytest.fixture
+def session_name_bound_to_key_a(mock_system_session_environ_repository: AsyncMock) -> None:
+    mock_system_session_environ_repository.resolve.side_effect = lambda sessions, searcher: {
+        session.session_id: {"A": session.name} for session in sessions
+    }
 
 
 @pytest.fixture
@@ -48,6 +76,20 @@ def mock_repository() -> AsyncMock:
     repository = AsyncMock()
     repository.update_session_error_info = AsyncMock(return_value=None)
     repository.update_session_network_id = AsyncMock(return_value=None)
+
+    persistent_network = NetworkData(
+        id=_PERSISTENT_NETWORK_ID,
+        name="testnet",
+        ref_name=_PERSISTENT_NETWORK_REF_NAME,
+        driver="overlay",
+        project_id=ProjectID(uuid4()),
+        domain_name="default",
+        options={},
+        created_at=datetime(2026, 1, 1, tzinfo=UTC),
+        updated_at=None,
+    )
+
+    repository.get_attached_network = AsyncMock(return_value=persistent_network)
     return repository
 
 
@@ -103,6 +145,7 @@ def mock_valkey_schedule() -> AsyncMock:
 @pytest.fixture
 def launcher(
     mock_repository: AsyncMock,
+    mock_system_session_environ_repository: AsyncMock,
     mock_agent_client_pool: MagicMock,
     mock_network_plugin_ctx: MagicMock,
     mock_config_provider: MagicMock,
@@ -111,7 +154,8 @@ def launcher(
     """Create SessionLauncher with mocked dependencies."""
     return SessionLauncher(
         SessionLauncherArgs(
-            repository=mock_repository,
+            scheduler_repository=mock_repository,
+            system_session_environ_repository=mock_system_session_environ_repository,
             agent_client_pool=mock_agent_client_pool,
             network_plugin_ctx=mock_network_plugin_ctx,
             config_provider=mock_config_provider,
@@ -140,7 +184,7 @@ def _create_kernel_binding_data(
         agent_addr="tcp://agent-1:6001",
         image=image,
         image_id=image_id,
-        architecture="x86_64",
+        architecture=ArchName("x86_64"),
         cluster_role=cluster_role,
         cluster_idx=cluster_idx,
         local_rank=0,
@@ -155,7 +199,7 @@ def _create_kernel_binding_data(
         startup_command=None,
         internal_data={},
         preopen_ports=[],
-        scaling_group="default",
+        resource_group="default",
     )
 
 
@@ -233,6 +277,7 @@ def _create_session_for_start(
     kernels: list[KernelBindingData] | None = None,
     cluster_mode: ClusterMode = ClusterMode.SINGLE_NODE,
     network_type: NetworkType | None = None,
+    network_id: str | None = None,
 ) -> SessionDataForStart:
     """Create SessionDataForStart for session start tests."""
     if kernels is None:
@@ -247,9 +292,11 @@ def _create_session_for_start(
         user_uuid=uuid4(),
         user_email="test@example.com",
         user_name="testuser",
+        domain_id=DomainID(uuid4()),
+        project_id=ProjectID(uuid4()),
         cluster_mode=cluster_mode,
         network_type=network_type or NetworkType.VOLATILE,
-        network_id=None,
+        network_id=network_id,
         kernels=kernels,
         environ={},
     )
@@ -259,6 +306,11 @@ def _create_session_for_start(
 def session_for_start_single_kernel() -> SessionDataForStart:
     """Single session with one kernel for starting."""
     return _create_session_for_start()
+
+
+@pytest.fixture
+def session_for_start_with_user_environ() -> SessionDataForStart:
+    return replace(_create_session_for_start(), environ={"A": "mine", "U": "mine"})
 
 
 @pytest.fixture
@@ -303,6 +355,15 @@ def session_for_start_host_network() -> SessionDataForStart:
 
 
 @pytest.fixture
+def session_for_start_persistent_network() -> SessionDataForStart:
+    """Session attached to a pre-created persistent network."""
+    return _create_session_for_start(
+        network_type=NetworkType.PERSISTENT,
+        network_id=str(_PERSISTENT_NETWORK_ID),
+    )
+
+
+@pytest.fixture
 def session_for_start_kernel_no_agent() -> SessionDataForStart:
     """Session with kernel that has no agent assigned."""
     kernel = _create_kernel_binding_data()
@@ -323,7 +384,7 @@ def _create_image_config_data(
     return ImageConfigData(
         id=image_id,
         canonical=canonical,
-        architecture="x86_64",
+        architecture=ArchName("x86_64"),
         project="stable",
         is_local=False,
         digest="sha256:abc123",

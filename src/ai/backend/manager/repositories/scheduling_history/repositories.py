@@ -13,7 +13,7 @@ class SchedulingHistoryRepositories:
 
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
-        repository = SchedulingHistoryRepository(args.db)
+        repository = SchedulingHistoryRepository(args.db, args.v2_ops_provider)
 
         return cls(
             repository=repository,

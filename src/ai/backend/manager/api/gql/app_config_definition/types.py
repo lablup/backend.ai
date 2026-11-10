@@ -8,9 +8,11 @@ from enum import StrEnum
 from typing import Any, Self, cast, override
 from uuid import UUID
 
+import strawberry
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.app_config_definition import AppConfigDefinitionID
 from ai.backend.common.dto.manager.v2.app_config_definition.request import (
     AppConfigDefinitionFilter as AppConfigDefinitionFilterDTO,
 )
@@ -19,6 +21,9 @@ from ai.backend.common.dto.manager.v2.app_config_definition.request import (
 )
 from ai.backend.common.dto.manager.v2.app_config_definition.request import (
     CreateAppConfigDefinitionInput as CreateAppConfigDefinitionInputDTO,
+)
+from ai.backend.common.dto.manager.v2.app_config_definition.request import (
+    PartialBulkPurgeAppConfigDefinitionsInput as PartialBulkPurgeAppConfigDefinitionsInputDTO,
 )
 from ai.backend.common.dto.manager.v2.app_config_definition.request import (
     PurgeAppConfigDefinitionInput as PurgeAppConfigDefinitionInputDTO,
@@ -32,8 +37,10 @@ from ai.backend.common.dto.manager.v2.app_config_definition.response import (
 from ai.backend.common.dto.manager.v2.app_config_definition.response import (
     PurgeAppConfigDefinitionPayload as PurgeAppConfigDefinitionPayloadDTO,
 )
-from ai.backend.common.identifier.app_config_definition import AppConfigDefinitionID
-from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter, UUIDFilter
+from ai.backend.manager.api.gql.common_types import PartialBulkFailureGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -77,6 +84,12 @@ __all__ = (
 class AppConfigDefinitionGQL(PydanticNodeMixin[AppConfigDefinitionNode]):
     id: NodeID[str] = gql_field(
         description="Relay-style global node identifier for the app config definition."
+    )
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="UUID of the app config definition.",
+        ),
     )
     config_name: str = gql_field(description="Registered config name.")
     created_at: datetime = gql_field(description="Creation timestamp (UTC).")
@@ -135,6 +148,12 @@ class AppConfigDefinitionFilterGQL(PydanticInputMixin[AppConfigDefinitionFilterD
     )
     updated_at: DateTimeFilter | None = gql_field(
         description="Filter by last update datetime.", default=None
+    )
+    entity_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by definition ID."
+        ),
+        default=None,
     )
     AND: list[Self] | None = gql_added_field(
         BackendAIGQLMeta(added_version="26.7.0", description="Match all of the given sub-filters."),
@@ -222,8 +241,61 @@ class CreateAppConfigDefinitionPayloadGQL(PydanticOutputMixin[CreateAppConfigDef
         description="Payload for app config definition purge.",
     ),
     model=PurgeAppConfigDefinitionPayloadDTO,
-    all_fields=True,
     name="PurgeAppConfigDefinitionPayload",
 )
 class PurgeAppConfigDefinitionPayloadGQL(PydanticOutputMixin[PurgeAppConfigDefinitionPayloadDTO]):
-    pass
+    id: UUID = gql_field(
+        description="UUID of the purged app config definition.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `purgedId` or `entityId`.",
+    )
+    purged_id: strawberry.ID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Global ID of the purged app config definition.",
+        ),
+    )
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the purged app config definition.",
+        ),
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Input for purging several app config definitions, each answered for separately."
+        ),
+    ),
+    name="PartialBulkPurgeAppConfigDefinitionsInput",
+)
+class PartialBulkPurgeAppConfigDefinitionsInputGQL(
+    PydanticInputMixin[PartialBulkPurgeAppConfigDefinitionsInputDTO]
+):
+    ids: list[UUID] = gql_field(description="IDs of the app config definitions to purge.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Result of a partial bulk app config definition operation: the definitions "
+            "processed and the ones that failed."
+        ),
+    ),
+    model=PartialBulkPayload[AppConfigDefinitionNode],
+    name="PartialBulkAppConfigDefinitionsPayload",
+)
+class PartialBulkAppConfigDefinitionsPayloadGQL(
+    PydanticOutputMixin[PartialBulkPayload[AppConfigDefinitionNode]]
+):
+    """Payload for partial bulk app config definition mutations."""
+
+    successes: list[AppConfigDefinitionGQL] = gql_field(
+        description="The app config definitions processed, as they stood when processed."
+    )
+    failed: list[PartialBulkFailureGQL] = gql_field(
+        description="The app config definitions not processed, each with the reason."
+    )

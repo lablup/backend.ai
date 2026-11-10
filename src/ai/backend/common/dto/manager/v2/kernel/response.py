@@ -9,6 +9,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "AdminSearchKernelsPayload",
@@ -55,7 +56,9 @@ class KernelUserInfo(BaseResponseModel):
         default=None, description="The UUID of the user who owns this kernel."
     )
     access_key: str | None = Field(
-        default=None, description="The access key used to create this kernel."
+        default=None,
+        deprecated=True,
+        description=f"The access key used to create this kernel. Deprecated since {NEXT_RELEASE_VERSION}. Use `user_uuid`.",
     )
     domain_name: str | None = Field(default=None, description="The domain this kernel belongs to.")
     group_id: UUID | None = Field(
@@ -141,9 +144,16 @@ class KernelNode(BaseResponseModel):
     """Node model representing a kernel (compute container) entity."""
 
     id: UUID = Field(description="Kernel ID.")
+    field_id: UUID = Field(
+        description="UUID of the kernel. Added in 26.9.0.",
+    )
     image_id: UUID | None = Field(
         default=None,
         description="The UUID of the image used by this kernel. Null if the image has been purged.",
+    )
+    kernel_group_id: UUID | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. ID of the kernel group this kernel belongs to.",
     )
     startup_command: str | None = Field(
         default=None, description="Startup command executed when the kernel starts."
@@ -227,7 +237,9 @@ class KernelUserInfoGQLDTO(BaseResponseModel):
         default=None, description="The UUID of the user who owns this kernel."
     )
     access_key: str | None = Field(
-        default=None, description="The access key used to create this kernel."
+        default=None,
+        deprecated=True,
+        description=f"The access key used to create this kernel. Deprecated since {NEXT_RELEASE_VERSION}. Use `user_id`.",
     )
     domain_name: str | None = Field(default=None, description="The domain this kernel belongs to.")
     group_id: UUID | None = Field(

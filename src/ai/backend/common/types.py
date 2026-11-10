@@ -22,6 +22,7 @@ from typing import (
     TYPE_CHECKING,
     Annotated,
     Any,
+    Final,
     Literal,
     NewType,
     NotRequired,
@@ -36,7 +37,6 @@ from uuid import UUID
 from warnings import deprecated
 
 import attrs
-import redis.asyncio.sentinel
 import trafaret as t
 import typeguard
 from aiohttp import Fingerprint
@@ -50,9 +50,15 @@ from pydantic import (
     ValidationError,
     field_validator,
 )
-from pydantic_core import ErrorDetails
-from redis.asyncio import Redis
+from pydantic_core import ErrorDetails, core_schema
 
+# Deprecated re-export: new code should import ``ImageID`` from
+# ``ai.backend.common.data.entity.image``. This line lets existing
+# ``from ai.backend.common.types import ImageID`` sites keep working and
+# will be removed once call sites are migrated.
+from .data.entity.image import ImageID
+from .data.entity.resource_slot import ResourceSlotName
+from .data.entity.vfolder import VFolderUUID
 from .defs import UNKNOWN_CONTAINER_ID, RedisRole
 from .exception import (
     BackendAIError,
@@ -62,18 +68,12 @@ from .exception import (
     InvalidResourceSlotQuantity,
     UnknownResourceSlotType,
 )
-
-# Deprecated re-export: new code should import ``ImageID`` from
-# ``ai.backend.common.identifier.image``. This line lets existing
-# ``from ai.backend.common.types import ImageID`` sites keep working and
-# will be removed once call sites are migrated.
-from .identifier.image import ImageID
-from .identifier.vfolder import VFolderUUID
 from .models.minilang.mount import MountPointParser
 
 __all__ = (
     "MODEL_SERVICE_RUNTIME_PROFILES",
     "PID",
+    "REDIS_PASSWORD_MASK",
     "AbstractPermission",
     "AbuseReport",
     "AbuseReportValue",
@@ -128,6 +128,7 @@ __all__ = (
     "MovingStatValue",
     "PreemptionMode",
     "PreemptionOrder",
+    "PreemptionVictimScope",
     "PromMetric",
     "PromMetricGroup",
     "PromMetricPrimitive",
@@ -137,7 +138,6 @@ __all__ = (
     "QuotaScopeID",
     "QuotaScopeType",
     "ReadableCIDR",
-    "RedisConnectionInfo",
     "RedisHelperConfig",
     "RedisProfileTarget",
     "ResourceGroupID",
@@ -175,7 +175,7 @@ __all__ = (
 
 
 if TYPE_CHECKING:
-    from ai.backend.common.configs.redis import RedisConfig
+    from ai.backend.common.configs.redis import RedisConfig, SingleRedisConfig
     from ai.backend.common.data.vfolder.types import VFolderMountData
     from ai.backend.common.dto.manager.v2.common import BinarySizeInfo
 
@@ -404,8 +404,8 @@ ContainerId = NewType("ContainerId", str)
 RuleId = NewType("RuleId", UUID)
 SessionId = NewType("SessionId", UUID)
 KernelId = NewType("KernelId", UUID)
-ImageAlias = NewType("ImageAlias", str)
 ArchName = NewType("ArchName", str)
+ImageAlias = NewType("ImageAlias", str)
 Subdomain = NewType("Subdomain", str)
 
 ResourceGroupID = NewType("ResourceGroupID", str)
@@ -1264,7 +1264,23 @@ class ResourceSlot(UserDict[str, Decimal]):
         )
 
     def normalize_slots(self, *, ignore_unknown: bool) -> ResourceSlot:
-        known_slots = current_resource_slots.get()
+        """
+        Normalize using the known slots in the ``current_resource_slots`` ContextVar.
+        Callers must have set it; use :meth:`normalize_slots_by_known_slots` otherwise.
+        """
+        return self.normalize_slots_by_known_slots(
+            current_resource_slots.get(), ignore_unknown=ignore_unknown
+        )
+
+    def normalize_slots_by_known_slots(
+        self,
+        known_slots: Mapping[SlotName, SlotTypes],
+        *,
+        ignore_unknown: bool,
+    ) -> ResourceSlot:
+        """
+        Drop keys outside ``known_slots`` and fill unset known slots with zero.
+        """
         unset_slots = known_slots.keys() - self.data.keys()
         if not ignore_unknown and (unknown_slots := self.data.keys() - known_slots.keys()):
             raise ValueError(f"Unknown slots: {', '.join(map(repr, unknown_slots))}")
@@ -1409,14 +1425,16 @@ class ResourceSlotEntry(BackendAISchema):
     layers without re-shaping.
     """
 
-    resource_type: str = Field(description="Resource type identifier (e.g., 'cpu', 'mem').")
+    resource_type: ResourceSlotName = Field(
+        description="Resource type identifier (e.g., 'cpu', 'mem')."
+    )
     quantity: str = Field(description="Quantity of the resource as a decimal string.")
 
     @classmethod
     def from_resource_slot(cls, slot: ResourceSlot) -> list[ResourceSlotEntry]:
         """Project a legacy ``ResourceSlot`` into an entry list."""
         return [
-            cls(resource_type=str(k), quantity=_stringify_number(Decimal(v)))
+            cls(resource_type=ResourceSlotName(str(k)), quantity=_stringify_number(Decimal(v)))
             for k, v in slot.items()
             if v is not None
         ]
@@ -1494,7 +1512,6 @@ class QuotaScopeID:
         handler: Any,
     ) -> Any:
         """Provide Pydantic core schema for QuotaScopeID serialization/deserialization."""
-        from pydantic_core import core_schema
 
         def validate_quota_scope_id(v: Any) -> QuotaScopeID:
             if isinstance(v, QuotaScopeID):
@@ -1559,7 +1576,6 @@ class VFolderID:
         handler: Any,
     ) -> Any:
         """Provide Pydantic core schema for VFolderID serialization/deserialization."""
-        from pydantic_core import core_schema
 
         def validate_vfolder_id(v: Any) -> VFolderID:
             if isinstance(v, VFolderID):
@@ -1622,6 +1638,43 @@ class VFolderUsageMode(CIStrEnum):
     GENERAL = "general"
     MODEL = "model"
     DATA = "data"
+
+
+class VFolderMountPolicy(CIStrEnum):
+    """
+    The mount level a vfolder's default and its per-user policy rows answer with.
+
+    ``wd`` is folded to ``rw``: the agent mounts both the same way.
+    """
+
+    NONE = "none"
+    READ_ONLY = "ro"
+    READ_WRITE = "rw"
+
+    def exceeds(self, other: VFolderMountPolicy) -> bool:
+        """Whether this level mounts more than ``other``: none < ro < rw."""
+        return self._rank() > other._rank()
+
+    def _rank(self) -> int:
+        match self:
+            case VFolderMountPolicy.NONE:
+                return 0
+            case VFolderMountPolicy.READ_ONLY:
+                return 1
+            case VFolderMountPolicy.READ_WRITE:
+                return 2
+
+    @override
+    @classmethod
+    def _missing_(cls, value: Any) -> VFolderMountPolicy | None:
+        if not isinstance(value, str):
+            raise TypeError("value must be a string")
+        match value.lower():
+            case "wd" | "rw_delete" | "owner_perm" | "read_write":
+                return cls.READ_WRITE
+            case "read_only":
+                return cls.READ_ONLY
+        return super()._missing_(value)
 
 
 @attrs.define(slots=True)
@@ -1925,6 +1978,7 @@ class KernelCreationConfig(TypedDict):
     image: ImageConfig
     kernel_id: str  # the kernel's ID
     session_id: str  # the session's ID
+    session_name: str  # the session's name
     owner_user_id: str  # the owner user's ID
     owner_project_id: str | None  # the owner project's ID (for project-owned sessions)
     network_id: str
@@ -2109,6 +2163,10 @@ class ValkeyProfileTarget:
             return self._override_targets[role]
         return self._base_target
 
+    def targets(self) -> list[ValkeyTarget]:
+        """The base target and every override target."""
+        return [self._base_target, *(self._override_targets or {}).values()]
+
 
 # TODO: Remove this type
 @dataclass
@@ -2145,6 +2203,11 @@ class RedisProfileTarget:
         if self._override_targets and (role in self._override_targets):
             return self._override_targets[role]
         return self._base_target
+
+    def valkey_targets(self) -> list[ValkeyTarget]:
+        """The base target and every override target, converted to Valkey targets."""
+        targets = [self._base_target, *(self._override_targets or {}).values()]
+        return [target.to_valkey_target() for target in targets]
 
     @staticmethod
     def _parse_addr(addr_data: Any) -> HostPortPair:
@@ -2191,12 +2254,20 @@ class RedisProfileTarget:
         )
 
 
+REDIS_PASSWORD_MASK: Final = "********"
+
+
 def safe_print_redis_config(config: RedisConfig) -> str:
     safe_config = copy.deepcopy(config)
-    if config.password is not None:
-        safe_config.password = "********"
-    if config.sentinel_password is not None:
-        safe_config.sentinel_password = "********"
+    # The overrides carry their own credentials, so they must be masked as well.
+    masking_targets: list[SingleRedisConfig] = [safe_config]
+    if safe_config.override_configs is not None:
+        masking_targets.extend(safe_config.override_configs.values())
+    for target in masking_targets:
+        if target.password is not None:
+            target.password = REDIS_PASSWORD_MASK
+        if target.sentinel_password is not None:
+            target.sentinel_password = REDIS_PASSWORD_MASK
     return str(safe_config)
 
 
@@ -2206,18 +2277,6 @@ class RedisHelperConfig(TypedDict, total=False):
     reconnect_poll_timeout: float
     max_connections: int
     connection_ready_timeout: float
-
-
-@attrs.define(auto_attribs=True)
-class RedisConnectionInfo:
-    client: Redis[Any]
-    name: str  # connection pool name
-    service_name: str | None
-    sentinel: redis.asyncio.sentinel.Sentinel | None
-    redis_helper_config: RedisHelperConfig
-
-    async def close(self, close_connection_pool: bool | None = None) -> None:
-        await self.client.close(close_connection_pool)
 
 
 class AcceleratorNumberFormat(TypedDict):
@@ -2248,8 +2307,32 @@ class PreemptionMode(enum.StrEnum):
 
 
 class PreemptionOrder(enum.StrEnum):
+    """Victim selection order for preemption.
+
+    OLDEST/NEWEST break same-priority ties by start time; FEWEST_SESSIONS
+    evicts the fewest sessions; SMALLEST_RESOURCES reclaims the least
+    resources. The deficit-aware orders are computed against the pending
+    session being placed.
+    """
+
     OLDEST = "oldest"
     NEWEST = "newest"
+    FEWEST_SESSIONS = "fewest-sessions"
+    SMALLEST_RESOURCES = "smallest-resources"
+
+
+class PreemptionVictimScope(enum.StrEnum):
+    """Which sessions may become preemption victims for a pending session.
+
+    USER limits victims to the pending session's own sessions;
+    PROJECT/DOMAIN widen to sessions of the same project/domain;
+    RESOURCE_GROUP allows any session in the resource group.
+    """
+
+    USER = "user"
+    PROJECT = "project"
+    DOMAIN = "domain"
+    RESOURCE_GROUP = "resource-group"
 
 
 class SchedulerStatus(TypedDict):

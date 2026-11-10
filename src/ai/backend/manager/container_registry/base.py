@@ -3,10 +3,12 @@ from __future__ import annotations
 import asyncio
 import copy
 import logging
+import uuid
 from abc import ABCMeta, abstractmethod
 from collections.abc import AsyncIterator, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from contextvars import ContextVar
+from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -21,7 +23,9 @@ import trafaret as t
 import yarl
 
 from ai.backend.common.bgtask.reporter import ProgressReporter
-from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.docker import (
     ImageRef,
     LabelName,
@@ -37,37 +41,101 @@ from ai.backend.common.exception import (
 from ai.backend.common.json import read_json
 from ai.backend.common.types import SlotName, SSLContextType
 from ai.backend.common.utils import join_non_empty
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger, with_log_context
 from ai.backend.manager.data.image.types import (
     ImageData,
+    ImageIdentifier,
     ImageStatus,
     ImageType,
     RescanImagesResult,
 )
-from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.defs import INTRINSIC_SLOTS_MIN
 from ai.backend.manager.exceptions import ScanImageError, ScanTagError
-from ai.backend.manager.models.image import ImageIdentifier, ImageRow
+from ai.backend.manager.models.image.creators import ImageCreator
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.image.searchable_fields import ImageSearchableFields
+from ai.backend.manager.models.user.queriers import BulkUserQuerier
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base.rbac.entity_creator import (
-    RBACEntityCreator,
-    execute_rbac_entity_creators,
-)
-from ai.backend.manager.repositories.image.creators import ImageRowCreatorSpec
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 concurrency_sema: ContextVar[asyncio.Semaphore] = ContextVar("concurrency_sema")
 progress_reporter: ContextVar[ProgressReporter | None] = ContextVar(
     "progress_reporter", default=None
 )
 all_updates: ContextVar[dict[ImageIdentifier, dict[str, Any]]] = ContextVar("all_updates")
 
+
+@dataclass
+class RescanCounts:
+    scanned: int = 0
+    skipped: int = 0
+
+
+rescan_counts: ContextVar[RescanCounts] = ContextVar("rescan_counts")
+
 if TYPE_CHECKING:
-    from ai.backend.manager.models.container_registry import ContainerRegistryRow
+    from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+
+
+@dataclass(frozen=True)
+class _ScannedOwners:
+    """The users the scanned owner labels name that exist here, and the personal
+    project of each one that has it."""
+
+    known_users: frozenset[UserID]
+    personal_projects: Mapping[UserID, ProjectID]
+
+    def creator_of(self, labels: Mapping[str, Any]) -> UserID | None:
+        """The user the owner label names, or none where that user does not exist here."""
+        user_id = _customized_owner_user_id(labels)
+        if user_id not in self.known_users:
+            return None
+        return user_id
+
+    def created_in_project(self, labels: Mapping[str, Any]) -> ProjectID | None:
+        """The personal project of the image's creator, or none where it has none."""
+        user_id = self.creator_of(labels)
+        if user_id is None:
+            return None
+        return self.personal_projects.get(user_id)
+
+
+def _is_customized(labels: Mapping[str, Any]) -> bool:
+    """Whether a session commit made the image, which its owner label is what says.
+
+    Separate from :func:`_customized_owner_user_id`: a label naming a user nobody knows
+    still marks the image customized, and so leaves it reachable by nobody.
+    """
+    return labels.get(LabelName.CUSTOMIZED_OWNER) is not None
+
+
+def _customized_owner_user_id(labels: Mapping[str, Any]) -> UserID | None:
+    """The user a customized image was committed for, read off its owner label.
+
+    Write-time input only: what it settles — the creator column and the project the
+    image is created in — is what every read goes to.
+    """
+    owner_label = labels.get(LabelName.CUSTOMIZED_OWNER)
+    if owner_label is None:
+        return None
+    prefix, sep, user_id = owner_label.partition(":")
+    if prefix and sep and user_id:
+        try:
+            return UserID(uuid.UUID(user_id))
+        except ValueError:
+            pass
+    log.warning(
+        "image label value invalid",
+        label_name=LabelName.CUSTOMIZED_OWNER,
+        label_value=str(owner_label),
+    )
+    return None
 
 
 class BaseContainerRegistry(metaclass=ABCMeta):
     db: ExtendedAsyncSAEngine
+    _ops_provider: V2DBOpsProvider
     registry_name: str
     registry_info: ContainerRegistryRow
     registry_url: yarl.URL
@@ -101,6 +169,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         ssl_verify: bool = True,
     ) -> None:
         self.db = db
+        self._ops_provider = V2DBOpsProvider(db)
         self.registry_name = registry_name
         self.registry_info = registry_info
         self.registry_url = yarl.URL(registry_info.url)
@@ -124,10 +193,20 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         self,
         reporter: ProgressReporter | None = None,
     ) -> RescanImagesResult:
-        log.info("rescan_single_registry()")
+        with with_log_context(
+            registry_name=self.registry_name, project_name=self.registry_info.project
+        ):
+            return await self._rescan_single_registry_in_scope(reporter)
+
+    async def _rescan_single_registry_in_scope(
+        self,
+        reporter: ProgressReporter | None,
+    ) -> RescanImagesResult:
+        log.debug("registry rescan starting")
         errors: list[str] = []
 
         all_updates_token = all_updates.set({})
+        counts_token = rescan_counts.set(RescanCounts())
         concurrency_sema.set(asyncio.Semaphore(self.max_concurrency_per_registry))
         progress_reporter.set(reporter)
         try:
@@ -152,35 +231,27 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         errors.append(f"Failed to scan image! Detail: {e!s}")
 
             scanned_images = await self.commit_rescan_result()
+            counts = rescan_counts.get()
+            log.trace(
+                "registry rescanned",
+                scanned_count=counts.scanned,
+                skipped_count=counts.skipped,
+                updated_count=len(scanned_images),
+                error_count=len(errors),
+            )
             return RescanImagesResult(images=scanned_images, errors=errors)
         finally:
+            rescan_counts.reset(counts_token)
             all_updates.reset(all_updates_token)
-
-    def _determine_additional_image_scopes(
-        self,
-        labels: dict[str, str],
-    ) -> list[RBACElementRef]:
-        """
-        Parse the customized image owner label and return a USER scope
-        if present, allowing user-level access restriction for customized images.
-        """
-        result: list[RBACElementRef] = []
-        owner_label = labels.get(LabelName.CUSTOMIZED_OWNER)
-        if owner_label is not None:
-            prefix, sep, scope_id = owner_label.partition(":")
-            if prefix and sep and scope_id:
-                result.append(RBACElementRef(RBACElementType.USER, scope_id))
-            else:
-                log.warning("Invalid {} label value: {!r}", LabelName.CUSTOMIZED_OWNER, owner_label)
-        return result
 
     async def commit_rescan_result(self) -> list[ImageData]:
         scanned_images: list[ImageData] = []
         _all_updates = all_updates.get()
         if not _all_updates:
-            log.info("No images found in registry {0}", self.registry_url)
+            log.trace("registry has no images", registry_url=str(self.registry_url))
         else:
             image_identifiers = [(k.canonical, k.architecture) for k in _all_updates.keys()]
+            scanned_owners = await self._scanned_owners(_all_updates)
             async with self.db.begin_session_read_committed() as session:
                 existing_images = await session.scalars(
                     sa.select(ImageRow).where(
@@ -197,19 +268,26 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         image_row.size_bytes = update["size_bytes"]
                         image_row.accelerators = update.get("accels")
                         image_row.labels = update["labels"]
+                        image_row.customized = _is_customized(update["labels"])
+                        image_row.creator_id = scanned_owners.creator_of(update["labels"])
                         image_row.is_local = is_local
-                        scanned_images.append(image_row.to_dataclass())
+                        scanned_images.append(ImageSearchableFields.own.to_data(image_row))
 
                         if image_row.status == ImageStatus.DELETED:
                             image_row.status = ImageStatus.ALIVE
 
                             progress_msg = f"Restored deleted image - {image_ref.canonical}/{image_ref.architecture} ({update['config_digest']})"
-                            log.info(progress_msg)
+                            log.trace(
+                                "deleted image restored",
+                                image_name=image_ref.canonical,
+                                architecture=image_ref.architecture,
+                                config_digest=update["config_digest"],
+                            )
 
                             if (reporter := progress_reporter.get()) is not None:
                                 await reporter.update(1, message=progress_msg)
 
-                rbac_creators: list[RBACEntityCreator[ImageRow]] = []
+                creators: list[ImageCreator] = []
                 for image_identifier, update in _all_updates.items():
                     try:
                         parsed_img = ImageRef.from_image_str(
@@ -221,55 +299,89 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     except (ProjectMismatchWithCanonical, ValueError) as e:
                         skip_reason = str(e)
                         progress_msg = f"Skipped image - {image_identifier.canonical}/{image_identifier.architecture} ({skip_reason})"
-                        log.warning(progress_msg)
+                        log.trace(
+                            "image skipped",
+                            image_name=image_identifier.canonical,
+                            architecture=image_identifier.architecture,
+                            skip_reason=skip_reason,
+                        )
+                        rescan_counts.get().skipped += 1
                         if (reporter := progress_reporter.get()) is not None:
                             await reporter.update(1, message=progress_msg)
                         continue
 
-                    rbac_creators.append(
-                        RBACEntityCreator(
-                            spec=ImageRowCreatorSpec(
-                                name=parsed_img.canonical,
-                                project=self.registry_info.project,
-                                architecture=image_identifier.architecture,
-                                registry_id=self.registry_info.id,
-                                is_local=is_local,
-                                registry=parsed_img.registry,
-                                image=join_non_empty(parsed_img.project, parsed_img.name, sep="/"),
-                                tag=parsed_img.tag,
-                                config_digest=update["config_digest"],
-                                size_bytes=update["size_bytes"],
-                                type=ImageType.COMPUTE,
-                                accelerators=update.get("accels"),
-                                labels=update["labels"],
-                                status=ImageStatus.ALIVE,
-                            ),
-                            scope_ref=RBACElementRef(
-                                RBACElementType.CONTAINER_REGISTRY,
-                                str(self.registry_info.id),
-                            ),
-                            additional_scope_refs=self._determine_additional_image_scopes(
+                    creators.append(
+                        ImageCreator(
+                            name=parsed_img.canonical,
+                            project=self.registry_info.project,
+                            architecture=image_identifier.architecture,
+                            registry_id=ContainerRegistryID(self.registry_info.id),
+                            is_local=is_local,
+                            registry=parsed_img.registry,
+                            image=join_non_empty(parsed_img.project, parsed_img.name, sep="/"),
+                            tag=parsed_img.tag,
+                            config_digest=update["config_digest"],
+                            size_bytes=update["size_bytes"],
+                            type=ImageType.COMPUTE,
+                            accelerators=update.get("accels"),
+                            labels=update["labels"],
+                            status=ImageStatus.ALIVE,
+                            customized=_is_customized(update["labels"]),
+                            creator_id=scanned_owners.creator_of(update["labels"]),
+                            created_in_project_id=scanned_owners.created_in_project(
                                 update["labels"]
                             ),
-                            element_type=RBACElementType.IMAGE,
+                            registry_is_global=self.registry_info.is_global,
                         ),
                     )
 
-                bulk_result = await execute_rbac_entity_creators(session, rbac_creators)
-                for row in bulk_result.rows:
-                    scanned_images.append(row.to_dataclass())
-                    progress_msg = (
-                        f"Updated image - {row.name}/{row.architecture} ({row.config_digest})"
-                    )
-                    log.info(progress_msg)
-                    if (reporter := progress_reporter.get()) is not None:
-                        await reporter.update(1, message=progress_msg)
-
                 await session.flush()
+
+            scanned_images.extend(await self._create_scanned_images(creators))
         return scanned_images
+
+    async def _scanned_owners(self, updates: Mapping[ImageIdentifier, Any]) -> _ScannedOwners:
+        """Resolve every scanned customized-owner label against the users here, so a
+        label naming a user this installation does not have writes no creator."""
+        user_ids = list({
+            user_id
+            for update in updates.values()
+            if (user_id := _customized_owner_user_id(update["labels"])) is not None
+        })
+        if not user_ids:
+            return _ScannedOwners(known_users=frozenset(), personal_projects={})
+        async with self._ops_provider.read_ops() as r:
+            known_users = await r.query_bulk_data(BulkUserQuerier(), user_ids)
+            personal_projects = await r.personal_projects(user_ids)
+        return _ScannedOwners(
+            known_users=frozenset(UserID(user_id) for user_id in known_users),
+            personal_projects=personal_projects,
+        )
+
+    async def _create_scanned_images(self, creators: list[ImageCreator]) -> list[ImageData]:
+        """Insert the images the scan found, each joining the registry it came from,
+        `public` as well where that registry is global, and the project that owns it."""
+        if not creators:
+            return []
+        async with self._ops_provider.write_ops() as w:
+            created = await w.atomic_create_entities(creators)
+        for image in created:
+            progress_msg = (
+                f"Updated image - {image.name}/{image.architecture} ({image.config_digest})"
+            )
+            log.trace(
+                "image updated",
+                image_name=image.name,
+                architecture=image.architecture,
+                config_digest=image.config_digest,
+            )
+            if (reporter := progress_reporter.get()) is not None:
+                await reporter.update(1, message=progress_msg)
+        return created
 
     async def scan_single_ref(self, image: str) -> RescanImagesResult:
         all_updates_token = all_updates.set({})
+        counts_token = rescan_counts.set(RescanCounts())
         sema_token = concurrency_sema.set(asyncio.Semaphore(1))
         try:
             username = self.registry_info.username
@@ -291,6 +403,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             return RescanImagesResult(images=scanned_images)
         finally:
             concurrency_sema.reset(sema_token)
+            rescan_counts.reset(counts_token)
             all_updates.reset(all_updates_token)
 
     async def _scan_image(
@@ -298,7 +411,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         sess: aiohttp.ClientSession,
         image: str,
     ) -> None:
-        log.info("_scan_image()")
+        log.debug("image scanning", image_name=image)
         rqst_args = await registry_login(
             sess,
             self.registry_url,
@@ -396,7 +509,6 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                                 )
 
                             case _:
-                                log.warning("Unknown content type: {}", content_type)
                                 raise RuntimeError(
                                     "The registry does not support the standard way of "
                                     "listing multiarch images."
@@ -438,11 +550,11 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             )
 
             if not manifests[architecture]["labels"]:
-                log.warning(
-                    "The image {}:{}/{} has no metadata labels -> treating as vanilla image",
-                    image,
-                    tag,
-                    architecture,
+                log.trace(
+                    "image has no metadata labels, treating as vanilla image",
+                    image_name=image,
+                    image_tag=tag,
+                    architecture=architecture,
                 )
                 manifests[architecture]["labels"] = {}
 
@@ -539,10 +651,10 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             labels = _container_config_labels
 
         if not labels:
-            log.warning(
-                "The image {}:{} has no metadata labels -> treating as vanilla image",
-                image,
-                tag,
+            log.trace(
+                "image has no metadata labels, treating as vanilla image",
+                image_name=image,
+                image_tag=tag,
             )
             labels = {}
 
@@ -622,7 +734,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         tag: str,
         image_info: Mapping[str, Any],
     ) -> None:
-        log.warning("Docker image manifest v1 is deprecated.")
+        log.trace("docker image manifest v1 is deprecated", image_name=image, image_tag=tag)
 
         architecture = image_info["architecture"]
 
@@ -671,7 +783,8 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         if not manifests:
             if not skip_reason:
                 skip_reason = "missing/deleted"
-            log.warning("Skipped image - {}:{} ({})", image, tag, skip_reason)
+            log.trace("image skipped", image_name=image, image_tag=tag, skip_reason=skip_reason)
+            rescan_counts.get().skipped += 1
             progress_msg = f"Skipped {image}:{tag} ({skip_reason})"
             if (reporter := progress_reporter.get()) is not None:
                 await reporter.update(1, message=progress_msg)
@@ -719,22 +832,24 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                 skip_reason = str(e)
             finally:
                 if skip_reason:
-                    log.warning(
-                        "Skipped image (_read_manifest inner) - {}:{}/{} ({})",
-                        image,
-                        tag,
-                        architecture,
-                        skip_reason,
+                    log.trace(
+                        "image skipped",
+                        image_name=image,
+                        image_tag=tag,
+                        architecture=architecture,
+                        skip_reason=skip_reason,
                     )
+                    rescan_counts.get().skipped += 1
                     progress_msg = f"Skipped {image}:{tag}/{architecture} ({skip_reason})"
                 else:
-                    log.info(
-                        "Scanned image - {0}:{1}/{2} ({3})",
-                        image,
-                        tag,
-                        architecture,
-                        manifest["digest"],
+                    log.debug(
+                        "image scanned",
+                        image_name=image,
+                        image_tag=tag,
+                        architecture=architecture,
+                        config_digest=manifest["digest"],
                     )
+                    rescan_counts.get().scanned += 1
                     progress_msg = f"Updated {image}:{tag}/{architecture} ({manifest['digest']})"
                 if (reporter := progress_reporter.get()) is not None:
                     await reporter.update(1, message=progress_msg)

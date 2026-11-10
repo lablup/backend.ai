@@ -10,18 +10,18 @@ from ai.backend.common.cli import LazyGroup
 from .context import CLIContext
 
 if TYPE_CHECKING:
-    from ai.backend.logging import BraceStyleAdapter
+    from ai.backend.logging.structured import StructuredLogger
 
 # LogLevel values for click.Choice - avoid importing ai.backend.logging at module level
 _LOG_LEVELS = ["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG", "TRACE", "NOTSET"]
 
 
-def _get_logger() -> BraceStyleAdapter:
+def _get_logger() -> StructuredLogger:
     import logging
 
-    from ai.backend.logging import BraceStyleAdapter
+    from ai.backend.logging.structured import StructuredLogger
 
-    return BraceStyleAdapter(logging.getLogger("ai.backend.appproxy.coordinator.cli"))
+    return StructuredLogger(logging.getLogger("ai.backend.appproxy.coordinator.cli"))
 
 
 @click.group(invoke_without_command=False, context_settings={"help_option_names": ["-h", "--help"]})
@@ -217,15 +217,20 @@ def dbshell(
             sys.exit(ExitCode.FAILURE)
     elif container_name == "-":
         # Use the host-provided psql command
+        hosts = ",".join(addr.host for addr in db_config.addrs)
+        ports = ",".join(str(addr.port) for addr in db_config.addrs)
         cmd = [
             "psql",
-            (f"postgres://{db_config.user}:{db_config.password}@{db_config.addr}/{db_config.name}"),
+            (
+                f"postgres://{db_config.user}:{db_config.password}@/{db_config.name}"
+                f"?host={hosts}&port={ports}&target_session_attrs=primary"
+            ),
             *psql_args,
         ]
         subprocess.run(cmd)
         return
     # Use the container to start the psql client command
-    _get_logger().info(f"using the db container {container_name} ...")
+    _get_logger().info("using the db container", container_name=container_name)
     cmd = [
         "docker",
         "exec",

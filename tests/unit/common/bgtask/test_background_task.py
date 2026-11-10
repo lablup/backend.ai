@@ -3,14 +3,13 @@ from __future__ import annotations
 import asyncio
 import enum
 from collections.abc import AsyncIterator
-from dataclasses import asdict
 from typing import Any
 from uuid import uuid4
 
 import pytest
 
-from ai.backend.common import redis_helper
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, BackgroundTaskManagerArgs
+from ai.backend.common.clients.valkey_client.client import create_valkey_client
 from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyBgtaskClient
 from ai.backend.common.defs import REDIS_BGTASK_DB, REDIS_STREAM_DB
 from ai.backend.common.events.dispatcher import (
@@ -25,6 +24,20 @@ from ai.backend.common.events.event_types.bgtask.broadcast import (
 from ai.backend.common.message_queue.redis_queue.queue import RedisMQArgs, RedisQueue
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import AgentId, HostPortPair, RedisTarget, ValkeyTarget
+
+
+async def _flush_db(redis_addr: HostPortPairModel, db_id: int) -> None:
+    client = create_valkey_client(
+        valkey_target=ValkeyTarget(addr=redis_addr.address),
+        db_id=db_id,
+        human_readable_name=f"test_cleanup_{db_id}",
+    )
+    await client.connect()
+    try:
+        async with client.client() as conn:
+            await conn.flushdb()
+    finally:
+        await client.disconnect()
 
 
 class ContextSentinel(enum.Enum):
@@ -55,15 +68,7 @@ async def message_queue(
     yield message_queue
 
     await message_queue.close()
-    stream_redis_conn = redis_helper.get_redis_object(
-        redis_target,
-        name="test_cleanup_stream",
-        db=REDIS_STREAM_DB,
-    )
-    try:
-        await redis_helper.execute(stream_redis_conn, lambda r: r.flushdb())
-    finally:
-        await stream_redis_conn.close()
+    await _flush_db(redis_addr, REDIS_STREAM_DB)
 
 
 @pytest.fixture
@@ -98,10 +103,6 @@ async def valkey_bgtask_client(
     redis_container: tuple[str, HostPortPairModel],
 ) -> AsyncIterator[ValkeyBgtaskClient]:
     _, redis_addr = redis_container
-    redis_target = RedisTarget(
-        addr=HostPortPair(host=redis_addr.host, port=redis_addr.port), redis_helper_config={}
-    )
-
     valkey_target = ValkeyTarget(
         addr=redis_addr.address,
     )
@@ -117,15 +118,7 @@ async def valkey_bgtask_client(
     await valkey_client.close()
 
     # Flush BGTASK_DB for test isolation
-    bgtask_redis_conn = redis_helper.get_redis_object(
-        redis_target,
-        name="test_cleanup_bgtask",
-        db=REDIS_BGTASK_DB,
-    )
-    try:
-        await redis_helper.execute(bgtask_redis_conn, lambda r: r.flushdb())
-    finally:
-        await bgtask_redis_conn.close()
+    await _flush_db(redis_addr, REDIS_BGTASK_DB)
 
 
 @pytest.fixture
@@ -168,8 +161,7 @@ async def test_background_task(
         # since assertions inside the handler does not affect the test result
         # because the handlers are executed inside a separate asyncio task.
         update_handler_ctx["event_name"] = event.event_name()
-        # type checker complains event is not a subclass of AttrsInstance, but it definitely is...
-        update_body = asdict(event)
+        update_body = event.model_dump()
         update_handler_ctx.update(**update_body)
 
     async def done_sub(
@@ -179,7 +171,7 @@ async def test_background_task(
     ) -> None:
         done_handler_ctx["context"] = context
         done_handler_ctx["event_name"] = event.event_name()
-        update_body = asdict(event)
+        update_body = event.model_dump()
         done_handler_ctx.update(**update_body)
 
     async def _mock_task(reporter: Any) -> str:
@@ -235,7 +227,7 @@ async def test_background_task_fail(
     ) -> None:
         fail_handler_ctx["context"] = context
         fail_handler_ctx["event_name"] = event.event_name()
-        update_body = asdict(event)
+        update_body = event.model_dump()
         fail_handler_ctx.update(**update_body)
 
     async def _mock_task(reporter: Any) -> None:

@@ -5,12 +5,16 @@ from __future__ import annotations
 from uuid import UUID
 
 from ai.backend.client.v2.base_domain import BaseDomainClient
+from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.dto.manager.v2.auto_scaling_rule.request import (
     BulkDeleteAutoScalingRulesInput,
     CreateAutoScalingRuleInput,
     DeleteAutoScalingRuleInput,
+    PartialBulkPurgeAutoScalingRulesInput,
+    PartialBulkUpdateAutoScalingRulesInput,
     UpdateAutoScalingRuleInput,
 )
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.deployment.request import (
     ActivateRevisionInput,
     AddRevisionInput,
@@ -21,6 +25,7 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     CreateDeploymentInput,
     DeleteAccessTokenInput,
     DeleteDeploymentInput,
+    PartialBulkPurgeAccessTokensInput,
     ReplaceDeploymentOptionsInput,
     SearchAccessTokensInput,
     SearchAutoScalingRulesInput,
@@ -33,11 +38,13 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     UpsertDeploymentPolicyInput,
 )
 from ai.backend.common.dto.manager.v2.deployment.response import (
+    AccessTokenNode,
     ActivateRevisionPayload,
     AddRevisionPayload,
     AdminRefreshDeploymentRevisionsPayload,
     AdminSearchDeploymentsPayload,
     AdminSearchRevisionsPayload,
+    AutoScalingRuleNode,
     BulkDeleteAccessTokensPayload,
     BulkDeleteAutoScalingRulesPayload,
     CreateAccessTokenPayload,
@@ -65,7 +72,6 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
     UpsertDeploymentPolicyPayload,
 )
 from ai.backend.common.dto.manager.v2.deployment_options import DeploymentOptionsInfo
-from ai.backend.common.identifier.deployment import DeploymentID
 
 _PATH = "/v2/deployments"
 
@@ -370,11 +376,31 @@ class V2DeploymentClient(BaseDomainClient):
             response_model=GetAccessTokenPayload,
         )
 
+    async def purge_access_token(self, token_id: UUID) -> DeleteAccessTokenPayload:
+        """Permanently remove an access token."""
+        return await self._client.typed_request(
+            "DELETE",
+            _PATH + f"/access-tokens/{token_id}",
+            response_model=DeleteAccessTokenPayload,
+        )
+
+    async def partial_bulk_purge_access_tokens(
+        self,
+        body: PartialBulkPurgeAccessTokensInput,
+    ) -> PartialBulkPayload[AccessTokenNode]:
+        """Permanently remove several access tokens, answering for each one."""
+        return await self._client.typed_request(
+            "POST",
+            _PATH + "/access-tokens/partial-bulk-purge",
+            request=body,
+            response_model=PartialBulkPayload[AccessTokenNode],
+        )
+
     async def delete_access_token(
         self,
         body: DeleteAccessTokenInput,
     ) -> DeleteAccessTokenPayload:
-        """Delete an access token."""
+        """Deprecated. Use :meth:`purge_access_token`."""
         return await self._client.typed_request(
             "POST",
             _PATH + "/access-tokens/delete",
@@ -386,7 +412,7 @@ class V2DeploymentClient(BaseDomainClient):
         self,
         body: BulkDeleteAccessTokensInput,
     ) -> BulkDeleteAccessTokensPayload:
-        """Bulk delete access tokens."""
+        """Deprecated. Use :meth:`partial_bulk_purge_access_tokens`."""
         return await self._client.typed_request(
             "POST",
             _PATH + "/access-tokens/bulk-delete",
@@ -441,17 +467,49 @@ class V2DeploymentClient(BaseDomainClient):
     ) -> UpdateAutoScalingRulePayload:
         """Update an auto-scaling rule."""
         return await self._client.typed_request(
-            "PUT",
+            "PATCH",
             _PATH + f"/auto-scaling-rules/{rule_id}",
             request=body,
             response_model=UpdateAutoScalingRulePayload,
+        )
+
+    async def purge_auto_scaling_rule(self, rule_id: UUID) -> DeleteAutoScalingRulePayload:
+        """Permanently remove an auto-scaling rule."""
+        return await self._client.typed_request(
+            "DELETE",
+            _PATH + f"/auto-scaling-rules/{rule_id}",
+            response_model=DeleteAutoScalingRulePayload,
+        )
+
+    async def partial_bulk_update_auto_scaling_rules(
+        self,
+        body: PartialBulkUpdateAutoScalingRulesInput,
+    ) -> PartialBulkPayload[AutoScalingRuleNode]:
+        """Update several auto-scaling rules, answering for each one."""
+        return await self._client.typed_request(
+            "POST",
+            _PATH + "/auto-scaling-rules/partial-bulk-update",
+            request=body,
+            response_model=PartialBulkPayload[AutoScalingRuleNode],
+        )
+
+    async def partial_bulk_purge_auto_scaling_rules(
+        self,
+        body: PartialBulkPurgeAutoScalingRulesInput,
+    ) -> PartialBulkPayload[AutoScalingRuleNode]:
+        """Permanently remove several auto-scaling rules, answering for each one."""
+        return await self._client.typed_request(
+            "POST",
+            _PATH + "/auto-scaling-rules/partial-bulk-purge",
+            request=body,
+            response_model=PartialBulkPayload[AutoScalingRuleNode],
         )
 
     async def delete_auto_scaling_rule(
         self,
         body: DeleteAutoScalingRuleInput,
     ) -> DeleteAutoScalingRulePayload:
-        """Delete an auto-scaling rule."""
+        """Deprecated. Use :meth:`purge_auto_scaling_rule`."""
         return await self._client.typed_request(
             "POST",
             _PATH + "/auto-scaling-rules/delete",
@@ -463,7 +521,7 @@ class V2DeploymentClient(BaseDomainClient):
         self,
         body: BulkDeleteAutoScalingRulesInput,
     ) -> BulkDeleteAutoScalingRulesPayload:
-        """Bulk delete auto-scaling rules."""
+        """Deprecated. Use :meth:`partial_bulk_purge_auto_scaling_rules`."""
         return await self._client.typed_request(
             "POST",
             _PATH + "/auto-scaling-rules/bulk-delete",

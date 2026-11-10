@@ -3,10 +3,9 @@
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.deployment.types import DeploymentPolicyData
-from ai.backend.manager.data.deployment.upserter import DeploymentPolicyUpserter
+from ai.backend.manager.models.deployment_policy.upserters import DeploymentPolicyUpserter
 from ai.backend.manager.services.deployment.actions.deployment_policy.base import (
     DeploymentPolicyBaseAction,
 )
@@ -19,8 +18,9 @@ class UpsertDeploymentPolicyAction(DeploymentPolicyBaseAction):
     upserter: DeploymentPolicyUpserter
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.upserter.deployment_id)
+    @classmethod
+    def action_name(cls) -> str:
+        return "upsert_deployment_policy"
 
     @override
     @classmethod
@@ -29,12 +29,8 @@ class UpsertDeploymentPolicyAction(DeploymentPolicyBaseAction):
 
 
 @dataclass
-class UpsertDeploymentPolicyActionResult(BaseActionResult):
+class UpsertDeploymentPolicyActionResult:
     """Result of upserting a deployment policy."""
 
     data: DeploymentPolicyData
     created: bool
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.data.id)

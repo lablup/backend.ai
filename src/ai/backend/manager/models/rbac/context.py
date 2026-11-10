@@ -1,7 +1,7 @@
 import uuid
 from dataclasses import dataclass
 
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 

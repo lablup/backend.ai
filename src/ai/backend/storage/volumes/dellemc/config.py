@@ -9,4 +9,5 @@ config_iv = t.Dict({
     t.Key("dell_api_version"): t.String(),
     t.Key("dell_ifs_path"): tx.Path(type="dir", allow_nonexisting=True),
     t.Key("dell_system_name", default=None): t.Null | t.String(),
+    t.Key("dell_verify_ssl", default=False): t.ToBool(),
 }).allow_extra("*")

@@ -5,9 +5,9 @@ import os
 from pathlib import Path
 from typing import Any
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 def _get_libc() -> ctypes.CDLL:
@@ -36,7 +36,7 @@ class NetworkNamespaceManager:
         try:
             setns(self.self_ns)
         except OSError:
-            log.warning("Failed to restore original network namespace")
+            log.exception("original network namespace restore failed")
         finally:
             os.close(self.new_ns)
             os.close(self.self_ns)

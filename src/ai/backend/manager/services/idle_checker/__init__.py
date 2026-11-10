@@ -1,0 +1,1 @@
+"""Idle checker service package."""

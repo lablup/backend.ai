@@ -2,31 +2,49 @@
 
 This file contains the core rules for AI coding agents. For detailed patterns and workflows, use the skills and documents below.
 
-## Document structure (AGENTS.md / CONTEXTS.md)
+## Document structure (AGENTS.md / KNOWLEDGE.md)
 
 - **`AGENTS.md`**: Guardrails (rules) only. Concise and imperative. Always auto-loaded (`CLAUDE.md` is a symlink to this file).
-- **`CONTEXTS.md`**: Background read for development (assumptions, rationale, caveats, examples, development context). Updated relatively often as assumptions and such change. Read on demand, with a pointer placed at the top of the corresponding `AGENTS.md`.
-- **`README.md`**: A document for humans to understand the component's composition. Should not change often. Does not duplicate AGENTS/CONTEXTS.
+- **`KNOWLEDGE.md`**: Background knowledge (assumptions, rationale, decision tables, caveats) with a fixed frontmatter schema. Read on demand — find documents with `python3 scripts/knowledge/search.py <term>`; the schema and authoring rules live in the `/knowledge` skill. `knowledge-check.yml` validates conformance on PRs.
+- A change that shifts a base assumption — an `AGENTS.md` rule rewrite, a migration completing — updates the affected `KNOWLEDGE.md` in the same change. Routine task-level edits do not.
+- **`README.md`**: A document for humans to understand the component's composition. Should not change often. Does not duplicate AGENTS/KNOWLEDGE.
+- **`GLOSSARY.md`, `glossary/`**: The words and writing style for documents. `GLOSSARY.md` holds the style rules and expressions to avoid, `glossary/<topic>.md` the terms by topic.
+- **Bilingual documents**: `KNOWLEDGE.md`, `report.md`, BEPs and the glossary come in pairs in the same folder: English in `<name>.md`, Korean in `<name>.ko.md`. Keep the same sections and update both in the same change. `AGENTS.md` is English only. `scripts/knowledge/check_bilingual.py` checks the pairs, `scripts/knowledge/check_words.py` the words.
+- **`report.md`, `report.ko.md`**: Output of the scenario tests (`scripts/scenario-report.py`). Do not edit them by hand.
+- **Korean goes only in `.ko.md`**: Do not add Korean to a `.md` file.
 - Place a rule **only once, at the highest level** of its scope — global at this root, component-global at the component top level. Do not duplicate an upper-level rule lower down.
 
 ## Writing style
 
 Applies to every generated artifact — docs, code comments, BEPs, PR descriptions.
 
+- Before writing, read `GLOSSARY.md` and the `glossary/<topic>.md` for the topic, and use the words they set.
 - Lead with the conclusion; keep background short.
 - Implementation details live in the code and the PR — docs describe interfaces and contracts, not line-by-line steps.
 - Prefer tables and lists over prose.
 - Code examples show the interface/contract only, not internal implementation.
 - State a rule once at its highest scope (see above); link instead of repeating.
+- No asides. Write the rule and the fact, nothing around them.
+- Never restate the previous sentence in different words.
+- Leave out how an individual value is composed and why a choice reads as natural.
+- Do not coin a term to group things. Name what is there and say how many. A term
+  invented for one document spreads before anyone agrees it is the right one.
+- Refer to a layer or value by its name in the code: REST handler, GQL resolver,
+  GQL DataLoader, adapter, processor, service, Action, repository, validator, `current_user()`,
+  user id and so on. Do not replace it with a descriptive word.
+- A comment or docstring stops at three lines. Anything longer is background: put it
+  in `KNOWLEDGE.md` and point at it.
 
 ## Document index
 
 **Core Documents (Read directly):**
 - `tests/AGENTS.md` — Testing guidelines and strategies
+- `.github/AGENTS.md` — CI workflows and the helper scripts they call, in `.github/scripts/` and `scripts/`
 - `BUILDING.md` — Build system, quality enforcement, BUILD policies
 - `src/ai/backend/manager/models/alembic/README.md` — Alembic migration backport strategy
 - `README.md` — Project overview and architecture
 - `proposals/README.md` — BEP (Backend.AI Enhancement Proposals)
+- `scripts/README.md` — Index of `scripts/` by when each one runs and who calls it
 
 **Skills (Invoke with `/skill-name`):**
 
@@ -42,8 +60,9 @@ When to use:
 - Docker/halfstack issues → `/halfstack`
 - Checking/applying DB migrations → `/db-migrate`
 - Running component servers directly → `/local-dev`
-- Submitting PR → `/submit`
+- Submitting PR (backport targeting) → `/submit`
 - Preparing release → `/release`
+- Searching or writing background knowledge (`KNOWLEDGE.md`) → `/knowledge`
 
 Skills source: `.claude/skills/{name}/SKILL.md`
 
@@ -61,6 +80,14 @@ Skills source: `.claude/skills/{name}/SKILL.md`
 - **re-export**: Where possible, do NOT use `__init__.py` re-exports; import modules directly.
 - **Class fields**: Declare the instance fields a class uses at the top of the class body with their types (assign them in `__init__`).
 
+**Version metadata:**
+- A new GQL type/field, config field, or DTO field records its version as `NEXT_RELEASE_VERSION`
+  (`ai.backend.common.meta.meta`): `added_version=NEXT_RELEASE_VERSION`, or `f"Added in {NEXT_RELEASE_VERSION}."`
+  in a description. Do NOT write the version literal; `scripts/release.sh` freezes it at release.
+- Do not change a literal version that is already released.
+- On a version branch (`YY.S`), write the literal version the branch will ship instead — CI rejects new
+  `NEXT_RELEASE_VERSION` references there.
+
 **BUILD files:**
 - ❌ Do NOT add BUILD files to the `src/` directory.
 - ✅ MUST add BUILD files to new test directories.
@@ -68,15 +95,9 @@ Skills source: `.claude/skills/{name}/SKILL.md`
 
 ## Before committing
 
-Before committing, run the commands below and fix all errors:
-
-```bash
-pants fmt --changed-since=HEAD~1
-pants fix --changed-since=HEAD~1
-pants lint --changed-since=HEAD~1
-pants check --changed-since=HEAD~1
-pants test --changed-since=HEAD~1
-```
+- The git hooks (pre-commit, pre-push) run the low-cost checks. When a hook fails, find the cause in its output, fix it and commit or push again. Do not bypass it with `--no-verify` (except `/submit --draft`).
+- CI runs the pants-based checks (lint, check, test). After a push, check the results with `gh pr checks <PR>`; for a failed job, find the cause with `gh run view --job <job-id> --log-failed` (the job id is the last segment of the check's `link` in `gh pr checks <PR> --json name,bucket,link`), fix it and push again.
+- A local `pants test` is scoped to the changed tests. While working in several worktrees at once, local pants runs are not recommended because their pantsd loads add up; confirm with the CI results.
 
 **Fix all lint, type, and test errors — never suppress or skip.**
 
@@ -116,9 +137,42 @@ API Handler → Processor → Service → Repository → DB
 **After implementing new API endpoints, verify with the live server** — check both admin and non-admin. For the server restart, `./bai`
 test, and log-checking procedures, see the `/local-dev`, `/bai-cli`, and `/observability` skills.
 
+## Logging
+
+Levels:
+
+| Level | Use for |
+|---|---|
+| error | A server fault. Logged once, where it happens. Where an exception is caught, log it with `exception()` so the traceback is kept |
+| warning | A transient server-side failure, a retry, degradation |
+| info | Server lifecycle events an operator needs (start, stop, config applied, leader change) |
+| debug | Per-cycle summaries of periodic work, progress steps |
+| trace | Outcomes of user and admin requests (scheduling failure, resource exhaustion, quota exceeded, 4xx, bulk-operation results). History, the audit log and the API are the record |
+
+Use `info` only when all three hold:
+
+1. An operator needs to know it without looking for it
+2. It does not occur in proportion to requests or time
+3. No other record holds it (history, the audit log, the API)
+
+| `info` target | Examples |
+|---|---|
+| Process lifecycle | Startup finished and the listen address, shutdown |
+| Config applied | Config loaded, an etcd config change applied, a plugin loaded |
+| Role change | Leader election won or lost, service discovery registered or deregistered |
+| Membership change | A new agent's first registration, a volume mounted |
+| State changed by the system without a request | Rows removed by a retention purge, stuck sessions cleaned up. A cycle that changed nothing is `debug` |
+
+Writing rules:
+
+- New code and touched log lines use `StructuredLogger` (`ai.backend.logging.structured`).
+- At `info` and above, the message is a constant and values are keyword fields. Field names follow BEP-1066 section 4.
+- A layer that re-raises does not log.
+- Unit-of-work identifiers are set once at the entry point with `with_log_context`, not repeated on every line.
+
 ## Development guidelines
 
-**Document-first:** Before making changes, read the `AGENTS.md` in the relevant directory, and if you need more context, read `CONTEXTS.md` in the same directory.
+**Document-first:** Before making changes, read the `AGENTS.md` in the relevant directory, and if you need more context, search the `KNOWLEDGE.md` documents (`/knowledge`).
 
 **BEP-first:** For significant features, use the `/bep-guide` skill. Check `proposals/README.md` for an existing BEP or create a new one.
 

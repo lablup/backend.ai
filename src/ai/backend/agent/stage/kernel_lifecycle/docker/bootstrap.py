@@ -4,11 +4,11 @@ Bootstrap stage for kernel lifecycle.
 This stage handles creation of bootstrap scripts in the container work directory.
 """
 
-import asyncio
 from dataclasses import dataclass
 from pathlib import Path
 from typing import override
 
+from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.stage.types import ArgsSpecGenerator, Provisioner, ProvisionStage
 
 from .utils import ChownUtil, PathOwnerDeterminer
@@ -56,9 +56,9 @@ class BootstrapProvisioner(Provisioner[BootstrapSpec, BootstrapResult]):
 
     @override
     async def setup(self, spec: BootstrapSpec) -> BootstrapResult:
-        loop = asyncio.get_running_loop()
-
-        bootstrap_path = await loop.run_in_executor(None, self._write_bootstrap_script, spec)
+        bootstrap_path = await run_in_executor_with_context(
+            None, self._write_bootstrap_script, spec
+        )
         return BootstrapResult(bootstrap_path=bootstrap_path)
 
     def _write_bootstrap_script(self, spec: BootstrapSpec) -> Path | None:

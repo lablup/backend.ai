@@ -3,38 +3,25 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.storage_namespace import StorageNamespaceEntityType
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import GlobalSearcherOpsAction
 from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.services.storage_namespace.actions.base import StorageNamespaceAction
+from ai.backend.manager.models.storage_namespace.row import StorageNamespaceRow
 
 
-@dataclass
-class SearchStorageNamespacesAction(StorageNamespaceAction):
-    """Action to search storage namespaces."""
-
-    querier: BatchQuerier
+@dataclass(frozen=True)
+class SearchStorageNamespacesAction(
+    GlobalSearcherOpsAction[StorageNamespaceRow, StorageNamespaceData]
+):
+    """Page through registered namespaces."""
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
+    def entity_type(cls) -> EntityType:
+        return StorageNamespaceEntityType()
 
     @override
-    def entity_id(self) -> str | None:
-        return None
-
-
-@dataclass
-class SearchStorageNamespacesActionResult(BaseActionResult):
-    """Result of searching storage namespaces."""
-
-    namespaces: list[StorageNamespaceData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "search_storage_namespaces"

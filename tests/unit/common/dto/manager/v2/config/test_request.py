@@ -7,7 +7,6 @@ import uuid
 import pytest
 from pydantic import ValidationError
 
-from ai.backend.common.api_handlers import SENTINEL, Sentinel
 from ai.backend.common.dto.manager.v2.config.request import (
     CreateDotfileInput,
     DeleteDotfileInput,
@@ -16,6 +15,7 @@ from ai.backend.common.dto.manager.v2.config.request import (
 )
 from ai.backend.common.dto.manager.v2.config.types import MAXIMUM_DOTFILE_SIZE, DotfileScope
 from ai.backend.common.exception import BackendAISchemaValidationFailed
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 
 class TestCreateDotfileInput:
@@ -189,14 +189,14 @@ class TestCreateDotfileInputRoundTrip:
 class TestUpdateDotfileInput:
     """Tests for UpdateDotfileInput model creation and validation."""
 
-    def test_default_data_is_sentinel(self) -> None:
+    def test_default_data_is_unset(self) -> None:
         req = UpdateDotfileInput(path="/home/.bashrc")
-        assert req.data is SENTINEL
-        assert isinstance(req.data, Sentinel)
+        assert req.data is UNSET
+        assert isinstance(req.data, Unset)
 
-    def test_explicit_sentinel_data(self) -> None:
-        req = UpdateDotfileInput(path="/home/.bashrc", data=SENTINEL)
-        assert req.data is SENTINEL
+    def test_explicit_unset_data(self) -> None:
+        req = UpdateDotfileInput(path="/home/.bashrc", data=UNSET)
+        assert req.data is UNSET
 
     def test_none_data_means_no_change(self) -> None:
         req = UpdateDotfileInput(path="/home/.bashrc", data=None)
@@ -210,8 +210,17 @@ class TestUpdateDotfileInput:
         req = UpdateDotfileInput(path="/home/.bashrc", permission="755")
         assert req.permission == "755"
 
-    def test_permission_default_is_none(self) -> None:
+    def test_permission_default_is_unset(self) -> None:
         req = UpdateDotfileInput(path="/home/.bashrc")
+        assert req.permission is UNSET
+        assert isinstance(req.permission, Unset)
+
+    def test_explicit_unset_permission(self) -> None:
+        req = UpdateDotfileInput(path="/home/.bashrc", permission=UNSET)
+        assert req.permission is UNSET
+
+    def test_none_permission_stays_none(self) -> None:
+        req = UpdateDotfileInput(path="/home/.bashrc", permission=None)
         assert req.permission is None
 
     def test_path_whitespace_is_stripped(self) -> None:
@@ -233,16 +242,16 @@ class TestUpdateDotfileInput:
     def test_partial_update_data_only(self) -> None:
         req = UpdateDotfileInput(path="/home/.bashrc", data="updated content")
         assert req.data == "updated content"
-        assert req.permission is None
+        assert req.permission is UNSET
 
     def test_partial_update_permission_only(self) -> None:
         req = UpdateDotfileInput(path="/home/.bashrc", permission="644")
-        assert req.data is SENTINEL
+        assert req.data is UNSET
         assert req.permission == "644"
 
 
 class TestUpdateDotfileInputRoundTrip:
-    """Tests for UpdateDotfileInput serialization round-trip (non-SENTINEL values)."""
+    """Tests for UpdateDotfileInput serialization round-trip (non-UNSET values)."""
 
     def test_round_trip_with_string_data(self) -> None:
         req = UpdateDotfileInput(path="/home/.bashrc", data="new content", permission="644")

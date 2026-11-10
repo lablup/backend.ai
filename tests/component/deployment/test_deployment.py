@@ -19,8 +19,12 @@ from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
 from ai.backend.client.v2.exceptions import NotFoundError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.config import ModelDefinitionDraft
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.resource_group import ResourceGroupName
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy, ModelDeploymentStatus
 from ai.backend.common.data.model_deployment.types import (
     RouteHealthStatus as CommonRouteHealthStatus,
@@ -52,13 +56,13 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     ReplicaFilter,
     ReplicaHealthStatusFilter,
     ReplicaNestedFilter,
+    ScopedSearchDeploymentsInput,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
     DeploymentFilter as DeploymentFilterV2,
 )
-from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.identifier.resource_group import ResourceGroupName
-from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.common.dto.manager.v2.deployment.types import DeploymentScope
+from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.types import ClusterMode
 from ai.backend.manager.api.adapters.deployment.adapter import DeploymentAdapter
 from ai.backend.manager.data.deployment.types import (
@@ -66,9 +70,8 @@ from ai.backend.manager.data.deployment.types import (
     RouteStatus,
     RouteTrafficStatus,
 )
-from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
-from ai.backend.manager.services.deployment.service import _map_lifecycle_to_status
 from ai.backend.manager.services.processors import Processors
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -110,7 +113,7 @@ class TestSearchDeployments:
         admin_registry: BackendAIClientRegistry,
         group_fixture: uuid.UUID,
         domain_fixture: DomainFixtureData,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
         deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
         """Search deployments with pagination returns correct page."""
@@ -122,7 +125,7 @@ class TestSearchDeployments:
                 metadata=DeploymentMetadataInput(
                     project_id=group_fixture,
                     domain_name=domain_fixture.domain_name,
-                    resource_group_name=scaling_group_name,
+                    resource_group_name=resource_group_name,
                     name=f"test-deployment-{i}-{secrets.token_hex(4)}",
                 ),
                 network_access=NetworkAccessInput(open_to_public=False),
@@ -172,7 +175,7 @@ class TestGetDeployment:
         admin_registry: BackendAIClientRegistry,
         group_fixture: uuid.UUID,
         domain_fixture: DomainFixtureData,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
         deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
         """Get deployment by ID returns correct deployment details."""
@@ -181,7 +184,7 @@ class TestGetDeployment:
             metadata=DeploymentMetadataInput(
                 project_id=group_fixture,
                 domain_name=domain_fixture.domain_name,
-                resource_group_name=scaling_group_name,
+                resource_group_name=resource_group_name,
                 name=f"test-deployment-{secrets.token_hex(4)}",
             ),
             network_access=NetworkAccessInput(open_to_public=False),
@@ -283,7 +286,7 @@ class TestSearchRoutes:
         admin_registry: BackendAIClientRegistry,
         group_fixture: uuid.UUID,
         domain_fixture: DomainFixtureData,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
         deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
         """Search routes for a deployment returns route list."""
@@ -292,7 +295,7 @@ class TestSearchRoutes:
             metadata=DeploymentMetadataInput(
                 project_id=group_fixture,
                 domain_name=domain_fixture.domain_name,
-                resource_group_name=scaling_group_name,
+                resource_group_name=resource_group_name,
                 name=f"test-deployment-{secrets.token_hex(4)}",
             ),
             network_access=NetworkAccessInput(open_to_public=False),
@@ -347,7 +350,7 @@ class TestDeactivateRevision:
 class TestDeploymentAdapterFilter:
     """Verify the GQL adapter honors AND/OR/NOT in DeploymentFilter.
 
-    The adapter's ``my_search`` and ``project_search`` previously inlined
+    The adapter's ``scoped_search`` and ``project_search`` previously inlined
     the filter conversion and silently dropped nested ``AND``/``OR``/``NOT``
     clauses, so multi-condition filters degenerated into "no filter at all".
     These tests pin the corrected behavior.
@@ -360,7 +363,7 @@ class TestDeploymentAdapterFilter:
     ) -> DeploymentAdapter:
         processors_mock = MagicMock(spec=Processors)
         processors_mock.deployment = deployment_processors
-        return DeploymentAdapter(processors_mock, deployment_coordinator=MagicMock())
+        return DeploymentAdapter(processors_mock.deployment, deployment_coordinator=MagicMock())
 
     @staticmethod
     def _admin_user_data(user_uuid: uuid.UUID, domain: str) -> UserData:
@@ -371,6 +374,7 @@ class TestDeploymentAdapterFilter:
             is_superadmin=True,
             role=UserRole.SUPERADMIN,
             domain_name=domain,
+            domain_id=DomainID(uuid.uuid4()),
         )
 
     @staticmethod
@@ -378,7 +382,7 @@ class TestDeploymentAdapterFilter:
         admin_registry: BackendAIClientRegistry,
         project_id: uuid.UUID,
         domain: str,
-        scaling_group: ResourceGroupName,
+        resource_group: ResourceGroupName,
         seed_data: tuple[ImageID, VFolderUUID],
         tags: list[str],
         name: str | None = None,
@@ -388,7 +392,7 @@ class TestDeploymentAdapterFilter:
             metadata=DeploymentMetadataInput(
                 project_id=project_id,
                 domain_name=domain,
-                resource_group_name=scaling_group,
+                resource_group_name=resource_group,
                 name=name or f"test-deployment-{secrets.token_hex(4)}",
                 tags=tags,
             ),
@@ -423,7 +427,7 @@ class TestDeploymentAdapterFilter:
         db_engine: SAEngine,
         group_fixture: uuid.UUID,
         domain_fixture: DomainFixtureData,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
         deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> dict[str, uuid.UUID]:
         deployment_ids = {
@@ -431,7 +435,7 @@ class TestDeploymentAdapterFilter:
                 admin_registry,
                 group_fixture,
                 domain_fixture.domain_name,
-                scaling_group_name,
+                resource_group_name,
                 deployment_seed_data,
                 [name],
             )
@@ -512,11 +516,12 @@ class TestDeploymentAdapterFilter:
         replicas_filter: ReplicaNestedFilter,
         expected_names: tuple[str, ...],
     ) -> None:
-        with with_user(
+        with with_user_context(
             self._admin_user_data(admin_user_fixture.user_uuid, domain_fixture.domain_name)
         ):
-            payload = await deployment_adapter.my_search(
-                AdminSearchDeploymentsInput(
+            payload = await deployment_adapter.scoped_search(
+                ScopedSearchDeploymentsInput(
+                    scope=DeploymentScope(user=[UUIDScope(value=admin_user_fixture.user_uuid)]),
                     filter=DeploymentFilterV2(
                         replicas=replicas_filter,
                     ),
@@ -528,21 +533,22 @@ class TestDeploymentAdapterFilter:
             replica_filter_deployments[name] for name in expected_names
         }
 
-    async def test_replica_some_and_every_require_nonempty_all_match(
+    async def test_replica_exists_and_every_require_nonempty_all_match(
         self,
         deployment_adapter: DeploymentAdapter,
         admin_user_fixture: UserFixtureData,
         domain_fixture: DomainFixtureData,
         replica_filter_deployments: dict[str, uuid.UUID],
     ) -> None:
-        with with_user(
+        with with_user_context(
             self._admin_user_data(admin_user_fixture.user_uuid, domain_fixture.domain_name)
         ):
-            payload = await deployment_adapter.my_search(
-                AdminSearchDeploymentsInput(
+            payload = await deployment_adapter.scoped_search(
+                ScopedSearchDeploymentsInput(
+                    scope=DeploymentScope(user=[UUIDScope(value=admin_user_fixture.user_uuid)]),
                     filter=DeploymentFilterV2(
                         replicas=ReplicaNestedFilter(
-                            some=ReplicaFilter(),
+                            exists=True,
                             every=ReplicaFilter(
                                 health_status=ReplicaHealthStatusFilter(
                                     equals=CommonRouteHealthStatus.HEALTHY
@@ -556,14 +562,14 @@ class TestDeploymentAdapterFilter:
 
         assert {item.id for item in payload.items} == {replica_filter_deployments["healthy"]}
 
-    async def test_my_search_and_filter_returns_intersection(
+    async def test_user_scoped_search_and_filter_returns_intersection(
         self,
         admin_registry: BackendAIClientRegistry,
         admin_user_fixture: UserFixtureData,
         deployment_adapter: DeploymentAdapter,
         group_fixture: uuid.UUID,
         domain_fixture: DomainFixtureData,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
         deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
         """AND clause must narrow results to deployments matching every nested filter."""
@@ -571,7 +577,7 @@ class TestDeploymentAdapterFilter:
             admin_registry,
             group_fixture,
             domain_fixture.domain_name,
-            scaling_group_name,
+            resource_group_name,
             deployment_seed_data,
             ["alpha", "production"],
         )
@@ -579,7 +585,7 @@ class TestDeploymentAdapterFilter:
             admin_registry,
             group_fixture,
             domain_fixture.domain_name,
-            scaling_group_name,
+            resource_group_name,
             deployment_seed_data,
             ["beta", "production"],
         )
@@ -587,7 +593,7 @@ class TestDeploymentAdapterFilter:
             admin_registry,
             group_fixture,
             domain_fixture.domain_name,
-            scaling_group_name,
+            resource_group_name,
             deployment_seed_data,
             ["alpha", "beta"],
         )
@@ -598,24 +604,28 @@ class TestDeploymentAdapterFilter:
                 DeploymentFilterV2(tags=StringFilter(i_contains="beta")),
             ],
         )
-        with with_user(
+        with with_user_context(
             self._admin_user_data(admin_user_fixture.user_uuid, domain_fixture.domain_name)
         ):
-            payload = await deployment_adapter.my_search(
-                AdminSearchDeploymentsInput(filter=filter_input, limit=50),
+            payload = await deployment_adapter.scoped_search(
+                ScopedSearchDeploymentsInput(
+                    scope=DeploymentScope(user=[UUIDScope(value=admin_user_fixture.user_uuid)]),
+                    filter=filter_input,
+                    limit=50,
+                ),
             )
 
         assert payload.total_count == 1
         assert [item.id for item in payload.items] == [target_id]
 
-    async def test_my_search_or_filter_returns_union(
+    async def test_user_scoped_search_or_filter_returns_union(
         self,
         admin_registry: BackendAIClientRegistry,
         admin_user_fixture: UserFixtureData,
         deployment_adapter: DeploymentAdapter,
         group_fixture: uuid.UUID,
         domain_fixture: DomainFixtureData,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
         deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
         """OR clause must widen results to deployments matching any nested filter."""
@@ -623,7 +633,7 @@ class TestDeploymentAdapterFilter:
             admin_registry,
             group_fixture,
             domain_fixture.domain_name,
-            scaling_group_name,
+            resource_group_name,
             deployment_seed_data,
             ["alpha"],
         )
@@ -631,7 +641,7 @@ class TestDeploymentAdapterFilter:
             admin_registry,
             group_fixture,
             domain_fixture.domain_name,
-            scaling_group_name,
+            resource_group_name,
             deployment_seed_data,
             ["beta"],
         )
@@ -639,7 +649,7 @@ class TestDeploymentAdapterFilter:
             admin_registry,
             group_fixture,
             domain_fixture.domain_name,
-            scaling_group_name,
+            resource_group_name,
             deployment_seed_data,
             ["gamma"],
         )
@@ -650,24 +660,28 @@ class TestDeploymentAdapterFilter:
                 DeploymentFilterV2(tags=StringFilter(i_contains="beta")),
             ],
         )
-        with with_user(
+        with with_user_context(
             self._admin_user_data(admin_user_fixture.user_uuid, domain_fixture.domain_name)
         ):
-            payload = await deployment_adapter.my_search(
-                AdminSearchDeploymentsInput(filter=filter_input, limit=50),
+            payload = await deployment_adapter.scoped_search(
+                ScopedSearchDeploymentsInput(
+                    scope=DeploymentScope(user=[UUIDScope(value=admin_user_fixture.user_uuid)]),
+                    filter=filter_input,
+                    limit=50,
+                ),
             )
 
         assert payload.total_count == 2
         assert {item.id for item in payload.items} == {alpha_id, beta_id}
 
-    async def test_my_search_or_filter_groups_multi_field_subfilters(
+    async def test_user_scoped_search_or_filter_groups_multi_field_subfilters(
         self,
         admin_registry: BackendAIClientRegistry,
         admin_user_fixture: UserFixtureData,
         deployment_adapter: DeploymentAdapter,
         group_fixture: uuid.UUID,
         domain_fixture: DomainFixtureData,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
         deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
         """OR with multi-field sub-filters must AND fields within each branch.
@@ -682,7 +696,7 @@ class TestDeploymentAdapterFilter:
             admin_registry,
             group_fixture,
             domain_fixture.domain_name,
-            scaling_group_name,
+            resource_group_name,
             deployment_seed_data,
             ["alpha"],
             name=f"bar-x-{suffix}",
@@ -691,7 +705,7 @@ class TestDeploymentAdapterFilter:
             admin_registry,
             group_fixture,
             domain_fixture.domain_name,
-            scaling_group_name,
+            resource_group_name,
             deployment_seed_data,
             ["beta"],
             name=f"foo-x-{suffix}",
@@ -700,7 +714,7 @@ class TestDeploymentAdapterFilter:
             admin_registry,
             group_fixture,
             domain_fixture.domain_name,
-            scaling_group_name,
+            resource_group_name,
             deployment_seed_data,
             ["beta"],
             name=f"bar-y-{suffix}",
@@ -709,7 +723,7 @@ class TestDeploymentAdapterFilter:
             admin_registry,
             group_fixture,
             domain_fixture.domain_name,
-            scaling_group_name,
+            resource_group_name,
             deployment_seed_data,
             ["alpha"],
             name=f"foo-y-{suffix}",
@@ -727,11 +741,15 @@ class TestDeploymentAdapterFilter:
                 ),
             ],
         )
-        with with_user(
+        with with_user_context(
             self._admin_user_data(admin_user_fixture.user_uuid, domain_fixture.domain_name)
         ):
-            payload = await deployment_adapter.my_search(
-                AdminSearchDeploymentsInput(filter=filter_input, limit=50),
+            payload = await deployment_adapter.scoped_search(
+                ScopedSearchDeploymentsInput(
+                    scope=DeploymentScope(user=[UUIDScope(value=admin_user_fixture.user_uuid)]),
+                    filter=filter_input,
+                    limit=50,
+                ),
             )
 
         assert payload.total_count == 2
@@ -744,7 +762,7 @@ class TestDeploymentAdapterFilter:
         deployment_adapter: DeploymentAdapter,
         group_fixture: uuid.UUID,
         domain_fixture: DomainFixtureData,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
         deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
         """project_search must also honor AND across nested filters."""
@@ -752,7 +770,7 @@ class TestDeploymentAdapterFilter:
             admin_registry,
             group_fixture,
             domain_fixture.domain_name,
-            scaling_group_name,
+            resource_group_name,
             deployment_seed_data,
             ["alpha"],
         )
@@ -760,7 +778,7 @@ class TestDeploymentAdapterFilter:
             admin_registry,
             group_fixture,
             domain_fixture.domain_name,
-            scaling_group_name,
+            resource_group_name,
             deployment_seed_data,
             ["alpha", "beta"],
         )
@@ -771,7 +789,7 @@ class TestDeploymentAdapterFilter:
                 DeploymentFilterV2(tags=StringFilter(i_contains="beta")),
             ],
         )
-        with with_user(
+        with with_user_context(
             self._admin_user_data(admin_user_fixture.user_uuid, domain_fixture.domain_name)
         ):
             payload = await deployment_adapter.project_search(
@@ -781,6 +799,91 @@ class TestDeploymentAdapterFilter:
 
         assert payload.total_count == 1
         assert [item.id for item in payload.items] == [target_id]
+
+    @pytest.fixture
+    async def tagged_deployments(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        group_fixture: uuid.UUID,
+        domain_fixture: DomainFixtureData,
+        resource_group_name: ResourceGroupName,
+        deployment_seed_data: tuple[ImageID, VFolderUUID],
+    ) -> dict[str, uuid.UUID]:
+        tag_sets = {
+            "six": ["hi", "hello", "nice", "to", "meet", "you"],
+            "two": ["hello", "hi"],
+            "one": ["meet"],
+        }
+        return {
+            name: await self._create_deployment_with_tags(
+                admin_registry,
+                group_fixture,
+                domain_fixture.domain_name,
+                resource_group_name,
+                deployment_seed_data,
+                tags,
+            )
+            for name, tags in tag_sets.items()
+        }
+
+    async def _search_by_tags(
+        self,
+        deployment_adapter: DeploymentAdapter,
+        admin_user_fixture: UserFixtureData,
+        domain_fixture: DomainFixtureData,
+        tags: StringFilter,
+    ) -> set[uuid.UUID]:
+        with with_user_context(
+            self._admin_user_data(admin_user_fixture.user_uuid, domain_fixture.domain_name)
+        ):
+            payload = await deployment_adapter.scoped_search(
+                ScopedSearchDeploymentsInput(
+                    scope=DeploymentScope(user=[UUIDScope(value=admin_user_fixture.user_uuid)]),
+                    filter=DeploymentFilterV2(tags=tags),
+                    limit=50,
+                ),
+            )
+        return {item.id for item in payload.items}
+
+    @pytest.mark.parametrize(
+        ("tags", "expected"),
+        [
+            (StringFilter(i_equals="meet"), {"six", "one"}),
+            (StringFilter(equals="meet"), {"six", "one"}),
+            (StringFilter(i_equals="MEET"), {"six", "one"}),
+            (StringFilter(equals="MEET"), set()),
+            (StringFilter(in_=["nice", "zzz"]), {"six"}),
+            (StringFilter(i_in=["HI"]), {"six", "two"}),
+            (StringFilter(i_equals="hi,hello,nice,to,meet,you"), set()),
+            (StringFilter(not_equals="meet"), {"two"}),
+            (StringFilter(not_in=["hi", "meet"]), set()),
+        ],
+        ids=[
+            "i_equals_one_tag",
+            "equals_one_tag",
+            "i_equals_ignores_case",
+            "equals_honors_case",
+            "in_matches_any_listed_tag",
+            "i_in_ignores_case",
+            "joined_string_is_not_a_tag",
+            "not_equals_excludes_the_tag",
+            "not_in_excludes_every_listed_tag",
+        ],
+    )
+    async def test_tags_filter_matches_one_tag_of_a_deployment(
+        self,
+        deployment_adapter: DeploymentAdapter,
+        admin_user_fixture: UserFixtureData,
+        domain_fixture: DomainFixtureData,
+        tagged_deployments: dict[str, uuid.UUID],
+        tags: StringFilter,
+        expected: set[str],
+    ) -> None:
+        found = await self._search_by_tags(
+            deployment_adapter, admin_user_fixture, domain_fixture, tags
+        )
+
+        assert found == {tagged_deployments[name] for name in expected}
 
 
 class TestStatusMapping:
@@ -805,7 +908,7 @@ class TestStatusMapping:
         }
 
         for lifecycle, expected_status in mapping.items():
-            actual_status = _map_lifecycle_to_status(lifecycle)
+            actual_status = ModelDeploymentStatus.from_lifecycle(lifecycle)
             assert actual_status == expected_status, (
                 f"EndpointLifecycle.{lifecycle.name} should map to "
                 f"ModelDeploymentStatus.{expected_status.name}, got {actual_status.name}"

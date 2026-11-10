@@ -1,5 +1,6 @@
 import urllib.parse
 from collections.abc import Iterable
+from http import HTTPStatus
 from uuid import UUID
 
 import aiohttp
@@ -13,6 +14,7 @@ from tenacity.stop import stop_after_attempt
 from ai.backend.appproxy.common.defs import PERMIT_COOKIE_NAME
 from ai.backend.appproxy.common.errors import (
     InvalidAPIParameters,
+    InvalidCredentials,
     ServerMisconfiguredError,
 )
 from ai.backend.appproxy.common.types import (
@@ -102,9 +104,15 @@ async def setup(
     request: web.Request, params: ProxySetupRequestModel
 ) -> web.StreamResponse | PydanticResponse[ProxySetupResponseModel]:
     root_ctx: RootContext = request.app["_root.context"]
-    jwt_body = jwt.decode(
-        params.token, root_ctx.local_config.secrets.jwt_secret, algorithms=["HS256"]
-    )
+    try:
+        jwt_body = jwt.decode(
+            params.token,
+            root_ctx.local_config.secrets.jwt_secret,
+            algorithms=["HS256"],
+            options={"require": ["exp", "jti", "circuit"]},
+        )
+    except jwt.PyJWTError as e:
+        raise InvalidCredentials(f"E20008: Invalid authorization token ({e})") from e
     requested_circuit_id = UUID(jwt_body["circuit"])
 
     config = root_ctx.local_config.proxy_worker
@@ -166,7 +174,12 @@ async def setup(
             protocol = "https" if use_tls else "http"
             redirect_path = jwt_body.get("redirect", "")
             proxy_url = generate_proxy_url(port_config, protocol, circuit, redirect_path)
-            response = web.HTTPFound(proxy_url, headers=cors_headers)
+            response = web.Response(
+                status=HTTPStatus.FOUND,
+                headers={**cors_headers, "Location": proxy_url},
+                # Legacy body that aiohttp's HTTP*Redirect filled in.
+                text=f"{HTTPStatus.FOUND.value}: {HTTPStatus.FOUND.phrase}",
+            )
             cookie_domain = None
             if circuit.frontend_mode == FrontendMode.WILDCARD_DOMAIN:
                 wildcard_info = config.wildcard_domain
@@ -192,9 +205,14 @@ async def setup(
                 "gateway": generate_proxy_url(port_config, protocol, circuit, redirect_path=None),
             }
             if jwt_body["redirect"]:
-                return web.HTTPFound(
-                    f"http://localhost:45678/start?{urllib.parse.urlencode(queryparams)}",
-                    headers=cors_headers,
+                return web.Response(
+                    status=HTTPStatus.FOUND,
+                    headers={
+                        **cors_headers,
+                        "Location": f"http://localhost:45678/start?{urllib.parse.urlencode(queryparams)}",
+                    },
+                    # Legacy body that aiohttp's HTTP*Redirect filled in.
+                    text=f"{HTTPStatus.FOUND.value}: {HTTPStatus.FOUND.phrase}",
                 )
             return PydanticResponse(
                 ProxySetupResponseModel(

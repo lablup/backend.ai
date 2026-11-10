@@ -5,8 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Self
 
-from .db_source import ExportDBSource
-from .registry import ExportReportRegistry
+from ai.backend.manager.repositories.export.db_source.db_source import ExportDBSource
+from ai.backend.manager.repositories.export.registry.base import ExportReportRegistry
+
 from .repository import ExportRepository
 
 if TYPE_CHECKING:

@@ -5,50 +5,39 @@ import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
+
+import aiohttp
 
 from ai.backend.common.data.notification import NotifiableMessage, NotificationRuleType
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.common.data.notification.types import NotificationChannelType
+from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.data.notification.types import MatchingNotificationRuleData
+from ai.backend.manager.errors.notification import (
+    NotificationProcessingFailure,
+    NotificationTemplateRenderingFailure,
+)
 from ai.backend.manager.notification.types import ProcessRuleParams
-from ai.backend.manager.repositories.notification.creators import NotificationRuleCreatorSpec
-from ai.backend.manager.repositories.notification.updaters import NotificationRuleUpdaterSpec
-
-from .actions import (
-    CreateChannelAction,
-    CreateChannelActionResult,
-    CreateRuleAction,
-    CreateRuleActionResult,
-    DeleteChannelAction,
-    DeleteChannelActionResult,
-    DeleteRuleAction,
-    DeleteRuleActionResult,
-    GetChannelAction,
-    GetChannelActionResult,
-    GetRuleAction,
-    GetRuleActionResult,
-    ProcessedRuleSuccess,
+from ai.backend.manager.services.notification.actions.process_notification import (
     ProcessNotificationAction,
     ProcessNotificationActionResult,
-    SearchChannelsAction,
-    SearchChannelsActionResult,
-    SearchRulesAction,
-    SearchRulesActionResult,
-    UpdateChannelAction,
-    UpdateChannelActionResult,
-    UpdateRuleAction,
-    UpdateRuleActionResult,
+)
+from ai.backend.manager.services.notification.actions.validate_channel import (
     ValidateChannelAction,
     ValidateChannelActionResult,
+)
+from ai.backend.manager.services.notification.actions.validate_rule import (
     ValidateRuleAction,
     ValidateRuleActionResult,
 )
 
-if TYPE_CHECKING:
-    from ai.backend.manager.data.notification.types import NotificationRuleData
-    from ai.backend.manager.notification import NotificationCenter
-    from ai.backend.manager.repositories.notification import NotificationRepository
+from .actions.process_notification import ProcessedRuleSuccess
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+if TYPE_CHECKING:
+    from ai.backend.manager.notification.notification_center import NotificationCenter
+    from ai.backend.manager.repositories.notification.repository import NotificationRepository
+
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 __all__ = ("NotificationService",)
 
@@ -107,72 +96,6 @@ class NotificationService:
             errors=result.errors,
         )
 
-    async def create_channel(
-        self,
-        action: CreateChannelAction,
-    ) -> CreateChannelActionResult:
-        """Creates a new notification channel."""
-        channel_data = await self._repository.create_channel(action.creator)
-
-        return CreateChannelActionResult(
-            channel_data=channel_data,
-        )
-
-    async def create_rule(
-        self,
-        action: CreateRuleAction,
-    ) -> CreateRuleActionResult:
-        """Creates a new notification rule."""
-        spec = cast(NotificationRuleCreatorSpec, action.creator.spec)
-        # Validate message_template length
-        if len(spec.message_template) > 65536:
-            raise ValueError("message_template must not exceed 65536 characters (64KB)")
-
-        rule_data = await self._repository.create_rule(action.creator)
-
-        return CreateRuleActionResult(
-            rule_data=rule_data,
-        )
-
-    async def update_channel(
-        self,
-        action: UpdateChannelAction,
-    ) -> UpdateChannelActionResult:
-        """Updates an existing notification channel."""
-        channel_data = await self._repository.update_channel(updater=action.updater)
-
-        return UpdateChannelActionResult(
-            channel_data=channel_data,
-        )
-
-    async def update_rule(
-        self,
-        action: UpdateRuleAction,
-    ) -> UpdateRuleActionResult:
-        """Updates an existing notification rule."""
-        # Validate message_template length if being updated
-        spec = cast(NotificationRuleUpdaterSpec, action.updater.spec)
-        if (message_template := spec.message_template.optional_value()) is not None:
-            if len(message_template) > 65536:
-                raise ValueError("message_template must not exceed 65536 characters (64KB)")
-
-        rule_data = await self._repository.update_rule(updater=action.updater)
-
-        return UpdateRuleActionResult(
-            rule_data=rule_data,
-        )
-
-    async def delete_channel(
-        self,
-        action: DeleteChannelAction,
-    ) -> DeleteChannelActionResult:
-        """Deletes a notification channel."""
-        deleted = await self._repository.delete_channel(action.channel_id)
-
-        return DeleteChannelActionResult(
-            deleted=deleted,
-        )
-
     async def validate_channel(
         self,
         action: ValidateChannelAction,
@@ -187,9 +110,9 @@ class NotificationService:
         channel_data = await self._repository.get_channel_by_id(action.channel_id)
         await self._notification_center.validate_channel(channel_data, action.test_message)
         log.debug(
-            "Test notification sent successfully for channel '{}' (ID: {})",
-            channel_data.name,
-            action.channel_id,
+            "test notification sent",
+            channel_name=channel_data.name,
+            notification_channel_id=action.channel_id,
         )
 
         return ValidateChannelActionResult()
@@ -206,8 +129,11 @@ class NotificationService:
             NotificationTemplateRenderingFailure: If template rendering fails
             ValidationError: If notification_data doesn't match the rule type's schema
         """
-        # Fetch the rule to know its rule_type
+        # Fetch the rule to know its rule_type, then the channel it names. The rule
+        # carries the channel's id, not the channel — reading both is this method's
+        # job rather than the row conversion's.
         rule = await self._repository.get_rule_by_id(action.rule_id)
+        channel = await self._repository.get_channel_by_id(rule.channel_id)
 
         # Validate notification_data against the rule type's schema
         validated_data = NotifiableMessage.validate_notification_data(
@@ -220,77 +146,13 @@ class NotificationService:
             ProcessRuleParams(
                 message_template=rule.message_template,
                 rule_type=rule.rule_type,
-                channel=rule.channel,
+                channel=channel,
                 timestamp=datetime.now(UTC),
                 notification_data=validated_data,
             )
         )
         return ValidateRuleActionResult(
             message=result.message,
-        )
-
-    async def delete_rule(
-        self,
-        action: DeleteRuleAction,
-    ) -> DeleteRuleActionResult:
-        """Deletes a notification rule."""
-        deleted = await self._repository.delete_rule(action.rule_id)
-
-        return DeleteRuleActionResult(
-            deleted=deleted,
-        )
-
-    async def get_channel(
-        self,
-        action: GetChannelAction,
-    ) -> GetChannelActionResult:
-        """Gets a notification channel by ID."""
-        channel_data = await self._repository.get_channel_by_id(action.channel_id)
-
-        return GetChannelActionResult(
-            channel_data=channel_data,
-        )
-
-    async def get_rule(
-        self,
-        action: GetRuleAction,
-    ) -> GetRuleActionResult:
-        """Gets a notification rule by ID."""
-        rule_data = await self._repository.get_rule_by_id(action.rule_id)
-
-        return GetRuleActionResult(
-            rule_data=rule_data,
-        )
-
-    async def search_channels(
-        self,
-        action: SearchChannelsAction,
-    ) -> SearchChannelsActionResult:
-        """Searches notification channels."""
-        result = await self._repository.search_channels(
-            querier=action.querier,
-        )
-
-        return SearchChannelsActionResult(
-            channels=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
-
-    async def search_rules(
-        self,
-        action: SearchRulesAction,
-    ) -> SearchRulesActionResult:
-        """Searches notification rules."""
-        result = await self._repository.search_rules(
-            querier=action.querier,
-        )
-        return SearchRulesActionResult(
-            rules=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
         )
 
     async def _process_notification(
@@ -314,11 +176,11 @@ class NotificationService:
             Processed notification result
         """
         # Query matching rules
-        rules = await self._repository.get_matching_rules(
+        matches = await self._repository.get_matching_rules(
             rule_type,
             enabled_only=True,
         )
-        if not rules:
+        if not matches:
             return _ProcessedNotificationResult(
                 rules_matched=0,
                 successes=[],
@@ -326,19 +188,30 @@ class NotificationService:
             )
         # Process rules
         result = await self._process_rules(
-            rules=rules,
+            matches=matches,
             timestamp=timestamp,
             notification_data=notification_data,
         )
         return _ProcessedNotificationResult(
-            rules_matched=len(rules),
+            rules_matched=len(matches),
             successes=result.successes,
             errors=result.errors,
         )
 
+    def _is_user_side_failure(
+        self, channel_type: NotificationChannelType, error: BaseException
+    ) -> bool:
+        if isinstance(error, NotificationTemplateRenderingFailure):
+            return True
+        if channel_type == NotificationChannelType.WEBHOOK:
+            return isinstance(
+                error, (NotificationProcessingFailure, aiohttp.ClientError, TimeoutError)
+            )
+        return False
+
     async def _process_rules(
         self,
-        rules: Sequence[NotificationRuleData],
+        matches: Sequence[MatchingNotificationRuleData],
         timestamp: datetime,
         notification_data: NotifiableMessage,
     ) -> _ProcessedRulesResult:
@@ -346,7 +219,7 @@ class NotificationService:
         Process notification rules concurrently.
 
         Args:
-            rules: List of notification rules to process
+            matches: Rules paired with the channel each dispatches through
             rule_type: Type of notification rule
             timestamp: Timestamp of the notification
             notification_data: Data for template rendering
@@ -359,14 +232,14 @@ class NotificationService:
             *[
                 self._notification_center.process_rule(
                     ProcessRuleParams(
-                        message_template=rule.message_template,
-                        rule_type=rule.rule_type,
-                        channel=rule.channel,
+                        message_template=match.rule.message_template,
+                        rule_type=match.rule.rule_type,
+                        channel=match.channel,
                         timestamp=timestamp,
                         notification_data=notification_data,
                     )
                 )
-                for rule in rules
+                for match in matches
             ],
             return_exceptions=True,
         )
@@ -375,27 +248,36 @@ class NotificationService:
         successes: list[ProcessedRuleSuccess] = []
         errors: list[BaseException] = []
 
-        for rule, result in zip(rules, results, strict=True):
+        for match, result in zip(matches, results, strict=True):
             if isinstance(result, BaseException):
                 errors.append(result)
-                log.error(
-                    "Failed to process notification for rule '{}': {}",
-                    rule.name,
-                    str(result),
-                )
+                if self._is_user_side_failure(match.channel.channel_type, result):
+                    log.trace(
+                        "notification rule processing failed: {}",
+                        result,
+                        rule_name=match.rule.name,
+                        notification_rule_id=match.rule.id,
+                    )
+                else:
+                    log.error(
+                        "notification rule processing failed",
+                        rule_name=match.rule.name,
+                        notification_rule_id=match.rule.id,
+                        exc_info=result,
+                    )
                 continue
             successes.append(
                 ProcessedRuleSuccess(
-                    rule_id=rule.id,
-                    rule_name=rule.name,
-                    channel_name=rule.channel.name,
+                    rule_id=match.rule.id,
+                    rule_name=match.rule.name,
+                    channel_name=match.channel.name,
                 )
             )
             log.debug(
-                "Notification sent successfully for rule '{}' (channel: '{}')",
-                rule.name,
-                rule.channel.name,
-                rule_id=rule.id,
+                "notification sent",
+                rule_name=match.rule.name,
+                channel_name=match.channel.name,
+                notification_rule_id=match.rule.id,
             )
 
         return _ProcessedRulesResult(

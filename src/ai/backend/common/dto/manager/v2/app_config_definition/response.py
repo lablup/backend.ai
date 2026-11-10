@@ -21,6 +21,9 @@ class AppConfigDefinitionNode(BaseResponseModel):
     """Node model representing a registered app config definition."""
 
     id: UUID = Field(description="App config definition UUID.")
+    entity_id: UUID = Field(
+        description="UUID of the app config definition. Added in 26.9.0.",
+    )
     config_name: str = Field(description="Registered config name.")
     created_at: datetime = Field(description="Creation timestamp (UTC).")
     updated_at: datetime = Field(description="Last update timestamp (UTC).")
@@ -38,6 +41,9 @@ class PurgeAppConfigDefinitionPayload(BaseResponseModel):
     """Payload for app config definition purge."""
 
     id: UUID = Field(description="UUID of the purged app config definition.")
+    entity_id: UUID = Field(
+        description="UUID of the purged app config definition. Added in 26.10.0."
+    )
 
 
 class SearchAppConfigDefinitionsPayload(BaseResponseModel):

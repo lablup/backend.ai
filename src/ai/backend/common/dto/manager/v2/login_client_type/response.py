@@ -14,6 +14,7 @@ __all__ = (
     "CreateLoginClientTypePayload",
     "DeleteLoginClientTypePayload",
     "LoginClientTypeNode",
+    "PurgeLoginClientTypePayload",
     "UpdateLoginClientTypePayload",
 )
 
@@ -22,6 +23,9 @@ class LoginClientTypeNode(BaseResponseModel):
     """Node model representing a login client type entity."""
 
     id: UUID = Field(description="Login client type UUID.")
+    entity_id: UUID = Field(
+        description="UUID of the login client type. Added in 26.9.0.",
+    )
     name: str = Field(description="Unique login client type name.")
     description: str | None = Field(description="Optional description.")
     created_at: datetime = Field(description="Creation timestamp (UTC).")
@@ -44,6 +48,14 @@ class DeleteLoginClientTypePayload(BaseResponseModel):
     """Payload for login client type deletion."""
 
     id: UUID = Field(description="UUID of the deleted login client type.")
+    entity_id: UUID = Field(description="UUID of the deleted login client type. Added in 26.10.0.")
+
+
+class PurgeLoginClientTypePayload(BaseResponseModel):
+    """Payload for login client type purge."""
+
+    id: UUID = Field(description="UUID of the purged login client type.")
+    entity_id: UUID = Field(description="UUID of the purged login client type. Added in 26.10.0.")
 
 
 class SearchLoginClientTypesPayload(BaseResponseModel):

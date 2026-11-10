@@ -12,6 +12,7 @@ from ai.backend.manager.config.unified import DatabaseConfig
 from ai.backend.manager.health.database import DatabaseHealthChecker
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.db.engine import connect_database
+from ai.backend.testutils.bootstrap import POSTGRES_MAINTENANCE_DB, POSTGRES_PASSWORD, POSTGRES_USER
 
 
 @pytest.fixture
@@ -22,9 +23,9 @@ async def database_engine(
     container_id, postgres_addr = postgres_container
     db_config = DatabaseConfig(  # type: ignore[call-arg]
         addr=HostPortPair(host=postgres_addr.host, port=postgres_addr.port),
-        name="postgres",
-        user="postgres",
-        password="develove",
+        name=POSTGRES_MAINTENANCE_DB,
+        user=POSTGRES_USER,
+        password=POSTGRES_PASSWORD,
     )
     async with connect_database(db_config) as engine:
         yield engine

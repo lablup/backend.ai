@@ -1,20 +1,32 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import override
 
-from ai.backend.common.data.permission.types import RBACElementType, ScopeType
-from ai.backend.common.defs.session import JOB_PRIORITY_DEFAULT
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.session_group import SessionGroupID
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
+from ai.backend.common.defs.session import JOB_PRIORITY_DEFAULT, SESSION_PRIORITY_DEFAULT
 from ai.backend.common.types import AccessKey, ClusterMode, MountInfoEntry, SessionTypes
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.data.session.types import SessionData
-from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.services.session.base import SessionScopeAction
+from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.session_group.searchable_fields import SessionGroupSearchableFields
+from ai.backend.manager.models.session_group.searchers import SessionGroupSearcher
+from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.models.user.row import UserRole
+from ai.backend.manager.services.session.base import (
+    SessionScopeAction,
+    SessionScopeActionResult,
+)
 
 
 @dataclass(frozen=True)
@@ -50,11 +62,12 @@ class SessionExecutionSpec:
 class SessionSchedulingSpec:
     """Scheduling constraints and preferences."""
 
-    priority: int = 10
+    tier: int = SESSION_PRIORITY_DEFAULT
     job_priority: int = JOB_PRIORITY_DEFAULT
     is_preemptible: bool = True
     dependencies: list[uuid.UUID] | None = None
     agent_list: list[str] | None = None
+    agent_selection_policy: AgentSelectionPolicy | None = None
     attach_network: uuid.UUID | None = None
 
 
@@ -74,8 +87,10 @@ class EnqueueSessionAction(SessionScopeAction):
     The session is placed in PENDING status immediately.
     The scheduler picks it up asynchronously for resource allocation and launch.
 
-    RBAC validation checks if the user has CREATE permission in USER scope.
+    Answered for by the project the session is created in.
     """
+
+    project_id: ProjectID
 
     session_name: str
     session_type: SessionTypes
@@ -89,6 +104,7 @@ class EnqueueSessionAction(SessionScopeAction):
 
     tag: str | None = None
     callback_url: str | None = None
+    session_group_id: SessionGroupID | None = None
 
     user_id: uuid.UUID = field(default_factory=lambda: uuid.UUID(int=0))
     user_role: UserRole = UserRole.USER
@@ -96,44 +112,67 @@ class EnqueueSessionAction(SessionScopeAction):
     domain_name: str = ""
     group_id: uuid.UUID = field(default_factory=lambda: uuid.UUID(int=0))
     owner_id: uuid.UUID | None = None
-    """Delegated owner user UUID. When set, the service resolves it and
-    overrides ``user_id``, ``user_role``, ``access_key``, and ``domain_name``
-    with the target user's values.
+    """Delegated owner user UUID. When set, the service checks that the caller
+    may act for that user and replaces ``user_id``, ``access_key``, and
+    ``domain_name`` with the owner's values.
     """
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return (self.project_id,)
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "enqueue_session"
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.CREATE
 
-    @override
-    def scope_type(self) -> ScopeType:
-        return ScopeType.USER
+    def to_owned_session_group_searcher(self, owner_user_id: UserID) -> SessionGroupSearcher | None:
+        """The live session group named, owned by ``owner_user_id`` in the project;
+        ``None`` when none is named."""
+        conditions = self._owned_session_group_conditions(owner_user_id)
+        if conditions is None:
+            return None
+        return SessionGroupSearcher(pagination=NoPagination(), conditions=conditions)
 
-    @override
-    def scope_id(self) -> str:
-        return str(self.owner_id) if self.owner_id is not None else str(self.user_id)
-
-    @override
-    def target_element(self) -> RBACElementRef:
-        # When delegating, authorize against the owner's scope, not the caller's.
-        target_user_id = self.owner_id if self.owner_id is not None else self.user_id
-        return RBACElementRef(
-            element_type=RBACElementType.USER,
-            element_id=str(target_user_id),
+    def to_held_session_group_searcher(self, owner_user_id: UserID) -> SessionGroupSearcher | None:
+        """The owned session group named, only when a replica group holds it;
+        ``None`` when none is named."""
+        conditions = self._owned_session_group_conditions(owner_user_id)
+        if conditions is None:
+            return None
+        return SessionGroupSearcher(
+            pagination=NoPagination(),
+            conditions=[
+                *conditions,
+                SessionGroupSearchableFields.linked.replica_groups.exists(),
+            ],
         )
+
+    def _owned_session_group_conditions(self, owner_user_id: UserID) -> list[QueryCondition] | None:
+        if self.session_group_id is None:
+            return None
+        fields = SessionGroupSearchableFields.own
+        return [
+            fields.id.filter.equals(UUIDEqualMatchSpec(value=self.session_group_id, negated=False)),
+            fields.owner_user_id.filter.equals(
+                UUIDEqualMatchSpec(value=owner_user_id, negated=False)
+            ),
+            fields.project_id.filter.equals(UUIDEqualMatchSpec(value=self.group_id, negated=False)),
+            fields.deleted_at.filter.is_null(),
+        ]
 
 
 @dataclass
-class EnqueueSessionActionResult(BaseActionResult):
+class EnqueueSessionActionResult(SessionScopeActionResult):
     """Returns full session data for SessionNode conversion."""
 
     session_data: SessionData
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.session_data.id)
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
+        return (SessionID(self.session_data.id),)

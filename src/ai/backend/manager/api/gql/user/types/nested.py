@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from uuid import UUID
 
 from ai.backend.common.dto.manager.v2.user.response import (
     EntityTimestamps as EntityTimestampsDTO,
@@ -100,13 +101,22 @@ class UserOrganizationInfoGQL:
     """User's organizational context and permissions."""
 
     domain_name: str | None = gql_field(description="Name of the domain this user belongs to.")
+    domain_id: UUID | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="ID of the domain this user belongs to.",
+        ),
+    )
     role: UserRoleEnumGQL | None = gql_field(
         description="User's role determining access permissions. See UserRoleV2 enum."
     )
     resource_policy: str = gql_field(
         description="Name of the user resource policy applied to this user."
     )
-    main_access_key: str | None = gql_field(description="Primary API access key for this user.")
+    main_access_key: str | None = gql_field(
+        description="Primary API access key for this user.",
+        deprecation_reason="Deprecated since 26.9.0. Use the keypair's is_default field.",
+    )
 
 
 @gql_pydantic_type(

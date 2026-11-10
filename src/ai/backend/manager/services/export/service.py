@@ -10,13 +10,15 @@ from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.user.row import UserRow
-
-from .actions import (
+from ai.backend.manager.services.export.actions.get_report import (
     GetReportAction,
     GetReportActionResult,
+)
+from ai.backend.manager.services.export.actions.list_reports import (
     ListReportsAction,
     ListReportsActionResult,
 )
+
 from .actions.export_audit_logs_csv import (
     ExportAuditLogsCSVAction,
     ExportAuditLogsCSVActionResult,
@@ -41,9 +43,10 @@ from .actions.export_users_by_domain_csv import (
     ExportUsersByDomainCSVActionResult,
 )
 from .actions.export_users_csv import ExportUsersCSVAction, ExportUsersCSVActionResult
+from .actions.public_get_report import PublicGetReportAction, PublicGetReportActionResult
 
 if TYPE_CHECKING:
-    from ai.backend.manager.repositories.export import ExportRepository
+    from ai.backend.manager.repositories.export.repository import ExportRepository
 
 __all__ = ("ExportService",)
 
@@ -94,6 +97,11 @@ class ExportService:
         """
         report = self._repository.get_report(action.report_key)
         return GetReportActionResult(report=report)
+
+    async def public_get_report(self, action: PublicGetReportAction) -> PublicGetReportActionResult:
+        """Get a report definition for an export authorized against its own scope."""
+        report = self._repository.get_report(action.report_key)
+        return PublicGetReportActionResult(report=report)
 
     async def export_users_csv(self, action: ExportUsersCSVAction) -> ExportUsersCSVActionResult:
         """Execute user CSV export.

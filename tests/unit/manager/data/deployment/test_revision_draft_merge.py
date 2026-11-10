@@ -8,10 +8,10 @@ from uuid import uuid4
 import yarl
 
 from ai.backend.common.config import ModelConfigDraft, ModelDefinitionDraft
-from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
-from ai.backend.common.identifier.runtime_variant_preset import RuntimeVariantPresetID
-from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
+from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.types import ClusterMode
 from ai.backend.manager.data.deployment.types import MountMetadata, RevisionDraft
 from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetValueData

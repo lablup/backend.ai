@@ -9,6 +9,10 @@ from aiohttp import web
 from aiohttp.typedefs import Middleware
 
 from ai.backend.common.api_handlers import APIResponse, APIStreamResponse
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
+from ai.backend.manager.data.network.types import NetworkData
+from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.secret.pool import KeyProviderPool
 
 if TYPE_CHECKING:
     from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
@@ -29,7 +33,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.repositories.agent.repository import AgentRepository
     from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
     from ai.backend.manager.repositories.user.repository import UserRepository
-    from ai.backend.manager.service.base import ServicesContext
     from ai.backend.manager.services.processors import Processors
 
 type WebRequestHandler = Callable[
@@ -62,15 +65,16 @@ class GQLContextDeps:
     """
 
     config_provider: ManagerConfigProvider
+    key_provider_pool: KeyProviderPool
     etcd: AsyncEtcd
     db: ExtendedAsyncSAEngine
     valkey_stat: ValkeyStatClient
     valkey_image: ValkeyImageClient
     valkey_live: ValkeyLiveClient
     valkey_schedule: ValkeyScheduleClient
+    sentinel_monitors: SentinelMonitorSet
     network_plugin_ctx: NetworkPluginContext
     background_task_manager: BackgroundTaskManager
-    services_ctx: ServicesContext
     storage_manager: StorageSessionManager
     registry: AgentRegistry
     idle_checker_host: IdleCheckerHost
@@ -79,6 +83,7 @@ class GQLContextDeps:
     scheduler_repository: SchedulerRepository
     user_repository: UserRepository
     agent_repository: AgentRepository
+    network_repository: OpsRepository[NetworkData]
     strawberry_gql_adapter: BaseGQLAdapter
     adapters: Adapters
 

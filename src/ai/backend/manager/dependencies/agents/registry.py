@@ -14,12 +14,13 @@ from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.manager.agent_cache import AgentRPCCache
-from ai.backend.manager.clients.agent import AgentClientPool
+from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
     SchedulingController,
@@ -44,6 +45,7 @@ class AgentRegistryInput:
     network_plugin_ctx: NetworkPluginContext
     scheduling_controller: SchedulingController
     scheduler_repository: SchedulerRepository
+    ops_provider: V2DBOpsProvider
     debug: bool
     manager_public_key: PublicKey
     manager_secret_key: SecretKey
@@ -88,6 +90,7 @@ class AgentRegistryDependency(
             setup_input.network_plugin_ctx,
             setup_input.scheduling_controller,
             setup_input.scheduler_repository,
+            setup_input.ops_provider,
             debug=setup_input.debug,
             manager_public_key=setup_input.manager_public_key,
             manager_secret_key=setup_input.manager_secret_key,

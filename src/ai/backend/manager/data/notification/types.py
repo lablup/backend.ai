@@ -5,6 +5,11 @@ from datetime import datetime
 from typing import Any, override
 from uuid import UUID
 
+from ai.backend.common.data.entity.notification import (
+    NotificationChannelID,
+    NotificationRuleID,
+)
+from ai.backend.common.data.entity.types import EntityData, EntityIdentifier
 from ai.backend.common.data.notification import (
     EmailSpec,
     NotificationChannelType,
@@ -14,11 +19,11 @@ from ai.backend.common.data.notification import (
 from ai.backend.manager.types import OptionalState, PartialModifier, TriState
 
 
-@dataclass
-class NotificationChannelData:
+@dataclass(frozen=True)
+class NotificationChannelData(EntityData):
     """Domain model data for notification channel."""
 
-    id: UUID
+    id: NotificationChannelID
     name: str
     description: str | None
     channel_type: NotificationChannelType
@@ -28,21 +33,45 @@ class NotificationChannelData:
     created_at: datetime = field(compare=False)
     updated_at: datetime = field(compare=False)
 
+    @override
+    def entity_id(self) -> EntityIdentifier:
+        return self.id
 
-@dataclass
-class NotificationRuleData:
-    """Domain model data for notification rule."""
 
-    id: UUID
+@dataclass(frozen=True)
+class NotificationRuleData(EntityData):
+    """Domain model data for notification rule.
+
+    Names its channel by id: a row projection mirrors one table, and composing the two
+    forced an eager load on every read.
+    """
+
+    id: NotificationRuleID
     name: str
     description: str | None
     rule_type: NotificationRuleType
-    channel: NotificationChannelData
+    channel_id: NotificationChannelID
     message_template: str
     enabled: bool
     created_by: UUID
     created_at: datetime = field(compare=False)
     updated_at: datetime = field(compare=False)
+
+    @override
+    def entity_id(self) -> EntityIdentifier:
+        return self.id
+
+
+@dataclass(frozen=True)
+class MatchingNotificationRuleData:
+    """A rule paired with the channel it dispatches through.
+
+    Assembled by the repository for the dispatch read, not projected from a row —
+    which is why it may carry another entity where a row projection may not.
+    """
+
+    rule: NotificationRuleData
+    channel: NotificationChannelData
 
 
 @dataclass

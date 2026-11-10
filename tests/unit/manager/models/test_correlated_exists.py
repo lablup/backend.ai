@@ -3,8 +3,8 @@ from __future__ import annotations
 import sqlalchemy as sa
 
 from ai.backend.manager.models.condition_utils import make_correlated_exists
-from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.endpoint.row import EndpointRow
+from ai.backend.manager.models.routing.row import RoutingRow
 
 
 class TestMakeCorrelatedExists:

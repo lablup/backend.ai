@@ -14,11 +14,11 @@ from ai.backend.manager.errors.repository import (
     RepositoryIntegrityError,
     UniqueConstraintViolationError,
 )
+from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.repositories.base.integrity import (
     match_integrity_error,
     parse_integrity_error,
 )
-from ai.backend.manager.repositories.base.types import IntegrityErrorCheck
 
 
 def _make_asyncpg_error(

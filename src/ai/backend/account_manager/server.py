@@ -30,8 +30,9 @@ from aiohttp import web
 from aiohttp.typedefs import Middleware
 from setproctitle import setproctitle
 
-from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.metrics.http import (
+    SystemMetricUpdater,
     build_api_metric_middleware,
     build_prometheus_metrics_handler,
 )
@@ -39,7 +40,7 @@ from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.metrics.multiprocess_setup import cleanup_prometheus_multiprocess_dir
 from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
-from ai.backend.common.types import HostPortPair
+from ai.backend.common.networking import force_threaded_dns_resolver
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 
@@ -199,22 +200,7 @@ def build_root_app(
         ]
     )
 
-    etcd_credentials = None
-    if local_config.etcd.user:
-        etcd_credentials = {
-            "user": local_config.etcd.user,
-            "password": local_config.etcd.password,
-        }
-    scope_prefix_map = {
-        ConfigScopes.GLOBAL: "",
-        # TODO: provide a way to specify other scope prefixes
-    }
-    etcd = AsyncEtcd(
-        HostPortPair(host=local_config.etcd.addr.host, port=local_config.etcd.addr.port),
-        local_config.etcd.namespace,
-        scope_prefix_map,
-        credentials=etcd_credentials,
-    )
+    etcd = AsyncEtcd.create_from_config(local_config.etcd.to_dataclass())
     root_ctx = RootContext()
     root_ctx.etcd = etcd
     root_ctx.local_config = local_config
@@ -273,6 +259,7 @@ def build_internal_app() -> web.Application:
     app = web.Application()
     metric_registry = CommonMetricRegistry.instance()
     app.router.add_route("GET", r"/metrics", build_prometheus_metrics_handler(metric_registry))
+    app.cleanup_ctx.append(SystemMetricUpdater(metric_registry.system).cleanup_ctx)
     return app
 
 
@@ -431,6 +418,7 @@ def main(
     """
     Start the account-manager service as a foreground process.
     """
+    force_threaded_dns_resolver()
     log_level = LogLevel.DEBUG if debug else log_level
     server_config = load_config(config_path, log_level)
 

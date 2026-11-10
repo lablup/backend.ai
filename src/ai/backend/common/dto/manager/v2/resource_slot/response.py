@@ -5,6 +5,7 @@ Response DTOs for resource slot DTO v2.
 from __future__ import annotations
 
 from decimal import Decimal
+from uuid import UUID
 
 from pydantic import Field
 
@@ -20,9 +21,12 @@ __all__ = (
     "AdminSearchResourceSlotTypesPayload",
     "AgentResourceNode",
     "AllocatedResourceSlotNode",
+    "CreateResourceSlotTypePayload",
+    "PurgeResourceSlotTypePayload",
     "ResourceAllocationNode",
     "ResourceSlotTypeNode",
     "SearchAllocatedResourceSlotsPayload",
+    "UpdateResourceSlotTypePayload",
 )
 
 
@@ -30,11 +34,25 @@ class ResourceSlotTypeNode(BaseResponseModel):
     """Node model representing a resource slot type entity."""
 
     id: str | None = Field(default=None, description="Node ID (same as slot_name).")
+    entity_id: UUID = Field(
+        description="UUID of the resource slot type. Added in 26.9.0.",
+    )
+    uuid: UUID = Field(
+        description=(
+            "Stable UUID identity of the resource slot type. "
+            "Deprecated since 26.9.0. Use entity_id."
+        ),
+        deprecated=True,
+    )
     slot_name: str = Field(
         description="Unique identifier for the resource slot (e.g., 'cpu', 'mem', 'cuda.device')."
     )
     slot_type: str = Field(
-        description="Category of the slot type (e.g., 'count', 'bytes', 'unique-count')."
+        description="Category of the slot type: one of 'count', 'bytes', 'unique', 'unified'."
+    )
+    required: bool = Field(description="Whether a session request must name this slot.")
+    enabled: bool = Field(
+        description="Whether the scheduler considers this slot when placing sessions."
     )
     display_name: str = Field(description="Human-readable name for display in UIs.")
     description: str = Field(
@@ -61,10 +79,34 @@ class AdminSearchResourceSlotTypesPayload(BaseResponseModel):
     has_previous_page: bool = Field(description="Whether there is a previous page.")
 
 
+class CreateResourceSlotTypePayload(BaseResponseModel):
+    """Payload for resource slot type registration."""
+
+    resource_slot_type: ResourceSlotTypeNode = Field(
+        description="The registered resource slot type."
+    )
+
+
+class UpdateResourceSlotTypePayload(BaseResponseModel):
+    """Payload for resource slot type update."""
+
+    resource_slot_type: ResourceSlotTypeNode = Field(description="The updated resource slot type.")
+
+
+class PurgeResourceSlotTypePayload(BaseResponseModel):
+    """Payload for resource slot type removal."""
+
+    slot_name: str = Field(description="Slot name of the removed resource slot type.")
+    entity_id: UUID = Field(description="UUID of the purged resource slot type. Added in 26.10.0.")
+
+
 class AgentResourceNode(BaseResponseModel):
     """Node model representing a per-agent, per-slot resource capacity and usage entry."""
 
     id: str = Field(description="Node ID (format: '{agent_id}:{slot_name}').")
+    field_id: UUID = Field(
+        description="UUID of the agent resource. Added in 26.9.0.",
+    )
     agent_id: str = Field(description="Agent identifier.")
     slot_name: str = Field(
         description="Resource slot identifier (e.g., 'cpu', 'mem', 'cuda.device')."
@@ -72,6 +114,8 @@ class AgentResourceNode(BaseResponseModel):
     capacity: str = Field(
         description="Total hardware resource capacity for this slot on the agent."
     )
+    reserved: str = Field(description="Amount reserved by scheduling for this slot.")
+    prereserved: str = Field(description="Amount reserved in advance by preemption plans.")
     used: str = Field(
         description="Amount of this slot currently consumed by running and scheduled sessions."
     )
@@ -90,6 +134,9 @@ class ResourceAllocationNode(BaseResponseModel):
     """Node model representing a per-kernel, per-slot resource allocation entry."""
 
     id: str = Field(description="Node ID (format: '{kernel_id}:{slot_name}').")
+    field_id: UUID = Field(
+        description="UUID of the resource allocation. Added in 26.9.0.",
+    )
     kernel_id: str = Field(description="Kernel identifier (UUID).")
     slot_name: str = Field(
         description="Resource slot identifier (e.g., 'cpu', 'mem', 'cuda.device')."

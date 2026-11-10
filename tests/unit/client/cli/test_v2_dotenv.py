@@ -26,8 +26,8 @@ def dotenv_environment(
         "BACKEND_SECRET_KEY",
     ):
         monkeypatch.delenv(key, raising=False)
-    monkeypatch.setattr(helpers, "CONFIG_FILE", tmp_path / "missing-config.toml")
-    monkeypatch.setattr(helpers, "CREDENTIALS_FILE", tmp_path / "missing-creds.toml")
+    monkeypatch.delenv(helpers.PROFILE_ENV, raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path))
     (tmp_path / ".env").write_text(
         "BACKEND_ENDPOINT=https://from-dotenv.example\nBACKEND_ACCESS_KEY=ak-from-dotenv\n",
     )

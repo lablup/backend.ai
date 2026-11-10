@@ -1,70 +1,62 @@
 from __future__ import annotations
 
-import logging
 from collections.abc import Sequence
-from decimal import Decimal
-from uuid import UUID
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.manager.data.deployment_revision_preset.types import DeploymentRevisionPresetData
-from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.deployment_revision_preset.creators import (
-    DeploymentRevisionPresetCreatorSpec,
-    PresetResourceSlotDependentCreatorSpec,
+from ai.backend.manager.errors.resource import DeploymentRevisionPresetNotFound
+from ai.backend.manager.models.deployment_revision_preset.creators import (
+    PresetResourceSlotCreator,
 )
-from ai.backend.manager.repositories.deployment_revision_preset.db_source.db_source import (
-    DeploymentRevisionPresetDBSource,
+from ai.backend.manager.models.deployment_revision_preset.purgers import (
+    PresetResourceSlotBatchPurger,
 )
-from ai.backend.manager.repositories.ops import DBOpsProvider
+from ai.backend.manager.models.deployment_revision_preset.queriers import (
+    DeploymentPresetQuerier,
+)
+from ai.backend.manager.models.deployment_revision_preset.updaters import DeploymentPresetUpdater
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+__all__ = ("DeploymentPresetRepository",)
 
 
-class DeploymentRevisionPresetRepository:
-    _db_source: DeploymentRevisionPresetDBSource
+class DeploymentPresetRepository:
+    """The update that touches both tables, and the read internal callers hold no
+    processor for. Everything keyed on one spec goes through ``OpsRepository``."""
 
-    def __init__(self, ops_provider: DBOpsProvider) -> None:
-        self._db_source = DeploymentRevisionPresetDBSource(ops_provider)
+    _ops: V2DBOpsProvider
 
-    async def create(
-        self,
-        spec: DeploymentRevisionPresetCreatorSpec,
-        slot_specs: Sequence[PresetResourceSlotDependentCreatorSpec],
-    ) -> DeploymentRevisionPresetData:
-        return await self._db_source.create(spec, slot_specs)
-
-    async def get_by_id(self, preset_id: UUID) -> DeploymentRevisionPresetData:
-        return await self._db_source.get_by_id(preset_id)
+    def __init__(self, v2_ops_provider: V2DBOpsProvider) -> None:
+        self._ops = v2_ops_provider
 
     async def update(
         self,
-        updater: Updater[DeploymentRevisionPresetRow],
-        slot_specs: Sequence[PresetResourceSlotDependentCreatorSpec] | None,
+        updater: DeploymentPresetUpdater,
+        slot_creators: Sequence[PresetResourceSlotCreator] | None,
     ) -> DeploymentRevisionPresetData:
-        return await self._db_source.update(updater, slot_specs)
+        """Apply the update and, when slots are given, restate the whole set.
 
-    async def delete(self, preset_id: UUID) -> DeploymentRevisionPresetData:
-        return await self._db_source.delete(preset_id)
+        One transaction: a preset left with the old slots would ask for resources it no
+        longer declares. ``None`` leaves the slots alone.
+        """
+        async with self._ops.write_ops() as w:
+            data = await w.update_data(updater)
+            if data is None:
+                raise DeploymentRevisionPresetNotFound(
+                    f"Deployment preset with ID {updater.target_id_value()} not found."
+                )
+            if slot_creators is not None:
+                preset_id = data.entity_id()
+                await w.batch_purge_field_entities(preset_id, PresetResourceSlotBatchPurger())
+                await w.atomic_create_field_entities(preset_id, slot_creators)
+            return data
 
-    async def search(
-        self,
-        querier: BatchQuerier,
-    ) -> tuple[list[DeploymentRevisionPresetData], int, bool, bool]:
-        return await self._db_source.search(querier)
-
-    async def get_resource_slots(
-        self,
-        preset_id: UUID,
-    ) -> list[tuple[str, Decimal]]:
-        """Get all resource slots for a preset."""
-        return await self._db_source.get_resource_slots(preset_id)
-
-    async def search_resource_slots(
-        self,
-        preset_id: UUID,
-        querier: BatchQuerier,
-    ) -> tuple[list[tuple[str, Decimal]], int, bool, bool]:
-        """Search resource slots allocated to a preset."""
-        return await self._db_source.search_resource_slots(preset_id, querier)
+    async def get_by_id(self, preset_id: DeploymentPresetID) -> DeploymentRevisionPresetData:
+        """Read one preset, for internal callers that hold no processor."""
+        async with self._ops.read_ops() as r:
+            data = await r.query_data(DeploymentPresetQuerier(preset_id=preset_id))
+            if data is None:
+                raise DeploymentRevisionPresetNotFound(
+                    f"Deployment preset with ID {preset_id} not found."
+                )
+            return data

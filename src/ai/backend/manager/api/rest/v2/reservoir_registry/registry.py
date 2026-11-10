@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ai.backend.manager.api.rest.middleware.auth import superadmin_required
+from ai.backend.manager.api.rest.middleware.auth import auth_required, superadmin_required
 from ai.backend.manager.api.rest.routing import RouteRegistry
 
 from .handler import V2ReservoirRegistryHandler
@@ -44,6 +44,25 @@ def register_v2_reservoir_registry_routes(
         handler.update,
         middlewares=[superadmin_required],
     )
+    registry.add(
+        "DELETE",
+        "/{registry_id}",
+        handler.purge,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
+        "/partial-bulk-update",
+        handler.partial_bulk_update,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
+        "/partial-bulk-purge",
+        handler.partial_bulk_purge,
+        middlewares=[auth_required],
+    )
+    # Deprecated since NEXT_RELEASE_VERSION.
     registry.add(
         "POST",
         "/delete",

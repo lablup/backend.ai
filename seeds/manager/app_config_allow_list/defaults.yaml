@@ -1,0 +1,15 @@
+kind: app_config_allow_list
+version: 1
+items:
+  - config_name: userConfig
+    scope_type: domain
+    rank: 200
+  - config_name: userConfig
+    scope_type: user
+    rank: 300
+  - config_name: domainConfig
+    scope_type: domain
+    rank: 200
+  - config_name: publicConfigByDomain
+    scope_type: public
+    rank: 100

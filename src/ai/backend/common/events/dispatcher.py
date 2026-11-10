@@ -8,6 +8,7 @@ import time
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from collections.abc import Callable, Coroutine, Sequence
+from contextlib import ExitStack
 from typing import (
     Any,
     Protocol,
@@ -21,27 +22,27 @@ import attrs
 from aiomonitor.task import preserve_termination_log
 from aiotools.taskgroup import PersistentTaskGroup
 from aiotools.taskgroup.types import AsyncExceptionHandler
+from opentelemetry import trace
+from opentelemetry.trace import SpanKind, StatusCode
 
-from ai.backend.common.contexts.request_id import current_request_id
-from ai.backend.common.contexts.user import current_user, triggered_user
-from ai.backend.common.message_queue.queue import AbstractMessageQueue
-from ai.backend.common.message_queue.types import (
-    BroadcastMessage,
-    BroadcastPayload,
-    MessageId,
-    MessageMetadata,
-    MessagePayload,
-    MQMessage,
-    deserialize_event_name_for_anycast,
-    deserialize_event_name_for_broadcast,
+from ai.backend.common.asyncio import IgnoreTaskExceptionHandler
+from ai.backend.common.message_queue.message import MessageId, MQMessage
+from ai.backend.common.message_queue.payload import (
+    AnycastMessagePayload,
+    BroadcastMessagePayload,
+    CachedBroadcastMessagePayload,
 )
+from ai.backend.common.message_queue.queue import AbstractMessageQueue
+from ai.backend.common.message_queue.types import MessageMetadata
 from ai.backend.common.types import (
     AgentId,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger, with_log_context
 
+from .exceptions import EventPayloadDecodingError
+from .message import EventMessage
 from .reporter import AbstractEventReporter, CompleteEventReportArgs, PrepareEventReportArgs
-from .types import AbstractAnycastEvent, AbstractBroadcastEvent, AbstractEvent
+from .types import AbstractAnycastEvent, AbstractBroadcastEvent, AbstractEvent, LogScopedEvent
 
 __all__ = (
     "EventCallback",
@@ -50,7 +51,7 @@ __all__ = (
     "EventProducer",
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class _EventHandlerType(enum.StrEnum):
@@ -84,7 +85,6 @@ class EventHandler[TContext, TEvent: "AbstractEvent"]:
     handler_type: _EventHandlerType
     coalescing_opts: CoalescingOptions | None
     coalescing_state: CoalescingState
-    args_matcher: Callable[[tuple[Any, ...]], bool] | None
     event_start_reporters: tuple[AbstractEventReporter, ...] = attrs.field(factory=tuple)
     event_complete_reporters: tuple[AbstractEventReporter, ...] = attrs.field(factory=tuple)
 
@@ -217,7 +217,6 @@ class EventDispatcherGroup(ABC):
         coalescing_opts: CoalescingOptions | None = None,
         *,
         name: str | None = None,
-        args_matcher: Callable[[tuple[Any, ...]], bool] | None = None,
     ) -> EventHandler[TContext, TConsumedEvent]:
         raise NotImplementedError
 
@@ -231,7 +230,6 @@ class EventDispatcherGroup(ABC):
         *,
         name: str | None = None,
         override_event_name: str | None = None,
-        args_matcher: Callable[[tuple[Any, ...]], bool] | None = None,
     ) -> EventHandler[TContext, TSubscirbedEvent]:
         raise NotImplementedError
 
@@ -273,7 +271,6 @@ class _EventDispatcherWrapper(EventDispatcherGroup):
         coalescing_opts: CoalescingOptions | None = None,
         *,
         name: str | None = None,
-        args_matcher: Callable[[tuple[Any, ...]], bool] | None = None,
     ) -> EventHandler[TContext, TConsumedEvent]:
         return self._event_dispatcher.consume(
             event_cls,
@@ -281,7 +278,6 @@ class _EventDispatcherWrapper(EventDispatcherGroup):
             callback,
             coalescing_opts=coalescing_opts,
             name=name,
-            args_matcher=args_matcher,
             start_reporters=tuple(self._start_reporters),
             complete_reporters=tuple(self._complete_reporters),
         )
@@ -296,7 +292,6 @@ class _EventDispatcherWrapper(EventDispatcherGroup):
         *,
         name: str | None = None,
         override_event_name: str | None = None,
-        args_matcher: Callable[[tuple[Any, ...]], bool] | None = None,
     ) -> EventHandler[TContext, TSubscirbedEvent]:
         return self._event_dispatcher.subscribe(
             event_cls,
@@ -305,7 +300,6 @@ class _EventDispatcherWrapper(EventDispatcherGroup):
             coalescing_opts=coalescing_opts,
             name=name,
             override_event_name=override_event_name,
-            args_matcher=args_matcher,
             start_reporters=tuple(self._start_reporters),
             complete_reporters=tuple(self._complete_reporters),
         )
@@ -357,11 +351,11 @@ class EventDispatcher(EventDispatcherGroup):
         self._metric_observer = event_observer if event_observer is not None else NopEventObserver()
         self._consumer_taskgroup = PersistentTaskGroup(
             name="consumer_taskgroup",
-            exception_handler=consumer_exception_handler,
+            exception_handler=consumer_exception_handler or IgnoreTaskExceptionHandler(),
         )
         self._subscriber_taskgroup = PersistentTaskGroup(
             name="subscriber_taskgroup",
-            exception_handler=subscriber_exception_handler,
+            exception_handler=subscriber_exception_handler or IgnoreTaskExceptionHandler(),
         )
         self._consumer_loop_task = None
         self._subscriber_loop_task = None
@@ -388,7 +382,7 @@ class EventDispatcher(EventDispatcherGroup):
             cancel_task(self._subscriber_loop_task)
             await asyncio.gather(*cancelled_tasks, return_exceptions=True)
         except Exception:
-            log.exception("unexpected error while closing event dispatcher")
+            log.exception("event dispatcher close failed")
 
     @override
     def with_reporters(
@@ -411,17 +405,12 @@ class EventDispatcher(EventDispatcherGroup):
         coalescing_opts: CoalescingOptions | None = None,
         *,
         name: str | None = None,
-        args_matcher: Callable[[tuple[Any, ...]], bool] | None = None,
         start_reporters: Sequence[AbstractEventReporter] = tuple(),
         complete_reporters: Sequence[AbstractEventReporter] = tuple(),
     ) -> EventHandler[TContext, TConsumedEvent]:
         """
         Register a callback as a consumer. When multiple callback registers as a consumer
         on a single event, only one callable among those will be called.
-
-        args_matcher:
-          Optional. A callable which accepts event argument and supplies a bool as a return value.
-          When specified, EventDispatcher will only execute callback when this lambda returns True.
         """
 
         if name is None:
@@ -434,7 +423,6 @@ class EventDispatcher(EventDispatcherGroup):
             _EventHandlerType.CONSUMER,
             coalescing_opts,
             CoalescingState(),
-            args_matcher,
             event_start_reporters=tuple(start_reporters),
             event_complete_reporters=tuple(complete_reporters),
         )
@@ -459,16 +447,11 @@ class EventDispatcher(EventDispatcherGroup):
         *,
         name: str | None = None,
         override_event_name: str | None = None,
-        args_matcher: Callable[[tuple[Any, ...]], bool] | None = None,
         start_reporters: Sequence[AbstractEventReporter] = tuple(),
         complete_reporters: Sequence[AbstractEventReporter] = tuple(),
     ) -> EventHandler[TContext, TSubscirbedEvent]:
         """
         Subscribes to given event. All handlers will be called when certain event pops up.
-
-        args_matcher:
-          Optional. A callable which accepts event argument and supplies a bool as a return value.
-          When specified, EventDispatcher will only execute callback when this lambda returns True.
         """
 
         if name is None:
@@ -481,7 +464,6 @@ class EventDispatcher(EventDispatcherGroup):
             _EventHandlerType.SUBSCRIBER,
             coalescing_opts,
             CoalescingState(),
-            args_matcher,
             event_start_reporters=tuple(start_reporters),
             event_complete_reporters=tuple(complete_reporters),
         )
@@ -502,67 +484,108 @@ class EventDispatcher(EventDispatcherGroup):
 
     async def _handle(
         self,
-        evh: EventHandler,  # type: ignore[type-arg]
+        evh: EventHandler[Any, AbstractEvent],
         source: AgentId,
-        args: tuple[Any, ...],
+        message: EventMessage,
         post_callbacks: Sequence[PostCallback] = tuple(),
         metadata: MessageMetadata | None = None,
+        delivery: MQMessage | None = None,
     ) -> None:
-        if evh.args_matcher and not evh.args_matcher(args):
+        if self._closed:
             return
+        event_type = evh.event_cls.event_name()
+        with with_log_context(event_name=event_type, handler_name=evh.name):
+            try:
+                with ExitStack() as stack:
+                    if delivery is not None:
+                        stack.enter_context(
+                            with_log_context(
+                                message_id=delivery.msg_id.decode(),
+                                retry_count=delivery.payload.retry_count,
+                            )
+                        )
+                    if metadata:
+                        stack.enter_context(metadata.apply_context())
+                        stack.enter_context(metadata.continue_trace(event_type, SpanKind.CONSUMER))
+                    await self._handle_in_scope(evh, source, message, post_callbacks)
+            except Exception:
+                # Nobody awaits this task, so a failure left here would vanish.
+                log.exception("event handling failed", handler_type=evh.handler_type)
+
+    async def _handle_in_scope(
+        self,
+        evh: EventHandler[Any, AbstractEvent],
+        source: AgentId,
+        message: EventMessage,
+        post_callbacks: Sequence[PostCallback],
+    ) -> None:
+        evh_type = evh.handler_type
+        event_cls = evh.event_cls
+        event_type = event_cls.event_name()
+        start = time.perf_counter()
+        try:
+            event = event_cls.from_message(message)
+        except EventPayloadDecodingError as e:
+            # A body this consumer cannot read will never become readable, so ack it via
+            # the post callbacks instead of leaving it to be redelivered until discarded.
+            log.exception("event payload undecodable", handler_type=evh_type)
+            self._metric_observer.observe_event_failure(
+                event_type=event_type,
+                duration=time.perf_counter() - start,
+                exception=e,
+            )
+            for post_callback in post_callbacks:
+                await post_callback.done()
+            return
+        with with_log_context(
+            **(event.log_fields(source) if isinstance(event, LogScopedEvent) else {})
+        ):
+            await self._handle_decoded(evh, source, event, post_callbacks, start)
+
+    async def _handle_decoded(
+        self,
+        evh: EventHandler[Any, AbstractEvent],
+        source: AgentId,
+        event: AbstractEvent,
+        post_callbacks: Sequence[PostCallback],
+        start: float,
+    ) -> None:
         coalescing_opts = evh.coalescing_opts
         coalescing_state = evh.coalescing_state
         cb = evh.callback
         evh_type = evh.handler_type
-        event_cls = evh.event_cls
-        if self._closed:
-            return
-        event_type = event_cls.event_name()
-        event = event_cls.deserialize(args)
-        start = time.perf_counter()
+        event_type = evh.event_cls.event_name()
         for start_reporter in evh.event_start_reporters:
             await start_reporter.prepare_event_report(event, PrepareEventReportArgs())
         try:
             if await coalescing_state.rate_control(coalescing_opts):
                 if self._closed:  # _closed can change during await
-                    return  # type: ignore[unreachable]
+                    return
                 if self._log_events:
-                    log.debug("DISPATCH_{}(evh:{})", evh_type.name, evh.name)
-
-                # Apply all context variables from metadata if available
-                if metadata:
-                    with metadata.apply_context():
-                        if asyncio.iscoroutinefunction(cb):
-                            # mypy cannot catch the meaning of asyncio.iscoroutinefunction().
-                            await cb(evh.context, source, event)
-                        else:
-                            cb(evh.context, source, event)
-                        for post_callback in post_callbacks:
-                            await post_callback.done()
-                        self._metric_observer.observe_event_success(
-                            event_type=event_type,
-                            duration=time.perf_counter() - start,
-                        )
+                    log.debug("event dispatched", handler_type=evh_type)
+                if asyncio.iscoroutinefunction(cb):
+                    # mypy cannot catch the meaning of asyncio.iscoroutinefunction().
+                    await cb(evh.context, source, event)
                 else:
-                    if asyncio.iscoroutinefunction(cb):
-                        # mypy cannot catch the meaning of asyncio.iscoroutinefunction().
-                        await cb(evh.context, source, event)
-                    else:
-                        cb(evh.context, source, event)
-                    for post_callback in post_callbacks:
-                        await post_callback.done()
-                    self._metric_observer.observe_event_success(
-                        event_type=event_type,
-                        duration=time.perf_counter() - start,
-                    )
+                    cb(evh.context, source, event)
+                for post_callback in post_callbacks:
+                    await post_callback.done()
+                self._metric_observer.observe_event_success(
+                    event_type=event_type,
+                    duration=time.perf_counter() - start,
+                )
         except Exception as e:
             self._metric_observer.observe_event_failure(
                 event_type=event_type,
                 duration=time.perf_counter() - start,
                 exception=e,
             )
-            log.exception("EventDispatcher.{}(): unexpected-error", evh_type)
-            raise
+            log.exception("event handler failed", handler_type=evh_type)
+            # The handler span never sees this exception, so mark it here.
+            span = trace.get_current_span()
+            span.record_exception(e)
+            span.set_status(StatusCode.ERROR, str(e))
+            return
         except BaseException as e:
             self._metric_observer.observe_event_failure(
                 event_type=event_type,
@@ -578,7 +601,7 @@ class EventDispatcher(EventDispatcherGroup):
         self,
         mq_msg: MQMessage,
     ) -> None:
-        event_name = deserialize_event_name_for_anycast(mq_msg.payload)
+        event_name = mq_msg.payload.name
         consumer_handlers = self._consumers.get(event_name)
         post_callback = _ConsumerPostCallback(
             mq_msg.msg_id,
@@ -589,39 +612,41 @@ class EventDispatcher(EventDispatcherGroup):
             await post_callback.done()
             return
         if self._log_events:
-            log.debug("DISPATCH_CONSUMERS(ev:{})", event_name)
-        msg_payload = MessagePayload.from_anycast(mq_msg.payload)
+            log.debug("event dispatched to consumers", event_name=event_name)
+        payload = mq_msg.payload
+        message = EventMessage(name=payload.name, payload=payload.payload)
         for consumer in consumer_handlers.copy():
             self._consumer_taskgroup.create_task(
                 self._handle(
                     consumer,
-                    AgentId(msg_payload.source),
-                    msg_payload.args,
+                    AgentId(payload.legacy_source),
+                    message,
                     [post_callback],
-                    msg_payload.metadata,
+                    payload.metadata,
+                    mq_msg,
                 ),
             )
             await asyncio.sleep(0)
 
     async def _dispatch_subscribers(
         self,
-        broadcast_msg: BroadcastMessage,
+        payload: BroadcastMessagePayload,
     ) -> None:
-        event_name = deserialize_event_name_for_broadcast(broadcast_msg.payload)
+        event_name = payload.name
         subscriber_handlers = self._subscribers.get(event_name)
         if not subscriber_handlers:
             return
         if self._log_events:
-            log.debug("DISPATCH_SUBSCRIBERS(ev:{})", event_name)
-        msg_payload = MessagePayload.from_broadcast(broadcast_msg.payload)
+            log.debug("event dispatched to subscribers", event_name=event_name)
+        message = EventMessage(name=payload.name, payload=payload.payload)
         for subscriber in subscriber_handlers.copy():
             self._subscriber_taskgroup.create_task(
                 self._handle(
                     subscriber,
-                    AgentId(msg_payload.source),
-                    msg_payload.args,
+                    AgentId(payload.legacy_source),
+                    message,
                     tuple(),
-                    msg_payload.metadata,
+                    payload.metadata,
                 ),
             )
             await asyncio.sleep(0)
@@ -633,11 +658,8 @@ class EventDispatcher(EventDispatcherGroup):
                 return
             try:
                 await self._dispatch_consumers(cast(MQMessage, msg))
-            except Exception as e:
-                log.exception(
-                    "EventDispatcher._consume_loop: unexpected-error, {}",
-                    repr(e),
-                )
+            except Exception:
+                log.exception("event consume loop failed")
                 # Do not raise the exception to avoid stopping the loop.
                 # The exception will be handled by the task group.
 
@@ -647,12 +669,9 @@ class EventDispatcher(EventDispatcherGroup):
             if self._closed:
                 return
             try:
-                await self._dispatch_subscribers(cast(BroadcastMessage, msg))
-            except Exception as e:
-                log.exception(
-                    "EventDispatcher._subscribe_loop: unexpected-error, {}",
-                    repr(e),
-                )
+                await self._dispatch_subscribers(cast(BroadcastMessagePayload, msg))
+            except Exception:
+                log.exception("event subscribe loop failed")
                 # Do not raise the exception to avoid stopping the loop.
                 # The exception will be handled by the task group.
 
@@ -690,22 +709,15 @@ class EventProducer:
         if source_override is not None:
             source = source_override
 
-        # Capture current request_id and other metadata
-        request_id = current_request_id()
-        user = current_user()
-        triggered = triggered_user()
-        metadata = MessageMetadata(
-            request_id=request_id,
-            user=user,
-            triggered_user=triggered,
-        )
-        raw_event = MessagePayload(
-            name=event.event_name(),
+        metadata = MessageMetadata.from_current_context()
+        message = event.to_message()
+        payload = AnycastMessagePayload.from_event_body(
+            name=message.name,
             source=source,
-            args=event.serialize(),
+            payload=message.payload,
             metadata=metadata,
-        ).serialize_anycast()
-        await self._msg_queue.send(raw_event)
+        )
+        await self._msg_queue.send(payload)
 
     async def broadcast_event(
         self,
@@ -717,22 +729,15 @@ class EventProducer:
         source = self._source
         if source_override is not None:
             source = source_override
-        # Capture current request_id and other metadata
-        request_id = current_request_id()
-        user = current_user()
-        triggered = triggered_user()
-        metadata = MessageMetadata(
-            request_id=request_id,
-            user=user,
-            triggered_user=triggered,
-        )
-        raw_event = MessagePayload(
-            name=event.event_name(),
+        metadata = MessageMetadata.from_current_context()
+        message = event.to_message()
+        payload = BroadcastMessagePayload.from_event_body(
+            name=message.name,
             source=source,
-            args=event.serialize(),
+            payload=message.payload,
             metadata=metadata,
-        ).serialize_broadcast()
-        await self._msg_queue.broadcast(raw_event)
+        )
+        await self._msg_queue.broadcast(payload)
 
     async def broadcast_event_with_cache(
         self,
@@ -743,25 +748,17 @@ class EventProducer:
         Broadcast a message to all subscribers with cache.
         The message will be delivered to all subscribers.
         """
-        # Capture current request_id and other metadata
-        request_id = current_request_id()
-        user = current_user()
-        triggered = triggered_user()
-        metadata = MessageMetadata(
-            request_id=request_id,
-            user=user,
-            triggered_user=triggered,
-        )
-        # I want to receive MessagePayload as an argument in anycast and broadcast, but changing it would require changes in other places, so I'll leave it as is for now.
-        raw_event = MessagePayload(
-            name=event.event_name(),
+        metadata = MessageMetadata.from_current_context()
+        message = event.to_message()
+        payload = BroadcastMessagePayload.from_event_body(
+            name=message.name,
             source=str(self._source),
-            args=event.serialize(),
+            payload=message.payload,
             metadata=metadata,
-        ).serialize_broadcast()
+        )
         await self._msg_queue.broadcast_with_cache(
             cache_id,
-            raw_event,
+            payload,
         )
 
     async def broadcast_events_batch(
@@ -777,28 +774,20 @@ class EventProducer:
         if not events:
             return
 
-        # Capture current request_id and other metadata
-        request_id = current_request_id()
-        user = current_user()
-        triggered = triggered_user()
-        metadata = MessageMetadata(
-            request_id=request_id,
-            user=user,
-            triggered_user=triggered,
-        )
+        metadata = MessageMetadata.from_current_context()
 
-        # Convert events to BroadcastPayload objects
-        broadcast_payloads: list[BroadcastPayload] = []
+        broadcast_payloads: list[CachedBroadcastMessagePayload] = []
         for event in events:
-            raw_event = MessagePayload(
-                name=event.event_name(),
+            message = event.to_message()
+            payload = BroadcastMessagePayload.from_event_body(
+                name=message.name,
                 source=str(self._source),
-                args=event.serialize(),
+                payload=message.payload,
                 metadata=metadata,
-            ).serialize_broadcast()
+            )
             broadcast_payloads.append(
-                BroadcastPayload(
-                    payload=raw_event,
+                CachedBroadcastMessagePayload(
+                    payload=payload,
                     cache_id=event.cache_id(),  # Get cache_id from event
                 )
             )

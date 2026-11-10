@@ -2,14 +2,21 @@
 
 from __future__ import annotations
 
-from pydantic import Field
+from uuid import UUID
+
+from pydantic import Field, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
-from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.query import DecimalFilter, StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.v2.common import NonEmptyList
+from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.common.types import SlotTypes
 
 from .types import (
     AgentResourceOrderField,
     AllocatedResourceSlotOrderField,
+    NumberFormatInput,
     OrderDirection,
     ResourceAllocationOrderField,
     ResourceSlotTypeOrderField,
@@ -20,14 +27,20 @@ __all__ = (
     "AdminSearchResourceAllocationsInput",
     "AdminSearchResourceSlotTypesInput",
     "AgentResourceFilter",
+    "AgentResourceScope",
     "AgentResourceOrder",
+    "ScopedSearchAgentResourcesInput",
     "AllocatedResourceSlotFilter",
     "AllocatedResourceSlotOrder",
+    "CreateResourceSlotTypeInput",
+    "PartialBulkPurgeResourceSlotTypesInput",
+    "PurgeResourceSlotTypeInput",
     "ResourceAllocationFilter",
     "ResourceAllocationOrder",
     "ResourceSlotTypeFilter",
     "ResourceSlotTypeOrder",
     "SearchAllocatedResourceSlotsInput",
+    "UpdateResourceSlotTypeInput",
 )
 
 
@@ -40,6 +53,10 @@ class ResourceSlotTypeFilter(BaseRequestModel):
     slot_name: StringFilter | None = Field(default=None, description="Filter by slot name.")
     slot_type: StringFilter | None = Field(default=None, description="Filter by slot type.")
     display_name: StringFilter | None = Field(default=None, description="Filter by display name.")
+    entity_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by resource slot type ID.",
+    )
     AND: list[ResourceSlotTypeFilter] | None = Field(
         default=None, description="Logical AND of multiple filter conditions."
     )
@@ -83,6 +100,82 @@ class AdminSearchResourceSlotTypesInput(BaseRequestModel):
     offset: int | None = Field(default=None, ge=0, description="Number of items to skip.")
 
 
+class CreateResourceSlotTypeInput(BaseRequestModel):
+    """Input for registering a new resource slot type."""
+
+    slot_name: str = Field(
+        min_length=1,
+        max_length=64,
+        description="Unique slot name to register (e.g., 'cpu', 'mem', 'cuda.device').",
+    )
+    slot_type: SlotTypes = Field(
+        description=(
+            "Category of the slot type. The scheduler reads this back as a "
+            "`SlotTypes` member for every enabled slot, so a value outside the "
+            "enum is rejected here rather than breaking the catalog."
+        ),
+    )
+    required: bool = Field(
+        default=False,
+        description="Whether a session request must name this slot.",
+    )
+    enabled: bool = Field(
+        default=True,
+        description="Whether the scheduler considers this slot when placing sessions.",
+    )
+    display_name: str = Field(default="", max_length=128, description="Human-readable name.")
+    description: str = Field(default="", max_length=256, description="Longer description.")
+    display_unit: str = Field(default="", max_length=32, description="Unit label (e.g., 'GiB').")
+    display_icon: str = Field(default="", max_length=64, description="Icon identifier for UIs.")
+    number_format: NumberFormatInput | None = Field(
+        default=None, description="Number formatting rules. Defaults to decimal, no rounding."
+    )
+    rank: int = Field(default=0, description="Display ordering rank. Lower values appear first.")
+
+
+class UpdateResourceSlotTypeInput(BaseRequestModel):
+    """Input for updating a resource slot type.
+
+    ``slot_name`` names the target and is not itself updatable; neither is
+    ``slot_type``. Every other field left unset stays unchanged.
+    """
+
+    slot_name: str = Field(description="Slot name identifying the slot type to update.")
+    required: bool | None = Field(
+        default=None, description="Whether a session request must name this slot."
+    )
+    enabled: bool | None = Field(
+        default=None,
+        description="Whether the scheduler considers this slot when placing sessions.",
+    )
+    display_name: str | None = Field(
+        default=None, max_length=128, description="Human-readable name."
+    )
+    description: str | None = Field(default=None, max_length=256, description="Longer description.")
+    display_unit: str | None = Field(
+        default=None, max_length=32, description="Unit label (e.g., 'GiB')."
+    )
+    display_icon: str | None = Field(
+        default=None, max_length=64, description="Icon identifier for UIs."
+    )
+    number_format: NumberFormatInput | None = Field(
+        default=None, description="Number formatting rules."
+    )
+    rank: int | None = Field(default=None, description="Display ordering rank.")
+
+
+class PurgeResourceSlotTypeInput(BaseRequestModel):
+    """Input for removing a resource slot type."""
+
+    slot_name: str = Field(description="Slot name identifying the slot type to remove.")
+
+
+class PartialBulkPurgeResourceSlotTypesInput(BaseRequestModel):
+    """Input for purging several resource slot types, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the resource slot types to purge.")
+
+
 # ========== AgentResource ==========
 
 
@@ -91,6 +184,14 @@ class AgentResourceFilter(BaseRequestModel):
 
     slot_name: StringFilter | None = Field(default=None, description="Filter by slot name.")
     agent_id: StringFilter | None = Field(default=None, description="Filter by agent ID.")
+    reserved: DecimalFilter | None = Field(default=None, description="Filter by reserved amount.")
+    prereserved: DecimalFilter | None = Field(
+        default=None, description="Filter by pre-reserved amount."
+    )
+    field_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by agent resource slot ID.",
+    )
     AND: list[AgentResourceFilter] | None = Field(
         default=None, description="Logical AND of multiple filter conditions."
     )
@@ -110,6 +211,35 @@ class AgentResourceOrder(BaseRequestModel):
 
     field: AgentResourceOrderField = Field(description="Field to order by.")
     direction: OrderDirection = Field(default=OrderDirection.ASC, description="Order direction.")
+
+
+class AgentResourceScope(BaseRequestModel):
+    """Scope for the scoped agent resource query.
+
+    Each list is OR'd internally. Raises an error if every field is empty.
+    """
+
+    agent: list[UUIDScope] | None = Field(
+        default=None, description="Agents whose slot rows are being read"
+    )
+
+    @model_validator(mode="after")
+    def _require_non_empty(self) -> AgentResourceScope:
+        if not self.agent:
+            raise ValueError("AgentResourceScope requires a non-empty value for 'agent'")
+        return self
+
+
+class ScopedSearchAgentResourcesInput(BaseRequestModel):
+    """Input for searching the slot rows the named agents carry."""
+
+    scope: AgentResourceScope = Field(description="Scope (OR across all items).")
+    filter: AgentResourceFilter | None = Field(default=None, description="Filter conditions.")
+    order: list[AgentResourceOrder] | None = Field(
+        default=None, description="Order specifications."
+    )
+    limit: int | None = Field(default=None, ge=1, description="Maximum items to return.")
+    offset: int | None = Field(default=None, ge=0, description="Number of items to skip.")
 
 
 class AdminSearchAgentResourcesInput(BaseRequestModel):
@@ -142,6 +272,10 @@ class ResourceAllocationFilter(BaseRequestModel):
 
     slot_name: StringFilter | None = Field(default=None, description="Filter by slot name.")
     kernel_id: UUIDFilter | None = Field(default=None, description="Filter by kernel ID.")
+    field_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by resource allocation ID.",
+    )
     AND: list[ResourceAllocationFilter] | None = Field(
         default=None, description="Logical AND of multiple filter conditions."
     )

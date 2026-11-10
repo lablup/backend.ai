@@ -1,4 +1,4 @@
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from http import HTTPMethod
 from typing import Any, cast
 
@@ -29,7 +29,7 @@ from ai.backend.manager.clients.prometheus.metric_types import (
     KernelLiveStatBatchResult,
     MetricResultValue,
 )
-from ai.backend.manager.clients.prometheus.preset import LabelMatcher, MetricPreset
+from ai.backend.manager.clients.prometheus.preset import MetricPreset, PromQLTemplateRenderer
 
 DEFAULT_TIMEOUT_SECONDS: float = 30.0
 
@@ -42,6 +42,7 @@ class PrometheusClient:
     _timeout: aiohttp.ClientTimeout
     _container_metric_query_builder: ContainerMetricQueryBuilder
     _container_live_stat_query_builder: ContainerLiveStatQueryBuilder
+    _template_renderer: PromQLTemplateRenderer
 
     def __init__(
         self,
@@ -57,6 +58,7 @@ class PrometheusClient:
         self._timeout = aiohttp.ClientTimeout(total=timeout)
         self._container_metric_query_builder = container_metric_query_builder
         self._container_live_stat_query_builder = container_live_stat_query_builder
+        self._template_renderer = PromQLTemplateRenderer()
 
     async def fetch_available_container_metric_names(self) -> list[str]:
         query = self._container_metric_query_builder.get_container_metric_metadata_query()
@@ -110,26 +112,15 @@ class PrometheusClient:
 
     async def execute_preset(
         self,
+        preset: MetricPreset,
         *,
-        query_template: str,
-        filter_labels: Mapping[str, str],
-        group_labels: Sequence[str],
-        time_window: str,
         time_range: QueryTimeRange | None,
+        time: str | None = None,
     ) -> PrometheusResponse:
-        metric_preset = MetricPreset(
-            template=query_template,
-            labels={
-                label_name: LabelMatcher.exact(label_value)
-                for label_name, label_value in filter_labels.items()
-            },
-            group_by=set(group_labels),
-            window=time_window,
-        )
         if time_range is None:
-            return await self._query_instant(preset=metric_preset)
+            return await self._query_instant(preset=preset, time=time)
         return await self._query_range(
-            preset=metric_preset,
+            preset=preset,
             time_range=time_range,
         )
 
@@ -160,7 +151,7 @@ class PrometheusClient:
         Returns:
             PrometheusResponse with query results.
         """
-        query = preset.render()
+        query = self._template_renderer.render(preset)
         form_data = aiohttp.FormData({
             "query": query,
             "start": time_range.start,
@@ -185,7 +176,7 @@ class PrometheusClient:
         Returns:
             PrometheusResponse with query results.
         """
-        query = preset.render()
+        query = self._template_renderer.render(preset)
         form_fields: dict[str, str] = {"query": query}
         if time is not None:
             form_fields["time"] = time

@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from functools import cached_property
-from typing import TYPE_CHECKING, Any
+from typing import Any
 from uuid import UUID
 
 import jwt
@@ -35,10 +35,6 @@ from .base import (
     EnumType,
     PydanticListColumn,
 )
-
-if TYPE_CHECKING:
-    pass
-
 
 __all__ = [
     "Circuit",
@@ -481,6 +477,9 @@ class Circuit(Base, BaseMixin):  # type: ignore[misc]
                                 "id": str(self.id),
                                 "sessionids": [str(x) for x in self.session_ids],
                                 "lastusedmarkerpath": self.worker_row.traefik_last_used_marker_path,
+                                "contentencoding": {
+                                    "rejectedencodings": local_config.proxy_coordinator.content_encoding.rejected_encodings,
+                                },
                             }
                         }
                     },

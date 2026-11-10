@@ -1,18 +1,21 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Mapping
-from typing import Any, Self, override
+from typing import Self, override
 
+from ai.backend.common.clients.valkey_client.sentinel_monitor.base import AbstractSentinelMonitor
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.message_queue.abc import AbstractBroadcaster
-from ai.backend.common.message_queue.types import BroadcastPayload
+from ai.backend.common.message_queue.payload import (
+    BroadcastMessagePayload,
+    CachedBroadcastMessagePayload,
+)
 from ai.backend.common.types import RedisTarget
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .exceptions import MessageQueueClosedError
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class RedisBroadcaster(AbstractBroadcaster):
@@ -40,7 +43,13 @@ class RedisBroadcaster(AbstractBroadcaster):
         self._closed = False
 
     @classmethod
-    async def create(cls, redis_target: RedisTarget, channel: str, db: int = 0) -> Self:
+    async def create(
+        cls,
+        redis_target: RedisTarget,
+        channel: str,
+        db: int = 0,
+        sentinel_monitor: AbstractSentinelMonitor | None = None,
+    ) -> Self:
         """
         Create a new RedisBroadcaster instance.
 
@@ -56,11 +65,12 @@ class RedisBroadcaster(AbstractBroadcaster):
             redis_target.to_valkey_target(),
             human_readable_name="redis_broadcaster",
             db_id=db,
+            sentinel_monitor=sentinel_monitor,
         )
         return cls(client, channel)
 
     @override
-    async def broadcast(self, payload: Mapping[str, Any]) -> None:
+    async def broadcast(self, payload: BroadcastMessagePayload) -> None:
         """
         Broadcast a message to all subscribers.
 
@@ -68,7 +78,7 @@ class RedisBroadcaster(AbstractBroadcaster):
         Messages are not guaranteed to be delivered (fire-and-forget).
 
         Args:
-            payload: Message payload as a mapping
+            payload: Message payload as a broadcast envelope
 
         Raises:
             MessageQueueClosedError: If the broadcaster is closed
@@ -77,10 +87,10 @@ class RedisBroadcaster(AbstractBroadcaster):
             raise MessageQueueClosedError("Broadcaster is closed")
 
         await self._client.broadcast(self._channel, payload)
-        log.debug("Message broadcasted to channel {}", self._channel)
+        log.trace("message broadcasted", channel_name=self._channel)
 
     @override
-    async def broadcast_with_cache(self, cache_id: str, payload: Mapping[str, str]) -> None:
+    async def broadcast_with_cache(self, cache_id: str, payload: BroadcastMessagePayload) -> None:
         """
         Broadcast a message with caching support.
 
@@ -89,7 +99,7 @@ class RedisBroadcaster(AbstractBroadcaster):
 
         Args:
             cache_id: Unique identifier for caching the message
-            payload: Message payload as string mapping
+            payload: Message payload as a broadcast envelope
 
         Raises:
             MessageQueueClosedError: If the broadcaster is closed
@@ -98,12 +108,10 @@ class RedisBroadcaster(AbstractBroadcaster):
             raise MessageQueueClosedError("Broadcaster is closed")
 
         await self._client.broadcast_with_cache(self._channel, cache_id, payload)
-        log.debug(
-            "Cached message broadcasted to channel {} with cache_id {}", self._channel, cache_id
-        )
+        log.trace("cached message broadcasted", channel_name=self._channel, cache_id=cache_id)
 
     @override
-    async def fetch_cached_broadcast_message(self, cache_id: str) -> Mapping[str, str] | None:
+    async def fetch_cached_broadcast_message(self, cache_id: str) -> BroadcastMessagePayload | None:
         """
         Retrieve a cached broadcast message.
 
@@ -118,20 +126,17 @@ class RedisBroadcaster(AbstractBroadcaster):
 
         Raises:
             MessageQueueClosedError: If the broadcaster is closed
+            InvalidMessagePayloadError: If the cached message is malformed
         """
         if self._closed:
             raise MessageQueueClosedError("Broadcaster is closed")
 
-        message = await self._client.fetch_cached_broadcast_message(cache_id)
-        log.debug(
-            "Fetched cached message for cache_id {}: {}",
-            cache_id,
-            "found" if message else "not found",
-        )
-        return message
+        payload = await self._client.fetch_cached_broadcast_message(cache_id)
+        log.trace("cached message fetched", cache_id=cache_id, found=payload is not None)
+        return payload
 
     @override
-    async def broadcast_batch(self, events: list[BroadcastPayload]) -> None:
+    async def broadcast_batch(self, events: list[CachedBroadcastMessagePayload]) -> None:
         """
         Broadcast multiple messages in a batch.
 
@@ -148,7 +153,9 @@ class RedisBroadcaster(AbstractBroadcaster):
             raise MessageQueueClosedError("Broadcaster is closed")
 
         await self._client.broadcast_batch(self._channel, events)
-        log.debug("Batch of {} messages broadcasted to channel {}", len(events), self._channel)
+        log.trace(
+            "message batch broadcasted", channel_name=self._channel, message_count=len(events)
+        )
 
     @override
     async def close(self) -> None:
@@ -162,4 +169,4 @@ class RedisBroadcaster(AbstractBroadcaster):
 
         self._closed = True
         await self._client.close()
-        log.debug("RedisBroadcaster closed")
+        log.debug("redis broadcaster closed")

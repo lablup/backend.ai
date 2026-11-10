@@ -8,53 +8,63 @@ from collections.abc import AsyncGenerator
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
+from ai.backend.common.data.entity.domain import DomainEntityType, DomainID, DomainName
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
+from ai.backend.common.data.entity.role import RoleEntityType, RoleID
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-from ai.backend.manager.data.group.types import ProjectType
-from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.role import (
     UserRoleAssignmentInput,
     UserRoleRevocationInput,
 )
 from ai.backend.manager.data.permission.status import RoleStatus
-from ai.backend.manager.data.permission.types import EntityType, ScopeType
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
-from ai.backend.manager.models.replica_group import ReplicaGroupRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.data.project.types import ProjectType
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.endpoint.row import EndpointRow
+from ai.backend.manager.models.entity_label.row import EntityLabelRow
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
+from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.resource_preset import ResourcePresetRow
-from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
-from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
+from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
+from ai.backend.manager.models.routing.row import RoutingRow
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.repositories.group.db_source import GroupDBSource
+from ai.backend.manager.models.vfolder.row import VFolderRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
+    EntityMembershipCapRow,
+)
+from ai.backend.manager.models.virtual_entity.entity_membership_field import (
+    EntityMembershipFieldRow,
+)
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
+from ai.backend.manager.repositories.ops.v2.roster.provider import RosterOpsProvider
 from ai.backend.manager.repositories.permission_controller.db_source.db_source import (
     PermissionDBSource,
 )
-from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
+from ai.backend.manager.repositories.rbac.roster_repository import RbacRosterRepository
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 
 class TestRoleAssignment:
     """Tests for PermissionDBSource.revoke_role project remaining count
-    and GroupDBSource.bind/unbind_user_to_project."""
+    and the project roster ops."""
 
     @pytest.fixture
     def test_password_info(self) -> PasswordInfo:
@@ -74,7 +84,7 @@ class TestRoleAssignment:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -82,8 +92,7 @@ class TestRoleAssignment:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
-                AssociationScopesEntitiesRow,
+                ProjectRow,
                 ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
@@ -94,16 +103,27 @@ class TestRoleAssignment:
                 ReplicaGroupRow,
                 RoutingRow,
                 ResourcePresetRow,
+                VirtualEntityRow,
+                EntityMembershipRow,
+                EntityMembershipCapRow,
+                EntityMembershipFieldRow,
+                ScopeBindingRow,
+                EntityLabelRow,
             ],
         ):
             yield database_connection
 
     @pytest.fixture
-    async def test_domain(self, db_with_cleanup: ExtendedAsyncSAEngine) -> str:
+    async def test_domain(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> DomainFixtureData:
+        domain_id = DomainID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as session:
             session.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -115,7 +135,7 @@ class TestRoleAssignment:
                 )
             )
             await session.commit()
-        return domain_name
+        return DomainFixtureData(domain_name=DomainName(domain_name), domain_id=domain_id)
 
     @pytest.fixture
     async def user_resource_policy(self, db_with_cleanup: ExtendedAsyncSAEngine) -> str:
@@ -135,7 +155,7 @@ class TestRoleAssignment:
 
     @pytest.fixture
     async def test_project(
-        self, db_with_cleanup: ExtendedAsyncSAEngine, test_domain: str
+        self, db_with_cleanup: ExtendedAsyncSAEngine, test_domain: DomainFixtureData
     ) -> uuid.UUID:
         project_id = uuid.uuid4()
         policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
@@ -149,17 +169,23 @@ class TestRoleAssignment:
                 )
             )
             session.add(
-                GroupRow(
+                ProjectRow(
                     id=project_id,
                     name=f"test-project-{project_id.hex[:8]}",
                     description="Test project",
                     is_active=True,
-                    domain_name=test_domain,
+                    domain_name=test_domain.domain_name,
                     total_resource_slots=ResourceSlot(),
                     allowed_vfolder_hosts=VFolderHostPermissionMap(),
                     integration_id=None,
                     resource_policy=policy_name,
                     type=ProjectType.GENERAL,
+                )
+            )
+            session.add(
+                VirtualEntityRow(
+                    entity_type=ProjectEntityType(),
+                    entity_id=project_id,
                 )
             )
             await session.commit()
@@ -174,6 +200,9 @@ class TestRoleAssignment:
     ) -> uuid.UUID:
         user_uuid = uuid.uuid4()
         async with db.begin_session() as session:
+            domain_id = (
+                await session.execute(sa.select(DomainRow.id).where(DomainRow.name == domain_name))
+            ).scalar_one()
             session.add(
                 UserRow(
                     uuid=user_uuid,
@@ -188,8 +217,10 @@ class TestRoleAssignment:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=policy_name,
+                    domain_id=domain_id,
                 )
             )
+            session.add(VirtualEntityRow(entity_type=UserEntityType(), entity_id=user_uuid))
             await session.commit()
         return user_uuid
 
@@ -197,12 +228,12 @@ class TestRoleAssignment:
     async def user_1(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: str,
+        test_domain: DomainFixtureData,
         user_resource_policy: str,
         test_password_info: PasswordInfo,
     ) -> uuid.UUID:
         return await self._create_user(
-            db_with_cleanup, test_domain, user_resource_policy, test_password_info
+            db_with_cleanup, test_domain.domain_name, user_resource_policy, test_password_info
         )
 
     @pytest.fixture
@@ -213,13 +244,12 @@ class TestRoleAssignment:
     ) -> uuid.UUID:
         role_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as session:
-            session.add(RoleRow(id=role_id, name=f"project-role-{role_id.hex[:8]}"))
             session.add(
-                AssociationScopesEntitiesRow(
-                    scope_type=ScopeType.PROJECT,
-                    scope_id=str(test_project),
-                    entity_type=EntityType.ROLE,
-                    entity_id=str(role_id),
+                RoleRow(
+                    id=role_id,
+                    name=f"project-role-{role_id.hex[:8]}",
+                    scope_type=ProjectEntityType(),
+                    scope_id=test_project,
                 )
             )
             await session.commit()
@@ -233,23 +263,34 @@ class TestRoleAssignment:
     ) -> uuid.UUID:
         role_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as session:
-            session.add(RoleRow(id=role_id, name=f"project-role2-{role_id.hex[:8]}"))
             session.add(
-                AssociationScopesEntitiesRow(
-                    scope_type=ScopeType.PROJECT,
-                    scope_id=str(test_project),
-                    entity_type=EntityType.ROLE,
-                    entity_id=str(role_id),
+                RoleRow(
+                    id=role_id,
+                    name=f"project-role2-{role_id.hex[:8]}",
+                    scope_type=ProjectEntityType(),
+                    scope_id=test_project,
                 )
             )
             await session.commit()
         return role_id
 
     @pytest.fixture
-    async def global_role(self, db_with_cleanup: ExtendedAsyncSAEngine) -> uuid.UUID:
+    async def domain_role(
+        self, db_with_cleanup: ExtendedAsyncSAEngine, test_domain: DomainFixtureData
+    ) -> uuid.UUID:
         role_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as session:
-            session.add(RoleRow(id=role_id, name=f"global-role-{role_id.hex[:8]}"))
+            session.add(
+                VirtualEntityRow(entity_type=DomainEntityType(), entity_id=test_domain.domain_id)
+            )
+            session.add(
+                RoleRow(
+                    id=role_id,
+                    name=f"domain-role-{role_id.hex[:8]}",
+                    scope_type=DomainEntityType(),
+                    scope_id=test_domain.domain_id,
+                )
+            )
             await session.commit()
         return role_id
 
@@ -258,8 +299,8 @@ class TestRoleAssignment:
         return PermissionDBSource(db=db_with_cleanup)
 
     @pytest.fixture
-    def group_db_source(self, db_with_cleanup: ExtendedAsyncSAEngine) -> GroupDBSource:
-        return GroupDBSource(db=db_with_cleanup)
+    def roster_repository(self, db_with_cleanup: ExtendedAsyncSAEngine) -> RbacRosterRepository:
+        return RbacRosterRepository(RosterOpsProvider(db_with_cleanup))
 
     # --- revoke_role remaining count ---
 
@@ -272,10 +313,14 @@ class TestRoleAssignment:
     ) -> None:
         """Revoking the only project-scoped role returns remaining_count=0."""
         await perm_db_source.assign_role(
-            UserRoleAssignmentInput(user_id=user_1, role_id=project_scoped_role)
+            UserRoleAssignmentInput(
+                user_id=UserID(user_1),
+                role_id=RoleID(project_scoped_role),
+                granted_by=UserID(user_1),
+            )
         )
         result = await perm_db_source.revoke_role(
-            UserRoleRevocationInput(user_id=user_1, role_id=project_scoped_role)
+            UserRoleRevocationInput(user_id=UserID(user_1), role_id=RoleID(project_scoped_role))
         )
 
         assert len(result.project_remaining_roles) == 1
@@ -292,118 +337,226 @@ class TestRoleAssignment:
     ) -> None:
         """Revoking one role when another exists returns remaining_count=1."""
         await perm_db_source.assign_role(
-            UserRoleAssignmentInput(user_id=user_1, role_id=project_scoped_role)
+            UserRoleAssignmentInput(
+                user_id=UserID(user_1),
+                role_id=RoleID(project_scoped_role),
+                granted_by=UserID(user_1),
+            )
         )
         await perm_db_source.assign_role(
-            UserRoleAssignmentInput(user_id=user_1, role_id=second_project_scoped_role)
+            UserRoleAssignmentInput(
+                user_id=UserID(user_1),
+                role_id=RoleID(second_project_scoped_role),
+                granted_by=UserID(user_1),
+            )
         )
         result = await perm_db_source.revoke_role(
-            UserRoleRevocationInput(user_id=user_1, role_id=project_scoped_role)
+            UserRoleRevocationInput(user_id=UserID(user_1), role_id=RoleID(project_scoped_role))
         )
 
         assert len(result.project_remaining_roles) == 1
         assert result.project_remaining_roles[0].project_id == test_project
         assert result.project_remaining_roles[0].remaining_count == 1
 
-    async def test_revoke_global_role_returns_empty_project_remaining(
+    async def test_revoke_domain_role_returns_empty_project_remaining(
         self,
         perm_db_source: PermissionDBSource,
-        global_role: uuid.UUID,
+        domain_role: uuid.UUID,
         user_1: uuid.UUID,
     ) -> None:
         """Revoking a non-project-scoped role returns empty project_remaining."""
         await perm_db_source.assign_role(
-            UserRoleAssignmentInput(user_id=user_1, role_id=global_role)
+            UserRoleAssignmentInput(
+                user_id=UserID(user_1), role_id=RoleID(domain_role), granted_by=UserID(user_1)
+            )
         )
         result = await perm_db_source.revoke_role(
-            UserRoleRevocationInput(user_id=user_1, role_id=global_role)
+            UserRoleRevocationInput(user_id=UserID(user_1), role_id=RoleID(domain_role))
         )
         assert result.project_remaining_roles == []
 
-    # --- GroupDBSource.bind/unbind_user_to_project ---
+    # --- bulk_assign_role ---
 
-    async def test_bind_user_to_project_creates_associations(
+    async def test_bulk_assign_fails_only_the_user_the_grant_fails_for(
+        self,
+        perm_db_source: PermissionDBSource,
+        project_scoped_role: uuid.UUID,
+        user_1: uuid.UUID,
+    ) -> None:
+        """A user naming no user row fails alone; the others are still granted."""
+        missing_user = UserID(uuid.uuid4())
+
+        result = await perm_db_source.bulk_assign_role(
+            RoleID(project_scoped_role), [missing_user, UserID(user_1)], UserID(user_1)
+        )
+
+        assert [s.user_id for s in result.successes] == [user_1]
+        assert [f.user_id for f in result.failures] == [missing_user]
+
+    # --- the project roster ---
+
+    async def test_join_member_puts_the_user_on_the_project_list(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        group_db_source: GroupDBSource,
+        roster_repository: RbacRosterRepository,
         user_1: uuid.UUID,
         test_project: uuid.UUID,
     ) -> None:
-        """bind_user_to_project creates the ASE row (PROJECT/USER)."""
-        await group_db_source.bind_user_to_project(user_1, test_project)
+        """Enrolling writes the roster edge and no legacy scope association."""
+        await roster_repository.join_member(ProjectID(test_project), UserID(user_1))
 
         async with db_with_cleanup.begin_readonly_session() as session:
-            assoc = await session.execute(
-                sa.select(AssociationScopesEntitiesRow.entity_id).where(
-                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                    AssociationScopesEntitiesRow.scope_id == str(test_project),
-                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                    AssociationScopesEntitiesRow.entity_id == str(user_1),
+            edges = (
+                await session.scalars(
+                    sa.select(EntityMembershipRow.id).where(
+                        EntityMembershipRow.virtual_entity_id
+                        == sa.select(VirtualEntityRow.id)
+                        .where(
+                            VirtualEntityRow.entity_type == ProjectEntityType(),
+                            VirtualEntityRow.entity_id == test_project,
+                        )
+                        .scalar_subquery(),
+                        EntityMembershipRow.member_entity_id
+                        == sa.select(VirtualEntityRow.id)
+                        .where(
+                            VirtualEntityRow.entity_type == UserEntityType(),
+                            VirtualEntityRow.entity_id == user_1,
+                        )
+                        .scalar_subquery(),
+                    )
                 )
-            )
-            assert len(assoc.fetchall()) == 1
+            ).all()
+            assert len(edges) == 1
 
-    async def test_bind_user_to_project_skips_if_already_bound(
+    async def test_join_member_does_not_bind_project_into_user_scope(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        group_db_source: GroupDBSource,
+        roster_repository: RbacRosterRepository,
         user_1: uuid.UUID,
         test_project: uuid.UUID,
     ) -> None:
-        """Calling bind twice does not create duplicate rows."""
-        await group_db_source.bind_user_to_project(user_1, test_project)
-        await group_db_source.bind_user_to_project(user_1, test_project)
+        """Joining a project leaves the user's own virtual entity unbound: the user is a
+        ordinary member of the project, not an inheriting one, so project permissions never
+        reach the entities the user owns."""
+        await roster_repository.join_member(ProjectID(test_project), UserID(user_1))
 
         async with db_with_cleanup.begin_readonly_session() as session:
-            assoc = await session.execute(
-                sa.select(AssociationScopesEntitiesRow.entity_id).where(
-                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                    AssociationScopesEntitiesRow.scope_id == str(test_project),
-                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                    AssociationScopesEntitiesRow.entity_id == str(user_1),
+            user_vs_id = await session.scalar(
+                sa.select(VirtualEntityRow.id).where(
+                    VirtualEntityRow.entity_type == UserEntityType(),
+                    VirtualEntityRow.entity_id == user_1,
                 )
             )
-            assert len(assoc.fetchall()) == 1
+            project_vs_id = await session.scalar(
+                sa.select(VirtualEntityRow.id).where(
+                    VirtualEntityRow.entity_type == ProjectEntityType(),
+                    VirtualEntityRow.entity_id == test_project,
+                )
+            )
+            bindings_into_user_scope = (
+                await session.scalars(
+                    sa.select(ScopeBindingRow.scope_entity_id).where(
+                        ScopeBindingRow.virtual_entity_id == user_vs_id,
+                        ScopeBindingRow.scope_entity_id == project_vs_id,
+                    )
+                )
+            ).all()
+            memberships_in_project_scope = (
+                await session.scalars(
+                    sa.select(EntityMembershipRow.member_entity_id).where(
+                        EntityMembershipRow.virtual_entity_id == project_vs_id,
+                        EntityMembershipRow.member_entity_id == user_vs_id,
+                    )
+                )
+            ).all()
 
-    async def test_unbind_user_from_project_removes_associations(
+        assert list(bindings_into_user_scope) == []
+        assert list(memberships_in_project_scope) == [user_vs_id]
+
+    async def test_join_member_is_idempotent(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        group_db_source: GroupDBSource,
+        roster_repository: RbacRosterRepository,
         user_1: uuid.UUID,
         test_project: uuid.UUID,
     ) -> None:
-        """unbind_user_from_project removes the ASE row."""
-        await group_db_source.bind_user_to_project(user_1, test_project)
-        await group_db_source.unbind_user_from_project(user_1, test_project)
+        """Enrolling twice leaves one roster edge."""
+        await roster_repository.join_member(ProjectID(test_project), UserID(user_1))
+        await roster_repository.join_member(ProjectID(test_project), UserID(user_1))
 
         async with db_with_cleanup.begin_readonly_session() as session:
-            assoc = await session.execute(
-                sa.select(AssociationScopesEntitiesRow.entity_id).where(
-                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                    AssociationScopesEntitiesRow.scope_id == str(test_project),
-                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+            edges = (
+                await session.scalars(
+                    sa.select(EntityMembershipRow.id).where(
+                        EntityMembershipRow.virtual_entity_id
+                        == sa.select(VirtualEntityRow.id)
+                        .where(
+                            VirtualEntityRow.entity_type == ProjectEntityType(),
+                            VirtualEntityRow.entity_id == test_project,
+                        )
+                        .scalar_subquery(),
+                        EntityMembershipRow.member_entity_id
+                        == sa.select(VirtualEntityRow.id)
+                        .where(
+                            VirtualEntityRow.entity_type == UserEntityType(),
+                            VirtualEntityRow.entity_id == user_1,
+                        )
+                        .scalar_subquery(),
+                    )
                 )
-            )
-            assert len(assoc.fetchall()) == 0
+            ).all()
+            assert len(edges) == 1
 
-    # --- RoleManager.assign_auto_assign_roles ---
+    async def test_leave_member_removes_the_roster_edge(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        roster_repository: RbacRosterRepository,
+        user_1: uuid.UUID,
+        test_project: uuid.UUID,
+    ) -> None:
+        """Withdrawing takes the roster edge away."""
+        await roster_repository.join_member(ProjectID(test_project), UserID(user_1))
+        await roster_repository.leave_member(ProjectID(test_project), UserID(user_1))
+
+        async with db_with_cleanup.begin_readonly_session() as session:
+            edges = (
+                await session.scalars(
+                    sa.select(EntityMembershipRow.id).where(
+                        EntityMembershipRow.virtual_entity_id
+                        == sa.select(VirtualEntityRow.id)
+                        .where(
+                            VirtualEntityRow.entity_type == ProjectEntityType(),
+                            VirtualEntityRow.entity_id == test_project,
+                        )
+                        .scalar_subquery(),
+                        EntityMembershipRow.member_entity_id
+                        == sa.select(VirtualEntityRow.id)
+                        .where(
+                            VirtualEntityRow.entity_type == UserEntityType(),
+                            VirtualEntityRow.entity_id == user_1,
+                        )
+                        .scalar_subquery(),
+                    )
+                )
+            ).all()
+            assert edges == []
+
+    # --- the roles a join grants ---
 
     @pytest.fixture
-    def role_manager(self) -> RoleManager:
-        return RoleManager()
+    def project_id(self, test_project: uuid.UUID) -> ProjectID:
+        return ProjectID(test_project)
 
-    @pytest.fixture
-    def project_scope(self, test_project: uuid.UUID) -> ScopeId:
-        return ScopeId(scope_type=ScopeType.PROJECT, scope_id=str(test_project))
-
-    async def _bind_auto_assign_role(
+    async def _enrol_role_in_project(
         self,
         db: ExtendedAsyncSAEngine,
-        scope_id: ScopeId,
+        project_id: uuid.UUID,
         *,
         auto_assign: bool = True,
         status: RoleStatus = RoleStatus.ACTIVE,
     ) -> uuid.UUID:
+        """Create a role of the project and enrol its node under the project's, as a
+        scope's roles are."""
         role_id = uuid.uuid4()
         async with db.begin_session() as session:
             session.add(
@@ -412,130 +565,79 @@ class TestRoleAssignment:
                     name=f"auto-role-{role_id.hex[:8]}",
                     auto_assign=auto_assign,
                     status=status,
+                    scope_type=ProjectEntityType(),
+                    scope_id=project_id,
+                )
+            )
+            await session.flush()
+            role_node = VirtualEntityRow(entity_type=RoleEntityType(), entity_id=role_id)
+            session.add(role_node)
+            await session.flush()
+            project_node_id = await session.scalar(
+                sa.select(VirtualEntityRow.id).where(
+                    VirtualEntityRow.entity_type == ProjectEntityType(),
+                    VirtualEntityRow.entity_id == project_id,
                 )
             )
             session.add(
-                AssociationScopesEntitiesRow(
-                    scope_type=scope_id.scope_type,
-                    scope_id=scope_id.scope_id,
-                    entity_type=EntityType.ROLE,
-                    entity_id=str(role_id),
+                EntityMembershipRow(
+                    virtual_entity_id=project_node_id,
+                    member_entity_id=role_node.id,
                 )
             )
             await session.commit()
         return role_id
 
-    async def _user_ids_for_role(
-        self, db: ExtendedAsyncSAEngine, role_id: uuid.UUID
-    ) -> list[uuid.UUID]:
+    async def _role_ids_of(self, db: ExtendedAsyncSAEngine, user_id: uuid.UUID) -> list[uuid.UUID]:
         async with db.begin_readonly_session() as session:
             return list(
                 await session.scalars(
-                    sa.select(UserRoleRow.user_id).where(UserRoleRow.role_id == role_id)
+                    sa.select(UserRoleRow.role_id).where(UserRoleRow.user_id == user_id)
                 )
             )
 
-    @pytest.fixture
-    async def joined_users(
+    async def test_join_member_grants_the_projects_auto_assign_role(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: str,
-        user_resource_policy: str,
-        test_password_info: PasswordInfo,
-    ) -> list[uuid.UUID]:
-        return [
-            await self._create_user(
-                db_with_cleanup, test_domain, user_resource_policy, test_password_info
-            )
-            for _ in range(3)
-        ]
-
-    @pytest.fixture
-    async def auto_assign_role(
-        self, db_with_cleanup: ExtendedAsyncSAEngine, project_scope: ScopeId
-    ) -> uuid.UUID:
-        """An active, auto_assign role bound to the target scope."""
-        return await self._bind_auto_assign_role(db_with_cleanup, project_scope)
-
-    @pytest.fixture
-    async def role_with_one_existing_member(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        auto_assign_role: uuid.UUID,
-        joined_users: list[uuid.UUID],
-    ) -> uuid.UUID:
-        """The auto_assign role with its first joined user already mapped."""
-        async with db_with_cleanup.begin_session() as session:
-            session.add(UserRoleRow(user_id=joined_users[0], role_id=auto_assign_role))
-            await session.commit()
-        return auto_assign_role
-
-    @pytest.fixture
-    async def ineligible_roles(
-        self, db_with_cleanup: ExtendedAsyncSAEngine, project_scope: ScopeId
-    ) -> list[uuid.UUID]:
-        """Roles that must NOT be granted: not auto_assign, inactive, or bound elsewhere."""
-        not_auto_assign = await self._bind_auto_assign_role(
-            db_with_cleanup, project_scope, auto_assign=False
-        )
-        inactive = await self._bind_auto_assign_role(
-            db_with_cleanup, project_scope, status=RoleStatus.INACTIVE
-        )
-        other_scope = ScopeId(scope_type=ScopeType.PROJECT, scope_id=str(uuid.uuid4()))
-        bound_to_other_scope = await self._bind_auto_assign_role(db_with_cleanup, other_scope)
-        return [not_auto_assign, inactive, bound_to_other_scope]
-
-    async def test_assign_auto_assign_roles_grants_to_all_users_when_none_mapped(
-        self,
-        role_manager: RoleManager,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        project_scope: ScopeId,
-        auto_assign_role: uuid.UUID,
-        joined_users: list[uuid.UUID],
-    ) -> None:
-        """Every joining user is mapped to an active auto_assign role bound to the scope."""
-        async with db_with_cleanup.begin_session() as session:
-            await role_manager.assign_auto_assign_roles(session, joined_users, project_scope)
-
-        mapped_user_ids = await self._user_ids_for_role(db_with_cleanup, auto_assign_role)
-        assert set(mapped_user_ids) == set(joined_users)
-
-    async def test_assign_auto_assign_roles_skips_already_mapped_users(
-        self,
-        role_manager: RoleManager,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        project_scope: ScopeId,
-        role_with_one_existing_member: uuid.UUID,
-        joined_users: list[uuid.UUID],
-    ) -> None:
-        """A pre-mapped (user, role) pair is not re-inserted; only new users are added."""
-        async with db_with_cleanup.begin_session() as session:
-            await role_manager.assign_auto_assign_roles(session, joined_users, project_scope)
-
-        mapped_user_ids = await self._user_ids_for_role(
-            db_with_cleanup, role_with_one_existing_member
-        )
-        # Exactly one row per user: the pre-mapped user is neither duplicated nor dropped.
-        assert sorted(mapped_user_ids) == sorted(joined_users)
-
-    async def test_assign_auto_assign_roles_skips_non_eligible_roles(
-        self,
-        role_manager: RoleManager,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        project_scope: ScopeId,
-        auto_assign_role: uuid.UUID,
-        ineligible_roles: list[uuid.UUID],
+        roster_repository: RbacRosterRepository,
+        project_id: ProjectID,
         user_1: uuid.UUID,
     ) -> None:
-        """Only active, auto_assign roles bound to the target scope are granted."""
-        async with db_with_cleanup.begin_session() as session:
-            await role_manager.assign_auto_assign_roles(session, [user_1], project_scope)
+        """Joining grants every active auto_assign role the project holds."""
+        role_id = await self._enrol_role_in_project(db_with_cleanup, project_id)
 
-        async with db_with_cleanup.begin_readonly_session() as session:
-            granted_role_ids = list(
-                await session.scalars(
-                    sa.select(UserRoleRow.role_id).where(UserRoleRow.user_id == user_1)
-                )
-            )
-        # Only the eligible role is granted; none of the ineligible roles appear.
-        assert granted_role_ids == [auto_assign_role]
+        await roster_repository.join_member(project_id, UserID(user_1))
+
+        assert await self._role_ids_of(db_with_cleanup, user_1) == [role_id]
+
+    async def test_joining_twice_grants_the_role_once(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        roster_repository: RbacRosterRepository,
+        project_id: ProjectID,
+        user_1: uuid.UUID,
+    ) -> None:
+        """A pair already granted is left as it stands, so a repeated join adds nothing."""
+        role_id = await self._enrol_role_in_project(db_with_cleanup, project_id)
+
+        await roster_repository.join_member(project_id, UserID(user_1))
+        await roster_repository.join_member(project_id, UserID(user_1))
+
+        assert await self._role_ids_of(db_with_cleanup, user_1) == [role_id]
+
+    async def test_join_member_skips_the_roles_it_must_not_grant(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        roster_repository: RbacRosterRepository,
+        project_id: ProjectID,
+        user_1: uuid.UUID,
+    ) -> None:
+        """A role that is not auto_assign, is inactive, or belongs to another project is
+        left alone."""
+        granted = await self._enrol_role_in_project(db_with_cleanup, project_id)
+        await self._enrol_role_in_project(db_with_cleanup, project_id, auto_assign=False)
+        await self._enrol_role_in_project(db_with_cleanup, project_id, status=RoleStatus.INACTIVE)
+
+        await roster_repository.join_member(project_id, UserID(user_1))
+
+        assert await self._role_ids_of(db_with_cleanup, user_1) == [granted]

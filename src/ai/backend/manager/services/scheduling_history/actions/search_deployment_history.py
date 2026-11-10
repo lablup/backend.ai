@@ -3,45 +3,25 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import EntityType
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.deployment import DeploymentEntityType
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import GlobalSearcherOpsAction
 from ai.backend.manager.data.deployment.types import DeploymentHistoryData
-from ai.backend.manager.repositories.base import BatchQuerier
-
-from .base import SchedulingHistoryAction
+from ai.backend.manager.models.scheduling_history.row import DeploymentHistoryRow
 
 
-@dataclass
-class SearchDeploymentHistoryAction(SchedulingHistoryAction):
-    """Action to search deployment history (admin API)."""
-
-    querier: BatchQuerier
+@dataclass(frozen=True)
+class SearchDeploymentHistoryAction(
+    GlobalSearcherOpsAction[DeploymentHistoryRow, DeploymentHistoryData]
+):
+    """Page through every deployment history row."""
 
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return EntityType.DEPLOYMENT_HISTORY
+        return DeploymentEntityType()
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
-
-
-@dataclass
-class SearchDeploymentHistoryActionResult(BaseActionResult):
-    """Result of searching deployment history."""
-
-    histories: list[DeploymentHistoryData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
+    def action_name(cls) -> str:
+        return "search_deployment_history"

@@ -12,6 +12,7 @@ import json
 import logging
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
+from uuid import UUID
 
 import yaml
 
@@ -21,6 +22,10 @@ from ai.backend.common.api_handlers import (
     PathParam,
     QueryParam,
 )
+from ai.backend.common.data.entity.domain import DomainName
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.session_template import SessionTemplateID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.template.request import (
     CreateSessionTemplateRequest,
     DeleteSessionTemplateRequest,
@@ -38,14 +43,11 @@ from ai.backend.common.dto.manager.template.response import (
     SessionTemplateListItemDTO,
     UpdateSessionTemplateResponse,
 )
-from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.json import load_json
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.services.group.actions.resolve_project_id_by_name import (
-    ResolveProjectIdByNameAction,
-)
+from ai.backend.manager.services.project.actions.lookup import LookupProjectAction
 from ai.backend.manager.services.template.actions.create_task_template import (
     CreateTaskTemplateAction,
     TaskTemplateItemInput,
@@ -64,10 +66,10 @@ from ai.backend.manager.services.template.actions.update_task_template import (
 )
 
 if TYPE_CHECKING:
-    from ai.backend.manager.services.group.processors import GroupProcessors
+    from ai.backend.manager.services.project.processors import ProjectProcessors
     from ai.backend.manager.services.template.processors import TemplateProcessors
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class SessionTemplateHandler:
@@ -77,20 +79,16 @@ class SessionTemplateHandler:
         self,
         *,
         template: TemplateProcessors,
-        group: GroupProcessors,
+        project: ProjectProcessors,
     ) -> None:
         self._template = template
-        self._group = group
+        self._project = project
 
     async def _resolve_project_id(self, domain_name: str, project_name: str) -> ProjectID:
-        result = await self._group.resolve_project_id_by_name.wait_for_complete(
-            ResolveProjectIdByNameAction(domain_name=domain_name, project_name=project_name)
+        result = await self._project.lookup.run(
+            LookupProjectAction(domain_name=DomainName(domain_name), project_name=project_name)
         )
-        if result.project_id is None:
-            raise InvalidAPIParameters(
-                f"No active group named {project_name!r} exists in domain {domain_name!r}"
-            )
-        return result.project_id
+        return ProjectID(result.entity_id())
 
     async def create(
         self,
@@ -101,11 +99,6 @@ class SessionTemplateHandler:
         params = body.parsed
         domain = params.domain or ctx.user_domain
         owner_access_key = params.owner_access_key
-        log.info(
-            "SESSION_TEMPLATE.CREATE (ak:{0}/{1})",
-            ctx.access_key,
-            owner_access_key if owner_access_key and owner_access_key != ctx.access_key else "*",
-        )
 
         try:
             payload = load_json(params.payload)
@@ -136,7 +129,7 @@ class SessionTemplateHandler:
             owner_access_key=owner_access_key,
             items=items,
         )
-        result = await self._template.create_task.wait_for_complete(action)
+        result = await self._template.create_task.run(action)
         resp = [CreateSessionTemplateItemDTO(id=item.id, user=item.user) for item in result.created]
         return APIResponse.build(
             HTTPStatus.OK,
@@ -149,10 +142,8 @@ class SessionTemplateHandler:
         ctx: UserContext,
         req: RequestCtx,
     ) -> APIResponse:
-        log.info("SESSION_TEMPLATE.LIST (ak:{})", ctx.access_key)
-
-        action = ListTaskTemplatesAction(user_uuid=ctx.user_uuid)
-        result = await self._template.list_task.wait_for_complete(action)
+        action = ListTaskTemplatesAction(user_uuid=UserID(ctx.user_uuid))
+        result = await self._template.list_task.run(action)
 
         items = [
             SessionTemplateListItemDTO(
@@ -185,17 +176,10 @@ class SessionTemplateHandler:
         params = query.parsed
         if params.format not in ("yaml", "json"):
             raise InvalidAPIParameters('format should be "yaml" or "json"')
-        log.info(
-            "SESSION_TEMPLATE.GET (ak:{0}/{1})",
-            ctx.access_key,
-            params.owner_access_key
-            if params.owner_access_key and params.owner_access_key != ctx.access_key
-            else "*",
-        )
 
         template_id = path.parsed.template_id
-        action = GetTaskTemplateAction(template_id=template_id)
-        result = await self._template.get_task.wait_for_complete(action)
+        action = GetTaskTemplateAction(template_id=SessionTemplateID(UUID(template_id)))
+        result = await self._template.get_task.run(action)
         return APIResponse.build(
             HTTPStatus.OK,
             GetSessionTemplateResponse(
@@ -218,11 +202,6 @@ class SessionTemplateHandler:
         template_id = path.parsed.template_id
         domain = params.domain or ctx.user_domain
         owner_access_key = params.owner_access_key
-        log.info(
-            "SESSION_TEMPLATE.PUT (ak:{0}/{1})",
-            ctx.access_key,
-            owner_access_key if owner_access_key and owner_access_key != ctx.access_key else "*",
-        )
 
         try:
             payload = load_json(params.payload)
@@ -244,7 +223,7 @@ class SessionTemplateHandler:
 
         project_id = await self._resolve_project_id(domain, params.group)
         action = UpdateTaskTemplateAction(
-            template_id=template_id,
+            template_id=SessionTemplateID(UUID(template_id)),
             domain_name=domain,
             requesting_project=project_id,
             requester_uuid=ctx.user_uuid,
@@ -254,7 +233,7 @@ class SessionTemplateHandler:
             owner_access_key=owner_access_key,
             items=items,
         )
-        await self._template.update_task.wait_for_complete(action)
+        await self._template.update_task.run(action)
         return APIResponse.build(
             HTTPStatus.OK,
             UpdateSessionTemplateResponse(success=True),
@@ -268,17 +247,9 @@ class SessionTemplateHandler:
         req: RequestCtx,
     ) -> APIResponse:
         template_id = path.parsed.template_id
-        params = query.parsed
-        log.info(
-            "SESSION_TEMPLATE.DELETE (ak:{0}/{1})",
-            ctx.access_key,
-            params.owner_access_key
-            if params.owner_access_key and params.owner_access_key != ctx.access_key
-            else "*",
-        )
 
-        action = DeleteTaskTemplateAction(template_id=template_id)
-        await self._template.delete_task.wait_for_complete(action)
+        action = DeleteTaskTemplateAction(template_id=SessionTemplateID(UUID(template_id)))
+        await self._template.delete_task.run(action)
         return APIResponse.build(
             HTTPStatus.OK,
             DeleteSessionTemplateResponse(success=True),

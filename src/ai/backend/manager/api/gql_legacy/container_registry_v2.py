@@ -9,28 +9,26 @@ import sqlalchemy as sa
 from graphql import Undefined
 
 from ai.backend.common.container_registry import AllowedGroupsModel
-from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.models.container_registry import (
-    ContainerRegistryRow,
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
+from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.models.container_registry.creators import ContainerRegistryCreator
+from ai.backend.manager.models.container_registry.purgers import ContainerRegistryPurger
+from ai.backend.manager.models.container_registry.row import (
     ContainerRegistryValidator,
     ContainerRegistryValidatorArgs,
 )
-from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.purger import Purger
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.container_registry.creators import ContainerRegistryCreatorSpec
-from ai.backend.manager.repositories.container_registry.updaters import (
-    ContainerRegistryUpdaterSpec,
-)
+from ai.backend.manager.models.container_registry.updaters import ContainerRegistryUpdater
+from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.services.container_registry.actions.create_container_registry import (
     CreateContainerRegistryAction,
 )
 from ai.backend.manager.services.container_registry.actions.delete_container_registry import (
     DeleteContainerRegistryAction,
 )
-from ai.backend.manager.services.container_registry.actions.modify_container_registry import (
-    ModifyContainerRegistryAction,
+from ai.backend.manager.services.container_registry.actions.update_container_registry import (
+    UpdateContainerRegistryAction,
 )
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -44,7 +42,7 @@ from .gql_relay import AsyncNode
 if TYPE_CHECKING:
     from .schema import GraphQueryContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 type WhereClauseType = sa.sql.expression.BinaryExpression[Any] | sa.sql.expression.BooleanClauseList
@@ -70,26 +68,27 @@ class CreateContainerRegistryNodeInputV2(graphene.InputObjectType):  # type: ign
         def value_or_none(val: Any) -> None | Any:
             return None if val is Undefined else val
 
-        sanitized_allowed_groups: AllowedGroups | None = value_or_none(self.allowed_groups)
-
         return CreateContainerRegistryAction(
-            creator=Creator(
-                spec=ContainerRegistryCreatorSpec(
-                    url=self.url,
-                    type=self.type,
-                    registry_name=self.registry_name,
-                    is_global=value_or_none(self.is_global),
-                    project=value_or_none(self.project),
-                    username=value_or_none(self.username),
-                    password=value_or_none(self.password),
-                    ssl_verify=value_or_none(self.ssl_verify),
-                    extra=value_or_none(self.extra),
-                    allowed_groups=sanitized_allowed_groups.to_model()
-                    if sanitized_allowed_groups is not None
-                    else None,
-                )
+            creator=ContainerRegistryCreator(
+                url=self.url,
+                type=self.type,
+                registry_name=self.registry_name,
+                is_global=value_or_none(self.is_global),
+                project=value_or_none(self.project),
+                username=value_or_none(self.username),
+                password=value_or_none(self.password),
+                ssl_verify=value_or_none(self.ssl_verify),
+                extra=value_or_none(self.extra),
             )
         )
+
+    def to_allowed_groups(self) -> AllowedGroupsModel | None:
+        """The projects the registry is to be linked to, which the relation operations
+        write beside the registry itself."""
+        groups: AllowedGroups | None = (
+            None if self.allowed_groups is Undefined else self.allowed_groups
+        )
+        return groups.to_model() if groups is not None else None
 
 
 class CreateContainerRegistryNodeV2(graphene.Mutation):  # type: ignore[misc]
@@ -121,11 +120,14 @@ class CreateContainerRegistryNodeV2(graphene.Mutation):  # type: ignore[misc]
 
         validator.validate()
 
-        result = (
-            await ctx.processors.container_registry.create_container_registry.wait_for_complete(
-                props.to_action()
-            )
+        result = await ctx.processors.container_registry.create_container_registry.run(
+            props.to_action()
         )
+        allowed_groups = props.to_allowed_groups()
+        if allowed_groups is not None:
+            await ContainerRegistryAdapter(
+                ctx.processors.container_registry, ctx.processors.rbac
+            ).apply_allowed_groups(ContainerRegistryID(result.data.id), allowed_groups)
 
         return cls(
             container_registry=ContainerRegistryNode.from_dataclass(result.data),
@@ -148,31 +150,28 @@ class ModifyContainerRegistryNodeInputV2(graphene.InputObjectType):  # type: ign
     extra = graphene.JSONString(description="Added in 25.3.0.")
     allowed_groups = AllowedGroups(description="Added in 25.3.0.")
 
-    def to_action(self, registry_id: uuid.UUID) -> ModifyContainerRegistryAction:
-        if self.allowed_groups is not Undefined:
-            allowed_groups_model = AllowedGroupsModel(
-                add=self.allowed_groups.add or [],
-                remove=self.allowed_groups.remove or [],
-            )
-            allowed_groups_state = TriState.update(allowed_groups_model)
-        else:
-            allowed_groups_state = TriState.nop()
+    def to_allowed_groups(self) -> AllowedGroupsModel | None:
+        """The projects to link and unlink, which the relation operations write beside
+        the update."""
+        if self.allowed_groups is Undefined:
+            return None
+        return AllowedGroupsModel(
+            add=self.allowed_groups.add or [],
+            remove=self.allowed_groups.remove or [],
+        )
 
-        return ModifyContainerRegistryAction(
-            updater=Updater(
-                spec=ContainerRegistryUpdaterSpec(
-                    url=OptionalState.from_graphql(self.url),
-                    type=OptionalState.from_graphql(self.type),
-                    registry_name=OptionalState.from_graphql(self.registry_name),
-                    is_global=TriState.from_graphql(self.is_global),
-                    project=TriState.from_graphql(self.project),
-                    username=TriState.from_graphql(self.username),
-                    password=TriState.from_graphql(self.password),
-                    ssl_verify=TriState.from_graphql(self.ssl_verify),
-                    extra=TriState.from_graphql(self.extra),
-                    allowed_groups=allowed_groups_state,
-                ),
-                pk_value=registry_id,
+    def to_action(self, registry_id: uuid.UUID) -> UpdateContainerRegistryAction:
+        return UpdateContainerRegistryAction(
+            updater=ContainerRegistryUpdater(
+                registry_id=ContainerRegistryID(registry_id),
+                url=OptionalState.from_graphql(self.url),
+                type=OptionalState.from_graphql(self.type),
+                registry_name=OptionalState.from_graphql(self.registry_name),
+                project=TriState.from_graphql(self.project),
+                username=TriState.from_graphql(self.username),
+                password=TriState.from_graphql(self.password),
+                ssl_verify=TriState.from_graphql(self.ssl_verify),
+                extra=TriState.from_graphql(self.extra),
             )
         )
 
@@ -203,14 +202,25 @@ class ModifyContainerRegistryNodeV2(graphene.Mutation):  # type: ignore[misc]
         ctx: GraphQueryContext = info.context
 
         _, _id = AsyncNode.resolve_global_id(info, id)
-        reg_id = uuid.UUID(_id) if _id else uuid.UUID(id)
+        try:
+            reg_id = uuid.UUID(_id) if _id else uuid.UUID(id)
+        except ValueError as e:
+            raise InvalidAPIParameters(f"Invalid id: {id}") from e
 
-        result = (
-            await ctx.processors.container_registry.modify_container_registry.wait_for_complete(
-                props.to_action(reg_id)
-            )
+        allowed_groups = props.to_allowed_groups()
+        if allowed_groups is not None:
+            await ContainerRegistryAdapter(
+                ctx.processors.container_registry, ctx.processors.rbac
+            ).apply_allowed_groups(ContainerRegistryID(reg_id), allowed_groups)
+        result = await ctx.processors.container_registry.update_container_registry.run(
+            props.to_action(reg_id)
         )
-        return cls(container_registry=ContainerRegistryNode.from_dataclass(result.data))
+        data = result.data
+        if props.is_global is not Undefined:
+            data = await ContainerRegistryAdapter(
+                ctx.processors.container_registry, ctx.processors.rbac
+            ).apply_global(ContainerRegistryID(reg_id), props.is_global)
+        return cls(container_registry=ContainerRegistryNode.from_dataclass(data))
 
 
 class DeleteContainerRegistryNodeV2(graphene.Mutation):  # type: ignore[misc]
@@ -237,13 +247,14 @@ class DeleteContainerRegistryNodeV2(graphene.Mutation):  # type: ignore[misc]
         ctx: GraphQueryContext = info.context
 
         _, _id = AsyncNode.resolve_global_id(info, id)
-        reg_id = uuid.UUID(_id) if _id else uuid.UUID(id)
+        try:
+            reg_id = uuid.UUID(_id) if _id else uuid.UUID(id)
+        except ValueError as e:
+            raise InvalidAPIParameters(f"Invalid id: {id}") from e
 
-        result = (
-            await ctx.processors.container_registry.delete_container_registry.wait_for_complete(
-                DeleteContainerRegistryAction(
-                    purger=Purger(row_class=ContainerRegistryRow, pk_value=reg_id)
-                )
+        result = await ctx.processors.container_registry.delete_container_registry.run(
+            DeleteContainerRegistryAction(
+                purger=ContainerRegistryPurger(registry_id=ContainerRegistryID(reg_id))
             )
         )
         return cls(container_registry=ContainerRegistryNode.from_dataclass(result.data))

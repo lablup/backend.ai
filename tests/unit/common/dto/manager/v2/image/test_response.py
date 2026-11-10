@@ -6,6 +6,7 @@ import json
 import uuid
 from datetime import UTC, datetime
 
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.pagination import PaginationInfo
 from ai.backend.common.dto.manager.v2.image.response import (
     AliasImagePayload,
@@ -13,7 +14,6 @@ from ai.backend.common.dto.manager.v2.image.response import (
     GetImagePayload,
     ImageNode,
     PurgeImagePayload,
-    RescanImagesPayload,
     SearchImagesPayload,
 )
 from ai.backend.common.dto.manager.v2.image.types import (
@@ -27,8 +27,10 @@ from ai.backend.common.dto.manager.v2.image.types import (
 
 def make_image_node(**kwargs: object) -> ImageNode:
     """Helper to create a minimal valid ImageNode."""
+    image_id = uuid.uuid4()
     defaults: dict[str, object] = {
-        "id": uuid.uuid4(),
+        "id": image_id,
+        "entity_id": image_id,
         "name": "python:3.11-cuda12",
         "image": "stable/python",
         "registry": "registry.example.com",
@@ -39,6 +41,7 @@ def make_image_node(**kwargs: object) -> ImageNode:
         "status": ImageStatusType.ALIVE,
         "config_digest": "sha256:abc123",
         "is_local": False,
+        "customized": False,
     }
     defaults.update(kwargs)
     return ImageNode(**defaults)  # type: ignore[arg-type]
@@ -56,13 +59,16 @@ class TestImageNodeCreation:
         assert node.resource_limits == []
         assert node.accelerators is None
         assert node.created_at is None
+        assert node.creator_id is None
 
     def test_creation_with_all_fields(self) -> None:
         image_id = uuid.uuid4()
         registry_id = uuid.uuid4()
+        creator_id = UserID(uuid.uuid4())
         now = datetime.now(tz=UTC)
         node = ImageNode(
             id=image_id,
+            entity_id=image_id,
             name="python:3.11",
             image="stable/python",
             registry="registry.example.com",
@@ -80,6 +86,8 @@ class TestImageNodeCreation:
             config_digest="sha256:abc123",
             is_local=False,
             created_at=now,
+            customized=True,
+            creator_id=creator_id,
         )
         assert node.id == image_id
         assert node.project == "myproject"
@@ -89,6 +97,8 @@ class TestImageNodeCreation:
         assert len(node.resource_limits) == 1
         assert node.accelerators == "cuda>=11"
         assert node.created_at == now
+        assert node.customized is True
+        assert node.creator_id == creator_id
 
     def test_status_alive(self) -> None:
         node = make_image_node(status=ImageStatusType.ALIVE)
@@ -238,29 +248,6 @@ class TestGetImagePayload:
         restored = GetImagePayload.model_validate_json(json_str)
         assert restored.item.id == node.id
         assert restored.item.name == node.name
-
-
-class TestRescanImagesPayload:
-    """Tests for RescanImagesPayload model."""
-
-    def test_creation_no_errors(self) -> None:
-        node = make_image_node()
-        payload = RescanImagesPayload(item=node)
-        assert payload.errors == []
-
-    def test_creation_with_errors(self) -> None:
-        node = make_image_node()
-        payload = RescanImagesPayload(item=node, errors=["failed to pull", "timeout"])
-        assert len(payload.errors) == 2
-        assert payload.errors[0] == "failed to pull"
-
-    def test_round_trip_serialization(self) -> None:
-        node = make_image_node()
-        payload = RescanImagesPayload(item=node, errors=["err1"])
-        json_str = payload.model_dump_json()
-        restored = RescanImagesPayload.model_validate_json(json_str)
-        assert restored.item.id == node.id
-        assert restored.errors == ["err1"]
 
 
 class TestAliasImagePayload:

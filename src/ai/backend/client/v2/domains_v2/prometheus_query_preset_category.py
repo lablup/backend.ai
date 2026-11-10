@@ -5,12 +5,15 @@ from __future__ import annotations
 from uuid import UUID
 
 from ai.backend.client.v2.base_domain import BaseDomainClient
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.prometheus_query_preset_category.request import (
     CreateCategoryInput,
     DeleteCategoryInput,
+    PartialBulkPurgeQueryPresetCategoriesInput,
     SearchCategoriesInput,
 )
 from ai.backend.common.dto.manager.v2.prometheus_query_preset_category.response import (
+    CategoryNode,
     CreateCategoryPayload,
     DeleteCategoryPayload,
     GetCategoryPayload,
@@ -49,8 +52,27 @@ class V2PrometheusQueryPresetCategoryClient(BaseDomainClient):
             response_model=GetCategoryPayload,
         )
 
+    async def purge(self, category_id: UUID) -> DeleteCategoryPayload:
+        """Permanently remove a category."""
+        return await self._client.typed_request(
+            "DELETE",
+            f"{_PATH}/{category_id}",
+            response_model=DeleteCategoryPayload,
+        )
+
+    async def partial_bulk_purge(
+        self, request: PartialBulkPurgeQueryPresetCategoriesInput
+    ) -> PartialBulkPayload[CategoryNode]:
+        """Permanently remove several categories, answering for each one."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/partial-bulk-purge",
+            request=request,
+            response_model=PartialBulkPayload[CategoryNode],
+        )
+
     async def delete(self, request: DeleteCategoryInput) -> DeleteCategoryPayload:
-        """Delete a category by ID."""
+        """Deprecated. Use :meth:`purge`."""
         return await self._client.typed_request(
             "POST",
             f"{_PATH}/delete",

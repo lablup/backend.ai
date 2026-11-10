@@ -7,7 +7,8 @@ from typing import override
 
 from ai.backend.common.dependencies import NonMonitorableDependencyProvider
 from ai.backend.manager.agent_cache import AgentRPCCache
-from ai.backend.manager.clients.agent import AgentClientPool, AgentPoolSpec
+from ai.backend.manager.clients.agent.pool import AgentClientPool
+from ai.backend.manager.clients.agent.types import AgentPoolSpec
 
 
 @dataclass

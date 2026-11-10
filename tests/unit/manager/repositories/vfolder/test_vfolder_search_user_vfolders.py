@@ -1,41 +1,75 @@
 """
 Tests for VfolderRepository.search_user_vfolders() functionality.
 Verifies that user-scoped vfolder search includes vfolders where the user is the owner
-(VFolderRow.user) or has been granted permission (via VFolderPermissionRow).
+(VFolderRow.user) or has been lent it through the share graph.
 """
 
 from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
+from typing import Any
 
 import pytest
+import sqlalchemy as sa
+from sqlalchemy import Row
 
-from ai.backend.common.types import BinarySize, ResourceSlot, VFolderUsageMode
-from ai.backend.manager.data.group.types import ProjectType
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
+from ai.backend.common.data.permission.types import Permission
+from ai.backend.common.types import BinarySize, ResourceSlot, VFolderMountPolicy, VFolderUsageMode
+from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.data.vfolder.types import (
-    VFolderMountPermission,
     VFolderOperationStatus,
     VFolderOwnershipType,
 )
 from ai.backend.manager.errors.user import UserNotFound
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
+from ai.backend.manager.models.scopes import OperationScope
+from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import VFolderPermissionRow, VFolderRow
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.models.vfolder.row import (
+    VFolderRow,
+    VFolderUserMountPolicyRow,
+)
+from ai.backend.manager.models.vfolder.scopes import (
+    ProjectVFolderTarget,
+    UserVFolderTarget,
+)
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.entity_membership_cap import EntityMembershipCapRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
+from ai.backend.manager.repositories.base.querier import (
+    BatchQuerier,
+    BatchQuerierResult,
+    execute_batch_querier,
+)
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
-from ai.backend.manager.repositories.vfolder.types import UserVFolderSearchScope
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
+
+
+async def _search_vfolders(
+    db: ExtendedAsyncSAEngine, querier: BatchQuerier, scope: OperationScope
+) -> BatchQuerierResult[Row[Any]]:
+    """What the read does, without the repository method that used to wrap it."""
+    async with db.begin_readonly_session() as sess:
+        return await execute_batch_querier(sess, sa.select(VFolderRow), querier, scopes=[scope])
 
 
 class TestVfolderSearchUserVfolders:
@@ -55,11 +89,15 @@ class TestVfolderSearchUserVfolders:
                 KeyPairResourcePolicyRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
-                VFolderPermissionRow,
+                VFolderUserMountPolicyRow,
+                VirtualEntityRow,
+                EntityMembershipRow,
+                ScopeBindingRow,
+                EntityMembershipCapRow,
             ],
         ):
             yield database_connection
@@ -69,7 +107,9 @@ class TestVfolderSearchUserVfolders:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> VfolderRepository:
-        return VfolderRepository(db=db_with_cleanup)
+        return VfolderRepository(
+            db=db_with_cleanup, v2_ops_provider=ShareOpsProvider(db_with_cleanup)
+        )
 
     @pytest.fixture
     async def test_data(
@@ -77,6 +117,7 @@ class TestVfolderSearchUserVfolders:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[dict[str, uuid.UUID], None]:
         """Create two users with vfolders: user_a has 2 vfolders, user_b has 1 (all GROUP-owned)."""
+        domain_id = DomainID(uuid.uuid4())
         domain_name = "test-domain"
         user_a_id = uuid.uuid4()
         user_b_id = uuid.uuid4()
@@ -88,6 +129,7 @@ class TestVfolderSearchUserVfolders:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -139,6 +181,7 @@ class TestVfolderSearchUserVfolders:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy="default",
+                    domain_id=domain_id,
                 )
             )
             db_sess.add(
@@ -153,16 +196,16 @@ class TestVfolderSearchUserVfolders:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy="default",
+                    domain_id=domain_id,
                 )
             )
             await db_sess.flush()
 
             db_sess.add(
                 KeyPairRow(
-                    user_id="usera@example.com",
                     user=user_a_id,
                     access_key="TESTKEY0000000A",
-                    secret_key="test-secret-a",
+                    secret_key=SecretValue("test-secret-a"),
                     is_active=True,
                     is_admin=False,
                     resource_policy="default",
@@ -171,10 +214,9 @@ class TestVfolderSearchUserVfolders:
             )
             db_sess.add(
                 KeyPairRow(
-                    user_id="userb@example.com",
                     user=user_b_id,
                     access_key="TESTKEY0000000B",
-                    secret_key="test-secret-b",
+                    secret_key=SecretValue("test-secret-b"),
                     is_active=True,
                     is_admin=False,
                     resource_policy="default",
@@ -184,7 +226,7 @@ class TestVfolderSearchUserVfolders:
             await db_sess.flush()
 
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=project_id,
                     name="project-a",
                     domain_name=domain_name,
@@ -198,6 +240,25 @@ class TestVfolderSearchUserVfolders:
             )
             await db_sess.flush()
 
+            # A folder of one's own lands in the project that is theirs alone
+            # (BEP-1077), which is what a user scope reaches it through.
+            personal_projects = {user_a_id: uuid.uuid4(), user_b_id: uuid.uuid4()}
+            for owner_id, personal_id in personal_projects.items():
+                db_sess.add(
+                    ProjectRow(
+                        id=personal_id,
+                        name=f"personal-{personal_id.hex[:8]}",
+                        domain_name=domain_name,
+                        is_active=True,
+                        total_resource_slots=ResourceSlot(),
+                        allowed_vfolder_hosts={},
+                        resource_policy="default",
+                        type=ProjectType.PERSONAL,
+                        creator_id=owner_id,
+                    )
+                )
+            await db_sess.flush()
+
             for vid, user_id, name in [
                 (vfolder_1_id, user_a_id, "vfolder-1"),
                 (vfolder_2_id, user_a_id, "vfolder-2"),
@@ -209,23 +270,36 @@ class TestVfolderSearchUserVfolders:
                         name=name,
                         host="local:volume1",
                         domain_name=domain_name,
-                        quota_scope_id=f"project:{project_id}",
+                        quota_scope_id=f"user:{user_id}",
                         usage_mode=VFolderUsageMode.GENERAL,
-                        permission=VFolderMountPermission.READ_WRITE,
+                        default_mount_permission=VFolderMountPolicy.READ_WRITE,
                         max_files=0,
                         max_size=None,
                         num_files=0,
                         cur_size=0,
                         creator="usera@example.com",
                         unmanaged_path=None,
-                        ownership_type=VFolderOwnershipType.GROUP,
+                        ownership_type=VFolderOwnershipType.USER,
                         user=user_id,
-                        group=project_id,
+                        group=None,
                         cloneable=False,
                         status=VFolderOperationStatus.READY,
                     )
                 )
             await db_sess.flush()
+
+            seeder = VirtualEntitySeeder()
+            for vid, user_id, _ in [
+                (vfolder_1_id, user_a_id, None),
+                (vfolder_2_id, user_a_id, None),
+                (vfolder_3_id, user_b_id, None),
+            ]:
+                await seeder.create_in(
+                    db_sess,
+                    VFolderEntityType(),
+                    vid,
+                    [(ProjectEntityType(), personal_projects[user_id])],
+                )
 
         yield {
             "user_a_id": user_a_id,
@@ -237,57 +311,57 @@ class TestVfolderSearchUserVfolders:
 
     async def test_returns_only_vfolders_for_target_user(
         self,
-        vfolder_repository: VfolderRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         test_data: dict[str, uuid.UUID],
     ) -> None:
         """search_user_vfolders returns only vfolders where VFolderRow.user matches the target user."""
-        scope = UserVFolderSearchScope(user_id=test_data["user_a_id"])
+        scope = UserVFolderTarget(user_id=UserID(test_data["user_a_id"]))
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[],
         )
 
-        result = await vfolder_repository.search_user_vfolders(querier, scope)
+        result = await _search_vfolders(db_with_cleanup, querier, scope)
 
         assert result.total_count == 2
-        assert len(result.items) == 2
-        returned_ids = {item.id for item in result.items}
+        assert len([row.VFolderRow for row in result.rows]) == 2
+        returned_ids = {item.id for item in [row.VFolderRow for row in result.rows]}
         assert returned_ids == {test_data["vfolder_1_id"], test_data["vfolder_2_id"]}
 
     async def test_does_not_return_vfolders_from_other_user(
         self,
-        vfolder_repository: VfolderRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         test_data: dict[str, uuid.UUID],
     ) -> None:
         """search_user_vfolders for user_b returns only vfolders with user_b as VFolderRow.user."""
-        scope = UserVFolderSearchScope(user_id=test_data["user_b_id"])
+        scope = UserVFolderTarget(user_id=UserID(test_data["user_b_id"]))
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[],
         )
 
-        result = await vfolder_repository.search_user_vfolders(querier, scope)
+        result = await _search_vfolders(db_with_cleanup, querier, scope)
 
         assert result.total_count == 1
-        assert len(result.items) == 1
-        assert result.items[0].id == test_data["vfolder_3_id"]
+        assert len([row.VFolderRow for row in result.rows]) == 1
+        assert [row.VFolderRow for row in result.rows][0].id == test_data["vfolder_3_id"]
 
     async def test_pagination_fields(
         self,
-        vfolder_repository: VfolderRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         test_data: dict[str, uuid.UUID],
     ) -> None:
         """search_user_vfolders returns correct pagination fields."""
-        scope = UserVFolderSearchScope(user_id=test_data["user_a_id"])
+        scope = UserVFolderTarget(user_id=UserID(test_data["user_a_id"]))
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[],
         )
 
-        result = await vfolder_repository.search_user_vfolders(querier, scope)
+        result = await _search_vfolders(db_with_cleanup, querier, scope)
 
         assert result.has_next_page is False
         assert result.has_previous_page is False
@@ -298,6 +372,7 @@ class TestVfolderSearchUserVfolders:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[dict[str, uuid.UUID], None]:
         """Create a user with both USER-owned and GROUP-owned vfolders."""
+        domain_id = DomainID(uuid.uuid4())
         domain_name = "test-domain"
         user_id = uuid.uuid4()
         project_id = uuid.uuid4()
@@ -307,6 +382,7 @@ class TestVfolderSearchUserVfolders:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -357,16 +433,16 @@ class TestVfolderSearchUserVfolders:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy="default",
+                    domain_id=domain_id,
                 )
             )
             await db_sess.flush()
 
             db_sess.add(
                 KeyPairRow(
-                    user_id="test@example.com",
                     user=user_id,
                     access_key="TESTKEY0000000M",
-                    secret_key="test-secret-m",
+                    secret_key=SecretValue("test-secret-m"),
                     is_active=True,
                     is_admin=False,
                     resource_policy="default",
@@ -376,7 +452,7 @@ class TestVfolderSearchUserVfolders:
             await db_sess.flush()
 
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=project_id,
                     name="project-mixed",
                     domain_name=domain_name,
@@ -399,7 +475,7 @@ class TestVfolderSearchUserVfolders:
                     domain_name=domain_name,
                     quota_scope_id=f"user:{user_id}",
                     usage_mode=VFolderUsageMode.GENERAL,
-                    permission=VFolderMountPermission.READ_WRITE,
+                    default_mount_permission=VFolderMountPolicy.READ_WRITE,
                     max_files=0,
                     max_size=None,
                     num_files=0,
@@ -422,7 +498,7 @@ class TestVfolderSearchUserVfolders:
                     domain_name=domain_name,
                     quota_scope_id=f"project:{project_id}",
                     usage_mode=VFolderUsageMode.GENERAL,
-                    permission=VFolderMountPermission.READ_WRITE,
+                    default_mount_permission=VFolderMountPolicy.READ_WRITE,
                     max_files=0,
                     max_size=None,
                     num_files=0,
@@ -438,42 +514,80 @@ class TestVfolderSearchUserVfolders:
             )
             await db_sess.flush()
 
+            seeder = VirtualEntitySeeder()
+            personal_id = uuid.uuid4()
+            db_sess.add(
+                ProjectRow(
+                    id=personal_id,
+                    name=f"personal-{personal_id.hex[:8]}",
+                    domain_name=domain_name,
+                    is_active=True,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts={},
+                    resource_policy="default",
+                    type=ProjectType.PERSONAL,
+                    creator_id=user_id,
+                )
+            )
+            await db_sess.flush()
+            await seeder.create_in(
+                db_sess, VFolderEntityType(), user_vfolder_id, [(ProjectEntityType(), personal_id)]
+            )
+            await seeder.create_in(
+                db_sess, VFolderEntityType(), group_vfolder_id, [(ProjectEntityType(), project_id)]
+            )
+
         yield {
             "user_id": user_id,
+            "project_id": project_id,
             "user_vfolder_id": user_vfolder_id,
             "group_vfolder_id": group_vfolder_id,
         }
 
-    async def test_returns_vfolders_regardless_of_ownership_type(
+    async def test_a_user_reaches_their_own_folder_and_not_the_project_one(
         self,
-        vfolder_repository: VfolderRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         mixed_ownership_data: dict[str, uuid.UUID],
     ) -> None:
-        """search_user_vfolders returns both USER-owned and GROUP-owned vfolders
-        as long as VFolderRow.user matches, regardless of ownership_type."""
-        scope = UserVFolderSearchScope(user_id=mixed_ownership_data["user_id"])
+        """A folder in a team project belongs to that project, so the user scope stops
+        at the one in the project that is theirs alone."""
+        scope = UserVFolderTarget(user_id=UserID(mixed_ownership_data["user_id"]))
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[],
         )
 
-        result = await vfolder_repository.search_user_vfolders(querier, scope)
+        result = await _search_vfolders(db_with_cleanup, querier, scope)
 
-        assert result.total_count == 2
-        returned_ids = {item.id for item in result.items}
-        assert returned_ids == {
-            mixed_ownership_data["user_vfolder_id"],
-            mixed_ownership_data["group_vfolder_id"],
-        }
+        returned_ids = {item.id for item in [row.VFolderRow for row in result.rows]}
+        assert returned_ids == {mixed_ownership_data["user_vfolder_id"]}
+
+    async def test_the_project_reaches_the_folder_it_holds(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        mixed_ownership_data: dict[str, uuid.UUID],
+    ) -> None:
+        """The other side of the same pair: the project scope answers for its folder."""
+        scope = ProjectVFolderTarget(project_id=ProjectID(mixed_ownership_data["project_id"]))
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[],
+            orders=[],
+        )
+
+        result = await _search_vfolders(db_with_cleanup, querier, scope)
+
+        returned_ids = {item.id for item in [row.VFolderRow for row in result.rows]}
+        assert returned_ids == {mixed_ownership_data["group_vfolder_id"]}
 
     async def test_nonexistent_user_raises_error(
         self,
-        vfolder_repository: VfolderRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         test_data: dict[str, uuid.UUID],
     ) -> None:
         """search_user_vfolders raises UserNotFound for a nonexistent user."""
-        scope = UserVFolderSearchScope(user_id=uuid.uuid4())
+        scope = UserVFolderTarget(user_id=UserID(uuid.uuid4()))
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
@@ -481,7 +595,7 @@ class TestVfolderSearchUserVfolders:
         )
 
         with pytest.raises(UserNotFound):
-            await vfolder_repository.search_user_vfolders(querier, scope)
+            await _search_vfolders(db_with_cleanup, querier, scope)
 
     @pytest.fixture
     async def permission_data(
@@ -494,6 +608,7 @@ class TestVfolderSearchUserVfolders:
         - vfolder_shared: owned by user_b, user_a has READ_ATTRIBUTE permission
         - vfolder_no_access: owned by user_b, user_a has no permission
         """
+        domain_id = DomainID(uuid.uuid4())
         domain_name = "test-domain"
         user_a_id = uuid.uuid4()
         user_b_id = uuid.uuid4()
@@ -505,6 +620,7 @@ class TestVfolderSearchUserVfolders:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -555,6 +671,7 @@ class TestVfolderSearchUserVfolders:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy="default",
+                    domain_id=domain_id,
                 )
             )
             db_sess.add(
@@ -569,16 +686,16 @@ class TestVfolderSearchUserVfolders:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy="default",
+                    domain_id=domain_id,
                 )
             )
             await db_sess.flush()
 
             db_sess.add(
                 KeyPairRow(
-                    user_id="usera@example.com",
                     user=user_a_id,
                     access_key="TESTKEY0000000P",
-                    secret_key="test-secret-p",
+                    secret_key=SecretValue("test-secret-p"),
                     is_active=True,
                     is_admin=False,
                     resource_policy="default",
@@ -587,10 +704,9 @@ class TestVfolderSearchUserVfolders:
             )
             db_sess.add(
                 KeyPairRow(
-                    user_id="userb@example.com",
                     user=user_b_id,
                     access_key="TESTKEY0000000Q",
-                    secret_key="test-secret-q",
+                    secret_key=SecretValue("test-secret-q"),
                     is_active=True,
                     is_admin=False,
                     resource_policy="default",
@@ -600,7 +716,7 @@ class TestVfolderSearchUserVfolders:
             await db_sess.flush()
 
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=project_id,
                     name="project-perm",
                     domain_name=domain_name,
@@ -623,7 +739,7 @@ class TestVfolderSearchUserVfolders:
                     domain_name=domain_name,
                     quota_scope_id=f"user:{user_a_id}",
                     usage_mode=VFolderUsageMode.GENERAL,
-                    permission=VFolderMountPermission.READ_WRITE,
+                    default_mount_permission=VFolderMountPolicy.READ_WRITE,
                     max_files=0,
                     max_size=None,
                     num_files=0,
@@ -646,7 +762,7 @@ class TestVfolderSearchUserVfolders:
                     domain_name=domain_name,
                     quota_scope_id=f"user:{user_b_id}",
                     usage_mode=VFolderUsageMode.GENERAL,
-                    permission=VFolderMountPermission.READ_WRITE,
+                    default_mount_permission=VFolderMountPolicy.READ_WRITE,
                     max_files=0,
                     max_size=None,
                     num_files=0,
@@ -669,7 +785,7 @@ class TestVfolderSearchUserVfolders:
                     domain_name=domain_name,
                     quota_scope_id=f"user:{user_b_id}",
                     usage_mode=VFolderUsageMode.GENERAL,
-                    permission=VFolderMountPermission.READ_WRITE,
+                    default_mount_permission=VFolderMountPolicy.READ_WRITE,
                     max_files=0,
                     max_size=None,
                     num_files=0,
@@ -686,14 +802,40 @@ class TestVfolderSearchUserVfolders:
             await db_sess.flush()
 
             # Grant user_a permission on vfolder_shared
-            db_sess.add(
-                VFolderPermissionRow(
-                    permission=VFolderMountPermission.READ_ONLY,
-                    vfolder=vfolder_shared_id,
-                    user=user_a_id,
-                )
-            )
             await db_sess.flush()
+
+            # Each folder lands in the project that is its owner's alone; the shared one
+            # reaches user A as a capped edge, which is what a share is.
+            seeder = VirtualEntitySeeder()
+            personal_a, personal_b = uuid.uuid4(), uuid.uuid4()
+            for owner_id, personal_id in [(user_a_id, personal_a), (user_b_id, personal_b)]:
+                db_sess.add(
+                    ProjectRow(
+                        id=personal_id,
+                        name=f"personal-{personal_id.hex[:8]}",
+                        domain_name=domain_name,
+                        is_active=True,
+                        total_resource_slots=ResourceSlot(),
+                        allowed_vfolder_hosts={},
+                        resource_policy="default",
+                        type=ProjectType.PERSONAL,
+                        creator_id=owner_id,
+                    )
+                )
+            await db_sess.flush()
+            await seeder.create_in(
+                db_sess, VFolderEntityType(), vfolder_owned_id, [(ProjectEntityType(), personal_a)]
+            )
+            for vid in (vfolder_shared_id, vfolder_no_access_id):
+                await seeder.create_in(
+                    db_sess, VFolderEntityType(), vid, [(ProjectEntityType(), personal_b)]
+                )
+            await seeder.cap_edge(
+                db_sess,
+                await seeder.get_or_create_scope(db_sess, ProjectEntityType(), personal_a),
+                await seeder.get_or_create_node(db_sess, VFolderEntityType(), vfolder_shared_id),
+                Permission.READ,
+            )
 
         yield {
             "user_a_id": user_a_id,
@@ -705,20 +847,20 @@ class TestVfolderSearchUserVfolders:
 
     async def test_returns_vfolders_with_permission(
         self,
-        vfolder_repository: VfolderRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         permission_data: dict[str, uuid.UUID],
     ) -> None:
         """search_user_vfolders returns vfolders the user owns AND vfolders shared via permission."""
-        scope = UserVFolderSearchScope(user_id=permission_data["user_a_id"])
+        scope = UserVFolderTarget(user_id=UserID(permission_data["user_a_id"]))
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[],
         )
 
-        result = await vfolder_repository.search_user_vfolders(querier, scope)
+        result = await _search_vfolders(db_with_cleanup, querier, scope)
 
-        returned_ids = {item.id for item in result.items}
+        returned_ids = {item.id for item in [row.VFolderRow for row in result.rows]}
         assert returned_ids == {
             permission_data["vfolder_owned_id"],
             permission_data["vfolder_shared_id"],
@@ -727,50 +869,48 @@ class TestVfolderSearchUserVfolders:
 
     async def test_does_not_return_vfolders_without_permission(
         self,
-        vfolder_repository: VfolderRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         permission_data: dict[str, uuid.UUID],
     ) -> None:
         """search_user_vfolders does not return vfolders the user neither owns nor has permission for."""
-        scope = UserVFolderSearchScope(user_id=permission_data["user_a_id"])
+        scope = UserVFolderTarget(user_id=UserID(permission_data["user_a_id"]))
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[],
         )
 
-        result = await vfolder_repository.search_user_vfolders(querier, scope)
+        result = await _search_vfolders(db_with_cleanup, querier, scope)
 
-        returned_ids = {item.id for item in result.items}
+        returned_ids = {item.id for item in [row.VFolderRow for row in result.rows]}
         assert permission_data["vfolder_no_access_id"] not in returned_ids
 
     async def test_no_duplicate_when_owner_has_permission(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         permission_data: dict[str, uuid.UUID],
-        vfolder_repository: VfolderRepository,
     ) -> None:
-        """When a user owns a vfolder AND has a permission row for it, it appears only once."""
-        # Add a permission row for user_a on their own vfolder
+        """When a user owns a vfolder AND has a mount policy row for it, it appears only once."""
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
-                VFolderPermissionRow(
-                    permission=VFolderMountPermission.READ_ONLY,
-                    vfolder=permission_data["vfolder_owned_id"],
-                    user=permission_data["user_a_id"],
+                VFolderUserMountPolicyRow(
+                    permission=VFolderMountPolicy.READ_ONLY,
+                    vfolder_id=permission_data["vfolder_owned_id"],
+                    user_id=permission_data["user_a_id"],
                 )
             )
             await db_sess.flush()
 
-        scope = UserVFolderSearchScope(user_id=permission_data["user_a_id"])
+        scope = UserVFolderTarget(user_id=UserID(permission_data["user_a_id"]))
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[],
         )
 
-        result = await vfolder_repository.search_user_vfolders(querier, scope)
+        result = await _search_vfolders(db_with_cleanup, querier, scope)
 
-        returned_ids = [item.id for item in result.items]
+        returned_ids = [item.id for item in [row.VFolderRow for row in result.rows]]
         assert len(returned_ids) == 2
         assert set(returned_ids) == {
             permission_data["vfolder_owned_id"],

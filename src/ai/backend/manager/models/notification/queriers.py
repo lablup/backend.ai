@@ -1,0 +1,104 @@
+"""DataQuerier implementations for the notification repository."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any, override
+
+from sqlalchemy.orm import InstrumentedAttribute
+
+from ai.backend.common.data.entity.notification import (
+    NotificationChannelID,
+    NotificationRuleID,
+)
+from ai.backend.manager.data.notification.types import (
+    NotificationChannelData,
+    NotificationRuleData,
+)
+from ai.backend.manager.models.notification.row import (
+    NotificationChannelRow,
+    NotificationRuleRow,
+)
+from ai.backend.manager.models.notification.searchable_fields import (
+    NotificationChannelSearchableFields,
+    NotificationRuleSearchableFields,
+)
+from ai.backend.manager.models.specs.querier import BulkEntityQuerier, DataQuerier
+
+
+@dataclass
+class NotificationChannelQuerier(DataQuerier[NotificationChannelRow, NotificationChannelData]):
+    channel_id: NotificationChannelID
+
+    @override
+    def row_class(self) -> type[NotificationChannelRow]:
+        return NotificationChannelRow
+
+    @override
+    @override
+    def entity_id_column(self) -> InstrumentedAttribute[Any]:
+        return NotificationChannelRow.id
+
+    @override
+    def entity_id_value(self) -> NotificationChannelID:
+        return self.channel_id
+
+    @override
+    def to_data(self, row: NotificationChannelRow) -> NotificationChannelData:
+        return NotificationChannelSearchableFields.own.to_data(row)
+
+
+@dataclass
+class NotificationRuleQuerier(DataQuerier[NotificationRuleRow, NotificationRuleData]):
+    rule_id: NotificationRuleID
+
+    @override
+    def row_class(self) -> type[NotificationRuleRow]:
+        return NotificationRuleRow
+
+    @override
+    @override
+    def entity_id_column(self) -> InstrumentedAttribute[Any]:
+        return NotificationRuleRow.id
+
+    @override
+    def entity_id_value(self) -> NotificationRuleID:
+        return self.rule_id
+
+    @override
+    def to_data(self, row: NotificationRuleRow) -> NotificationRuleData:
+        return NotificationRuleSearchableFields.own.to_data(row)
+
+
+class BulkNotificationChannelQuerier(
+    BulkEntityQuerier[NotificationChannelRow, NotificationChannelData]
+):
+    """The notification channels the caller named."""
+
+    @override
+    def row_class(self) -> type[NotificationChannelRow]:
+        return NotificationChannelRow
+
+    @override
+    def entity_id_column(self) -> InstrumentedAttribute[Any]:
+        return NotificationChannelRow.id
+
+    @override
+    def to_data(self, row: NotificationChannelRow) -> NotificationChannelData:
+        return NotificationChannelSearchableFields.own.to_data(row)
+
+
+class BulkNotificationRuleQuerier(BulkEntityQuerier[NotificationRuleRow, NotificationRuleData]):
+    """The notification rules the caller named."""
+
+    @override
+    def row_class(self) -> type[NotificationRuleRow]:
+        return NotificationRuleRow
+
+    @override
+    def entity_id_column(self) -> InstrumentedAttribute[Any]:
+        return NotificationRuleRow.id
+
+    @override
+    def to_data(self, row: NotificationRuleRow) -> NotificationRuleData:
+        return NotificationRuleSearchableFields.own.to_data(row)

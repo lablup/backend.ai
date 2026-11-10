@@ -12,11 +12,12 @@ from pydantic import HttpUrl
 
 from ai.backend.common.config import ModelDefinition
 from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
+from ai.backend.common.data.entity.types import FieldData
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.session.types import MountOption as MountOptionDTO
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
-from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
     AccessKey,
     AutoScalingMetricComparator,
@@ -27,6 +28,7 @@ from ai.backend.common.types import (
     MountTypes,
     QuotaScopeID,
     ResourceSlot,
+    SessionId,
     VFolderMount,
 )
 from ai.backend.manager.data.image.types import ImageData
@@ -112,10 +114,10 @@ class EndpointData:
 
 
 @dataclass
-class RoutingData:
+class RoutingData(FieldData):
     id: uuid.UUID
     endpoint: uuid.UUID
-    session: uuid.UUID | None
+    session: SessionId | None
     status: RouteStatus
     health_status: RouteHealthStatus
     traffic_ratio: float
@@ -135,7 +137,7 @@ class EndpointTokenData:
 
 
 @dataclass
-class EndpointAutoScalingRuleData:
+class EndpointAutoScalingRuleData(FieldData):
     id: uuid.UUID
     metric_source: AutoScalingMetricSource
     metric_name: str
@@ -157,7 +159,7 @@ class UserData:
 
 
 @dataclass
-class ScalingGroupData:
+class ResourceGroupData:
     wsproxy_addr: str
     wsproxy_api_token: str
 
@@ -176,7 +178,7 @@ class ModelServiceValidationContext:
     owner_role: UserRole
     group_id: uuid.UUID
     resource_policy: dict[str, Any]
-    scaling_group: str
+    resource_group: str
     extra_mounts: Sequence[VFolderMount]
     variant_reads_vfolder_config_files: bool
 
@@ -191,7 +193,7 @@ class ModelServicePrepareCtx:
     owner_role: UserRole
     group_id: uuid.UUID
     resource_policy: dict[str, Any]
-    scaling_group: str
+    resource_group: str
     extra_mounts: Sequence[VFolderMount]
 
 
@@ -252,7 +254,7 @@ class ServiceConfig:
     model_mount_destination: str
     extra_mounts: dict[uuid.UUID, MountOption]
     environ: dict[str, str] | None
-    scaling_group: str
+    resource_group: str
     resources: dict[str, str | int | float] | None
     resource_opts: dict[str, str | int | bool] | None
     vfolder_subpath: str | None = None
@@ -265,7 +267,7 @@ class ServiceConfig:
             "vfolder_subpath": self.vfolder_subpath,
             "extra_mounts": {key: value.to_dict() for key, value in self.extra_mounts.items()},
             "environ": self.environ if self.environ is not None else {},
-            "scaling_group": self.scaling_group,
+            "scaling_group": self.resource_group,
             "resources": self.resources,
             "resource_opts": self.resource_opts,
         }

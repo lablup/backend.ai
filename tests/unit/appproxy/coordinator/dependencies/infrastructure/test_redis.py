@@ -8,8 +8,11 @@ from ai.backend.appproxy.coordinator.config import ServerConfig
 from ai.backend.appproxy.coordinator.dependencies.infrastructure.redis import (
     CoordinatorValkeyClients,
     RedisProvider,
+    RedisProviderInput,
 )
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.config import redis_config_iv
+from ai.backend.common.lock import RedisLock
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import HostPortPair
 
@@ -49,17 +52,22 @@ class TestRedisProvider:
         """Dependency should create and cleanup all Valkey clients."""
         dependency = RedisProvider()
 
-        async with dependency.provide(coordinator_config) as clients:
+        async with dependency.provide(
+            RedisProviderInput(config=coordinator_config, sentinel_monitors=SentinelMonitorSet([]))
+        ) as clients:
             assert isinstance(clients, CoordinatorValkeyClients)
             # Verify clients are functional
             assert clients.valkey_live is not None
             assert clients.core_valkey_live is not None
-            assert clients.redis_lock is not None
+            assert clients.valkey_lock is not None
             assert clients.valkey_schedule is not None
 
             # Test basic operation on live client
             server_time = await clients.valkey_live.get_server_time()
             assert server_time > 0
+
+            async with RedisLock("test-coordinator-lock", clients.valkey_lock, timeout=1.0):
+                pass
 
     async def test_cleanup_on_exception(
         self,
@@ -69,7 +77,11 @@ class TestRedisProvider:
         dependency = RedisProvider()
 
         with pytest.raises(RuntimeError):
-            async with dependency.provide(coordinator_config) as clients:
+            async with dependency.provide(
+                RedisProviderInput(
+                    config=coordinator_config, sentinel_monitors=SentinelMonitorSet([])
+                )
+            ) as clients:
                 assert isinstance(clients, CoordinatorValkeyClients)
                 raise RuntimeError("Test error")
 

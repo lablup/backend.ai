@@ -3,13 +3,15 @@ import logging
 from asyncio import subprocess
 from typing import Any, override
 
+from ai.backend.appproxy.common.config import ContentEncodingConfig
 from ai.backend.appproxy.common.errors import ServerMisconfiguredError
+from ai.backend.appproxy.common.types import RouteInfo
 from ai.backend.appproxy.worker.proxy.backend.h2 import H2Backend
 from ai.backend.appproxy.worker.proxy.frontend.base import BaseFrontend
 from ai.backend.appproxy.worker.types import Circuit
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class H2Frontend[TCircuitKeyType: (int, str)](BaseFrontend[H2Backend, TCircuitKeyType]):
@@ -24,9 +26,25 @@ class H2Frontend[TCircuitKeyType: (int, str)](BaseFrontend[H2Backend, TCircuitKe
         self.api_port_pool = set(range(h2_config.api_port_pool[0], h2_config.api_port_pool[1] + 1))
 
     @override
+    async def register_circuit(self, circuit: Circuit, routes: list[RouteInfo]) -> bool:
+        # nghttpx receives the requests, so the worker cannot check credentials or client addresses.
+        # A stored circuit is skipped instead of raising, which would stop the worker from starting.
+        if circuit.open_to_public and not circuit.ip_validator.is_restricted:
+            registered = await super().register_circuit(circuit, routes)
+        else:
+            log.error("skipped an access-controlled HTTP/2 circuit", circuit_id=circuit.id)
+            registered = False
+        return registered
+
+    @override
     async def list_inactive_circuits(self, threshold: int) -> list[Circuit]:
         # We can't measure activeness of HTTP/2 circuits
         return []
+
+    @override
+    def apply_content_encoding_config(self, config: ContentEncodingConfig) -> None:
+        # nghttpx forwards request bodies without passing them through the worker.
+        pass
 
     async def _log_monitor_task(
         self, stream: asyncio.StreamReader, log_header_postfix: str = ""
@@ -43,4 +61,4 @@ class H2Frontend[TCircuitKeyType: (int, str)](BaseFrontend[H2Backend, TCircuitKe
         except asyncio.CancelledError:
             raise  # process did not terminate before task cleanup
         else:
-            log.exception("E20010: nghttpx terminated unexpectedly")
+            log.error("E20010: nghttpx terminated unexpectedly", exit_code=proc.returncode)

@@ -1,0 +1,14 @@
+/**
+ @license
+ Copyright (c) 2015-2026 Lablup Inc. All rights reserved.
+
+ Co-located styles for <TerminateSessionModalForProjectAdmin> (to-astryx
+ ticket 33). Replaces the antd-style `createStyles` block; imported by the
+ component itself (P17). Plain `ul` chrome — nothing targets `.ant-*` (P6).
+
+ The rule restores list markers, which the global Astryx reset removes
+ (`ul { list-style-type: none }`); the sibling v1 modal already carries the
+ same StyleX-side treatment.
+
+ Token mapping (P19-checked): token.paddingMD (20px) -> var(--spacing-5).
+*/.terminate-session-modal-admin-list ul{list-style-type:circle;padding-left:var(--spacing-5)}

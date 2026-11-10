@@ -1,0 +1,342 @@
+"""도메인 만들기 — 누가 만들 수 있고, 무엇이 이름을 막는가."""
+
+from __future__ import annotations
+
+from collections.abc import Mapping
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Any, override
+
+import pytest
+
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.v2.domain.request import (
+    AdminSearchDomainsInput,
+    CreateDomainInput,
+    DomainFilter,
+)
+from ai.backend.common.dto.manager.v2.domain.response import DomainNode
+from ai.backend.common.dto.manager.v2.domain.types import DomainProjectFilter
+from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.manager.api.adapters.domain.adapter import DomainAdapter
+from ai.backend.manager.errors.auth import InsufficientPrivilege
+from ai.backend.manager.models.project.creators import ProjectCreator
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.testutils.scenario_steps import (
+    Configured,
+    Given,
+    Says,
+    Scenario,
+    Then,
+    When,
+)
+from bai_scenario.components.domain import (
+    WAS_HERE,
+    ADomainAndACaller,
+    ADomainAndSomeone,
+    TheCallIsRefused,
+    TheNewDomainNode,
+)
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import TestSeedingSession
+from bai_scenario.runner.steps import run_scenario
+
+FRESH = Says("새로 생성한 도메인", english="a freshly created domain")
+ENFORCEMENT = "manager.rbac.enforcement_enabled"
+
+type DomainStep = Scenario[TestSeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
+
+
+@dataclass(frozen=True)
+class Creating(When[ADomainAndACaller, DomainAdapter, DomainNode]):
+    """도메인을 만든다. 이름을 대지 않으면 미리 만든 도메인의 이름을 그대로 쓴다."""
+
+    named: str | None = None
+    described: str | None = None
+
+    @override
+    def operation(self) -> str:
+        return "create"
+
+    @override
+    def describe(self, laid: ADomainAndACaller) -> str:
+        name = self.named or laid.domain.name
+        return Says(
+            f"{laid.caller.username}이 {name}으로 생성합니다",
+            english=f"{laid.caller.username} creates it as {name}",
+        )
+
+    @override
+    async def call(self, adapter: DomainAdapter, laid: ADomainAndACaller) -> DomainNode:
+        with ActingAs(laid.caller):
+            payload = await adapter.create(
+                CreateDomainInput(name=self.named or laid.domain.name, description=self.described)
+            )
+        return payload.domain
+
+
+@dataclass(frozen=True)
+class CreatingThenFindingByItsModelStore(When[ADomainAndACaller, DomainAdapter, DomainNode]):
+    """도메인을 만든 뒤, 그 도메인의 model-store 프로젝트를 가진 도메인으로 걸러 다시 찾는다.
+
+    그 프로젝트가 없으면 걸러 찾은 답이 비어 거부로 끝난다.
+    """
+
+    named: str
+    described: str | None = None
+
+    @override
+    def operation(self) -> str:
+        return "create"
+
+    @override
+    def describe(self, laid: ADomainAndACaller) -> str:
+        return Says(
+            f"{laid.caller.username}이 {self.named}으로 생성한 뒤, "
+            "model-store 프로젝트를 가진 도메인으로 필터 기반 조회합니다",
+            english=(
+                f"{laid.caller.username} creates it as {self.named}, then searches for "
+                "the domain holding the model-store project"
+            ),
+        )
+
+    @override
+    async def call(self, adapter: DomainAdapter, laid: ADomainAndACaller) -> DomainNode:
+        with ActingAs(laid.caller):
+            created = await adapter.create(
+                CreateDomainInput(name=self.named, description=self.described)
+            )
+            project = ProjectCreator.model_store(
+                domain_id=DomainID(created.domain.entity_id), domain_name=self.named
+            )
+            found = await adapter.global_search(
+                AdminSearchDomainsInput(
+                    filter=DomainFilter(
+                        name=StringFilter(equals=self.named),
+                        project=DomainProjectFilter(name=StringFilter(equals=project.name)),
+                    )
+                )
+            )
+        match found.items:
+            case [node]:
+                return node
+            case _:
+                raise LookupError(f"{len(found.items)} domains hold the model-store project")
+
+
+@dataclass(frozen=True)
+class TheWholeNodeComesBack(
+    Scenario[TestSeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "creating-a-domain-answers-with-the-whole-node"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "superadmin 이 이름과 설명만 지정하고 도메인을 생성하면, "
+            "요청에 없던 값들은 기본값으로 채워진 노드 전체가 응답으로 옵니다",
+            english=(
+                "when the superadmin creates a domain with only a name and a description, "
+                "the whole node comes back with the values the request omitted filled "
+                "from defaults"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
+        return ADomainAndSomeone(role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[ADomainAndACaller, DomainAdapter, DomainNode]:
+        return Creating(named="new-domain", described=FRESH)
+
+    @override
+    def then(self) -> Then[ADomainAndACaller, DomainNode]:
+        return TheNewDomainNode(started=self.started, named="new-domain", described=FRESH)
+
+
+@dataclass(frozen=True)
+class ANameAnotherDomainHoldsIsRefused(
+    Scenario[TestSeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
+):
+    @override
+    def summary(self) -> str:
+        return "a-name-another-domain-already-holds-is-refused"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "이미 어떤 도메인이 쓰고 있는 이름으로 생성하려 하면, "
+            "권한이 있어도 이름이 겹친다는 이유로 거부됩니다",
+            english=(
+                "when a domain is created with a name another domain already holds, "
+                "it is rejected because the name is taken even when the caller has "
+                "the permission"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
+        return ADomainAndSomeone(role=UserRole.SUPERADMIN, name_hint="taken")
+
+    @override
+    def when(self) -> When[ADomainAndACaller, DomainAdapter, DomainNode]:
+        return Creating(described=WAS_HERE)
+
+    @override
+    def then(self) -> Then[ADomainAndACaller, DomainNode]:
+        return TheCallIsRefused(InvalidAPIParameters)
+
+
+@dataclass(frozen=True)
+class ABlankNameIsRefused(
+    Scenario[TestSeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
+):
+    @override
+    def summary(self) -> str:
+        return "a-blank-name-is-refused"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "이름이 공백뿐이면 도메인을 생성할 수 없습니다",
+            english="a domain cannot be created when the name is only whitespace",
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
+        return ADomainAndSomeone(role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[ADomainAndACaller, DomainAdapter, DomainNode]:
+        return Creating(named="   ")
+
+    @override
+    def then(self) -> Then[ADomainAndACaller, DomainNode]:
+        return TheCallIsRefused(InvalidAPIParameters)
+
+
+@dataclass(frozen=True)
+class APlainUserMayNotCreate(
+    Scenario[TestSeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-who-is-not-the-superadmin-may-not-create-a-domain"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "superadmin 이 아닌 사용자가 도메인을 생성하려 하면, "
+            "권한을 얼마나 받았는지와 무관하게 역할로 거부됩니다",
+            english=(
+                "when a user who is not the superadmin tries to create a domain, "
+                "the role rejects it regardless of how much permission the user holds"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
+        return ADomainAndSomeone()
+
+    @override
+    def when(self) -> When[ADomainAndACaller, DomainAdapter, DomainNode]:
+        return Creating(named="by-a-user")
+
+    @override
+    def then(self) -> Then[ADomainAndACaller, DomainNode]:
+        return TheCallIsRefused(InsufficientPrivilege)
+
+
+@dataclass(frozen=True)
+class EnforcementOffChangesNothing(
+    Scenario[TestSeedingSession, ADomainAndACaller, DomainAdapter, DomainNode], Configured
+):
+    @override
+    def summary(self) -> str:
+        return "turning-enforcement-off-still-does-not-let-a-user-create-a-domain"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "엔티티 권한 집행을 꺼도 도메인 생성은 여전히 거부됩니다. "
+            "이 동작은 권한 그래프가 아니라 역할이 검사하기 때문입니다",
+            english=(
+                "turning entity permission enforcement off still rejects creating a domain, "
+                "because a role checks this operation, not the permission graph"
+            ),
+        )
+
+    @override
+    def config(self) -> Mapping[str, Any]:
+        return {ENFORCEMENT: False}
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
+        return ADomainAndSomeone()
+
+    @override
+    def when(self) -> When[ADomainAndACaller, DomainAdapter, DomainNode]:
+        return Creating(named="by-a-user-again")
+
+    @override
+    def then(self) -> Then[ADomainAndACaller, DomainNode]:
+        return TheCallIsRefused(InsufficientPrivilege)
+
+
+@dataclass(frozen=True)
+class AModelStoreProjectComesWithIt(
+    Scenario[TestSeedingSession, ADomainAndACaller, DomainAdapter, DomainNode]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "creating-a-domain-also-creates-its-model-store-project"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "superadmin 이 도메인을 생성하면 model-store 프로젝트가 함께 생성되어, "
+            "그 프로젝트를 가진 도메인으로 필터 기반 조회할 때 생성한 도메인이 응답으로 옵니다",
+            english=(
+                "when the superadmin creates a domain, its model-store project is created "
+                "too, and searching for the domain holding that project brings back the "
+                "domain just created"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
+        return ADomainAndSomeone(role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[ADomainAndACaller, DomainAdapter, DomainNode]:
+        return CreatingThenFindingByItsModelStore(named="with-model-store", described=FRESH)
+
+    @override
+    def then(self) -> Then[ADomainAndACaller, DomainNode]:
+        return TheNewDomainNode(started=self.started, named="with-model-store", described=FRESH)
+
+
+SCENARIOS: list[DomainStep] = [
+    TheWholeNodeComesBack(started=datetime.now(UTC)),
+    AModelStoreProjectComesWithIt(started=datetime.now(UTC)),
+    ANameAnotherDomainHoldsIsRefused(),
+    ABlankNameIsRefused(),
+    APlainUserMayNotCreate(),
+    EnforcementOffChangesNothing(),
+]
+
+
+@pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
+async def test_creating(
+    scenario: DomainStep, adapter: DomainAdapter, engine: ExtendedAsyncSAEngine
+) -> None:
+    await run_scenario(scenario, adapter, engine)

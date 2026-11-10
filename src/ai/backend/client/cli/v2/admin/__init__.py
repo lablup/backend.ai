@@ -47,6 +47,15 @@ def agent() -> None:
 
 @admin.group(
     cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.admin.app_config_fragment:app_config_fragment",
+    name="app-config-fragment",
+)
+def app_config_fragment() -> None:
+    """Admin app config fragment commands."""
+
+
+@admin.group(
+    cls=LazyGroup,
     import_name="ai.backend.client.cli.v2.admin.app_config_allow_list:app_config_allow_list",
     name="app-config-allow-list",
 )
@@ -54,9 +63,27 @@ def app_config_allow_list() -> None:
     """Admin app config allow-list commands."""
 
 
+@admin.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.admin.idle_checker:idle_checker",
+    name="idle-checker",
+)
+def idle_checker() -> None:
+    """Admin idle checker commands."""
+
+
 @admin.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.admin.deployment:deployment")
 def deployment() -> None:
     """Admin deployment commands."""
+
+
+@admin.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.admin.idle_checker_assignment:idle_checker_assignment",
+    name="idle-checker-assignment",
+)
+def idle_checker_assignment() -> None:
+    """Admin idle checker assignment commands."""
 
 
 @admin.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.admin.image:image")
@@ -80,6 +107,19 @@ def artifact() -> None:
 )
 def container_registry() -> None:
     """Admin container registry commands."""
+
+
+@admin.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.admin.client_ip_masking:client_ip_masking_policy",
+)
+def client_ip_masking_policy() -> None:
+    """Admin client IP masking policy commands."""
+
+
+@admin.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.admin.secret:secret")
+def secret() -> None:
+    """Admin stored secret commands."""
 
 
 @admin.group(
@@ -217,10 +257,22 @@ def scheduling_handler() -> None:
 
 @admin.group(
     cls=LazyGroup,
-    import_name="ai.backend.client.cli.v2.admin.invitation:invitation",
+    import_name="ai.backend.client.cli.v2.admin.system_session_environ:system_session_environ",
+    name="system-session-environ",
 )
-def invitation() -> None:
-    """Admin role invitation commands."""
+def system_session_environ() -> None:
+    """Admin system session environ commands."""
+
+
+@admin.group(
+    cls=LazyGroup,
+    import_name=(
+        "ai.backend.client.cli.v2.admin.session_lifecycle_handler:session_lifecycle_handler"
+    ),
+    name="session-lifecycle-handler",
+)
+def session_lifecycle_handler() -> None:
+    """Admin session lifecycle handler commands."""
 
 
 @admin.group(

@@ -11,6 +11,7 @@ from pathlib import Path
 from subprocess import CalledProcessError
 from typing import override
 
+from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.docker import KernelFeatures
 from ai.backend.common.stage.types import (
     ArgsSpecGenerator,
@@ -86,17 +87,20 @@ class ScratchProvisioner(Provisioner[ScratchSpec, ScratchResult]):
         )
 
     async def _create_filesystem(self, spec: ScratchSpec) -> None:
-        loop = asyncio.get_running_loop()
         tmp_dir = ScratchUtil.tmp_dir(spec.scratch_root, spec.kernel_id)
         scratch_dir = ScratchUtil.scratch_dir(spec.scratch_root, spec.kernel_id)
         if sys.platform.startswith("linux") and spec.scratch_type == "memory":
-            await loop.run_in_executor(None, functools.partial(tmp_dir.mkdir, exist_ok=True))
+            await run_in_executor_with_context(
+                None, functools.partial(tmp_dir.mkdir, exist_ok=True)
+            )
             await self._create_scratch_filesystem(scratch_dir, 64)
             await self._create_scratch_filesystem(tmp_dir, 64)
         elif sys.platform.startswith("linux") and spec.scratch_type == "hostfile":
             await self._create_loop_filesystem(spec.scratch_root, spec.scratch_size, spec.kernel_id)
         else:
-            await loop.run_in_executor(None, functools.partial(scratch_dir.mkdir, exist_ok=True))
+            await run_in_executor_with_context(
+                None, functools.partial(scratch_dir.mkdir, exist_ok=True)
+            )
 
     async def _create_scratch_filesystem(self, scratch_dir: Path, size: int) -> None:
         """
@@ -139,13 +143,14 @@ class ScratchProvisioner(Provisioner[ScratchSpec, ScratchResult]):
     async def _create_loop_filesystem(
         self, scratch_root: Path, scratch_size: int, kernel_id: KernelId
     ) -> None:
-        loop = asyncio.get_running_loop()
         scratch_dir = ScratchUtil.scratch_dir(scratch_root, kernel_id)
         scratch_file = ScratchUtil.scratch_file(scratch_root, kernel_id)
-        await loop.run_in_executor(
+        await run_in_executor_with_context(
             None, functools.partial(os.makedirs, str(scratch_dir), exist_ok=True)
         )
-        await loop.run_in_executor(None, self._create_sparse_file, str(scratch_file), scratch_size)
+        await run_in_executor_with_context(
+            None, self._create_sparse_file, str(scratch_file), scratch_size
+        )
         mkfs = await asyncio.create_subprocess_exec(
             "/sbin/mkfs.ext4",
             str(scratch_file),
@@ -170,8 +175,7 @@ class ScratchProvisioner(Provisioner[ScratchSpec, ScratchResult]):
             work_dir.mkdir(parents=True, exist_ok=True)
             work_dir.chmod(0o755)
 
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(None, create)
+        await run_in_executor_with_context(None, create)
 
     async def _clone_dotfiles(self, spec: ScratchSpec) -> None:
         # Since these files are bind-mounted inside a bind-mounted directory,
@@ -179,8 +183,7 @@ class ScratchProvisioner(Provisioner[ScratchSpec, ScratchResult]):
         # as root in the host-side filesystem, which prevents deletion of scratch
         # directories when the agent is running as non-root.
 
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(None, self._clone_func, spec)
+        await run_in_executor_with_context(None, self._clone_func, spec)
 
     def _clone_func(self, spec: ScratchSpec) -> None:
         work_dir = ScratchUtil.work_dir(spec.scratch_root, spec.kernel_id)
@@ -258,19 +261,18 @@ class ScratchProvisioner(Provisioner[ScratchSpec, ScratchResult]):
 
     @override
     async def teardown(self, resource: ScratchResult) -> None:
-        loop = asyncio.get_running_loop()
         scratch_dir = resource.scratch_dir
         tmp_dir = resource.tmp_dir
         try:
             if sys.platform.startswith("linux") and resource.scratch_type == "memory":
                 await self._destroy_scratch_filesystem(scratch_dir)
                 await self._destroy_scratch_filesystem(tmp_dir)
-                await loop.run_in_executor(None, shutil.rmtree, scratch_dir)
-                await loop.run_in_executor(None, shutil.rmtree, tmp_dir)
+                await run_in_executor_with_context(None, shutil.rmtree, scratch_dir)
+                await run_in_executor_with_context(None, shutil.rmtree, tmp_dir)
             elif sys.platform.startswith("linux") and resource.scratch_type == "hostfile":
                 await self._destroy_loop_filesystem(resource)
             else:
-                await loop.run_in_executor(None, shutil.rmtree, scratch_dir)
+                await run_in_executor_with_context(None, shutil.rmtree, scratch_dir)
         except CalledProcessError:
             pass
         except FileNotFoundError:
@@ -297,15 +299,14 @@ class ScratchProvisioner(Provisioner[ScratchSpec, ScratchResult]):
             )
 
     async def _destroy_loop_filesystem(self, resource: ScratchResult) -> None:
-        loop = asyncio.get_running_loop()
         scratch_dir = resource.scratch_dir
         scratch_file = resource.scratch_file
         umount = await asyncio.create_subprocess_exec("umount", str(scratch_dir))
         exit_code = await umount.wait()
         if exit_code != 0:
             raise RuntimeError("umount failed")
-        await loop.run_in_executor(None, scratch_file.unlink)
-        await loop.run_in_executor(None, shutil.rmtree, str(scratch_dir))
+        await run_in_executor_with_context(None, scratch_file.unlink)
+        await run_in_executor_with_context(None, shutil.rmtree, str(scratch_dir))
 
 
 class ScratchStage(ProvisionStage[ScratchSpec, ScratchResult]):

@@ -9,7 +9,7 @@ from datetime import datetime
 import sqlalchemy as sa
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
-from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
 from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import make_string_in_factory
@@ -73,6 +73,26 @@ class AppConfigAllowListConditions:
     by_config_name_in = staticmethod(make_string_in_factory(AppConfigAllowListRow.config_name))
 
     @staticmethod
+    def by_id_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = AppConfigAllowListRow.id == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_id_in(spec: UUIDInMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = AppConfigAllowListRow.id.in_(spec.values)
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
     def by_ids(ids: Collection[uuid.UUID]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return AppConfigAllowListRow.id.in_(ids)
@@ -106,44 +126,6 @@ class AppConfigAllowListConditions:
     def by_scope_type_not_in(scope_types: Sequence[AppConfigScopeType]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return AppConfigAllowListRow.scope_type.not_in(list(scope_types))
-
-        return inner
-
-    # --- cursor (created_at-based) pagination ---
-
-    @staticmethod
-    def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for forward pagination (after cursor).
-
-        Uses subquery to get created_at of the cursor row and compare.
-        """
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(AppConfigAllowListRow.created_at)
-                .where(AppConfigAllowListRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return AppConfigAllowListRow.created_at < subquery
-
-        return inner
-
-    @staticmethod
-    def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for backward pagination (before cursor).
-
-        Uses subquery to get created_at of the cursor row and compare.
-        """
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(AppConfigAllowListRow.created_at)
-                .where(AppConfigAllowListRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return AppConfigAllowListRow.created_at > subquery
 
         return inner
 

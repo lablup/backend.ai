@@ -1,13 +1,25 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
+from typing import override
 from uuid import UUID
 
+import strawberry
+from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.retention_policy import RetentionPolicyID
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.retention_policy.request import (
     CreateRetentionPolicyInput as CreateInputDTO,
+)
+from ai.backend.common.dto.manager.v2.retention_policy.request import (
+    PartialBulkPurgeRetentionPoliciesInput as PartialBulkPurgeInputDTO,
+)
+from ai.backend.common.dto.manager.v2.retention_policy.request import (
+    PartialBulkUpdateRetentionPoliciesInput as PartialBulkUpdateInputDTO,
 )
 from ai.backend.common.dto.manager.v2.retention_policy.request import (
     RetentionPolicyFilter as FilterDTO,
@@ -34,9 +46,12 @@ from ai.backend.common.dto.manager.v2.retention_policy.response import (
     UpdateRetentionPolicyPayload as UpdatePayloadDTO,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.base import UUIDFilter
+from ai.backend.manager.api.gql.common_types import PartialBulkFailureGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
+    gql_added_field,
     gql_connection_type,
     gql_enum,
     gql_field,
@@ -45,11 +60,12 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 
 @gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description="Retention category identifying a code-side cleanup procedure.",
     ),
     name="RetentionCategory",
@@ -63,11 +79,12 @@ class RetentionCategoryGQL(StrEnum):
     SESSIONS = "sessions"
     USAGE_RECORDS = "usage_records"
     USAGE_BUCKETS = "usage_buckets"
+    PROJECTS = "projects"
 
 
 @gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description="Order fields for retention policies.",
     ),
     name="RetentionPolicyOrderField",
@@ -80,13 +97,19 @@ class RetentionPolicyOrderFieldGQL(StrEnum):
 
 @gql_node_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description="A per-category retention policy: admin-tunable cleanup settings for accumulating DB records.",
     ),
     name="RetentionPolicy",
 )
 class RetentionPolicyGQL(PydanticNodeMixin[NodeDTO]):
     id: NodeID[str] = gql_field(description="Relay-style global node identifier.")
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="UUID of the retention policy.",
+        ),
+    )
     category: RetentionCategoryGQL = gql_field(description="Retention category.")
     retention_period_days: int = gql_field(
         description="Retention period in days; records older than now - period are purged."
@@ -98,13 +121,26 @@ class RetentionPolicyGQL(PydanticNodeMixin[NodeDTO]):
     created_at: datetime = gql_field(description="Timestamp when this policy was created.")
     updated_at: datetime = gql_field(description="Timestamp of the last modification.")
 
+    @classmethod
+    @override
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[RetentionPolicyGQL | None]:
+        return await info.context.data_loaders.retention_policy_loader.load_many([
+            RetentionPolicyID(UUID(nid)) for nid in node_ids
+        ])
+
 
 RetentionPolicyEdge = Edge[RetentionPolicyGQL]
 
 
 @gql_connection_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description="Paginated list of retention policies.",
     )
 )
@@ -117,18 +153,22 @@ class RetentionPolicyConnection(Connection[RetentionPolicyGQL]):
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION, description="Filter for retention policies."
-    ),
+    BackendAIGQLMeta(added_version="26.8.0", description="Filter for retention policies."),
     name="RetentionPolicyFilter",
 )
 class RetentionPolicyFilterGQL(PydanticInputMixin[FilterDTO]):
     category: RetentionCategoryGQL | None = gql_field(default=None, description="Category filter.")
     enabled: bool | None = gql_field(default=None, description="Enabled filter.")
+    entity_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by retention policy ID."
+        ),
+        default=None,
+    )
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Order specification."),
+    BackendAIGQLMeta(added_version="26.8.0", description="Order specification."),
     name="RetentionPolicyOrderBy",
 )
 class RetentionPolicyOrderByGQL(PydanticInputMixin[OrderDTO]):
@@ -137,9 +177,7 @@ class RetentionPolicyOrderByGQL(PydanticInputMixin[OrderDTO]):
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION, description="Create retention policy input."
-    ),
+    BackendAIGQLMeta(added_version="26.8.0", description="Create retention policy input."),
     name="CreateRetentionPolicyInput",
 )
 class CreateRetentionPolicyInputGQL(PydanticInputMixin[CreateInputDTO]):
@@ -151,9 +189,7 @@ class CreateRetentionPolicyInputGQL(PydanticInputMixin[CreateInputDTO]):
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION, description="Update retention policy input."
-    ),
+    BackendAIGQLMeta(added_version="26.8.0", description="Update retention policy input."),
     name="UpdateRetentionPolicyInput",
 )
 class UpdateRetentionPolicyInputGQL(PydanticInputMixin[UpdateInputDTO]):
@@ -165,10 +201,32 @@ class UpdateRetentionPolicyInputGQL(PydanticInputMixin[UpdateInputDTO]):
     enabled: bool | None = gql_field(default=None, description="Toggle enabled.")
 
 
-@gql_pydantic_type(
+@gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION, description="Create retention policy payload."
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for updating several retention policies, each answered for separately.",
     ),
+    name="PartialBulkUpdateRetentionPoliciesInput",
+)
+class PartialBulkUpdateRetentionPoliciesInputGQL(PydanticInputMixin[PartialBulkUpdateInputDTO]):
+    items: list[UpdateRetentionPolicyInputGQL] = gql_field(
+        description="The retention policies to update, each with its ID and fields."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for purging several retention policies, each answered for separately.",
+    ),
+    name="PartialBulkPurgeRetentionPoliciesInput",
+)
+class PartialBulkPurgeRetentionPoliciesInputGQL(PydanticInputMixin[PartialBulkPurgeInputDTO]):
+    ids: list[UUID] = gql_field(description="IDs of the retention policies to purge.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(added_version="26.8.0", description="Create retention policy payload."),
     model=CreatePayloadDTO,
     name="CreateRetentionPolicyPayload",
 )
@@ -177,9 +235,7 @@ class CreateRetentionPolicyPayloadGQL(PydanticOutputMixin[CreatePayloadDTO]):
 
 
 @gql_pydantic_type(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION, description="Update retention policy payload."
-    ),
+    BackendAIGQLMeta(added_version="26.8.0", description="Update retention policy payload."),
     model=UpdatePayloadDTO,
     name="UpdateRetentionPolicyPayload",
 )
@@ -188,9 +244,7 @@ class UpdateRetentionPolicyPayloadGQL(PydanticOutputMixin[UpdatePayloadDTO]):
 
 
 @gql_pydantic_type(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION, description="Delete retention policy payload."
-    ),
+    BackendAIGQLMeta(added_version="26.8.0", description="Delete retention policy payload."),
     model=DeletePayloadDTO,
     name="DeleteRetentionPolicyPayload",
 )
@@ -199,11 +253,45 @@ class DeleteRetentionPolicyPayloadGQL(PydanticOutputMixin[DeletePayloadDTO]):
 
 
 @gql_pydantic_type(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION, description="Purge retention policy payload."
-    ),
+    BackendAIGQLMeta(added_version="26.8.0", description="Purge retention policy payload."),
     model=PurgePayloadDTO,
     name="PurgeRetentionPolicyPayload",
 )
 class PurgeRetentionPolicyPayloadGQL(PydanticOutputMixin[PurgePayloadDTO]):
-    id: UUID = gql_field(description="ID of the purged retention policy.")
+    id: UUID = gql_field(
+        description="ID of the purged retention policy.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `purgedId` or `entityId`.",
+    )
+    purged_id: strawberry.ID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Global ID of the purged retention policy.",
+        ),
+    )
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="UUID of the purged retention policy."
+        ),
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Result of a partial bulk retention policy operation: the policies processed and "
+            "the ones that failed."
+        ),
+    ),
+    model=PartialBulkPayload[NodeDTO],
+    name="PartialBulkRetentionPoliciesPayload",
+)
+class PartialBulkRetentionPoliciesPayloadGQL(PydanticOutputMixin[PartialBulkPayload[NodeDTO]]):
+    """Payload for partial bulk retention policy mutations."""
+
+    successes: list[RetentionPolicyGQL] = gql_field(
+        description="The retention policies processed, as they now stand."
+    )
+    failed: list[PartialBulkFailureGQL] = gql_field(
+        description="The retention policies not processed, each with the reason."
+    )

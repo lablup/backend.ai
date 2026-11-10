@@ -21,6 +21,7 @@ from ai.backend.common.clients.valkey_client.client import (
     AbstractValkeyClient,
     create_valkey_client,
 )
+from ai.backend.common.clients.valkey_client.sentinel_monitor.base import AbstractSentinelMonitor
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.json import dump_json_str, load_json
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -33,10 +34,10 @@ from ai.backend.common.resilience import (
     RetryPolicy,
 )
 from ai.backend.common.resource.types import TotalResourceData
-from ai.backend.common.types import AccessKey, ValkeyTarget
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.common.types import ValkeyTarget
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 # Resilience instance for valkey_stat layer
 valkey_stat_resilience = Resilience(
@@ -54,8 +55,6 @@ valkey_stat_resilience = Resilience(
 )
 
 _DEFAULT_EXPIRATION = 86400  # 24 hours default expiration
-_KEYPAIR_CONCURRENCY_PREFIX: Final[str] = "keypair.concurrency_used"
-_KEYPAIR_SFTP_CONCURRENCY_PREFIX: Final[str] = "keypair.sftp_concurrency_used"
 _KERNEL_COMMIT_PREFIX: Final[str] = "kernel"
 _KERNEL_COMMIT_SUFFIX: Final[str] = "commit"
 _ABUSE_REPORT_HASH: Final[str] = "abuse_report"
@@ -63,10 +62,7 @@ _CONTAINER_COUNT_PREFIX: Final[str] = "container_count"
 _MANAGER_STATUS_PREFIX: Final[str] = "manager.status"
 _INFERENCE_PREFIX: Final[str] = "inference"
 _COMPUTER_METADATA_KEY: Final[str] = "computer.metadata"
-_COMPUTE_CONCURRENCY_USED_KEY_PREFIX: Final[str] = "keypair.concurrency_used."
-_SYSTEM_CONCURRENCY_USED_KEY_PREFIX: Final[str] = "keypair.sftp_concurrency_used."
 _TOTAL_RESOURCE_SLOTS_KEY: Final[str] = "system.total_resource_slots"
-_RESOURCE_PRESET_CHECK_INDEX_KEY: Final[str] = "resource_preset:check:_index_"
 
 
 class ValkeyStatClient:
@@ -92,6 +88,7 @@ class ValkeyStatClient:
         db_id: int,
         human_readable_name: str,
         pubsub_channels: set[str] | None = None,
+        sentinel_monitor: AbstractSentinelMonitor | None = None,
     ) -> Self:
         """
         Create a ValkeyStatClient instance.
@@ -107,6 +104,7 @@ class ValkeyStatClient:
             db_id=db_id,
             human_readable_name=human_readable_name,
             pubsub_channels=pubsub_channels,
+            sentinel_monitor=sentinel_monitor,
         )
         await client.connect()
         return cls(
@@ -119,7 +117,7 @@ class ValkeyStatClient:
         Close the ValkeyStatClient connection.
         """
         if self._closed:
-            log.debug("ValkeyStatClient is already closed.")
+            log.debug("valkey stat client already closed")
             return
         self._closed = True
         await self._client.disconnect()
@@ -144,27 +142,6 @@ class ValkeyStatClient:
             return int(result.decode("utf-8"))
         except (ValueError, UnicodeDecodeError):
             return 0
-
-    @valkey_stat_resilience.apply()
-    async def get_keypair_concurrency_used(
-        self, access_key: str, is_private: bool = False
-    ) -> int | None:
-        """
-        Get current concurrency usage for a keypair.
-
-        :param access_key: The keypair access key.
-        :param is_private: Whether to get SFTP concurrency (True) or regular concurrency (False).
-        :return: The concurrency usage count, or None if not found in cache.
-        """
-        key = self._get_keypair_concurrency_key(access_key, is_private)
-        async with self._client.client() as conn:
-            result = await conn.get(key)
-        if result is None:
-            return None
-        try:
-            return int(result.decode("utf-8"))
-        except (ValueError, UnicodeDecodeError):
-            return None
 
     @valkey_stat_resilience.apply()
     async def get_keypair_last_used_time(self, access_key: str) -> float | None:
@@ -200,9 +177,9 @@ class ValkeyStatClient:
             return {k: Decimal(v) for k, v in raw.items()}
         except (json.JSONDecodeError, UnicodeDecodeError):
             log.warning(
-                "Failed to decode GPU allocation map for agent {}: {}",
-                agent_id,
-                result.decode("utf-8"),
+                "gpu allocation map decode failed",
+                agent_id=agent_id,
+                raw_value=result.decode("utf-8", errors="replace"),
             )
             return None
 
@@ -236,9 +213,9 @@ class ValkeyStatClient:
             return cast(dict[str, Any], msgpack.unpackb(result, raw=False))
         except (ExtraData, UnpackException, ValueError):
             log.warning(
-                "Failed to unpack kernel statistics for ID {}: {}",
-                kernel_id,
-                result.decode("utf-8"),
+                "kernel statistics unpack failed",
+                kernel_id=kernel_id,
+                raw_value=result.decode("utf-8", errors="replace"),
             )
             return None
 
@@ -333,9 +310,9 @@ class ValkeyStatClient:
                 ValueError,
             ):
                 log.warning(
-                    "Failed to unpack session statistics for ID {}: {}",
-                    session_ids[i],
-                    result.decode("utf-8"),
+                    "session statistics unpack failed",
+                    session_id=session_ids[i],
+                    raw_value=result.decode("utf-8", errors="replace"),
                 )
                 stats.append(None)
         return stats
@@ -372,9 +349,9 @@ class ValkeyStatClient:
                 ValueError,
             ):
                 log.warning(
-                    "Failed to unpack agent statistics for ID {}: {}",
-                    agent_ids[i],
-                    result.decode("utf-8"),
+                    "agent statistics unpack failed",
+                    agent_id=agent_ids[i],
+                    raw_value=result.decode("utf-8", errors="replace"),
                 )
                 stats.append(None)
         return stats
@@ -402,9 +379,9 @@ class ValkeyStatClient:
                 counts.append(int(result.decode("utf-8")))
             except (ValueError, UnicodeDecodeError):
                 log.warning(
-                    "Failed to decode container count for key {}: {}",
-                    keys[i],
-                    result.decode("utf-8"),
+                    "container count decode failed",
+                    agent_id=agent_ids[i],
+                    raw_value=result.decode("utf-8", errors="replace"),
                 )
                 counts.append(0)
         return counts
@@ -477,9 +454,9 @@ class ValkeyStatClient:
                 ValueError,
             ):
                 log.warning(
-                    "Failed to unpack inference app statistics for key {}: {}",
-                    keys[i],
-                    result.decode("utf-8"),
+                    "inference app statistics unpack failed",
+                    endpoint_id=endpoint_ids[i],
+                    raw_value=result.decode("utf-8", errors="replace"),
                 )
                 stats.append(None)
         return stats
@@ -598,203 +575,6 @@ class ValkeyStatClient:
         async with self._client.client() as conn:
             return await conn.get(key)
 
-    # Resource preset cache methods
-    def _get_resource_preset_id_key(self, preset_id: str) -> str:
-        """Generate resource preset key by ID."""
-        return f"resource_preset:id:{preset_id}"
-
-    def _get_resource_preset_name_key(self, name: str) -> str:
-        """Generate resource preset key by name."""
-        return f"resource_preset:name:{name}"
-
-    def _get_resource_preset_list_key(self, scaling_group: str | None = None) -> str:
-        """Generate resource preset list key."""
-        return f"resource_preset:list:{scaling_group or '_global_'}"
-
-    def _get_resource_preset_check_key(
-        self, access_key: str, group: str, domain: str, scaling_group: str | None = None
-    ) -> str:
-        """Generate resource preset check key."""
-        return f"resource_preset:check:{access_key}:{group}:{domain}:{scaling_group or '_any_'}"
-
-    @valkey_stat_resilience.apply()
-    async def get_resource_preset_by_id(self, preset_id: str) -> bytes | None:
-        """
-        Get cached resource preset data by ID.
-
-        :param preset_id: The preset ID.
-        :return: The cached data, or None if not found.
-        """
-        key = self._get_resource_preset_id_key(preset_id)
-        async with self._client.client() as conn:
-            return await conn.get(key)
-
-    @valkey_stat_resilience.apply()
-    async def get_resource_preset_by_name(self, name: str) -> bytes | None:
-        """
-        Get cached resource preset data by name.
-
-        :param name: The preset name.
-        :return: The cached data, or None if not found.
-        """
-        key = self._get_resource_preset_name_key(name)
-        async with self._client.client() as conn:
-            return await conn.get(key)
-
-    @valkey_stat_resilience.apply()
-    async def get_resource_preset_list(self, scaling_group: str | None = None) -> bytes | None:
-        """
-        Get cached resource preset list.
-
-        :param scaling_group: The scaling group name.
-        :return: The cached data, or None if not found.
-        """
-        key = self._get_resource_preset_list_key(scaling_group)
-        async with self._client.client() as conn:
-            return await conn.get(key)
-
-    @valkey_stat_resilience.apply()
-    async def get_resource_preset_check_data(
-        self, access_key: str, group: str, domain: str, scaling_group: str | None = None
-    ) -> bytes | None:
-        """
-        Get cached resource preset check data.
-
-        :param access_key: The access key.
-        :param group: The group name.
-        :param domain: The domain name.
-        :param scaling_group: The scaling group name.
-        :return: The cached data, or None if not found.
-        """
-        key = self._get_resource_preset_check_key(access_key, group, domain, scaling_group)
-        async with self._client.client() as conn:
-            return await conn.get(key)
-
-    @valkey_stat_resilience.apply()
-    async def set_resource_preset_by_id_and_name(
-        self, preset_id: str, name: str, value: bytes, expire_sec: int = 60
-    ) -> None:
-        """
-        Cache resource preset data by both ID and name.
-
-        :param preset_id: The preset ID.
-        :param name: The preset name.
-        :param value: The data to cache.
-        :param expire_sec: Expiration time in seconds (default 60).
-        """
-        batch = self._create_batch()
-
-        # Set by ID
-        id_key = self._get_resource_preset_id_key(preset_id)
-        batch.set(id_key, value, expiry=ExpirySet(ExpiryType.SEC, expire_sec))
-
-        # Set by name
-        name_key = self._get_resource_preset_name_key(name)
-        batch.set(name_key, value, expiry=ExpirySet(ExpiryType.SEC, expire_sec))
-
-        async with self._client.client() as conn:
-            await conn.exec(batch, raise_on_error=True)
-
-    @valkey_stat_resilience.apply()
-    async def set_resource_preset_list(
-        self, scaling_group: str | None, value: bytes, expire_sec: int = 60
-    ) -> None:
-        """
-        Cache resource preset list.
-
-        :param scaling_group: The scaling group name.
-        :param value: The data to cache.
-        :param expire_sec: Expiration time in seconds (default 60).
-        """
-        key = self._get_resource_preset_list_key(scaling_group)
-        async with self._client.client() as conn:
-            await conn.set(
-                key=key,
-                value=value,
-                expiry=ExpirySet(ExpiryType.SEC, expire_sec),
-            )
-
-    @valkey_stat_resilience.apply()
-    async def set_resource_preset_check_data(
-        self,
-        access_key: str,
-        group: str,
-        domain: str,
-        scaling_group: str | None,
-        value: bytes,
-        expire_sec: int = 60,
-    ) -> None:
-        """
-        Cache resource preset check data.
-
-        :param access_key: The access key.
-        :param group: The group name.
-        :param domain: The domain name.
-        :param value: The data to cache.
-        :param scaling_group: The scaling group name.
-        :param expire_sec: Expiration time in seconds (default 60).
-        """
-        key = self._get_resource_preset_check_key(access_key, group, domain, scaling_group)
-        batch = self._create_batch()
-        batch.set(
-            key=key,
-            value=value,
-            expiry=ExpirySet(ExpiryType.SEC, expire_sec),
-        )
-        batch.sadd(_RESOURCE_PRESET_CHECK_INDEX_KEY, [key])
-        batch.expire(_RESOURCE_PRESET_CHECK_INDEX_KEY, expire_sec)
-        async with self._client.client() as conn:
-            await conn.exec(batch, raise_on_error=True)
-
-    @valkey_stat_resilience.apply()
-    async def delete_resource_preset(
-        self, preset_id: str | None = None, name: str | None = None
-    ) -> int:
-        """
-        Delete resource preset cache by ID and/or name.
-
-        :param preset_id: The preset ID.
-        :param name: The preset name.
-        :return: Number of keys that were deleted.
-        """
-        keys_to_delete: list[str | bytes] = []
-        if preset_id:
-            keys_to_delete.append(self._get_resource_preset_id_key(preset_id))
-        if name:
-            keys_to_delete.append(self._get_resource_preset_name_key(name))
-
-        if not keys_to_delete:
-            return 0
-        async with self._client.client() as conn:
-            return await conn.delete(keys_to_delete)
-
-    @valkey_stat_resilience.apply()
-    async def invalidate_all_resource_presets(self) -> None:
-        """
-        Invalidate all resource preset caches by scanning and deleting all preset-related keys.
-        This includes keys for ID, name, list, and check data.
-        """
-        # Scan for all preset-related keys
-        patterns = [
-            "resource_preset:id:*",
-            "resource_preset:name:*",
-            "resource_preset:list:*",
-            "resource_preset:check:*",
-        ]
-
-        all_keys: list[bytes] = []
-        for pattern in patterns:
-            keys = await self._keys(pattern)
-            all_keys.extend(keys)
-
-        # Delete all keys in batch, including the check index SET
-        if all_keys:
-            batch = self._create_batch()
-            batch = self._invalidate_resource_presets(batch, all_keys)
-            batch.delete([_RESOURCE_PRESET_CHECK_INDEX_KEY])
-            async with self._client.client() as conn:
-                await conn.exec(batch, raise_on_error=True)
-
     # TODO: Remove this too generalized methods
     @valkey_stat_resilience.apply()
     async def set(
@@ -870,17 +650,6 @@ class ValkeyStatClient:
         async with self._client.client() as conn:
             return await conn.incr(key)
 
-    def _get_keypair_concurrency_key(self, access_key: str, is_private: bool) -> str:
-        """
-        Generate keypair concurrency key.
-
-        :param access_key: The access key.
-        :param is_private: Whether this is for SFTP concurrency.
-        :return: The generated key.
-        """
-        prefix = _KEYPAIR_SFTP_CONCURRENCY_PREFIX if is_private else _KEYPAIR_CONCURRENCY_PREFIX
-        return f"{prefix}.{access_key}"
-
     @valkey_stat_resilience.apply()
     async def increment_keypair_query_count(
         self,
@@ -894,141 +663,6 @@ class ValkeyStatClient:
         last_call_time_key = self._get_keypair_last_call_time_key(access_key)
         batch.set(last_call_time_key, str(now).encode())
         batch.expire(last_call_time_key, 86400 * 30)  # retention: 1 month
-        async with self._client.client() as conn:
-            await conn.exec(batch, raise_on_error=True)
-
-    # DEPRECATED: These methods are being phased out in favor of cache mirroring approach
-    # Will be removed in future versions
-    @valkey_stat_resilience.apply()
-    async def increment_keypair_concurrencies(
-        self,
-        concurrency_to_increment: Mapping[str, int],
-        sftp_concurrency_to_increment: Mapping[str, int],
-    ) -> None:
-        """
-        DEPRECATED: Use update_compute_concurrency_by_map and update_system_concurrency_by_map instead.
-        This method will be removed in future versions.
-
-        Increment keypair concurrency counters.
-
-        :param concurrency_to_increment: Mapping of access keys to concurrency increments.
-        :param sftp_concurrency_to_increment: Mapping of access keys to SFTP concurrency increments.
-        """
-        log.warning(
-            "increment_keypair_concurrencies is deprecated. "
-            "Use update_compute_concurrency_by_map and update_system_concurrency_by_map instead."
-        )
-        if not concurrency_to_increment and not sftp_concurrency_to_increment:
-            return
-
-        batch = self._create_batch()
-        for access_key, delta in concurrency_to_increment.items():
-            key = self._get_keypair_concurrency_key(access_key, is_private=False)
-            batch.incrby(key, delta)
-
-        for access_key, delta in sftp_concurrency_to_increment.items():
-            key = self._get_keypair_concurrency_key(access_key, is_private=True)
-            batch.incrby(key, delta)
-
-        async with self._client.client() as conn:
-            await conn.exec(batch, raise_on_error=True)
-
-    @valkey_stat_resilience.apply()
-    async def decrement_keypair_concurrencies(
-        self,
-        concurrency_to_decrement: Mapping[str, int],
-        sftp_concurrency_to_decrement: Mapping[str, int],
-    ) -> None:
-        """
-        DEPRECATED: Use update_compute_concurrency_by_map and update_system_concurrency_by_map instead.
-        This method will be removed in future versions.
-
-        Decrement keypair concurrency counters.
-
-        :param concurrency_to_decrement: Mapping of access keys to concurrency decrements.
-        :param sftp_concurrency_to_decrement: Mapping of access keys to SFTP concurrency decrements.
-        """
-        log.warning(
-            "decrement_keypair_concurrencies is deprecated. "
-            "Use update_compute_concurrency_by_map and update_system_concurrency_by_map instead."
-        )
-        if not concurrency_to_decrement and not sftp_concurrency_to_decrement:
-            return
-
-        batch = self._create_batch()
-
-        for access_key, delta in concurrency_to_decrement.items():
-            key = self._get_keypair_concurrency_key(access_key, is_private=False)
-            batch.decrby(key, delta)
-
-        for access_key, delta in sftp_concurrency_to_decrement.items():
-            key = self._get_keypair_concurrency_key(access_key, is_private=True)
-            batch.decrby(key, delta)
-
-        async with self._client.client() as conn:
-            await conn.exec(batch, raise_on_error=True)
-
-    @valkey_stat_resilience.apply()
-    async def decrement_keypair_concurrency(self, access_key: str, is_private: bool = False) -> int:
-        """
-        Decrement keypair concurrency counter.
-
-        :param access_key: The access key to decrement concurrency for.
-        :param is_private: Whether this is for SFTP concurrency (True) or regular concurrency (False).
-        :return: The new value after decrement.
-        """
-        key = self._get_keypair_concurrency_key(access_key, is_private)
-        async with self._client.client() as conn:
-            return await conn.incrby(key, -1)
-
-    @valkey_stat_resilience.apply()
-    async def delete_keypair_concurrency(self, access_key: str, is_private: bool = False) -> bool:
-        """
-        Delete keypair concurrency counter.
-
-        :param access_key: The access key to delete concurrency counter for.
-        :param is_private: Whether this is for SFTP concurrency (True) or regular concurrency (False).
-        :return: True if the key was deleted, False if it didn't exist.
-        """
-        key = self._get_keypair_concurrency_key(access_key, is_private)
-        async with self._client.client() as conn:
-            result = await conn.delete([key])
-        return result > 0
-
-    @valkey_stat_resilience.apply()
-    async def set_keypair_concurrency(
-        self, access_key: str, concurrency_used: int, is_private: bool = False
-    ) -> None:
-        """
-        Set keypair concurrency counter.
-
-        :param access_key: The access key to set concurrency for.
-        :param concurrency_used: The concurrency value to set.
-        :param is_private: Whether this is for SFTP concurrency (True) or regular concurrency (False).
-        """
-        key = self._get_keypair_concurrency_key(access_key, is_private)
-        async with self._client.client() as conn:
-            await conn.set(key, str(concurrency_used))
-
-    @valkey_stat_resilience.apply()
-    async def set_keypair_concurrencies(
-        self, access_key: str, regular_concurrency: int, sftp_concurrency: int
-    ) -> None:
-        """
-        Set both regular and SFTP keypair concurrency counters in a batch.
-
-        :param access_key: The access key to set concurrency for.
-        :param regular_concurrency: The regular concurrency value to set.
-        :param sftp_concurrency: The SFTP concurrency value to set.
-        """
-        batch = self._create_batch()
-
-        regular_key = self._get_keypair_concurrency_key(access_key, is_private=False)
-        sftp_key = self._get_keypair_concurrency_key(access_key, is_private=True)
-
-        batch.set(regular_key, str(regular_concurrency))
-        batch.set(sftp_key, str(sftp_concurrency))
-
         async with self._client.client() as conn:
             await conn.exec(batch, raise_on_error=True)
 
@@ -1224,43 +858,6 @@ class ValkeyStatClient:
             await conn.exec(batch, raise_on_error=True)
 
     @valkey_stat_resilience.apply()
-    async def check_keypair_concurrency(
-        self,
-        redis_key: str,
-        limit: int,
-    ) -> tuple[int, int]:
-        """
-        Check and increment keypair concurrency usage.
-
-        :param redis_key: The key for storing concurrency count.
-        :param limit: The maximum allowed concurrent sessions.
-        :return: Tuple of (ok, concurrency_used) where ok is 1 if allowed, 0 if limit exceeded.
-        """
-        async with self._client.client() as conn:
-            # Set default value if key doesn't exist
-            current_value = await conn.get(redis_key)
-            if current_value is None:
-                await conn.set(redis_key, "0")
-
-            # Get current count
-            result = await conn.get(redis_key)
-            if result is not None:
-                try:
-                    current_count = int(str(result))
-                except (ValueError, TypeError):
-                    current_count = 0
-            else:
-                current_count = 0
-
-            # Check if limit is exceeded
-            if limit > 0 and current_count >= limit:
-                return (0, current_count)
-
-            # Increment counter
-            await conn.incr(redis_key)
-        return (1, current_count + 1)
-
-    @valkey_stat_resilience.apply()
     async def scan_and_get_manager_status(
         self,
         pattern: str,
@@ -1308,78 +905,6 @@ class ValkeyStatClient:
     ) -> str:
         return f"kp:{access_key}:last_call_time"
 
-    @valkey_stat_resilience.apply()
-    async def update_compute_concurrency_by_map(
-        self,
-        concurrency_map: Mapping[str, int],
-    ) -> None:
-        """
-        Update compute concurrency values from a map of access keys to concurrency counts.
-
-        :param concurrency_map: Dictionary mapping access keys to their compute concurrency counts.
-        """
-        if not concurrency_map:
-            return
-
-        updates: dict[str, bytes] = {}
-        for access_key, concurrency_count in concurrency_map.items():
-            key = f"{_COMPUTE_CONCURRENCY_USED_KEY_PREFIX}{access_key}"
-            updates[key] = str(concurrency_count).encode("utf-8")
-
-        await self.set_multiple_keys(updates)
-
-    @valkey_stat_resilience.apply()
-    async def update_system_concurrency_by_map(
-        self,
-        concurrency_map: Mapping[str, int],
-    ) -> None:
-        """
-        Update system (SFTP) concurrency values from a map of access keys to concurrency counts.
-
-        :param concurrency_map: Dictionary mapping access keys to their system concurrency counts.
-        """
-        if not concurrency_map:
-            return
-
-        updates: dict[str, bytes] = {}
-        for access_key, concurrency_count in concurrency_map.items():
-            key = f"{_SYSTEM_CONCURRENCY_USED_KEY_PREFIX}{access_key}"
-            updates[key] = str(concurrency_count).encode("utf-8")
-
-        await self.set_multiple_keys(updates)
-
-    @valkey_stat_resilience.apply()
-    async def update_concurrency_by_fullscan(
-        self,
-        access_key_to_concurrency: Mapping[str, int],
-    ) -> None:
-        """
-        Update concurrency values by doing a full scan and setting all keys.
-        Used when the system has no sessions to reset all concurrency to 0.
-
-        :param access_key_to_concurrency: Dictionary mapping access keys to their concurrency counts.
-        """
-        updates: dict[str, bytes] = {}
-
-        # Scan and update compute concurrency keys
-        compute_keys = await self._keys(f"{_COMPUTE_CONCURRENCY_USED_KEY_PREFIX}*")
-        for key in compute_keys:
-            key_str = key.decode("utf-8")
-            access_key = key_str.replace(_COMPUTE_CONCURRENCY_USED_KEY_PREFIX, "")
-            concurrency_count = access_key_to_concurrency.get(access_key, 0)
-            updates[key_str] = str(concurrency_count).encode("utf-8")
-
-        # Scan and update system concurrency keys
-        system_keys = await self._keys(f"{_SYSTEM_CONCURRENCY_USED_KEY_PREFIX}*")
-        for key in system_keys:
-            key_str = key.decode("utf-8")
-            access_key = key_str.replace(_SYSTEM_CONCURRENCY_USED_KEY_PREFIX, "")
-            concurrency_count = access_key_to_concurrency.get(access_key, 0)
-            updates[key_str] = str(concurrency_count).encode("utf-8")
-
-        if updates:
-            await self.set_multiple_keys(updates)
-
     async def get_total_resource_slots(self) -> TotalResourceData | None:
         """
         Get total resource slots data from cache.
@@ -1395,7 +920,7 @@ class ValkeyStatClient:
             data = load_json(result.decode("utf-8"))
             return TotalResourceData.from_json(data)
         except (json.JSONDecodeError, ValueError, KeyError, UnicodeDecodeError) as e:
-            log.warning("Failed to deserialize TotalResourceData from cache: {}", e)
+            log.warning("total resource data cache deserialize failed", exc_info=e)
             return None
 
     async def set_total_resource_slots(
@@ -1407,75 +932,21 @@ class ValkeyStatClient:
         :param total_slots: The TotalResourceData to cache
         :param ttl_seconds: TTL in seconds (default: 300 = 5 minutes)
         """
-        try:
-            total_slots_obj = total_slots.to_json()
-            serialized = dump_json_str(total_slots_obj)
-            async with self._client.client() as conn:
-                await conn.set(
-                    _TOTAL_RESOURCE_SLOTS_KEY,
-                    serialized,
-                    expiry=ExpirySet(ExpiryType.SEC, ttl_seconds),
-                )
-        except Exception as e:
-            log.warning("Failed to serialize TotalResourceData to cache: {}", e)
-            raise
-
-    def _invalidate_keypair_concurrencies(
-        self, batch: Batch, access_keys: list[AccessKey]
-    ) -> Batch:
-        """
-        Delete concurrency counters for multiple access keys in a batch.
-        Removes both regular and SFTP concurrency values for all provided keys.
-
-        :param access_keys: List of access keys to delete concurrency for.
-        """
-        if not access_keys:
-            return batch
-
-        # Prepare all keys for deletion
-        keys_to_delete = []
-        for access_key in access_keys:
-            regular_key = self._get_keypair_concurrency_key(access_key, is_private=False)
-            sftp_key = self._get_keypair_concurrency_key(access_key, is_private=True)
-            keys_to_delete.extend([regular_key, sftp_key])
-
-        # Delete all keys in a single operation
-        if keys_to_delete:
-            batch.delete(cast(list[str | bytes], keys_to_delete))
-        return batch
-
-    def _invalidate_total_resource_slots(self, batch: Batch) -> Batch:
-        """
-        Invalidate (delete) the total resource slots cache.
-        """
-        return batch.delete([_TOTAL_RESOURCE_SLOTS_KEY])
-
-    def _invalidate_resource_presets(self, batch: Batch, keys: list[bytes]) -> Batch:
-        """
-        Invalidate (delete) all resource preset check caches.
-        """
-        if keys:
-            return batch.delete(cast(list[str | bytes], keys))
-        return batch
-
-    async def invalidate_kernel_related_cache(self, access_keys: list[AccessKey]) -> None:
-        """
-        Invalidate all kernel-related caches including resource presets, total resource slots,
-        and keypair concurrencies for the given access keys.
-        """
-
+        total_slots_obj = total_slots.to_json()
+        serialized = dump_json_str(total_slots_obj)
         async with self._client.client() as conn:
-            # Use the index SET to look up tracked keys instead of SCAN over the entire keyspace.
-            resource_preset_keys = list(await conn.smembers(_RESOURCE_PRESET_CHECK_INDEX_KEY))
+            await conn.set(
+                _TOTAL_RESOURCE_SLOTS_KEY,
+                serialized,
+                expiry=ExpirySet(ExpiryType.SEC, ttl_seconds),
+            )
 
-            batch = self._create_batch()
-            batch = self._invalidate_resource_presets(batch, resource_preset_keys)
-            if resource_preset_keys:
-                batch.delete([_RESOURCE_PRESET_CHECK_INDEX_KEY])
-            batch = self._invalidate_total_resource_slots(batch)
-            batch = self._invalidate_keypair_concurrencies(batch, access_keys)
-
-            await conn.exec(batch, raise_on_error=True)
+    async def invalidate_kernel_related_cache(self) -> None:
+        """
+        Invalidate caches derived from kernel occupancy: the total resource slots.
+        """
+        async with self._client.client() as conn:
+            await conn.delete([_TOTAL_RESOURCE_SLOTS_KEY])
 
     @valkey_stat_resilience.apply()
     async def config_get(self, parameters: Sequence[str]) -> dict[bytes, bytes]:

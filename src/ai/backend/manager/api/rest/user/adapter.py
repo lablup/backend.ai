@@ -6,8 +6,10 @@ as well as data-to-DTO conversion.
 
 from __future__ import annotations
 
-from uuid import UUID
+from typing import assert_never
 
+from ai.backend.common.auth.password import PasswordInfo
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.user import (
     OrderDirection,
@@ -20,16 +22,14 @@ from ai.backend.common.dto.manager.user import (
 )
 from ai.backend.common.dto.manager.user.types import UserRole as UserRoleDTO
 from ai.backend.common.dto.manager.user.types import UserStatus as UserStatusDTO
+from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.user.types import UserData, UserStatus
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.user import UserRow
-from ai.backend.manager.models.user.conditions import UserConditions
-from ai.backend.manager.models.user.orders import UserOrders
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
+from ai.backend.manager.models.user.searchers import UserSearcher
+from ai.backend.manager.models.user.updaters import UserUpdater
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
 from ai.backend.manager.types import OptionalState, TriState
 
 __all__ = ("UserAdapter",)
@@ -38,7 +38,7 @@ __all__ = ("UserAdapter",)
 class UserAdapter(BaseFilterAdapter):
     """Adapter for converting user admin requests to repository queries."""
 
-    def convert_to_dto(self, data: UserData) -> UserDTO:
+    def convert_to_dto(self, data: UserData, main_access_key: AccessKey | None) -> UserDTO:
         """Convert UserData to DTO for REST response."""
         return UserDTO(
             id=data.id,
@@ -57,7 +57,7 @@ class UserAdapter(BaseFilterAdapter):
             allowed_client_ip=data.allowed_client_ip,
             totp_activated=data.totp_activated,
             sudo_session_enabled=data.sudo_session_enabled,
-            main_access_key=data.main_access_key,
+            main_access_key=main_access_key,
             container_uid=data.container_uid,
             container_main_gid=data.container_main_gid,
             container_gids=data.container_gids,
@@ -66,23 +66,22 @@ class UserAdapter(BaseFilterAdapter):
     def build_updater(
         self,
         request: UpdateUserRequest,
-        email: str,
+        user_id: UserID,
         password_info: PasswordInfo | None = None,
-    ) -> Updater[UserRow]:
-        """Convert update request to updater."""
+        status: UserStatus | None = None,
+    ) -> UserUpdater:
+        """Convert update request to updater; ``status`` replaces the request's status."""
         username = OptionalState[str].nop()
         password = OptionalState[PasswordInfo].nop()
         need_password_change = OptionalState[bool].nop()
         full_name = TriState[str].nop()
         description = TriState[str].nop()
-        status = OptionalState[UserStatus].nop()
         domain_name = OptionalState[str].nop()
         role: OptionalState[UserRole] = OptionalState.nop()
         allowed_client_ip = TriState[list[str]].nop()
         totp_activated = OptionalState[bool].nop()
         resource_policy = OptionalState[str].nop()
         sudo_session_enabled = OptionalState[bool].nop()
-        main_access_key = TriState[str].nop()
         container_uid = TriState[int].nop()
         container_main_gid = TriState[int].nop()
         container_gids = TriState[list[int]].nop()
@@ -98,8 +97,6 @@ class UserAdapter(BaseFilterAdapter):
             full_name = TriState.update(request.full_name)
         if request.description is not None:
             description = TriState.update(request.description)
-        if request.status is not None:
-            status = OptionalState.update(UserStatus(request.status.value))
         if request.domain_name is not None:
             domain_name = OptionalState.update(request.domain_name)
         if request.role is not None:
@@ -112,8 +109,6 @@ class UserAdapter(BaseFilterAdapter):
             resource_policy = OptionalState.update(request.resource_policy)
         if request.sudo_session_enabled is not None:
             sudo_session_enabled = OptionalState.update(request.sudo_session_enabled)
-        if request.main_access_key is not None:
-            main_access_key = TriState.update(request.main_access_key)
         if request.container_uid is not None:
             container_uid = TriState.update(request.container_uid)
         if request.container_main_gid is not None:
@@ -123,124 +118,65 @@ class UserAdapter(BaseFilterAdapter):
         if request.group_ids is not None:
             group_ids = OptionalState.update(request.group_ids)
 
-        updater_spec = UserUpdaterSpec(
+        return UserUpdater(
+            user_id=user_id,
             username=username,
             password=password,
             need_password_change=need_password_change,
             full_name=full_name,
             description=description,
-            status=status,
+            status=OptionalState.nop() if status is None else OptionalState.update(status),
             domain_name=domain_name,
             role=role,
             allowed_client_ip=allowed_client_ip,
             totp_activated=totp_activated,
             resource_policy=resource_policy,
             sudo_session_enabled=sudo_session_enabled,
-            main_access_key=main_access_key,
             container_uid=container_uid,
             container_main_gid=container_main_gid,
             container_gids=container_gids,
             group_ids=group_ids,
         )
-        return Updater(
-            spec=updater_spec, pk_value=UUID(int=0)
-        )  # pk_value unused; email-based lookup
 
-    def build_querier(self, request: SearchUsersRequest) -> BatchQuerier:
-        """Build a BatchQuerier from search request."""
+    def build_searcher(self, request: SearchUsersRequest) -> UserSearcher:
+        """Build a user searcher from the search request."""
         conditions = self._convert_filter(request.filter) if request.filter else []
         orders = [self._convert_order(o) for o in request.order] if request.order else []
         pagination = OffsetPagination(limit=request.limit, offset=request.offset)
-        return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
+        return UserSearcher(conditions=conditions, orders=orders, pagination=pagination)
 
-    def _convert_filter(self, filter_req: UserFilter) -> list[QueryCondition]:
+    def _convert_filter(self, f: UserFilter) -> list[QueryCondition]:
         """Convert user filter to query conditions."""
-        conditions: list[QueryCondition] = []
-
-        if filter_req.uuid is not None:
-            condition = self.convert_uuid_filter(
-                filter_req.uuid,
-                equals_factory=UserConditions.by_uuid_equals,
-                in_factory=UserConditions.by_uuid_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.email is not None:
-            condition = self.convert_string_filter(
-                filter_req.email,
-                contains_factory=UserConditions.by_email_contains,
-                equals_factory=UserConditions.by_email_equals,
-                starts_with_factory=UserConditions.by_email_starts_with,
-                ends_with_factory=UserConditions.by_email_ends_with,
-                in_factory=UserConditions.by_email_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.username is not None:
-            condition = self.convert_string_filter(
-                filter_req.username,
-                contains_factory=UserConditions.by_username_contains,
-                equals_factory=UserConditions.by_username_equals,
-                starts_with_factory=UserConditions.by_username_starts_with,
-                ends_with_factory=UserConditions.by_username_ends_with,
-                in_factory=UserConditions.by_username_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.domain_name is not None:
-            condition = self.convert_string_filter(
-                filter_req.domain_name,
-                contains_factory=UserConditions.by_domain_name_contains,
-                equals_factory=UserConditions.by_domain_name_equals,
-                starts_with_factory=UserConditions.by_domain_name_starts_with,
-                ends_with_factory=UserConditions.by_domain_name_ends_with,
-                in_factory=UserConditions.by_domain_name_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.integration_name is not None:
-            condition = self.convert_string_filter(
-                filter_req.integration_name,
-                contains_factory=UserConditions.by_integration_name_contains,
-                equals_factory=UserConditions.by_integration_name_equals,
-                starts_with_factory=UserConditions.by_integration_name_starts_with,
-                ends_with_factory=UserConditions.by_integration_name_ends_with,
-                in_factory=UserConditions.by_integration_name_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.status is not None and len(filter_req.status) > 0:
-            conditions.append(
-                UserConditions.by_status_in([UserStatus(s.value) for s in filter_req.status])
-            )
-
-        if filter_req.role is not None and len(filter_req.role) > 0:
-            conditions.append(
-                UserConditions.by_role_in([UserRole(r.value) for r in filter_req.role])
-            )
-
+        fields = UserSearchableFields.own
+        conditions = [
+            *self.apply_uuid_filter(f.uuid, fields.uuid.filter),
+            *self.apply_string_filter(f.email, fields.email.filter),
+            *self.apply_string_filter(f.username, fields.username.filter),
+            *self.apply_string_filter(f.domain_name, fields.domain_name.filter),
+            *self.apply_string_filter(f.integration_name, fields.integration_name.filter),
+        ]
+        if f.status:
+            conditions.append(fields.status.filter.in_([UserStatus(s.value) for s in f.status]))
+        if f.role:
+            conditions.append(fields.role.filter.in_([UserRole(r.value) for r in f.role]))
         return conditions
 
     def _convert_order(self, order: UserOrder) -> QueryOrder:
         """Convert user order specification to query order."""
+        fields = UserSearchableFields.own
         ascending = order.direction == OrderDirection.ASC
-
         match order.field:
             case UserOrderField.CREATED_AT:
-                return UserOrders.created_at(ascending=ascending)
+                return fields.created_at.order.apply(ascending)
             case UserOrderField.MODIFIED_AT:
-                return UserOrders.modified_at(ascending=ascending)
+                return fields.modified_at.order.apply(ascending)
             case UserOrderField.USERNAME:
-                return UserOrders.username(ascending=ascending)
+                return fields.username.order.apply(ascending)
             case UserOrderField.EMAIL:
-                return UserOrders.email(ascending=ascending)
+                return fields.email.order.apply(ascending)
             case UserOrderField.STATUS:
-                return UserOrders.status(ascending=ascending)
+                return fields.status.order.apply(ascending)
             case UserOrderField.DOMAIN_NAME:
-                return UserOrders.domain_name(ascending=ascending)
-        raise ValueError(f"Unknown order field: {order.field}")
+                return fields.domain_name.order.apply(ascending)
+            case _:
+                assert_never(order.field)

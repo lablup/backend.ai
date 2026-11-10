@@ -37,7 +37,7 @@ class ProgressReporter:
         await self._event_producer.broadcast_event_with_cache(
             EventCacheDomain.BGTASK.cache_id(str(self._task_id)),
             BgtaskUpdatedEvent(
-                self._task_id,
+                task_id=self._task_id,
                 message=message,
                 current_progress=current,
                 total_progress=total,

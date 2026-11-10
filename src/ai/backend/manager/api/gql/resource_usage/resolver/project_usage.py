@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from aiohttp import web
 from strawberry import Info
 from strawberry.relay import PageInfo
 
@@ -12,7 +11,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_root_field,
 )
-from ai.backend.manager.api.gql.resource_usage.types import (
+from ai.backend.manager.api.gql.resource_usage.types.project_usage import (
     ProjectUsageBucketConnection,
     ProjectUsageBucketEdge,
     ProjectUsageBucketFilter,
@@ -21,6 +20,7 @@ from ai.backend.manager.api.gql.resource_usage.types import (
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
+from ai.backend.manager.errors.auth import SuperadminRequired
 
 # Admin APIs
 
@@ -91,7 +91,7 @@ async def project_usage_buckets(
     """Search project usage buckets with pagination."""
     me = current_user()
     if me is None or not me.is_superadmin:
-        raise web.HTTPForbidden(reason="Only superadmin can access usage bucket data.")
+        raise SuperadminRequired("Only superadmin can access usage bucket data.")
 
     payload = await info.context.adapters.resource_usage.gql_admin_search_project(
         filter=filter.to_pydantic() if filter else None,

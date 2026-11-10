@@ -42,12 +42,19 @@ def runtime_variant_preset() -> None:
 @click.option("--offset", type=int, default=0, help="Number of items to skip.")
 @click.option("--runtime-variant-id", default=None, type=click.UUID, help="Filter by variant ID.")
 @click.option("--name-contains", default=None, type=str, help="Filter by name substring.")
+@click.option(
+    "--runtime-version",
+    default=None,
+    type=str,
+    help="Keep only presets valid at this runtime version (e.g., 0.9.1).",
+)
 @click.option("--order-by", multiple=True, help="Order by field:direction (e.g., rank:asc).")
 def search(
     limit: int,
     offset: int,
     runtime_variant_id: uuid.UUID | None,
     name_contains: str | None,
+    runtime_version: str | None,
     order_by: tuple[str, ...],
 ) -> None:
     """Search runtime variant presets."""
@@ -61,7 +68,7 @@ def search(
     )
 
     filter_dto: RuntimeVariantPresetFilter | None = None
-    if runtime_variant_id is not None or name_contains is not None:
+    if runtime_variant_id is not None or name_contains is not None or runtime_version is not None:
         from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 
         filter_dto = RuntimeVariantPresetFilter(
@@ -69,6 +76,7 @@ def search(
             if runtime_variant_id is not None
             else None,
             name=StringFilter(contains=name_contains) if name_contains is not None else None,
+            runtime_version=runtime_version,
         )
     orders = (
         parse_order_options(order_by, RuntimeVariantPresetOrderField, RuntimeVariantPresetOrder)

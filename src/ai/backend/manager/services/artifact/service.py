@@ -13,7 +13,7 @@ from ai.backend.common.dto.storage.request import (
     HuggingFaceRetrieveModelsReq,
     HuggingFaceScanModelsReq,
 )
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.artifact_registry.reservoir_client import ReservoirRegistryClient
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -36,6 +36,7 @@ from ai.backend.manager.dto.response import (
     DelegateScanArtifactsResponse,
     SearchArtifactsResponse,
 )
+from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.artifact import ArtifactRevisionNotFoundError
 from ai.backend.manager.errors.artifact_registry import (
     ArtifactRegistryBadScanRequestError,
@@ -62,10 +63,6 @@ from ai.backend.manager.services.artifact.actions.delete_multi import (
 from ai.backend.manager.services.artifact.actions.get import (
     GetArtifactAction,
     GetArtifactActionResult,
-)
-from ai.backend.manager.services.artifact.actions.get_revisions import (
-    GetArtifactRevisionsAction,
-    GetArtifactRevisionsActionResult,
 )
 from ai.backend.manager.services.artifact.actions.restore_multi import (
     RestoreArtifactsAction,
@@ -101,7 +98,7 @@ from ai.backend.manager.services.artifact.actions.upsert_multi import (
 )
 from ai.backend.manager.types import OffsetBasedPaginationOptions, PaginationOptions
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ArtifactService:
@@ -226,20 +223,20 @@ class ArtifactService:
                         except ClientConnectorError as e:
                             retry_count += 1
                             log.warning(
-                                "Cannot connect to reservoir registry: {} (attempt {}/{}). Error: {}",
-                                registry_data.endpoint,
-                                retry_count,
-                                MAX_RETRIES,
-                                e,
+                                "reservoir registry connection failed, retrying",
+                                registry_endpoint=str(registry_data.endpoint),
+                                attempt_count=retry_count,
+                                max_retry_count=MAX_RETRIES,
+                                exc_info=e,
                             )
                             if retry_count < MAX_RETRIES:
                                 await asyncio.sleep(1)
 
                     if client_resp is None:
                         log.warning(
-                            "Failed to connect to reservoir registry after {} attempts: {}",
-                            MAX_RETRIES,
-                            registry_data.endpoint,
+                            "reservoir registry connection failed after retries",
+                            registry_endpoint=str(registry_data.endpoint),
+                            attempt_count=MAX_RETRIES,
                         )
                         raise ReservoirConnectionError()
 
@@ -344,7 +341,7 @@ class ArtifactService:
 
     async def search(self, action: SearchArtifactsAction) -> SearchArtifactsActionResult:
         result = await self._artifact_repository.search_artifacts(
-            querier=action.querier,
+            searcher=action.searcher,
         )
         return SearchArtifactsActionResult(
             data=result.items,
@@ -356,9 +353,9 @@ class ArtifactService:
     async def search_with_revisions(
         self, action: SearchArtifactsWithRevisionsAction
     ) -> SearchArtifactsWithRevisionsActionResult:
-        """Search artifacts with their revisions using BatchQuerier pattern."""
+        """Search artifacts with their revisions."""
         result = await self._artifact_repository.search_artifacts_with_revisions(
-            querier=action.querier,
+            searcher=action.searcher,
         )
         return SearchArtifactsWithRevisionsActionResult(
             data=result.items,
@@ -366,12 +363,6 @@ class ArtifactService:
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
         )
-
-    async def get_revisions(
-        self, action: GetArtifactRevisionsAction
-    ) -> GetArtifactRevisionsActionResult:
-        revisions = await self._artifact_repository.list_artifact_revisions(action.artifact_id)
-        return GetArtifactRevisionsActionResult(revisions=revisions)
 
     async def update(self, action: UpdateArtifactAction) -> UpdateArtifactActionResult:
         updated_artifact = await self._artifact_repository.update_artifact(action.updater)
@@ -411,7 +402,7 @@ class ArtifactService:
         registry_id = registry_meta.registry_id
 
         if registry_type != ArtifactRegistryType.HUGGINGFACE:
-            raise NotImplementedError("Only HuggingFace registry is supported for model retrieval")
+            raise InvalidAPIParameters("Only HuggingFace registry is supported for model retrieval")
 
         reservoir_config = self._config_provider.config.reservoir
         if reservoir_config is None:
@@ -444,7 +435,7 @@ class ArtifactService:
         registry_id = registry_meta.registry_id
 
         if registry_type != ArtifactRegistryType.HUGGINGFACE:
-            raise NotImplementedError("Only HuggingFace registry is supported for model retrieval")
+            raise InvalidAPIParameters("Only HuggingFace registry is supported for model retrieval")
 
         reservoir_config = self._config_provider.config.reservoir
         if reservoir_config is None:
@@ -539,7 +530,7 @@ class ArtifactService:
                     f"Failed to scan artifacts from remote reservoir: {e}"
                 ) from e
 
-            readme_data = {
+            readme_data: dict[uuid.UUID, ArtifactRevisionReadme] = {
                 rev.id: ArtifactRevisionReadme(readme=rev.readme)
                 for artifact in scan_result.result
                 for rev in artifact.revisions

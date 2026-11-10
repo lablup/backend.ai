@@ -1,10 +1,10 @@
 ---
 Author: Hyeokjin Jeon (achimnol@lablup.com)
-Status: Draft
+Status: Implemented
 Created: 2025-01-19
 Created-Version: 25.3.0
 Target-Version:
-Implemented-Version:
+Implemented-Version: 26.1.0
 ---
 
 # Sokovan Handler Test Scenarios

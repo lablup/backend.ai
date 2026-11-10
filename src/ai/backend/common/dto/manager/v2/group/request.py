@@ -9,26 +9,36 @@ from uuid import UUID
 
 from pydantic import Field
 
-from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.v2.common import NonEmptyList
 from ai.backend.common.dto.manager.v2.group.types import (
     OrderDirection,
     ProjectDomainFilter,
     ProjectOrderField,
+    ProjectScope,
     ProjectType,
     ProjectTypeFilter,
     ProjectUserFilter,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 __all__ = (
     "AdminSearchProjectsInput",
     "AssignUsersToProjectInput",
     "CreateProjectInput",
     "DeleteProjectInput",
+    "PartialBulkDeleteProjectsInput",
+    "PartialBulkRestoreProjectsInput",
+    "PartialBulkUpdateProjectItemInput",
+    "PartialBulkUpdateProjectsInput",
     "ProjectFilter",
     "ProjectOrder",
     "PurgeProjectInput",
+    "RestoreProjectInput",
+    "ScopedSearchProjectsInput",
     "SearchProjectsRequest",
     "UnassignUsersFromProjectInput",
     "UpdateProjectInput",
@@ -66,26 +76,32 @@ class CreateProjectInput(BaseRequestModel):
 class UpdateProjectInput(BaseRequestModel):
     """Input for updating group information. All fields optional — only provided fields will be updated."""
 
-    name: str | None = Field(
-        default=None,
-        description="New group name.",
+    name: str | None | Unset = Field(
+        default=UNSET,
+        description="New group name. Omit to leave unchanged.",
         max_length=64,
     )
-    description: str | Sentinel | None = Field(
-        default=SENTINEL,
-        description="New group description. Set to null to clear.",
+    description: str | None | Unset = Field(
+        default=UNSET,
+        description="Updated group description. Omit to leave unchanged; null clears.",
     )
-    is_active: bool | None = Field(
-        default=None,
-        description="Updated active status.",
+    is_active: bool | None | Unset = Field(
+        default=UNSET,
+        description=(
+            f"Deprecated since {NEXT_RELEASE_VERSION}. Use the project delete and restore "
+            "operations. false soft-deletes the project and true restores it, as those "
+            "operations do; nothing happens when it is already in that state. Omit to "
+            "leave unchanged."
+        ),
+        deprecated=True,
     )
-    integration_name: str | Sentinel | None = Field(
-        default=SENTINEL,
-        description="New external integration identifier. Set to null to clear.",
+    integration_name: str | None | Unset = Field(
+        default=UNSET,
+        description="Updated external integration identifier. Omit to leave unchanged; null clears.",
     )
-    resource_policy: str | None = Field(
-        default=None,
-        description="Name of the updated resource policy to apply to this group.",
+    resource_policy: str | None | Unset = Field(
+        default=UNSET,
+        description="Name of the updated resource policy to apply to this group. Omit to leave unchanged.",
     )
 
 
@@ -95,18 +111,65 @@ class DeleteProjectInput(BaseRequestModel):
     group_id: UUID = Field(description="UUID of the group to soft-delete.")
 
 
+class RestoreProjectInput(BaseRequestModel):
+    """Input for restoring a soft-deleted group."""
+
+    group_id: UUID = Field(description="UUID of the group to restore.")
+
+
 class PurgeProjectInput(BaseRequestModel):
     """Input for permanently purging a group and all associated data."""
 
     group_id: UUID = Field(description="UUID of the group to permanently purge.")
 
 
+class PartialBulkUpdateProjectItemInput(BaseRequestModel):
+    """One project of a partial bulk update and the fields to update on it."""
+
+    id: UUID = Field(description="ID of the project to update.")
+    input: UpdateProjectInput = Field(description="Fields to update on the project.")
+
+
+class PartialBulkUpdateProjectsInput(BaseRequestModel):
+    """Input for updating several projects, each answered for separately."""
+
+    items: NonEmptyList[PartialBulkUpdateProjectItemInput] = Field(
+        description="The projects to update, each with its fields."
+    )
+
+
+class PartialBulkDeleteProjectsInput(BaseRequestModel):
+    """Input for soft-deleting several projects, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the projects to soft-delete.")
+
+
+class PartialBulkRestoreProjectsInput(BaseRequestModel):
+    """Input for restoring several soft-deleted projects, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the projects to restore.")
+
+
 class ProjectFilter(BaseRequestModel):
     """Filter criteria for searching groups."""
 
-    id: UUIDFilter | None = Field(default=None, description="Filter by project ID (UUID).")
+    id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `entity_id`.",
+        deprecated=True,
+    )
+    entity_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by project ID.",
+    )
     name: StringFilter | None = Field(default=None, description="Filter by group name.")
     domain_name: StringFilter | None = Field(default=None, description="Filter by domain name.")
+    description: StringFilter | None = Field(
+        default=None, description="Filter by project description."
+    )
+    integration_name: StringFilter | None = Field(
+        default=None, description="Filter by the external integration name."
+    )
     type: ProjectTypeFilter | None = Field(default=None, description="Filter by project type.")
     is_active: bool | None = Field(default=None, description="Filter by active status.")
     created_at: DateTimeFilter | None = Field(
@@ -116,10 +179,20 @@ class ProjectFilter(BaseRequestModel):
         default=None, description="Filter by last modification timestamp."
     )
     domain: ProjectDomainFilter | None = Field(
-        default=None, description="Nested filter for domain conditions."
+        default=None,
+        description=(
+            "Filter by the domain holding the project. Deprecated: search domains first, "
+            "then narrow by `domain_name`."
+        ),
+        deprecated=True,
     )
     user: ProjectUserFilter | None = Field(
-        default=None, description="Nested filter for user conditions."
+        default=None,
+        description=(
+            "Filter by the users enrolled in the project. Deprecated: search users first, "
+            "then pass their ids as the `user` scope."
+        ),
+        deprecated=True,
     )
     AND: list[ProjectFilter] | None = Field(
         default=None, description="Combine filters with AND logic."
@@ -162,6 +235,20 @@ class SearchProjectsRequest(BaseRequestModel):
 class AdminSearchProjectsInput(BaseRequestModel):
     """Input for admin search of projects with cursor and offset pagination."""
 
+    filter: ProjectFilter | None = Field(default=None, description="Filter conditions.")
+    order: list[ProjectOrder] | None = Field(default=None, description="Order specifications.")
+    first: int | None = Field(default=None, description="Cursor pagination: number of items.")
+    after: str | None = Field(default=None, description="Cursor pagination: after cursor.")
+    last: int | None = Field(default=None, description="Cursor pagination: last N items.")
+    before: str | None = Field(default=None, description="Cursor pagination: before cursor.")
+    limit: int | None = Field(default=None, description="Offset pagination: maximum items.")
+    offset: int | None = Field(default=None, description="Offset pagination: number to skip.")
+
+
+class ScopedSearchProjectsInput(BaseRequestModel):
+    """Input for searching the projects the named scopes reach."""
+
+    scope: ProjectScope = Field(description="Scope (OR across all items).")
     filter: ProjectFilter | None = Field(default=None, description="Filter conditions.")
     order: list[ProjectOrder] | None = Field(default=None, description="Order specifications.")
     first: int | None = Field(default=None, description="Cursor pagination: number of items.")

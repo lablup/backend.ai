@@ -1,17 +1,22 @@
-import logging
-
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.common.types import KernelId
+from ai.backend.manager.clients.prometheus.metric_types import ensure_container_metric_name
 from ai.backend.manager.repositories.metric.repository import MetricRepository
-
-from .actions.container import (
-    ContainerMetricAction,
-    ContainerMetricActionResult,
-    ContainerMetricMetadataAction,
-    ContainerMetricMetadataActionResult,
+from ai.backend.manager.services.metric.actions.batch_get_kernel_live_stats import (
+    BatchGetKernelLiveStatsAction,
+    BatchGetKernelLiveStatsActionResult,
 )
-from .actions.live_stat import ContainerLiveStatAction, ContainerLiveStatActionResult
-
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+from ai.backend.manager.services.metric.actions.search_container_metric_metadata import (
+    PublicSearchContainerMetricMetadataAction,
+    PublicSearchContainerMetricMetadataActionResult,
+)
+from ai.backend.manager.services.metric.actions.search_container_metrics import (
+    GlobalSearchContainerMetricsAction,
+    GlobalSearchContainerMetricsActionResult,
+)
+from ai.backend.manager.services.metric.actions.search_user_container_metrics import (
+    SearchUserContainerMetricsAction,
+    SearchUserContainerMetricsActionResult,
+)
 
 
 class MetricService:
@@ -23,27 +28,42 @@ class MetricService:
     ) -> None:
         self._metric_repository = metric_repository
 
-    async def query_container_metric_metadata(
+    async def search_container_metric_metadata(
         self,
-        _action: ContainerMetricMetadataAction,
-    ) -> ContainerMetricMetadataActionResult:
+        _action: PublicSearchContainerMetricMetadataAction,
+    ) -> PublicSearchContainerMetricMetadataActionResult:
         metric_names = await self._metric_repository.query_container_metric_metadata()
-        return ContainerMetricMetadataActionResult(metric_names=metric_names)
+        return PublicSearchContainerMetricMetadataActionResult(metric_names=metric_names)
 
-    async def query_container_metric(
+    async def search_user_container_metrics(
         self,
-        action: ContainerMetricAction,
-    ) -> ContainerMetricActionResult:
+        action: SearchUserContainerMetricsAction,
+    ) -> SearchUserContainerMetricsActionResult:
+        ensure_container_metric_name(action.metric_name)
+        result = await self._metric_repository.query_container_metric(
+            action.metric_name,
+            action.labels(),
+            action.time_range,
+        )
+        return SearchUserContainerMetricsActionResult(result=result)
+
+    async def global_search_container_metrics(
+        self,
+        action: GlobalSearchContainerMetricsAction,
+    ) -> GlobalSearchContainerMetricsActionResult:
+        ensure_container_metric_name(action.metric_name)
         result = await self._metric_repository.query_container_metric(
             action.metric_name,
             action.labels,
             action.time_range,
         )
-        return ContainerMetricActionResult(result=result)
+        return GlobalSearchContainerMetricsActionResult(result=result)
 
-    async def query_container_live_stats(
+    async def batch_get_kernel_live_stats(
         self,
-        action: ContainerLiveStatAction,
-    ) -> ContainerLiveStatActionResult:
-        stats = await self._metric_repository.query_container_live_stats(action.kernel_ids)
-        return ContainerLiveStatActionResult(stats=stats)
+        action: BatchGetKernelLiveStatsAction,
+    ) -> BatchGetKernelLiveStatsActionResult:
+        stats = await self._metric_repository.query_container_live_stats([
+            KernelId(kernel_id) for kernel_id in action.kernel_ids
+        ])
+        return BatchGetKernelLiveStatsActionResult(stats=stats)

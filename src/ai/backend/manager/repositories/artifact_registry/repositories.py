@@ -11,7 +11,7 @@ class ArtifactRegistryRepositories:
 
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
-        repository = ArtifactRegistryRepository(args.db)
+        repository = ArtifactRegistryRepository(args.db, args.v2_ops_provider)
 
         return cls(
             repository=repository,

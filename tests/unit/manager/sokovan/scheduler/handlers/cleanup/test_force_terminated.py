@@ -7,6 +7,7 @@ from uuid import uuid4
 
 import pytest
 
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -17,12 +18,12 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.repositories.scheduler.types.session import (
-    TerminatingKernelData,
-    TerminatingSessionData,
-)
 from ai.backend.manager.sokovan.scheduler.handlers.cleanup.force_terminated import (
     CleanupForceTerminatedHandler,
+)
+from ai.backend.manager.views.sokovan.session import (
+    TerminatingKernelData,
+    TerminatingSessionData,
 )
 
 
@@ -67,7 +68,7 @@ def _make_terminating_session_data(session_id: SessionId) -> TerminatingSessionD
         access_key=AccessKey("test-access-key"),
         creation_id="test-creation-id",
         status=SessionStatus.TERMINATED,
-        status_info="FORCE_TERMINATED",
+        status_info=KernelLifecycleEventReason.FORCE_TERMINATED,
         session_type=SessionTypes.INTERACTIVE,
         kernels=[
             TerminatingKernelData(

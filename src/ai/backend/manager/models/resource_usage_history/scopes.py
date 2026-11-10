@@ -1,0 +1,204 @@
+"""Operation scopes for resource usage history."""
+
+from __future__ import annotations
+
+import uuid
+from abc import ABC
+from collections.abc import Sequence
+from dataclasses import dataclass
+from typing import Any, override
+
+import sqlalchemy as sa
+
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.manager.errors.resource import (
+    DomainNotFound,
+    ProjectNotFound,
+    ResourceGroupNotFound,
+)
+from ai.backend.manager.errors.user import UserNotFound
+from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_usage_history.row import (
+    DomainUsageBucketRow,
+    ProjectUsageBucketRow,
+    UserUsageBucketRow,
+)
+from ai.backend.manager.models.scopes import ExistenceCheck, ScopeTarget
+from ai.backend.manager.models.user.row import UserRow
+
+
+class UsageBucketTarget(ScopeTarget, ABC):
+    """One resource group a usage bucket read is answered for."""
+
+
+@dataclass(frozen=True)
+class DomainUsageBucketTarget(UsageBucketTarget):
+    """The domain usage buckets of one resource group, optionally of one domain."""
+
+    resource_group_id: ResourceGroupID
+    domain_name: str | None = None
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.resource_group_id
+
+    @override
+    def to_condition(self) -> QueryCondition:
+        resource_group_id = self.resource_group_id
+        domain_name = self.domain_name
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            conditions = [DomainUsageBucketRow.resource_group_id == resource_group_id]
+            if domain_name is not None:
+                conditions.append(DomainUsageBucketRow.domain_name == domain_name)
+            return sa.and_(*conditions)
+
+        return inner
+
+    @property
+    @override
+    def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
+        checks: list[ExistenceCheck[Any]] = [
+            ExistenceCheck(
+                column=ResourceGroupRow.id,
+                value=self.resource_group_id,
+                error=ResourceGroupNotFound(
+                    extra_data={"resource_group_id": str(self.resource_group_id)}
+                ),
+            ),
+        ]
+        if self.domain_name is not None:
+            checks.append(
+                ExistenceCheck(
+                    column=DomainRow.name,
+                    value=self.domain_name,
+                    error=DomainNotFound(self.domain_name),
+                )
+            )
+        return checks
+
+
+@dataclass(frozen=True)
+class ProjectUsageBucketTarget(UsageBucketTarget):
+    """The project usage buckets of one domain, optionally of one project."""
+
+    resource_group_id: ResourceGroupID
+    domain_name: str
+    project_id: uuid.UUID | None = None
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.resource_group_id
+
+    @override
+    def to_condition(self) -> QueryCondition:
+        resource_group_id = self.resource_group_id
+        domain_name = self.domain_name
+        project_id = self.project_id
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            conditions = [
+                ProjectUsageBucketRow.domain_name == domain_name,
+                ProjectUsageBucketRow.resource_group_id == resource_group_id,
+            ]
+            if project_id is not None:
+                conditions.append(ProjectUsageBucketRow.project_id == project_id)
+            return sa.and_(*conditions)
+
+        return inner
+
+    @property
+    @override
+    def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
+        checks: list[ExistenceCheck[Any]] = [
+            ExistenceCheck(
+                column=ResourceGroupRow.id,
+                value=self.resource_group_id,
+                error=ResourceGroupNotFound(
+                    extra_data={"resource_group_id": str(self.resource_group_id)}
+                ),
+            ),
+            ExistenceCheck(
+                column=DomainRow.name,
+                value=self.domain_name,
+                error=DomainNotFound(self.domain_name),
+            ),
+        ]
+        if self.project_id is not None:
+            checks.append(
+                ExistenceCheck(
+                    column=ProjectRow.id,
+                    value=self.project_id,
+                    error=ProjectNotFound(extra_data={"project_id": str(self.project_id)}),
+                )
+            )
+        return checks
+
+
+@dataclass(frozen=True)
+class UserUsageBucketTarget(UsageBucketTarget):
+    """The user usage buckets of one project, optionally of one user."""
+
+    resource_group_id: ResourceGroupID
+    domain_name: str
+    project_id: uuid.UUID
+    user_uuid: uuid.UUID | None = None
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.resource_group_id
+
+    @override
+    def to_condition(self) -> QueryCondition:
+        resource_group_id = self.resource_group_id
+        domain_name = self.domain_name
+        project_id = self.project_id
+        user_uuid = self.user_uuid
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            conditions = [
+                UserUsageBucketRow.domain_name == domain_name,
+                UserUsageBucketRow.project_id == project_id,
+                UserUsageBucketRow.resource_group_id == resource_group_id,
+            ]
+            if user_uuid is not None:
+                conditions.append(UserUsageBucketRow.user_uuid == user_uuid)
+            return sa.and_(*conditions)
+
+        return inner
+
+    @property
+    @override
+    def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
+        checks: list[ExistenceCheck[Any]] = [
+            ExistenceCheck(
+                column=ResourceGroupRow.id,
+                value=self.resource_group_id,
+                error=ResourceGroupNotFound(
+                    extra_data={"resource_group_id": str(self.resource_group_id)}
+                ),
+            ),
+            ExistenceCheck(
+                column=DomainRow.name,
+                value=self.domain_name,
+                error=DomainNotFound(self.domain_name),
+            ),
+            ExistenceCheck(
+                column=ProjectRow.id,
+                value=self.project_id,
+                error=ProjectNotFound(extra_data={"project_id": str(self.project_id)}),
+            ),
+        ]
+        if self.user_uuid is not None:
+            checks.append(
+                ExistenceCheck(
+                    column=UserRow.uuid,
+                    value=self.user_uuid,
+                    error=UserNotFound(extra_data={"user_uuid": str(self.user_uuid)}),
+                )
+            )
+        return checks

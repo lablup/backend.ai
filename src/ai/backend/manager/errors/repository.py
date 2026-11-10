@@ -18,7 +18,12 @@ from ai.backend.common.exception import (
 
 
 class RepositoryError(BackendAIError):
-    """Base class for repository layer errors."""
+    """Base class for repository layer errors.
+
+    Carries no ``web.HTTP*`` mixin on purpose — a status here would precede every
+    subclass's own mixin in the MRO. Each concrete error mixes in the status it
+    answers with; never raise this base directly.
+    """
 
     error_type = "https://api.backend.ai/probs/repository-error"
     error_title = "Repository operation failed."
@@ -32,7 +37,7 @@ class RepositoryError(BackendAIError):
         )
 
 
-class UpsertEmptyResultError(RepositoryError):
+class UpsertEmptyResultError(RepositoryError, web.HTTPInternalServerError):
     """Raised when upsert operation returns no rows."""
 
     error_type = "https://api.backend.ai/probs/upsert-empty-result"
@@ -47,7 +52,7 @@ class UpsertEmptyResultError(RepositoryError):
         )
 
 
-class UnsupportedCompositePrimaryKeyError(RepositoryError):
+class UnsupportedCompositePrimaryKeyError(RepositoryError, web.HTTPInternalServerError):
     """Raised when an operation requires a single-column primary key but the table has a composite key."""
 
     error_type = "https://api.backend.ai/probs/unsupported-composite-pk"
@@ -62,7 +67,7 @@ class UnsupportedCompositePrimaryKeyError(RepositoryError):
         )
 
 
-class EmptySearchScopeError(RepositoryError, web.HTTPBadRequest):
+class EmptyOperationScopeError(RepositoryError, web.HTTPBadRequest):
     """Raised when a scoped search is requested with no search scopes.
 
     A scoped query must carry at least one scope; an empty scope list would silently
@@ -70,15 +75,55 @@ class EmptySearchScopeError(RepositoryError, web.HTTPBadRequest):
     genuinely need an unscoped query must use the explicit global query path instead.
     """
 
-    error_type = "https://api.backend.ai/probs/empty-search-scope"
-    error_title = "Search scope must not be empty."
+    error_type = "https://api.backend.ai/probs/empty-operation-scope"
+    error_title = "Operation scope must not be empty."
 
     @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.DATABASE,
-            operation=ErrorOperation.LIST,
+            operation=ErrorOperation.SEARCH,
             error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
+class EmptyMatchConditionError(RepositoryError, web.HTTPBadRequest):
+    """Raised when a matching mode is given no condition.
+
+    ``some``/``every``/``none``/``has`` take the conditions one related row must meet.
+    With none given they stop constraining the rows and start answering whether a
+    related row exists at all, which ``exists``/``not_exists`` say by name.
+    """
+
+    error_type = "https://api.backend.ai/probs/empty-match-condition"
+    error_title = "Matching mode must carry at least one condition."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.DATABASE,
+            operation=ErrorOperation.SEARCH,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
+class AmbiguousEntityKeyError(RepositoryError, web.HTTPConflict):
+    """Raised when a lookup key matches more than one row.
+
+    The key a lookup resolves is expected to be unique. Matching several rows means
+    either the conditions are wrong or the constraint that should enforce it is
+    missing, and answering with an arbitrary one of them would hide both.
+    """
+
+    error_type = "https://api.backend.ai/probs/ambiguous-entity-key"
+    error_title = "Lookup key matched more than one entity."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.DATABASE,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.CONFLICT,
         )
 
 

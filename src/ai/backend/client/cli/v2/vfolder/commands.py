@@ -8,7 +8,14 @@ from uuid import UUID
 
 import click
 
-from ai.backend.client.cli.v2.helpers import create_v2_registry, load_v2_config, print_result
+from ai.backend.client.cli.v2.helpers import (
+    EntityLabelTerm,
+    create_v2_registry,
+    entity_label_filter_options,
+    entity_label_relations,
+    load_v2_config,
+    print_result,
+)
 
 
 @click.group()
@@ -19,15 +26,29 @@ def vfolder() -> None:
 @vfolder.command(name="my-search")
 @click.option("--limit", type=int, default=20)
 @click.option("--offset", type=int, default=0)
-def my_search(limit: int, offset: int) -> None:
+@entity_label_filter_options
+def my_search(limit: int, offset: int, label: tuple[EntityLabelTerm, ...]) -> None:
     """Search vfolders owned by the current user."""
 
-    from ai.backend.common.dto.manager.v2.vfolder.request import SearchVFoldersInput
+    from ai.backend.common.dto.manager.v2.vfolder.request import (
+        SearchVFoldersInput,
+        VFolderFilter,
+    )
+
+    relations = entity_label_relations(label)
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            request = SearchVFoldersInput(limit=limit, offset=offset)
+            request = SearchVFoldersInput(
+                filter=(
+                    VFolderFilter(AND=[VFolderFilter(labels=rel) for rel in relations])
+                    if relations
+                    else None
+                ),
+                limit=limit,
+                offset=offset,
+            )
             result = await registry.vfolder.my_search(request)
             print_result(result)
         finally:
@@ -40,15 +61,31 @@ def my_search(limit: int, offset: int) -> None:
 @click.argument("project_id", type=str)
 @click.option("--limit", type=int, default=20)
 @click.option("--offset", type=int, default=0)
-def project_search(project_id: str, limit: int, offset: int) -> None:
+@entity_label_filter_options
+def project_search(
+    project_id: str, limit: int, offset: int, label: tuple[EntityLabelTerm, ...]
+) -> None:
     """Search vfolders within a project."""
 
-    from ai.backend.common.dto.manager.v2.vfolder.request import SearchVFoldersInput
+    from ai.backend.common.dto.manager.v2.vfolder.request import (
+        SearchVFoldersInput,
+        VFolderFilter,
+    )
+
+    relations = entity_label_relations(label)
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            request = SearchVFoldersInput(limit=limit, offset=offset)
+            request = SearchVFoldersInput(
+                filter=(
+                    VFolderFilter(AND=[VFolderFilter(labels=rel) for rel in relations])
+                    if relations
+                    else None
+                ),
+                limit=limit,
+                offset=offset,
+            )
             result = await registry.vfolder.project_search(UUID(project_id), request)
             print_result(result)
         finally:
@@ -130,15 +167,29 @@ def upload(vfolder_id: UUID, filenames: tuple[str, ...]) -> None:
 @vfolder.command(name="admin-search")
 @click.option("--limit", type=int, default=20, help="Maximum number of items to return.")
 @click.option("--offset", type=int, default=0, help="Number of items to skip.")
-def admin_search(limit: int, offset: int) -> None:
+@entity_label_filter_options
+def admin_search(limit: int, offset: int, label: tuple[EntityLabelTerm, ...]) -> None:
     """Search all vfolders (admin)."""
 
-    from ai.backend.common.dto.manager.v2.vfolder.request import SearchVFoldersInput
+    from ai.backend.common.dto.manager.v2.vfolder.request import (
+        SearchVFoldersInput,
+        VFolderFilter,
+    )
+
+    relations = entity_label_relations(label)
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            request = SearchVFoldersInput(limit=limit, offset=offset)
+            request = SearchVFoldersInput(
+                filter=(
+                    VFolderFilter(AND=[VFolderFilter(labels=rel) for rel in relations])
+                    if relations
+                    else None
+                ),
+                limit=limit,
+                offset=offset,
+            )
             result = await registry.vfolder.admin_search(request)
             print_result(result)
         finally:
@@ -523,6 +574,68 @@ def bulk_purge(ids: tuple[UUID, ...], force: bool) -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.vfolder.bulk_purge(input_dto)
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@vfolder.command(name="mount-policy-set")
+@click.argument("vfolder_id", type=click.UUID)
+@click.argument("user_id", type=click.UUID)
+@click.argument("permission", type=click.Choice(["none", "ro", "rw"]))
+def mount_policy_set(vfolder_id: UUID, user_id: UUID, permission: str) -> None:
+    """Set the mount level one user gets on a vfolder."""
+
+    from ai.backend.common.dto.manager.v2.vfolder.request import SetVFolderMountPolicyInput
+    from ai.backend.common.dto.manager.v2.vfolder.types import VFolderPermissionField
+
+    input_dto = SetVFolderMountPolicyInput(
+        user_id=user_id, permission=VFolderPermissionField(permission)
+    )
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.vfolder.set_mount_policy(vfolder_id, input_dto)
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@vfolder.command(name="mount-policy-unset")
+@click.argument("vfolder_id", type=click.UUID)
+@click.argument("user_id", type=click.UUID)
+def mount_policy_unset(vfolder_id: UUID, user_id: UUID) -> None:
+    """Take back the mount level one user was given on a vfolder."""
+
+    from ai.backend.common.dto.manager.v2.vfolder.request import UnsetVFolderMountPolicyInput
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.vfolder.unset_mount_policy(
+                vfolder_id, UnsetVFolderMountPolicyInput(user_id=user_id)
+            )
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@vfolder.command(name="mount-policies")
+@click.argument("vfolder_id", type=click.UUID)
+def mount_policies(vfolder_id: UUID) -> None:
+    """List the mount levels set on a vfolder."""
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.vfolder.list_mount_policies(vfolder_id)
             print_result(result)
         finally:
             await registry.close()

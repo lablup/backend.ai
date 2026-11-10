@@ -1,0 +1,27 @@
+.bai-scoped-vfolder-select__permission{display:inline-flex;flex:none}.bai-scoped-vfolder-select__permission>.astryx-token:not(:first-child){margin-inline-start:calc(var(--border-width) * -1);border-start-start-radius:0;border-end-start-radius:0}.bai-scoped-vfolder-select__permission>.astryx-token:not(:last-child){border-start-end-radius:0;border-end-end-radius:0}.bai-scoped-vfolder-select__option-icon{width:var(--spacing-7);height:var(--spacing-7);border-radius:var(--radius-inner)}.bai-scoped-vfolder-select__option-meta{display:flex;flex-wrap:wrap;align-items:center;column-gap:var(--spacing-2)}.bai-scoped-vfolder-select__option-meta>span{display:inline-flex;align-items:center;gap:var(--spacing-1)}.bai-scoped-vfolder-select__option-meta>span+span:before{content:"·";margin-inline-end:var(--spacing-1)}/**
+ @license
+ Copyright (c) 2015-2026 Lablup Inc. All rights reserved.
+
+ Co-located styles for <DragAndDrop>, imported by the component itself (P17).
+
+ Astryx paints a dropzone's drag-over fill with `--color-accent-muted`. That is
+ a hint on the 350px field its templates show; this dropzone is stretched over
+ the whole explorer, where the same 20% accent reads as an orange wash on the
+ file list. Only the area fill is scale-dependent, so it goes neutral and the
+ accent dashed border stays as the drop cue (FR-3575).
+*/.bai-file-explorer-dropzone{--color-accent-muted: var(--color-background-muted)}/**
+ @license
+ Copyright (c) 2015-2026 Lablup Inc. All rights reserved.
+
+ Co-located styles for <EditableFileName>, imported by the component itself
+ (P17). No theme token is involved.
+
+ to-astryx W2-D: the hover-reveal rules were keyed on `ant-typography-edit`,
+ the anchor antd injected for `Typography.Text editable`. That element no
+ longer exists (the affordance is an Astryx `IconButton` now), so the selector
+ is re-pointed at the button's own class rather than left silently matching
+ nothing (P6).
+
+ The rename field's form item (`.uic-form-item`, ui-common's form engine)
+ drops the shell's default 24px bottom margin inside this single-line editor.
+*/.bai-editable-file-name-hover-edit .bai-editable-file-name-edit-button{opacity:0;max-width:0;overflow:hidden;transition:opacity .2s}.bai-editable-file-name-hover-edit:hover .bai-editable-file-name-edit-button,.bai-editable-file-name-hover-edit:focus-within .bai-editable-file-name-edit-button{opacity:1;max-width:none;overflow:visible}.bai-editable-file-name-form .uic-form-item{margin-bottom:0!important}.bai-editable-file-name-form{flex:1;min-width:0}.bai-vfolder-mount-config__grid{container-type:inline-size;display:flex;flex-direction:column;gap:var(--spacing-3)}.bai-vfolder-mount-config__header,.bai-vfolder-mount-config__row{display:grid;grid-template-columns:minmax(0,1.5fr) var(--spacing-5) minmax(0,1fr) var(--spacing-7);column-gap:var(--spacing-2);align-items:start}.bai-vfolder-mount-config__arrow{display:flex;align-items:center;justify-content:center;height:var(--size-element-md);color:var(--color-text-secondary)}.bai-vfolder-mount-config__source{display:flex;min-width:0}.bai-vfolder-mount-config__folder{display:flex;align-items:center;gap:var(--spacing-2);flex:0 1 auto;min-width:0;height:var(--size-element-md);padding-inline:var(--spacing-2);border:var(--border-width) solid var(--color-border-emphasized);border-inline-end:0;border-start-start-radius:var(--radius-element);border-end-start-radius:var(--radius-element);background:var(--color-background-muted)}.bai-vfolder-mount-config__source:has(.astryx-complex-selector:focus-within)>.bai-vfolder-mount-config__folder{border-color:var(--color-accent)}.bai-vfolder-mount-config__source:has(button[aria-haspopup]:disabled)>.bai-vfolder-mount-config__folder{opacity:.5}.bai-vfolder-mount-config__folder>*{flex:none}.bai-vfolder-mount-config__folder>.bai-vfolder-identicon{width:17px;height:17px}.bai-vfolder-mount-config__separator{color:var(--color-icon-secondary)}.bai-vfolder-mount-config__folder>.bai-vfolder-mount-config__folder-name{display:flex;flex:0 1 auto;min-width:0;overflow:hidden;white-space:nowrap}.bai-vfolder-mount-config__folder-name>*{min-width:0}.bai-vfolder-mount-config__source>.astryx-field{flex:1 1 calc(var(--spacing-12) * 3);min-width:calc(var(--spacing-12) * 3)}.bai-vfolder-mount-config__source .astryx-complex-selector,.bai-vfolder-mount-config__source .astryx-complex-selector>button{border-start-start-radius:0;border-end-start-radius:0}@container (max-width: 520px){.bai-vfolder-mount-config__header{display:none}.bai-vfolder-mount-config__row{grid-template-columns:minmax(0,1fr) var(--spacing-7);row-gap:var(--spacing-1);padding-block:var(--spacing-2)}.bai-vfolder-mount-config__row>*{grid-column:1}.bai-vfolder-mount-config__row>.bai-vfolder-mount-config__remove{grid-column:2;grid-row:1}.bai-vfolder-mount-config__arrow{justify-content:start;height:auto;margin-inline-start:var(--spacing-2)}.bai-vfolder-mount-config__arrow>svg{transform:rotate(90deg)}}

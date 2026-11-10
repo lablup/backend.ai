@@ -6,10 +6,12 @@ from typing import Any
 
 import pytest
 import sqlalchemy as sa
+from pydantic import ValidationError
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.dto.manager.field import VFolderPermissionField
 from ai.backend.common.dto.manager.vfolder import (
     GetVFolderIDReq,
     VFolderCreateReq,
@@ -17,8 +19,9 @@ from ai.backend.common.dto.manager.vfolder import (
     VFolderGetInfoResponse,
     VFolderListResponse,
 )
-from ai.backend.common.types import QuotaScopeID, QuotaScopeType
-from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
+from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderMountPolicy
+from ai.backend.manager.models.resource_policy.row import UserResourcePolicyRow
+from ai.backend.manager.models.vfolder.row import VFolderRow
 
 VFolderFixtureData = dict[str, Any]
 VFolderFactory = Callable[..., Coroutine[Any, Any, VFolderFixtureData]]
@@ -98,6 +101,55 @@ class TestVFolderCreateViaSDK:
         )
 
 
+class TestVFolderCreateMountLevel:
+    """The response carries the creator's mount level; the row keeps the folder default."""
+
+    async def _default_of(self, db_engine: SAEngine, vfolder_id: str) -> VFolderMountPolicy:
+        async with db_engine.begin() as conn:
+            return VFolderMountPolicy(
+                await conn.scalar(
+                    sa.select(VFolderRow.default_mount_permission).where(
+                        VFolderRow.id == uuid.UUID(vfolder_id)
+                    )
+                )
+            )
+
+    async def test_a_personal_folder_made_without_a_level_answers_read_write_to_its_owner(
+        self,
+        db_engine: SAEngine,
+        admin_registry: BackendAIClientRegistry,
+        vfolder_host_permission_fixture: None,
+    ) -> None:
+        result = await admin_registry.vfolder.create(
+            VFolderCreateReq(
+                name="crud-mount-default",
+                folder_host="local",
+                unmanaged_path="/mnt/external/mount-default",
+            ),
+        )
+
+        assert result.root.permission == VFolderPermissionField.READ_WRITE
+        assert await self._default_of(db_engine, result.root.id) == VFolderMountPolicy.NONE
+
+    async def test_a_named_level_becomes_the_default(
+        self,
+        db_engine: SAEngine,
+        admin_registry: BackendAIClientRegistry,
+        vfolder_host_permission_fixture: None,
+    ) -> None:
+        result = await admin_registry.vfolder.create(
+            VFolderCreateReq(
+                name="crud-mount-named",
+                folder_host="local",
+                unmanaged_path="/mnt/external/mount-named",
+                permission=VFolderPermissionField.READ_ONLY,
+            ),
+        )
+
+        assert result.root.permission == VFolderPermissionField.READ_WRITE
+        assert await self._default_of(db_engine, result.root.id) == VFolderMountPolicy.READ_ONLY
+
+
 class TestVFolderCreateErrors:
     """Failure scenarios for VFolder creation — errors raised before storage-proxy."""
 
@@ -130,26 +182,31 @@ class TestVFolderCreateErrors:
 
     async def test_dot_prefix_name_for_group_vfolder_raises_error(
         self,
-        admin_registry: BackendAIClientRegistry,
         group_fixture: uuid.UUID,
     ) -> None:
-        """F-BIZ-4: Dot-prefixed name (except '.local') for a group vfolder is rejected."""
-        with pytest.raises(BackendAPIError) as exc_info:
-            await admin_registry.vfolder.create(
-                VFolderCreateReq(
-                    name=".hidden-data",
-                    folder_host="local",
-                    group_id=group_fixture,
-                ),
+        """F-BIZ-4: a dot-prefixed name (except '.local') is not a project folder's.
+
+        The request itself cannot say it: the rule reads off the body alone, so it is
+        answered where the body is read rather than by the server.
+        """
+        with pytest.raises(ValidationError):
+            VFolderCreateReq(
+                name=".hidden-data",
+                folder_host="local",
+                group_id=group_fixture,
             )
-        assert exc_info.value.status == 400
 
     async def test_non_admin_cannot_create_group_vfolder_in_regular_project(
         self,
         user_registry: BackendAIClientRegistry,
         group_fixture: uuid.UUID,
     ) -> None:
-        """F-BIZ-6: Regular user creating a group vfolder in a non-model-store project is Forbidden."""
+        """F-BIZ-6: a regular user does not get a project folder in a team project.
+
+        The cluster answers first here: this deployment does not allow project-owned
+        folders at all. Once the project presets carry vfolder permissions, the scope
+        check answers before the cluster does and this becomes a 403.
+        """
         with pytest.raises(BackendAPIError) as exc_info:
             await user_registry.vfolder.create(
                 VFolderCreateReq(
@@ -158,8 +215,7 @@ class TestVFolderCreateErrors:
                     group_id=group_fixture,
                 ),
             )
-        # Forbidden propagates with its own 403 status (no longer masked as 500)
-        assert exc_info.value.status == 403
+        assert exc_info.value.status == 400
 
     async def test_duplicate_name_raises_conflict(
         self,

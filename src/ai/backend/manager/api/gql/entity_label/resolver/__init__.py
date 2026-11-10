@@ -1,0 +1,1 @@
+"""Label GQL resolvers."""

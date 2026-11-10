@@ -1,9 +1,26 @@
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Self, override
 
-from ai.backend.common.types import SessionId
+from ai.backend.common.data.entity.idle_checker import IdleCheckerAssignmentID, IdleCheckerID
+from ai.backend.common.data.entity.prometheus_query_preset import PrometheusQueryPresetID
+from ai.backend.common.data.entity.types import (
+    EntityData,
+    EntityIdentifier,
+    EntityType,
+    RuntimeEntityID,
+)
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.idle_checker.types import (
+    CheckerType,
+    IdleCheckerSpec,
+    IdleCheckPhase,
+    UtilizationThresholdEntry,
+)
+from ai.backend.common.types import SessionId, SessionTypes
 
 
 @dataclass(frozen=True)
@@ -13,3 +30,79 @@ class IdleCheckSession:
     session_id: SessionId
     created_at: datetime
     starts_at: datetime | None
+    expire_at: datetime | None
+
+
+@dataclass(frozen=True)
+class SessionUtilizationQuery:
+    """Hashable batching key: one Prometheus query per (preset, labels) combination."""
+
+    preset_id: PrometheusQueryPresetID
+    filter_labels: tuple[tuple[str, str], ...]
+    group_labels: tuple[str, ...]
+
+    @classmethod
+    def from_threshold(cls, threshold: UtilizationThresholdEntry) -> Self:
+        return cls(
+            preset_id=threshold.preset_id,
+            filter_labels=tuple(
+                sorted((label.key, label.value) for label in threshold.filter_labels)
+            ),
+            group_labels=tuple(sorted(set(threshold.group_labels))),
+        )
+
+
+@dataclass(frozen=True)
+class IdleCheckerAssignmentData:
+    id: IdleCheckerAssignmentID
+    scope_type: EntityType
+    scope_id: uuid.UUID
+    idle_checker_id: IdleCheckerID
+    enabled: bool
+    created_at: datetime
+    updated_at: datetime
+
+    def scope_entity(self) -> EntityIdentifier:
+        """The scope the checker is bound to, as the entity it is."""
+        return RuntimeEntityID(self.scope_type, self.scope_id)
+
+
+@dataclass(frozen=True)
+class IdleCheckerData(EntityData):
+    id: IdleCheckerID
+    name: str
+    description: str | None
+    checker_type: CheckerType
+    target_session_types: list[SessionTypes]
+    initial_grace_period_seconds: int
+    spec: IdleCheckerSpec
+    created_at: datetime
+    updated_at: datetime
+
+    @override
+    def entity_id(self) -> EntityIdentifier:
+        return self.id
+
+
+@dataclass(frozen=True)
+class SessionIdleCheckData:
+    """One checker's state on one session."""
+
+    session_id: SessionId
+    idle_checker_id: IdleCheckerID
+    expire_at: datetime | None
+    last_status: IdleCheckPhase
+    last_message: str
+    is_manual: bool
+    manually_triggered_by: UserID | None
+
+
+@dataclass(frozen=True)
+class IdleJudgmentData:
+    """One session's judgment from one checker, persisted onto its session_idle_checks row."""
+
+    session_id: SessionId
+    checker_id: IdleCheckerID
+    status: IdleCheckPhase
+    expire_at: datetime
+    message: str

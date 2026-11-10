@@ -1,32 +1,34 @@
-import uuid
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.vfs_storage import VFSStorageID
+from ai.backend.manager.actions.v2.ops.base import GetSingleEntityOpsAction
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
-from ai.backend.manager.services.vfs_storage.actions.base import VFSStorageAction
+from ai.backend.manager.models.vfs_storage.queriers import VFSStorageQuerier
+from ai.backend.manager.models.vfs_storage.row import VFSStorageRow
 
 
 @dataclass
-class GetVFSStorageAction(VFSStorageAction):
-    storage_id: uuid.UUID | None = None
-    storage_name: str | None = None
+class GetVFSStorageAction(GetSingleEntityOpsAction[VFSStorageRow, VFSStorageData]):
+    """Read one VFS storage registration by id.
 
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.storage_id)
+    The name-keyed path is its own lookup action — a branch on which key the
+    caller supplied belongs to the adapter, not inside a read."""
+
+    storage_id: VFSStorageID
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.GET
-
-
-@dataclass
-class GetVFSStorageActionResult(BaseActionResult):
-    result: VFSStorageData
+    def action_name(cls) -> str:
+        return "get_vfs_storage"
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.result.id)
+    def entity_id(self) -> EntityIdentifier:
+        return self.storage_id
+
+    @override
+    def to_querier(self) -> VFSStorageQuerier:
+        return VFSStorageQuerier(storage_id=self.storage_id)

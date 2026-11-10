@@ -6,12 +6,14 @@ from uuid import UUID
 
 from strawberry import ID, Info
 
-from ai.backend.common.dto.manager.v2.prometheus_query_preset_category.request import (
-    DeleteCategoryInput as DeleteCategoryInputDTO,
+from ai.backend.common.data.entity.prometheus_query_preset_category import (
+    PrometheusQueryPresetCategoryID,
 )
 from ai.backend.common.dto.manager.v2.prometheus_query_preset_category.response import (
     CreateCategoryGQLPayload as CreateCategoryGQLPayloadDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.base import parse_uuid
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
@@ -20,6 +22,8 @@ from ai.backend.manager.api.gql.prometheus_query_preset.types.category import (
     CreateCategoryInputGQL,
     CreateCategoryPayloadGQL,
     DeleteCategoryPayloadGQL,
+    PartialBulkPurgeQueryPresetCategoriesInputGQL,
+    PartialBulkQueryPresetCategoriesPayloadGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
@@ -44,16 +48,51 @@ async def admin_create_prometheus_query_preset_category(
 
 @gql_mutation(
     BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Permanently remove a query preset category.",
+    )
+)
+async def purge_prometheus_query_preset_category(
+    info: Info[StrawberryGQLContext],
+    id: UUID,
+) -> DeleteCategoryPayloadGQL:
+    result = await info.context.adapters.prometheus_query_preset_category.purge(
+        PrometheusQueryPresetCategoryID(id)
+    )
+    return DeleteCategoryPayloadGQL.from_pydantic(result)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Permanently remove several query preset categories, answering for each one.",
+    )
+)
+async def partial_bulk_purge_prometheus_query_preset_categories(
+    info: Info[StrawberryGQLContext],
+    input: PartialBulkPurgeQueryPresetCategoriesInputGQL,
+) -> PartialBulkQueryPresetCategoriesPayloadGQL:
+    payload = await info.context.adapters.prometheus_query_preset_category.partial_bulk_purge(
+        input.to_pydantic()
+    )
+    return PartialBulkQueryPresetCategoriesPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
         added_version="26.3.0",
         description="Delete a query preset category (admin only).",
-    )
+    ),
+    deprecation_reason=(
+        f"Deprecated since {NEXT_RELEASE_VERSION}. Use `purgePrometheusQueryPresetCategory`."
+    ),
 )
 async def admin_delete_prometheus_query_preset_category(
     info: Info[StrawberryGQLContext],
     id: ID,
 ) -> DeleteCategoryPayloadGQL | None:
     check_admin_only()
-    result = await info.context.adapters.prometheus_query_preset_category.delete(
-        DeleteCategoryInputDTO(id=UUID(id))
+    result = await info.context.adapters.prometheus_query_preset_category.purge(
+        PrometheusQueryPresetCategoryID(parse_uuid(id))
     )
     return DeleteCategoryPayloadGQL.from_pydantic(result)

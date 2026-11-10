@@ -23,11 +23,12 @@ from uuid import UUID
 import yarl
 from pydantic import ConfigDict, Field
 
+from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
+from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.exception import BackendAIError
-from ai.backend.common.identifier.domain import DomainID, DomainName
-from ai.backend.common.identifier.project import ProjectID
-from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
-from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.types import (
     AccessKey,
     BackendAISchema,
@@ -84,6 +85,10 @@ class SessionScope(_SpecBaseModel):
     project_id: ProjectID
     resource_group_id: ResourceGroupID
     resource_group_name: ResourceGroupName
+    # Placement group (BEP-1064). ``None`` — the default for ordinary
+    # sessions — means the RG strategy alone decides placement. Route
+    # sessions inherit their replica group's group.
+    session_group_id: SessionGroupID | None = None
 
 
 class SessionClassification(_SpecBaseModel):

@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import json
+import uuid
 from datetime import UTC, datetime
 
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.dto.manager.pagination import PaginationInfo
 from ai.backend.common.dto.manager.v2.agent.response import (
     AgentNetworkInfo,
@@ -41,8 +43,11 @@ def _make_network_info() -> AgentNetworkInfo:
 
 
 def _make_agent_node(agent_id: str = "agent-001") -> AgentNode:
+    agent_uuid = AgentUUID(uuid.uuid4())
     return AgentNode(
         id=agent_id,
+        entity_id=agent_uuid,
+        uuid=agent_uuid,
         resource_info=_make_resource_info(),
         status_info=_make_status_info(),
         system_info=_make_system_info(),
@@ -327,9 +332,9 @@ class TestAgentResourceStatsPayload:
 
     def test_round_trip(self) -> None:
         payload = AgentResourceStatsPayload(
-            total_used_slots={"cpu": "8", "mem": "32g", "cuda.devices": "2"},
-            total_free_slots={"cpu": "24", "mem": "96g", "cuda.devices": "6"},
-            total_capacity_slots={"cpu": "32", "mem": "128g", "cuda.devices": "8"},
+            total_used_slots={"cpu": "8", "mem": "32g", "cuda.device": "2"},
+            total_free_slots={"cpu": "24", "mem": "96g", "cuda.device": "6"},
+            total_capacity_slots={"cpu": "32", "mem": "128g", "cuda.device": "8"},
         )
         json_str = payload.model_dump_json()
         restored = AgentResourceStatsPayload.model_validate_json(json_str)

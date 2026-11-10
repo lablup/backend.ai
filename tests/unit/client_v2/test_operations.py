@@ -12,11 +12,9 @@ from ai.backend.common.dto.manager.operations import (
     AppendErrorLogResponse,
     ClearErrorLogResponse,
     FetchManagerStatusResponse,
-    GetAnnouncementResponse,
     ListErrorLogsRequest,
     ListErrorLogsResponse,
     PerformSchedulerOpsRequest,
-    UpdateAnnouncementRequest,
     UpdateManagerStatusRequest,
 )
 from ai.backend.common.dto.manager.operations.types import (
@@ -235,45 +233,6 @@ class TestUpdateManagerStatus:
         call_kwargs = call_args.kwargs
         assert call_kwargs["json"]["status"] == "frozen"
         assert call_kwargs["json"]["force_kill"] is True
-
-
-class TestGetAnnouncement:
-    async def test_sends_get_and_deserializes(self) -> None:
-        mock_resp = AsyncMock()
-        mock_resp.status = 200
-        mock_resp.json = AsyncMock(return_value={"enabled": True, "message": "Maintenance at 10PM"})
-        mock_session = _make_request_session(mock_resp)
-        client = _make_ops_client(mock_session)
-
-        result = await client.get_announcement()
-
-        call_args = mock_session.request.call_args
-        assert call_args[0][0] == "GET"
-        assert "/manager/announcement" in str(call_args[0][1])
-        assert isinstance(result, GetAnnouncementResponse)
-        assert result.enabled is True
-        assert result.message == "Maintenance at 10PM"
-
-
-class TestUpdateAnnouncement:
-    async def test_sends_post_with_body(self) -> None:
-        mock_resp = AsyncMock()
-        mock_resp.status = 204
-        mock_session = _make_request_session(mock_resp)
-        client = _make_ops_client(mock_session)
-
-        request = UpdateAnnouncementRequest(
-            enabled=True,
-            message="System update scheduled",
-        )
-        await client.update_announcement(request)
-
-        call_args = mock_session.request.call_args
-        assert call_args[0][0] == "POST"
-        assert "/manager/announcement" in str(call_args[0][1])
-        call_kwargs = call_args.kwargs
-        assert call_kwargs["json"]["enabled"] is True
-        assert call_kwargs["json"]["message"] == "System update scheduled"
 
 
 class TestPerformSchedulerOps:

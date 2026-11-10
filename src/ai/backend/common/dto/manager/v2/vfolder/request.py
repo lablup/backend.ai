@@ -4,15 +4,21 @@ Request DTOs for vfolder DTO v2.
 
 from __future__ import annotations
 
+from typing import Self
 from uuid import UUID
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
-from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
-from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
+from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
+from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.v2.common import NonEmptyList
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
-from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
-from ai.backend.common.typed_validators import VFolderName
+from ai.backend.common.dto.manager.v2.entity_label.request import EntityLabelNestedFilter
+from ai.backend.common.dto.manager.v2.vfolder.types import VFolderScope, VFolderUsage
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.common.tristate.unset import UNSET, Unset
+from ai.backend.common.typed_validators import VFolderName, VFolderRelativePath
 
 from .types import (
     OrderDirection,
@@ -41,6 +47,10 @@ __all__ = (
     "ListFilesInput",
     "MkdirInput",
     "MoveFileInput",
+    "PartialBulkDeleteVFoldersInput",
+    "PartialBulkRestoreVFoldersInput",
+    "PartialBulkUpdateVFolderItemInput",
+    "PartialBulkUpdateVFoldersInput",
     "PurgeVFolderInput",
     "PurgeVFolderOptions",
     "RenameFileInput",
@@ -66,9 +76,9 @@ class CreateVFolderInput(BaseRequestModel):
     usage_mode: VFolderUsageMode = Field(
         default=VFolderUsageMode.GENERAL, description="Usage mode of the vfolder"
     )
-    permission: VFolderPermissionField = Field(
-        default=VFolderPermissionField.READ_WRITE,
-        description="Default permission of the vfolder",
+    permission: VFolderPermissionField | None = Field(
+        default=None,
+        description="Default permission of the vfolder. The folder type's default when omitted.",
     )
     project_id: UUID | None = Field(
         default=None, description="Project ID for project-owned vfolder"
@@ -86,6 +96,15 @@ class CreateVFolderInput(BaseRequestModel):
             return stripped
         return v
 
+    @model_validator(mode="after")
+    def _reject_dot_prefixed_project_folder(self) -> Self:
+        """A dot-prefixed name is how a folder is mounted automatically, which only
+        makes sense for a folder of one's own. ``.local`` is the exception the mount
+        path gives a per-user subdirectory of."""
+        if self.project_id is not None and self.name.startswith(".") and self.name != ".local":
+            raise ValueError("dot-prefixed vfolders cannot be a project folder.")
+        return self
+
 
 class CreateVFolderInScopeInput(BaseRequestModel):
     """Scope-agnostic body for vfolder creation under a specific scope.
@@ -102,9 +121,9 @@ class CreateVFolderInScopeInput(BaseRequestModel):
     usage_mode: VFolderUsageMode = Field(
         default=VFolderUsageMode.GENERAL, description="Usage mode of the vfolder"
     )
-    permission: VFolderPermissionField = Field(
-        default=VFolderPermissionField.READ_WRITE,
-        description="Default permission of the vfolder",
+    permission: VFolderPermissionField | None = Field(
+        default=None,
+        description="Default permission of the vfolder. The folder type's default when omitted.",
     )
     cloneable: bool = Field(default=False, description="Whether the vfolder is cloneable")
 
@@ -118,23 +137,36 @@ class CreateVFolderInScopeInput(BaseRequestModel):
             return stripped
         return v
 
+    @model_validator(mode="after")
+    def _reject_dot_prefixed_name(self) -> Self:
+        """The scope this lands in is a project, and a dot-prefixed name is for a folder
+        of one's own. ``.local`` is the exception the mount path gives a per-user
+        subdirectory of."""
+        if self.name.startswith(".") and self.name != ".local":
+            raise ValueError("dot-prefixed vfolders cannot be a project folder.")
+        return self
+
 
 class UpdateVFolderInput(BaseRequestModel):
     """Input for updating a virtual folder."""
 
-    name: str | Sentinel | None = Field(
-        default=SENTINEL,
-        description="Updated vfolder name. Use SENTINEL (default) for no change.",
+    name: str | None | Unset = Field(
+        default=UNSET,
+        description="Updated vfolder name. Omit to leave unchanged.",
     )
-    cloneable: bool | None = Field(default=None, description="Updated cloneable setting")
-    permission: VFolderPermissionField | None = Field(
-        default=None, description="Updated permission level"
+    cloneable: bool | None | Unset = Field(
+        default=UNSET,
+        description="Updated cloneable setting. Omit to leave unchanged.",
+    )
+    permission: VFolderPermissionField | None | Unset = Field(
+        default=UNSET,
+        description="Updated permission level. Omit to leave unchanged.",
     )
 
     @field_validator("name")
     @classmethod
-    def strip_and_validate_name(cls, v: str | Sentinel | None) -> str | Sentinel | None:
-        if v is None or isinstance(v, Sentinel):
+    def strip_and_validate_name(cls, v: str | None | Unset) -> str | None | Unset:
+        if not isinstance(v, str):
             return v
         stripped = v.strip()
         if not stripped:
@@ -209,6 +241,33 @@ class RestoreVFolderInput(BaseRequestModel):
     id: UUID = Field(description="VFolder ID to restore")
 
 
+class PartialBulkUpdateVFolderItemInput(BaseRequestModel):
+    """One vfolder of a partial bulk update and the fields to update on it."""
+
+    id: UUID = Field(description="ID of the vfolder to update.")
+    input: UpdateVFolderInput = Field(description="Fields to update on the vfolder.")
+
+
+class PartialBulkUpdateVFoldersInput(BaseRequestModel):
+    """Input for updating several vfolders, each answered for separately."""
+
+    items: NonEmptyList[PartialBulkUpdateVFolderItemInput] = Field(
+        description="The vfolders to update, each with its fields."
+    )
+
+
+class PartialBulkDeleteVFoldersInput(BaseRequestModel):
+    """Input for soft-deleting several vfolders, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the vfolders to soft-delete.")
+
+
+class PartialBulkRestoreVFoldersInput(BaseRequestModel):
+    """Input for restoring several soft-deleted vfolders, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the vfolders to restore.")
+
+
 class CloneVFolderInput(BaseRequestModel):
     """Input for cloning a virtual folder.
 
@@ -224,9 +283,9 @@ class CloneVFolderInput(BaseRequestModel):
     usage_mode: VFolderUsageMode = Field(
         default=VFolderUsageMode.GENERAL, description="Usage mode of the cloned vfolder"
     )
-    permission: VFolderPermissionField = Field(
-        default=VFolderPermissionField.READ_WRITE,
-        description="Permission level of the cloned vfolder",
+    permission: VFolderPermissionField | None = Field(
+        default=None,
+        description="Permission level of the cloned vfolder. The folder type's default when omitted.",
     )
     cloneable: bool = Field(default=False, description="Whether the cloned vfolder is cloneable")
 
@@ -262,7 +321,7 @@ class CreateDownloadSessionInput(BaseRequestModel):
 class CreateUploadSessionInput(BaseRequestModel):
     """Input for creating a file upload session."""
 
-    path: str = Field(description="File path to upload to")
+    path: VFolderRelativePath = Field(description="File path to upload to")
     size: int = Field(ge=0, description="File size in bytes")
 
 
@@ -324,6 +383,21 @@ class UnshareVFolderInput(BaseRequestModel):
     emails: list[str] = Field(description="Email addresses of users to unshare from")
 
 
+class SetVFolderMountPolicyInput(BaseRequestModel):
+    """Input for setting the mount level one user gets on a virtual folder."""
+
+    user_id: UUID = Field(description="User the mount level is set for")
+    permission: VFolderPermissionField = Field(
+        description="Mount level: none, ro or rw. wd is stored as rw."
+    )
+
+
+class UnsetVFolderMountPolicyInput(BaseRequestModel):
+    """Input for taking back the mount level one user was given on a virtual folder."""
+
+    user_id: UUID = Field(description="User whose mount level is taken back")
+
+
 class AcceptInvitationInput(BaseRequestModel):
     """Input for accepting a virtual folder invitation."""
 
@@ -354,6 +428,13 @@ class VFolderFilter(BaseRequestModel):
     )
     cloneable: bool | None = Field(default=None, description="Filter by cloneable flag.")
     created_at: DateTimeFilter | None = Field(default=None, description="Filter by creation time.")
+    labels: EntityLabelNestedFilter | None = Field(
+        default=None, description="Filter by the labels on the entity"
+    )
+    entity_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by vfolder ID.",
+    )
     AND: list[VFolderFilter] | None = Field(default=None, description="AND logical combinator.")
     OR: list[VFolderFilter] | None = Field(default=None, description="OR logical combinator.")
     NOT: list[VFolderFilter] | None = Field(default=None, description="NOT logical combinator.")
@@ -372,6 +453,13 @@ class VFolderOrder(BaseRequestModel):
 class SearchVFoldersInput(BaseRequestModel):
     """Input for vfolder search with cursor and offset pagination (shared by admin and scoped searches)."""
 
+    usage: VFolderUsage | None = Field(
+        default=None,
+        description=(
+            "Uses narrowing the result. Each listed entity must be readable by the caller; "
+            "vfolders the caller cannot read are left out."
+        ),
+    )
     filter: VFolderFilter | None = Field(default=None, description="Filter conditions.")
     order: list[VFolderOrder] | None = Field(default=None, description="Order specifications.")
     first: int | None = Field(default=None, description="Cursor pagination: number of items.")
@@ -380,6 +468,12 @@ class SearchVFoldersInput(BaseRequestModel):
     before: str | None = Field(default=None, description="Cursor pagination: before cursor.")
     limit: int | None = Field(default=None, description="Offset pagination: maximum items.")
     offset: int | None = Field(default=None, description="Offset pagination: number to skip.")
+
+
+class ScopedSearchVFoldersInput(SearchVFoldersInput):
+    """Input for searching the vfolders the named scopes reach."""
+
+    scope: VFolderScope = Field(description="Scope (OR across all items).")
 
 
 # ============================================================

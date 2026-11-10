@@ -4,41 +4,15 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
-from ai.backend.common import redis_helper
 from ai.backend.common.defs import REDIS_STREAM_DB
+from ai.backend.common.message_queue.message import MQMessage
+from ai.backend.common.message_queue.payload import AnycastMessagePayload, BroadcastMessagePayload
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
-from ai.backend.common.message_queue.types import BroadcastMessage, MQMessage
+from ai.backend.common.message_queue.types import MessageName
 from ai.backend.common.types import (
     HostPortPair,
-    RedisConnectionInfo,
-    RedisHelperConfig,
     RedisTarget,
 )
-
-
-@pytest.fixture
-async def redis_conn(
-    redis_container: tuple[str, HostPortPair],
-) -> AsyncGenerator[RedisConnectionInfo, None]:
-    # Configure test Redis connection
-    addr = redis_container[1]
-    conn = redis_helper.get_redis_object(
-        RedisTarget(
-            addr=addr,
-            redis_helper_config=RedisHelperConfig(
-                socket_timeout=1.0,
-                socket_connect_timeout=1.0,
-                reconnect_poll_timeout=1.0,
-                max_connections=10,
-                connection_ready_timeout=1.0,
-            ),
-        ),
-        name="test-redis",
-    )
-    yield conn
-    # Cleanup after tests
-    await conn.client.flushdb()
-    await conn.close()
 
 
 @pytest.fixture
@@ -87,7 +61,9 @@ async def redis_queue(
 
 async def test_send_and_consume(redis_queue: RedisQueue) -> None:
     # Test message sending and consuming
-    test_payload = {b"key": b"value", b"key2": b"value2"}
+    test_payload = AnycastMessagePayload(
+        name=MessageName("test-event"), source="i-test", payload="{}"
+    )
 
     # Send message
     await redis_queue.send(test_payload)
@@ -102,10 +78,12 @@ async def test_send_and_consume(redis_queue: RedisQueue) -> None:
 
 async def test_subscribe(redis_queue: RedisQueue) -> None:
     # Test message subscription
-    test_payload = {"key": "value", "key2": "value2"}
+    test_payload = BroadcastMessagePayload(
+        name=MessageName("test-event"), source="i-test", payload="{}"
+    )
 
     # Create task to subscribe
-    received_messages: list[BroadcastMessage] = []
+    received_messages: list[BroadcastMessagePayload] = []
 
     async def subscriber() -> None:
         async for message in redis_queue.subscribe_queue():
@@ -123,15 +101,17 @@ async def test_subscribe(redis_queue: RedisQueue) -> None:
     await asyncio.wait_for(subscriber_task, timeout=5)
 
     assert len(received_messages) == 1
-    assert received_messages[0].payload == test_payload
+    assert received_messages[0] == test_payload
 
 
 async def test_broadcast_with_cache(redis_queue: RedisQueue) -> None:
     # Test broadcasting with cache
-    test_payload = {"key": "value", "key2": "value2"}
+    test_payload = BroadcastMessagePayload(
+        name=MessageName("test-event"), source="i-test", payload="{}"
+    )
     cache_id = f"test-cache-id-{random.randint(1000, 9999)}"
 
-    received_messages: list[BroadcastMessage] = []
+    received_messages: list[BroadcastMessagePayload] = []
 
     async def subscriber() -> None:
         async for message in redis_queue.subscribe_queue():
@@ -149,7 +129,7 @@ async def test_broadcast_with_cache(redis_queue: RedisQueue) -> None:
     await asyncio.wait_for(subscriber_task, timeout=5)
 
     assert len(received_messages) == 1
-    assert received_messages[0].payload == test_payload
+    assert received_messages[0] == test_payload
 
     # Fetch cached message
     cached_message = await redis_queue.fetch_cached_broadcast_message(cache_id)
@@ -159,7 +139,9 @@ async def test_broadcast_with_cache(redis_queue: RedisQueue) -> None:
 
 async def test_done(redis_queue: RedisQueue) -> None:
     # Test message acknowledgment
-    test_payload = {b"key": b"value"}
+    test_payload = AnycastMessagePayload(
+        name=MessageName("test-event"), source="i-test", payload="{}"
+    )
 
     # Send message
     await redis_queue.send(test_payload)

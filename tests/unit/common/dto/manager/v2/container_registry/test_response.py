@@ -24,6 +24,7 @@ def _make_registry_node(
 ) -> ContainerRegistryNode:
     return ContainerRegistryNode(
         id=uuid.uuid4(),
+        entity_id=uuid.uuid4(),
         url="https://registry.example.com",
         registry_name="test-registry",
         type=registry_type,
@@ -56,6 +57,7 @@ class TestContainerRegistryNode:
     def test_with_optional_fields(self) -> None:
         node = ContainerRegistryNode(
             id=uuid.uuid4(),
+            entity_id=uuid.uuid4(),
             url="https://harbor.example.com",
             registry_name="harbor-reg",
             type=ContainerRegistryType.HARBOR,
@@ -72,6 +74,7 @@ class TestContainerRegistryNode:
     def test_with_extra_metadata(self) -> None:
         node = ContainerRegistryNode(
             id=uuid.uuid4(),
+            entity_id=uuid.uuid4(),
             url="https://registry.example.com",
             registry_name="extra-reg",
             type=ContainerRegistryType.DOCKER,
@@ -100,6 +103,7 @@ class TestContainerRegistryNode:
     def test_serialization_round_trip(self) -> None:
         node = ContainerRegistryNode(
             id=uuid.uuid4(),
+            entity_id=uuid.uuid4(),
             url="https://registry.example.com",
             registry_name="my-reg",
             type=ContainerRegistryType.HARBOR,
@@ -156,6 +160,7 @@ class TestUpdateContainerRegistryPayload:
     def test_creation_with_registry_node(self) -> None:
         node = ContainerRegistryNode(
             id=uuid.uuid4(),
+            entity_id=uuid.uuid4(),
             url="https://updated.example.com",
             registry_name="updated-registry",
             type=ContainerRegistryType.HARBOR,
@@ -177,26 +182,32 @@ class TestDeleteContainerRegistryPayload:
 
     def test_creation_with_uuid(self) -> None:
         reg_id = uuid.uuid4()
-        payload = DeleteContainerRegistryPayload(id=reg_id)
+        payload = DeleteContainerRegistryPayload(id=reg_id, entity_id=reg_id)
         assert payload.id == reg_id
 
     def test_id_is_uuid_instance(self) -> None:
         reg_id = uuid.uuid4()
-        payload = DeleteContainerRegistryPayload(id=reg_id)
+        payload = DeleteContainerRegistryPayload(id=reg_id, entity_id=reg_id)
         assert isinstance(payload.id, uuid.UUID)
 
     def test_creation_from_uuid_string(self) -> None:
         reg_id = uuid.uuid4()
-        payload = DeleteContainerRegistryPayload.model_validate({"id": str(reg_id)})
+        payload = DeleteContainerRegistryPayload.model_validate({
+            "id": str(reg_id),
+            "entity_id": str(reg_id),
+        })
         assert payload.id == reg_id
 
     def test_invalid_uuid_raises_error(self) -> None:
         with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
-            DeleteContainerRegistryPayload.model_validate({"id": "not-a-uuid"})
+            DeleteContainerRegistryPayload.model_validate({
+                "id": "not-a-uuid",
+                "entity_id": "not-a-uuid",
+            })
 
     def test_round_trip_serialization(self) -> None:
         reg_id = uuid.uuid4()
-        payload = DeleteContainerRegistryPayload(id=reg_id)
+        payload = DeleteContainerRegistryPayload(id=reg_id, entity_id=reg_id)
         json_str = payload.model_dump_json()
         restored = DeleteContainerRegistryPayload.model_validate_json(json_str)
         assert restored.id == reg_id

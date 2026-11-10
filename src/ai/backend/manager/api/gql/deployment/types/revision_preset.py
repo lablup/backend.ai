@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Annotated, Self
+from typing import TYPE_CHECKING, Annotated, Self, override
 from uuid import UUID
 
 import strawberry
@@ -13,7 +14,11 @@ from strawberry.relay import Connection, Edge, NodeID
 from strawberry.scalars import JSON
 
 from ai.backend.common.config import DEFAULT_SHELL
+from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.deployment.request import (
     DeploymentStrategyInput as DeploymentStrategyInputDTO,
 )
@@ -28,6 +33,12 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import 
 )
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
     DeploymentRevisionPresetOrder as OrderDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
+    PartialBulkPurgeDeploymentRevisionPresetsInput as PartialBulkPurgeInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
+    PartialBulkUpdateDeploymentRevisionPresetsInput as PartialBulkUpdateInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
     PresetModelConfigInput as PresetModelConfigInputDTO,
@@ -46,6 +57,21 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import 
 )
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
     UpdateDeploymentRevisionPresetInput as UpdateInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
+    UpdatePresetModelConfigInput as UpdatePresetModelConfigInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
+    UpdatePresetModelDefinitionInput as UpdatePresetModelDefinitionInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
+    UpdatePresetModelHealthCheckInput as UpdatePresetModelHealthCheckInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
+    UpdatePresetModelMetadataInput as UpdatePresetModelMetadataInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
+    UpdatePresetModelServiceConfigInput as UpdatePresetModelServiceConfigInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import (
     CreateDeploymentRevisionPresetPayload as CreatePayloadDTO,
@@ -77,7 +103,14 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import (
     UpdateDeploymentRevisionPresetPayload as UpdatePayloadDTO,
 )
-from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.dto.manager.v2.deployment_revision_preset.types import (
+    DeploymentRevisionPresetUsage,
+    DeploymentRevisionPresetUsedBy,
+    PresetModelConfigInfoDTO,
+    PresetModelDefinitionInfoDTO,
+    PresetModelServiceConfigInfoDTO,
+)
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import StringFilter as StringFilterGQL
 from ai.backend.manager.api.gql.base import UUIDFilter as UUIDFilterGQL
 from ai.backend.manager.api.gql.common.types import (
@@ -86,7 +119,10 @@ from ai.backend.manager.api.gql.common.types import (
     ResourceOptsEntryInput,
 )
 from ai.backend.manager.api.gql.common.types import ResourceOptsEntryGQL as ResourceOptsEntryInfoGQL
-from ai.backend.manager.api.gql.common_types import ResourceSlotEntryInputGQL
+from ai.backend.manager.api.gql.common_types import (
+    PartialBulkFailureGQL,
+    ResourceSlotEntryInputGQL,
+)
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -109,10 +145,12 @@ from ai.backend.manager.api.gql.deployment.types.resource_slot import (
     AllocatedResourceSlotOrderByGQL,
 )
 from ai.backend.manager.api.gql.deployment.types.revision import (
-    ModelDefinitionGQL,
-    ModelDefinitionInputGQL,
+    ModelHealthCheckGQL,
+    ModelMetadataGQL,
+    PreStartActionGQL,
     PreStartActionInputGQL,
 )
+from ai.backend.manager.api.gql.entity_label.types.filters import EntityLabelNestedFilterGQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
@@ -253,6 +291,87 @@ class PresetDeploymentDefaultsGQL(PydanticOutputMixin[PresetDeploymentDefaultsDT
     )
 
 
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.9.0",
+        description="Service configuration for a model entry stored in a preset.",
+    ),
+    model=PresetModelServiceConfigInfoDTO,
+    name="PresetModelServiceConfig",
+)
+class PresetModelServiceConfigGQL:
+    pre_start_actions: list[PreStartActionGQL] = gql_field(
+        description="List of pre-start actions to execute before starting the model service."
+    )
+    command: str | None = gql_field(
+        description="Single-string command to start the model service.",
+        default=None,
+    )
+    start_command: list[str] | None = gql_field(
+        description="Command to start the model service.",
+        default=None,
+        deprecation_reason="Use `command` instead.",
+    )
+    shell: str | None = gql_field(
+        description=(
+            "Shell used to run the command. If set, the kernel runs "
+            "`[shell, '-c', command]`; null or empty disables shell wrapping."
+        ),
+        default=None,
+    )
+    port: int | None = gql_field(
+        default=None,
+        description="Port number for the model service. Null when the preset omits it to "
+        "inherit the runtime variant baseline's port at revision resolution.",
+    )
+    health_check: ModelHealthCheckGQL | None = gql_field(
+        description="Health check configuration for the model service.",
+        default=None,
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.9.0",
+        description="Configuration for a single model stored in a preset model definition.",
+    ),
+    model=PresetModelConfigInfoDTO,
+    name="PresetModelConfig",
+)
+class PresetModelConfigGQL:
+    name: str | None = gql_field(
+        default=None,
+        description="Name of the model. Null when the preset omits it to inherit the "
+        "runtime variant baseline's name at revision resolution.",
+    )
+    model_path: str | None = gql_field(
+        default=None,
+        description="Path to the model file. Null when the preset omits it to inherit the "
+        "model mount destination at revision resolution.",
+    )
+    service: PresetModelServiceConfigGQL | None = gql_field(
+        description="Configuration for the model service.", default=None
+    )
+    metadata: ModelMetadataGQL | None = gql_field(
+        description="Metadata about the model.", default=None
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.9.0",
+        description="Model definition stored in a preset; sparse fields inherit "
+        "merge-chain defaults at revision resolution.",
+    ),
+    model=PresetModelDefinitionInfoDTO,
+    name="PresetModelDefinition",
+)
+class PresetModelDefinitionGQL:
+    models: list[PresetModelConfigGQL] = gql_field(
+        description="List of models in the model definition."
+    )
+
+
 @gql_node_type(
     BackendAIGQLMeta(
         added_version="26.4.2",
@@ -262,6 +381,12 @@ class PresetDeploymentDefaultsGQL(PydanticOutputMixin[PresetDeploymentDefaultsDT
 )
 class DeploymentRevisionPresetGQL(PydanticNodeMixin[NodeDTO]):
     id: NodeID[str] = gql_field(description="Relay-style global node identifier.")
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="UUID of the deployment revision preset.",
+        ),
+    )
     runtime_variant_id: UUID = gql_field(
         description="The runtime variant this preset is designed for (e.g., vLLM, SGLang)."
     )
@@ -285,7 +410,7 @@ class DeploymentRevisionPresetGQL(PydanticNodeMixin[NodeDTO]):
         description="Deployment-level default values (open_to_public, replica_count, "
         "revision_history_limit, deployment_strategy) provided by this preset."
     )
-    model_definition: ModelDefinitionGQL | None = gql_field(
+    model_definition: PresetModelDefinitionGQL | None = gql_field(
         description="Parsed model definition specifying health checks, ports, and service configuration for the inference endpoint.",
         default=None,
     )
@@ -315,7 +440,9 @@ class DeploymentRevisionPresetGQL(PydanticNodeMixin[NodeDTO]):
         ]
         | None
     ):
-        return await info.context.data_loaders.runtime_variant_loader.load(self.runtime_variant_id)
+        return await info.context.data_loaders.runtime_variant_loader.load(
+            RuntimeVariantID(self.runtime_variant_id)
+        )
 
     @gql_added_field(
         BackendAIGQLMeta(
@@ -363,6 +490,19 @@ class DeploymentRevisionPresetGQL(PydanticNodeMixin[NodeDTO]):
         )
         return [AllocatedResourceSlotGQL.from_pydantic(item) for item in payload.items]
 
+    @classmethod
+    @override
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[DeploymentRevisionPresetGQL | None]:
+        return await info.context.data_loaders.revision_preset_loader.load_many([
+            DeploymentPresetID(UUID(nid)) for nid in node_ids
+        ])
+
 
 DeploymentRevisionPresetEdge = Edge[DeploymentRevisionPresetGQL]
 
@@ -408,10 +548,22 @@ class DeploymentRevisionPresetFilterGQL(PydanticInputMixin[FilterDTO]):
     id: UUIDFilterGQL | None = gql_added_field(
         BackendAIGQLMeta(added_version="26.4.4", description="Filter by preset ID."),
         default=None,
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `entityId`.",
+    )
+    entity_id: UUIDFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter by preset ID."),
+        default=None,
     )
     name: StringFilterGQL | None = gql_field(default=None, description="Name filter.")
     runtime_variant_id: UUIDFilterGQL | None = gql_field(
         default=None, description="Variant ID filter."
+    )
+    labels: EntityLabelNestedFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Select entities by the labels on them.",
+        ),
+        default=None,
     )
     AND: list[Self] | None = gql_added_field(
         BackendAIGQLMeta(added_version="26.7.0", description="Match all of the given sub-filters."),
@@ -424,6 +576,40 @@ class DeploymentRevisionPresetFilterGQL(PydanticInputMixin[FilterDTO]):
     NOT: list[Self] | None = gql_added_field(
         BackendAIGQLMeta(added_version="26.7.0", description="Negate the given sub-filters."),
         default=None,
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version="26.9.0",
+        description="Entities whose use of a deployment preset narrows the read.",
+    ),
+    name="DeploymentRevisionPresetUsedBy",
+)
+class DeploymentRevisionPresetUsedByGQL(PydanticInputMixin[DeploymentRevisionPresetUsedBy]):
+    """The entities whose use of a preset narrows the read."""
+
+    deployment: list[UUID] | None = gql_field(
+        default=None, description="Deployments whose revisions name the preset."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version="26.9.0",
+        description=(
+            "Uses narrowing a deployment preset query; every id is AND-ed. The caller must be able "
+            "to read each listed entity, or the request is refused. Only presets the caller "
+            "can read are returned, even when a listed entity is tied to others."
+        ),
+    ),
+    name="DeploymentRevisionPresetUsage",
+)
+class DeploymentRevisionPresetUsageGQL(PydanticInputMixin[DeploymentRevisionPresetUsage]):
+    """The uses that narrow a deployment preset read."""
+
+    used_by: DeploymentRevisionPresetUsedByGQL | None = gql_field(
+        default=None, description="Entities whose use of the preset narrows the read."
     )
 
 
@@ -524,8 +710,8 @@ class PresetModelMetadataInputGQL(PydanticInputMixin[PresetModelMetadataInputDTO
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version="26.4.4",
-        description="Strict service configuration for a preset model entry.",
+        added_version="26.9.0",
+        description="Service configuration for a preset model entry.",
     ),
     name="PresetModelServiceConfigInput",
 )
@@ -557,8 +743,10 @@ class PresetModelServiceConfigInputGQL(PydanticInputMixin[PresetModelServiceConf
         ),
         default=DEFAULT_SHELL,
     )
-    port: int = gql_field(
-        description="Port number for the model service. Must be greater than 1.",
+    port: int | None = gql_field(
+        default=None,
+        description="Port number for the model service. Must be greater than 1. Omit to "
+        "inherit the runtime variant baseline's port.",
     )
     health_check: PresetModelHealthCheckInputGQL | None = gql_field(
         description="Health check configuration for the model service.", default=None
@@ -567,14 +755,20 @@ class PresetModelServiceConfigInputGQL(PydanticInputMixin[PresetModelServiceConf
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version="26.4.4",
-        description="Strict configuration for a single model within a preset model definition.",
+        added_version="26.9.0",
+        description="Configuration for a single model within a preset model definition.",
     ),
     name="PresetModelConfigInput",
 )
 class PresetModelConfigInputGQL(PydanticInputMixin[PresetModelConfigInputDTO]):
-    name: str = gql_field(description="Name of the model.")
-    model_path: str = gql_field(description="Path to the model file.")
+    name: str | None = gql_field(
+        default=None,
+        description="Name of the model. Omit to inherit the runtime variant baseline's name.",
+    )
+    model_path: str | None = gql_field(
+        default=None,
+        description="Path to the model file. Omit to inherit the model mount destination.",
+    )
     service: PresetModelServiceConfigInputGQL = gql_field(
         description="Configuration for the model service.",
     )
@@ -586,8 +780,8 @@ class PresetModelConfigInputGQL(PydanticInputMixin[PresetModelConfigInputDTO]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         added_version="26.4.4",
-        description="Strict model definition for a preset. When provided on create it must be "
-        "fully populated with at least one model.",
+        description="Model definition for a preset. Each model requires a service block; "
+        "name/model_path may be omitted to inherit merge-chain defaults.",
     ),
     name="PresetModelDefinitionInput",
 )
@@ -638,8 +832,8 @@ class CreateDeploymentRevisionPresetInputGQL(PydanticInputMixin[CreateInputDTO])
         BackendAIGQLMeta(
             added_version="26.4.4",
             description="Parsed model definition specifying health checks, ports, and service "
-            "configuration for the inference endpoint. Optional, but when provided it must be "
-            "fully populated with at least one model.",
+            "configuration for the inference endpoint. Optional; name/model_path may be omitted "
+            "to inherit merge-chain defaults.",
         ),
         default=None,
     )
@@ -701,6 +895,185 @@ class CreateDeploymentRevisionPresetInputGQL(PydanticInputMixin[CreateInputDTO])
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
+        added_version="26.9.0",
+        description="Patch for a preset model's health check. Omit a field to keep its "
+        "current stored value.",
+    ),
+    name="UpdatePresetModelHealthCheckInput",
+)
+class UpdatePresetModelHealthCheckInputGQL(
+    PydanticInputMixin[UpdatePresetModelHealthCheckInputDTO]
+):
+    enable: bool | None = gql_field(
+        default=UNSET,
+        description="Whether the route should be health-checked. When false the route "
+        "activates immediately and the remaining fields are ignored. Omit to keep the "
+        "current value.",
+    )
+    interval: float | None = gql_field(
+        default=UNSET,
+        description="Interval in seconds between health checks. Omit to keep the current value.",
+    )
+    path: str | None = gql_field(
+        default=UNSET,
+        description="Path to check for health status. Omit to keep the current value.",
+    )
+    max_retries: int | None = gql_field(
+        default=UNSET,
+        description="Maximum number of retries for health check. Omit to keep the current value.",
+    )
+    max_wait_time: float | None = gql_field(
+        default=UNSET,
+        description="Maximum time in seconds to wait for a health check response. Omit to "
+        "keep the current value.",
+    )
+    expected_status_code: int | None = gql_field(
+        default=UNSET,
+        description="Expected HTTP status code for a healthy response. Omit to keep the "
+        "current value.",
+    )
+    initial_delay: float | None = gql_field(
+        default=UNSET,
+        description="Initial delay in seconds before the first health check. Omit to keep "
+        "the current value.",
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version="26.9.0",
+        description="Patch for a preset model's metadata. Omit a field to keep its current "
+        "stored value.",
+    ),
+    name="UpdatePresetModelMetadataInput",
+)
+class UpdatePresetModelMetadataInputGQL(PydanticInputMixin[UpdatePresetModelMetadataInputDTO]):
+    author: str | None = gql_field(
+        default=UNSET, description="Author of the model. Omit to keep the current value."
+    )
+    title: str | None = gql_field(
+        default=UNSET, description="Title of the model. Omit to keep the current value."
+    )
+    version: str | None = gql_field(
+        default=UNSET, description="Version of the model. Omit to keep the current value."
+    )
+    created: str | None = gql_field(
+        default=UNSET, description="Creation date of the model. Omit to keep the current value."
+    )
+    description: str | None = gql_field(
+        default=UNSET, description="Description of the model. Omit to keep the current value."
+    )
+    task: str | None = gql_field(
+        default=UNSET, description="Task type of the model. Omit to keep the current value."
+    )
+    category: str | None = gql_field(
+        default=UNSET, description="Category of the model. Omit to keep the current value."
+    )
+    architecture: str | None = gql_field(
+        default=UNSET, description="Architecture of the model. Omit to keep the current value."
+    )
+    framework: list[str] | None = gql_field(
+        default=UNSET, description="Frameworks used by the model. Omit to keep the current value."
+    )
+    label: list[str] | None = gql_field(
+        default=UNSET, description="Labels for the model. Omit to keep the current value."
+    )
+    license: str | None = gql_field(
+        default=UNSET, description="License of the model. Omit to keep the current value."
+    )
+    min_resource: JSON | None = gql_field(
+        default=UNSET,
+        description="Minimum resource requirements for the model. Omit to keep the current value.",
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version="26.9.0",
+        description="Patch for a preset model's service config. Omit a field to keep its "
+        "current stored value.",
+    ),
+    name="UpdatePresetModelServiceConfigInput",
+)
+class UpdatePresetModelServiceConfigInputGQL(
+    PydanticInputMixin[UpdatePresetModelServiceConfigInputDTO]
+):
+    pre_start_actions: list[PreStartActionInputGQL] | None = gql_field(
+        default=UNSET,
+        description="Pre-start actions to execute before starting the model service. Omit "
+        "to keep the current list; provide the full replacement list to change it.",
+    )
+    command: str | None = gql_field(
+        default=UNSET,
+        description="Single-string command to start the model service. Omit to keep the "
+        "current value.",
+    )
+    start_command: list[str] | None = gql_field(
+        default=UNSET,
+        description="Deprecated. Command to start the model service. Use `command` instead. "
+        "Omit to keep the current value.",
+        deprecation_reason="Use `command` instead.",
+    )
+    shell: str | None = gql_field(
+        default=UNSET,
+        description="Shell used to run the command. If set, the kernel runs "
+        "`[shell, '-c', command]`; null or empty disables shell wrapping. Omit to keep the "
+        "current value.",
+    )
+    port: int | None = gql_field(
+        default=UNSET,
+        description="Port number for the model service. Must be greater than 1. Omit to "
+        "keep the current value.",
+    )
+    health_check: UpdatePresetModelHealthCheckInputGQL | None = gql_field(
+        default=UNSET,
+        description="Health check configuration for the model service. Omit to keep the "
+        "current value.",
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version="26.9.0",
+        description="Patch for a single preset model entry. Omit a field to keep its current "
+        "stored value.",
+    ),
+    name="UpdatePresetModelConfigInput",
+)
+class UpdatePresetModelConfigInputGQL(PydanticInputMixin[UpdatePresetModelConfigInputDTO]):
+    name: str | None = gql_field(
+        default=UNSET, description="Name of the model. Omit to keep the current value."
+    )
+    model_path: str | None = gql_field(
+        default=UNSET, description="Path to the model file. Omit to keep the current value."
+    )
+    service: UpdatePresetModelServiceConfigInputGQL | None = gql_field(
+        default=UNSET,
+        description="Configuration for the model service. Omit to keep the current value.",
+    )
+    metadata: UpdatePresetModelMetadataInputGQL | None = gql_field(
+        default=UNSET, description="Metadata about the model. Omit to keep the current value."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version="26.9.0",
+        description="Patch for a preset's model definition. Omit `models` to keep the "
+        "current model entry.",
+    ),
+    name="UpdatePresetModelDefinitionInput",
+)
+class UpdatePresetModelDefinitionInputGQL(PydanticInputMixin[UpdatePresetModelDefinitionInputDTO]):
+    models: list[UpdatePresetModelConfigInputGQL] | None = gql_field(
+        default=UNSET,
+        description="Patch for the model definition's single model entry. Omit to keep the "
+        "current model entry.",
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
         added_version="26.4.2",
         description="Update deployment revision preset input.",
     ),
@@ -713,11 +1086,11 @@ class UpdateDeploymentRevisionPresetInputGQL(PydanticInputMixin[UpdateInputDTO])
             added_version="26.4.4",
             description="New runtime variant for the preset. Omit to leave unchanged.",
         ),
-        default=None,
+        default=UNSET,
     )
-    name: str | None = gql_field(default=None, description="New name.")
-    description: str | None = gql_field(default=None, description="New description.")
-    rank: int | None = gql_field(default=None, description="New rank.")
+    name: str | None = gql_field(default=UNSET, description="New name.")
+    description: str | None = gql_field(default=UNSET, description="New description.")
+    rank: int | None = gql_field(default=UNSET, description="New rank.")
     open_to_public: bool | None = gql_field(
         default=UNSET,
         description="Default open_to_public for deployments created from this preset. "
@@ -745,10 +1118,10 @@ class UpdateDeploymentRevisionPresetInputGQL(PydanticInputMixin[UpdateInputDTO])
         ),
         default=UNSET,
     )
-    model_definition: ModelDefinitionInputGQL | None = gql_added_field(
+    model_definition: UpdatePresetModelDefinitionInputGQL | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version="26.4.4",
-            description="Parsed model definition. Set to null to clear.",
+            added_version="26.9.0",
+            description="Model definition patch. Set to null to clear the whole model definition.",
         ),
         default=UNSET,
     )
@@ -771,42 +1144,42 @@ class UpdateDeploymentRevisionPresetInputGQL(PydanticInputMixin[UpdateInputDTO])
             added_version="26.4.4",
             description="Replace resource slot allocations. Omit to leave unchanged.",
         ),
-        default=None,
+        default=UNSET,
     )
     resource_opts: list[ResourceOptsEntryInput] | None = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.4",
             description="Replace additional resource options. Omit to leave unchanged.",
         ),
-        default=None,
+        default=UNSET,
     )
     cluster_mode: ClusterModeGQL | None = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.4",
             description="New cluster topology mode. Omit to leave unchanged.",
         ),
-        default=None,
+        default=UNSET,
     )
     cluster_size: int | None = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.4",
             description="New cluster size. Omit to leave unchanged.",
         ),
-        default=None,
+        default=UNSET,
     )
     environ: list[EnvironEntryInputGQL] | None = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.4",
             description="Replace environment variables. Omit to leave unchanged.",
         ),
-        default=None,
+        default=UNSET,
     )
     preset_values: list[RuntimeVariantPresetValueEntryInputGQL] | None = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.4",
             description="Replace runtime variant preset values. Omit to leave unchanged.",
         ),
-        default=None,
+        default=UNSET,
     )
 
 
@@ -844,3 +1217,66 @@ class UpdateDeploymentRevisionPresetPayloadGQL(PydanticOutputMixin[UpdatePayload
 )
 class DeleteDeploymentRevisionPresetPayloadGQL(PydanticOutputMixin[DeletePayloadDTO]):
     id: UUID = gql_field(description="ID of the deleted preset.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for deployment revision preset purge.",
+    ),
+    model=DeletePayloadDTO,
+    name="PurgeDeploymentRevisionPresetPayload",
+)
+class PurgeDeploymentRevisionPresetPayloadGQL(PydanticOutputMixin[DeletePayloadDTO]):
+    purged_id: strawberry.ID = gql_field(
+        description="Global ID of the purged deployment revision preset."
+    )
+    entity_id: UUID = gql_field(description="UUID of the purged deployment revision preset.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for updating several presets, each answered for separately.",
+    ),
+    name="PartialBulkUpdateDeploymentRevisionPresetsInput",
+)
+class PartialBulkUpdateDeploymentRevisionPresetsInputGQL(
+    PydanticInputMixin[PartialBulkUpdateInputDTO]
+):
+    items: list[UpdateDeploymentRevisionPresetInputGQL] = gql_field(
+        description="The presets to update, each naming its preset by `id`."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for permanently removing several presets, each answered for separately.",
+    ),
+    name="PartialBulkPurgeDeploymentRevisionPresetsInput",
+)
+class PartialBulkPurgeDeploymentRevisionPresetsInputGQL(
+    PydanticInputMixin[PartialBulkPurgeInputDTO]
+):
+    ids: list[UUID] = gql_field(description="IDs of the presets to purge.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Result of a partial bulk preset operation: the presets processed and the ones "
+            "that failed."
+        ),
+    ),
+    model=PartialBulkPayload[NodeDTO],
+    name="PartialBulkDeploymentRevisionPresetsPayload",
+)
+class PartialBulkDeploymentRevisionPresetsPayloadGQL(
+    PydanticOutputMixin[PartialBulkPayload[NodeDTO]]
+):
+    successes: list[DeploymentRevisionPresetGQL] = gql_field(description="The presets processed.")
+    failed: list[PartialBulkFailureGQL] = gql_field(
+        description="The presets not processed, each with the reason."
+    )

@@ -2,6 +2,7 @@
 
 from ai.backend.common.dto.manager.v2.audit_log.request import (
     AdminSearchAuditLogsInput,
+    AuditLogActionKindFilter,
     AuditLogFilter,
     AuditLogOrder,
     AuditLogScope,
@@ -13,6 +14,7 @@ from ai.backend.common.dto.manager.v2.audit_log.response import (
     SearchAuditLogsPayload,
 )
 from ai.backend.common.dto.manager.v2.audit_log.types import (
+    AuditLogActionKind,
     AuditLogOrderField,
     AuditLogStatus,
     OrderDirection,
@@ -20,6 +22,8 @@ from ai.backend.common.dto.manager.v2.audit_log.types import (
 
 __all__ = (
     "AdminSearchAuditLogsInput",
+    "AuditLogActionKind",
+    "AuditLogActionKindFilter",
     "AuditLogFilter",
     "AuditLogNode",
     "AuditLogOrder",

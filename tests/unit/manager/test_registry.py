@@ -5,7 +5,6 @@ import time
 import uuid
 from collections.abc import AsyncGenerator, AsyncIterator, Mapping
 from dataclasses import dataclass
-from decimal import Decimal
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -22,10 +21,7 @@ from ai.backend.common.events.event_types.session.broadcast import SchedulingBro
 from ai.backend.common.events.types import AbstractEvent
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import (
-    BinarySize,
-    DeviceId,
     SessionId,
-    SlotName,
 )
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.session.types import SessionStatus
@@ -131,6 +127,7 @@ async def registry_ctx() -> AsyncGenerator[
         network_plugin_ctx=network_plugin_ctx,
         scheduling_controller=mock_scheduling_controller,
         scheduler_repository=MagicMock(),
+        ops_provider=MagicMock(),
         manager_public_key=PublicKey(b"GqK]ZYY#h*9jAQbGxSwkeZX3Y*%b+DiY$7ju6sh{"),
         manager_secret_key=SecretKey(b"37KX6]ac^&hcnSaVo=-%eVO9M]ENe8v=BOWF(Sw$"),
     )
@@ -147,41 +144,6 @@ async def registry_ctx() -> AsyncGenerator[
         )
     finally:
         await registry.shutdown()
-
-
-async def test_convert_resource_spec_to_resource_slot(
-    registry_ctx: tuple[
-        AgentRegistry, MagicMock, MagicMock, MagicMock, ManagerConfigProvider, MagicMock, MagicMock
-    ],
-) -> None:
-    registry, _, _, _, _, _, _ = registry_ctx
-    allocations = {
-        "cuda": {
-            SlotName("cuda.shares"): {
-                DeviceId("a0"): "2.5",
-                DeviceId("a1"): "2.0",
-            },
-        },
-    }
-    converted_allocations = registry.convert_resource_spec_to_resource_slot(allocations)
-    assert converted_allocations["cuda.shares"] == Decimal("4.5")
-    allocations = {
-        "cpu": {
-            SlotName("cpu"): {
-                DeviceId("a0"): "3",
-                DeviceId("a1"): "1",
-            },
-        },
-        "ram": {
-            SlotName("ram"): {
-                DeviceId("b0"): "2.5g",
-                DeviceId("b1"): "512m",
-            },
-        },
-    }
-    converted_allocations = registry.convert_resource_spec_to_resource_slot(allocations)
-    assert converted_allocations["cpu"] == Decimal("4")
-    assert converted_allocations["ram"] == Decimal(BinarySize.from_str("1g")) * 3
 
 
 @dataclass
@@ -260,6 +222,32 @@ def _make_scheduling_event(
         status_transition=status,
         reason="test",
     )
+
+
+class TestResourceEntriesFromLegacyDict:
+    """Tests for ``AgentRegistry._resource_entries_from_legacy_dict``."""
+
+    def test_drops_zero_quantity_slots(self) -> None:
+        entries = AgentRegistry._resource_entries_from_legacy_dict({
+            "cpu": 1,
+            "mem": "1140850688",
+            "cuda.device": 0,
+            "cuda.shares": "0",
+        })
+        assert {str(e.resource_type): e.quantity for e in entries} == {
+            "cpu": "1",
+            "mem": "1140850688",
+        }
+
+    def test_normalizes_binary_size_shortcuts(self) -> None:
+        entries = AgentRegistry._resource_entries_from_legacy_dict({
+            "mem": "1g",
+            "cuda.shares": "0.5",
+        })
+        assert {str(e.resource_type): e.quantity for e in entries} == {
+            "mem": str(1024**3),
+            "cuda.shares": "0.5",
+        }
 
 
 class TestWaitForSessionRunning:

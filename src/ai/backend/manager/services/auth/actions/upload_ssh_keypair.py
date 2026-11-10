@@ -1,20 +1,15 @@
-import uuid
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import RBACElementType, ScopeType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.auth.types import SSHKeypair
-from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.services.auth.actions.base import (
-    KeypairScopeAction,
-    KeypairScopeActionResult,
-)
+from ai.backend.manager.services.auth.actions.base import UserEntityAction
 
 
-@dataclass
-class UploadSSHKeypairAction(KeypairScopeAction):
-    user_id: uuid.UUID
+@dataclass(frozen=True)
+class UploadSSHKeypairAction(UserEntityAction):
+    """Overwrite the SSH keypair the named user's keypair carries with a given one."""
+
     public_key: str
     private_key: str
     access_key: str
@@ -22,30 +17,14 @@ class UploadSSHKeypairAction(KeypairScopeAction):
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.CREATE
+        return ActionOperationType.UPDATE
 
     @override
-    def scope_type(self) -> ScopeType:
-        return ScopeType.USER
-
-    @override
-    def scope_id(self) -> str:
-        return str(self.user_id)
-
-    @override
-    def target_element(self) -> RBACElementRef:
-        return RBACElementRef(RBACElementType.USER, str(self.user_id))
+    @classmethod
+    def action_name(cls) -> str:
+        return "upload_ssh_keypair"
 
 
-@dataclass
-class UploadSSHKeypairActionResult(KeypairScopeActionResult):
+@dataclass(frozen=True)
+class UploadSSHKeypairActionResult:
     ssh_keypair: SSHKeypair
-    user_id: uuid.UUID
-
-    @override
-    def scope_type(self) -> ScopeType:
-        return ScopeType.USER
-
-    @override
-    def scope_id(self) -> str:
-        return str(self.user_id)

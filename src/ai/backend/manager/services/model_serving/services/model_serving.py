@@ -5,7 +5,7 @@ import secrets
 import uuid
 from collections.abc import Sequence
 from http import HTTPStatus
-from typing import Any, cast
+from typing import Any
 
 import aiohttp
 from pydantic import HttpUrl
@@ -15,6 +15,16 @@ from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.domain import DomainName
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.resource_group import ResourceGroupName
+from ai.backend.common.data.entity.resource_slot import ResourceSlotName
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
+from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.defs.session import SESSION_PRIORITY_DEFAULT
 from ai.backend.common.events.dispatcher import (
     EventDispatcher,
@@ -28,14 +38,6 @@ from ai.backend.common.events.event_types.session.broadcast import (
 from ai.backend.common.events.hub import EventHub
 from ai.backend.common.events.hub.propagators.bypass import AsyncBypassPropagator
 from ai.backend.common.events.types import EventDomain
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.domain import DomainName
-from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.identifier.project import ProjectID
-from ai.backend.common.identifier.resource_group import ResourceGroupName
-from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
-from ai.backend.common.identifier.session import SessionID
-from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import (
     AccessKey,
@@ -44,7 +46,7 @@ from ai.backend.common.types import (
     ResourceSlotEntry,
     SessionTypes,
 )
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.types import (
@@ -53,13 +55,17 @@ from ai.backend.manager.data.deployment.types import (
     ModelRevisionSpec,
     ModelRevisionSpecDraft,
     MountMetadata,
-    ResourceSpecDraft,
     RevisionDraft,
     RouteHealthStatus,
+    RouteStatus,
+)
+from ai.backend.manager.data.deployment.types import (
+    ResourceSpecDraft as DeploymentResourceSpecDraft,
 )
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.model_serving.types import (
     CompactServiceInfo,
+    EndpointLifecycle,
     ErrorInfo,
     RouteInfo,
     ServiceInfo,
@@ -71,6 +77,7 @@ from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
     KernelGroupDraft,
     KernelResourceInput,
+    ResourceSpecDraft,
     SchedulingTargetDraft,
     SessionClassificationDraft,
     SessionIdentityDraft,
@@ -96,14 +103,13 @@ from ai.backend.manager.errors.service import (
     ModelServiceNotFound,
     RouteNotFound,
 )
-from ai.backend.manager.models.endpoint import EndpointLifecycle
-from ai.backend.manager.models.routing import RouteStatus
+from ai.backend.manager.models.endpoint.creators import EndpointTokenCreator
+from ai.backend.manager.models.endpoint.searchers import DeploymentInfoSearcher
+from ai.backend.manager.models.endpoint.updaters import LegacyEndpointUpdater
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.registry import AgentRegistry
-from ai.backend.manager.repositories.base import BatchQuerier, Creator, OffsetPagination
-from ai.backend.manager.repositories.deployment import DeploymentRepository
-from ai.backend.manager.repositories.model_serving.creators import EndpointTokenCreatorSpec
+from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
-from ai.backend.manager.repositories.model_serving.updaters import EndpointUpdaterSpec
 from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVariantRepository
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.services.model_serving.actions.clear_error import (
@@ -142,13 +148,13 @@ from ai.backend.manager.services.model_serving.actions.list_model_service import
     ListModelServiceAction,
     ListModelServiceActionResult,
 )
-from ai.backend.manager.services.model_serving.actions.modify_endpoint import (
-    ModifyEndpointAction,
-    ModifyEndpointActionResult,
-)
 from ai.backend.manager.services.model_serving.actions.search_services import (
     SearchServicesAction,
     SearchServicesActionResult,
+)
+from ai.backend.manager.services.model_serving.actions.update_endpoint import (
+    UpdateEndpointAction,
+    UpdateEndpointActionResult,
 )
 from ai.backend.manager.services.model_serving.actions.update_route import (
     UpdateRouteAction,
@@ -163,10 +169,12 @@ from ai.backend.manager.sokovan.deployment.deployment_controller import Deployme
 from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
 from ai.backend.manager.sokovan.deployment.route.types import RouteLifecycleType
 from ai.backend.manager.sokovan.deployment.types import DeploymentLifecycleType
-from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
+    SchedulingController,
+)
 from ai.backend.manager.types import MountOptionModel
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 
 class ModelServingService:
@@ -286,7 +294,8 @@ class ModelServingService:
         if not resources:
             return ()
         return tuple(
-            ResourceSlotEntry(resource_type=str(k), quantity=str(v)) for k, v in resources.items()
+            ResourceSlotEntry(resource_type=ResourceSlotName(str(k)), quantity=str(v))
+            for k, v in resources.items()
         )
 
     async def list_serve(self, action: ListModelServiceAction) -> ListModelServiceActionResult:
@@ -317,11 +326,11 @@ class ModelServingService:
         )
 
     async def search_services(self, action: SearchServicesAction) -> SearchServicesActionResult:
-        querier = BatchQuerier(
+        searcher = DeploymentInfoSearcher(
             pagination=OffsetPagination(offset=action.offset, limit=action.limit),
             conditions=action.conditions,
         )
-        result = await self._repository.search_services_paginated(action.session_owner_id, querier)
+        result = await self._repository.search_services_paginated(action.session_owner_id, searcher)
         return SearchServicesActionResult(
             items=result.items,
             total_count=result.total_count,
@@ -335,7 +344,7 @@ class ModelServingService:
             raise GenericForbidden("Only authorized requests may have access key scopes.")
 
     async def delete(self, action: DeleteModelServiceAction) -> DeleteModelServiceActionResult:
-        service_id = action.service_id
+        service_id = action.deployment_id
 
         # Validate access
         await self.check_user_access()
@@ -383,7 +392,7 @@ class ModelServingService:
                 canonical=action.image,
                 architecture=action.architecture,
             ),
-            resource_spec=ResourceSpecDraft(
+            resource_spec=DeploymentResourceSpecDraft(
                 cluster_mode=action.cluster_mode,
                 cluster_size=action.cluster_size,
                 resource_slots=action.config.resources,
@@ -409,7 +418,7 @@ class ModelServingService:
                 environ=action.config.environ,
             ),
         )
-        revision = await self._generate_revision(revision_draft, service_prepare_ctx.scaling_group)
+        revision = await self._generate_revision(revision_draft, service_prepare_ctx.resource_group)
         image_data = await self._repository.get_image_by_id(revision.image_id)
         action = action.with_revision(
             revision,
@@ -419,8 +428,6 @@ class ModelServingService:
 
         # Get user with keypair
         created_user = await self._repository.get_user_with_keypair(action.request_user_id)
-        if not created_user:
-            raise InvalidAPIParameters("User not found")
 
         sudo_session_enabled = action.sudo_session_enabled
 
@@ -460,16 +467,16 @@ class ModelServingService:
 
         domain_name = DomainName(action.domain_name)
         domain_id = await self._scheduler_repository.get_domain_id_by_name(domain_name)
-        if service_prepare_ctx.scaling_group:
-            resource_group_name = ResourceGroupName(service_prepare_ctx.scaling_group)
+        if service_prepare_ctx.resource_group:
+            resource_group_name = ResourceGroupName(service_prepare_ctx.resource_group)
             resource_group_id = await self._scheduler_repository.get_resource_group_id_by_name(
                 resource_group_name
             )
         else:
             resource_group_id = await self._scheduler_repository.pick_default_resource_group(
-                access_key=AccessKey(service_prepare_ctx.owner_access_key),
-                domain_name=action.domain_name,
+                domain_id=domain_id,
                 project_id=ProjectID(service_prepare_ctx.group_id),
+                user_id=UserID(created_user.uuid),
             )
             resource_group_name = await self._scheduler_repository.get_resource_group_name_by_id(
                 resource_group_id
@@ -490,14 +497,16 @@ class ModelServingService:
                 ),
                 network=SessionNetworkDraft(),
                 callback_url=callback_url,
-                options=SessionOptionsDraft(
-                    priority=SESSION_PRIORITY_DEFAULT,
-                    is_preemptible=False,
-                    cluster_mode=action.cluster_mode,
-                    cluster_size=action.cluster_size,
-                    scheduling_target=SchedulingTargetDraft(),
-                    kernel_groups=kernel_groups,
-                    handler_options=None,
+                resource=ResourceSpecDraft(
+                    options=SessionOptionsDraft(
+                        priority=SESSION_PRIORITY_DEFAULT,
+                        is_preemptible=False,
+                        cluster_mode=action.cluster_mode,
+                        cluster_size=action.cluster_size,
+                        scheduling_target=SchedulingTargetDraft(),
+                        kernel_groups=kernel_groups,
+                        handler_options=None,
+                    ),
                 ),
                 internal_data_extras=InternalDataExtras(
                     sudo_session_enabled=sudo_session_enabled,
@@ -542,7 +551,7 @@ class ModelServingService:
                         if status == SessionStatus.RUNNING:
                             await self._scheduling_controller.mark_sessions_for_termination(
                                 [session_id],
-                                reason="DRY_RUN_COMPLETE",
+                                reason=KernelLifecycleEventReason.DRY_RUN_COMPLETE,
                             )
 
                         # Exit loop on terminal states
@@ -583,7 +592,7 @@ class ModelServingService:
         # Validate access
         await self.check_user_access()
         validation_data = await self._repository.get_endpoint_access_validation_data(
-            action.service_id
+            action.deployment_id
         )
         if not validation_data:
             raise ModelServiceNotFound
@@ -591,7 +600,7 @@ class ModelServingService:
             raise EndpointAccessForbiddenError
 
         # Get endpoint data
-        endpoint_data = await self._repository.get_endpoint_by_id(action.service_id)
+        endpoint_data = await self._repository.get_endpoint_by_id(action.deployment_id)
         if not endpoint_data:
             raise ModelServiceNotFound
         if endpoint_data.runtime_variant_id is None:
@@ -626,7 +635,7 @@ class ModelServingService:
         # Get endpoint
         await self.check_user_access()
         validation_data = await self._repository.get_endpoint_access_validation_data(
-            action.service_id
+            action.deployment_id
         )
         if not validation_data:
             raise ModelServiceNotFound
@@ -634,7 +643,7 @@ class ModelServingService:
             raise EndpointAccessForbiddenError
 
         # Get endpoint data
-        endpoint_data = await self._repository.get_endpoint_by_id(action.service_id)
+        endpoint_data = await self._repository.get_endpoint_by_id(action.deployment_id)
         if not endpoint_data:
             raise ModelServiceNotFound
 
@@ -658,7 +667,7 @@ class ModelServingService:
         # Validate access
         await self.check_user_access()
         validation_data = await self._repository.get_endpoint_access_validation_data(
-            action.service_id
+            action.deployment_id
         )
         if not validation_data:
             raise ModelServiceNotFound
@@ -666,7 +675,7 @@ class ModelServingService:
             raise EndpointAccessForbiddenError
 
         # Clear errors
-        success = await self._repository.clear_endpoint_errors(action.service_id)
+        success = await self._repository.clear_endpoint_errors(action.deployment_id)
 
         if not success:
             raise ModelServiceNotFound
@@ -677,7 +686,7 @@ class ModelServingService:
         # Validate access
         await self.check_user_access()
         validation_data = await self._repository.get_endpoint_access_validation_data(
-            action.service_id
+            action.deployment_id
         )
         if not validation_data:
             raise ModelServiceNotFound
@@ -686,7 +695,7 @@ class ModelServingService:
 
         # Update route traffic
         updated_endpoint_data = await self._repository.update_route_traffic(
-            self._valkey_live, action.route_id, action.service_id, action.traffic_ratio
+            self._valkey_live, action.route_id, action.deployment_id, action.traffic_ratio
         )
         if not updated_endpoint_data:
             raise ModelServiceNotFound
@@ -702,7 +711,7 @@ class ModelServingService:
         # Validate access
         await self.check_user_access()
         validation_data = await self._repository.get_endpoint_access_validation_data(
-            action.service_id
+            action.deployment_id
         )
         if not validation_data:
             raise ModelServiceNotFound
@@ -710,7 +719,7 @@ class ModelServingService:
             raise EndpointAccessForbiddenError
 
         # Get route
-        route_data = await self._repository.get_route_by_id(action.route_id, action.service_id)
+        route_data = await self._repository.get_route_by_id(action.route_id, action.deployment_id)
 
         if not route_data:
             raise RouteNotFound
@@ -718,20 +727,15 @@ class ModelServingService:
         if route_data.status == RouteStatus.PROVISIONING:
             raise InvalidAPIParameters("Cannot remove route in PROVISIONING status")
 
-        # Get session for destruction
-        route_row = await self._repository.get_route_with_session(action.route_id)
-        if not route_row:
-            raise RouteNotFound
-
-        if route_row.session_row:
+        if route_data.session is not None:
             await self._scheduling_controller.mark_sessions_for_termination(
-                [route_row.session_row.id],
-                reason=KernelLifecycleEventReason.SERVICE_SCALED_DOWN.value,
+                [route_data.session],
+                reason=KernelLifecycleEventReason.SERVICE_SCALED_DOWN,
                 forced=False,
             )
 
         # Decrease endpoint replicas
-        await self._repository.decrease_endpoint_replicas(action.service_id)
+        await self._repository.decrease_endpoint_replicas(action.deployment_id)
 
         return DeleteRouteActionResult(route_id=action.route_id)
 
@@ -739,7 +743,7 @@ class ModelServingService:
         # Validate access
         await self.check_user_access()
         validation_data = await self._repository.get_endpoint_access_validation_data(
-            action.service_id
+            action.deployment_id
         )
         if not validation_data:
             raise ModelServiceNotFound
@@ -747,15 +751,15 @@ class ModelServingService:
             raise EndpointAccessForbiddenError
 
         # Get endpoint data
-        endpoint_data = await self._repository.get_endpoint_by_id(action.service_id)
+        endpoint_data = await self._repository.get_endpoint_by_id(action.deployment_id)
         if not endpoint_data:
             raise ModelServiceNotFound
 
         # Get scaling group info
-        scaling_group_data = await self._repository.get_scaling_group_info(
+        resource_group_data = await self._repository.get_resource_group_info(
             endpoint_data.resource_group
         )
-        if not scaling_group_data:
+        if not resource_group_data:
             raise InvalidAPIParameters(f"Scaling group {endpoint_data.resource_group} not found")
 
         # Generate token via wsproxy
@@ -763,11 +767,11 @@ class ModelServingService:
         async with (
             aiohttp.ClientSession() as session,
             session.post(
-                f"{scaling_group_data.wsproxy_addr}/v2/endpoints/{endpoint_data.id}/token",
+                f"{resource_group_data.wsproxy_addr}/v2/endpoints/{endpoint_data.id}/token",
                 json=body,
                 headers={
                     "accept": "application/json",
-                    "X-BackendAI-Token": scaling_group_data.wsproxy_api_token,
+                    "X-BackendAI-Token": resource_group_data.wsproxy_api_token,
                 },
             ) as resp,
         ):
@@ -778,21 +782,16 @@ class ModelServingService:
                 )
             token = resp_json["token"]
 
-        # Create token in database
-        token_id = uuid.uuid4()
-        token_creator = Creator(
-            spec=EndpointTokenCreatorSpec(
-                id=token_id,
-                token=token,
-                endpoint=DeploymentID(endpoint_data.id),
-                domain=endpoint_data.domain,
-                project=endpoint_data.project,
-                session_owner=endpoint_data.session_owner_id,
-            )
-        )
-
         # Access already validated above, just create the token
-        token_data = await self._repository.create_endpoint_token(token_creator)
+        token_data = await self._repository.create_endpoint_token(
+            DeploymentID(endpoint_data.id),
+            EndpointTokenCreator(
+                domain=endpoint_data.domain,
+                project_id=ProjectID(endpoint_data.project),
+                session_owner_id=UserID(endpoint_data.session_owner_id),
+                token=token,
+            ),
+        )
         if not token_data:
             raise ModelServiceNotFound
 
@@ -800,10 +799,10 @@ class ModelServingService:
         service_token_data = ServiceEndpointTokenData(
             id=token_data.id,
             token=token_data.token,
-            endpoint=token_data.endpoint,
-            session_owner=token_data.session_owner,
-            domain=token_data.domain,
-            project=token_data.project,
+            endpoint=endpoint_data.id,
+            session_owner=endpoint_data.session_owner_id,
+            domain=endpoint_data.domain,
+            project=endpoint_data.project,
             created_at=token_data.created_at,
         )
         return GenerateTokenActionResult(data=service_token_data)
@@ -812,7 +811,7 @@ class ModelServingService:
         # Validate access
         await self.check_user_access()
         validation_data = await self._repository.get_endpoint_access_validation_data(
-            action.service_id
+            action.deployment_id
         )
         if not validation_data:
             raise ModelServiceNotFound
@@ -823,8 +822,8 @@ class ModelServingService:
 
         return ForceSyncActionResult(success=True)
 
-    async def modify_endpoint(self, action: ModifyEndpointAction) -> ModifyEndpointActionResult:
-        spec = cast(EndpointUpdaterSpec, action.updater.spec)
+    async def update_endpoint(self, action: UpdateEndpointAction) -> UpdateEndpointActionResult:
+        spec = action.updater
 
         # 1. Apply endpoint-level changes (name, resource_group, replicas)
         #    via the existing repository method (which only writes endpoint columns).
@@ -880,15 +879,15 @@ class ModelServingService:
                 DeploymentLifecycleType.CHECK_REPLICA,
             )
 
-        return ModifyEndpointActionResult(
+        return UpdateEndpointActionResult(
             deployment_id=action.deployment_id, success=result.success, data=result.data
         )
 
     async def _build_revision_overrides_from_spec(
         self,
-        spec: EndpointUpdaterSpec,
+        spec: LegacyEndpointUpdater,
     ) -> RevisionDraft:
-        """Convert ``EndpointUpdaterSpec`` overrides into a ``RevisionDraft``.
+        """Convert ``LegacyEndpointUpdater`` overrides into a ``RevisionDraft``.
 
         Only fields the user explicitly modified are populated. Fields left
         untouched stay ``None`` so that the controller's merge pipeline can
@@ -954,7 +953,7 @@ class ModelServingService:
 
         # Delegate all DB-dependent resolution to the repository.
         ctx = await self._repository.resolve_model_service_validation_context(
-            scaling_group=action.config.scaling_group,
+            resource_group=action.config.resource_group,
             owner_access_key=owner_access_key,
             domain_name=action.domain_name,
             group_name=action.group_name,
@@ -996,6 +995,6 @@ class ModelServingService:
             owner_role=ctx.owner_role,
             group_id=ctx.group_id,
             resource_policy=ctx.resource_policy,
-            scaling_group=ctx.scaling_group,
+            resource_group=ctx.resource_group,
             extra_mounts=ctx.extra_mounts,
         )

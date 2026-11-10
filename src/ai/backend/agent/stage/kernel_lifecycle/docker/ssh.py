@@ -1,10 +1,10 @@
-import asyncio
 import os
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import override
 
+from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.docker import KernelFeatures
 from ai.backend.common.json import dump_json
 from ai.backend.common.stage.types import (
@@ -73,8 +73,7 @@ class SSHProvisioner(Provisioner[SSHSpec, SSHResult]):
         return await self._write_config(spec)
 
     async def _write_config(self, spec: SSHSpec) -> SSHResult:
-        loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(None, self._write_config_func, spec)
+        return await run_in_executor_with_context(None, self._write_config_func, spec)
 
     def _write_config_func(self, spec: SSHSpec) -> SSHResult:
         sshkey = spec.ssh_keypair

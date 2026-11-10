@@ -12,5 +12,5 @@ class RuntimeVariantRepositories:
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
         return cls(
-            repository=RuntimeVariantRepository(args.db),
+            repository=RuntimeVariantRepository(args.db, args.v2_ops_provider),
         )

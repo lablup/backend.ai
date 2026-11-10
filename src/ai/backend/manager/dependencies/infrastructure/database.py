@@ -9,6 +9,7 @@ from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.health.database import DatabaseHealthChecker
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.db.engine import connect_database
+from ai.backend.manager.repositories.global_entity.loader import GlobalEntityIDLoader
 
 from .base import InfrastructureDependency
 
@@ -35,6 +36,7 @@ class DatabaseDependency(InfrastructureDependency[ExtendedAsyncSAEngine]):
             Initialized ExtendedAsyncSAEngine
         """
         async with connect_database(setup_input.db) as db:
+            await GlobalEntityIDLoader(db).load()
             yield db
 
     @override

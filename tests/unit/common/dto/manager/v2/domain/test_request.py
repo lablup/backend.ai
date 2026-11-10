@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import uuid
+
 import pytest
 from pydantic import ValidationError
 
-from ai.backend.common.api_handlers import SENTINEL, Sentinel
+from ai.backend.common.dto.manager.query import UUIDFilter
 from ai.backend.common.dto.manager.v2.domain.request import (
     CreateDomainInput,
     DeleteDomainInput,
@@ -17,6 +19,7 @@ from ai.backend.common.dto.manager.v2.domain.request import (
 )
 from ai.backend.common.dto.manager.v2.domain.types import DomainOrderField, OrderDirection
 from ai.backend.common.exception import BackendAISchemaValidationFailed
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 
 class TestCreateDomainInput:
@@ -81,21 +84,18 @@ class TestCreateDomainInput:
 
 
 class TestUpdateDomainInput:
-    """Tests for UpdateDomainInput model with SENTINEL fields."""
+    """Tests for UpdateDomainInput model with Unset fields."""
 
-    def test_empty_update_has_sentinel_defaults(self) -> None:
+    def test_empty_update_has_unset_defaults(self) -> None:
         req = UpdateDomainInput()
-        assert req.description is SENTINEL
-        assert isinstance(req.description, Sentinel)
-        assert req.allowed_docker_registries is SENTINEL
-        assert isinstance(req.allowed_docker_registries, Sentinel)
-        assert req.integration_name is SENTINEL
-        assert isinstance(req.integration_name, Sentinel)
-
-    def test_non_sentinel_fields_default_to_none(self) -> None:
-        req = UpdateDomainInput()
-        assert req.name is None
-        assert req.is_active is None
+        assert req.name is UNSET
+        assert req.is_active is UNSET
+        assert req.description is UNSET
+        assert isinstance(req.description, Unset)
+        assert req.allowed_docker_registries is UNSET
+        assert isinstance(req.allowed_docker_registries, Unset)
+        assert req.integration_name is UNSET
+        assert isinstance(req.integration_name, Unset)
 
     def test_explicit_none_description_signals_clear(self) -> None:
         req = UpdateDomainInput(description=None)
@@ -109,6 +109,10 @@ class TestUpdateDomainInput:
         req = UpdateDomainInput(name="new-name")
         assert req.name == "new-name"
 
+    def test_explicit_none_name_stays_none(self) -> None:
+        req = UpdateDomainInput(name=None)
+        assert req.name is None
+
     def test_name_max_length_enforced(self) -> None:
         with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdateDomainInput(name="a" * 65)
@@ -116,6 +120,10 @@ class TestUpdateDomainInput:
     def test_is_active_update(self) -> None:
         req = UpdateDomainInput(is_active=False)
         assert req.is_active is False
+
+    def test_explicit_none_is_active_stays_none(self) -> None:
+        req = UpdateDomainInput(is_active=None)
+        assert req.is_active is None
 
     def test_allowed_docker_registries_none_clears(self) -> None:
         req = UpdateDomainInput(allowed_docker_registries=None)
@@ -205,6 +213,13 @@ class TestDomainFilter:
         json_data = f.model_dump_json()
         restored = DomainFilter.model_validate_json(json_data)
         assert restored.is_active is True
+
+    def test_id_round_trip(self) -> None:
+        domain_id = uuid.uuid4()
+        f = DomainFilter(id=UUIDFilter(equals=domain_id))
+        restored = DomainFilter.model_validate_json(f.model_dump_json())
+        assert restored.id is not None
+        assert restored.id.equals == domain_id
 
 
 class TestDomainOrder:

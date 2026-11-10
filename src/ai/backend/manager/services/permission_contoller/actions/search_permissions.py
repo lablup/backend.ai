@@ -1,27 +1,23 @@
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import SearchActionResult
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.role import RoleEntityType
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import GlobalSearcherOpsAction
 from ai.backend.manager.data.permission.permission import PermissionData
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.services.permission_contoller.actions.base import PermissionAction
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 
 
-@dataclass
-class SearchPermissionsAction(PermissionAction):
-    querier: BatchQuerier
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
+@dataclass(frozen=True)
+class GlobalSearchPermissionsAction(GlobalSearcherOpsAction[PermissionRow, PermissionData]):
+    """Page through every permission entry, whichever role holds it."""
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
+    def entity_type(cls) -> EntityType:
+        return RoleEntityType()
 
-
-@dataclass
-class SearchPermissionsActionResult(SearchActionResult[PermissionData]):
-    pass
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "global_search_permissions"

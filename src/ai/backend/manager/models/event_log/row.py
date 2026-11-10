@@ -17,11 +17,11 @@ from ai.backend.manager.models.base import (
 __all__ = ("EventLogRow",)
 
 
-class EventLogRow(Base):  # type: ignore[misc]
+class EventLogRow(Base):
     __tablename__ = "event_logs"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
 
     event_name: Mapped[str] = mapped_column("event_name", sa.String, nullable=False)
@@ -46,7 +46,7 @@ class EventLogRow(Base):  # type: ignore[misc]
         event_name = event.event_name()
         event_domain = event.event_domain()
         event_domain_id = event.domain_id()
-        return EventLogRow(
+        return cls(
             event_name=event_name,
             event_domain=event_domain,
             domain_id=event_domain_id,

@@ -2,23 +2,18 @@ from typing import override
 
 from aiohttp import web
 
-from ai.backend.common.exception import (
-    BackendAIError,
-    ErrorCode,
-    ErrorDetail,
-    ErrorDomain,
-    ErrorOperation,
-)
+from ai.backend.common.data.entity.vfs_storage import VFSStorageEntityType
+from ai.backend.common.exception import ErrorDetail
+from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.errors.base.entity import EntityError, EntityErrorCode
 
 
-class VFSStorageNotFoundError(BackendAIError, web.HTTPNotFound):
+class VFSStorageNotFoundError(EntityError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/vfs-storage-not-found"
     error_title = "VFS Storage Not Found"
 
     @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.VFS_STORAGE,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            VFSStorageEntityType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND
         )

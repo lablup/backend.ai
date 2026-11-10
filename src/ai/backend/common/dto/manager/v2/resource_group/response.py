@@ -12,6 +12,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.dto.manager.v2.deployment_options import DeploymentOptionsInfo
 from ai.backend.common.dto.manager.v2.fair_share.types import (
     ResourceSlotInfo,
@@ -19,11 +20,10 @@ from ai.backend.common.dto.manager.v2.fair_share.types import (
 )
 from ai.backend.common.dto.manager.v2.resource_group.types import (
     PreemptionModeDTO,
-    PreemptionOrderDTO,
     SchedulerTypeDTO,
 )
 from ai.backend.common.dto.manager.v2.session_options import DefaultSessionOptionsInfo
-from ai.backend.common.identifier.resource_group import ResourceGroupName
+from ai.backend.common.types import PreemptionOrder, PreemptionVictimScope
 
 __all__ = (
     "AdminSearchResourceGroupsPayload",
@@ -32,7 +32,7 @@ __all__ = (
     "AllowedResourceGroupsPayload",
     "CreateResourceGroupPayload",
     "DeleteResourceGroupPayload",
-    "FairShareScalingGroupSpecInfo",
+    "FairShareResourceGroupSpecInfo",
     "PreemptionConfigInfo",
     "ReplaceResourceGroupDefaultDeploymentOptionsPayload",
     "ReplaceResourceGroupDefaultSessionOptionsPayload",
@@ -52,7 +52,7 @@ __all__ = (
 class ResourceGroupNode(BaseResponseModel):
     """Node model representing a resource group entity."""
 
-    id: UUID = Field(description="Resource group UUID.")
+    id: ResourceGroupID = Field(description="Resource group UUID.")
     name: str = Field(description="Unique name of the resource group.")
     domain_name: str = Field(description="Domain the resource group belongs to.")
     description: str | None = Field(
@@ -99,7 +99,8 @@ class UpdateResourceGroupPayload(BaseResponseModel):
 class DeleteResourceGroupPayload(BaseResponseModel):
     """Payload for resource group deletion mutation result."""
 
-    id: str = Field(description="Name of the deleted resource group.")
+    id: ResourceGroupID = Field(description="UUID of the deleted resource group.")
+    entity_id: UUID = Field(description="UUID of the deleted resource group. Added in 26.10.0.")
 
 
 class AdminSearchResourceGroupsPayload(BaseResponseModel):
@@ -123,9 +124,7 @@ class PreemptionConfigInfo(BaseResponseModel):
     preemptible_priority: int = Field(
         description="Sessions with priority <= this value are eligible for preemption."
     )
-    order: PreemptionOrderDTO = Field(
-        description="Tie-breaking order for same-priority sessions during preemption."
-    )
+    order: PreemptionOrder = Field(description="Victim selection order for preemption.")
     mode: PreemptionModeDTO = Field(
         description="How to preempt a session when preemption is triggered."
     )
@@ -133,6 +132,12 @@ class PreemptionConfigInfo(BaseResponseModel):
         description=(
             "Minimum session runtime in seconds before it becomes preemptible (0 = disabled)."
         )
+    )
+    victim_scope: PreemptionVictimScope = Field(
+        default=PreemptionVictimScope.USER,
+        description=(
+            "Scope preemption victims are drawn from (user/project/domain/resource-group)."
+        ),
     )
 
 
@@ -144,6 +149,13 @@ class ResourceGroupStatusInfo(BaseResponseModel):
     )
     is_public: bool = Field(
         description="Whether the resource group is publicly accessible to all users."
+    )
+    is_default: bool = Field(
+        description=(
+            "Whether this is the default resource group. At most one resource group is the"
+            " default at a time; an agent registering for the first time without a resolvable"
+            " resource group name falls back to it."
+        )
     )
 
 
@@ -183,7 +195,10 @@ class ResourceGroupSchedulerConfigInfo(BaseResponseModel):
 class ResourceGroupDetailNode(BaseResponseModel):
     """Detail node DTO for a resource group (GQL-layer representation)."""
 
-    id: str = Field(description="Resource group name used as the relay node ID.")
+    id: ResourceGroupID = Field(description="Resource group UUID used as the relay node ID.")
+    entity_id: UUID = Field(
+        description="UUID of the resource group. Added in 26.9.0.",
+    )
     name: str = Field(description="Unique name of the resource group.")
     status: ResourceGroupStatusInfo = Field(
         description="Status information including active and public flags."
@@ -261,7 +276,7 @@ class ReplaceResourceGroupDefaultSessionOptionsPayload(BaseResponseModel):
     )
 
 
-class FairShareScalingGroupSpecInfo(BaseResponseModel):
+class FairShareResourceGroupSpecInfo(BaseResponseModel):
     """Fair share configuration for a resource group."""
 
     half_life_days: int = Field(description="Half-life for exponential decay in days")

@@ -2,22 +2,28 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import override
-from uuid import UUID
 
-from ai.backend.common.data.permission.types import EntityType
-from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.common.types import ClusterMode
-from ai.backend.manager.actions.action import BaseAction, BaseActionResult
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.types import AgentId, ClusterMode
 from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 from ai.backend.manager.data.session.compute_schedule import (
     ComputeScheduleResult,
 )
 from ai.backend.manager.data.session.draft import KernelResourceInput
+from ai.backend.manager.data.session.options import AgentSelectionPolicy
 
 
 @dataclass(frozen=True)
-class ComputeScheduleAction(BaseAction):
+class ComputeScheduleAction(BaseSingleEntityAction):
     """Compute a session's scheduling against a resource group without provisioning.
+
+    The answer describes the named group's nodes -- which kernels fit and how much
+    to subtract for the ones that do not -- so the read is answered for that group,
+    not for the session that does not exist yet. Read on the resource group is the
+    gate; ``DOMAIN/PROJECT/USER -> RESOURCE_GROUP`` is a scope-entity edge, so a
+    caller reaches the group through the scope it is bound to.
 
     The fields mirror the scheduler's selection criteria so the real selector can
     be driven directly: ``cluster_mode`` decides whether kernel slots are summed
@@ -30,16 +36,17 @@ class ComputeScheduleAction(BaseAction):
     kernels: list[KernelResourceInput]
     cluster_mode: ClusterMode
     resource_group_id: ResourceGroupID
-    user_uuid: UUID
+    designated_agent_ids: list[AgentId] | None
+    agent_selection_policy: AgentSelectionPolicy | None
+
+    @override
+    def entity_id(self) -> EntityIdentifier:
+        return self.resource_group_id
 
     @override
     @classmethod
-    def entity_type(cls) -> EntityType:
-        return EntityType.RESOURCE_GROUP
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.resource_group_id)
+    def action_name(cls) -> str:
+        return "compute_schedule"
 
     @override
     @classmethod
@@ -48,9 +55,5 @@ class ComputeScheduleAction(BaseAction):
 
 
 @dataclass(frozen=True)
-class ComputeScheduleActionResult(BaseActionResult):
+class ComputeScheduleActionResult:
     result: ComputeScheduleResult
-
-    @override
-    def entity_id(self) -> str | None:
-        return None

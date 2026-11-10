@@ -2,51 +2,59 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
-from decimal import Decimal
 
 import pytest
 
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.common.types import BinarySize, ResourceSlot
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
+from ai.backend.common.data.entity.agent import AgentUUID
+from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.types import BinarySize
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.resource_slot import (
+from ai.backend.manager.models.resource_slot.row import (
     AgentResourceRow,
     ResourceAllocationRow,
     ResourceSlotTypeRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
-from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 
 @pytest.fixture
 async def database_with_resource_slot_tables(
-    database_connection: ExtendedAsyncSAEngine,
+    global_entity_ids: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
     """Set up tables required for resource slot normalization tests."""
     async with with_tables(
-        database_connection,
+        global_entity_ids,
         [
             # FK dependency order: parents before children
+            VirtualEntityRow,
+            EntityMembershipRow,
+            ScopeBindingRow,
             DomainRow,
-            ScalingGroupRow,
+            ResourceGroupRow,
             UserResourcePolicyRow,
             ProjectResourcePolicyRow,
             KeyPairResourcePolicyRow,
@@ -54,7 +62,7 @@ async def database_with_resource_slot_tables(
             UserRoleRow,
             UserRow,
             KeyPairRow,
-            GroupRow,
+            ProjectRow,
             AgentRow,
             ContainerRegistryRow,
             ImageRow,
@@ -66,40 +74,35 @@ async def database_with_resource_slot_tables(
             ResourceAllocationRow,
         ],
     ):
-        yield database_connection
+        yield global_entity_ids
 
 
 @pytest.fixture
-def domain_id() -> DomainID:
-    return DomainID(uuid.uuid4())
-
-
-@pytest.fixture
-def scaling_group_id() -> ResourceGroupID:
+def resource_group_id() -> ResourceGroupID:
     return ResourceGroupID(uuid.uuid4())
 
 
 @pytest.fixture
-async def domain_name(
+async def domain_fixture(
     database_with_resource_slot_tables: ExtendedAsyncSAEngine,
-    domain_id: DomainID,
-) -> AsyncGenerator[str, None]:
+) -> AsyncGenerator[DomainFixtureData, None]:
+    domain_id = DomainID(uuid.uuid4())
     name = "test-domain"
     async with database_with_resource_slot_tables.begin_session() as db_sess:
         db_sess.add(DomainRow(id=domain_id, name=name))
-    yield name
+    yield DomainFixtureData(domain_name=DomainName(name), domain_id=domain_id)
 
 
 @pytest.fixture
-async def scaling_group(
+async def resource_group(
     database_with_resource_slot_tables: ExtendedAsyncSAEngine,
-    scaling_group_id: ResourceGroupID,
+    resource_group_id: ResourceGroupID,
 ) -> AsyncGenerator[str, None]:
     name = "default"
     async with database_with_resource_slot_tables.begin_session() as db_sess:
         db_sess.add(
-            ScalingGroupRow(
-                id=scaling_group_id,
+            ResourceGroupRow(
+                id=resource_group_id,
                 name=name,
                 description="Test scaling group",
                 is_active=True,
@@ -107,7 +110,7 @@ async def scaling_group(
                 driver="static",
                 driver_opts={},
                 scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(),
+                scheduler_opts=ResourceGroupOpts(),
                 use_host_network=False,
             )
         )
@@ -152,7 +155,7 @@ async def project_resource_policy(
 @pytest.fixture
 async def user_uuid(
     database_with_resource_slot_tables: ExtendedAsyncSAEngine,
-    domain_name: str,
+    domain_fixture: DomainFixtureData,
     user_resource_policy: str,
 ) -> AsyncGenerator[uuid.UUID, None]:
     user_id = uuid.uuid4()
@@ -169,8 +172,9 @@ async def user_uuid(
                 username="testuser",
                 email="test@example.com",
                 password=password_info,
-                domain_name=domain_name,
+                domain_name=domain_fixture.domain_name,
                 resource_policy=user_resource_policy,
+                domain_id=domain_fixture.domain_id,
             )
         )
     yield user_id
@@ -179,16 +183,16 @@ async def user_uuid(
 @pytest.fixture
 async def project_id(
     database_with_resource_slot_tables: ExtendedAsyncSAEngine,
-    domain_name: str,
+    domain_fixture: DomainFixtureData,
     project_resource_policy: str,
 ) -> AsyncGenerator[uuid.UUID, None]:
     group_id = uuid.uuid4()
     async with database_with_resource_slot_tables.begin_session() as db_sess:
         db_sess.add(
-            GroupRow(
+            ProjectRow(
                 id=group_id,
                 name="test-project",
-                domain_name=domain_name,
+                domain_name=domain_fixture.domain_name,
                 resource_policy=project_resource_policy,
             )
         )
@@ -196,22 +200,33 @@ async def project_id(
 
 
 @pytest.fixture
+def agent_uuid() -> AgentUUID:
+    """The agent's surrogate key, fixed here rather than left to the column's server default.
+
+    ``agent_resources.agent_uuid`` is a NOT NULL copy of it, so every row a test writes has to name
+    it -- and reading it back from the inserted agent would make each of those tests depend on an
+    extra round trip for a value the fixture can simply decide.
+    """
+    return AgentUUID(uuid.uuid4())
+
+
+@pytest.fixture
 async def agent_id(
     database_with_resource_slot_tables: ExtendedAsyncSAEngine,
-    scaling_group: str,
-    scaling_group_id: ResourceGroupID,
+    resource_group: str,
+    resource_group_id: ResourceGroupID,
+    agent_uuid: AgentUUID,
 ) -> AsyncGenerator[str, None]:
     aid = "i-test-agent-001"
     async with database_with_resource_slot_tables.begin_session() as db_sess:
         db_sess.add(
             AgentRow(
                 id=aid,
-                scaling_group=scaling_group,
-                resource_group_id=scaling_group_id,
+                uuid=agent_uuid,
+                scaling_group=resource_group,
+                resource_group_id=resource_group_id,
                 region="local",
                 addr="tcp://127.0.0.1:6001",
-                available_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("4294967296")}),
-                occupied_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1073741824")}),
                 first_contact=None,
                 lost_at=None,
                 version="test",
@@ -225,12 +240,11 @@ async def agent_id(
 @pytest.fixture
 async def kernel_id(
     database_with_resource_slot_tables: ExtendedAsyncSAEngine,
-    domain_id: DomainID,
-    domain_name: str,
+    domain_fixture: DomainFixtureData,
     project_id: uuid.UUID,
     user_uuid: uuid.UUID,
-    scaling_group_id: ResourceGroupID,
-    scaling_group: str,
+    resource_group_id: ResourceGroupID,
+    resource_group: str,
     agent_id: str,
 ) -> AsyncGenerator[uuid.UUID, None]:
     kid = uuid.uuid4()
@@ -239,14 +253,12 @@ async def kernel_id(
         db_sess.add(
             SessionRow(
                 id=sid,
-                domain_id=domain_id,
-                domain_name=domain_name,
+                domain_id=domain_fixture.domain_id,
+                domain_name=domain_fixture.domain_name,
                 group_id=project_id,
-                resource_group_id=scaling_group_id,
-                scaling_group_name=scaling_group,
+                resource_group_id=resource_group_id,
+                scaling_group_name=resource_group,
                 user_uuid=user_uuid,
-                occupying_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1073741824")}),
-                requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1073741824")}),
             )
         )
         await db_sess.flush()
@@ -254,17 +266,15 @@ async def kernel_id(
             KernelRow(
                 id=kid,
                 session_id=sid,
-                domain_name=domain_name,
+                domain_name=domain_fixture.domain_name,
                 group_id=project_id,
                 user_uuid=user_uuid,
-                occupied_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1073741824")}),
-                requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1073741824")}),
                 repl_in_port=0,
                 repl_out_port=0,
                 stdin_port=0,
                 stdout_port=0,
-                scaling_group=scaling_group,
-                resource_group_id=scaling_group_id,
+                scaling_group=resource_group,
+                resource_group_id=resource_group_id,
                 agent=agent_id,
             )
         )

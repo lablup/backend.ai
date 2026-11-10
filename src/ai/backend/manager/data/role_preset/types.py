@@ -2,14 +2,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import override
+from uuid import UUID
 
-from ai.backend.common.data.permission.types import (
+from ai.backend.common.data.entity.role_permission_preset import RolePermissionPresetID
+from ai.backend.common.data.entity.role_preset import RolePresetID
+from ai.backend.common.data.entity.types import (
+    EntityData,
+    EntityIdentifier,
     EntityType,
-    OperationType,
-    RBACElementType,
+    FieldData,
 )
-from ai.backend.common.identifier.role_permission_preset import RolePermissionPresetID
-from ai.backend.common.identifier.role_preset import RolePresetID
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.data.common.bulk import (
     BulkCreateFailure,
     BulkPurgeFailure,
@@ -18,23 +22,30 @@ from ai.backend.manager.data.common.bulk import (
 
 
 @dataclass(frozen=True)
-class RolePermissionPresetData:
+class RolePermissionPresetData(FieldData):
     id: RolePermissionPresetID
     role_preset_id: RolePresetID
     entity_type: EntityType
-    operation: OperationType
+    permission: Permission
     created_at: datetime
 
 
 @dataclass(frozen=True)
-class RolePresetData:
+class RolePresetData(EntityData):
     id: RolePresetID
     name: str
-    scope_type: RBACElementType
+    role_name_template: str | None
+    scope_type: EntityType
+    scope_id: UUID | None
     auto_assign: bool
-    deleted: bool
+    auto_assign_to_owner: bool
+    deleted_at: datetime | None
     created_at: datetime
     updated_at: datetime
+
+    @override
+    def entity_id(self) -> EntityIdentifier:
+        return self.id
 
 
 @dataclass(frozen=True)

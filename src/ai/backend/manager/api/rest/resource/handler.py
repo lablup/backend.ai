@@ -13,6 +13,8 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, QueryParam
+from ai.backend.common.data.entity.resource_group import ResourceGroupName
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.resource.request import (
     CheckPresetsRequest,
     ListPresetsQuery,
@@ -29,10 +31,15 @@ from ai.backend.common.dto.manager.resource.response import (
     RawListResponse,
     WatcherDataResponse,
 )
-from ai.backend.common.types import AccessKey, AgentId
+from ai.backend.common.types import AgentId
 from ai.backend.common.types import LegacyResourceSlotState as ResourceSlotState
-from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.dto.context import RequestCtx, UserContext
+from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.dto.context import UserContext
+from ai.backend.manager.models.resource_preset.scopes import (
+    PublicResourcePresetTarget,
+    ResourceGroupResourcePresetTarget,
+    ResourcePresetTarget,
+)
 from ai.backend.manager.repositories.resource_slot.types import quantities_to_dict
 from ai.backend.manager.services.agent.actions.get_watcher_status import GetWatcherStatusAction
 from ai.backend.manager.services.agent.actions.recalculate_usage import RecalculateUsageAction
@@ -44,8 +51,9 @@ from ai.backend.manager.services.agent.actions.watcher_agent_stop import Watcher
 from ai.backend.manager.services.container_registry.actions.get_container_registries import (
     GetContainerRegistriesAction,
 )
-from ai.backend.manager.services.group.actions.usage_per_month import UsagePerMonthAction
-from ai.backend.manager.services.group.actions.usage_per_period import UsagePerPeriodAction
+from ai.backend.manager.services.project.actions.usage_per_month import UsagePerMonthAction
+from ai.backend.manager.services.project.actions.usage_per_period import UsagePerPeriodAction
+from ai.backend.manager.services.resource_group.actions.lookup import LookupResourceGroupAction
 from ai.backend.manager.services.resource_preset.actions.check_presets import (
     CheckResourcePresetsAction,
 )
@@ -60,11 +68,12 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.container_registry.processors import (
         ContainerRegistryProcessors,
     )
-    from ai.backend.manager.services.group.processors import GroupProcessors
+    from ai.backend.manager.services.project.processors import ProjectProcessors
+    from ai.backend.manager.services.resource_group.processors import ResourceGroupProcessors
     from ai.backend.manager.services.resource_preset.processors import ResourcePresetProcessors
     from ai.backend.manager.services.user.processors import UserProcessors
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ResourceHandler:
@@ -74,16 +83,31 @@ class ResourceHandler:
         self,
         *,
         resource_preset: ResourcePresetProcessors,
+        resource_group: ResourceGroupProcessors,
         agent: AgentProcessors,
-        group: GroupProcessors,
+        project: ProjectProcessors,
         user: UserProcessors,
         container_registry: ContainerRegistryProcessors,
     ) -> None:
         self._resource_preset = resource_preset
+        self._resource_group = resource_group
         self._agent = agent
-        self._group = group
+        self._project = project
         self._user = user
         self._container_registry = container_registry
+
+    async def _preset_targets(self, resource_group: str | None) -> list[ResourcePresetTarget]:
+        """The scopes a preset read is answered from: public, and the resource group the
+        caller named. Naming a group the caller holds no permission at refuses the read."""
+        targets: list[ResourcePresetTarget] = [PublicResourcePresetTarget()]
+        if resource_group is not None:
+            lookup = await self._resource_group.lookup.run(
+                LookupResourceGroupAction(name=ResourceGroupName(resource_group))
+            )
+            targets.append(
+                ResourceGroupResourcePresetTarget(resource_group_id=lookup.resolved_entity_id)
+            )
+        return targets
 
     # ------------------------------------------------------------------
     # list_presets (GET /resource/presets)
@@ -94,12 +118,12 @@ class ResourceHandler:
         query: QueryParam[ListPresetsQuery],
         ctx: UserContext,
     ) -> APIResponse:
-        log.info("LIST_PRESETS (ak:{})", ctx.access_key)
         params = query.parsed
-        result = await self._resource_preset.list_presets.wait_for_complete(
+        result = await self._resource_preset.list_presets.run(
             ListResourcePresetsAction(
+                targets=await self._preset_targets(params.scaling_group),
                 access_key=ctx.access_key,
-                scaling_group=params.scaling_group,
+                resource_group=params.scaling_group,
             )
         )
         return APIResponse.build(HTTPStatus.OK, ListPresetsResponse(presets=result.presets))
@@ -112,29 +136,20 @@ class ResourceHandler:
         self,
         body: BodyParam[CheckPresetsRequest],
         ctx: UserContext,
-        req: RequestCtx,
     ) -> APIResponse:
         params = body.parsed
-        resource_policy = req.request["keypair"]["resource_policy"]
-        log.info(
-            "CHECK_PRESETS (ak:{}, g:{}, sg:{})",
-            ctx.access_key,
-            params.group,
-            params.scaling_group,
-        )
-        result = await self._resource_preset.check_presets.wait_for_complete(
+        result = await self._resource_preset.check_presets.run(
             CheckResourcePresetsAction(
-                access_key=AccessKey(ctx.access_key),
-                resource_policy=resource_policy,
+                targets=await self._preset_targets(params.scaling_group),
                 domain_name=ctx.user_domain,
                 user_id=ctx.user_uuid,
                 group=params.group,
-                scaling_group=params.scaling_group,
+                resource_group=params.scaling_group,
             )
         )
-        scaling_groups_json: dict[str, Any] = {}
-        for sgname, sg_data in result.scaling_groups.items():
-            scaling_groups_json[sgname] = {
+        resource_groups_json: dict[str, Any] = {}
+        for sgname, sg_data in result.resource_groups.items():
+            resource_groups_json[sgname] = {
                 ResourceSlotState.OCCUPIED: quantities_to_dict(sg_data[ResourceSlotState.OCCUPIED]),
                 ResourceSlotState.AVAILABLE: quantities_to_dict(
                     sg_data[ResourceSlotState.AVAILABLE]
@@ -148,8 +163,8 @@ class ResourceHandler:
             group_limits=quantities_to_dict(result.group_limits),
             group_using=quantities_to_dict(result.group_using),
             group_remaining=quantities_to_dict(result.group_remaining),
-            scaling_group_remaining=quantities_to_dict(result.scaling_group_remaining),
-            scaling_groups=scaling_groups_json,
+            scaling_group_remaining=quantities_to_dict(result.resource_group_remaining),
+            scaling_groups=resource_groups_json,
         )
         return APIResponse.build(HTTPStatus.OK, resp)
 
@@ -158,8 +173,7 @@ class ResourceHandler:
     # ------------------------------------------------------------------
 
     async def recalculate_usage(self, ctx: UserContext) -> APIResponse:
-        log.info("RECALCULATE_USAGE ()")
-        await self._agent.recalculate_usage.wait_for_complete(RecalculateUsageAction())
+        await self._agent.recalculate_usage.run(RecalculateUsageAction())
         return APIResponse.build(HTTPStatus.OK, EmptyResponse())
 
     # ------------------------------------------------------------------
@@ -172,12 +186,7 @@ class ResourceHandler:
         ctx: UserContext,
     ) -> APIResponse:
         params = query.parsed
-        log.info(
-            "USAGE_PER_MONTH (g:[{}], month:{})",
-            ",".join(str(gid) for gid in params.group_ids) if params.group_ids else "",
-            params.month,
-        )
-        result = await self._group.usage_per_month.wait_for_complete(
+        result = await self._project.usage_per_month.run(
             UsagePerMonthAction(
                 group_ids=params.group_ids,
                 month=params.month,
@@ -195,7 +204,7 @@ class ResourceHandler:
         ctx: UserContext,
     ) -> APIResponse:
         params = query.parsed
-        result = await self._group.usage_per_period.wait_for_complete(
+        result = await self._project.usage_per_period.run(
             UsagePerPeriodAction(
                 project_id=params.project_id,
                 start_date=params.start_date,
@@ -209,9 +218,8 @@ class ResourceHandler:
     # ------------------------------------------------------------------
 
     async def user_month_stats(self, ctx: UserContext) -> APIResponse:
-        log.info("USER_LAST_MONTH_STATS (ak:{}, u:{})", ctx.access_key, ctx.user_uuid)
-        result = await self._user.user_month_stats.wait_for_complete(
-            UserMonthStatsAction(user_id=ctx.user_uuid)
+        result = await self._user.user_month_stats.run(
+            UserMonthStatsAction(user_id=UserID(ctx.user_uuid))
         )
         return APIResponse.build(HTTPStatus.OK, RawListResponse(root=result.stats))
 
@@ -220,8 +228,7 @@ class ResourceHandler:
     # ------------------------------------------------------------------
 
     async def admin_month_stats(self, ctx: UserContext) -> APIResponse:
-        log.info("ADMIN_LAST_MONTH_STATS ()")
-        result = await self._user.admin_month_stats.wait_for_complete(AdminMonthStatsAction())
+        result = await self._user.admin_month_stats.run(AdminMonthStatsAction())
         return APIResponse.build(HTTPStatus.OK, RawListResponse(root=result.stats))
 
     # ------------------------------------------------------------------
@@ -234,8 +241,7 @@ class ResourceHandler:
         ctx: UserContext,
     ) -> APIResponse:
         params = query.parsed
-        log.info("GET_WATCHER_STATUS (ag:{})", params.agent_id)
-        result = await self._agent.get_watcher_status.wait_for_complete(
+        result = await self._agent.get_watcher_status.run(
             GetWatcherStatusAction(agent_id=AgentId(params.agent_id))
         )
         return APIResponse.build(HTTPStatus.OK, WatcherDataResponse(root=result.data))
@@ -250,8 +256,7 @@ class ResourceHandler:
         ctx: UserContext,
     ) -> APIResponse:
         params = body.parsed
-        log.info("WATCHER_AGENT_START (ag:{})", params.agent_id)
-        result = await self._agent.watcher_agent_start.wait_for_complete(
+        result = await self._agent.watcher_agent_start.run(
             WatcherAgentStartAction(agent_id=AgentId(params.agent_id))
         )
         return APIResponse.build(HTTPStatus.OK, WatcherDataResponse(root=result.data))
@@ -266,8 +271,7 @@ class ResourceHandler:
         ctx: UserContext,
     ) -> APIResponse:
         params = body.parsed
-        log.info("WATCHER_AGENT_STOP (ag:{})", params.agent_id)
-        result = await self._agent.watcher_agent_stop.wait_for_complete(
+        result = await self._agent.watcher_agent_stop.run(
             WatcherAgentStopAction(agent_id=AgentId(params.agent_id))
         )
         return APIResponse.build(HTTPStatus.OK, WatcherDataResponse(root=result.data))
@@ -282,8 +286,7 @@ class ResourceHandler:
         ctx: UserContext,
     ) -> APIResponse:
         params = body.parsed
-        log.info("WATCHER_AGENT_RESTART (ag:{})", params.agent_id)
-        result = await self._agent.watcher_agent_restart.wait_for_complete(
+        result = await self._agent.watcher_agent_restart.run(
             WatcherAgentRestartAction(agent_id=AgentId(params.agent_id))
         )
         return APIResponse.build(HTTPStatus.OK, WatcherDataResponse(root=result.data))
@@ -293,7 +296,7 @@ class ResourceHandler:
     # ------------------------------------------------------------------
 
     async def get_container_registries(self, ctx: UserContext) -> APIResponse:
-        result = await self._container_registry.get_container_registries.wait_for_complete(
+        result = await self._container_registry.get_container_registries.run(
             GetContainerRegistriesAction()
         )
         return APIResponse.build(HTTPStatus.OK, ContainerRegistriesResponse(root=result.registries))

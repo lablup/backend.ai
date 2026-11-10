@@ -21,13 +21,12 @@ from ai.backend.common.clients.http_client.client_pool import (
 from ai.backend.common.dto.clients.prometheus import PrometheusResponse
 from ai.backend.common.service_discovery.service_discovery import MODEL_SERVICE_GROUP
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
-from ai.backend.manager.clients.prometheus import (
+from ai.backend.manager.clients.prometheus.client import PrometheusClient
+from ai.backend.manager.clients.prometheus.fixed_query_builder import (
     ContainerLiveStatQueryBuilder,
     ContainerMetricQueryBuilder,
-    LabelMatcher,
-    MetricPreset,
-    PrometheusClient,
 )
+from ai.backend.manager.clients.prometheus.preset import LabelMatcher, MetricPreset
 from ai.backend.testutils.pants import get_parallel_slot
 
 # ---------------------------------------------------------------------------
@@ -194,7 +193,7 @@ async def prometheus_client_with_relabel(
 @pytest.fixture
 def up_model_service_preset() -> MetricPreset:
     return MetricPreset(
-        template="up{{{labels}}}",
+        template="up{${{labels}}}",
         labels={"service_group": LabelMatcher.exact(MODEL_SERVICE_GROUP)},
         group_by=frozenset(),
     )

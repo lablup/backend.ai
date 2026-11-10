@@ -15,7 +15,7 @@ from ai.backend.common.dto.manager.v2.fair_share.types import (
     ResourceSlotInfo,
 )
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.api.gql.fair_share.types import ResourceSlotGQL
+from ai.backend.manager.api.gql.common_types import ResourceSlotGQL
 
 SECONDS_PER_DAY = Decimal("86400")
 

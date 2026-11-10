@@ -11,7 +11,6 @@ from ai.backend.common.dependencies import DependencyProvider
 from ai.backend.common.etcd import ConfigScopes
 from ai.backend.common.health_checker import ServiceHealthChecker
 from ai.backend.common.health_checker.checkers.etcd import EtcdHealthChecker
-from ai.backend.common.types import HostPortPair
 
 
 class EtcdProvider(DependencyProvider[ServerConfig, TraefikEtcd | None]):
@@ -28,30 +27,15 @@ class EtcdProvider(DependencyProvider[ServerConfig, TraefikEtcd | None]):
         """Create and provide Traefik etcd connection if enabled."""
         if setup_input.proxy_coordinator.enable_traefik:
             traefik_config = setup_input.proxy_coordinator.traefik
-            if not traefik_config:
+            if traefik_config is None or traefik_config.etcd is None:
                 raise MissingTraefikConfigError(
                     "Traefik is enabled but traefik configuration is missing."
                 )
 
-            creds: dict[str, str] | None = None
-            if traefik_config.etcd.password:
-                creds = {"password": traefik_config.etcd.password}
-
-            # Handle addr as either single HostPortPair or list
-            addr = traefik_config.etcd.addr
-            if isinstance(addr, list):
-                # Use first address from the list
-                host_port = addr[0]
-            else:
-                host_port = addr
-
-            traefik_etcd = TraefikEtcd(
-                HostPortPair(host_port.host, host_port.port),
-                traefik_config.etcd.namespace,
-                {ConfigScopes.GLOBAL: ""},
-                credentials=creds,
-            )
-            yield traefik_etcd
+            async with TraefikEtcd.create_from_config(
+                traefik_config.etcd.to_dataclass(), {ConfigScopes.GLOBAL: ""}
+            ) as traefik_etcd:
+                yield traefik_etcd
         else:
             yield None
 

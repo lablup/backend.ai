@@ -35,6 +35,7 @@ class AgentEtcdClientView(AbstractKVStore):
         the scope prefix mapping is recalculated.
         """
         return {
+            ConfigScopes.SGROUP: f"sgroup/{self._config.agent.legacy_sgroup_name()}",
             ConfigScopes.NODE: f"nodes/agents/{self._config.agent.defaulted_id}",
         }
 
@@ -135,6 +136,84 @@ class AgentEtcdClientView(AbstractKVStore):
             new_val,
             scope=scope,
             scope_prefix_map=scope_prefix_map,
+        )
+
+    @override
+    async def put_if_absent(
+        self,
+        key: str,
+        val: str,
+        *,
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
+    ) -> bool:
+        scope_prefix_map = self._augment_scope_prefix_map(scope_prefix_map)
+        return await self._etcd.put_if_absent(
+            key, val, scope=scope, scope_prefix_map=scope_prefix_map
+        )
+
+    @override
+    async def compare_and_put(
+        self,
+        key: str,
+        val: str,
+        *,
+        expected: str | None,
+        guards: Mapping[str, str | None],
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
+    ) -> bool:
+        scope_prefix_map = self._augment_scope_prefix_map(scope_prefix_map)
+        return await self._etcd.compare_and_put(
+            key,
+            val,
+            expected=expected,
+            guards=guards,
+            scope=scope,
+            scope_prefix_map=scope_prefix_map,
+        )
+
+    @override
+    async def compare_and_delete(
+        self,
+        key: str,
+        expected: str,
+        *,
+        guards: Mapping[str, str | None],
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
+    ) -> bool:
+        scope_prefix_map = self._augment_scope_prefix_map(scope_prefix_map)
+        return await self._etcd.compare_and_delete(
+            key, expected, guards=guards, scope=scope, scope_prefix_map=scope_prefix_map
+        )
+
+    @override
+    async def compare_and_replace_prefixes(
+        self,
+        replacements: Mapping[str, NestedStrKeyedMapping],
+        *,
+        guards: Mapping[str, str | None],
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
+    ) -> bool:
+        scope_prefix_map = self._augment_scope_prefix_map(scope_prefix_map)
+        return await self._etcd.compare_and_replace_prefixes(
+            replacements, guards=guards, scope=scope, scope_prefix_map=scope_prefix_map
+        )
+
+    @override
+    async def delete_if_value(
+        self,
+        key: str,
+        expected: str,
+        *,
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
+    ) -> bool:
+        scope_prefix_map = self._augment_scope_prefix_map(scope_prefix_map)
+        return await self._etcd.delete_if_value(
+            key, expected, scope=scope, scope_prefix_map=scope_prefix_map
         )
 
     @override

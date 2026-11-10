@@ -7,22 +7,26 @@ from typing import Any, override
 
 from aiohttp import web
 
+from ai.backend.appproxy.common.config import ContentEncodingConfig
 from ai.backend.appproxy.common.errors import (
     ServerMisconfiguredError,
+    WorkerNotAvailable,
 )
-from ai.backend.appproxy.common.types import RouteInfo, SerializableCircuit
+from ai.backend.appproxy.common.types import RouteInfo
 from ai.backend.appproxy.worker.errors import InvalidFrontendTypeError
+from ai.backend.appproxy.worker.errors.ingress import IngressFrontendNotRegisteredError
 from ai.backend.appproxy.worker.proxy.backend import TCPBackend
 from ai.backend.appproxy.worker.types import (
     Circuit,
     PortFrontendInfo,
     RootContext,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.common.dto.appproxy.v2.ingress.types import IngressAccess
+from ai.backend.logging.structured import StructuredLogger, with_log_context
 
 from .base import BaseFrontend
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class TCPFrontend(BaseFrontend[TCPBackend, int]):
@@ -36,6 +40,11 @@ class TCPFrontend(BaseFrontend[TCPBackend, int]):
 
         self.servers = []
         self.server_tasks = []
+
+    @override
+    def apply_content_encoding_config(self, config: ContentEncodingConfig) -> None:
+        # A raw TCP stream carries no Content-Encoding.
+        pass
 
     @override
     async def start(self) -> None:
@@ -59,10 +68,10 @@ class TCPFrontend(BaseFrontend[TCPBackend, int]):
             self.servers.append(server)
             self.server_tasks.append(asyncio.create_task(self._listen_task(port, server)))
         log.info(
-            "accepting proxy requests from {}:{}~{}",
-            port_proxy_config.bind_host,
-            port_start,
-            port_end,
+            "accepting proxy requests",
+            bind_host=port_proxy_config.bind_host,
+            port_range_start=port_start,
+            port_range_end=port_end,
         )
 
     async def _listen_task(self, circuit_key: int, server: asyncio.Server) -> None:
@@ -70,7 +79,7 @@ class TCPFrontend(BaseFrontend[TCPBackend, int]):
             async with server:
                 await server.serve_forever()
         except Exception:
-            log.exception("TCPFrontend._listen_task(c: {}): exception:", circuit_key)
+            log.exception("TCP proxy listener failed", port=circuit_key)
             raise
 
     @override
@@ -86,23 +95,13 @@ class TCPFrontend(BaseFrontend[TCPBackend, int]):
         # TCP does not support authentication
         return
 
-    def _is_peer_allowed(self, writer: asyncio.StreamWriter, circuit: SerializableCircuit) -> bool:
+    def _is_peer_allowed(self, writer: asyncio.StreamWriter, access: IngressAccess) -> bool:
         # TCP carries no forwarded-for header, so the allowlist is matched
         # against the direct connection peer only.
-        validator = circuit.ip_validator
-        if not validator.is_restricted:
-            return True
         peername = writer.get_extra_info("peername")
-        if not peername:
-            log.debug("rejecting TCP connection with unknown peer for circuit {}", circuit.id)
-            return False
-        peer_ip = peername[0]
-        if not validator.is_allowed(peer_ip):
-            log.debug(
-                "rejecting TCP client {} for circuit {} (not in allowed_client_ips)",
-                peer_ip,
-                circuit.id,
-            )
+        peer_ip = peername[0] if peername else None
+        if not self._is_client_ip_allowed(peer_ip, access):
+            log.trace("rejecting TCP client {} (not in allowed_client_ips)", peer_ip)
             return False
         return True
 
@@ -123,8 +122,8 @@ class TCPFrontend(BaseFrontend[TCPBackend, int]):
     async def list_inactive_circuits(self, threshold: int) -> list[Circuit]:
         now = time.time()
         return [
-            self.circuits[key]
-            for key, backend in self.backends.items()
+            backend.circuit
+            for backend in self.backends.values()
             if (backend.last_used - now) >= threshold
         ]
 
@@ -142,22 +141,30 @@ class TCPFrontend(BaseFrontend[TCPBackend, int]):
             await self._close_writer(writer)
             return
 
-        if not self._is_peer_allowed(writer, backend.circuit):
-            await self._close_writer(writer)
-            return
+        with with_log_context(circuit_id=backend.circuit.id):
+            try:
+                ingress = await self._read_registered_ingress(
+                    backend.circuit.to_ingress_frontend().key()
+                )
+            except IngressFrontendNotRegisteredError:
+                log.trace("rejecting a TCP connection to a slot with no ingress")
+                await self._close_writer(writer)
+                return
+            if not self._is_peer_allowed(writer, ingress.access):
+                await self._close_writer(writer)
+                return
 
-        circuit_id = str(backend.circuit.id)
-
-        start = time.monotonic()
-        try:
-            metrics.proxy.observe_downstream_tcp_start()
-            await backend.bind(reader, writer)
-        except Exception:
-            log.exception("TCPFrontend.pipe(k: {}, c: {}):", circuit_key, circuit_id)
-            raise
-        finally:
-            end = time.monotonic()
-            metrics.proxy.observe_downstream_tcp_end(duration=int(end - start))
+            start = time.monotonic()
+            try:
+                metrics.proxy.observe_downstream_tcp_start()
+                await backend.bind(reader, writer)
+            except WorkerNotAvailable:
+                log.trace("no healthy route for the TCP connection")
+            except Exception:
+                log.exception("failed to proxy a TCP connection")
+            finally:
+                end = time.monotonic()
+                metrics.proxy.observe_downstream_tcp_end(duration=int(end - start))
 
     @override
     def get_circuit_key(self, circuit: Circuit) -> int:

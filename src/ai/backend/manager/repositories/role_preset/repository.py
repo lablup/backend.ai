@@ -1,95 +1,110 @@
+"""The preset writes that carry over to the roles instantiated from the preset.
+
+Each write and the sync of the derived roles share one transaction, so a preset never
+commits ahead of the roles that stand for it.
+"""
+
 from __future__ import annotations
 
-import logging
-from collections.abc import Sequence
+from collections.abc import Collection, Mapping, Sequence
 
-from ai.backend.common.identifier.role_permission_preset import RolePermissionPresetID
-from ai.backend.common.identifier.role_preset import RolePresetID
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.common.data.entity.role_permission_preset import RolePermissionPresetID
+from ai.backend.common.data.entity.role_preset import RolePresetID
+from ai.backend.common.data.entity.types import EntityIdentifier, FieldIdentifier
+from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
 from ai.backend.manager.data.role_preset.types import (
-    RolePermissionPresetBulkAddResult,
-    RolePermissionPresetBulkRemoveResult,
-    RolePermissionPresetSearchResult,
-    RolePresetBulkPurgeResult,
-    RolePresetBulkUpdateResult,
+    RolePermissionPresetData,
     RolePresetData,
-    RolePresetSearchResult,
+)
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.models.rbac_models.role_permission_preset.creators import (
+    RolePermissionPresetCreator,
+)
+from ai.backend.manager.models.rbac_models.role_permission_preset.purgers import (
+    RolePermissionPresetPurger,
 )
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )
-from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    BulkCreator,
-)
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.ops import DBOpsProvider
-from ai.backend.manager.repositories.role_preset.creators import (
-    RolePermissionPresetDependentCreatorSpec,
-    RolePresetCreatorSpec,
-)
-from ai.backend.manager.repositories.role_preset.db_source.db_source import (
-    RolePresetDBSource,
-)
-
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+from ai.backend.manager.models.rbac_models.role_preset.updaters import RolePresetUpdater
+from ai.backend.manager.models.specs.purger import GuardedFieldPurger
+from ai.backend.manager.models.specs.types import BulkResultWithFailures
+from ai.backend.manager.repositories.ops.v2.role_preset.provider import RolePresetOpsProvider
 
 
 class RolePresetRepository:
-    _db_source: RolePresetDBSource
+    _ops: RolePresetOpsProvider
 
-    def __init__(self, ops_provider: DBOpsProvider) -> None:
-        self._db_source = RolePresetDBSource(ops_provider)
+    def __init__(self, ops_provider: RolePresetOpsProvider) -> None:
+        self._ops = ops_provider
 
-    async def create(
+    async def update(self, updater: RolePresetUpdater) -> RolePresetData:
+        """Apply the edit, then re-derive the preset's roles from it."""
+        async with self._ops.write_ops() as w:
+            data = await w.update_data(updater)
+            if data is None:
+                raise EntityNotFoundError(
+                    entity_type=updater.preset_id.entity_type(),
+                    operation=ActionOperationType.UPDATE,
+                    extra_msg=f"RolePresetRow {updater.preset_id} not found",
+                )
+            await w.sync_preset_roles(updater.preset_id)
+            return data
+
+    async def partial_bulk_update(
+        self, updaters: Sequence[RolePresetUpdater]
+    ) -> BulkResultWithFailures[RolePresetData]:
+        """Apply each edit the way :meth:`update` does, each in its own savepoint."""
+        successes: dict[EntityIdentifier, RolePresetData] = {}
+        errors: dict[EntityIdentifier, Exception] = {}
+        async with self._ops.write_ops() as w:
+            for updater in updaters:
+                try:
+                    async with w.savepoint() as sp:
+                        data = await sp.update_data(updater)
+                        if data is None:
+                            raise EntityNotFoundError(
+                                entity_type=updater.preset_id.entity_type(),
+                                operation=ActionOperationType.UPDATE,
+                                extra_msg=f"RolePresetRow {updater.preset_id} not found",
+                            )
+                        await sp.sync_preset_roles(updater.preset_id)
+                        successes[updater.preset_id] = data
+                except Exception as e:
+                    errors[updater.preset_id] = e
+        return BulkResultWithFailures(successes=successes, errors=errors)
+
+    async def add_permissions(
+        self, preset_id: RolePresetID, creators: Sequence[RolePermissionPresetCreator]
+    ) -> list[RolePermissionPresetData]:
+        """Insert the entries atomically, then widen the derived roles to them."""
+        async with self._ops.write_ops() as w:
+            items = await w.atomic_create_field_entities(preset_id, creators)
+            await w.sync_preset_roles(preset_id)
+            return items
+
+    async def remove_permissions(
+        self, purgers: Mapping[RolePermissionPresetID, RolePermissionPresetPurger]
+    ) -> BulkFieldOpsResult[RolePermissionPresetData]:
+        """Drop each named entry, then take the same permissions back from the roles of
+        every preset an entry left."""
+        named: Mapping[
+            FieldIdentifier, GuardedFieldPurger[RolePermissionPresetRow, RolePermissionPresetData]
+        ] = dict(purgers.items())
+        async with self._ops.write_ops() as w:
+            result = await w.partial_bulk_purge_field_entities(named)
+            for preset_id in {entry.role_preset_id for entry in result.successes.values()}:
+                await w.sync_preset_roles(preset_id)
+            return result
+
+    async def provision_roles(
         self,
-        creator_spec: RolePresetCreatorSpec,
-        permission_creator_specs: Sequence[RolePermissionPresetDependentCreatorSpec],
-    ) -> RolePresetData:
-        return await self._db_source.create(creator_spec, permission_creator_specs)
-
-    async def role_preset(self, preset_id: RolePresetID) -> RolePresetData:
-        return await self._db_source.get(preset_id)
-
-    async def search(
-        self,
-        querier: BatchQuerier,
-    ) -> RolePresetSearchResult:
-        return await self._db_source.search(querier)
-
-    async def search_permission_presets(
-        self,
-        querier: BatchQuerier,
-    ) -> RolePermissionPresetSearchResult:
-        return await self._db_source.search_permission_presets(querier)
-
-    async def update(self, updater: Updater[RolePresetRow]) -> RolePresetData:
-        return await self._db_source.update(updater)
-
-    async def bulk_update(
-        self,
-        updaters: list[Updater[RolePresetRow]],
-    ) -> RolePresetBulkUpdateResult:
-        return await self._db_source.bulk_update(updaters)
-
-    async def purge(self, preset_id: RolePresetID) -> bool:
-        return await self._db_source.purge(preset_id)
-
-    async def bulk_purge(
-        self,
-        ids: Sequence[RolePresetID],
-    ) -> RolePresetBulkPurgeResult:
-        return await self._db_source.bulk_purge(ids)
-
-    async def bulk_add_permissions(
-        self,
-        bulk_creator: BulkCreator[RolePermissionPresetRow],
-    ) -> RolePermissionPresetBulkAddResult:
-        return await self._db_source.bulk_add_permissions(bulk_creator)
-
-    async def bulk_remove_permissions(
-        self,
-        ids: Sequence[RolePermissionPresetID],
-    ) -> RolePermissionPresetBulkRemoveResult:
-        return await self._db_source.bulk_remove_permissions(ids)
+        creator_preset_ids: Collection[RolePresetID],
+        preset_scopes: Mapping[RolePresetID, EntityIdentifier],
+    ) -> None:
+        """Point the presets at their scopes, instantiate the active presets in every scope
+        lacking their role and grant what the scopes assign on their own, in one
+        transaction."""
+        async with self._ops.write_ops() as w:
+            await w.provision_preset_roles(creator_preset_ids, preset_scopes)

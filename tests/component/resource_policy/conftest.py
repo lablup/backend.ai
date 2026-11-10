@@ -17,6 +17,11 @@ from ai.backend.client.v2.v2_registry import V2ClientRegistry
 
 if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData
+from ai.backend.common.data.entity.resource_policy import (
+    KeyPairResourcePolicyEntityType,
+    ProjectResourcePolicyEntityType,
+    UserResourcePolicyEntityType,
+)
 from ai.backend.common.dto.manager.v2.common import BinarySizeInput
 from ai.backend.common.dto.manager.v2.resource_policy.request import (
     CreateKeypairResourcePolicyInput,
@@ -28,7 +33,7 @@ from ai.backend.common.dto.manager.v2.resource_policy.response import (
     CreateProjectResourcePolicyPayload,
     CreateUserResourcePolicyPayload,
 )
-from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.api.adapters.resource_policy.adapter import ResourcePolicyAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
@@ -36,40 +41,24 @@ from ai.backend.manager.api.rest.v2.resource_policy.handler import V2ResourcePol
 from ai.backend.manager.api.rest.v2.resource_policy.registry import (
     register_v2_resource_policy_routes,
 )
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.keypair_resource_policy.repository import (
-    KeypairResourcePolicyRepository,
-)
-from ai.backend.manager.repositories.project_resource_policy.repository import (
-    ProjectResourcePolicyRepository,
-)
-from ai.backend.manager.repositories.user_resource_policy.repository import (
-    UserResourcePolicyRepository,
-)
 from ai.backend.manager.services.keypair_resource_policy.processors import (
     KeypairResourcePolicyProcessors,
-)
-from ai.backend.manager.services.keypair_resource_policy.service import (
-    KeypairResourcePolicyService,
 )
 from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.project_resource_policy.processors import (
     ProjectResourcePolicyProcessors,
 )
-from ai.backend.manager.services.project_resource_policy.service import (
-    ProjectResourcePolicyService,
-)
 from ai.backend.manager.services.user_resource_policy.processors import (
     UserResourcePolicyProcessors,
 )
-from ai.backend.manager.services.user_resource_policy.service import (
-    UserResourcePolicyService,
-)
+from ai.backend.testutils.processors import ops_processor_group
 
 KeypairResourcePolicyFactory = Callable[
     ..., Coroutine[Any, Any, CreateKeypairResourcePolicyPayload]
@@ -83,33 +72,27 @@ ProjectResourcePolicyFactory = Callable[
 @pytest.fixture()
 def resource_policy_processors(
     database_engine: ExtendedAsyncSAEngine,
+    config_provider: ManagerConfigProvider,
 ) -> tuple[
     KeypairResourcePolicyProcessors,
     UserResourcePolicyProcessors,
     ProjectResourcePolicyProcessors,
 ]:
-    kp_repo = KeypairResourcePolicyRepository(database_engine)
-    kp_service = KeypairResourcePolicyService(kp_repo)
     kp_processors = KeypairResourcePolicyProcessors(
-        service=kp_service,
-        action_monitors=[],
-        validators=MagicMock(spec=ActionValidators),
+        group=ops_processor_group(
+            database_engine, GroupMeta(KeyPairResourcePolicyEntityType()), config_provider
+        )
     )
-
-    up_repo = UserResourcePolicyRepository(database_engine)
-    up_service = UserResourcePolicyService(up_repo)
     up_processors = UserResourcePolicyProcessors(
-        service=up_service,
-        action_monitors=[],
-        validators=MagicMock(spec=ActionValidators),
+        group=ops_processor_group(
+            database_engine, GroupMeta(UserResourcePolicyEntityType()), config_provider
+        )
     )
 
-    pp_repo = ProjectResourcePolicyRepository(database_engine)
-    pp_service = ProjectResourcePolicyService(pp_repo)
     pp_processors = ProjectResourcePolicyProcessors(
-        service=pp_service,
-        action_monitors=[],
-        validators=MagicMock(spec=ActionValidators),
+        group=ops_processor_group(
+            database_engine, GroupMeta(ProjectResourcePolicyEntityType()), config_provider
+        )
     )
 
     return kp_processors, up_processors, pp_processors
@@ -132,7 +115,11 @@ def server_module_registries(
     processors.user_resource_policy = up_proc
     processors.project_resource_policy = pp_proc
 
-    adapter = ResourcePolicyAdapter(processors)
+    adapter = ResourcePolicyAdapter(
+        processors.keypair_resource_policy,
+        processors.user_resource_policy,
+        processors.project_resource_policy,
+    )
     handler = V2ResourcePolicyHandler(adapter=adapter)
 
     v2_reg = RouteRegistry.create("v2", route_deps.cors_options)

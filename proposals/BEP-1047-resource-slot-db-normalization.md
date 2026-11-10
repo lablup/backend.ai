@@ -1,10 +1,10 @@
 ---
 Author: HyeokJin Kim (hyeokjin@lablup.com)
-Status: Draft
+Status: Implemented
 Created: 2026-02-08
 Created-Version: 26.3.0
 Target-Version:
-Implemented-Version:
+Implemented-Version: 26.7.0
 ---
 
 # Resource Slot DB Normalization

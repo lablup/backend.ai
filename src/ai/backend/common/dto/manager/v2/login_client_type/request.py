@@ -3,21 +3,28 @@
 from __future__ import annotations
 
 from typing import Self
+from uuid import UUID
 
 from pydantic import Field
 
-from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
-from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
+from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.v2.common import NonEmptyList, String64
 from ai.backend.common.dto.manager.v2.login_client_type.types import (
     LoginClientTypeOrderField,
     OrderDirection,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 __all__ = (
     "SearchLoginClientTypesInput",
     "CreateLoginClientTypeInput",
     "LoginClientTypeFilter",
     "LoginClientTypeOrder",
+    "PartialBulkPurgeLoginClientTypesInput",
+    "PartialBulkUpdateLoginClientTypeItemInput",
+    "PartialBulkUpdateLoginClientTypesInput",
     "UpdateLoginClientTypeInput",
 )
 
@@ -39,20 +46,40 @@ class CreateLoginClientTypeInput(BaseRequestModel):
 class UpdateLoginClientTypeInput(BaseRequestModel):
     """Input for updating a login client type.
 
-    Fields default to "no change". For ``description``, pass ``null`` to clear the
-    existing value; omit the field (SENTINEL) to leave it untouched.
+    Every field defaults to UNSET (no change). ``description`` accepts ``null`` to clear.
     """
 
-    name: str | None = Field(
-        default=None,
-        min_length=1,
-        max_length=64,
+    name: String64 | None | Unset = Field(
+        default=UNSET,
         description="Updated name. Omit to leave unchanged.",
     )
-    description: str | Sentinel | None = Field(
-        default=SENTINEL,
-        description="Updated description. Use null to clear, omit to leave unchanged.",
+    description: str | None | Unset = Field(
+        default=UNSET,
+        description="Updated description. Omit to leave unchanged; null clears.",
     )
+
+
+class PartialBulkUpdateLoginClientTypeItemInput(BaseRequestModel):
+    """One login client type of a partial bulk update and the fields to update on it."""
+
+    id: UUID = Field(description="ID of the login client type to update.")
+    input: UpdateLoginClientTypeInput = Field(
+        description="Fields to update on the login client type."
+    )
+
+
+class PartialBulkUpdateLoginClientTypesInput(BaseRequestModel):
+    """Input for updating several login client types, each answered for separately."""
+
+    items: NonEmptyList[PartialBulkUpdateLoginClientTypeItemInput] = Field(
+        description="The login client types to update, each with its fields."
+    )
+
+
+class PartialBulkPurgeLoginClientTypesInput(BaseRequestModel):
+    """Input for purging several login client types, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the login client types to purge.")
 
 
 class LoginClientTypeFilter(BaseRequestModel):
@@ -65,6 +92,10 @@ class LoginClientTypeFilter(BaseRequestModel):
     )
     modified_at: DateTimeFilter | None = Field(
         default=None, description="Filter by last modification datetime."
+    )
+    entity_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by login client type ID.",
     )
     AND: list[Self] | None = None
     OR: list[Self] | None = None

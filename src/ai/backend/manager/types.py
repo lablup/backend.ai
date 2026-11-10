@@ -18,6 +18,7 @@ from graphql import UndefinedType
 from pydantic import AliasChoices, Field
 from strawberry.types.unset import UnsetType
 
+from ai.backend.common.tristate.unset import Unset
 from ai.backend.common.types import BackendAISchema, MountPermission, MountTypes
 
 if TYPE_CHECKING:
@@ -120,6 +121,18 @@ class TriState[TVal]:
         return cls.update(value)
 
     @classmethod
+    def from_unset(cls, value: TVal | None | Unset) -> TriState[TVal]:
+        """Not provided → nop, None → nullify, value → update.
+
+        For request DTO fields on a nullable column.
+        """
+        if isinstance(value, Unset):
+            return cls.nop()
+        if value is None:
+            return cls.nullify()
+        return cls.update(value)
+
+    @classmethod
     def from_nullable(cls, value: TVal | None) -> TriState[TVal]:
         """None → nop (leave unchanged, not nullify), value → update."""
         if value is None:
@@ -217,6 +230,16 @@ class OptionalState[TVal]:
         return OptionalState.update(value)
 
     @classmethod
+    def from_unset(cls, value: TVal | None | Unset) -> OptionalState[TVal]:
+        """Not provided → nop, None → nop, value → update.
+
+        For request DTO fields on a non-nullable column.
+        """
+        if isinstance(value, Unset) or value is None:
+            return cls.nop()
+        return cls.update(value)
+
+    @classmethod
     def from_nullable(cls, value: TVal | None) -> OptionalState[TVal]:
         """None → nop (leave unchanged), value → update."""
         if value is None:
@@ -257,6 +280,24 @@ class OptionalState[TVal]:
         if self._state == _TriStateEnum.UPDATE:
             return OptionalState.update(fn(self.value()))
         return OptionalState.nop()
+
+    def and_optional[TNew](self, fn: Callable[[TVal], TNew | None | Unset]) -> OptionalState[TNew]:
+        """Read a field of the held value onto a non-nullable column.
+
+        For nested request models. An absent parent yields nop.
+        """
+        if self._state == _TriStateEnum.UPDATE:
+            return OptionalState.from_unset(fn(self.value()))
+        return OptionalState.nop()
+
+    def and_tri[TNew](self, fn: Callable[[TVal], TNew | None | Unset]) -> TriState[TNew]:
+        """Read a field of the held value onto a nullable column.
+
+        An absent parent yields nop; only the field's own null nullifies.
+        """
+        if self._state == _TriStateEnum.UPDATE:
+            return TriState.from_unset(fn(self.value()))
+        return TriState.nop()
 
     def update_dict(self, dict: dict[str, Any], attr_name: str) -> None:
         match self._state:

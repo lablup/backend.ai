@@ -8,29 +8,59 @@ from typing import override
 
 from ai.backend.common.dependencies import DependencyComposer, DependencyStack
 from ai.backend.logging.types import LogLevel
-from ai.backend.manager.plugin.error_monitor import ErrorEventDispatcher
-from ai.backend.manager.plugin.monitor import ManagerErrorPluginContext, ManagerStatsPluginContext
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.concentrated import (
-    ConcentratedAgentSelector,
+from ai.backend.manager.dependencies.agents.composer import (
+    AgentsComposer,
+    AgentsInput,
+    AgentsResources,
 )
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import AgentSelector
-
-from .agents import AgentsComposer, AgentsInput, AgentsResources
-from .bootstrap import BootstrapComposer, BootstrapInput, BootstrapResources
-from .components import ComponentsComposer, ComponentsInput, ComponentsResources
-from .domain import DomainComposer, DomainInput, DomainResources
-from .infrastructure import (
+from ai.backend.manager.dependencies.bootstrap.composer import (
+    BootstrapComposer,
+    BootstrapInput,
+    BootstrapResources,
+)
+from ai.backend.manager.dependencies.components.composer import (
+    ComponentsComposer,
+    ComponentsInput,
+    ComponentsResources,
+)
+from ai.backend.manager.dependencies.domain.composer import (
+    DomainComposer,
+    DomainInput,
+    DomainResources,
+)
+from ai.backend.manager.dependencies.infrastructure.composer import (
     InfrastructureComposer,
     InfrastructureInput,
     InfrastructureResources,
 )
-from .messaging import MessagingComposer, MessagingInput, MessagingResources
-from .orchestration import OrchestrationComposer, OrchestrationInput, OrchestrationResources
-from .plugins import PluginsComposer, PluginsResources
+from ai.backend.manager.dependencies.messaging.composer import (
+    MessagingComposer,
+    MessagingInput,
+    MessagingResources,
+)
+from ai.backend.manager.dependencies.orchestration.composer import (
+    OrchestrationComposer,
+    OrchestrationInput,
+    OrchestrationResources,
+)
+from ai.backend.manager.dependencies.plugins.composer import PluginsComposer, PluginsResources
+from ai.backend.manager.dependencies.processing.composer import (
+    ProcessingComposer,
+    ProcessingInput,
+    ProcessingResources,
+)
+from ai.backend.manager.dependencies.system.composer import (
+    SystemComposer,
+    SystemInput,
+    SystemResources,
+)
+from ai.backend.manager.plugin.monitor import ManagerErrorPluginContext, ManagerStatsPluginContext
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.pool import (
+    create_agent_selector,
+)
+
 from .plugins.base import PluginsInput
 from .plugins.monitoring import ErrorMonitorDependency, MonitoringInput, StatsMonitorDependency
-from .processing import ProcessingComposer, ProcessingInput, ProcessingResources
-from .system import SystemComposer, SystemInput, SystemResources
 from .system.prometheus_client import PrometheusClientDependency
 
 
@@ -169,7 +199,7 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
         # Stage 5: Messaging (event hub, message queue, event producer, event fetcher)
         messaging = await stack.enter_composer(
             MessagingComposer(),
-            MessagingInput(config=config),
+            MessagingInput(config=config, sentinel_monitors=infrastructure.sentinel_monitors),
         )
 
         # Stage 5.5: Prometheus client (depends only on config, needed by Domain and System)
@@ -180,6 +210,7 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
             DomainComposer(),
             DomainInput(
                 config_provider=bootstrap.config_provider,
+                key_provider_pool=bootstrap.key_provider_pool,
                 db=infrastructure.db,
                 etcd=bootstrap.etcd,
                 storage_manager=components.storage_manager,
@@ -188,28 +219,16 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 valkey_schedule=infrastructure.valkey.schedule,
                 valkey_image=infrastructure.valkey.image,
                 prometheus_client=prometheus_client,
+                sentinel_monitors=infrastructure.sentinel_monitors,
             ),
         )
 
-        # Stage 6.5: Re-initialize ErrorEventDispatcher plugin with repository.
-        # The plugin was disabled during Stage 4 (Plugins) because
-        # error_log_repository was not yet available.
-        for plugin_instance in plugins.event_dispatcher_plugin_ctx.plugins.values():
-            if isinstance(plugin_instance, ErrorEventDispatcher):
-                await plugin_instance.init(
-                    context={
-                        "error_log_repository": domain.repositories.error_log.repository,
-                    },
-                )
-
         # Stage 6.5: Monitoring (error_monitor, stats_monitor)
-        # Must run after Domain so that error_log_repository is available.
         monitoring_input = MonitoringInput(
             etcd=bootstrap.etcd,
             local_config=config.model_dump(by_alias=True),
             allowed_plugins=config.manager.allowed_plugins,
             disabled_plugins=config.manager.disabled_plugins,
-            error_log_repository=domain.repositories.error_log.repository,
         )
         error_monitor = await stack.enter_dependency(
             ErrorMonitorDependency(),
@@ -234,13 +253,14 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 db=infrastructure.db,
                 event_producer=messaging.event_producer,
                 valkey_profile_target=config.redis.to_valkey_profile_target(),
+                sentinel_monitors=infrastructure.sentinel_monitors,
                 prometheus_client=prometheus_client,
             ),
         )
         resource_priority = (
             bootstrap.config_provider.config.manager.agent_selection_resource_priority
         )
-        agent_selector = AgentSelector(ConcentratedAgentSelector(resource_priority))
+        agent_selector = create_agent_selector(resource_priority)
 
         # Stage 8: Agents (controllers, client pools, agent registry)
         agents = await stack.enter_composer(
@@ -261,6 +281,7 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 deployment_revision_preset_repository=domain.repositories.deployment_revision_preset.repository,
                 runtime_variant_repository=domain.repositories.runtime_variant.repository,
                 agent_selector=agent_selector,
+                ops_provider=domain.repositories.v2_ops_provider,
             ),
         )
 
@@ -273,16 +294,21 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 event_producer=messaging.event_producer,
                 distributed_lock_factory=domain.distributed_lock_factory,
                 valkey_profile_target=config.redis.to_valkey_profile_target(),
+                sentinel_monitors=infrastructure.sentinel_monitors,
                 valkey_schedule=infrastructure.valkey.schedule,
+                valkey_live=infrastructure.valkey.live,
                 valkey_stat=infrastructure.valkey.stat,
                 pidx=setup_input.pidx,
                 scheduler_repository=domain.repositories.scheduler.repository,
                 deployment_repository=domain.repositories.deployment.repository,
                 replica_group_repository=domain.repositories.replica_group.repository,
                 idle_checker_repository=domain.repositories.idle_checker.repository,
+                metric_repository=domain.repositories.metric.repository,
                 fair_share_repository=domain.repositories.fair_share.repository,
                 resource_usage_repository=domain.repositories.resource_usage_history.repository,
                 retention_repository=domain.repositories.retention.repository,
+                project_repository=domain.repositories.project.repository,
+                system_session_environ_repository=domain.repositories.system_session_environ.repository,
                 agent_client_pool=agents.agent_client_pool,
                 appproxy_client_pool=agents.appproxy_client_pool,
                 network_plugin_ctx=plugins.network_plugin_ctx,
@@ -323,6 +349,7 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 repositories=domain.repositories,
                 storage_manager=components.storage_manager,
                 config_provider=bootstrap.config_provider,
+                key_provider_pool=bootstrap.key_provider_pool,
                 event_producer=messaging.event_producer,
                 # Processors creation
                 etcd=bootstrap.etcd,
@@ -338,9 +365,8 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 agent_cache=components.agent_cache,
                 notification_center=domain.notification_center,
                 appproxy_client_pool=agents.appproxy_client_pool,
+                registry_quota_client_pool=domain.container_registry.quota_client_pool,
                 prometheus_client=system.prometheus_client,
-                # Registry quota service
-                registry_quota_service=domain.services_ctx.per_project_container_registries_quota,
                 # BgtaskRegistry creation
                 agent_client_pool=agents.agent_client_pool,
                 # Lifecycle background tasks

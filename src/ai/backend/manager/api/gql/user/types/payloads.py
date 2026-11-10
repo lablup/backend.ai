@@ -42,11 +42,15 @@ from ai.backend.common.dto.manager.v2.user.response import (
     PurgeUsersPayload as PurgeUsersPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.user.response import (
+    RestoreUserPayload as RestoreUserPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.user.response import (
     UpdateMyAllowedClientIPPayload as UpdateMyAllowedClientIPPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.user.response import (
     UpdateUserPayload as UpdateUserPayloadDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -200,10 +204,30 @@ class BulkUpdateUsersV2PayloadGQL(PydanticOutputMixin[BulkUpdateUsersPayloadDTO]
     model=DeleteUserPayloadDTO,
     name="DeleteUserV2Payload",
 )
-class DeleteUserPayloadGQL:
+class DeleteUserPayloadGQL(PydanticOutputMixin[DeleteUserPayloadDTO]):
     """Payload for single user soft-delete."""
 
-    success: bool = gql_field(description="Whether the deletion was successful.")
+    success: bool = gql_field(
+        description="Whether the deletion was successful.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `user`.",
+    )
+    user: UserV2GQL = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="The soft-deleted user."),
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.9.0",
+        description="Payload for single user restore mutation.",
+    ),
+    model=RestoreUserPayloadDTO,
+    name="RestoreUserV2Payload",
+)
+class RestoreUserPayloadGQL:
+    """Payload for single user restore."""
+
+    success: bool = gql_field(description="Whether the restore was successful.")
 
 
 @gql_pydantic_type(
@@ -280,7 +304,23 @@ class BulkPurgeUserV2ErrorGQL:
 class BulkPurgeUsersV2PayloadGQL:
     """Payload for bulk user permanent deletion."""
 
-    purged_count: int = gql_field(description="Number of users successfully purged.")
+    successes: list[UUID] = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description=(
+                "UUIDs of the users that were purged, in the order they were requested. "
+                "Together with `failed` this answers for every requested user exactly once."
+            ),
+        ),
+    )
+    purged_count: int = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.3.0",
+            deprecated_version="26.9.0",
+            description="Number of users successfully purged.",
+        ),
+        deprecation_reason="Use the length of successes.",
+    )
     failed: list[BulkPurgeUserV2ErrorGQL] = gql_field(
         description="List of errors for users that failed to purge."
     )

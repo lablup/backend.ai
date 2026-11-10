@@ -6,39 +6,27 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-import yarl
 from pytest_mock import MockerFixture
 
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.types import (
-    ClusterMode,
-    ResourceSlot,
+    VFolderMountPolicy,
     VFolderUsageMode,
 )
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
-from ai.backend.manager.data.model_serving.types import EndpointData
 from ai.backend.manager.data.vfolder.types import (
-    VFolderMountPermission,
     VFolderOperationStatus,
     VFolderOwnershipType,
 )
-from ai.backend.manager.models.endpoint import (
-    AutoScalingMetricComparator,
-    AutoScalingMetricSource,
-    EndpointAutoScalingRuleRow,
-    EndpointLifecycle,
-    EndpointRow,
-)
-from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.routing import RouteStatus, RoutingRow
-from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
+from ai.backend.manager.models.endpoint.row import EndpointRow
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.repositories.base import Creator
-from ai.backend.manager.repositories.model_serving import EndpointCreatorSpec
+from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
 
 @pytest.fixture
@@ -64,7 +52,11 @@ def mock_db_engine() -> MagicMock:
 @pytest.fixture
 def model_serving_repository(mock_db_engine: MagicMock) -> ModelServingRepository:
     """Create a ModelServingRepository instance with mocked database."""
-    return ModelServingRepository(db=mock_db_engine)
+    return ModelServingRepository(
+        db=mock_db_engine,
+        v2_ops_provider=V2DBOpsProvider(mock_db_engine),
+        permission_check=MagicMock(),
+    )
 
 
 @pytest.fixture
@@ -85,8 +77,8 @@ def sample_user() -> UserRow:
         resource_policy="default",
         created_at=datetime.now(UTC),
         modified_at=datetime.now(UTC),
-        main_access_key="test-access-key",
         sudo_session_enabled=False,
+        domain_id=uuid.uuid4(),
     )
 
 
@@ -108,8 +100,8 @@ def sample_admin_user() -> UserRow:
         resource_policy="default",
         created_at=datetime.now(UTC),
         modified_at=datetime.now(UTC),
-        main_access_key="admin-access-key",
         sudo_session_enabled=True,
+        domain_id=uuid.uuid4(),
     )
 
 
@@ -131,8 +123,8 @@ def sample_superadmin_user() -> UserRow:
         resource_policy="default",
         created_at=datetime.now(UTC),
         modified_at=datetime.now(UTC),
-        main_access_key="superadmin-access-key",
         sudo_session_enabled=True,
+        domain_id=uuid.uuid4(),
     )
 
 
@@ -164,7 +156,7 @@ def sample_vfolder() -> VFolderRow:
     vfolder = VFolderRow()
     vfolder.id = VFolderUUID(uuid.uuid4())
     vfolder.name = "model-vfolder"
-    vfolder.user = uuid.uuid4()
+    vfolder.user = UserID(uuid.uuid4())
     vfolder.group = None
     vfolder.host = "storage-host"
     vfolder.domain_name = "default"
@@ -177,104 +169,9 @@ def sample_vfolder() -> VFolderRow:
     vfolder.last_used = datetime.now(UTC)
     vfolder.unmanaged_path = ""
     vfolder.usage_mode = VFolderUsageMode.MODEL
-    vfolder.permission = VFolderMountPermission.READ_WRITE
-    vfolder.last_size_update = datetime.now(UTC)
+    vfolder.default_mount_permission = VFolderMountPolicy.READ_WRITE
     vfolder.status = VFolderOperationStatus.READY
     return vfolder
-
-
-@pytest.fixture
-def sample_endpoint_creator_spec(
-    sample_user: UserRow, sample_image: ImageRow, sample_vfolder: VFolderRow
-) -> EndpointCreatorSpec:
-    return EndpointCreatorSpec(
-        name="test-endpoint",
-        model=sample_vfolder.id,
-        model_mount_destination="/models",
-        model_definition_path="model.py",
-        session_owner=sample_user.uuid,
-        tag="test",
-        startup_command="python serve.py",
-        bootstrap_script="pip install -r requirements.txt",
-        callback_url=yarl.URL("https://callback.example.com"),
-        environ={"MODEL_NAME": "test"},
-        resource_slots=ResourceSlot({"cpu": "2", "mem": "4g"}),
-        resource_opts={},
-        image=sample_image.id,
-        replicas=1,
-        cluster_mode=ClusterMode.SINGLE_NODE,
-        cluster_size=1,
-        extra_mounts=[],
-        created_user=sample_user.uuid,
-        project=uuid.uuid4(),
-        domain="default",
-        resource_group="default",
-    )
-
-
-@pytest.fixture
-def sample_endpoint_creator(
-    sample_endpoint_creator_spec: EndpointCreatorSpec,
-) -> Creator[EndpointRow]:
-    """Create a Creator wrapper for endpoint creation."""
-    return Creator(spec=sample_endpoint_creator_spec)
-
-
-@pytest.fixture
-def sample_endpoint(
-    sample_endpoint_creator_spec: EndpointCreatorSpec, sample_user: UserRow, sample_image: ImageRow
-) -> EndpointRow:
-    """Create a sample endpoint for testing."""
-    endpoint = sample_endpoint_creator_spec.build_row()
-    # Set attributes that are normally set by the database
-    endpoint.id = DeploymentID(uuid.uuid4())
-    endpoint.created_at = datetime.now(UTC)
-    endpoint.destroyed_at = None
-    endpoint.lifecycle_stage = EndpointLifecycle.CREATED
-    endpoint.retries = 0
-    endpoint.url = f"https://api.example.com/v1/models/{endpoint.name}"
-    endpoint.open_to_public = False
-    # Set related rows for from_row method
-    endpoint.image_row = sample_image
-    endpoint.session_owner_row = sample_user
-    endpoint.created_user_row = sample_user
-    endpoint.routings = []
-    return endpoint
-
-
-@pytest.fixture
-def sample_route(sample_endpoint: EndpointRow) -> RoutingRow:
-    """Create a sample routing for testing."""
-    return RoutingRow(
-        id=uuid.uuid4(),
-        endpoint=sample_endpoint.id,
-        session=uuid.uuid4(),
-        status=RouteStatus.RUNNING,
-        traffic_ratio=1.0,
-        session_owner=sample_endpoint.session_owner,
-        domain=sample_endpoint.domain,
-        project=sample_endpoint.project,
-        revision=uuid.uuid4(),
-    )
-
-
-@pytest.fixture
-def sample_auto_scaling_rule(sample_endpoint: EndpointRow) -> EndpointAutoScalingRuleRow:
-    """Create a sample auto scaling rule for testing."""
-    return EndpointAutoScalingRuleRow(
-        id=uuid.uuid4(),
-        endpoint=sample_endpoint.id,
-        metric_source=AutoScalingMetricSource.KERNEL,
-        metric_name="cpu_util",
-        threshold=80.0,
-        comparator=AutoScalingMetricComparator.GREATER_THAN,
-        step_size=1,
-        cooldown_seconds=300,
-        min_replicas=1,
-        max_replicas=10,
-        created_at=datetime.now(UTC),
-        endpoint_row=sample_endpoint,
-    )
 
 
 @pytest.fixture
@@ -320,58 +217,16 @@ def setup_writable_session(mock_db_engine: MagicMock, mock_session: AsyncMock) -
 
 
 @pytest.fixture
-def patch_endpoint_get(mocker: MockerFixture) -> AsyncMock:
-    """Patch EndpointRow.get method using mocker."""
-    return mocker.patch(
-        "ai.backend.manager.models.endpoint.EndpointRow.get", new_callable=AsyncMock
-    )
-
-
-@pytest.fixture
-def patch_routing_get(mocker: MockerFixture) -> AsyncMock:
-    """Patch RoutingRow.get method using mocker."""
-    return mocker.patch("ai.backend.manager.models.routing.RoutingRow.get", new_callable=AsyncMock)
-
-
-@pytest.fixture
 def patch_user_get(mocker: MockerFixture) -> AsyncMock:
     """Patch UserRow.get method using mocker."""
-    return mocker.patch("ai.backend.manager.models.user.UserRow.get", new_callable=AsyncMock)
-
-
-@pytest.fixture
-def patch_vfolder_get(mocker: MockerFixture) -> AsyncMock:
-    """Patch VFolderRow.get method using mocker."""
-    return mocker.patch("ai.backend.manager.models.vfolder.VFolderRow.get", new_callable=AsyncMock)
-
-
-@pytest.fixture
-def patch_image_resolve(mocker: MockerFixture) -> AsyncMock:
-    """Patch ImageRow.resolve method using mocker."""
-    return mocker.patch("ai.backend.manager.models.image.ImageRow.resolve", new_callable=AsyncMock)
+    return mocker.patch("ai.backend.manager.models.user.row.UserRow.get", new_callable=AsyncMock)
 
 
 @pytest.fixture
 def patch_session_get(mocker: MockerFixture) -> AsyncMock:
     """Patch SessionRow.get_session method using mocker."""
     return mocker.patch(
-        "ai.backend.manager.models.session.SessionRow.get_session", new_callable=AsyncMock
-    )
-
-
-@pytest.fixture
-def patch_auto_scaling_rule_get(mocker: MockerFixture) -> AsyncMock:
-    """Patch EndpointAutoScalingRuleRow.get method using mocker."""
-    return mocker.patch(
-        "ai.backend.manager.models.endpoint.EndpointAutoScalingRuleRow.get", new_callable=AsyncMock
-    )
-
-
-@pytest.fixture
-def patch_resolve_group_name_or_id(mocker: MockerFixture) -> MagicMock:
-    """Patch resolve_group_name_or_id function using mocker."""
-    return mocker.patch(
-        "ai.backend.manager.repositories.model_serving.repository.resolve_group_name_or_id"
+        "ai.backend.manager.models.session.row.SessionRow.get_session", new_callable=AsyncMock
     )
 
 
@@ -413,59 +268,8 @@ def assert_update_query_executed(
         assert expected_field in str(executed_query)
 
 
-def assert_basic_endpoint_result(result: EndpointData, endpoint_row: EndpointRow) -> None:
-    """Helper function to validate basic endpoint result"""
-    assert result is not None
-    assert isinstance(result, EndpointData)
-    assert result.id == endpoint_row.id
-    assert result.name == endpoint_row.name
-
-
 def assert_endpoint_creation_operations(mock_session: AsyncMock, endpoint_row: EndpointRow) -> None:
     """Helper function to verify database operations related to endpoint creation"""
     mock_session.add.assert_called_once_with(endpoint_row)
     mock_session.flush.assert_called_once()
     mock_session.refresh.assert_called_once_with(endpoint_row)
-
-
-def create_full_featured_endpoint(
-    sample_user: UserRow, sample_image: ImageRow, sample_vfolder: VFolderRow
-) -> EndpointRow:
-    endpoint_row = EndpointRow(
-        name="full-featured-endpoint",
-        domain="test-domain",
-        project=uuid.uuid4(),
-        resource_group="gpu-cluster",
-        model=sample_vfolder.id,
-        model_mount_destination="/models/custom",
-        model_definition_path="model_definition.py",
-        session_owner=sample_user.uuid,
-        tag="v1.0.0",
-        startup_command="python -m model_server",
-        bootstrap_script="pip install -r requirements.txt",
-        callback_url=yarl.URL("https://webhook.example.com/callback"),
-        environ={"API_KEY": "secret", "DEBUG": "false"},
-        resource_slots=ResourceSlot({"cpu": "4", "mem": "8g", "cuda.device": "1"}),
-        resource_opts={"shmem": "2g"},
-        image=sample_image,
-        replicas=3,
-        cluster_mode=ClusterMode.MULTI_NODE,
-        cluster_size=3,
-        extra_mounts=[],
-        created_user=sample_user.uuid,
-    )
-
-    # Set attributes normally set by database
-    endpoint_row.id = DeploymentID(uuid.uuid4())
-    endpoint_row.created_at = datetime.now(tz=UTC)
-    endpoint_row.destroyed_at = None
-    endpoint_row.lifecycle_stage = EndpointLifecycle.CREATED
-    endpoint_row.retries = 0
-    endpoint_row.url = "https://api.example.com/v1/models/full-featured"
-    endpoint_row.open_to_public = False
-    endpoint_row.image_row = sample_image
-    endpoint_row.session_owner_row = sample_user
-    endpoint_row.created_user_row = sample_user
-    endpoint_row.routings = []
-
-    return endpoint_row

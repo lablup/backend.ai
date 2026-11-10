@@ -1,0 +1,22 @@
+kind: keypair_resource_policy
+version: 1
+items:
+- uuid: 2d420c65-9ee0-4a1e-8856-79e762cc710e
+  name: default
+  is_default: true
+  default_for_unspecified: UNLIMITED
+  total_resource_slots: {}
+  max_session_lifetime: 0
+  max_concurrent_sessions: 5
+  max_containers_per_session: 1
+  idle_timeout: 3600
+  allowed_vfolder_hosts:
+    local:volume1:
+    - create-vfolder
+    - modify-vfolder
+    - delete-vfolder
+    - mount-in-session
+    - upload-file
+    - download-file
+    - invite-others
+    - set-user-specific-permission

@@ -41,13 +41,13 @@ from pydantic import Field, TypeAdapter, ValidationError
 
 from ai.backend.common.api_handlers import BaseRequestModel, BaseResponseModel
 from ai.backend.common.exception import BackendAISchemaValidationFailed, DeprecatedAPI
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.errors.api import (
     InvalidAPIParameters,
     NotImplementedAPI,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 _rx_sitepkg_path = re.compile(r"^.+/site-packages/")
 
@@ -92,7 +92,10 @@ def check_api_params(
                 else:
                     orig_params = dict(request.query)
                 stripped_params = orig_params.copy()
-                log.debug("stripped raw params: {}", mask_sensitive_keys(stripped_params))
+                log.trace(
+                    "request params parsed",
+                    request_params=str(mask_sensitive_keys(stripped_params)),
+                )
                 checked_params = checker.check(stripped_params)
                 if body_exists and query_param_checker is not None:
                     query_params = query_param_checker.check(request.query)
@@ -216,7 +219,10 @@ def pydantic_params_api_handler[
                 else:
                     orig_params = dict(request.query)
                 stripped_params = orig_params.copy()
-                log.debug("stripped raw params: {}", mask_sensitive_keys(stripped_params))
+                log.trace(
+                    "request params parsed",
+                    request_params=str(mask_sensitive_keys(stripped_params)),
+                )
                 checked_params = checker.model_validate(stripped_params)
                 if body_exists and query_param_checker is not None:
                     query_params = query_param_checker.model_validate(request.query)

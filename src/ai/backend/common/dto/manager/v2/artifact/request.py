@@ -8,8 +8,11 @@ from uuid import UUID
 
 from pydantic import Field, field_validator
 
-from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import IntFilter, StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.v2.common import NonEmptyList
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 from .types import (
     ArtifactAvailability,
@@ -46,6 +49,11 @@ __all__ = (
     "ImportArtifactsInput",
     "ImportArtifactsOptionsInput",
     "ModelTargetInput",
+    "PartialBulkDeleteArtifactsInput",
+    "PartialBulkRestoreArtifactsInput",
+    "PartialBulkUpdateArtifactItemInput",
+    "PartialBulkUpdateArtifactsGQLInput",
+    "PartialBulkUpdateArtifactsInput",
     "RejectArtifactInput",
     "RestoreArtifactsInput",
     "ScanArtifactModelsInput",
@@ -58,22 +66,49 @@ __all__ = (
 class UpdateArtifactInput(BaseRequestModel):
     """Input for updating artifact metadata."""
 
-    readonly: bool | None = Field(
-        default=None,
-        description="Whether the artifact should be readonly. None means no change.",
+    readonly: bool | None | Unset = Field(
+        default=UNSET,
+        description="Whether the artifact should be readonly. Omit to leave unchanged.",
     )
-    description: str | Sentinel | None = Field(
-        default=SENTINEL,
-        description="Updated description. Use SENTINEL to clear the field; None means no change.",
+    description: str | None | Unset = Field(
+        default=UNSET,
+        description="Updated description. Omit to leave unchanged; null clears.",
     )
 
     @field_validator("description", mode="before")
     @classmethod
-    def description_strip_whitespace(cls, v: str | Sentinel | None) -> str | Sentinel | None:
+    def description_strip_whitespace(cls, v: str | None | Unset) -> str | None | Unset:
         if isinstance(v, str):
             stripped = v.strip()
             return stripped if stripped else None
         return v
+
+
+class PartialBulkUpdateArtifactItemInput(BaseRequestModel):
+    """One artifact of a partial bulk update and the fields to update on it."""
+
+    id: UUID = Field(description="ID of the artifact to update.")
+    input: UpdateArtifactInput = Field(description="Fields to update on the artifact.")
+
+
+class PartialBulkUpdateArtifactsInput(BaseRequestModel):
+    """Input for updating several artifacts, each answered for separately."""
+
+    items: NonEmptyList[PartialBulkUpdateArtifactItemInput] = Field(
+        description="The artifacts to update, each with its fields."
+    )
+
+
+class PartialBulkDeleteArtifactsInput(BaseRequestModel):
+    """Input for soft-deleting several artifacts, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the artifacts to soft-delete.")
+
+
+class PartialBulkRestoreArtifactsInput(BaseRequestModel):
+    """Input for restoring several soft-deleted artifacts, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the artifacts to restore.")
 
 
 class ImportArtifactsOptionsInput(BaseRequestModel):
@@ -117,12 +152,21 @@ class ArtifactFilter(BaseRequestModel):
     availability: ArtifactAvailabilityFilter | None = Field(
         default=None, description="Filter by artifact availability."
     )
+    entity_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by artifact ID.",
+    )
 
 
 class ArtifactOrder(BaseRequestModel):
     """Order specification for artifact search."""
 
-    field: ArtifactOrderField = Field(description="Field to order by.")
+    field: ArtifactOrderField = Field(
+        description=(
+            "Field to order by. `SIZE` is deprecated since 26.9.0: it is not used for"
+            " ordering and is removed in the next release."
+        )
+    )
     direction: OrderDirection = Field(default=OrderDirection.ASC, description="Order direction.")
 
 
@@ -299,6 +343,10 @@ class ArtifactGQLFilterInputDTO(BaseRequestModel):
     registry: StringFilter | None = Field(default=None)
     source: StringFilter | None = Field(default=None)
     availability: list[ArtifactAvailability] | None = Field(default=None)
+    entity_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by artifact ID.",
+    )
     AND: list[ArtifactGQLFilterInputDTO] | None = Field(default=None)
     OR: list[ArtifactGQLFilterInputDTO] | None = Field(default=None)
     NOT: list[ArtifactGQLFilterInputDTO] | None = Field(default=None)
@@ -310,7 +358,12 @@ ArtifactGQLFilterInputDTO.model_rebuild()
 class ArtifactGQLOrderByInputDTO(BaseRequestModel):
     """GQL-facing order by for artifacts."""
 
-    field: ArtifactOrderField = Field(description="Field to order by.")
+    field: ArtifactOrderField = Field(
+        description=(
+            "Field to order by. `SIZE` is deprecated since 26.9.0: it is not used for"
+            " ordering and is removed in the next release."
+        )
+    )
     direction: OrderDirection = Field(default=OrderDirection.ASC)
 
 
@@ -336,6 +389,10 @@ class ArtifactRevisionGQLFilterInputDTO(BaseRequestModel):
     version: StringFilter | None = Field(default=None)
     artifact_id: UUIDFilter | None = Field(default=None)
     size: IntFilter | None = Field(default=None)
+    field_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by artifact revision ID.",
+    )
     AND: list[ArtifactRevisionGQLFilterInputDTO] | None = Field(default=None)
     OR: list[ArtifactRevisionGQLFilterInputDTO] | None = Field(default=None)
     NOT: list[ArtifactRevisionGQLFilterInputDTO] | None = Field(default=None)
@@ -391,7 +448,19 @@ class UpdateArtifactGQLInput(BaseRequestModel):
     """GQL input for updating artifact metadata."""
 
     artifact_id: UUID = Field(description="ID of the artifact to update.")
-    readonly: bool | None = Field(
-        default=None, description="Whether the artifact should be readonly."
+    readonly: bool | None | Unset = Field(
+        default=UNSET,
+        description="Whether the artifact should be readonly. Omit to leave unchanged.",
     )
-    description: str | None = Field(default=None, description="Updated description.")
+    description: str | None | Unset = Field(
+        default=UNSET,
+        description="Updated description. Omit to leave unchanged; null clears.",
+    )
+
+
+class PartialBulkUpdateArtifactsGQLInput(BaseRequestModel):
+    """GQL input for updating several artifacts, each answered for separately."""
+
+    items: NonEmptyList[UpdateArtifactGQLInput] = Field(
+        description="The artifacts to update, each with its ID and fields."
+    )

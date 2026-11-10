@@ -2,16 +2,18 @@
 
 from __future__ import annotations
 
-import uuid
-from collections.abc import Sequence
-from typing import TYPE_CHECKING, cast
+from collections.abc import Mapping, Sequence
+from typing import TYPE_CHECKING, assert_never
 from uuid import UUID
 
-from ai.backend.common.api_handlers import Sentinel
+from ai.backend.common.auth.password import PasswordInfo
 from ai.backend.common.contexts.user import current_user
-from ai.backend.common.data.filter_specs import UUIDInMatchSpec
-from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.data.user.types import UserRole as DataUserRole
+from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.data.entity.keypair import KeyPairID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.role import RoleID
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.dto.manager.pagination import PaginationInfo
 from ai.backend.common.dto.manager.v2.keypair import (
     AdminSearchKeypairsInput,
@@ -20,7 +22,6 @@ from ai.backend.common.dto.manager.v2.keypair import (
     KeypairNode,
     KeypairOrderBy,
     KeypairOrderField,
-    SearchKeypairsRequest,
     SearchMyKeypairsRequest,
 )
 from ai.backend.common.dto.manager.v2.keypair.request import (
@@ -44,9 +45,12 @@ from ai.backend.common.dto.manager.v2.keypair.response import (
 )
 from ai.backend.common.dto.manager.v2.user.request import (
     AdminSearchUsersInput,
+    BulkUpdateUsersInput,
     CreateUserInput,
     DeleteUserInput,
     PurgeUserInput,
+    RestoreUserInput,
+    ScopedSearchUsersInput,
     SearchUsersRequest,
     UpdateUserInput,
     UserFilter,
@@ -65,6 +69,7 @@ from ai.backend.common.dto.manager.v2.user.response import (
     DeleteUserPayload,
     EntityTimestamps,
     PurgeUserPayload,
+    RestoreUserPayload,
     SearchUsersPayload,
     UpdateMyAllowedClientIPPayload,
     UpdateUserPayload,
@@ -81,8 +86,7 @@ from ai.backend.common.dto.manager.v2.user.types import (
     UserDomainFilter,
     UserOrderField,
     UserProjectFilter,
-    UserRoleFilter,
-    UserStatusFilter,
+    UserScope,
 )
 from ai.backend.common.dto.manager.v2.user.types import (
     UserRole as UserRoleDTO,
@@ -91,135 +95,185 @@ from ai.backend.common.dto.manager.v2.user.types import (
     UserStatus as UserStatusDTO,
 )
 from ai.backend.common.exception import UnreachableError
+from ai.backend.common.tristate.unset import UNSET, Unset
+from ai.backend.common.types import AccessKey, SecretKey
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairData
 from ai.backend.manager.data.user.types import UserData, UserStatus
-from ai.backend.manager.data.user.types import UserStatus as DataUserStatus
+from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.domain.conditions import DomainConditions
-from ai.backend.manager.models.group.conditions import GroupConditions
-from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.keypair.conditions import KeypairConditions, KeypairOrders
-from ai.backend.manager.models.keypair.row import KeyPairRow
-from ai.backend.manager.models.user.conditions import UserConditions
-from ai.backend.manager.models.user.orders import UserOrders
-from ai.backend.manager.models.user.row import UserRole as UserRoleModel
-from ai.backend.manager.models.user.row import UserRow
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    NoPagination,
-    OffsetPagination,
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
     combine_conditions_or,
     negate_conditions,
 )
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.keypair.types import (
-    KeypairResourcePolicyKeypairSearchScope,
-    UserKeypairSearchScope,
+from ai.backend.manager.models.domain.searchable_fields import DomainSearchableFields
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.keypair.searchable_fields import KeyPairSearchableFields
+from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
+from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.user.creators import UserCreator
+from ai.backend.manager.models.user.deprecated_search import (
+    DeprecatedUserConditions,
+    DeprecatedUserOrders,
 )
-from ai.backend.manager.repositories.keypair.updaters import KeyPairUpdaterSpec
-from ai.backend.manager.repositories.user.creators import UserCreatorSpec
-from ai.backend.manager.repositories.user.types import (
-    DomainUserSearchScope,
-    ProjectUserSearchScope,
-    RoleUserSearchScope,
+from ai.backend.manager.models.user.row import UserRole as UserRoleModel
+from ai.backend.manager.models.user.row import UserRow
+from ai.backend.manager.models.user.scopes import (
+    DomainUserTarget,
+    ProjectUserTarget,
+    RoleUserTarget,
+    UserTarget,
 )
-from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
+from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
+from ai.backend.manager.models.user.searchers import UserSearcher
+from ai.backend.manager.models.user.updaters import UserUpdater
+from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
+from ai.backend.manager.services.user.actions.bulk_get import BulkGetUsersAction
+from ai.backend.manager.services.user.actions.bulk_get_keypairs import BulkGetKeypairsAction
+from ai.backend.manager.services.user.actions.bulk_lookup import BulkLookupUsersAction
+from ai.backend.manager.services.user.actions.bulk_lookup_keypairs import BulkLookupKeypairsAction
 from ai.backend.manager.services.user.actions.create_user import (
     BulkCreateUserAction,
     CreateUserAction,
 )
-from ai.backend.manager.services.user.actions.delete_user import DeleteUserByIdAction
+from ai.backend.manager.services.user.actions.delete_user import DeleteUserAction
 from ai.backend.manager.services.user.actions.get_user import GetUserAction
 from ai.backend.manager.services.user.actions.keypair_ops import (
     AdminCreateKeypairAction,
-    AdminDeleteKeypairAction,
     AdminDeleteSSHKeypairAction,
-    AdminGetKeypairAction,
     AdminGetSSHKeypairAction,
     AdminRegisterSSHKeypairAction,
     AdminSearchKeypairsAction,
-    AdminUpdateKeypairAction,
+    GetDefaultKeypairsAction,
+    GetKeypairAction,
     IssueMyKeypairAction,
-    RevokeMyKeypairAction,
-    SearchKeypairsByResourcePolicyAction,
+    PurgeKeypairAction,
     SearchMyKeypairsAction,
-    SwitchMyMainAccessKeyAction,
-    UpdateMyKeypairAction,
+    SwitchDefaultAccessKeyAction,
+    UpdateKeypairAction,
 )
-from ai.backend.manager.services.user.actions.modify_user import (
-    BulkModifyUserAction,
-    ModifyUserAction,
-    ModifyUserByIdAction,
+from ai.backend.manager.services.user.actions.lookup_keypair import (
+    LookupKeypairByAccessKeyAction,
+)
+from ai.backend.manager.services.user.actions.lookup_keypair_owner import (
+    LookupKeypairOwnerByAccessKeyAction,
 )
 from ai.backend.manager.services.user.actions.purge_user import (
     BulkPurgeUserAction,
-    PurgeUserByIdAction,
+    PurgeUserAction,
 )
-from ai.backend.manager.services.user.actions.search_users import SearchUsersAction
-from ai.backend.manager.services.user.actions.search_users_by_domain import (
-    SearchUsersByDomainAction,
+from ai.backend.manager.services.user.actions.restore_user import RestoreUserAction
+from ai.backend.manager.services.user.actions.scoped_search import (
+    ScopedSearchUsersAction,
 )
-from ai.backend.manager.services.user.actions.search_users_by_project import (
-    SearchUsersByProjectAction,
-)
-from ai.backend.manager.services.user.actions.search_users_by_role import (
-    SearchUsersByRoleAction,
+from ai.backend.manager.services.user.actions.search_users import GlobalSearchUsersAction
+from ai.backend.manager.services.user.actions.update_user import (
+    BulkUpdateUserAction,
+    UpdateUserAction,
 )
 from ai.backend.manager.types import OptionalState, TriState
 
 if TYPE_CHECKING:
     from ai.backend.manager.config.unified import AuthConfig
-    from ai.backend.manager.services.processors import Processors
 
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
+from ai.backend.manager.models.keypair.row import KEYPAIR_SECRET_KEY_CONTEXT
+from ai.backend.manager.models.keypair.searchers import KeyPairSearcher
+from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
+from ai.backend.manager.secret.pool import KeyProviderPool
+from ai.backend.manager.services.domain.processors import DomainProcessors
+from ai.backend.manager.services.user.processors import UserProcessors
 
 _USER_PAGINATION_SPEC = PaginationSpec(
-    forward_order=UserOrders.created_at(ascending=False),
-    backward_order=UserOrders.created_at(ascending=True),
-    forward_condition_factory=UserConditions.by_cursor_forward,
-    backward_condition_factory=UserConditions.by_cursor_backward,
-    tiebreaker_order=UserRow.uuid.asc(),
+    forward_order=UserSearchableFields.own.created_at.order.apply(ascending=False),
+    cursor_column=UserRow.uuid,
 )
 
 _KEYPAIR_PAGINATION_SPEC = PaginationSpec(
-    forward_order=KeypairOrders.created_at(ascending=False),
-    backward_order=KeypairOrders.created_at(ascending=True),
-    forward_condition_factory=KeypairConditions.by_cursor_forward,
-    backward_condition_factory=KeypairConditions.by_cursor_backward,
-    tiebreaker_order=KeyPairRow.access_key.asc(),
+    forward_order=KeyPairSearchableFields.own.created_at.order.apply(ascending=False),
+    cursor_column=KeyPairRow.id,
 )
 
 
 class UserAdapter(BaseAdapter):
     """Adapter for user domain operations."""
 
-    def __init__(self, processors: Processors, auth_config: AuthConfig) -> None:
-        super().__init__(processors)
+    _user: UserProcessors
+    _domain: DomainProcessors
+    _auth_config: AuthConfig
+    _key_provider_pool: KeyProviderPool
+
+    def __init__(
+        self,
+        user: UserProcessors,
+        domain: DomainProcessors,
+        auth_config: AuthConfig,
+        key_provider_pool: KeyProviderPool,
+    ) -> None:
+        self._user = user
+        self._domain = domain
         self._auth_config = auth_config
+        self._key_provider_pool = key_provider_pool
+
+    async def resolve_domain_id(self, domain_name: str) -> DomainID:
+        """The domain's id, for callers that only hold its name."""
+        result = await self._domain.lookup_name.run(
+            LookupDomainAction(name=DomainName(domain_name))
+        )
+        return result.entity_id()
 
     # ------------------------------------------------------------------ batch load (DataLoader)
 
-    async def batch_load_by_ids(self, user_ids: Sequence[uuid.UUID]) -> list[UserNode | None]:
-        """Batch load users by UUID for DataLoader use.
-
-        Returns UserNode DTOs in the same order as the input user_ids list.
-        """
+    async def batch_load_by_ids(
+        self, user_ids: Sequence[UserID]
+    ) -> list[UserNode | Exception | None]:
+        """Batch load users by UUID for DataLoader use, checked per user."""
         if not user_ids:
             return []
-        querier = BatchQuerier(
-            pagination=NoPagination(),
-            conditions=[
-                UserConditions.by_uuid_in(UUIDInMatchSpec(values=list(user_ids), negated=False))
-            ],
+        result = await self._user.bulk_get.run(BulkGetUsersAction(ids=list(user_ids)))
+        users = [item.value for item in result.items if item.value is not None]
+        nodes = iter(await self._user_nodes(users))
+        return [
+            next(nodes) if item.value is not None else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
+
+    async def batch_lookup_by_emails(self, emails: Sequence[str]) -> list[UserID | Exception]:
+        """The user each email names, for DataLoader use, checked per user."""
+        if not emails:
+            return []
+        lookup = await self._user.bulk_lookup.run(BulkLookupUsersAction(emails=list(emails)))
+        return [lookup.resolved.get(email) or lookup.failures[email] for email in emails]
+
+    async def bulk_lookup_keypair_access_keys(
+        self, access_keys: Sequence[str]
+    ) -> list[KeyPairID | None]:
+        """The id of the keypair each access key names, ``None`` for a key matching none.
+
+        Checks the login only: the read the ids are passed to checks the permission.
+        """
+        if not access_keys:
+            return []
+        keys = [AccessKey(access_key) for access_key in access_keys]
+        lookup = await self._user.bulk_lookup_keypairs.run(
+            BulkLookupKeypairsAction(access_keys=keys)
         )
-        action_result = await self._processors.user.search_users.wait_for_complete(
-            SearchUsersAction(querier=querier)
+        return [lookup.resolved.get(key) for key in keys]
+
+    async def bulk_get_keypair_ids(
+        self, ids: Sequence[KeyPairID]
+    ) -> list[KeypairNode | Exception | None]:
+        """Batch load keypairs by id for DataLoader use, checked per owning user."""
+        if not ids:
+            return []
+        return await self.batch_load_fields(
+            self._user.bulk_get_keypairs,
+            BulkGetKeypairsAction(ids=list(ids)),
+            ids,
+            self._keypair_data_to_node,
         )
-        user_map = {user.uuid: self._user_data_to_node(user) for user in action_result.users}
-        return [user_map.get(user_id) for user_id in user_ids]
 
     # ------------------------------------------------------------------ GQL search (cursor-based)
 
@@ -228,9 +282,10 @@ class UserAdapter(BaseAdapter):
         input: AdminSearchUsersInput,
     ) -> AdminSearchUsersPayload:
         """Search users with no scope restriction (admin only), cursor-based pagination."""
-        conditions = self._convert_gql_filter(input.filter) if input.filter else []
-        orders = self._convert_gql_orders(input.order) if input.order else []
-        querier = self._build_querier(
+        conditions = self._convert_user_filter(input.filter) if input.filter else []
+        orders = self._convert_user_orders(input.order) if input.order else []
+        searcher = self._build_searcher(
+            UserSearcher,
             conditions=conditions,
             orders=orders,
             pagination_spec=_USER_PAGINATION_SPEC,
@@ -241,25 +296,26 @@ class UserAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.user.search_users.wait_for_complete(
-            SearchUsersAction(querier=querier)
+        result = await self._user.global_search.run(
+            GlobalSearchUsersAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
         )
         return AdminSearchUsersPayload(
-            items=[self._user_data_to_node(u) for u in action_result.users],
-            total_count=action_result.total_count,
-            has_next_page=action_result.has_next_page,
-            has_previous_page=action_result.has_previous_page,
+            items=await self._user_nodes(result.items),
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
         )
 
     async def gql_search_by_domain(
         self,
-        scope: DomainUserSearchScope,
+        domain_name: str,
         input: AdminSearchUsersInput,
     ) -> AdminSearchUsersPayload:
         """Search users within a domain, cursor-based pagination."""
-        conditions = self._convert_gql_filter(input.filter) if input.filter else []
-        orders = self._convert_gql_orders(input.order) if input.order else []
-        querier = self._build_querier(
+        conditions = self._convert_user_filter(input.filter) if input.filter else []
+        orders = self._convert_user_orders(input.order) if input.order else []
+        searcher = self._build_searcher(
+            UserSearcher,
             conditions=conditions,
             orders=orders,
             pagination_spec=_USER_PAGINATION_SPEC,
@@ -270,25 +326,32 @@ class UserAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.user.search_users_by_domain.wait_for_complete(
-            SearchUsersByDomainAction(scope=scope, querier=querier)
+        result = await self._user.scoped_search.run(
+            ScopedSearchUsersAction(
+                searcher=ScopedSearcher(
+                    scopes=[DomainUserTarget(domain_id=await self.resolve_domain_id(domain_name))],
+                    used_by=(),
+                    searcher=searcher,
+                )
+            )
         )
         return AdminSearchUsersPayload(
-            items=[self._user_data_to_node(u) for u in action_result.users],
-            total_count=action_result.total_count,
-            has_next_page=action_result.has_next_page,
-            has_previous_page=action_result.has_previous_page,
+            items=await self._user_nodes(result.items),
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
         )
 
     async def gql_search_by_project(
         self,
-        scope: ProjectUserSearchScope,
+        project_id: ProjectID,
         input: AdminSearchUsersInput,
     ) -> AdminSearchUsersPayload:
         """Search users within a project, cursor-based pagination."""
-        conditions = self._convert_gql_filter(input.filter) if input.filter else []
-        orders = self._convert_gql_orders(input.order) if input.order else []
-        querier = self._build_querier(
+        conditions = self._convert_user_filter(input.filter) if input.filter else []
+        orders = self._convert_user_orders(input.order) if input.order else []
+        searcher = self._build_searcher(
+            UserSearcher,
             conditions=conditions,
             orders=orders,
             pagination_spec=_USER_PAGINATION_SPEC,
@@ -299,14 +362,20 @@ class UserAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.user.search_users_by_project.wait_for_complete(
-            SearchUsersByProjectAction(scope=scope, querier=querier)
+        result = await self._user.scoped_search.run(
+            ScopedSearchUsersAction(
+                searcher=ScopedSearcher(
+                    scopes=[ProjectUserTarget(project_id=project_id)],
+                    used_by=(),
+                    searcher=searcher,
+                )
+            )
         )
         return AdminSearchUsersPayload(
-            items=[self._user_data_to_node(u) for u in action_result.users],
-            total_count=action_result.total_count,
-            has_next_page=action_result.has_next_page,
-            has_previous_page=action_result.has_previous_page,
+            items=await self._user_nodes(result.items),
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
         )
 
     # ------------------------------------------------------------------ search
@@ -316,17 +385,91 @@ class UserAdapter(BaseAdapter):
         input: SearchUsersRequest,
     ) -> SearchUsersPayload:
         """Search users with no scope restriction (admin only)."""
-        querier = self._build_search_querier(input)
-        action_result = await self._processors.user.search_users.wait_for_complete(
-            SearchUsersAction(querier=querier)
+        searcher = self._build_search_searcher(input)
+        result = await self._user.global_search.run(
+            GlobalSearchUsersAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
         )
         return SearchUsersPayload(
-            items=[self._user_data_to_node(u) for u in action_result.users],
+            items=await self._user_nodes(result.items),
             pagination=PaginationInfo(
-                total=action_result.total_count,
+                total=result.total_count,
                 offset=input.offset,
                 limit=input.limit,
             ),
+        )
+
+    def _scope_targets(self, scope: UserScope) -> list[UserTarget]:
+        """The scope targets the request named, in the order the input lists them."""
+        targets: list[UserTarget] = [
+            DomainUserTarget(domain_id=DomainID(entry.value)) for entry in scope.domain or ()
+        ]
+        targets.extend(
+            ProjectUserTarget(project_id=ProjectID(entry.value)) for entry in scope.project or ()
+        )
+        targets.extend(RoleUserTarget(role_id=RoleID(entry.value)) for entry in scope.role or ())
+        return targets
+
+    async def scoped_search(
+        self,
+        input: ScopedSearchUsersInput,
+    ) -> SearchUsersPayload:
+        """Search the users the named scopes reach, combined with OR."""
+        conditions = self._convert_user_filter(input.filter) if input.filter else []
+        orders = self._convert_user_orders(input.order) if input.order else []
+        result = await self._user.scoped_search.run(
+            ScopedSearchUsersAction(
+                searcher=ScopedSearcher(
+                    scopes=self._scope_targets(input.scope),
+                    used_by=(),
+                    searcher=UserSearcher(
+                        conditions=conditions,
+                        orders=orders,
+                        pagination=OffsetPagination(limit=input.limit, offset=input.offset),
+                    ),
+                )
+            )
+        )
+        return SearchUsersPayload(
+            items=await self._user_nodes(result.items),
+            pagination=PaginationInfo(
+                total=result.total_count,
+                offset=input.offset,
+                limit=input.limit,
+            ),
+        )
+
+    async def gql_scoped_search(
+        self,
+        scope: UserScope,
+        input: AdminSearchUsersInput,
+    ) -> AdminSearchUsersPayload:
+        """Search the users the named scopes reach, cursor-based pagination."""
+        conditions = self._convert_user_filter(input.filter) if input.filter else []
+        orders = self._convert_user_orders(input.order) if input.order else []
+        searcher = self._build_searcher(
+            UserSearcher,
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_USER_PAGINATION_SPEC,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
+        result = await self._user.scoped_search.run(
+            ScopedSearchUsersAction(
+                searcher=ScopedSearcher(
+                    scopes=self._scope_targets(scope), used_by=(), searcher=searcher
+                )
+            )
+        )
+        return AdminSearchUsersPayload(
+            items=await self._user_nodes(result.items),
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
         )
 
     async def domain_search(
@@ -335,15 +478,20 @@ class UserAdapter(BaseAdapter):
         input: SearchUsersRequest,
     ) -> SearchUsersPayload:
         """Search users within a domain."""
-        querier = self._build_search_querier(input)
-        scope = DomainUserSearchScope(domain_name=domain_name)
-        action_result = await self._processors.user.search_users_by_domain.wait_for_complete(
-            SearchUsersByDomainAction(scope=scope, querier=querier)
+        searcher = self._build_search_searcher(input)
+        result = await self._user.scoped_search.run(
+            ScopedSearchUsersAction(
+                searcher=ScopedSearcher(
+                    scopes=[DomainUserTarget(domain_id=await self.resolve_domain_id(domain_name))],
+                    used_by=(),
+                    searcher=searcher,
+                )
+            )
         )
         return SearchUsersPayload(
-            items=[self._user_data_to_node(u) for u in action_result.users],
+            items=await self._user_nodes(result.items),
             pagination=PaginationInfo(
-                total=action_result.total_count,
+                total=result.total_count,
                 offset=input.offset,
                 limit=input.limit,
             ),
@@ -355,15 +503,20 @@ class UserAdapter(BaseAdapter):
         input: SearchUsersRequest,
     ) -> SearchUsersPayload:
         """Search users within a project."""
-        querier = self._build_search_querier(input)
-        scope = ProjectUserSearchScope(project_id=project_id)
-        action_result = await self._processors.user.search_users_by_project.wait_for_complete(
-            SearchUsersByProjectAction(scope=scope, querier=querier)
+        searcher = self._build_search_searcher(input)
+        result = await self._user.scoped_search.run(
+            ScopedSearchUsersAction(
+                searcher=ScopedSearcher(
+                    scopes=[ProjectUserTarget(project_id=ProjectID(project_id))],
+                    used_by=(),
+                    searcher=searcher,
+                )
+            )
         )
         return SearchUsersPayload(
-            items=[self._user_data_to_node(u) for u in action_result.users],
+            items=await self._user_nodes(result.items),
             pagination=PaginationInfo(
-                total=action_result.total_count,
+                total=result.total_count,
                 offset=input.offset,
                 limit=input.limit,
             ),
@@ -375,15 +528,20 @@ class UserAdapter(BaseAdapter):
         input: SearchUsersRequest,
     ) -> SearchUsersPayload:
         """Search users assigned to a role."""
-        querier = self._build_search_querier(input)
-        scope = RoleUserSearchScope(role_id=role_id)
-        action_result = await self._processors.user.search_users_by_role.wait_for_complete(
-            SearchUsersByRoleAction(scope=scope, querier=querier)
+        searcher = self._build_search_searcher(input)
+        result = await self._user.scoped_search.run(
+            ScopedSearchUsersAction(
+                searcher=ScopedSearcher(
+                    scopes=[RoleUserTarget(role_id=RoleID(role_id))],
+                    used_by=(),
+                    searcher=searcher,
+                )
+            )
         )
         return SearchUsersPayload(
-            items=[self._user_data_to_node(u) for u in action_result.users],
+            items=await self._user_nodes(result.items),
             pagination=PaginationInfo(
-                total=action_result.total_count,
+                total=result.total_count,
                 offset=input.offset,
                 limit=input.limit,
             ),
@@ -393,10 +551,8 @@ class UserAdapter(BaseAdapter):
 
     async def get(self, user_id: UUID) -> UserPayload:
         """Get a user by UUID."""
-        action_result = await self._processors.user.get_user.wait_for_complete(
-            GetUserAction(user_uuid=user_id)
-        )
-        return UserPayload(user=self._user_data_to_node(action_result.user))
+        action_result = await self._user.get_user.run(GetUserAction(user_id=UserID(user_id)))
+        return UserPayload(user=await self._user_node(action_result.user))
 
     # ------------------------------------------------------------------ single CRUD
 
@@ -408,16 +564,16 @@ class UserAdapter(BaseAdapter):
             rounds=self._auth_config.password_hash_rounds,
             salt_size=self._auth_config.password_hash_salt_size,
         )
-        spec = UserCreatorSpec(
+        creator = UserCreator(
+            domain_id=await self.resolve_domain_id(input.domain_name),
             email=input.email,
             username=input.username,
             password=password_info,
             need_password_change=input.need_password_change,
-            domain_name=input.domain_name,
             full_name=input.full_name,
             description=input.description,
             status=UserStatus(input.status),
-            role=str(UserRoleModel(input.role)),
+            role=UserRoleModel(input.role),
             allowed_client_ip=input.allowed_client_ip,
             totp_activated=input.totp_activated,
             resource_policy=input.resource_policy,
@@ -428,24 +584,77 @@ class UserAdapter(BaseAdapter):
             integration_name=input.integration_name,
         )
         group_ids = [str(gid) for gid in input.group_ids] if input.group_ids else None
-        result = await self._processors.user.create_user.wait_for_complete(
-            CreateUserAction(creator=Creator(spec=spec), group_ids=group_ids)
+        result = await self._user.create_user.run(
+            CreateUserAction(creator=creator, group_ids=group_ids)
         )
         return CreateUserPayload(
-            user=self._user_data_to_node(result.data.user),
-            keypair=self._keypair_data_to_created_payload(result.data.keypair),
+            user=await self._user_node(result.data.user),
+            keypair=await self._keypair_data_to_created_payload(result.data.keypair),
         )
 
-    async def modify_user_by_id(self, user_id: UUID, input: UpdateUserInput) -> UpdateUserPayload:
-        """Update a user by UUID."""
-        updater_spec = UserUpdaterSpec(
-            username=(
-                OptionalState.update(input.username)
-                if input.username is not None
-                else OptionalState.nop()
-            ),
+    async def update_user_by_id(self, user_id: UUID, input: UpdateUserInput) -> UpdateUserPayload:
+        """Update a user by UUID.
+
+        ``status=DELETED`` soft-deletes after the other fields; ``status=ACTIVE`` on a
+        deleted user restores before them.
+        """
+        target = UserID(user_id)
+        current_status = None
+        if self._needs_current_status(input):
+            current = await self._user.get_user.run(GetUserAction(user_id=target))
+            current_status = UserStatus(current.user.status)
+        delete, restore, input = self._split_soft_delete_status(input, current_status)
+        if restore:
+            await self._user.restore_user.run(RestoreUserAction(user_id=target))
+        data: UserData | None = None
+        if not (delete or restore) or self._has_update_fields(input):
+            result = await self._user.update_user.run(
+                UpdateUserAction(updater=self._build_user_updater(target, input))
+            )
+            data = result.data
+        if not isinstance(input.main_access_key, Unset) and input.main_access_key is not None:
+            await self.switch_default_access_key(target, AccessKey(input.main_access_key))
+        if delete:
+            await self._user.delete_user.run(DeleteUserAction(user_id=target))
+        if data is None or delete:
+            data = (await self._user.get_user.run(GetUserAction(user_id=target))).user
+        return UpdateUserPayload(user=await self._user_node(data))
+
+    def _needs_current_status(self, input: UpdateUserInput) -> bool:
+        return input.status in (UserStatusDTO.DELETED, UserStatusDTO.ACTIVE)
+
+    def _split_soft_delete_status(
+        self, input: UpdateUserInput, current_status: UserStatus | None
+    ) -> tuple[bool, bool, UpdateUserInput]:
+        """Split a deprecated soft delete ``status`` off the update input.
+
+        Returns whether to delete, whether to restore, and the input left for the updater.
+        """
+        if current_status is None or isinstance(input.status, Unset) or input.status is None:
+            return False, False, input
+        requested = UserStatus(input.status)
+        rest = (
+            input
+            if requested.is_updater_value_from(current_status)
+            else input.model_copy(update={"status": UNSET})
+        )
+        return requested.deletes_from(current_status), requested.restores_from(current_status), rest
+
+    def _has_update_fields(self, input: UpdateUserInput) -> bool:
+        return any(
+            not isinstance(getattr(input, name), Unset)
+            for name in UpdateUserInput.model_fields
+            if name != "main_access_key"
+        )
+
+    def _build_user_updater(self, user_id: UserID, input: UpdateUserInput) -> UserUpdater:
+        return UserUpdater(
+            user_id=user_id,
+            username=OptionalState.from_unset(input.username),
             password=(
-                OptionalState.update(
+                OptionalState.nop()
+                if isinstance(input.password, Unset) or input.password is None
+                else OptionalState.update(
                     PasswordInfo(
                         password=input.password,
                         algorithm=self._auth_config.password_hash_algorithm,
@@ -453,109 +662,52 @@ class UserAdapter(BaseAdapter):
                         salt_size=self._auth_config.password_hash_salt_size,
                     )
                 )
-                if input.password is not None
-                else OptionalState.nop()
             ),
-            need_password_change=(
-                OptionalState.update(input.need_password_change)
-                if input.need_password_change is not None
-                else OptionalState.nop()
-            ),
-            full_name=(
-                TriState.nop()
-                if isinstance(input.full_name, Sentinel)
-                else TriState.nullify()
-                if input.full_name is None
-                else TriState.update(input.full_name)
-            ),
-            description=(
-                TriState.nop()
-                if isinstance(input.description, Sentinel)
-                else TriState.nullify()
-                if input.description is None
-                else TriState.update(input.description)
-            ),
+            need_password_change=OptionalState.from_unset(input.need_password_change),
+            full_name=TriState.from_unset(input.full_name),
+            description=TriState.from_unset(input.description),
             status=(
-                OptionalState.update(UserStatus(input.status))
-                if input.status is not None
-                else OptionalState.nop()
+                OptionalState.nop()
+                if isinstance(input.status, Unset) or input.status is None
+                else OptionalState.update(UserStatus(input.status))
             ),
-            domain_name=(
-                OptionalState.update(input.domain_name)
-                if input.domain_name is not None
-                else OptionalState.nop()
-            ),
+            domain_name=OptionalState.from_unset(input.domain_name),
             role=(
-                OptionalState.update(UserRoleModel(input.role))
-                if input.role is not None
-                else OptionalState.nop()
+                OptionalState.nop()
+                if isinstance(input.role, Unset) or input.role is None
+                else OptionalState.update(UserRoleModel(input.role))
             ),
-            allowed_client_ip=(
-                TriState.nop()
-                if isinstance(input.allowed_client_ip, Sentinel)
-                else TriState.from_graphql(input.allowed_client_ip)
-            ),
-            resource_policy=(
-                OptionalState.update(input.resource_policy)
-                if input.resource_policy is not None
-                else OptionalState.nop()
-            ),
-            sudo_session_enabled=(
-                OptionalState.update(input.sudo_session_enabled)
-                if input.sudo_session_enabled is not None
-                else OptionalState.nop()
-            ),
-            main_access_key=(
-                TriState.nop()
-                if isinstance(input.main_access_key, Sentinel)
-                else TriState.from_graphql(input.main_access_key)
-            ),
-            container_uid=(
-                TriState.nop()
-                if isinstance(input.container_uid, Sentinel)
-                else TriState.from_graphql(input.container_uid)
-            ),
-            container_main_gid=(
-                TriState.nop()
-                if isinstance(input.container_main_gid, Sentinel)
-                else TriState.from_graphql(input.container_main_gid)
-            ),
-            container_gids=(
-                TriState.nop()
-                if isinstance(input.container_gids, Sentinel)
-                else TriState.from_graphql(input.container_gids)
-            ),
-            integration_name=(
-                TriState.nop()
-                if isinstance(input.integration_name, Sentinel)
-                else TriState.from_graphql(input.integration_name)
-            ),
+            allowed_client_ip=TriState.from_unset(input.allowed_client_ip),
+            resource_policy=OptionalState.from_unset(input.resource_policy),
+            sudo_session_enabled=OptionalState.from_unset(input.sudo_session_enabled),
+            container_uid=TriState.from_unset(input.container_uid),
+            container_main_gid=TriState.from_unset(input.container_main_gid),
+            container_gids=TriState.from_unset(input.container_gids),
+            integration_name=TriState.from_unset(input.integration_name),
             group_ids=(
                 OptionalState.nop()
-                if isinstance(input.group_ids, Sentinel) or input.group_ids is None
+                if isinstance(input.group_ids, Unset) or input.group_ids is None
                 else OptionalState.update([str(gid) for gid in input.group_ids])
             ),
         )
-        updater: Updater[UserRow] = Updater(spec=updater_spec, pk_value=user_id)
-        result = await self._processors.user.modify_user_by_id.wait_for_complete(
-            ModifyUserByIdAction(user_id=user_id, updater=updater)
-        )
-        return UpdateUserPayload(user=self._user_data_to_node(result.data))
 
     async def delete_user_by_id(self, input: DeleteUserInput) -> DeleteUserPayload:
         """Soft-delete a user by UUID."""
-        await self._processors.user.delete_user_by_id.wait_for_complete(
-            DeleteUserByIdAction(user_id=input.user_id)
-        )
-        return DeleteUserPayload(success=True)
+        result = await self._user.delete_user.run(DeleteUserAction(user_id=UserID(input.user_id)))
+        return DeleteUserPayload(success=True, user=await self._user_node(result.user))
+
+    async def restore_user_by_id(self, input: RestoreUserInput) -> RestoreUserPayload:
+        """Restore a soft-deleted user by UUID."""
+        await self._user.restore_user.run(RestoreUserAction(user_id=UserID(input.user_id)))
+        return RestoreUserPayload(success=True)
 
     async def purge_user_by_id(
         self, input: PurgeUserInput, admin_user_id: UUID
     ) -> PurgeUserPayload:
         """Permanently purge a user by UUID."""
-        await self._processors.user.purge_user_by_id.wait_for_complete(
-            PurgeUserByIdAction(
-                user_id=input.user_id,
+        await self._user.purge_user.run(
+            PurgeUserAction(
+                user_id=UserID(input.user_id),
                 admin_user_id=admin_user_id,
                 purge_shared_vfolders=(
                     OptionalState.update(input.purge_shared_vfolders)
@@ -579,15 +731,13 @@ class UserAdapter(BaseAdapter):
         Deprecated: the generated keypairs are not returned. Use
         :meth:`bulk_create_users_with_keypair` instead.
         """
-        result = await self._processors.user.bulk_create_users.wait_for_complete(action)
-        created_users = [self._user_data_to_node(item.user) for item in result.data.successes]
+        result = await self._user.bulk_create_users.run(action)
+        created_users = await self._user_nodes([item.user for item in result.data.successes])
         failed = [
             BulkCreateUserV2Error(
                 index=error.index,
-                username=(
-                    spec := cast(UserCreatorSpec, action.items[error.index].creator.spec)
-                ).username,
-                email=spec.email,
+                username=(creator := action.items[error.index].creator).username,
+                email=creator.email,
                 message=str(error.exception),
             )
             for error in result.data.failures
@@ -601,43 +751,109 @@ class UserAdapter(BaseAdapter):
 
         The secret key of each keypair is only returned here at creation time.
         """
-        result = await self._processors.user.bulk_create_users.wait_for_complete(action)
+        result = await self._user.bulk_create_users.run(action)
+        created_nodes = await self._user_nodes([item.user for item in result.data.successes])
         created = [
             CreateUserPayload(
-                user=self._user_data_to_node(item.user),
-                keypair=self._keypair_data_to_created_payload(item.keypair),
+                user=node,
+                keypair=await self._keypair_data_to_created_payload(item.keypair),
             )
-            for item in result.data.successes
+            for item, node in zip(result.data.successes, created_nodes, strict=True)
         ]
         failed = [
             BulkCreateUserV2Error(
                 index=error.index,
-                username=(
-                    spec := cast(UserCreatorSpec, action.items[error.index].creator.spec)
-                ).username,
-                email=spec.email,
+                username=(creator := action.items[error.index].creator).username,
+                email=creator.email,
                 message=str(error.exception),
             )
             for error in result.data.failures
         ]
         return BulkCreateUsersWithKeypairPayload(created=created, failed=failed)
 
-    async def bulk_modify_users(self, action: BulkModifyUserAction) -> BulkUpdateUsersPayload:
-        """Bulk-modify users. Each item's transformation is the caller's responsibility."""
-        result = await self._processors.user.bulk_modify_users.wait_for_complete(action)
-        updated_users = [self._user_data_to_node(u) for u in result.data.successes]
-        failed = [
-            BulkUpdateUserV2Error(
-                user_id=action.items[error.index].user_id,
-                message=str(error.exception),
+    async def bulk_update_users(self, input: BulkUpdateUsersInput) -> BulkUpdateUsersPayload:
+        """Update users item by item, answering each failure in ``failed``.
+
+        Each item takes the soft delete ``status`` as :meth:`update_user_by_id` does.
+        A key switch or a delete runs only for a user whose update went through.
+        """
+        failed: list[BulkUpdateUserV2Error] = []
+        current_statuses = await self._current_statuses([
+            item.user_id for item in input.users if self._needs_current_status(item.input)
+        ])
+        to_delete: set[UserID] = set()
+        to_reload: list[UserID] = []
+        updaters: list[UserUpdater] = []
+        rest_inputs: dict[UserID, UpdateUserInput] = {}
+        for item in input.users:
+            user_id = UserID(item.user_id)
+            try:
+                current = current_statuses.get(user_id)
+                if isinstance(current, Exception):
+                    raise current
+                delete, restore, rest = self._split_soft_delete_status(item.input, current)
+                if restore:
+                    await self._user.restore_user.run(RestoreUserAction(user_id=user_id))
+                if delete:
+                    to_delete.add(user_id)
+                if not (delete or restore) or self._has_update_fields(rest):
+                    updaters.append(self._build_user_updater(user_id, rest))
+                    rest_inputs[user_id] = rest
+                else:
+                    to_reload.append(user_id)
+            except Exception as e:
+                failed.append(BulkUpdateUserV2Error(user_id=user_id, message=str(e)))
+        updated: list[UserData] = []
+        if updaters:
+            result = await self._user.bulk_modify_users.run(BulkUpdateUserAction(items=updaters))
+            failed.extend(
+                BulkUpdateUserV2Error(
+                    user_id=updaters[error.index].user_id, message=str(error.exception)
+                )
+                for error in result.data.failures
             )
-            for error in result.data.failures
-        ]
-        return BulkUpdateUsersPayload(updated_users=updated_users, failed=failed)
+            for user in result.data.successes:
+                user_id = UserID(user.id)
+                main_access_key = rest_inputs[user_id].main_access_key
+                try:
+                    if not isinstance(main_access_key, Unset) and main_access_key is not None:
+                        await self.switch_default_access_key(user_id, AccessKey(main_access_key))
+                except Exception as e:
+                    failed.append(BulkUpdateUserV2Error(user_id=user_id, message=str(e)))
+                    to_delete.discard(user_id)
+                    continue
+                if user_id in to_delete:
+                    to_reload.append(user_id)
+                else:
+                    updated.append(user)
+        for user_id in to_reload:
+            try:
+                if user_id in to_delete:
+                    await self._user.delete_user.run(DeleteUserAction(user_id=user_id))
+                updated.append((await self._user.get_user.run(GetUserAction(user_id=user_id))).user)
+            except Exception as e:
+                failed.append(BulkUpdateUserV2Error(user_id=user_id, message=str(e)))
+        return BulkUpdateUsersPayload(updated_users=await self._user_nodes(updated), failed=failed)
+
+    async def _current_statuses(
+        self, user_ids: Sequence[UUID]
+    ) -> Mapping[UserID, UserStatus | Exception]:
+        if not user_ids:
+            return {}
+        ids = [UserID(user_id) for user_id in user_ids]
+        result = await self._user.bulk_get.run(BulkGetUsersAction(ids=ids))
+        return {
+            user_id: (
+                UserStatus(item.value.status)
+                if item.value is not None
+                else item.error or UserNotFound(f"User with UUID {user_id} not found.")
+            )
+            for user_id, item in zip(ids, result.items, strict=True)
+        }
 
     async def bulk_purge_users(self, action: BulkPurgeUserAction) -> BulkPurgeUsersPayload:
         """Bulk-purge users permanently."""
-        result = await self._processors.user.bulk_purge_users.wait_for_complete(action)
+        result = await self._user.bulk_purge_users.run(action)
         failed = [
             BulkPurgeUserV2Error(
                 user_id=error.user_id,
@@ -646,55 +862,49 @@ class UserAdapter(BaseAdapter):
             for error in result.data.failures
         ]
         return BulkPurgeUsersPayload(
+            successes=list(result.data.purged_user_ids),
             purged_count=result.data.purged_count(),
             failed=failed,
         )
 
-    async def modify_user(self, action: ModifyUserAction) -> UpdateMyAllowedClientIPPayload:
+    async def update_user(self, action: UpdateUserAction) -> UpdateMyAllowedClientIPPayload:
         """Modify a user. Caller is responsible for building the action."""
-        await self._processors.user.modify_user.wait_for_complete(action)
+        await self._user.update_user.run(action)
         return UpdateMyAllowedClientIPPayload(success=True)
 
     # ------------------------------------------------------------------ keypair operations
 
     async def issue_my_keypair(self, user_id: UUID) -> IssueMyKeypairPayload:
         """Issue a new keypair for the current user."""
-        result = await self._processors.user.issue_my_keypair.wait_for_complete(
-            IssueMyKeypairAction(user_uuid=user_id)
+        result = await self._user.issue_my_keypair.run(
+            IssueMyKeypairAction(user_id=UserID(user_id))
         )
         return IssueMyKeypairPayload(
             keypair=self._keypair_data_to_node(result.generated_data.keypair),
-            secret_key=str(result.generated_data.keypair.secret_key),
+            secret_key=await self._secret_key_of(result.generated_data.keypair),
         )
 
-    async def revoke_my_keypair(self, user_id: UUID, access_key: str) -> RevokeMyKeypairPayload:
+    async def revoke_my_keypair(self, access_key: str) -> RevokeMyKeypairPayload:
         """Revoke a keypair owned by the current user."""
-        result = await self._processors.user.revoke_my_keypair.wait_for_complete(
-            RevokeMyKeypairAction(user_uuid=user_id, access_key=access_key)
-        )
-        return RevokeMyKeypairPayload(success=result.success)
+        await self._purge_keypair(access_key)
+        return RevokeMyKeypairPayload(success=True)
 
-    async def update_my_keypair(
-        self, user_id: UUID, access_key: str, is_active: bool
-    ) -> UpdateMyKeypairPayload:
+    async def update_my_keypair(self, access_key: str, is_active: bool) -> UpdateMyKeypairPayload:
         """Update a keypair owned by the current user."""
-        result = await self._processors.user.update_my_keypair.wait_for_complete(
-            UpdateMyKeypairAction(
-                user_uuid=user_id,
-                updater=Updater(
-                    spec=KeyPairUpdaterSpec(is_active=OptionalState.update(is_active)),
-                    pk_value=access_key,
-                ),
+        result = await self._user.update_keypair.run(
+            UpdateKeypairAction(
+                keypair_id=await self._resolve_keypair(access_key),
+                is_active=OptionalState.update(is_active),
             )
         )
         return UpdateMyKeypairPayload(keypair=self._keypair_data_to_node(result.keypair))
 
-    async def switch_my_main_access_key(
-        self, user_id: UUID, access_key: str
+    async def switch_default_access_key(
+        self, user_id: UserID, access_key: AccessKey
     ) -> SwitchMyMainAccessKeyPayload:
-        """Switch the main access key for the current user."""
-        result = await self._processors.user.switch_my_main_access_key.wait_for_complete(
-            SwitchMyMainAccessKeyAction(user_uuid=user_id, access_key=access_key)
+        """Move the ``is_default`` marker among the user's keypairs onto ``access_key``."""
+        result = await self._user.switch_default_access_key.run(
+            SwitchDefaultAccessKeyAction(user_id=user_id, access_key=access_key)
         )
         return SwitchMyMainAccessKeyPayload(success=result.success)
 
@@ -711,10 +921,10 @@ class UserAdapter(BaseAdapter):
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
-        scope = UserKeypairSearchScope(user_uuid=me.user_id)
         conditions = self._convert_keypair_filter(input.filter) if input.filter else []
         orders = self._convert_keypair_orders(input.order) if input.order else []
-        querier = self._build_querier(
+        searcher = self._build_searcher(
+            KeyPairSearcher,
             conditions=conditions,
             orders=orders,
             pagination_spec=_KEYPAIR_PAGINATION_SPEC,
@@ -725,52 +935,14 @@ class UserAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.user.search_my_keypairs.wait_for_complete(
-            SearchMyKeypairsAction(scope=scope, querier=querier)
+        action_result = await self._user.search_my_keypairs.run(
+            SearchMyKeypairsAction(user_id=UserID(me.user_id), searcher=searcher)
         )
         return SearchResult(
-            items=[self._keypair_data_to_node(item) for item in action_result.result.items],
-            total_count=action_result.result.total_count,
-            has_next_page=action_result.result.has_next_page,
-            has_previous_page=action_result.result.has_previous_page,
-        )
-
-    async def gql_search_keypairs_by_resource_policy(
-        self,
-        scope: KeypairResourcePolicyKeypairSearchScope,
-        input: SearchKeypairsRequest,
-    ) -> SearchResult[KeypairNode]:
-        """Search keypairs assigned to a keypair resource policy (GQL connection).
-
-        Used by the ``keypairs`` connection on the keypair resource policy node.
-        The connection field gates access with ``check_admin_only()`` because the
-        keypair resource policy entity itself is not RBAC-protected; this method
-        runs the RBAC-scoped action so superadmins receive all keypairs governed
-        by the policy.
-        """
-        conditions = self._convert_keypair_filter(input.filter) if input.filter else []
-        orders = self._convert_keypair_orders(input.order) if input.order else []
-        querier = self._build_querier(
-            conditions=conditions,
-            orders=orders,
-            pagination_spec=_KEYPAIR_PAGINATION_SPEC,
-            first=input.first,
-            after=input.after,
-            last=input.last,
-            before=input.before,
-            limit=input.limit,
-            offset=input.offset,
-        )
-        action_result = (
-            await self._processors.user.search_keypairs_by_resource_policy.wait_for_complete(
-                SearchKeypairsByResourcePolicyAction(scope=scope, querier=querier)
-            )
-        )
-        return SearchResult(
-            items=[self._keypair_data_to_node(item) for item in action_result.result.items],
-            total_count=action_result.result.total_count,
-            has_next_page=action_result.result.has_next_page,
-            has_previous_page=action_result.result.has_previous_page,
+            items=[self._keypair_data_to_node(item) for item in action_result.items],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
         )
 
     @staticmethod
@@ -778,9 +950,11 @@ class UserAdapter(BaseAdapter):
         """Convert KeyPairData to KeypairNode DTO."""
         return KeypairNode(
             id=str(data.access_key),
+            field_id=data.id,
             access_key=str(data.access_key),
             is_active=data.is_active,
             is_admin=data.is_admin,
+            is_default=data.is_default,
             created_at=data.created_at,
             modified_at=data.modified_at,
             last_used=data.last_used,
@@ -791,12 +965,17 @@ class UserAdapter(BaseAdapter):
             user_id=data.user_id,
         )
 
-    @staticmethod
-    def _keypair_data_to_created_payload(data: KeyPairData) -> CreateKeypairPayload:
+    async def _secret_key_of(self, data: KeyPairData) -> SecretKey:
+        """The keypair's secret key as plaintext, whatever form it is stored in."""
+        return SecretKey(
+            await self._key_provider_pool.decrypt(data.secret_key, KEYPAIR_SECRET_KEY_CONTEXT)
+        )
+
+    async def _keypair_data_to_created_payload(self, data: KeyPairData) -> CreateKeypairPayload:
         """Convert KeyPairData to a CreateKeypairPayload, including the one-time secret key."""
         return CreateKeypairPayload(
             keypair=UserAdapter._keypair_data_to_node(data),
-            secret_key=data.secret_key,
+            secret_key=await self._secret_key_of(data),
         )
 
     # ------------------------------------------------------------------ admin keypair operations
@@ -811,57 +990,58 @@ class UserAdapter(BaseAdapter):
             resource_policy=input.resource_policy,
             rate_limit=input.rate_limit,
         )
-        result = await self._processors.user.admin_create_keypair.wait_for_complete(
-            AdminCreateKeypairAction(user_id=input.user_id, creator=creator)
+        result = await self._user.admin_create_keypair.run(
+            AdminCreateKeypairAction(user_id=UserID(input.user_id), creator=creator)
         )
         return AdminCreateKeypairPayload(
             keypair=self._keypair_data_to_node(result.generated_data.keypair),
-            secret_key=str(result.generated_data.keypair.secret_key),
+            secret_key=await self._secret_key_of(result.generated_data.keypair),
         )
+
+    async def _resolve_keypair_owner(self, access_key: str) -> UserID:
+        result = await self._user.lookup_keypair_owner.run(
+            LookupKeypairOwnerByAccessKeyAction(access_key=AccessKey(access_key))
+        )
+        return UserID(result.entity_id())
+
+    async def _resolve_keypair(self, access_key: str) -> KeyPairID:
+        """The id of the keypair an access key names, which every operation on that row
+        is built from."""
+        result = await self._user.lookup_keypair.run(
+            LookupKeypairByAccessKeyAction(access_key=AccessKey(access_key))
+        )
+        return KeyPairID(result.field_id)
+
+    async def _purge_keypair(self, access_key: str) -> KeyPairData:
+        result = await self._user.purge_keypair.run(
+            PurgeKeypairAction(keypair_id=await self._resolve_keypair(access_key))
+        )
+        return result.keypair
 
     async def admin_update_keypair(
         self, input: AdminUpdateKeypairInput
     ) -> AdminUpdateKeypairPayload:
         """Admin updates any keypair."""
-        updater_spec = KeyPairUpdaterSpec(
-            is_active=(
-                OptionalState.update(input.is_active)
-                if input.is_active is not None
-                else OptionalState.nop()
-            ),
-            is_admin=(
-                OptionalState.update(input.is_admin)
-                if input.is_admin is not None
-                else OptionalState.nop()
-            ),
-            resource_policy=(
-                OptionalState.update(input.resource_policy)
-                if input.resource_policy is not None
-                else OptionalState.nop()
-            ),
-            rate_limit=(
-                OptionalState.update(input.rate_limit)
-                if input.rate_limit is not None
-                else OptionalState.nop()
-            ),
-        )
-        updater: Updater[KeyPairRow] = Updater(spec=updater_spec, pk_value=input.access_key)
-        result = await self._processors.user.admin_update_keypair.wait_for_complete(
-            AdminUpdateKeypairAction(updater=updater)
+        result = await self._user.update_keypair.run(
+            UpdateKeypairAction(
+                keypair_id=await self._resolve_keypair(input.access_key),
+                is_active=OptionalState.from_nullable(input.is_active),
+                is_admin=OptionalState.from_nullable(input.is_admin),
+                resource_policy=OptionalState.from_nullable(input.resource_policy),
+                rate_limit=OptionalState.from_nullable(input.rate_limit),
+            )
         )
         return AdminUpdateKeypairPayload(keypair=self._keypair_data_to_node(result.keypair))
 
     async def admin_delete_keypair(self, access_key: str) -> AdminDeleteKeypairPayload:
         """Admin deletes any keypair."""
-        result = await self._processors.user.admin_delete_keypair.wait_for_complete(
-            AdminDeleteKeypairAction(access_key=access_key)
-        )
-        return AdminDeleteKeypairPayload(access_key=result.access_key)
+        keypair = await self._purge_keypair(access_key)
+        return AdminDeleteKeypairPayload(access_key=str(keypair.access_key), field_id=keypair.id)
 
     async def admin_get_keypair(self, access_key: str) -> KeypairNode:
         """Admin retrieves a single keypair by access key."""
-        result = await self._processors.user.admin_get_keypair.wait_for_complete(
-            AdminGetKeypairAction(access_key=access_key)
+        result = await self._user.get_keypair.run(
+            GetKeypairAction(keypair_id=await self._resolve_keypair(access_key))
         )
         return self._keypair_data_to_node(result.keypair)
 
@@ -869,8 +1049,9 @@ class UserAdapter(BaseAdapter):
         self, input: AdminRegisterSSHKeypairInput
     ) -> AdminRegisterSSHKeypairPayload:
         """Admin registers (overwrites) a user's SSH keypair."""
-        result = await self._processors.user.admin_register_ssh_keypair.wait_for_complete(
+        result = await self._user.admin_register_ssh_keypair.run(
             AdminRegisterSSHKeypairAction(
+                user_id=await self._resolve_keypair_owner(input.access_key),
                 access_key=input.access_key,
                 ssh_public_key=input.ssh_public_key,
                 ssh_private_key=input.ssh_private_key,
@@ -880,15 +1061,19 @@ class UserAdapter(BaseAdapter):
 
     async def admin_delete_ssh_keypair(self, access_key: str) -> AdminDeleteSSHKeypairPayload:
         """Admin clears a user's SSH keypair."""
-        result = await self._processors.user.admin_delete_ssh_keypair.wait_for_complete(
-            AdminDeleteSSHKeypairAction(access_key=access_key)
+        result = await self._user.admin_delete_ssh_keypair.run(
+            AdminDeleteSSHKeypairAction(
+                user_id=await self._resolve_keypair_owner(access_key), access_key=access_key
+            )
         )
         return AdminDeleteSSHKeypairPayload(access_key=result.access_key)
 
     async def admin_get_ssh_keypair(self, access_key: str) -> AdminGetSSHKeypairPayload:
         """Admin retrieves a user's SSH public key (never the private key)."""
-        result = await self._processors.user.admin_get_ssh_keypair.wait_for_complete(
-            AdminGetSSHKeypairAction(access_key=access_key)
+        result = await self._user.admin_get_ssh_keypair.run(
+            AdminGetSSHKeypairAction(
+                user_id=await self._resolve_keypair_owner(access_key), access_key=access_key
+            )
         )
         return AdminGetSSHKeypairPayload(
             keypair=SSHKeypairNode(
@@ -915,13 +1100,22 @@ class UserAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.user.admin_search_keypairs.wait_for_complete(
-            AdminSearchKeypairsAction(querier=querier)
+        action_result = await self._user.admin_search_keypairs.run(
+            AdminSearchKeypairsAction(
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=KeyPairSearcher(
+                        pagination=querier.pagination,
+                        conditions=querier.conditions,
+                        orders=querier.orders,
+                    ),
+                )
+            )
         )
         return AdminSearchKeypairsPayload(
-            items=[self._keypair_data_to_node(item) for item in action_result.result.items],
+            items=[self._keypair_data_to_node(item) for item in action_result.items],
             pagination=PaginationInfo(
-                total=action_result.result.total_count,
+                total=action_result.total_count,
                 offset=input.offset or 0,
                 limit=input.limit,
             ),
@@ -930,9 +1124,21 @@ class UserAdapter(BaseAdapter):
     async def gql_admin_search_keypairs(
         self,
         input: AdminSearchKeypairsInput,
+        *,
+        resource_policy_name: str | None = None,
     ) -> SearchResult[KeypairNode]:
-        """Admin search all keypairs (GQL, returns SearchResult for connection)."""
+        """Admin search across every keypair (GQL, returns SearchResult for connection).
+
+        ``resource_policy_name`` narrows the same admin read to one policy for the
+        resource policy node's ``keypairs`` connection. A filter, not a second path.
+        """
         conditions = self._convert_keypair_filter(input.filter) if input.filter else []
+        if resource_policy_name is not None:
+            conditions.append(
+                KeyPairSearchableFields.own.resource_policy_name.filter.equals(
+                    StringMatchSpec(resource_policy_name, case_insensitive=False, negated=False)
+                )
+            )
         orders = self._convert_keypair_orders(input.order) if input.order else []
         querier = self._build_querier(
             conditions=conditions,
@@ -945,614 +1151,252 @@ class UserAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.user.admin_search_keypairs.wait_for_complete(
-            AdminSearchKeypairsAction(querier=querier)
+        action_result = await self._user.admin_search_keypairs.run(
+            AdminSearchKeypairsAction(
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=KeyPairSearcher(
+                        pagination=querier.pagination,
+                        conditions=querier.conditions,
+                        orders=querier.orders,
+                    ),
+                )
+            )
         )
         return SearchResult(
-            items=[self._keypair_data_to_node(item) for item in action_result.result.items],
-            total_count=action_result.result.total_count,
-            has_next_page=action_result.result.has_next_page,
-            has_previous_page=action_result.result.has_previous_page,
+            items=[self._keypair_data_to_node(item) for item in action_result.items],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
         )
 
-    def _convert_keypair_filter(self, filter_req: KeypairFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
+    def _convert_keypair_filter(self, f: KeypairFilter) -> list[QueryCondition]:
+        """Conditions matching a single keypair row.
 
-        if filter_req.is_active is not None:
-            conditions.append(KeypairConditions.by_is_active(filter_req.is_active))
-
-        if filter_req.is_admin is not None:
-            conditions.append(KeypairConditions.by_is_admin(filter_req.is_admin))
-
-        if filter_req.access_key is not None:
-            condition = self.convert_string_filter(
-                filter_req.access_key,
-                contains_factory=KeypairConditions.by_access_key_contains,
-                equals_factory=KeypairConditions.by_access_key_equals,
-                starts_with_factory=KeypairConditions.by_access_key_starts_with,
-                ends_with_factory=KeypairConditions.by_access_key_ends_with,
-                in_factory=KeypairConditions.by_access_key_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.resource_policy is not None:
-            condition = self.convert_string_filter(
-                filter_req.resource_policy,
-                contains_factory=KeypairConditions.by_resource_policy_contains,
-                equals_factory=KeypairConditions.by_resource_policy_equals,
-                starts_with_factory=KeypairConditions.by_resource_policy_starts_with,
-                ends_with_factory=KeypairConditions.by_resource_policy_ends_with,
-                in_factory=KeypairConditions.by_resource_policy_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.user_id is not None:
-            condition = self.convert_uuid_filter(
-                filter_req.user_id,
-                equals_factory=KeypairConditions.by_user_id_equals,
-                in_factory=KeypairConditions.by_user_id_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.created_at is not None:
-            condition = filter_req.created_at.build_query_condition(
-                before_factory=KeypairConditions.by_created_at_before,
-                after_factory=KeypairConditions.by_created_at_after,
-                equals_factory=KeypairConditions.by_created_at_equals,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.last_used is not None:
-            condition = filter_req.last_used.build_query_condition(
-                before_factory=KeypairConditions.by_last_used_before,
-                after_factory=KeypairConditions.by_last_used_after,
-                equals_factory=KeypairConditions.by_last_used_equals,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.AND:
-            for sub_filter in filter_req.AND:
-                conditions.extend(self._convert_keypair_filter(sub_filter))
-
-        if filter_req.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in filter_req.OR:
-                or_sub_conditions.extend(self._convert_keypair_filter(sub_filter))
-            if or_sub_conditions:
-                conditions.append(combine_conditions_or(or_sub_conditions))
-
-        if filter_req.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in filter_req.NOT:
-                not_sub_conditions.extend(self._convert_keypair_filter(sub_filter))
-            if not_sub_conditions:
-                conditions.append(negate_conditions(not_sub_conditions))
-
+        Used both by the keypair searches and, through ``keypairs``, to narrow a user
+        search; one instance narrows one row either way.
+        """
+        fields = KeyPairSearchableFields.own
+        conditions = [
+            *self.apply_uuid_filter(f.field_id, fields.field_id.filter),
+            *self.apply_bool_filter(f.is_active, fields.is_active.filter),
+            *self.apply_bool_filter(f.is_admin, fields.is_admin.filter),
+            *self.apply_bool_filter(f.is_default, fields.is_default.filter),
+            *self.apply_string_filter(f.access_key, fields.access_key.filter),
+            *self.apply_string_filter(f.resource_policy, fields.resource_policy_name.filter),
+            *self.apply_uuid_filter(f.user_id, fields.user_id.filter),
+            *self.apply_datetime_filter(f.created_at, fields.created_at.filter),
+            *self.apply_datetime_filter(f.last_used, fields.last_used.filter),
+        ]
+        if f.AND:
+            for sub in f.AND:
+                conditions.extend(self._convert_keypair_filter(sub))
+        if f.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub in f.OR:
+                sub_conditions = self._convert_keypair_filter(sub)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+        if f.NOT:
+            for sub in f.NOT:
+                sub_conditions = self._convert_keypair_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     def _convert_keypair_orders(self, orders: list[KeypairOrderBy]) -> list[QueryOrder]:
-        return [self._convert_keypair_order(o) for o in orders]
+        return [self._convert_keypair_order(order) for order in orders]
 
-    @staticmethod
-    def _convert_keypair_order(order: KeypairOrderBy) -> QueryOrder:
+    def _convert_keypair_order(self, order: KeypairOrderBy) -> QueryOrder:
+        fields = KeyPairSearchableFields.own
         ascending = order.direction == OrderDirection.ASC
         match order.field:
             case KeypairOrderField.CREATED_AT:
-                return KeypairOrders.created_at(ascending=ascending)
+                return fields.created_at.order.apply(ascending)
             case KeypairOrderField.LAST_USED:
-                return KeypairOrders.last_used(ascending=ascending)
+                return fields.last_used.order.apply(ascending)
             case KeypairOrderField.ACCESS_KEY:
-                return KeypairOrders.access_key(ascending=ascending)
+                return fields.access_key.order.apply(ascending)
             case KeypairOrderField.IS_ACTIVE:
-                return KeypairOrders.is_active(ascending=ascending)
+                return fields.is_active.order.apply(ascending)
+            case KeypairOrderField.IS_DEFAULT:
+                return fields.is_default.order.apply(ascending)
             case KeypairOrderField.RESOURCE_POLICY:
-                return KeypairOrders.resource_policy(ascending=ascending)
+                return fields.resource_policy_name.order.apply(ascending)
+            case _:
+                assert_never(order.field)
 
     # ------------------------------------------------------------------ GQL filter/order helpers
 
-    def _convert_gql_filter(self, filter_req: UserFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-
-        if filter_req.uuid is not None:
-            condition = self.convert_uuid_filter(
-                filter_req.uuid,
-                equals_factory=UserConditions.by_uuid_equals,
-                in_factory=UserConditions.by_uuid_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.username is not None:
-            condition = self.convert_string_filter(
-                filter_req.username,
-                contains_factory=UserConditions.by_username_contains,
-                equals_factory=UserConditions.by_username_equals,
-                starts_with_factory=UserConditions.by_username_starts_with,
-                ends_with_factory=UserConditions.by_username_ends_with,
-                in_factory=UserConditions.by_username_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.email is not None:
-            condition = self.convert_string_filter(
-                filter_req.email,
-                contains_factory=UserConditions.by_email_contains,
-                equals_factory=UserConditions.by_email_equals,
-                starts_with_factory=UserConditions.by_email_starts_with,
-                ends_with_factory=UserConditions.by_email_ends_with,
-                in_factory=UserConditions.by_email_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.status is not None:
-            conditions.extend(self._convert_status_filter(filter_req.status))
-
-        if filter_req.domain_name is not None:
-            condition = self.convert_string_filter(
-                filter_req.domain_name,
-                contains_factory=UserConditions.by_domain_name_contains,
-                equals_factory=UserConditions.by_domain_name_equals,
-                starts_with_factory=UserConditions.by_domain_name_starts_with,
-                ends_with_factory=UserConditions.by_domain_name_ends_with,
-                in_factory=UserConditions.by_domain_name_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.integration_name is not None:
-            condition = self.convert_string_filter(
-                filter_req.integration_name,
-                contains_factory=UserConditions.by_integration_name_contains,
-                equals_factory=UserConditions.by_integration_name_equals,
-                starts_with_factory=UserConditions.by_integration_name_starts_with,
-                ends_with_factory=UserConditions.by_integration_name_ends_with,
-                in_factory=UserConditions.by_integration_name_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.full_name is not None:
-            condition = self.convert_string_filter(
-                filter_req.full_name,
-                contains_factory=UserConditions.by_full_name_contains,
-                equals_factory=UserConditions.by_full_name_equals,
-                starts_with_factory=UserConditions.by_full_name_starts_with,
-                ends_with_factory=UserConditions.by_full_name_ends_with,
-                in_factory=UserConditions.by_full_name_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.description is not None:
-            condition = self.convert_string_filter(
-                filter_req.description,
-                contains_factory=UserConditions.by_description_contains,
-                equals_factory=UserConditions.by_description_equals,
-                starts_with_factory=UserConditions.by_description_starts_with,
-                ends_with_factory=UserConditions.by_description_ends_with,
-                in_factory=UserConditions.by_description_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.status_info is not None:
-            condition = self.convert_string_filter(
-                filter_req.status_info,
-                contains_factory=UserConditions.by_status_info_contains,
-                equals_factory=UserConditions.by_status_info_equals,
-                starts_with_factory=UserConditions.by_status_info_starts_with,
-                ends_with_factory=UserConditions.by_status_info_ends_with,
-                in_factory=UserConditions.by_status_info_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.resource_policy is not None:
-            condition = self.convert_string_filter(
-                filter_req.resource_policy,
-                contains_factory=UserConditions.by_resource_policy_contains,
-                equals_factory=UserConditions.by_resource_policy_equals,
-                starts_with_factory=UserConditions.by_resource_policy_starts_with,
-                ends_with_factory=UserConditions.by_resource_policy_ends_with,
-                in_factory=UserConditions.by_resource_policy_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.role is not None:
-            conditions.extend(self._convert_role_filter(filter_req.role))
-
-        if filter_req.need_password_change is not None:
-            conditions.append(
-                UserConditions.by_need_password_change(filter_req.need_password_change)
-            )
-
-        if filter_req.totp_activated is not None:
-            conditions.append(UserConditions.by_totp_activated(filter_req.totp_activated))
-
-        if filter_req.sudo_session_enabled is not None:
-            conditions.append(
-                UserConditions.by_sudo_session_enabled(filter_req.sudo_session_enabled)
-            )
-
-        if filter_req.container_uid is not None:
-            condition = self.convert_int_filter(
-                filter_req.container_uid,
-                UserConditions.by_container_uid,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.container_main_gid is not None:
-            condition = self.convert_int_filter(
-                filter_req.container_main_gid,
-                UserConditions.by_container_main_gid,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.container_gids is not None:
-            condition = self.convert_array_filter(
-                filter_req.container_gids,
-                contains_factory=UserConditions.by_container_gids_contains,
-                contains_any_factory=UserConditions.by_container_gids_any,
-                contains_all_factory=UserConditions.by_container_gids_all,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.created_at is not None:
-            condition = filter_req.created_at.build_query_condition(
-                before_factory=UserConditions.by_created_at_before,
-                after_factory=UserConditions.by_created_at_after,
-                equals_factory=UserConditions.by_created_at_equals,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.domain is not None:
-            conditions.extend(self._convert_domain_nested_filter(filter_req.domain))
-
-        if filter_req.project is not None:
-            conditions.extend(self._convert_project_nested_filter(filter_req.project))
-
-        if filter_req.AND:
-            for sub_filter in filter_req.AND:
-                conditions.extend(self._convert_gql_filter(sub_filter))
-
-        if filter_req.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in filter_req.OR:
-                or_sub_conditions.extend(self._convert_gql_filter(sub_filter))
-            if or_sub_conditions:
-                conditions.append(combine_conditions_or(or_sub_conditions))
-
-        if filter_req.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in filter_req.NOT:
-                not_sub_conditions.extend(self._convert_gql_filter(sub_filter))
-            if not_sub_conditions:
-                conditions.append(negate_conditions(not_sub_conditions))
-
+    def _convert_user_filter(self, f: UserFilter) -> list[QueryCondition]:
+        fields = UserSearchableFields.own
+        conditions = [
+            *self.apply_uuid_filter(f.uuid, fields.uuid.filter),
+            *self.apply_uuid_filter(f.entity_id, fields.id.filter),
+            *self.apply_string_filter(f.username, fields.username.filter),
+            *self.apply_string_filter(f.email, fields.email.filter),
+            *self.apply_string_filter(f.full_name, fields.full_name.filter),
+            *self.apply_string_filter(f.description, fields.description.filter),
+            *self.apply_enum_filter(f.status, fields.status.filter),
+            *self.apply_string_filter(f.status_info, fields.status_info.filter),
+            *self.apply_string_filter(f.domain_name, fields.domain_name.filter),
+            *self.apply_uuid_filter(f.domain_id, fields.domain_id.filter),
+            *self.apply_string_filter(f.integration_name, fields.integration_name.filter),
+            *self.apply_string_filter(f.resource_policy, fields.resource_policy.filter),
+            *self.apply_enum_filter(f.role, fields.role.filter),
+            *self.apply_bool_filter(f.need_password_change, fields.need_password_change.filter),
+            *self.apply_bool_filter(f.totp_activated, fields.totp_activated.filter),
+            *self.apply_bool_filter(f.sudo_session_enabled, fields.sudo_session_enabled.filter),
+            *self.apply_int_filter(f.container_uid, fields.container_uid.filter),
+            *self.apply_int_filter(f.container_main_gid, fields.container_main_gid.filter),
+            *self.apply_array_filter(f.container_gids, fields.container_gids.filter),
+            *self.apply_datetime_filter(f.created_at, fields.created_at.filter),
+            *self.apply_datetime_filter(f.modified_at, fields.modified_at.filter),
+            *self.apply_to_many_filter(
+                f.keypairs,
+                UserSearchableFields.nested.keypairs.correlation,
+                self._convert_keypair_filter,
+            ),
+            *self.apply_to_many_filter(
+                f.labels,
+                UserSearchableFields.nested.labels.correlation,
+                self._convert_entity_label_filter,
+            ),
+            *self.apply_nullable_datetime_filter(
+                f.totp_activated_at, fields.totp_activated_at.filter
+            ),
+            *self._convert_domain_filter(f.domain),
+            *self._convert_project_filter(f.project),
+        ]
+        if f.AND:
+            for sub in f.AND:
+                conditions.extend(self._convert_user_filter(sub))
+        if f.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub in f.OR:
+                sub_conditions = self._convert_user_filter(sub)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+        if f.NOT:
+            for sub in f.NOT:
+                sub_conditions = self._convert_user_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
-    @staticmethod
-    def _convert_status_filter(sf: UserStatusFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if sf.equals is not None:
-            conditions.append(UserConditions.by_status_equals(DataUserStatus(sf.equals.value)))
-        if sf.in_ is not None:
-            conditions.append(
-                UserConditions.by_status_in([DataUserStatus(s.value) for s in sf.in_])
-            )
-        if sf.not_equals is not None:
-            conditions.append(
-                negate_conditions([
-                    UserConditions.by_status_equals(DataUserStatus(sf.not_equals.value))
-                ])
-            )
-        if sf.not_in is not None:
-            conditions.append(
-                negate_conditions([
-                    UserConditions.by_status_in([DataUserStatus(s.value) for s in sf.not_in])
-                ])
-            )
-        return conditions
-
-    @staticmethod
-    def _convert_role_filter(rf: UserRoleFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if rf.equals is not None:
-            conditions.append(UserConditions.by_role_equals(DataUserRole(rf.equals.value)))
-        if rf.in_ is not None:
-            conditions.append(UserConditions.by_role_in([DataUserRole(r.value) for r in rf.in_]))
-        if rf.not_equals is not None:
-            conditions.append(
-                negate_conditions([
-                    UserConditions.by_role_equals(DataUserRole(rf.not_equals.value))
-                ])
-            )
-        if rf.not_in is not None and len(rf.not_in) > 0:
-            conditions.append(
-                negate_conditions([
-                    UserConditions.by_role_in([DataUserRole(r.value) for r in rf.not_in])
-                ])
-            )
-        return conditions
-
-    def _convert_domain_nested_filter(
-        self, domain_filter: UserDomainFilter
-    ) -> list[QueryCondition]:
-        raw_conditions: list[QueryCondition] = []
-        if domain_filter.name is not None:
-            condition = self.convert_string_filter(
-                domain_filter.name,
-                contains_factory=DomainConditions.by_name_contains,
-                equals_factory=DomainConditions.by_name_equals,
-                starts_with_factory=DomainConditions.by_name_starts_with,
-                ends_with_factory=DomainConditions.by_name_ends_with,
-                in_factory=DomainConditions.by_name_in,
-            )
-            if condition is not None:
-                raw_conditions.append(condition)
-        if domain_filter.is_active is not None:
-            raw_conditions.append(DomainConditions.by_is_active(domain_filter.is_active))
-        if not raw_conditions:
+    def _convert_domain_filter(self, f: UserDomainFilter | None) -> list[QueryCondition]:
+        """Deprecated. Every condition lands in one EXISTS over the user's domain."""
+        if f is None:
             return []
-        return [UserConditions.exists_domain_combined(raw_conditions)]
-
-    def _convert_project_nested_filter(
-        self, project_filter: UserProjectFilter
-    ) -> list[QueryCondition]:
-        raw_conditions: list[QueryCondition] = []
-        if project_filter.name is not None:
-            condition = self.convert_string_filter(
-                project_filter.name,
-                contains_factory=GroupConditions.by_name_contains,
-                equals_factory=GroupConditions.by_name_equals,
-                starts_with_factory=GroupConditions.by_name_starts_with,
-                ends_with_factory=GroupConditions.by_name_ends_with,
-                in_factory=GroupConditions.by_name_in,
-            )
-            if condition is not None:
-                raw_conditions.append(condition)
-        if project_filter.is_active is not None:
-            raw_conditions.append(GroupConditions.by_is_active(project_filter.is_active))
-        if not raw_conditions:
+        fields = DomainSearchableFields.own
+        conditions = [
+            *self.apply_string_filter(f.name, fields.name.filter),
+            *self.apply_bool_filter(f.is_active, fields.is_active.filter),
+        ]
+        if not conditions:
             return []
-        return [UserConditions.exists_project_combined(raw_conditions)]
+        return [DeprecatedUserConditions.exists_domain_combined(conditions)]
 
-    def _convert_gql_orders(self, orders: list[UserOrder]) -> list[QueryOrder]:
-        return [self._convert_gql_order(o) for o in orders]
+    def _convert_project_filter(self, f: UserProjectFilter | None) -> list[QueryCondition]:
+        """Deprecated. Every condition lands in one EXISTS over one of the user's projects."""
+        if f is None:
+            return []
+        fields = ProjectSearchableFields.own
+        conditions = [
+            *self.apply_string_filter(f.name, fields.name.filter),
+            *self.apply_bool_filter(f.is_active, fields.is_active.filter),
+        ]
+        if not conditions:
+            return []
+        return [DeprecatedUserConditions.exists_project_combined(conditions)]
 
-    @staticmethod
-    def _convert_gql_order(order: UserOrder) -> QueryOrder:
+    def _convert_user_orders(self, orders: list[UserOrder]) -> list[QueryOrder]:
+        return [self._convert_user_order(order) for order in orders]
+
+    def _convert_user_order(self, order: UserOrder) -> QueryOrder:
+        fields = UserSearchableFields.own
         ascending = order.direction == OrderDirection.ASC
         match order.field:
+            case UserOrderField.ENTITY_ID:
+                return fields.id.order.apply(ascending)
             case UserOrderField.CREATED_AT:
-                return UserOrders.created_at(ascending=ascending)
+                return fields.created_at.order.apply(ascending)
             case UserOrderField.MODIFIED_AT:
-                return UserOrders.modified_at(ascending=ascending)
+                return fields.modified_at.order.apply(ascending)
             case UserOrderField.USERNAME:
-                return UserOrders.username(ascending=ascending)
+                return fields.username.order.apply(ascending)
             case UserOrderField.EMAIL:
-                return UserOrders.email(ascending=ascending)
+                return fields.email.order.apply(ascending)
+            case UserOrderField.FULL_NAME:
+                return fields.full_name.order.apply(ascending)
+            case UserOrderField.DESCRIPTION:
+                return fields.description.order.apply(ascending)
             case UserOrderField.STATUS:
-                return UserOrders.status(ascending=ascending)
+                return fields.status.order.apply(ascending)
+            case UserOrderField.STATUS_INFO:
+                return fields.status_info.order.apply(ascending)
             case UserOrderField.ROLE:
-                return UserOrders.role(ascending=ascending)
+                return fields.role.order.apply(ascending)
             case UserOrderField.DOMAIN_NAME:
-                return UserOrders.domain_name(ascending=ascending)
+                return fields.domain_name.order.apply(ascending)
+            case UserOrderField.DOMAIN_ID:
+                return fields.domain_id.order.apply(ascending)
+            case UserOrderField.INTEGRATION_NAME:
+                return fields.integration_name.order.apply(ascending)
+            case UserOrderField.RESOURCE_POLICY:
+                return fields.resource_policy.order.apply(ascending)
+            case UserOrderField.NEED_PASSWORD_CHANGE:
+                return fields.need_password_change.order.apply(ascending)
+            case UserOrderField.TOTP_ACTIVATED:
+                return fields.totp_activated.order.apply(ascending)
+            case UserOrderField.TOTP_ACTIVATED_AT:
+                return fields.totp_activated_at.order.apply(ascending)
+            case UserOrderField.SUDO_SESSION_ENABLED:
+                return fields.sudo_session_enabled.order.apply(ascending)
+            case UserOrderField.CONTAINER_UID:
+                return fields.container_uid.order.apply(ascending)
+            case UserOrderField.CONTAINER_MAIN_GID:
+                return fields.container_main_gid.order.apply(ascending)
             case UserOrderField.PROJECT_NAME:
-                return UserOrders.by_project_name(ascending=ascending)
+                return DeprecatedUserOrders.by_project_name(ascending=ascending)
+            case _:
+                assert_never(order.field)
 
-    # ------------------------------------------------------------------ helpers
-
-    def _build_search_querier(self, input: SearchUsersRequest) -> BatchQuerier:
-        """Build a BatchQuerier from the search request DTO."""
-        conditions = self._convert_filter(input.filter) if input.filter else []
-        orders = self._convert_orders(input.order) if input.order else []
+    def _build_search_searcher(self, input: SearchUsersRequest) -> UserSearcher:
+        """Build a user searcher from the search request DTO."""
+        conditions = self._convert_user_filter(input.filter) if input.filter else []
+        orders = self._convert_user_orders(input.order) if input.order else []
         pagination = OffsetPagination(limit=input.limit, offset=input.offset)
-        return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
+        return UserSearcher(conditions=conditions, orders=orders, pagination=pagination)
 
-    def _convert_filter(self, filter_req: UserFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
+    async def _default_access_keys(self, users: Sequence[UserData]) -> Mapping[UserID, AccessKey]:
+        """The key each user authorizes with, read for every one of them in one go."""
+        if not users:
+            return {}
+        result = await self._user.get_default_keypairs.run(
+            GetDefaultKeypairsAction(user_ids=[UserID(user.id) for user in users])
+        )
+        return {
+            owner: AccessKey(keypair.access_key) for owner, keypair in result.designated.items()
+        }
 
-        if filter_req.uuid is not None:
-            condition = self.convert_uuid_filter(
-                filter_req.uuid,
-                equals_factory=UserConditions.by_uuid_equals,
-                in_factory=UserConditions.by_uuid_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
+    async def _user_nodes(self, users: Sequence[UserData]) -> list[UserNode]:
+        access_keys = await self._default_access_keys(users)
+        return [self._user_data_to_node(user, access_keys.get(UserID(user.id))) for user in users]
 
-        if filter_req.email is not None:
-            condition = self.convert_string_filter(
-                filter_req.email,
-                contains_factory=UserConditions.by_email_contains,
-                equals_factory=UserConditions.by_email_equals,
-                starts_with_factory=UserConditions.by_email_starts_with,
-                ends_with_factory=UserConditions.by_email_ends_with,
-                in_factory=UserConditions.by_email_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.username is not None:
-            condition = self.convert_string_filter(
-                filter_req.username,
-                contains_factory=UserConditions.by_username_contains,
-                equals_factory=UserConditions.by_username_equals,
-                starts_with_factory=UserConditions.by_username_starts_with,
-                ends_with_factory=UserConditions.by_username_ends_with,
-                in_factory=UserConditions.by_username_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.domain_name is not None:
-            condition = self.convert_string_filter(
-                filter_req.domain_name,
-                contains_factory=UserConditions.by_domain_name_contains,
-                equals_factory=UserConditions.by_domain_name_equals,
-                starts_with_factory=UserConditions.by_domain_name_starts_with,
-                ends_with_factory=UserConditions.by_domain_name_ends_with,
-                in_factory=UserConditions.by_domain_name_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.integration_name is not None:
-            condition = self.convert_string_filter(
-                filter_req.integration_name,
-                contains_factory=UserConditions.by_integration_name_contains,
-                equals_factory=UserConditions.by_integration_name_equals,
-                starts_with_factory=UserConditions.by_integration_name_starts_with,
-                ends_with_factory=UserConditions.by_integration_name_ends_with,
-                in_factory=UserConditions.by_integration_name_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.status is not None:
-            status_f = filter_req.status
-            if status_f.equals is not None:
-                conditions.append(
-                    UserConditions.by_status_equals(UserStatus(status_f.equals.value))
-                )
-            if status_f.in_ is not None and len(status_f.in_) > 0:
-                conditions.append(
-                    UserConditions.by_status_in([UserStatus(s.value) for s in status_f.in_])
-                )
-            if status_f.not_equals is not None:
-                conditions.append(
-                    negate_conditions([
-                        UserConditions.by_status_equals(UserStatus(status_f.not_equals.value))
-                    ])
-                )
-            if status_f.not_in is not None and len(status_f.not_in) > 0:
-                conditions.append(
-                    negate_conditions([
-                        UserConditions.by_status_in([UserStatus(s.value) for s in status_f.not_in])
-                    ])
-                )
-
-        if filter_req.role is not None:
-            role_f = filter_req.role
-            if role_f.equals is not None:
-                conditions.append(UserConditions.by_role_equals(UserRole(role_f.equals.value)))
-            if role_f.in_ is not None and len(role_f.in_) > 0:
-                conditions.append(
-                    UserConditions.by_role_in([UserRole(r.value) for r in role_f.in_])
-                )
-            if role_f.not_equals is not None:
-                conditions.append(
-                    negate_conditions([
-                        UserConditions.by_role_equals(UserRole(role_f.not_equals.value))
-                    ])
-                )
-            if role_f.not_in is not None and len(role_f.not_in) > 0:
-                conditions.append(
-                    negate_conditions([
-                        UserConditions.by_role_in([UserRole(r.value) for r in role_f.not_in])
-                    ])
-                )
-
-        if filter_req.container_uid is not None:
-            condition = self.convert_int_filter(
-                filter_req.container_uid,
-                UserConditions.by_container_uid,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.container_main_gid is not None:
-            condition = self.convert_int_filter(
-                filter_req.container_main_gid,
-                UserConditions.by_container_main_gid,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.container_gids is not None:
-            condition = self.convert_array_filter(
-                filter_req.container_gids,
-                contains_factory=UserConditions.by_container_gids_contains,
-                contains_any_factory=UserConditions.by_container_gids_any,
-                contains_all_factory=UserConditions.by_container_gids_all,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.created_at is not None:
-            condition = filter_req.created_at.build_query_condition(
-                before_factory=UserConditions.by_created_at_before,
-                after_factory=UserConditions.by_created_at_after,
-                equals_factory=UserConditions.by_created_at_equals,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_req.domain is not None:
-            conditions.extend(self._convert_domain_nested_filter(filter_req.domain))
-
-        if filter_req.project is not None:
-            conditions.extend(self._convert_project_nested_filter(filter_req.project))
-
-        if filter_req.AND:
-            for sub_filter in filter_req.AND:
-                conditions.extend(self._convert_filter(sub_filter))
-        if filter_req.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in filter_req.OR:
-                or_sub_conditions.extend(self._convert_filter(sub_filter))
-            if or_sub_conditions:
-                conditions.append(combine_conditions_or(or_sub_conditions))
-        if filter_req.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in filter_req.NOT:
-                not_sub_conditions.extend(self._convert_filter(sub_filter))
-            if not_sub_conditions:
-                conditions.append(negate_conditions(not_sub_conditions))
-
-        return conditions
-
-    def _convert_orders(self, orders: list[UserOrder]) -> list[QueryOrder]:
-        return [self._convert_order(o) for o in orders]
+    async def _user_node(self, user: UserData) -> UserNode:
+        return (await self._user_nodes([user]))[0]
 
     @staticmethod
-    def _convert_order(order: UserOrder) -> QueryOrder:
-        ascending = order.direction == OrderDirection.ASC
-        match order.field:
-            case UserOrderField.CREATED_AT:
-                return UserOrders.created_at(ascending=ascending)
-            case UserOrderField.MODIFIED_AT:
-                return UserOrders.modified_at(ascending=ascending)
-            case UserOrderField.USERNAME:
-                return UserOrders.username(ascending=ascending)
-            case UserOrderField.EMAIL:
-                return UserOrders.email(ascending=ascending)
-            case UserOrderField.STATUS:
-                return UserOrders.status(ascending=ascending)
-            case UserOrderField.ROLE:
-                return UserOrders.role(ascending=ascending)
-            case UserOrderField.DOMAIN_NAME:
-                return UserOrders.domain_name(ascending=ascending)
-        raise ValueError(f"Unknown order field: {order.field}")
-
-    @staticmethod
-    def _user_data_to_node(data: UserData) -> UserNode:
+    def _user_data_to_node(data: UserData, main_access_key: AccessKey | None) -> UserNode:
         """Convert UserData to UserNode DTO."""
         return UserNode(
             id=data.id,
+            entity_id=data.entity_id(),
             basic_info=UserBasicInfo(
                 username=data.username,
                 email=data.email,
@@ -1567,9 +1411,10 @@ class UserAdapter(BaseAdapter):
             ),
             organization=UserOrganizationInfo(
                 domain_name=data.domain_name,
+                domain_id=data.domain_id,
                 role=UserRoleDTO(data.role.value) if data.role is not None else None,
                 resource_policy=data.resource_policy,
-                main_access_key=data.main_access_key,
+                main_access_key=main_access_key,
             ),
             security=UserSecurityInfo(
                 allowed_client_ip=data.allowed_client_ip,

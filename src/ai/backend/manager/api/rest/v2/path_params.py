@@ -7,11 +7,15 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
-from ai.backend.common.identifier.role_preset import RolePresetID
+from ai.backend.common.data.entity.role_preset import RolePresetID
 
 
 class DomainNamePathParam(BaseRequestModel):
     domain_name: str = Field(description="Domain name")
+
+
+class DomainIdPathParam(BaseRequestModel):
+    domain_id: UUID = Field(description="Domain ID")
 
 
 class UserIdPathParam(BaseRequestModel):
@@ -62,8 +66,16 @@ class ResourceGroupNamePathParam(BaseRequestModel):
     name: str = Field(description="Resource group name")
 
 
+class ResourceGroupIdPathParam(BaseRequestModel):
+    resource_group_id: UUID = Field(description="Resource group ID")
+
+
 class ResourcePolicyNamePathParam(BaseRequestModel):
     name: str = Field(description="Resource policy name")
+
+
+class ResourcePolicyIdPathParam(BaseRequestModel):
+    policy_id: UUID = Field(description="Resource policy ID")
 
 
 class ChannelIdPathParam(BaseRequestModel):
@@ -86,12 +98,24 @@ class LoginClientTypeIdPathParam(BaseRequestModel):
     login_client_type_id: UUID = Field(description="Login client type UUID")
 
 
+class ClientIPMaskingPolicyIdPathParam(BaseRequestModel):
+    policy_id: UUID = Field(description="Client IP masking policy UUID")
+
+
 class AppConfigAllowListIdPathParam(BaseRequestModel):
     app_config_allow_list_id: UUID = Field(description="App config allow-list entry UUID")
 
 
 class AppConfigDefinitionIdPathParam(BaseRequestModel):
     app_config_definition_id: UUID = Field(description="App config definition UUID")
+
+
+class AppConfigFragmentIdPathParam(BaseRequestModel):
+    fragment_id: UUID = Field(description="App config fragment UUID")
+
+
+class IdleCheckerIdPathParam(BaseRequestModel):
+    idle_checker_id: UUID = Field(description="Idle checker UUID")
 
 
 class ReplicaIdPathParam(BaseRequestModel):
@@ -106,6 +130,11 @@ class VFolderIdPathParam(BaseRequestModel):
     vfolder_id: UUID = Field(description="VFolder UUID")
 
 
+class VFolderUserPathParam(BaseRequestModel):
+    vfolder_id: UUID = Field(description="VFolder UUID")
+    user_id: UUID = Field(description="User UUID")
+
+
 class TokenIdPathParam(BaseRequestModel):
     token_id: UUID = Field(description="Token UUID")
 
@@ -118,5 +147,29 @@ class AccessKeyPathParam(BaseRequestModel):
     access_key: str = Field(description="Access key string")
 
 
-class InvitationIdPathParam(BaseRequestModel):
-    invitation_id: UUID = Field(description="Invitation UUID")
+class ShareIdPathParam(BaseRequestModel):
+    share_id: UUID = Field(description="Entity share UUID")
+
+
+class IdleCheckerAssignmentIdPathParam(BaseRequestModel):
+    idle_checker_assignment_id: UUID = Field(description="Idle checker assignment UUID")
+
+
+class SessionGroupIdPathParam(BaseRequestModel):
+    session_group_id: UUID = Field(description="Session group UUID")
+
+
+class VFolderAutoMountIdPathParam(BaseRequestModel):
+    vfolder_auto_mount_id: UUID = Field(description="VFolder auto-mount UUID")
+
+
+class SlotNamePathParam(BaseRequestModel):
+    slot_name: str = Field(description="Resource slot name")
+
+
+class ImageIdPathParam(BaseRequestModel):
+    image_id: UUID = Field(description="Image ID")
+
+
+class SlotTypeIdPathParam(BaseRequestModel):
+    slot_type_id: UUID = Field(description="Resource slot type ID")

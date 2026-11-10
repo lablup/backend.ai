@@ -4,12 +4,12 @@ Credentials stage for kernel lifecycle.
 This stage handles Docker credentials setup for containers.
 """
 
-import asyncio
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, override
 
+from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.json import dump_json
 from ai.backend.common.stage.types import ArgsSpecGenerator, Provisioner, ProvisionStage
 
@@ -46,10 +46,9 @@ class CredentialsProvisioner(Provisioner[CredentialsSpec, CredentialsResult]):
         if not spec.docker_credentials:
             return CredentialsResult(credentials_path=None)
 
-        loop = asyncio.get_running_loop()
         credentials_path = spec.config_dir / "docker-creds.json"
 
-        await loop.run_in_executor(
+        await run_in_executor_with_context(
             None,
             credentials_path.write_bytes,
             dump_json(spec.docker_credentials),

@@ -74,19 +74,53 @@ _pid_alive() {
   [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null
 }
 
+_service_config() {
+  case $1 in
+    agent)      echo "./agent.toml" ;;
+    sftp-agent) echo "./agent-sftp.toml" ;;
+    *) return 1 ;;
+  esac
+}
+
+# Fallback when the pid-file is missing/stale: find the agent that owns the
+# rpc-listen port from its config, then walk up to the main process (the
+# listener may be a worker whose parent is the main agent).
+_find_agent_pid_by_port() {
+  local svc=$1 conf port pid ppid
+  conf=$(_service_config "$svc") || return 1
+  port=$(grep -m1 'rpc-listen-addr' "$conf" 2>/dev/null \
+    | grep -oE 'port *= *[0-9]+' | grep -oE '[0-9]+') || return 1
+  [ -n "$port" ] || return 1
+  pid=$(ss -tlnpH "sport = :$port" 2>/dev/null \
+    | grep -oE 'pid=[0-9]+' | head -1 | cut -d= -f2)
+  [ -n "$pid" ] || return 1
+  ppid=$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ')
+  if [ -n "$ppid" ] && ps -o cmd= -p "$ppid" 2>/dev/null | grep -q "backend\.ai:"; then
+    echo "$ppid"
+  else
+    echo "$pid"
+  fi
+}
+
+# Resolve the live main pid of an agent service: pid-file first, port fallback.
+_get_agent_pid() {
+  local svc=$1 pidfile pid
+  pidfile=$(_service_pidfile "$svc")
+  pid=$(cat "$pidfile" 2>/dev/null || true)
+  if _pid_alive "$pid"; then
+    echo "$pid"
+    return 0
+  fi
+  pid=$(_find_agent_pid_by_port "$svc") || return 1
+  _pid_alive "$pid" || return 1
+  echo "$pid"
+}
+
 _is_running() {
   local svc=$1
   case "$svc" in
     agent|sftp-agent)
-      local pidfile
-      pidfile=$(_service_pidfile "$svc")
-      if [ -f "$pidfile" ]; then
-        local pid
-        pid=$(cat "$pidfile" 2>/dev/null || true)
-        _pid_alive "$pid"
-        return $?
-      fi
-      return 1
+      _get_agent_pid "$svc" > /dev/null
       ;;
     *)
       pgrep -f "$(_service_process "$svc")" > /dev/null 2>&1
@@ -96,23 +130,17 @@ _is_running() {
 
 _stop_service() {
   local svc=$1
-  _kill_by_pidfile() {
+  _kill_agent() {
     local signal=$1
-    local pidfile
-    pidfile=$(_service_pidfile "$svc")
-    if [ -f "$pidfile" ]; then
-      local pid
-      pid=$(cat "$pidfile" 2>/dev/null || true)
-      if [ -n "$pid" ]; then
-        kill "-${signal}" "$pid" 2>/dev/null || true
-      fi
-    fi
+    local pid
+    pid=$(_get_agent_pid "$svc") || return 0
+    kill "-${signal}" "$pid" 2>/dev/null || true
   }
   _kill_matching() {
     local signal=$1
     case "$svc" in
       agent|sftp-agent)
-        _kill_by_pidfile "$signal"
+        _kill_agent "$signal"
         ;;
       *)
         pkill "-${signal}" -f "$(_service_process "$svc")" 2>/dev/null || true
@@ -170,7 +198,7 @@ _status_services() {
       local pid
       case "$svc" in
         agent|sftp-agent)
-          pid=$(cat "$(_service_pidfile "$svc")" 2>/dev/null || true)
+          pid=$(_get_agent_pid "$svc" 2>/dev/null || true)
           ;;
         *)
           pid=$(pgrep -f "$(_service_process "$svc")" | head -1)

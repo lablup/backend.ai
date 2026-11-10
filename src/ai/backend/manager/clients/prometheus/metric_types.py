@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass, field
@@ -15,12 +16,14 @@ from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import KernelId
 from ai.backend.manager.clients.prometheus.preset import MetricPreset
 from ai.backend.manager.clients.prometheus.types import MetricValue, ValueType
+from ai.backend.manager.errors.metric import InvalidContainerMetricName
 
 __all__ = [
     "ContainerLiveStatQueries",
     "ContainerMetricOptionalLabel",
     "ContainerMetricResponseInfo",
     "ContainerMetricResult",
+    "CONTAINER_METRIC_UNIT_HINTS",
     "DIFF_METRICS",
     "KernelLiveStatBatchResult",
     "KernelLiveStatValues",
@@ -31,6 +34,8 @@ __all__ = [
     "RATE_METRICS",
     "MetricType",
     "ValueType",
+    "ensure_container_metric_name",
+    "resolve_container_metric_unit_hint",
 ]
 
 
@@ -38,6 +43,14 @@ __all__ = [
 type MetricName = str
 # Raw Prometheus sample value, kept as the string Prometheus returned.
 type LiveStatRawValue = str
+
+_CONTAINER_METRIC_NAME_RE: Final = re.compile(r"[A-Za-z0-9_:-]+")
+
+
+def ensure_container_metric_name(metric_name: str) -> None:
+    """Raise `InvalidContainerMetricName` unless the name is letters, digits, `_`, `:` and `-`."""
+    if not _CONTAINER_METRIC_NAME_RE.fullmatch(metric_name):
+        raise InvalidContainerMetricName(f"Invalid container metric name: {metric_name!r}")
 
 
 class MetricType(StrEnum):
@@ -76,6 +89,34 @@ class ContainerLiveStatQueries:
 
 DIFF_METRICS: Final[frozenset[str]] = frozenset({"cpu_util"})
 RATE_METRICS: Final[frozenset[str]] = frozenset({"net_rx", "net_tx"})
+
+# Per-metric unit hint emitted by the agent (source of truth:
+# src/ai/backend/agent/docker/intrinsic.py). Not a Prometheus label, so it is
+# mirrored here for query building and the legacy live_stat payload.
+CONTAINER_METRIC_UNIT_HINTS: Final[dict[str, str]] = {
+    "cpu_used": "msec",
+    "cpu_util": "millicores",
+    "mem": "bytes",
+    "net_rx": "bps",
+    "net_tx": "bps",
+    "io_read": "bytes",
+    "io_write": "bytes",
+    "io_scratch_size": "bytes",
+}
+
+
+def resolve_container_metric_unit_hint(metric_name: str) -> str:
+    if metric_name in CONTAINER_METRIC_UNIT_HINTS:
+        return CONTAINER_METRIC_UNIT_HINTS[metric_name]
+    if metric_name.endswith("_util"):
+        return "percent"
+    if metric_name == "mem" or metric_name.endswith("_mem"):
+        return "bytes"
+    if metric_name.startswith("io_"):
+        return "bytes"
+    if metric_name.startswith("net_"):
+        return "bps"
+    return metric_name
 
 
 @dataclass

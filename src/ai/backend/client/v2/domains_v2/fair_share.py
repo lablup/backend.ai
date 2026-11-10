@@ -71,10 +71,21 @@ class V2FairShareClient(BaseDomainClient):
             response_model=UpsertDomainFairShareWeightPayload,
         )
 
+    async def atomic_bulk_upsert_domain(
+        self, request: BulkUpsertDomainFairShareWeightInput
+    ) -> BulkUpsertDomainFairShareWeightPayload:
+        """Upsert several domain fair share weights in one transaction."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/domains/atomic-bulk-upsert",
+            request=request,
+            response_model=BulkUpsertDomainFairShareWeightPayload,
+        )
+
     async def bulk_upsert_domain(
         self, request: BulkUpsertDomainFairShareWeightInput
     ) -> BulkUpsertDomainFairShareWeightPayload:
-        """Bulk upsert domain fair share weights."""
+        """Deprecated. Use :meth:`atomic_bulk_upsert_domain`."""
         return await self._client.typed_request(
             "POST",
             f"{_PATH}/domains/bulk-upsert",
@@ -115,10 +126,21 @@ class V2FairShareClient(BaseDomainClient):
             response_model=UpsertProjectFairShareWeightPayload,
         )
 
+    async def atomic_bulk_upsert_project(
+        self, request: BulkUpsertProjectFairShareWeightInput
+    ) -> BulkUpsertProjectFairShareWeightPayload:
+        """Upsert several project fair share weights in one transaction."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/projects/atomic-bulk-upsert",
+            request=request,
+            response_model=BulkUpsertProjectFairShareWeightPayload,
+        )
+
     async def bulk_upsert_project(
         self, request: BulkUpsertProjectFairShareWeightInput
     ) -> BulkUpsertProjectFairShareWeightPayload:
-        """Bulk upsert project fair share weights."""
+        """Deprecated. Use :meth:`atomic_bulk_upsert_project`."""
         return await self._client.typed_request(
             "POST",
             f"{_PATH}/projects/bulk-upsert",
@@ -157,10 +179,21 @@ class V2FairShareClient(BaseDomainClient):
             response_model=UpsertUserFairShareWeightPayload,
         )
 
+    async def atomic_bulk_upsert_user(
+        self, request: BulkUpsertUserFairShareWeightInput
+    ) -> BulkUpsertUserFairShareWeightPayload:
+        """Upsert several user fair share weights in one transaction."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/users/atomic-bulk-upsert",
+            request=request,
+            response_model=BulkUpsertUserFairShareWeightPayload,
+        )
+
     async def bulk_upsert_user(
         self, request: BulkUpsertUserFairShareWeightInput
     ) -> BulkUpsertUserFairShareWeightPayload:
-        """Bulk upsert user fair share weights."""
+        """Deprecated. Use :meth:`atomic_bulk_upsert_user`."""
         return await self._client.typed_request(
             "POST",
             f"{_PATH}/users/bulk-upsert",

@@ -3,32 +3,18 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, override
-from uuid import UUID
+from typing import Any
 
-import sqlalchemy as sa
-
-from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
-from ai.backend.common.identifier.replica import ReplicaID
-from ai.backend.common.types import SessionId
-from ai.backend.manager.data.deployment.types import (
-    RouteHealthStatus,
-    RouteStatus,
-    RouteSubStatus,
-    RouteTrafficStatus,
-)
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.errors.resource import ProjectNotFound
-from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.endpoint.row import EndpointRow
-from ai.backend.manager.models.group.row import GroupRow
-from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
+from ai.backend.manager.models.scheduling_history.creators import (
+    DeploymentHistoryCreator,
+    RouteHistoryCreator,
+)
 
 
 @dataclass
@@ -44,7 +30,7 @@ class EndpointCreationArgs:
     runtime_variant: str
     desired_session_count: int
     resource_opts: dict[str, Any] | None = None
-    scaling_group: str | None = None
+    resource_group: str | None = None
 
 
 @dataclass
@@ -65,56 +51,6 @@ class EndpointData:
     updated_at: datetime | None = None
     service_endpoint: str | None = None
     resource_opts: dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass
-class RouteData:
-    """Data structure for model service route."""
-
-    route_id: ReplicaID
-    deployment_id: DeploymentID
-    session_id: SessionId | None
-    status: RouteStatus
-    health_status: RouteHealthStatus
-    traffic_ratio: float
-    created_at: datetime
-    revision_id: DeploymentRevisionID
-    traffic_status: RouteTrafficStatus
-    health_check: ModelHealthCheck | None
-    termination_grace_period: float
-    replica_host: str | None = None
-    replica_port: int | None = None
-    updated_at: datetime | None = None
-    sub_status: RouteSubStatus | None = None
-    last_transition_at: datetime | None = None
-    error_data: dict[str, Any] = field(default_factory=dict)
-
-    @property
-    def enabled_health_check(self) -> ModelHealthCheck | None:
-        """The health check to enforce, or ``None`` when absent or disabled.
-
-        A ``health_check`` with ``enable=False`` means the route activates
-        immediately and the remaining fields are ignored, so it must be
-        treated the same as no health check at all.
-        """
-        if self.health_check is None or not self.health_check.enable:
-            return None
-        return self.health_check
-
-    def is_termination_grace_elapsed(self, now: datetime) -> bool:
-        """Whether the session may be cleaned up at ``now``.
-
-        The grace period counts from ``last_transition_at`` — for a
-        COOLING_DOWN route, the moment the draining stage finished. When
-        no transition history exists (pre-migration rows) or the grace
-        period is non-positive, the session is cleaned up immediately.
-        """
-        if self.last_transition_at is None:
-            return True
-        if self.termination_grace_period <= 0:
-            return True
-        elapsed = (now - self.last_transition_at).total_seconds()
-        return elapsed >= self.termination_grace_period
 
 
 @dataclass(frozen=True)
@@ -147,31 +83,17 @@ class RouteServiceDiscoveryInfo:
     project: uuid.UUID
 
 
-@dataclass(frozen=True)
-class ProjectDeploymentSearchScope(SearchScope):
-    """Required scope for searching endpoints within a project.
+@dataclass
+class RouteHistoryToCreate:
+    """One replica transition to record, under the deployment it serves."""
 
-    Used for project-scoped deployment search (project admin).
-    """
+    deployment_id: DeploymentID
+    creator: RouteHistoryCreator
 
-    project_id: UUID
 
-    @override
-    def to_condition(self) -> QueryCondition:
-        project_id = self.project_id
+@dataclass
+class DeploymentHistoryToCreate:
+    """One deployment transition to record, under the deployment it is about."""
 
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return EndpointRow.project == project_id
-
-        return inner
-
-    @property
-    @override
-    def existence_checks(self) -> Sequence[ExistenceCheck[UUID]]:
-        return [
-            ExistenceCheck(
-                column=GroupRow.id,
-                value=self.project_id,
-                error=ProjectNotFound(str(self.project_id)),
-            ),
-        ]
+    deployment_id: DeploymentID
+    creator: DeploymentHistoryCreator

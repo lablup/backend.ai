@@ -2,8 +2,11 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.v2 import validators as v2_validators
+from ai.backend.manager.actions.v2.global_scope.validator.refusing import (
+    RefusingGlobalActionValidator,
+)
 from ai.backend.manager.dependencies.processing.processors import (
     ProcessorsDependency,
     ProcessorsProviderInput,
@@ -19,11 +22,11 @@ class TestProcessorsDependency:
         mock_create_processors: MagicMock,
     ) -> None:
         """Dependency should create Processors via create_processors()."""
-        mock_processors = MagicMock()
-        mock_create_processors.return_value = mock_processors
+        mock_bundle = MagicMock(processors=MagicMock(), registry=MagicMock())
+        mock_create_processors.return_value = mock_bundle
 
         mock_service_args = MagicMock()
-        mock_monitors: list[ActionMonitor] = [MagicMock(), MagicMock()]
+        mock_monitors = ActionMonitors(single_entity=[MagicMock(), MagicMock()])
 
         dependency = ProcessorsDependency()
         processors_input = ProcessorsProviderInput(
@@ -31,11 +34,13 @@ class TestProcessorsDependency:
             action_monitors=mock_monitors,
             event_hub=MagicMock(),
             event_fetcher=MagicMock(),
-            validators=MagicMock(spec=ActionValidators),
+            v2_validators=v2_validators.ActionValidators(
+                global_scope=[RefusingGlobalActionValidator()]
+            ),
         )
 
-        async with dependency.provide(processors_input) as processors:
-            assert processors is mock_processors
+        async with dependency.provide(processors_input) as bundle:
+            assert bundle is mock_bundle
             mock_create_processors.assert_called_once()
             call_args = mock_create_processors.call_args
             assert call_args[0][0].service_args is mock_service_args

@@ -2,18 +2,25 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator, Callable, Sequence
 from contextlib import asynccontextmanager
-from typing import Any, Protocol, cast, override
+from typing import Any, ClassVar, Protocol, cast, override
 
 from sqlalchemy import Table, text
 from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlalchemy.sql.ddl import SchemaGenerator
 from sqlalchemy.sql.schema import ForeignKeyConstraint
 
+from ai.backend.manager.models.global_entity.row import GlobalEntityRow
+from ai.backend.manager.models.global_entity.seed import SEED_GLOBAL_ENTITIES_SQL
+from ai.backend.manager.models.uuid7 import UUID_GENERATE_V7_DDL
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
+
 
 class HasTable(Protocol):
     """Protocol for SQLAlchemy ORM model classes with __table__ attribute."""
 
-    __table__: Table
+    __table__: ClassVar[Table]
 
 
 # Type alias for items that can be passed to with_tables
@@ -95,13 +102,13 @@ async def with_tables(
 
     Example:
         async def test_something(database_connection):
-            async with with_tables(database_connection, [DomainRow, UserRow, GroupRow]):
+            async with with_tables(database_connection, [DomainRow, UserRow, ProjectRow]):
                 ...
 
         # With association tables:
         async with with_tables(database_connection, [
             DomainRow,
-            ScalingGroupRow,
+            ResourceGroupRow,
             sgroups_for_domains,  # raw Table object
         ]):
             ...
@@ -110,8 +117,9 @@ async def with_tables(
 
     # Create required PostgreSQL extensions and tables
     async with engine.begin() as conn:
-        # Create uuid-ossp extension for uuid_generate_v4()
+        # uuid-ossp for uuid_generate_v4(), then the uuid_generate_v7() function
         await conn.execute(text('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"'))
+        await conn.execute(text(UUID_GENERATE_V7_DDL))
         await conn.run_sync(_create_tables_sync, tables)
 
     try:
@@ -121,3 +129,22 @@ async def with_tables(
         async with engine.begin() as conn:
             table_names = ", ".join(f'"{t.name}"' for t in tables)
             await conn.execute(text(f"TRUNCATE {table_names} CASCADE"))
+
+
+@asynccontextmanager
+async def with_global_entities(engine: AsyncEngine) -> AsyncGenerator[None, None]:
+    """
+    Create the global entity rows and their virtual entities, as the migration does.
+    Tables are truncated on exit.
+    """
+    tables: list[TableOrORM] = [
+        GlobalEntityRow,
+        VirtualEntityRow,
+        EntityMembershipRow,
+        ScopeBindingRow,
+    ]
+    async with with_tables(engine, tables):
+        async with engine.begin() as conn:
+            for statement in SEED_GLOBAL_ENTITIES_SQL:
+                await conn.execute(text(statement))
+        yield

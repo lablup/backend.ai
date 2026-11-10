@@ -1,0 +1,63 @@
+name: create-version-branch
+
+# Cutting a release line and releasing its first rc are one action: merging
+# `release: X.Y.0rc1` into `main` is what tags the release and creates `X.Y`.
+
+on:
+  push:
+    branches:
+      - 'main'
+
+permissions:
+  contents: read
+
+concurrency:
+  # One group per commit: a re-run of the same push must not race the first run
+  # into the push of the refs.
+  group: ${{ github.workflow }}-${{ github.sha }}
+
+jobs:
+  cut:
+    # A cheap filter on the event; which release cuts a line is the script's call.
+    if: "startsWith(github.event.head_commit.message, 'release: ')"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the release commit
+        uses: actions/checkout@v6
+        with:
+          lfs: false
+          # Refs pushed with the workflow's own token trigger no workflow, and
+          # `ci.yml`'s `make-final-release` -- wheels, GitHub Release, PyPI --
+          # runs on the tag push.
+          token: ${{ secrets.OCTODOG }}
+      - name: Tag the release and cut the version branch
+        env:
+          COMMIT: ${{ github.sha }}
+        run: .github/scripts/create-version-branch.sh "$COMMIT"
+
+  bump-main:
+    # A job of its own, so that re-running it after a failure does not repeat the
+    # cut, which refuses to move existing refs.
+    needs: cut
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the release commit
+        uses: actions/checkout@v6
+        with:
+          lfs: false
+          # The pull request's checks only run when its branch is pushed by
+          # something other than the workflow's own token.
+          token: ${{ secrets.OCTODOG }}
+      # The script installs the pinned ruff into a venv of its own.
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.x'
+      - name: Freeze the cut line and advance NEXT_RELEASE_VERSION on main
+        # Set the `NEXT_DEV_VERSION` repository variable (e.g. 27.1.0) before
+        # cutting the last line of a year, and clear it afterwards.
+        env:
+          GH_TOKEN: ${{ secrets.OCTODOG }}
+          COMMIT: ${{ github.sha }}
+          NEXT_DEV_VERSION: ${{ vars.NEXT_DEV_VERSION }}
+        run: .github/scripts/bump-next-release-on-main.sh "$COMMIT" ${NEXT_DEV_VERSION:+--next "$NEXT_DEV_VERSION"}

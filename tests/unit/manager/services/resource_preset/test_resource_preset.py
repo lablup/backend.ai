@@ -12,30 +12,28 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.data.entity.resource_preset import ResourcePresetID
 from ai.backend.common.exception import InvalidAPIParameters, ResourcePresetConflict
 from ai.backend.common.types import (
-    AccessKey,
     BinarySize,
     ResourceSlot,
     SlotName,
     SlotQuantity,
     SlotTypes,
-    current_resource_slots,
 )
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.errors.common import ObjectNotFound
+from ai.backend.manager.models.resource_preset.creators import ResourcePresetCreator
+from ai.backend.manager.models.resource_preset.scopes import PublicResourcePresetTarget
+from ai.backend.manager.models.resource_preset.updaters import ResourcePresetUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.resource_preset.creators import ResourcePresetCreatorSpec
 from ai.backend.manager.repositories.resource_preset.db_source.types import (
     PresetAllocatabilityData,
 )
 from ai.backend.manager.repositories.resource_preset.repository import ResourcePresetRepository
 from ai.backend.manager.repositories.resource_preset.types import CheckPresetsResult
-from ai.backend.manager.repositories.resource_preset.updaters import ResourcePresetUpdaterSpec
 from ai.backend.manager.services.resource_preset.actions.check_presets import (
     CheckResourcePresetsAction,
     CheckResourcePresetsActionResult,
@@ -52,9 +50,9 @@ from ai.backend.manager.services.resource_preset.actions.list_presets import (
     ListResourcePresetsAction,
     ListResourcePresetsResult,
 )
-from ai.backend.manager.services.resource_preset.actions.modify_preset import (
-    ModifyResourcePresetAction,
-    ModifyResourcePresetActionResult,
+from ai.backend.manager.services.resource_preset.actions.update_preset import (
+    UpdateResourcePresetAction,
+    UpdateResourcePresetActionResult,
 )
 from ai.backend.manager.services.resource_preset.service import ResourcePresetService
 from ai.backend.manager.types import OptionalState, TriState
@@ -66,7 +64,6 @@ class TestResourcePresetServiceCompatibility:
     @pytest.fixture
     def mock_dependencies(self) -> dict[str, Any]:
         """Create mocked dependencies for testing."""
-        # Set up current_resource_slots context variable
         resource_slots = {
             SlotName("cpu"): SlotTypes("count"),
             SlotName("mem"): SlotTypes("bytes"),
@@ -76,12 +73,12 @@ class TestResourcePresetServiceCompatibility:
             SlotName("npu"): SlotTypes("count"),
             SlotName("tpu"): SlotTypes("count"),
         }
-        current_resource_slots.set(resource_slots)
 
         db_engine = MagicMock(spec=ExtendedAsyncSAEngine)
         agent_registry = MagicMock(spec=AgentRegistry)
         config_provider = MagicMock(spec=ManagerConfigProvider)
         resource_preset_repository = MagicMock(spec=ResourcePresetRepository)
+        resource_preset_repository.known_slot_types = AsyncMock(return_value=resource_slots)
 
         # Mock config provider methods
         config_provider.legacy_etcd_config_loader.get_resource_slots = AsyncMock(
@@ -111,11 +108,11 @@ class TestResourcePresetServiceCompatibility:
         """Test that CreateResourcePresetAction has the expected structure from test scenarios."""
         # Mock successful preset creation
         mock_preset_data = ResourcePresetData(
-            id=uuid.uuid4(),
+            id=ResourcePresetID(uuid.uuid4()),
             name="cpu-small",
             resource_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4294967296")}),
             shared_memory=BinarySize(BinarySize.from_str("1G")),
-            scaling_group_name=None,
+            resource_group_name=None,
         )
 
         mock_dependencies["resource_preset_repository"].create_preset_validated = AsyncMock(
@@ -124,13 +121,11 @@ class TestResourcePresetServiceCompatibility:
 
         # Test 1: Normal CPU-only preset creation
         action = CreateResourcePresetAction(
-            creator=Creator(
-                spec=ResourcePresetCreatorSpec(
-                    name="cpu-small",
-                    resource_slots=ResourceSlot({"cpu": "2", "mem": "4G"}),
-                    shared_memory=str(BinarySize.from_str("1G")),
-                    scaling_group_name=None,
-                )
+            creator=ResourcePresetCreator(
+                name="cpu-small",
+                resource_slots=ResourceSlot({"cpu": "2", "mem": "4G"}),
+                shared_memory=str(BinarySize.from_str("1G")),
+                resource_group_name=None,
             )
         )
 
@@ -148,7 +143,7 @@ class TestResourcePresetServiceCompatibility:
     ) -> None:
         """Test GPU preset creation with scaling group."""
         mock_preset_data = ResourcePresetData(
-            id=uuid.uuid4(),
+            id=ResourcePresetID(uuid.uuid4()),
             name="gpu-standard",
             resource_slots=ResourceSlot({
                 "cpu": Decimal("4"),
@@ -157,7 +152,7 @@ class TestResourcePresetServiceCompatibility:
                 "gpu_memory": Decimal("8589934592"),
             }),
             shared_memory=BinarySize(BinarySize.from_str("2G")),
-            scaling_group_name="gpu-cluster",
+            resource_group_name="gpu-cluster",
         )
 
         mock_dependencies["resource_preset_repository"].create_preset_validated = AsyncMock(
@@ -165,38 +160,34 @@ class TestResourcePresetServiceCompatibility:
         )
 
         action = CreateResourcePresetAction(
-            creator=Creator(
-                spec=ResourcePresetCreatorSpec(
-                    name="gpu-standard",
-                    resource_slots=ResourceSlot({
-                        "cpu": "4",
-                        "mem": "16G",
-                        "gpu": "1",
-                        "gpu_memory": "8G",
-                    }),
-                    shared_memory=str(BinarySize.from_str("2G")),
-                    scaling_group_name="gpu-cluster",
-                )
+            creator=ResourcePresetCreator(
+                name="gpu-standard",
+                resource_slots=ResourceSlot({
+                    "cpu": "4",
+                    "mem": "16G",
+                    "gpu": "1",
+                    "gpu_memory": "8G",
+                }),
+                shared_memory=str(BinarySize.from_str("2G")),
+                resource_group_name="gpu-cluster",
             )
         )
 
         result = await resource_preset_service.create_preset(action)
 
         assert isinstance(result, CreateResourcePresetActionResult)
-        assert result.resource_preset.scaling_group_name == "gpu-cluster"
+        assert result.resource_preset.resource_group_name == "gpu-cluster"
 
     async def test_create_preset_missing_intrinsic_slots(
         self, resource_preset_service: ResourcePresetService
     ) -> None:
         """Test preset creation fails when missing intrinsic slots."""
         action = CreateResourcePresetAction(
-            creator=Creator(
-                spec=ResourcePresetCreatorSpec(
-                    name="invalid-preset",
-                    resource_slots=ResourceSlot({"gpu": "1"}),  # Missing CPU and mem
-                    shared_memory=None,
-                    scaling_group_name=None,
-                )
+            creator=ResourcePresetCreator(
+                name="invalid-preset",
+                resource_slots=ResourceSlot({"gpu": "1"}),  # Missing CPU and mem
+                shared_memory=None,
+                resource_group_name=None,
             )
         )
 
@@ -215,13 +206,11 @@ class TestResourcePresetServiceCompatibility:
         )
 
         action = CreateResourcePresetAction(
-            creator=Creator(
-                spec=ResourcePresetCreatorSpec(
-                    name="existing-preset",
-                    resource_slots=ResourceSlot({"cpu": "2", "mem": "4G"}),
-                    shared_memory=None,
-                    scaling_group_name=None,
-                )
+            creator=ResourcePresetCreator(
+                name="existing-preset",
+                resource_slots=ResourceSlot({"cpu": "2", "mem": "4G"}),
+                shared_memory=None,
+                resource_group_name=None,
             )
         )
 
@@ -233,13 +222,13 @@ class TestResourcePresetServiceCompatibility:
         resource_preset_service: ResourcePresetService,
         mock_dependencies: dict[str, Any],
     ) -> None:
-        """Test that ModifyResourcePresetAction supports the expected modifications."""
+        """Test that UpdateResourcePresetAction supports the expected modifications."""
         mock_preset_data = ResourcePresetData(
-            id=uuid.uuid4(),
+            id=ResourcePresetID(uuid.uuid4()),
             name="cpu-small",
             resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8589934592")}),
             shared_memory=BinarySize(BinarySize.from_str("1G")),
-            scaling_group_name=None,
+            resource_group_name=None,
         )
 
         mock_dependencies["resource_preset_repository"].modify_preset_validated = AsyncMock(
@@ -247,20 +236,16 @@ class TestResourcePresetServiceCompatibility:
         )
 
         # Test resource slots update
-        action = ModifyResourcePresetAction(
-            name="cpu-small",
-            id=None,
-            updater=Updater(
-                spec=ResourcePresetUpdaterSpec(
-                    resource_slots=OptionalState.update(ResourceSlot({"cpu": "4", "mem": "8G"}))
-                ),
-                pk_value="cpu-small",
+        action = UpdateResourcePresetAction(
+            updater=ResourcePresetUpdater(
+                preset_id=ResourcePresetID(uuid.uuid4()),
+                resource_slots=OptionalState.update(ResourceSlot({"cpu": "4", "mem": "8G"})),
             ),
         )
 
-        result = await resource_preset_service.modify_preset(action)
+        result = await resource_preset_service.update_preset(action)
 
-        assert isinstance(result, ModifyResourcePresetActionResult)
+        assert isinstance(result, UpdateResourcePresetActionResult)
         assert result.resource_preset is not None
         mock_dependencies["resource_preset_repository"].modify_preset_validated.assert_called_once()
 
@@ -272,45 +257,26 @@ class TestResourcePresetServiceCompatibility:
         """Test preset name modification."""
         preset_id = uuid.uuid4()
         mock_preset_data = ResourcePresetData(
-            id=preset_id,
+            id=ResourcePresetID(preset_id),
             name="cpu-medium",
             resource_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4294967296")}),
             shared_memory=BinarySize(BinarySize.from_str("1G")),
-            scaling_group_name=None,
+            resource_group_name=None,
         )
 
         mock_dependencies["resource_preset_repository"].modify_preset_validated = AsyncMock(
             return_value=mock_preset_data
         )
 
-        action = ModifyResourcePresetAction(
-            name=None,
-            id=preset_id,
-            updater=Updater(
-                spec=ResourcePresetUpdaterSpec(name=OptionalState.update("cpu-medium")),
-                pk_value=preset_id,
+        action = UpdateResourcePresetAction(
+            updater=ResourcePresetUpdater(
+                preset_id=ResourcePresetID(preset_id), name=OptionalState.update("cpu-medium")
             ),
         )
 
-        result = await resource_preset_service.modify_preset(action)
+        result = await resource_preset_service.update_preset(action)
 
         assert result.resource_preset.name == "cpu-medium"
-
-    async def test_modify_preset_missing_identifiers(
-        self, resource_preset_service: ResourcePresetService
-    ) -> None:
-        """Test modify fails when neither name nor id provided."""
-        action = ModifyResourcePresetAction(
-            name=None,
-            id=None,
-            updater=Updater(
-                spec=ResourcePresetUpdaterSpec(name=OptionalState.update("new-name")),
-                pk_value="",
-            ),
-        )
-
-        with pytest.raises(InvalidAPIParameters):
-            await resource_preset_service.modify_preset(action)
 
     async def test_delete_preset_action_structure(
         self,
@@ -319,18 +285,18 @@ class TestResourcePresetServiceCompatibility:
     ) -> None:
         """Test that DeleteResourcePresetAction works as expected."""
         mock_preset_data = ResourcePresetData(
-            id=uuid.uuid4(),
+            id=ResourcePresetID(uuid.uuid4()),
             name="unused-preset",
             resource_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4294967296")}),
             shared_memory=None,
-            scaling_group_name=None,
+            resource_group_name=None,
         )
 
         mock_dependencies["resource_preset_repository"].delete_preset_validated = AsyncMock(
             return_value=mock_preset_data
         )
 
-        action = DeleteResourcePresetAction(name="unused-preset", id=None)
+        action = DeleteResourcePresetAction(preset_id=ResourcePresetID(uuid.uuid4()))
 
         result = await resource_preset_service.delete_preset(action)
 
@@ -348,7 +314,7 @@ class TestResourcePresetServiceCompatibility:
             side_effect=ObjectNotFound("Resource preset not found")
         )
 
-        action = DeleteResourcePresetAction(name="non-existent", id=None)
+        action = DeleteResourcePresetAction(preset_id=ResourcePresetID(uuid.uuid4()))
 
         with pytest.raises(ObjectNotFound):
             await resource_preset_service.delete_preset(action)
@@ -361,14 +327,14 @@ class TestResourcePresetServiceCompatibility:
         """Test that ListResourcePresetsAction returns expected structure."""
         mock_presets = [
             ResourcePresetData(
-                id=uuid.uuid4(),
+                id=ResourcePresetID(uuid.uuid4()),
                 name="cpu-small",
                 resource_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4294967296")}),
                 shared_memory=BinarySize(BinarySize.from_str("1G")),
-                scaling_group_name=None,
+                resource_group_name=None,
             ),
             ResourcePresetData(
-                id=uuid.uuid4(),
+                id=ResourcePresetID(uuid.uuid4()),
                 name="gpu-standard",
                 resource_slots=ResourceSlot({
                     "cpu": Decimal("4"),
@@ -377,7 +343,7 @@ class TestResourcePresetServiceCompatibility:
                     "gpu_memory": Decimal("8589934592"),
                 }),
                 shared_memory=BinarySize(BinarySize.from_str("2G")),
-                scaling_group_name=None,
+                resource_group_name=None,
             ),
         ]
 
@@ -385,7 +351,11 @@ class TestResourcePresetServiceCompatibility:
             return_value=mock_presets
         )
 
-        action = ListResourcePresetsAction(access_key="test-access-key", scaling_group=None)
+        action = ListResourcePresetsAction(
+            targets=[PublicResourcePresetTarget()],
+            access_key="test-access-key",
+            resource_group=None,
+        )
 
         result = await resource_preset_service.list_presets(action)
 
@@ -407,15 +377,11 @@ class TestResourcePresetServiceCompatibility:
     ) -> None:
         """Test check presets when resources are sufficient."""
         action = CheckResourcePresetsAction(
-            access_key=AccessKey("test-key"),
-            resource_policy={
-                "total_resource_slots": {"cpu": "100", "mem": "100G", "gpu": "10"},
-                "default_for_unspecified": "UNLIMITED",
-            },
+            targets=[PublicResourcePresetTarget()],
             domain_name="default",
             group="default",
             user_id=uuid.uuid4(),
-            scaling_group=None,
+            resource_group=None,
         )
 
         # Setup complex mocking for check_presets
@@ -456,11 +422,11 @@ class TestResourcePresetServiceCompatibility:
         # Mock scaling group query - this is now handled by repository
         # Create mock preset data
         preset_data = ResourcePresetData(
-            id=uuid.uuid4(),
+            id=ResourcePresetID(uuid.uuid4()),
             name="test-preset",
             resource_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4294967296")}),
             shared_memory=None,
-            scaling_group_name=None,
+            resource_group_name=None,
         )
 
         # Create mock result that the repository would return
@@ -495,12 +461,12 @@ class TestResourcePresetServiceCompatibility:
                 SlotQuantity("mem", Decimal("102005473280")),
                 SlotQuantity("gpu", Decimal("10")),
             ],
-            scaling_group_remaining=[
+            resource_group_remaining=[
                 SlotQuantity("cpu", Decimal("1000")),
                 SlotQuantity("mem", Decimal("1073741824000")),
                 SlotQuantity("gpu", Decimal("100")),
             ],
-            scaling_groups={},
+            resource_groups={},
         )
 
         # Mock the repository's check_presets method directly
@@ -513,7 +479,7 @@ class TestResourcePresetServiceCompatibility:
     ) -> None:
         """Test support for custom resource types like NPU/TPU."""
         mock_preset_data = ResourcePresetData(
-            id=uuid.uuid4(),
+            id=ResourcePresetID(uuid.uuid4()),
             name="custom-preset",
             resource_slots=ResourceSlot({
                 "cpu": Decimal("4"),
@@ -522,7 +488,7 @@ class TestResourcePresetServiceCompatibility:
                 "tpu": Decimal("1"),
             }),
             shared_memory=None,
-            scaling_group_name=None,
+            resource_group_name=None,
         )
 
         mock_dependencies["resource_preset_repository"].create_preset_validated = AsyncMock(
@@ -530,13 +496,11 @@ class TestResourcePresetServiceCompatibility:
         )
 
         action = CreateResourcePresetAction(
-            creator=Creator(
-                spec=ResourcePresetCreatorSpec(
-                    name="custom-preset",
-                    resource_slots=ResourceSlot({"cpu": "4", "mem": "8G", "npu": "2", "tpu": "1"}),
-                    shared_memory=None,
-                    scaling_group_name=None,
-                )
+            creator=ResourcePresetCreator(
+                name="custom-preset",
+                resource_slots=ResourceSlot({"cpu": "4", "mem": "8G", "npu": "2", "tpu": "1"}),
+                shared_memory=None,
+                resource_group_name=None,
             )
         )
 
@@ -552,7 +516,7 @@ class TestResourcePresetServiceCompatibility:
     ) -> None:
         """Test shared memory adjustment in preset modification."""
         mock_preset_data = ResourcePresetData(
-            id=uuid.uuid4(),
+            id=ResourcePresetID(uuid.uuid4()),
             name="gpu-standard",
             resource_slots=ResourceSlot({
                 "cpu": Decimal("4"),
@@ -561,25 +525,21 @@ class TestResourcePresetServiceCompatibility:
                 "gpu_memory": Decimal("8589934592"),
             }),
             shared_memory=BinarySize(BinarySize.from_str("4G")),
-            scaling_group_name="gpu-cluster",
+            resource_group_name="gpu-cluster",
         )
 
         mock_dependencies["resource_preset_repository"].modify_preset_validated = AsyncMock(
             return_value=mock_preset_data
         )
 
-        action = ModifyResourcePresetAction(
-            name="gpu-standard",
-            id=None,
-            updater=Updater(
-                spec=ResourcePresetUpdaterSpec(
-                    shared_memory=TriState.update(BinarySize(BinarySize.from_str("4G"))),
-                ),
-                pk_value="gpu-standard",
+        action = UpdateResourcePresetAction(
+            updater=ResourcePresetUpdater(
+                preset_id=ResourcePresetID(uuid.uuid4()),
+                shared_memory=TriState.update(BinarySize(BinarySize.from_str("4G"))),
             ),
         )
 
-        result = await resource_preset_service.modify_preset(action)
+        result = await resource_preset_service.update_preset(action)
 
         assert result.resource_preset.shared_memory == BinarySize(BinarySize.from_str("4G"))
 
@@ -588,29 +548,15 @@ class TestResourcePresetServiceCompatibility:
         resource_preset_service: ResourcePresetService,
     ) -> None:
         """Test modify fails when resource_slots provided without intrinsic slots."""
-        action = ModifyResourcePresetAction(
-            name="existing-preset",
-            id=None,
-            updater=Updater(
-                spec=ResourcePresetUpdaterSpec(
-                    resource_slots=OptionalState.update(ResourceSlot({"gpu": "1"}))
-                ),
-                pk_value="existing-preset",
+        action = UpdateResourcePresetAction(
+            updater=ResourcePresetUpdater(
+                preset_id=ResourcePresetID(uuid.uuid4()),
+                resource_slots=OptionalState.update(ResourceSlot({"gpu": "1"})),
             ),
         )
 
         with pytest.raises(InvalidAPIParameters):
-            await resource_preset_service.modify_preset(action)
-
-    async def test_delete_preset_missing_identifiers(
-        self,
-        resource_preset_service: ResourcePresetService,
-    ) -> None:
-        """Test delete fails when neither name nor id provided."""
-        action = DeleteResourcePresetAction(name=None, id=None)
-
-        with pytest.raises(InvalidAPIParameters):
-            await resource_preset_service.delete_preset(action)
+            await resource_preset_service.update_preset(action)
 
     async def test_delete_preset_by_id(
         self,
@@ -620,18 +566,18 @@ class TestResourcePresetServiceCompatibility:
         """Test delete by id returns ResourcePresetData."""
         preset_id = uuid.uuid4()
         mock_preset_data = ResourcePresetData(
-            id=preset_id,
+            id=ResourcePresetID(preset_id),
             name="to-delete",
             resource_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4294967296")}),
             shared_memory=None,
-            scaling_group_name=None,
+            resource_group_name=None,
         )
 
         mock_dependencies["resource_preset_repository"].delete_preset_validated = AsyncMock(
             return_value=mock_preset_data
         )
 
-        action = DeleteResourcePresetAction(name=None, id=preset_id)
+        action = DeleteResourcePresetAction(preset_id=ResourcePresetID(uuid.uuid4()))
 
         result = await resource_preset_service.delete_preset(action)
 
@@ -645,7 +591,7 @@ class TestResourcePresetServiceCompatibility:
     ) -> None:
         """Test list presets filters by specific scaling_group."""
         gpu_preset = ResourcePresetData(
-            id=uuid.uuid4(),
+            id=ResourcePresetID(uuid.uuid4()),
             name="gpu-standard",
             resource_slots=ResourceSlot({
                 "cpu": Decimal("4"),
@@ -653,7 +599,7 @@ class TestResourcePresetServiceCompatibility:
                 "gpu": Decimal("1"),
             }),
             shared_memory=None,
-            scaling_group_name="gpu-cluster",
+            resource_group_name="gpu-cluster",
         )
 
         mock_dependencies["resource_preset_repository"].list_presets = AsyncMock(
@@ -661,8 +607,9 @@ class TestResourcePresetServiceCompatibility:
         )
 
         action = ListResourcePresetsAction(
+            targets=[PublicResourcePresetTarget()],
             access_key="test-key",
-            scaling_group="gpu-cluster",
+            resource_group="gpu-cluster",
         )
 
         result = await resource_preset_service.list_presets(action)
@@ -680,11 +627,11 @@ class TestResourcePresetServiceCompatibility:
     ) -> None:
         """Test check presets returns keypair/group limits/using/remaining details."""
         preset_data = ResourcePresetData(
-            id=uuid.uuid4(),
+            id=ResourcePresetID(uuid.uuid4()),
             name="test-preset",
             resource_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4294967296")}),
             shared_memory=None,
-            scaling_group_name=None,
+            resource_group_name=None,
         )
 
         mock_check_result = CheckPresetsResult(
@@ -713,11 +660,11 @@ class TestResourcePresetServiceCompatibility:
                 SlotQuantity("cpu", Decimal("45")),
                 SlotQuantity("mem", Decimal("48318382080")),
             ],
-            scaling_group_remaining=[
+            resource_group_remaining=[
                 SlotQuantity("cpu", Decimal("1000")),
                 SlotQuantity("mem", Decimal("1073741824000")),
             ],
-            scaling_groups={},
+            resource_groups={},
         )
 
         mock_dependencies["resource_preset_repository"].check_presets = AsyncMock(
@@ -725,15 +672,11 @@ class TestResourcePresetServiceCompatibility:
         )
 
         action = CheckResourcePresetsAction(
-            access_key=AccessKey("test-key"),
-            resource_policy={
-                "total_resource_slots": {"cpu": "100", "mem": "100G"},
-                "default_for_unspecified": "UNLIMITED",
-            },
+            targets=[PublicResourcePresetTarget()],
             domain_name="default",
             group="default",
             user_id=uuid.uuid4(),
-            scaling_group=None,
+            resource_group=None,
         )
 
         result = await resource_preset_service.check_presets(action)

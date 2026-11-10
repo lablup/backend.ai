@@ -1,14 +1,10 @@
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import RBACElementType
-from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.deployment.types import LegacyDeploymentData
-from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.services.deployment.actions.base import (
     DeploymentSingleEntityAction,
-    DeploymentSingleEntityActionResult,
 )
 
 
@@ -18,15 +14,10 @@ class GetLegacyDeploymentByIdAction(DeploymentSingleEntityAction):
     USE in new code — v2 / GraphQL use ``GetDeploymentByIdAction``.
     """
 
-    deployment_id: DeploymentID
-
     @override
-    def target_entity_id(self) -> str:
-        return str(self.deployment_id)
-
-    @override
-    def target_element(self) -> RBACElementRef:
-        return RBACElementRef(RBACElementType.MODEL_DEPLOYMENT, str(self.deployment_id))
+    @classmethod
+    def action_name(cls) -> str:
+        return "get_legacy_deployment_by_id"
 
     @override
     @classmethod
@@ -35,9 +26,5 @@ class GetLegacyDeploymentByIdAction(DeploymentSingleEntityAction):
 
 
 @dataclass
-class GetLegacyDeploymentByIdActionResult(DeploymentSingleEntityActionResult):
+class GetLegacyDeploymentByIdActionResult:
     data: LegacyDeploymentData
-
-    @override
-    def target_entity_id(self) -> str:
-        return str(self.data.id)

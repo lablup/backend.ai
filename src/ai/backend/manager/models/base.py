@@ -6,12 +6,14 @@ import ipaddress
 import json
 import logging
 import uuid
+import warnings
 from collections.abc import (
     Callable,
     Mapping,
     Sequence,
 )
 from dataclasses import dataclass
+from datetime import timedelta
 from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
@@ -29,16 +31,18 @@ import trafaret as t
 import yarl
 from dateutil.parser import isoparse
 from pydantic import BaseModel
-from sqlalchemy.dialects.postgresql import ARRAY, CIDR, ENUM, JSONB, UUID
+from sqlalchemy.dialects.postgresql import ARRAY, CIDR, ENUM, INET, JSONB, UUID
 from sqlalchemy.ext.asyncio import AsyncConnection
 from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
-from sqlalchemy.orm import registry
+from sqlalchemy.orm import DeclarativeBase, registry
 from sqlalchemy.types import CHAR, SchemaType, TypeDecorator, TypeEngine, Unicode, UnicodeText
 
 from ai.backend.common import validators as tx
 from ai.backend.common.auth import PublicKey
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.exception import InvalidIpAddressValue
-from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.types import (
     AbstractPermission,
     BackendAISchema,
@@ -51,16 +55,16 @@ from ai.backend.common.types import (
     VFolderHostPermission,
     VFolderHostPermissionMap,
 )
-from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.resource import DataTransformationFailed
-from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.errors.secret import InvalidSecretBinding
+from ai.backend.manager.secret.types import SecretValue
 
 if TYPE_CHECKING:
     from sqlalchemy.engine.interfaces import Dialect
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 # The common shared metadata instance
 convention = {
@@ -72,7 +76,15 @@ convention = {
 }
 metadata = sa.MetaData(naming_convention=convention)
 mapper_registry = registry(metadata=metadata)
-Base: Any = mapper_registry.generate_base()  # TODO: remove Any after #422 is merged
+
+
+class Base(DeclarativeBase):
+    registry = mapper_registry
+    metadata = mapper_registry.metadata
+    # Narrowed from the stubs' ClassVar[FromClause]; declarative mapping always
+    # materializes __table__ as a real Table.
+    __table__: ClassVar[sa.Table]
+
 
 # Subpackages to skip when dynamically importing model modules
 _SKIP_SUBPACKAGES: Final[frozenset[str]] = frozenset({"alembic", "hasher", "minilang", "rbac"})
@@ -90,10 +102,15 @@ def ensure_all_tables_registered() -> None:
 
     import ai.backend.manager.models
 
+    prefix = "ai.backend.manager.models."
     for module_info in pkgutil.iter_modules(ai.backend.manager.models.__path__):
         if module_info.name in _SKIP_SUBPACKAGES:
             continue
-        importlib.import_module(f"ai.backend.manager.models.{module_info.name}")
+        package = importlib.import_module(prefix + module_info.name)
+        # A domain package declares its tables in submodules, not in its __init__.
+        if module_info.ispkg:
+            for sub_info in pkgutil.walk_packages(package.__path__, f"{package.__name__}."):
+                importlib.import_module(sub_info.name)
 
 
 pgsql_connect_opts = {
@@ -608,7 +625,8 @@ class PydanticColumn[TBaseModel: BaseModel](TypeDecorator[TBaseModel]):
     cache_ok = True
 
     def __init__(self, schema: type[TBaseModel], *, exclude_unset: bool = False) -> None:
-        super().__init__()
+        # Without none_as_null, JSONB binds None as the JSON value 'null' instead of SQL NULL.
+        super().__init__(none_as_null=True)
         self._schema = schema
         self._exclude_unset = exclude_unset
 
@@ -792,6 +810,39 @@ class IPColumn(TypeDecorator[ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6
         return ReadableCIDR(value)
 
 
+_INETValue = (
+    str
+    | ipaddress.IPv4Address
+    | ipaddress.IPv6Address
+    | ipaddress.IPv4Interface
+    | ipaddress.IPv6Interface
+)
+
+
+class IPAddressColumn(TypeDecorator[str]):
+    """
+    A column type keeping an ``inet`` value as a string on both sides.
+
+    The driver decodes ``inet`` into an ``ipaddress`` object, while the callers of
+    these columns store and read plain strings.
+    """
+
+    impl = INET
+    cache_ok = True
+
+    @override
+    def process_bind_param(self, value: _INETValue | None, _dialect: Dialect) -> str | None:
+        if value is None:
+            return None
+        return str(value)
+
+    @override
+    def process_result_value(self, value: _INETValue | None, _dialect: Dialect) -> str | None:
+        if value is None:
+            return None
+        return str(value)
+
+
 class PermissionListColumn(TypeDecorator[set[AbstractPermission]]):
     """
     A column type to convert Permission values back and forth.
@@ -941,6 +992,63 @@ class GUID[TUUIDSubType: uuid.UUID](TypeDecorator[TUUIDSubType]):
         return type(self)(self._subtype_func)
 
 
+class SecretColumn(TypeDecorator[SecretValue]):
+    """
+    A column holding a secret, stored either as legacy plaintext or encrypted.
+
+    It only converts between the stored string and its parsed form: encrypting needs a
+    key provider and is asynchronous, so it happens before a value reaches here.
+    """
+
+    impl = UnicodeText
+    cache_ok = True
+
+    context: str
+
+    def __init__(self, context: str) -> None:
+        super().__init__()
+        # Names this column, and is what callers pass the key provider as the associated
+        # data. Public because SQLAlchemy keys a type's cache on the __init__ arguments it
+        # finds as plain attributes; sharing one key would bind a value under another
+        # column's associated data.
+        self.context = context
+
+    @override
+    def process_bind_param(self, value: Any, _dialect: Dialect) -> str | None:
+        if value is None:
+            return None
+        if not isinstance(value, SecretValue):
+            raise InvalidSecretBinding(
+                f"A secret column takes a SecretValue but got {type(value).__name__}."
+            )
+        return value.serialize()
+
+    @override
+    def process_result_value(self, value: str | None, _dialect: Dialect) -> SecretValue | None:
+        if value is None:
+            return None
+        return SecretValue.parse(value)
+
+
+class EntityTypeColumn(TypeDecorator[EntityType]):
+    """A string column read back as an :class:`EntityType`."""
+
+    impl = sa.String
+    cache_ok = True
+
+    @override
+    def process_bind_param(self, value: Any | None, _dialect: Dialect) -> str | None:
+        if value is None:
+            return None
+        return str(value)
+
+    @override
+    def process_result_value(self, value: Any | None, _dialect: Dialect) -> EntityType | None:
+        if value is None:
+            return None
+        return EntityType(value)
+
+
 class SlugType(TypeDecorator[str]):
     """
     A type wrapper for slug type string
@@ -969,14 +1077,18 @@ class SlugType(TypeDecorator[str]):
     def coerce_compared_value(self, _op: Any, _value: Any) -> Unicode:
         return Unicode()
 
-    @override
-    def process_bind_param(self, value: Any | None, _dialect: Dialect) -> str | None:
-        if value is None:
-            return value
+    def check(self, value: str) -> None:
+        """Raise :class:`ValueError` unless the value fits the column."""
         try:
             self._tx_slug.check(value)
         except t.DataError as e:
             raise ValueError(e.error, value) from e
+
+    @override
+    def process_bind_param(self, value: Any | None, _dialect: Dialect) -> str | None:
+        if value is None:
+            return value
+        self.check(value)
         return cast(str, value)
 
 
@@ -1013,6 +1125,8 @@ class ResourceOptsEntry(BackendAISchema):
     value: str
 
 
+# The three helpers below stay on uuid_generate_v4(): old migrations reproduce past
+# schemas through them. New tables declare their own column; see AGENTS.md.
 def IDColumn(name: str = "id") -> sa.Column[Any]:
     return sa.Column(name, GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()"))
 
@@ -1037,6 +1151,18 @@ async def populate_fixture(
     engine: SAEngine,
     fixture_data: Mapping[str, str | Sequence[dict[str, Any]]],
 ) -> None:
+    """Deprecated: write seed files with `mgr seed apply` instead. Removed in the next LTS.
+
+    A fixture without the RBAC rows of the entities it writes may leave them unreachable through
+    permission checks."""
+    warnings.warn(
+        "populate_fixture() is deprecated and will be removed in the next LTS; use"
+        " `mgr seed apply`. A fixture without the RBAC rows (virtual_entities,"
+        " entity_memberships, scope_bindings) of the entities it writes may leave them"
+        " unreachable through permission checks.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     ensure_all_tables_registered()
     op_mode = FixtureOpModes(cast(str, fixture_data.get("__mode", "insert")))
     for table_name, rows in fixture_data.items():
@@ -1053,8 +1179,8 @@ async def populate_fixture(
         if not isinstance(table, sa.Table):
             raise DataTransformationFailed(f"Table {table_name} not found in metadata")
         if not rows:
-            return
-        log.debug("Loading the fixture table {0} (mode:{1})", table_name, op_mode.name)
+            continue
+        log.debug("fixture table loading", table_name=table_name, op_mode=op_mode.name)
         from .hasher.types import PasswordColumn
 
         async with engine.begin() as conn:
@@ -1072,6 +1198,19 @@ async def populate_fixture(
                                 del row[col.name]
                             else:
                                 row[col.name] = None
+                if isinstance(col.type, sa.Interval):
+                    # asyncpg encodes intervals only from datetime.timedelta.
+                    # Accept a kwargs dict (e.g. {"days": 365}) or a number of
+                    # seconds in the fixture JSON.
+                    for row in rows:
+                        if col.name in row and row[col.name] is not None:
+                            value = row[col.name]
+                            if isinstance(value, timedelta):
+                                continue
+                            if isinstance(value, Mapping):
+                                row[col.name] = timedelta(**value)
+                            else:
+                                row[col.name] = timedelta(seconds=value)
                 if isinstance(col.type, EnumType):
                     for row in rows:
                         if col.name in row:
@@ -1104,6 +1243,11 @@ async def populate_fixture(
                                 rounds=600_000,
                                 salt_size=32,
                             )
+                elif isinstance(col.type, SecretColumn):
+                    for row in rows:
+                        if col.name in row and row[col.name] is not None:
+                            # Fixtures carry plaintext, which needs no key provider.
+                            row[col.name] = SecretValue(row[col.name])
                 elif isinstance(col.type, ResourceSlotColumn):
                     from ai.backend.common.types import ResourceSlot
 
@@ -1126,10 +1270,19 @@ async def populate_fixture(
 
             match op_mode:
                 case FixtureOpModes.INSERT:
-                    insert_stmt = (
-                        sa.dialects.postgresql.insert(table).values(rows).on_conflict_do_nothing()
-                    )
-                    await conn.execute(insert_stmt)
+                    # A multi-row INSERT takes its column list from the FIRST row, silently
+                    # dropping keys that only later rows carry. Group the rows by attribute
+                    # set so every row's own columns reach the server.
+                    row_groups: dict[tuple[str, ...], list[dict[str, Any]]] = {}
+                    for row in rows:
+                        row_groups.setdefault(tuple(sorted(row)), []).append(row)
+                    for row_group in row_groups.values():
+                        insert_stmt = (
+                            sa.dialects.postgresql.insert(table)
+                            .values(row_group)
+                            .on_conflict_do_nothing()
+                        )
+                        await conn.execute(insert_stmt)
                 case FixtureOpModes.UPDATE:
                     update_stmt = sa.update(table)
                     pkcols = []
@@ -1173,6 +1326,13 @@ async def populate_fixture(
                                 ) from e
                         update_data.append(update_row)
                     await conn.execute(update_stmt, update_data)
+
+    # After every table, so a node this fixture wrote itself is already there and the
+    # edges naming it stand. Imported here: the module is declared over this one's rows.
+    from .virtual_entity.fixture import provision_fixture_entities
+
+    async with engine.begin() as conn:
+        await provision_fixture_entities(conn, fixture_data.keys())
 
 
 async def _resolve_fixture_references(

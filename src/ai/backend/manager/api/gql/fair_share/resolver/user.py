@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import uuid
 
-from aiohttp import web
 from strawberry import Info
 from strawberry.relay import PageInfo
 
@@ -13,13 +12,14 @@ from ai.backend.common.dto.manager.v2.fair_share.request import (
     GetUserFairShareInput,
     SearchUserFairSharesInput,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
     gql_root_field,
 )
-from ai.backend.manager.api.gql.fair_share.types import (
+from ai.backend.manager.api.gql.fair_share.types.user import (
     BulkUpsertUserFairShareWeightInput,
     BulkUpsertUserFairShareWeightPayload,
     RGUserFairShareFilter,
@@ -33,6 +33,7 @@ from ai.backend.manager.api.gql.fair_share.types import (
 )
 from ai.backend.manager.api.gql.types import ResourceGroupUserScope, StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
+from ai.backend.manager.errors.auth import SuperadminRequired
 
 # Admin APIs
 
@@ -201,7 +202,7 @@ async def user_fair_share(
     """Get a single user fair share record."""
     me = current_user()
     if me is None or not me.is_superadmin:
-        raise web.HTTPForbidden(reason="Only superadmin can access fair share data.")
+        raise SuperadminRequired("Only superadmin can access fair share data.")
 
     result = await info.context.adapters.fair_share.get_user(
         GetUserFairShareInput(
@@ -233,7 +234,7 @@ async def user_fair_shares(
     """Search user fair shares with pagination."""
     me = current_user()
     if me is None or not me.is_superadmin:
-        raise web.HTTPForbidden(reason="Only superadmin can access fair share data.")
+        raise SuperadminRequired("Only superadmin can access fair share data.")
 
     pydantic_filter = filter.to_pydantic() if filter else None
     pydantic_orders = [o.to_pydantic() for o in order_by] if order_by else None
@@ -266,6 +267,41 @@ async def user_fair_shares(
     )
 
 
+# Mutations
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description="Upsert user fair share weight. Creates a new record if it doesn't exist, or updates the weight if it does",
+    )
+)
+async def upsert_user_fair_share_weight(
+    info: Info[StrawberryGQLContext],
+    input: UpsertUserFairShareWeightInput,
+) -> UpsertUserFairShareWeightPayload | None:
+    """Upsert user fair share weight."""
+    result = await info.context.adapters.fair_share.upsert_user(input.to_pydantic())
+    return UpsertUserFairShareWeightPayload(
+        user_fair_share=UserFairShareGQL.from_pydantic(result.user_fair_share)
+    )
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Upsert several user fair share weights in one transaction. Creates new records if they don't exist, or updates weights if they do",
+    )
+)
+async def atomic_bulk_upsert_user_fair_share_weights(
+    info: Info[StrawberryGQLContext],
+    input: BulkUpsertUserFairShareWeightInput,
+) -> BulkUpsertUserFairShareWeightPayload | None:
+    """Upsert several user fair share weights in one transaction."""
+    result = await info.context.adapters.fair_share.atomic_bulk_upsert_user(input.to_pydantic())
+    return BulkUpsertUserFairShareWeightPayload.from_pydantic(result)
+
+
 # Admin Mutations
 
 
@@ -273,7 +309,8 @@ async def user_fair_shares(
     BackendAIGQLMeta(
         added_version="26.2.0",
         description="Upsert user fair share weight (admin only). Creates a new record if it doesn't exist, or updates the weight if it does",
-    )
+    ),
+    deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `upsertUserFairShareWeight`.",
 )
 async def admin_upsert_user_fair_share_weight(
     info: Info[StrawberryGQLContext],
@@ -292,7 +329,8 @@ async def admin_upsert_user_fair_share_weight(
     BackendAIGQLMeta(
         added_version="26.2.0",
         description="Bulk upsert user fair share weights (admin only). Creates new records if they don't exist, or updates weights if they do",
-    )
+    ),
+    deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `atomicBulkUpsertUserFairShareWeights`.",
 )
 async def admin_bulk_upsert_user_fair_share_weight(
     info: Info[StrawberryGQLContext],
@@ -301,7 +339,7 @@ async def admin_bulk_upsert_user_fair_share_weight(
     """Bulk upsert user fair share weights (admin only)."""
     check_admin_only()
 
-    result = await info.context.adapters.fair_share.bulk_upsert_user(input.to_pydantic())
+    result = await info.context.adapters.fair_share.atomic_bulk_upsert_user(input.to_pydantic())
     return BulkUpsertUserFairShareWeightPayload.from_pydantic(result)
 
 
@@ -311,31 +349,9 @@ async def admin_bulk_upsert_user_fair_share_weight(
 @gql_mutation(
     BackendAIGQLMeta(
         added_version="26.1.0",
-        description="Upsert user fair share weight (superadmin only). Creates a new record if it doesn't exist, or updates the weight if it does",
-    ),
-    deprecation_reason="Use admin_upsert_user_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
-)
-async def upsert_user_fair_share_weight(
-    info: Info[StrawberryGQLContext],
-    input: UpsertUserFairShareWeightInput,
-) -> UpsertUserFairShareWeightPayload | None:
-    """Upsert user fair share weight."""
-    me = current_user()
-    if me is None or not me.is_superadmin:
-        raise web.HTTPForbidden(reason="Only superadmin can modify fair share data.")
-
-    result = await info.context.adapters.fair_share.upsert_user(input.to_pydantic())
-    return UpsertUserFairShareWeightPayload(
-        user_fair_share=UserFairShareGQL.from_pydantic(result.user_fair_share)
-    )
-
-
-@gql_mutation(
-    BackendAIGQLMeta(
-        added_version="26.1.0",
         description="Bulk upsert user fair share weights (superadmin only). Creates new records if they don't exist, or updates weights if they do",
     ),
-    deprecation_reason="Use admin_bulk_upsert_user_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
+    deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `atomicBulkUpsertUserFairShareWeights`.",
 )
 async def bulk_upsert_user_fair_share_weight(
     info: Info[StrawberryGQLContext],
@@ -344,7 +360,7 @@ async def bulk_upsert_user_fair_share_weight(
     """Bulk upsert user fair share weights."""
     me = current_user()
     if me is None or not me.is_superadmin:
-        raise web.HTTPForbidden(reason="Only superadmin can modify fair share data.")
+        raise SuperadminRequired("Only superadmin can modify fair share data.")
 
-    result = await info.context.adapters.fair_share.bulk_upsert_user(input.to_pydantic())
+    result = await info.context.adapters.fair_share.atomic_bulk_upsert_user(input.to_pydantic())
     return BulkUpsertUserFairShareWeightPayload.from_pydantic(result)

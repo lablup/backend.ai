@@ -3,15 +3,18 @@ import logging
 from collections.abc import Awaitable, Callable
 from typing import Self
 
+from ai.backend.common.asyncio import ConsecutiveFailures
 from ai.backend.common.configs.loader import EtcdConfigWatcher, LoaderChain
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .loader.legacy_etcd_loader import LegacyEtcdLoader
 from .unified import ManagerUnifiedConfig
 
 SharedConfigChangeCallback = Callable[[ManagerUnifiedConfig], Awaitable[None]]
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
+
+_WATCH_MAX_RETRY_DELAY_SEC = 30.0
 
 
 class ManagerConfigProvider:
@@ -58,10 +61,43 @@ class ManagerConfigProvider:
         return self._legacy_etcd_config_loader
 
     async def _run_watcher(self) -> None:
-        async for event in self._etcd_watcher.watch():
+        watch_failures = ConsecutiveFailures(max_delay_sec=_WATCH_MAX_RETRY_DELAY_SEC)
+        reload_failures = ConsecutiveFailures()
+        while True:
+            try:
+                async for event in self._etcd_watcher.watch():
+                    if failure_count := watch_failures.record_success():
+                        log.info("config watch recovered", failure_count=failure_count)
+                    await self._reload_on_change(event.key, reload_failures)
+            except Exception:
+                if watch_failures.record_failure():
+                    log.exception("config watch failed")
+                else:
+                    log.debug("config watch failed", failure_count=watch_failures.count)
+            await asyncio.sleep(watch_failures.delay_sec())
+
+    async def _reload_on_change(
+        self, config_key: str, reload_failures: ConsecutiveFailures
+    ) -> None:
+        try:
             raw_config = await self._loader.load()
-            self._config = ManagerUnifiedConfig.model_validate(raw_config, by_name=True)
-            log.debug("config reloaded due to etcd event.")
+            config = ManagerUnifiedConfig.model_validate(raw_config, by_name=True)
+        except Exception:
+            if reload_failures.record_failure():
+                log.exception(
+                    "config reload failed, keeping the previous config", config_key=config_key
+                )
+            else:
+                log.debug(
+                    "config reload failed, keeping the previous config",
+                    config_key=config_key,
+                    failure_count=reload_failures.count,
+                )
+            return
+        if failure_count := reload_failures.record_success():
+            log.info("config reload recovered", failure_count=failure_count)
+        self._config = config
+        log.info("config reloaded on an etcd change", config_key=config_key)
 
     async def terminate(self) -> None:
         if self._etcd_watcher_task:

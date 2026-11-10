@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import uuid
 from collections.abc import Sequence
 from datetime import datetime
@@ -10,22 +9,22 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship, selectinload
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ai.backend.common.config import ModelHealthCheck
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.replica import ReplicaID
-from ai.backend.common.identifier.replica_group import ReplicaGroupID
-from ai.backend.common.types import SessionId
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.replica import ReplicaID
+from ai.backend.common.data.entity.replica_group import ReplicaGroupID
+from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.deployment.types import (
     RouteHealthStatus,
-    RouteInfo,
     RouteStatus,
     RouteSubStatus,
     RouteTrafficStatus,
 )
-from ai.backend.manager.data.model_serving.types import RoutingData
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -34,47 +33,35 @@ from ai.backend.manager.models.base import (
 )
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
-    from ai.backend.manager.models.endpoint import EndpointRow
-    from ai.backend.manager.models.replica_group import ReplicaGroupRow
-    from ai.backend.manager.models.session import SessionRow
+    from ai.backend.manager.models.endpoint.row import EndpointRow
 
 
-__all__ = ("RouteStatus", "RoutingRow")
+__all__ = ("RoutingRow",)
 
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
-
-def _get_deployment_revision_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
-
-    return RoutingRow.revision == DeploymentRevisionRow.id
-
-
-def _get_replica_group_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.replica_group import ReplicaGroupRow
-
-    return foreign(RoutingRow.replica_group_id) == ReplicaGroupRow.id
-
-
-class RoutingRow(Base):  # type: ignore[misc]
+class RoutingRow(Base):
     __tablename__ = "routings"
     __table_args__ = (
         sa.UniqueConstraint("endpoint", "session", name="uq_routings_endpoint_session"),
     )
 
     id: Mapped[ReplicaID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID(ReplicaID), primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     endpoint: Mapped[DeploymentID] = mapped_column(
-        "endpoint", GUID, sa.ForeignKey("endpoints.id", ondelete="CASCADE"), nullable=False
+        "endpoint",
+        GUID(DeploymentID),
+        sa.ForeignKey("endpoints.id", ondelete="CASCADE"),
+        nullable=False,
     )
-    session: Mapped[uuid.UUID | None] = mapped_column(
-        "session", GUID, sa.ForeignKey("sessions.id", ondelete="RESTRICT"), nullable=True
+    session: Mapped[SessionID | None] = mapped_column(
+        "session", GUID(SessionID), sa.ForeignKey("sessions.id", ondelete="RESTRICT"), nullable=True
     )
-    session_owner: Mapped[uuid.UUID] = mapped_column(
-        "session_owner", GUID, sa.ForeignKey("users.uuid", ondelete="RESTRICT"), nullable=False
+    session_owner: Mapped[UserID] = mapped_column(
+        "session_owner",
+        GUID(UserID),
+        sa.ForeignKey("users.uuid", ondelete="RESTRICT"),
+        nullable=False,
     )
     domain: Mapped[str] = mapped_column(
         "domain",
@@ -82,9 +69,9 @@ class RoutingRow(Base):  # type: ignore[misc]
         sa.ForeignKey("domains.name", ondelete="RESTRICT"),
         nullable=False,
     )
-    project: Mapped[uuid.UUID] = mapped_column(
+    project: Mapped[ProjectID] = mapped_column(
         "project",
-        GUID,
+        GUID(ProjectID),
         sa.ForeignKey("groups.id", ondelete="RESTRICT"),
         nullable=False,
     )
@@ -137,7 +124,9 @@ class RoutingRow(Base):  # type: ignore[misc]
     )
 
     # Revision reference without FK (relationship only)
-    revision: Mapped[uuid.UUID] = mapped_column("revision", GUID, nullable=False)
+    revision: Mapped[DeploymentRevisionID] = mapped_column(
+        "revision", GUID(DeploymentRevisionID), nullable=False
+    )
     # Replica group this replica belongs to (``NULL`` until assigned). FK is SET NULL on group delete.
     replica_group_id: Mapped[ReplicaGroupID | None] = mapped_column(
         "replica_group_id",
@@ -169,76 +158,25 @@ class RoutingRow(Base):  # type: ignore[misc]
     )
 
     endpoint_row: Mapped[EndpointRow] = relationship("EndpointRow", back_populates="routings")
-    session_row: Mapped[SessionRow | None] = relationship(
-        "SessionRow", back_populates="routing", foreign_keys="RoutingRow.session"
-    )
-    revision_row: Mapped[DeploymentRevisionRow | None] = relationship(
-        "DeploymentRevisionRow",
-        primaryjoin=_get_deployment_revision_join_condition,
-        foreign_keys="RoutingRow.revision",
-        viewonly=True,
-    )
-    replica_group_row: Mapped[ReplicaGroupRow | None] = relationship(
-        "ReplicaGroupRow",
-        primaryjoin=_get_replica_group_join_condition,
-        viewonly=True,
-    )
 
-    @classmethod
-    async def get_by_session(
-        cls,
-        db_sess: AsyncSession,
-        session_id: uuid.UUID,
-        load_endpoint: bool = False,
-        project: uuid.UUID | None = None,
-        domain: str | None = None,
-        user_uuid: uuid.UUID | None = None,
-    ) -> RoutingRow:
-        """
-        :raises: sqlalchemy.orm.exc.NoResultFound
-        """
-        query = sa.select(RoutingRow).where(RoutingRow.session == session_id)
-        if load_endpoint:
-            query = query.options(selectinload(RoutingRow.endpoint_row))
-        if project:
-            query = query.filter(RoutingRow.project == project)
-        if domain:
-            query = query.filter(RoutingRow.domain == domain)
-        if user_uuid:
-            query = query.filter(RoutingRow.session_owner == user_uuid)
-        result = await db_sess.execute(query)
-        row = result.scalar()
-        if row is None:
-            raise NoResultFound
-        return row
+    # The two reads below serve api/gql_legacy only; delete them together with gql_legacy.
 
     @classmethod
     async def list(
         cls,
         db_sess: AsyncSession,
         endpoint_id: uuid.UUID,
-        load_endpoint: bool = False,
-        load_session: bool = False,
-        status_filter: list[RouteStatus] | None = None,
         project: uuid.UUID | None = None,
         domain: str | None = None,
         user_uuid: uuid.UUID | None = None,
     ) -> Sequence[RoutingRow]:
-        """
-        :raises: sqlalchemy.orm.exc.NoResultFound
-        """
-        if status_filter is None:
-            status_filter = list(RouteStatus.active_route_statuses())
+        """Used only by Routing.load_all, which nothing calls."""
         query = (
             sa.select(RoutingRow)
             .filter(RoutingRow.endpoint == endpoint_id)
-            .filter(RoutingRow.status.in_(status_filter))
+            .filter(RoutingRow.status.in_(list(RouteStatus.active_route_statuses())))
             .order_by(sa.desc(RoutingRow.created_at))
         )
-        if load_endpoint:
-            query = query.options(selectinload(RoutingRow.endpoint_row))
-        if load_session:
-            query = query.options(selectinload(RoutingRow.session_row))
         if project:
             query = query.filter(RoutingRow.project == project)
         if domain:
@@ -253,8 +191,6 @@ class RoutingRow(Base):  # type: ignore[misc]
         cls,
         db_sess: AsyncSession,
         route_id: uuid.UUID,
-        load_session: bool = False,
-        load_endpoint: bool = False,
         project: uuid.UUID | None = None,
         domain: str | None = None,
         user_uuid: uuid.UUID | None = None,
@@ -263,10 +199,6 @@ class RoutingRow(Base):  # type: ignore[misc]
         :raises: sqlalchemy.orm.exc.NoResultFound
         """
         query = sa.select(RoutingRow).where(RoutingRow.id == route_id)
-        if load_session:
-            query = query.options(selectinload(RoutingRow.session_row))
-        if load_endpoint:
-            query = query.options(selectinload(RoutingRow.endpoint_row))
         if project:
             query = query.filter(RoutingRow.project == project)
         if domain:
@@ -278,34 +210,3 @@ class RoutingRow(Base):  # type: ignore[misc]
         if row is None:
             raise NoResultFound
         return row
-
-    def delegate_ownership(self, user_uuid: uuid.UUID) -> None:
-        self.session_owner = user_uuid
-
-    def to_data(self) -> RoutingData:
-        return RoutingData(
-            id=self.id,
-            endpoint=self.endpoint,
-            session=self.session,
-            status=self.status,
-            health_status=self.health_status,
-            traffic_ratio=self.traffic_ratio,
-            created_at=self.created_at,
-            error_data=self.error_data or {},
-        )
-
-    def to_route_info(self) -> RouteInfo:
-        return RouteInfo(
-            route_id=self.id,
-            deployment_id=self.endpoint,
-            session_id=SessionId(self.session) if self.session else None,
-            status=self.status,
-            health_status=self.health_status,
-            traffic_ratio=self.traffic_ratio,
-            created_at=self.created_at,
-            revision_id=self.revision,
-            traffic_status=self.traffic_status,
-            health_check=self.health_check,
-            replica_group_id=self.replica_group_id,
-            error_data=self.error_data or {},
-        )

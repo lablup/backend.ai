@@ -1,8 +1,6 @@
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import EntityType
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.services.container_registry.actions.base import ContainerRegistryAction
@@ -15,12 +13,8 @@ class ClearImagesAction(ContainerRegistryAction):
 
     @override
     @classmethod
-    def entity_type(cls) -> EntityType:
-        return EntityType.CONTAINER_REGISTRY_IMAGE
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
+    def action_name(cls) -> str:
+        return "clear_images"
 
     @override
     @classmethod
@@ -29,12 +23,8 @@ class ClearImagesAction(ContainerRegistryAction):
 
 
 @dataclass
-class ClearImagesActionResult(BaseActionResult):
+class ClearImagesActionResult:
     registry: ContainerRegistryData
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.registry.id)
 
 
 # @dataclass
@@ -51,7 +41,7 @@ class ClearImagesActionResult(BaseActionResult):
 
 
 # @dataclass
-# class ClearImagesBatchActionResult(BaseActionResult):
+# class ClearImagesBatchActionResult:
 #     registry_row: ContainerRegistryRow
 
 #     @override

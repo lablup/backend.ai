@@ -10,11 +10,11 @@ from ai.backend.appproxy.common.types import RouteInfo
 from ai.backend.appproxy.worker.errors import InvalidFrontendTypeError, SubprocessPipeError
 from ai.backend.appproxy.worker.proxy.backend.h2 import BackendConfig, H2Backend
 from ai.backend.appproxy.worker.types import Circuit, PortFrontendInfo
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .base import H2Frontend
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class PortFrontend(H2Frontend[int]):
@@ -53,7 +53,9 @@ class PortFrontend(H2Frontend[int]):
                     str(worker_config.tls_privkey),
                 ]
             else:
-                nghttpx_args.append(f"--frontend=*,{listen_port};no-tls")
+                nghttpx_args.append(
+                    f"--frontend={port_proxy_config.bind_host},{listen_port};no-tls"
+                )
 
             proc = await subprocess.create_subprocess_exec(
                 h2_config.nghttpx_path,
@@ -72,7 +74,11 @@ class PortFrontend(H2Frontend[int]):
             )
             self.proc_monitor_tasks.append(asyncio.create_task(self._proc_monitor_task(proc)))
             self.api_ports[listen_port] = api_port
-            log.info("started nghttpx server at {}:{}", port_proxy_config.bind_host, listen_port)
+            log.info(
+                "started the nghttpx server",
+                bind_host=port_proxy_config.bind_host,
+                port=listen_port,
+            )
 
     @override
     async def stop(self) -> None:

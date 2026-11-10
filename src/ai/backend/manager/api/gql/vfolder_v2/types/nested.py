@@ -9,6 +9,8 @@ from uuid import UUID
 import strawberry
 from strawberry import Info
 
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderAccessControlInfo as VFolderAccessControlInfoDTO,
 )
@@ -78,8 +80,8 @@ class VFolderMetadataInfoGQL:
         added_version="26.4.2",
         description=(
             "Access control information for a virtual folder. "
-            "Includes the mount permission level (read-only, read-write, read-write-delete) "
-            "and ownership type (user or project)."
+            "Includes the folder's default mount permission level "
+            "(read-only, read-write, read-write-delete) and ownership type (user or project)."
         ),
     ),
     model=VFolderAccessControlInfoDTO,
@@ -89,7 +91,12 @@ class VFolderAccessControlInfoGQL:
     """Access control and ownership type information."""
 
     permission: VFolderMountPermissionGQL = gql_field(
-        description="Mount permission level: READ_ONLY (ro), READ_WRITE (rw), or RW_DELETE (wd)."
+        description=(
+            "The folder's default mount permission level: READ_ONLY (ro), READ_WRITE (rw), "
+            "or RW_DELETE (wd). Applies to a shared user without their own "
+            "`vfolderMountPolicies` entry. The level the current user mounts at is "
+            "`VFolder.mountPermission`."
+        )
     )
     ownership_type: VFolderOwnershipTypeGQL = gql_field(
         description="Ownership type: USER (personal folder) or GROUP (project-shared folder)."
@@ -181,7 +188,7 @@ class VFolderOwnershipInfoGQL:
     ):
         if self.user_id is None:
             return None
-        return await info.context.data_loaders.user_loader.load(self.user_id)
+        return await info.context.data_loaders.user_loader.load(UserID(self.user_id))
 
     @gql_field(
         description="The project that owns this virtual folder. Null for user-owned folders."
@@ -198,7 +205,7 @@ class VFolderOwnershipInfoGQL:
     ):
         if self.project_id is None:
             return None
-        return await info.context.data_loaders.project_loader.load(self.project_id)
+        return await info.context.data_loaders.project_loader.load(ProjectID(self.project_id))
 
     @gql_field(description="The user who originally created this virtual folder.")  # type: ignore[misc]
     async def creator(
@@ -213,4 +220,4 @@ class VFolderOwnershipInfoGQL:
     ):
         if self.creator_id is None:
             return None
-        return await info.context.data_loaders.user_loader.load(self.creator_id)
+        return await info.context.data_loaders.user_loader.load(UserID(self.creator_id))

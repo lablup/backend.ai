@@ -1,37 +1,31 @@
 from __future__ import annotations
 
-from typing import override
-
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
-from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.ops.result import BatchOpsResult
+from ai.backend.manager.data.service_catalog.types import ServiceCatalogData
+from ai.backend.manager.services.service_catalog.actions.bulk_get import (
+    BulkGetServiceCatalogsAction,
+)
 from ai.backend.manager.services.service_catalog.actions.search import (
     SearchServiceCatalogsAction,
-    SearchServiceCatalogsActionResult,
 )
 from ai.backend.manager.services.service_catalog.service import ServiceCatalogService
 
 
-class ServiceCatalogProcessors(AbstractProcessorPackage):
-    """Processor package for service catalog operations."""
+class ServiceCatalogProcessors:
+    """The search runs straight against ops; the bulk read keeps a service, which reads
+    the endpoints of the services it found in a second query."""
 
-    search_service_catalogs: ActionProcessor[
-        SearchServiceCatalogsAction, SearchServiceCatalogsActionResult
+    global_search_service_catalogs: GlobalActionProcessor[
+        SearchServiceCatalogsAction,
+        BatchOpsResult[ServiceCatalogData],
     ]
+    bulk_get: PartialBulkActionProcessor[BulkGetServiceCatalogsAction, ServiceCatalogData]
 
     def __init__(
-        self,
-        service: ServiceCatalogService,
-        action_monitors: list[ActionMonitor],
-        validators: ActionValidators,
+        self, group: ProcessorGroup[ServiceCatalogData], service: ServiceCatalogService
     ) -> None:
-        self.search_service_catalogs = ActionProcessor(
-            service.search_service_catalogs, action_monitors
-        )
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            SearchServiceCatalogsAction.spec(),
-        ]
+        self.global_search_service_catalogs = group.global_searcher_ops(SearchServiceCatalogsAction)
+        self.bulk_get = group.partial_bulk(BulkGetServiceCatalogsAction, service.bulk_get)

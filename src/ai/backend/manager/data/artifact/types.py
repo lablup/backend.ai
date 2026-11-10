@@ -2,12 +2,15 @@ import enum
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Self
+from typing import Any, Self, override
 
 from ai.backend.common.data.artifact.types import (
     ArtifactRegistryType,
     VerificationStepResult,
 )
+from ai.backend.common.data.entity.artifact import ArtifactID
+from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
+from ai.backend.common.data.entity.types import EntityData, FieldData
 from ai.backend.manager.data.common.types import StringFilterData
 
 
@@ -54,8 +57,8 @@ class ArtifactAvailability(enum.StrEnum):
 
 
 @dataclass
-class ArtifactData:
-    id: uuid.UUID
+class ArtifactData(EntityData):
+    id: ArtifactID
     name: str
     type: ArtifactType
     description: str | None
@@ -69,11 +72,15 @@ class ArtifactData:
     readonly: bool
     extra: dict[str, Any] | None
 
+    @override
+    def entity_id(self) -> ArtifactID:
+        return self.id
+
 
 @dataclass
-class ArtifactRevisionData:
-    id: uuid.UUID
-    artifact_id: uuid.UUID
+class ArtifactRevisionData(FieldData):
+    id: ArtifactRevisionID
+    artifact_id: ArtifactID
     version: str
     readme: str | None
     size: int | None
@@ -89,8 +96,8 @@ class ArtifactRevisionData:
 class ArtifactRevisionResponseData:
     """ArtifactRevisionData without readme field for API responses."""
 
-    id: uuid.UUID
-    artifact_id: uuid.UUID
+    id: ArtifactRevisionID
+    artifact_id: ArtifactID
     version: str
     size: int | None
     status: ArtifactStatus

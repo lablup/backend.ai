@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyBgtaskClient
 from ai.backend.common.clients.valkey_client.valkey_container_log.client import (
     ValkeyContainerLogClient,
@@ -50,7 +51,13 @@ class AgentValkeyClients:
         await self.container_log.close()
 
 
-class AgentValkeyDependency(DependencyProvider[RedisConfig, AgentValkeyClients]):
+@dataclass
+class AgentValkeyInput:
+    redis_config: RedisConfig
+    sentinel_monitors: SentinelMonitorSet
+
+
+class AgentValkeyDependency(DependencyProvider[AgentValkeyInput, AgentValkeyClients]):
     """Provides lifecycle management for 4 agent-specific Valkey clients."""
 
     @property
@@ -60,16 +67,17 @@ class AgentValkeyDependency(DependencyProvider[RedisConfig, AgentValkeyClients])
 
     @asynccontextmanager
     @override
-    async def provide(self, setup_input: RedisConfig) -> AsyncIterator[AgentValkeyClients]:
+    async def provide(self, setup_input: AgentValkeyInput) -> AsyncIterator[AgentValkeyClients]:
         """Initialize and provide all agent Valkey clients.
 
         Args:
-            setup_input: Redis configuration from etcd
+            setup_input: Redis configuration from etcd and the Sentinel monitors
 
         Yields:
             AgentValkeyClients instance containing 4 specialized clients
         """
-        valkey_profile_target = setup_input.to_valkey_profile_target()
+        valkey_profile_target = setup_input.redis_config.to_valkey_profile_target()
+        sentinel_monitors = setup_input.sentinel_monitors
 
         # Create 4 specialized clients needed by agent
         clients = AgentValkeyClients(
@@ -77,21 +85,33 @@ class AgentValkeyDependency(DependencyProvider[RedisConfig, AgentValkeyClients])
                 valkey_profile_target.profile_target(RedisRole.STATISTICS),
                 db_id=REDIS_STATISTICS_DB,
                 human_readable_name="agent.stat",
+                sentinel_monitor=sentinel_monitors.monitor_for(
+                    valkey_profile_target.profile_target(RedisRole.STATISTICS)
+                ),
             ),
             stream=await ValkeyStreamClient.create(
                 valkey_profile_target.profile_target(RedisRole.STREAM),
                 db_id=REDIS_STREAM_DB,
                 human_readable_name="agent.stream",
+                sentinel_monitor=sentinel_monitors.monitor_for(
+                    valkey_profile_target.profile_target(RedisRole.STREAM)
+                ),
             ),
             bgtask=await ValkeyBgtaskClient.create(
                 valkey_profile_target.profile_target(RedisRole.BGTASK),
                 db_id=REDIS_BGTASK_DB,
                 human_readable_name="agent.bgtask",
+                sentinel_monitor=sentinel_monitors.monitor_for(
+                    valkey_profile_target.profile_target(RedisRole.BGTASK)
+                ),
             ),
             container_log=await ValkeyContainerLogClient.create(
                 valkey_profile_target.profile_target(RedisRole.CONTAINER_LOG),
                 db_id=REDIS_CONTAINER_LOG,
                 human_readable_name="agent.container_log",
+                sentinel_monitor=sentinel_monitors.monitor_for(
+                    valkey_profile_target.profile_target(RedisRole.CONTAINER_LOG)
+                ),
             ),
         )
 

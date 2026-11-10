@@ -6,6 +6,7 @@ from uuid import UUID
 from pydantic import AliasChoices, Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.dto.manager.v2.deployment.types import (
     ModelMetadataInfoDTO,
     PreStartActionInfoDTO,
@@ -63,6 +64,9 @@ class RuntimeVariantModelDefinitionInfo(BaseResponseModel):
 
 class RuntimeVariantNode(BaseResponseModel):
     id: UUID = Field(description="ID of the runtime variant.")
+    entity_id: UUID = Field(
+        description="UUID of the runtime variant. Added in 26.9.0.",
+    )
     name: str = Field(description="Unique name of the runtime variant.")
     description: str | None = Field(default=None, description="Description.")
     reads_vfolder_config_files: bool = Field(
@@ -88,11 +92,29 @@ class UpdateRuntimeVariantPayload(BaseResponseModel):
 
 class DeleteRuntimeVariantPayload(BaseResponseModel):
     id: UUID = Field(description="ID of the deleted runtime variant.")
+    entity_id: UUID = Field(description="UUID of the deleted runtime variant. Added in 26.10.0.")
+
+
+class RuntimeVariantBulkFailureInfo(BaseResponseModel):
+    """One failed item of a partial-success bulk operation."""
+
+    id: RuntimeVariantID = Field(description="Id of the runtime variant the failed item targeted.")
+    message: str = Field(description="Reason the item failed.")
 
 
 class DeleteRuntimeVariantsPayload(BaseResponseModel):
-    """Payload for bulk runtime variant deletion."""
+    """Partial-success payload for a bulk runtime variant deletion."""
 
+    items: list[RuntimeVariantID] = Field(
+        default_factory=list,
+        description="Ids of successfully deleted runtime variants. Added in 26.9.0.",
+    )
+    failed: list[RuntimeVariantBulkFailureInfo] = Field(
+        default_factory=list,
+        description=(
+            "Per-item failures, each naming the runtime variant it targeted. Added in 26.9.0."
+        ),
+    )
     deleted_count: int = Field(description="Number of runtime variants successfully deleted.")
 
 

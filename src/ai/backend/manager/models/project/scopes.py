@@ -1,0 +1,145 @@
+"""Operation scopes for projects."""
+
+from __future__ import annotations
+
+from abc import ABC
+from collections.abc import Sequence
+from dataclasses import dataclass
+from typing import Any, override
+
+import sqlalchemy as sa
+
+from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.manager.errors.resource import DomainNotFound
+from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupForProjectRow
+from ai.backend.manager.models.scopes import ExistenceCheck, ScopeTarget
+from ai.backend.manager.models.virtual_entity.queries import (
+    scope_membership_exists,
+    user_scope_membership_exists,
+)
+
+__all__ = (
+    "DomainProjectTarget",
+    "ProjectTarget",
+    "ResourceGroupProjectTarget",
+    "UserProjectTarget",
+)
+
+
+class ProjectTarget(ScopeTarget, ABC):
+    """One side a project is reachable from."""
+
+
+@dataclass(frozen=True)
+class DomainProjectTarget(ProjectTarget):
+    """Required scope for searching projects within a domain.
+
+    Used for domain-scoped project search (domain admin+).
+    """
+
+    domain_id: DomainID
+    """Required. The domain to search within."""
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.domain_id
+
+    @override
+    def to_condition(self) -> QueryCondition:
+        """Convert scope to a query condition for ProjectRow.
+
+        Groups reference their domain by name, so the domain UUID is resolved
+        to the name via a scalar subquery.
+        """
+        domain_id = self.domain_id
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return scope_membership_exists(
+                DomainEntityType(), domain_id, ProjectEntityType(), ProjectRow.id
+            )
+
+        return inner
+
+    @property
+    @override
+    def existence_checks(self) -> Sequence[ExistenceCheck[DomainID]]:
+        """Return existence checks for scope validation."""
+        return [
+            ExistenceCheck(
+                column=DomainRow.id,
+                value=self.domain_id,
+                error=DomainNotFound(str(self.domain_id)),
+            ),
+        ]
+
+
+@dataclass(frozen=True)
+class UserProjectTarget(ProjectTarget):
+    """Required scope for searching projects a user is member of.
+
+    Used for user-scoped project search (any authenticated user).
+    Membership is read from the projects' virtual entities.
+    """
+
+    user_id: UserID
+    """Required. The user to search projects for."""
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.user_id
+
+    @override
+    def to_condition(self) -> QueryCondition:
+        """Membership predicate: the user is enrolled in the project's virtual
+        scope."""
+        user_id = self.user_id
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return user_scope_membership_exists(ProjectEntityType(), ProjectRow.id, user_id)
+
+        return inner
+
+    @property
+    @override
+    def existence_checks(self) -> Sequence[ExistenceCheck[UserID]]:
+        """Return existence checks for scope validation.
+
+        Note: User existence is typically already validated by auth layer.
+        """
+        return []
+
+
+@dataclass(frozen=True)
+class ResourceGroupProjectTarget(ProjectTarget):
+    """The projects one resource group serves."""
+
+    resource_group_id: ResourceGroupID
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.resource_group_id
+
+    @override
+    def to_condition(self) -> QueryCondition:
+        resource_group_id = self.resource_group_id
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ProjectRow.id.in_(
+                sa.select(ResourceGroupForProjectRow.group).where(
+                    ResourceGroupForProjectRow.resource_group_id == resource_group_id
+                )
+            )
+
+        return inner
+
+    @property
+    @override
+    def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
+        return ()

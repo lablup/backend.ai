@@ -80,6 +80,7 @@ class TestVFolderNodeCreation:
     def test_creation(self) -> None:
         node = VFolderNode(
             id=uuid.uuid4(),
+            entity_id=uuid.uuid4(),
             status=VFolderOperationStatusField.READY,
             host="nfs01",
             metadata=_make_metadata_info(),
@@ -92,6 +93,7 @@ class TestVFolderNodeCreation:
     def test_round_trip(self) -> None:
         node = VFolderNode(
             id=uuid.uuid4(),
+            entity_id=uuid.uuid4(),
             status=VFolderOperationStatusField.READY,
             host="nfs01",
             metadata=_make_metadata_info(),
@@ -106,6 +108,7 @@ class TestVFolderNodeCreation:
     def test_nested_structure_in_json(self) -> None:
         node = VFolderNode(
             id=uuid.uuid4(),
+            entity_id=uuid.uuid4(),
             status=VFolderOperationStatusField.READY,
             host="nfs01",
             metadata=_make_metadata_info(),
@@ -183,6 +186,7 @@ class TestPayloadModels:
     def test_create_payload(self) -> None:
         node = VFolderNode(
             id=uuid.uuid4(),
+            entity_id=uuid.uuid4(),
             status=VFolderOperationStatusField.READY,
             host="nfs01",
             metadata=_make_metadata_info(),
@@ -196,6 +200,7 @@ class TestPayloadModels:
     def test_update_payload(self) -> None:
         node = VFolderNode(
             id=uuid.uuid4(),
+            entity_id=uuid.uuid4(),
             status=VFolderOperationStatusField.READY,
             host="nfs01",
             metadata=_make_metadata_info(),
@@ -208,13 +213,35 @@ class TestPayloadModels:
 
     def test_delete_payload(self) -> None:
         vid = uuid.uuid4()
-        payload = DeleteVFolderPayload(id=vid)
+        node = VFolderNode(
+            id=vid,
+            entity_id=vid,
+            status=VFolderOperationStatusField.DELETE_PENDING,
+            host="nfs01",
+            metadata=_make_metadata_info(),
+            access_control=_make_access_control_info(),
+            ownership=_make_owner_info(),
+            quota=_make_quota_info(),
+        )
+        payload = DeleteVFolderPayload(id=vid, vfolder=node)
         assert payload.id == vid
+        assert payload.vfolder.entity_id == vid
 
     def test_purge_payload(self) -> None:
         vid = uuid.uuid4()
-        payload = PurgeVFolderPayload(id=vid)
+        node = VFolderNode(
+            id=vid,
+            entity_id=vid,
+            status=VFolderOperationStatusField.DELETE_ONGOING,
+            host="nfs01",
+            metadata=_make_metadata_info(),
+            access_control=_make_access_control_info(),
+            ownership=_make_owner_info(),
+            quota=_make_quota_info(),
+        )
+        payload = PurgeVFolderPayload(id=vid, vfolder=node)
         assert payload.id == vid
+        assert payload.vfolder.entity_id == vid
 
     def test_restore_payload(self) -> None:
         vid = uuid.uuid4()
@@ -224,6 +251,7 @@ class TestPayloadModels:
     def test_clone_payload(self) -> None:
         node = VFolderNode(
             id=uuid.uuid4(),
+            entity_id=uuid.uuid4(),
             status=VFolderOperationStatusField.READY,
             host="nfs01",
             metadata=_make_metadata_info(),
@@ -279,6 +307,7 @@ class TestPayloadModels:
     def test_create_payload_round_trip(self) -> None:
         node = VFolderNode(
             id=uuid.uuid4(),
+            entity_id=uuid.uuid4(),
             status=VFolderOperationStatusField.READY,
             host="nfs01",
             metadata=_make_metadata_info(),

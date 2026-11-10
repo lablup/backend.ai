@@ -2,7 +2,7 @@
 
 Ports the ``DotfileVFolderPathConflict`` branch of the legacy
 ``prepare_dotfiles`` helper into a dedicated validator. The scheduler
-repository seeds :attr:`SessionSpecValidationContext.dotfile_data` via
+repository seeds :attr:`SessionSpecContext.dotfile_data` via
 its readonly batch fetch; this rule checks every resolved kernel
 mount against each dotfile target.
 """
@@ -15,8 +15,10 @@ from typing import override
 from ai.backend.manager.data.session.spec import SessionSpec
 from ai.backend.manager.errors.storage import DotfileVFolderPathConflict
 from ai.backend.manager.sokovan.scheduling_controller.validators.session_spec_base import (
-    SessionSpecValidationContext,
     SessionSpecValidatorRule,
+)
+from ai.backend.manager.views.sokovan.session_creation import (
+    SessionSpecContext,
 )
 
 
@@ -31,9 +33,9 @@ class DotfileVFolderConflictRule(SessionSpecValidatorRule):
     def validate(
         self,
         spec: SessionSpec,
-        context: SessionSpecValidationContext,
+        context: SessionSpecContext,
     ) -> None:
-        dotfiles = context.dotfile_data.dotfiles
+        dotfiles = context.user.dotfiles.dotfiles
         if not dotfiles:
             return
         kernel_paths: set[PurePosixPath] = set()

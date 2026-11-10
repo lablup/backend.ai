@@ -1,32 +1,37 @@
 import uuid
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, override
 
-from ai.backend.common.types import (
-    AccessKey,
-    SlotQuantity,
-)
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.types import (
     LegacyResourceSlotState as ResourceSlotState,
 )
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.common.types import SlotQuantity
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.services.resource_preset.actions.base import ResourcePresetAction
+from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
+from ai.backend.manager.services.resource_preset.actions.scope_base import (
+    ResourcePresetScopeAction,
+)
 
 
 @dataclass
-class CheckResourcePresetsAction(ResourcePresetAction):
-    access_key: AccessKey
-    resource_policy: Mapping[str, Any]
+class CheckResourcePresetsAction(ResourcePresetScopeAction):
+    """List the presets the named scopes offer, against the caller's own limits.
+
+    The occupancy it adds is the caller's own: the user, group and domain it reports
+    on are theirs.
+    """
+
     domain_name: str
     user_id: uuid.UUID
     group: str
-    scaling_group: str | None
+    resource_group: str | None
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "check_resource_presets"
 
     @override
     @classmethod
@@ -35,7 +40,7 @@ class CheckResourcePresetsAction(ResourcePresetAction):
 
 
 @dataclass
-class CheckResourcePresetsActionResult(BaseActionResult):
+class CheckResourcePresetsActionResult(BaseScopeActionResult):
     presets: list[Mapping[str, Any]]
     keypair_limits: list[SlotQuantity]
     keypair_using: list[SlotQuantity]
@@ -43,10 +48,11 @@ class CheckResourcePresetsActionResult(BaseActionResult):
     group_limits: list[SlotQuantity]
     group_using: list[SlotQuantity]
     group_remaining: list[SlotQuantity]
-    scaling_group_remaining: list[SlotQuantity]
-    scaling_groups: Mapping[str, Mapping[ResourceSlotState, list[SlotQuantity]]]
+    resource_group_remaining: list[SlotQuantity]
+    resource_groups: Mapping[str, Mapping[ResourceSlotState, list[SlotQuantity]]]
 
     # TODO: Should return preset row ids after changing to batching.
+
     @override
-    def entity_id(self) -> str | None:
-        return None
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
+        return ()

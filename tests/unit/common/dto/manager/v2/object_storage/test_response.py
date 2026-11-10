@@ -18,6 +18,7 @@ from ai.backend.common.dto.manager.v2.object_storage.response import (
 def _make_node(region: str | None = "us-east-1") -> ObjectStorageNode:
     return ObjectStorageNode(
         id=uuid.uuid4(),
+        entity_id=uuid.uuid4(),
         name="my-storage",
         host="s3.amazonaws.com",
         access_key="AKIAIOSFODNN7EXAMPLE",
@@ -42,6 +43,7 @@ class TestObjectStorageNode:
     def test_region_default_is_none(self) -> None:
         node = ObjectStorageNode(
             id=uuid.uuid4(),
+            entity_id=uuid.uuid4(),
             name="storage",
             host="host",
             access_key="key",
@@ -91,12 +93,12 @@ class TestObjectStoragePayloads:
 
     def test_delete_payload(self) -> None:
         oid = uuid.uuid4()
-        payload = DeleteObjectStoragePayload(id=oid)
+        payload = DeleteObjectStoragePayload(id=oid, entity_id=oid)
         assert payload.id == oid
 
     def test_delete_payload_round_trip(self) -> None:
         oid = uuid.uuid4()
-        payload = DeleteObjectStoragePayload(id=oid)
+        payload = DeleteObjectStoragePayload(id=oid, entity_id=oid)
         restored = DeleteObjectStoragePayload.model_validate_json(payload.model_dump_json())
         assert restored.id == oid
 

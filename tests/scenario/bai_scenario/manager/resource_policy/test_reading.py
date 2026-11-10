@@ -1,0 +1,234 @@
+"""정책을 이름으로 조회 — 누가 조회할 수 있고, 이름이 무엇을 숨기는가.
+
+이름을 정책으로 풀어내는 단계가 먼저 실행되고, 존재하지 않는 이름과 권한이 미치지 않는
+이름을 같은 이유로 거부한다. 슈퍼관리자에게도 동일하므로 "대상 없음"으로 거부되는
+시나리오가 따로 없다.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Mapping
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Any, override
+
+import pytest
+
+from ai.backend.common.data.user.types import UserRole
+from ai.backend.manager.api.adapters.resource_policy.adapter import ResourcePolicyAdapter
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.errors.common import GenericBadRequest
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.testutils.scenario_steps import (
+    Configured,
+    Given,
+    Language,
+    Says,
+    Scenario,
+    Then,
+    When,
+    in_language,
+)
+from bai_scenario.components.answers import TheCallIsRefused
+from bai_scenario.components.resource_policy import (
+    FAMILIES,
+    APolicyAndACaller,
+    APolicyAndSomeone,
+    Family,
+    ThePolicyNode,
+)
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import TestSeedingSession
+from bai_scenario.runner.steps import run_scenario
+
+NOBODY = "nobody"
+ENFORCEMENT = "manager.rbac.enforcement_enabled"
+
+type ReadingStep = Scenario[TestSeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
+
+
+@dataclass(frozen=True)
+class ReadingByName(When[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]):
+    """이름으로 조회한다. 이름을 지정하지 않으면 미리 만들어 둔 정책의 이름을 쓴다."""
+
+    family: Family[Any, Any]
+    named: str | None = None
+
+    @override
+    def operation(self) -> str:
+        return self.family.calls.read
+
+    @override
+    def describe(self, laid: APolicyAndACaller[Any]) -> str:
+        name = self.named or laid.policy.name
+        return Says(
+            f"{laid.caller.username}이 {name} 이름으로 조회합니다",
+            english=f"{laid.caller.username} reads {name} by name",
+        )
+
+    @override
+    async def call(self, adapter: ResourcePolicyAdapter, laid: APolicyAndACaller[Any]) -> Any:
+        with ActingAs(laid.caller):
+            return await self.family.read(adapter, self.named or laid.policy.name)
+
+
+@dataclass(frozen=True)
+class TheSuperadminReadsItByName(
+    Scenario[TestSeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
+):
+    family: Family[Any, Any]
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return f"the-superadmin-reads-a-{self.family.label}-by-name"
+
+    @override
+    def describe(self) -> str:
+        kind = self.family.kind
+        kind_en = in_language(kind, Language.ENGLISH)
+        return Says(
+            f"{kind} 하나가 있고 superadmin 이 이름으로 조회하면, 그 정책 전체가 반환됩니다",
+            english=(
+                f"one {kind_en} exists and the superadmin reads it by name, so the whole policy "
+                "comes back"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, APolicyAndACaller[Any]]:
+        return APolicyAndSomeone(self.family, role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]:
+        return ReadingByName(self.family)
+
+    @override
+    def then(self) -> Then[APolicyAndACaller[Any], Any]:
+        return ThePolicyNode(self.family, self.started)
+
+
+@dataclass(frozen=True)
+class AUserGrantedNothingMayNotRead(
+    Scenario[TestSeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
+):
+    family: Family[Any, Any]
+
+    @override
+    def summary(self) -> str:
+        return f"a-user-granted-nothing-cannot-resolve-a-{self.family.label}-name"
+
+    @override
+    def describe(self) -> str:
+        kind = self.family.kind
+        kind_en = in_language(kind, Language.ENGLISH)
+        return Says(
+            f"같은 {kind}이 있고 아무 권한도 없는 사용자가 이름으로 조회하면, 정책을 찾을 수 "
+            "없다는 이유로 거부됩니다",
+            english=(
+                f"when the same {kind_en} exists and a user granted nothing reads it by name, "
+                "the call is rejected because the policy cannot be found"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, APolicyAndACaller[Any]]:
+        return APolicyAndSomeone(self.family)
+
+    @override
+    def when(self) -> When[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]:
+        return ReadingByName(self.family)
+
+    @override
+    def then(self) -> Then[APolicyAndACaller[Any], Any]:
+        return TheCallIsRefused(GenericBadRequest)
+
+
+@dataclass(frozen=True)
+class ANameNothingAnswersToIsNotFound(
+    Scenario[TestSeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
+):
+    family: Family[Any, Any]
+
+    @override
+    def summary(self) -> str:
+        return f"reading-a-{self.family.label}-name-nothing-answers-to-is-not-found"
+
+    @override
+    def describe(self) -> str:
+        kind = self.family.kind
+        kind_en = in_language(kind, Language.ENGLISH)
+        return Says(
+            f"superadmin 이 어느 {kind}에도 없는 이름으로 조회하면, 권한 문제가 아니라 대상이 "
+            "없다는 것으로 거부됩니다",
+            english=(
+                f"when the superadmin reads a name no {kind_en} holds, the call is rejected as "
+                "no such target, not on a permission problem"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, APolicyAndACaller[Any]]:
+        return APolicyAndSomeone(self.family, role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]:
+        return ReadingByName(self.family, named=NOBODY)
+
+    @override
+    def then(self) -> Then[APolicyAndACaller[Any], Any]:
+        return TheCallIsRefused(EntityNotFoundError)
+
+
+@dataclass(frozen=True)
+class EnforcementOffOpensTheRead(
+    Scenario[TestSeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any], Configured
+):
+    family: Family[Any, Any]
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return f"turning-enforcement-off-lets-a-user-granted-nothing-read-a-{self.family.label}"
+
+    @override
+    def describe(self) -> str:
+        kind = self.family.kind
+        return Says(
+            f"권한 검사를 끄면 아무 권한도 없는 사용자도 {kind}을 이름으로 조회할 수 있습니다",
+            english=(
+                "turning permission enforcement off lets a user granted nothing read a "
+                f"{in_language(kind, Language.ENGLISH)} by name"
+            ),
+        )
+
+    @override
+    def config(self) -> Mapping[str, Any]:
+        return {ENFORCEMENT: False}
+
+    @override
+    def given(self) -> Given[TestSeedingSession, APolicyAndACaller[Any]]:
+        return APolicyAndSomeone(self.family)
+
+    @override
+    def when(self) -> When[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]:
+        return ReadingByName(self.family)
+
+    @override
+    def then(self) -> Then[APolicyAndACaller[Any], Any]:
+        return ThePolicyNode(self.family, self.started)
+
+
+SCENARIOS: list[ReadingStep] = [
+    *(TheSuperadminReadsItByName(family, started=datetime.now(UTC)) for family in FAMILIES),
+    *(AUserGrantedNothingMayNotRead(family) for family in FAMILIES),
+    *(ANameNothingAnswersToIsNotFound(family) for family in FAMILIES),
+    *(EnforcementOffOpensTheRead(family, started=datetime.now(UTC)) for family in FAMILIES),
+]
+
+
+@pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
+async def test_reading(
+    scenario: ReadingStep, adapter: ResourcePolicyAdapter, engine: ExtendedAsyncSAEngine
+) -> None:
+    await run_scenario(scenario, adapter, engine)

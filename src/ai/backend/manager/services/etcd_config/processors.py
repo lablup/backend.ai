@@ -1,58 +1,63 @@
 from __future__ import annotations
 
-from typing import override
+from typing import Any
 
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
-from ai.backend.manager.actions.validators import ActionValidators
-
-from .actions.delete_config import DeleteConfigAction, DeleteConfigActionResult
-from .actions.get_config import GetConfigAction, GetConfigActionResult
-from .actions.get_resource_metadata import (
+from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.v2.global_scope.processor import (
+    GlobalActionProcessor,
+    PublicActionProcessor,
+)
+from ai.backend.manager.services.etcd_config.actions.delete_config import (
+    DeleteConfigAction,
+    DeleteConfigActionResult,
+)
+from ai.backend.manager.services.etcd_config.actions.get_config import (
+    GetConfigAction,
+    GetConfigActionResult,
+)
+from ai.backend.manager.services.etcd_config.actions.get_resource_metadata import (
     GetResourceMetadataAction,
     GetResourceMetadataActionResult,
 )
-from .actions.get_resource_slots import GetResourceSlotsAction, GetResourceSlotsActionResult
-from .actions.get_vfolder_types import GetVfolderTypesAction, GetVfolderTypesActionResult
-from .actions.set_config import SetConfigAction, SetConfigActionResult
-from .service import EtcdConfigService
+from ai.backend.manager.services.etcd_config.actions.get_resource_slots import (
+    GetResourceSlotsAction,
+    GetResourceSlotsActionResult,
+)
+from ai.backend.manager.services.etcd_config.actions.get_vfolder_types import (
+    GetVfolderTypesAction,
+    GetVfolderTypesActionResult,
+)
+from ai.backend.manager.services.etcd_config.actions.set_config import (
+    SetConfigAction,
+    SetConfigActionResult,
+)
+from ai.backend.manager.services.etcd_config.service import EtcdConfigService
 
-__all__ = ("EtcdConfigProcessors",)
 
+class EtcdConfigProcessors:
+    """The installation's own configuration, read from etcd and the config provider.
 
-class EtcdConfigProcessors(AbstractProcessorPackage):
-    """Processor package for etcd config operations."""
+    Every operation reaches an external store, so the service stays and only the action
+    shapes moved. What the config describes belongs to no entity, so all six are global;
+    the three that report what the installation offers are open to any authenticated
+    caller, while reading and writing raw keys stays behind the SUPERADMIN gate.
+    """
 
-    get_resource_slots: ActionProcessor[GetResourceSlotsAction, GetResourceSlotsActionResult]
-    get_resource_metadata: ActionProcessor[
+    get_resource_slots: PublicActionProcessor[GetResourceSlotsAction, GetResourceSlotsActionResult]
+    get_resource_metadata: PublicActionProcessor[
         GetResourceMetadataAction, GetResourceMetadataActionResult
     ]
-    get_vfolder_types: ActionProcessor[GetVfolderTypesAction, GetVfolderTypesActionResult]
-    get_config: ActionProcessor[GetConfigAction, GetConfigActionResult]
-    set_config: ActionProcessor[SetConfigAction, SetConfigActionResult]
-    delete_config: ActionProcessor[DeleteConfigAction, DeleteConfigActionResult]
+    get_vfolder_types: PublicActionProcessor[GetVfolderTypesAction, GetVfolderTypesActionResult]
+    get_config: GlobalActionProcessor[GetConfigAction, GetConfigActionResult]
+    set_config: GlobalActionProcessor[SetConfigAction, SetConfigActionResult]
+    delete_config: GlobalActionProcessor[DeleteConfigAction, DeleteConfigActionResult]
 
-    def __init__(
-        self,
-        service: EtcdConfigService,
-        action_monitors: list[ActionMonitor],
-        validators: ActionValidators,
-    ) -> None:
-        self.get_resource_slots = ActionProcessor(service.get_resource_slots, action_monitors)
-        self.get_resource_metadata = ActionProcessor(service.get_resource_metadata, action_monitors)
-        self.get_vfolder_types = ActionProcessor(service.get_vfolder_types, action_monitors)
-        self.get_config = ActionProcessor(service.get_config, action_monitors)
-        self.set_config = ActionProcessor(service.set_config, action_monitors)
-        self.delete_config = ActionProcessor(service.delete_config, action_monitors)
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            GetResourceSlotsAction.spec(),
-            GetResourceMetadataAction.spec(),
-            GetVfolderTypesAction.spec(),
-            GetConfigAction.spec(),
-            SetConfigAction.spec(),
-            DeleteConfigAction.spec(),
-        ]
+    def __init__(self, group: ProcessorGroup[Any], service: EtcdConfigService) -> None:
+        self.get_resource_slots = group.public(GetResourceSlotsAction, service.get_resource_slots)
+        self.get_resource_metadata = group.public(
+            GetResourceMetadataAction, service.get_resource_metadata
+        )
+        self.get_vfolder_types = group.public(GetVfolderTypesAction, service.get_vfolder_types)
+        self.get_config = group.global_scope(GetConfigAction, service.get_config)
+        self.set_config = group.global_scope(SetConfigAction, service.set_config)
+        self.delete_config = group.global_scope(DeleteConfigAction, service.delete_config)

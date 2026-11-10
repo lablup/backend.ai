@@ -9,9 +9,10 @@ from typing import Any
 import pytest
 from dateutil.tz import tzutc
 
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -27,26 +28,34 @@ from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.user.types import UserStatus
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.image.row import ImageRow
-from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.network import NetworkType
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.network.row import NetworkType
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
-from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.session.conditions import SessionConditions
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.resource_slot.row import (
+    ResourceAllocationRow,
+    ResourceSlotTypeRow,
+)
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
+from ai.backend.manager.models.session.searchers import SessionSearcher
+from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
 
 
@@ -60,18 +69,20 @@ class TestPersistentNetworkNotRecreated:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 ContainerRegistryRow,
                 ImageRow,
                 AgentRow,
                 SessionRow,
                 KernelRow,
+                ResourceSlotTypeRow,
+                ResourceAllocationRow,
             ],
         ):
             yield database_connection
@@ -106,12 +117,12 @@ class TestPersistentNetworkNotRecreated:
                 )
             )
             db_sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     id=sg_id,
                     name=sg_name,
                     driver="static",
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(
+                    scheduler_opts=ResourceGroupOpts(
                         allowed_session_types=[],
                         pending_timeout=timedelta(hours=1),
                         config={},
@@ -163,10 +174,11 @@ class TestPersistentNetworkNotRecreated:
                     status=UserStatus.ACTIVE,
                     domain_name=domain_name,
                     resource_policy=user_policy_name,
+                    domain_id=domain_id,
                 )
             )
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=group_id,
                     name=f"test-group-{uuid.uuid4().hex[:8]}",
                     domain_name=domain_name,
@@ -182,11 +194,6 @@ class TestPersistentNetworkNotRecreated:
                     region="local",
                     scaling_group=sg_name,
                     resource_group_id=sg_id,
-                    available_slots=ResourceSlot({
-                        "cpu": Decimal("10"),
-                        "mem": Decimal("10240"),
-                    }),
-                    occupied_slots=ResourceSlot(),
                     addr="127.0.0.1:6001",
                     version="1.0.0",
                     architecture="x86_64",
@@ -196,9 +203,8 @@ class TestPersistentNetworkNotRecreated:
 
             db_sess.add(
                 KeyPairRow(
-                    user_id=f"net-test-{uuid.uuid4().hex[:8]}@test.com",
                     access_key=access_key,
-                    secret_key=SecretKey(f"SK{uuid.uuid4().hex[:38]}"),
+                    secret_key=SecretValue(SecretKey(f"SK{uuid.uuid4().hex[:38]}")),
                     is_active=True,
                     is_admin=False,
                     resource_policy=keypair_policy_name,
@@ -247,10 +253,6 @@ class TestPersistentNetworkNotRecreated:
                     status=SessionStatus.PREPARED,
                     status_info="prepared",
                     cluster_mode=ClusterMode.MULTI_NODE,
-                    requested_slots=ResourceSlot({
-                        "cpu": Decimal("2"),
-                        "mem": Decimal("4096"),
-                    }),
                     created_at=datetime.now(tzutc()),
                     images=["python:3.8"],
                     vfolder_mounts=[],
@@ -278,11 +280,6 @@ class TestPersistentNetworkNotRecreated:
                     registry="docker.io",
                     status=KernelStatus.PREPARED,
                     status_changed=datetime.now(tzutc()),
-                    occupied_slots=ResourceSlot(),
-                    requested_slots=ResourceSlot({
-                        "cpu": Decimal("2"),
-                        "mem": Decimal("4096"),
-                    }),
                     domain_name=env["domain_name"],
                     group_id=env["group_id"],
                     user_uuid=env["user_uuid"],
@@ -313,12 +310,16 @@ class TestPersistentNetworkNotRecreated:
             network_id=pre_created_network_id,
         )
 
-        db_source = ScheduleDBSource(db_with_cleanup)
-        querier = BatchQuerier(
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        searcher = SessionSearcher(
             pagination=NoPagination(),
-            conditions=[SessionConditions.by_ids([session_id])],
+            conditions=[
+                SessionSearchableFields.own.id.filter.in_(
+                    UUIDInMatchSpec(values=[session_id], negated=False)
+                )
+            ],
         )
-        result = await db_source.search_sessions_with_kernels_and_user(querier)
+        result = await db_source.search_sessions_with_kernels_and_user(searcher)
 
         assert len(result.sessions) == 1
         session = result.sessions[0]

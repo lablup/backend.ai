@@ -1,25 +1,32 @@
 from __future__ import annotations
 
-import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import EntityType
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.session import SessionEntityType
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
+from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
 from ai.backend.manager.data.resource_slot.types import ResourceOccupancy
 
-from .base import ResourceSlotAction
 
+@dataclass(frozen=True)
+class GetProjectResourceOverviewAction(BaseScopeAction):
+    """Read what the sessions inside a project occupy."""
 
-@dataclass
-class GetProjectResourceOverviewAction(ResourceSlotAction):
-    project_id: uuid.UUID
+    project_id: ProjectID
 
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return EntityType.RESOURCE_OVERVIEW
+        return SessionEntityType()
+
+    @override
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return (self.project_id,)
 
     @override
     @classmethod
@@ -27,14 +34,15 @@ class GetProjectResourceOverviewAction(ResourceSlotAction):
         return ActionOperationType.GET
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.project_id)
+    @classmethod
+    def action_name(cls) -> str:
+        return "get_project_resource_overview"
 
 
-@dataclass
-class GetProjectResourceOverviewResult(BaseActionResult):
+@dataclass(frozen=True)
+class GetProjectResourceOverviewResult(BaseScopeActionResult):
     item: ResourceOccupancy
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
+        return ()

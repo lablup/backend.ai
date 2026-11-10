@@ -4,8 +4,8 @@ Response DTOs for keypair DTO v2.
 
 from __future__ import annotations
 
-import uuid
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import Field
 
@@ -36,10 +36,17 @@ class KeypairNode(BaseResponseModel):
     """Node DTO representing a keypair. Does not include secret_key or ssh_private_key."""
 
     id: str = Field(description="The primary key, equal to access_key. Used as the Relay Node ID.")
+    field_id: UUID = Field(
+        description="UUID of the keypair. Added in 26.9.0.",
+    )
     access_key: str = Field(description="The access key (acts as the unique identifier).")
     is_active: bool | None = Field(default=None, description="Whether the keypair is active.")
     is_admin: bool | None = Field(
         default=None, description="Whether the keypair has admin privileges."
+    )
+    is_default: bool = Field(
+        default=False,
+        description="Whether this is the owner's default keypair. Added in 26.9.0.",
     )
     created_at: datetime | None = Field(default=None, description="When the keypair was created.")
     modified_at: datetime | None = Field(
@@ -56,7 +63,7 @@ class KeypairNode(BaseResponseModel):
     ssh_public_key: str | None = Field(
         default=None, description="The SSH public key associated with this keypair."
     )
-    user_id: uuid.UUID = Field(description="UUID of the user who owns this keypair.")
+    user_id: UUID = Field(description="UUID of the user who owns this keypair.")
 
 
 class CreateKeypairPayload(BaseResponseModel):
@@ -127,6 +134,7 @@ class AdminDeleteKeypairPayload(BaseResponseModel):
     """Payload returned after admin deletes a keypair."""
 
     access_key: str = Field(description="The access key of the deleted keypair.")
+    field_id: UUID = Field(description="UUID of the deleted keypair. Added in 26.10.0.")
 
 
 class AdminSearchKeypairsPayload(BaseResponseModel):

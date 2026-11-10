@@ -1,89 +1,95 @@
 {
   "$schema": "./theme.schema.json",
-  "fontFamily": "'Ubuntu', Roboto, sans-serif",
-  "light": {
-    "token": {
-      "colorPrimary": "#FF7A00",
-      "colorLink": "#FF7A00",
-      "colorText": "#141414",
-      "colorInfo": "#028DF2",
-      "colorError": "#FF4D4F",
-      "colorSuccess": "#00BD9B",
-      "screenXLMax": 1919,
-      "screenXXLMin": 1920,
-      "screenXXL": 1920,
-      "screenXXLMax": 2559,
-      "screenXXXLMin": 2560,
-      "screenXXXL": 2560
-    },
-    "components": {
-      "Tag": {
-        "borderRadiusSM": 1
+  "schemaVersion": 2,
+  "theme": {
+    "fontFamily": "'Ubuntu', Roboto, Pretendard, sans-serif",
+    "families": {
+      "default": {
+        "seeds": {
+          "accent": ["#FF7A00", "#DC6B03"],
+          "link": ["#FF7A00", "#DC6B03"],
+          "info": ["#028DF2", "#009BDD"],
+          "error": ["#FF4D4F", "#DC4446"],
+          "success": ["#00BD9B", "#03A487"],
+          "warning": ["#FAAD14", "#FAAD14"]
+        },
+        "headerBg": ["#FF9729", "#E88A28"],
+        "headerBgAdmin": ["#35A4F5", "#33AFE4"]
       },
-      "Layout": {
-        "lightSiderBg": "#FFF",
-        "siderBg": "#141414",
-        "headerBg": "#FF9729"
+      "stained": {
+        "seeds": {
+          "accent": ["#8B5CF6", "#A78BFA"],
+          "link": ["#8B5CF6", "#A78BFA"],
+          "info": ["#0066CC", "#009BDD"],
+          "error": ["#C82333", "#DC4446"],
+          "success": ["#007A63", "#03A487"],
+          "warning": ["#9A5D00", "#D89614"]
+        },
+        "headerBg": ["#8B5CF6", "#7C3AED"]
       },
-      "Divider": {
-        "colorSplit": "#D9D9D9"
+      "glass": {
+        "seeds": {
+          "accent": ["#007AFF", "#0A84FF"],
+          "link": ["#007AFF", "#0A84FF"],
+          "info": ["#005EB8", "#0A84FF"],
+          "error": ["#C22D26", "#FF453A"],
+          "success": ["#1D7D43", "#32D74B"],
+          "warning": ["#9A5700", "#FF9F0A"]
+        },
+        "headerBg": ["rgba(30, 32, 38, 0.15)", "rgba(255, 255, 255, 0.3)"]
       },
-      "Table": {
-        "headerBg": "#E3E3E3",
-        "headerSplitColor": "rgba(0,0,0,0.25)"
+      "reverie": {
+        "seeds": {
+          "accent": ["#F43F5E", "#FF97A8"],
+          "link": ["#F43F5E", "#FF97A8"],
+          "info": ["#0066CC", "#009BDD"],
+          "error": ["#C82333", "#DC4446"],
+          "success": ["#007A63", "#03A487"],
+          "warning": ["#9A5D00", "#D89614"]
+        },
+        "headerBg": "#FB7185"
+      },
+      "bliss": {
+        "seeds": {
+          "accent": ["#0054E3", "#0044CC"],
+          "link": ["#0054E3", "#0044CC"],
+          "info": ["#0054E3", "#0044CC"],
+          "error": ["#C00000", "#FF5C5C"],
+          "success": ["#2D7A1E", "#4CAF50"],
+          "warning": ["#9A5700", "#FFB74D"]
+        },
+        "headerBg": ["#245EDC", "#0044CC"]
       }
     }
   },
-  "dark": {
-    "token": {
-      "colorPrimary": "#DC6B03",
-      "colorLink": "#DC6B03",
-      "colorText": "#FFF",
-      "colorInfo": "#009BDD",
-      "colorError": "#DC4446",
-      "colorSuccess": "#03A487",
-      "colorFillSecondary": "#262626",
-      "screenXLMax": 1919,
-      "screenXXLMin": 1920,
-      "screenXXL": 1920,
-      "screenXXLMax": 2559,
-      "screenXXXLMin": 2560,
-      "screenXXXL": 2560
-    },
-    "components": {
-      "Tag": {
-        "borderRadiusSM": 1
-      },
-      "Layout": {
-        "lightSiderBg": "#FFF",
-        "siderBg": "#141414",
-        "headerBg": "#E88A28"
-      }
-    }
-  },
-  "logo": {
-    "src": "/manifest/backend.ai-webui-white.svg",
-    "srcCollapsed": "/manifest/backend.ai-brand-simple-white.svg",
-    "srcDark": "/manifest/backend.ai-webui-black.svg",
-    "srcCollapsedDark": "/manifest/backend.ai-brand-simple-black.svg",
-    "alt": "Backend.AI Logo",
-    "href": "/start",
-    "size": {
-      "width": 159,
-      "height": 24
-    },
-    "sizeCollapsed": {
-      "width": 34,
-      "height": 34
-    },
-    "aboutLogoSize": {
-      "width": 159,
-      "height": 24
-    }
-  },
-  "sider": {},
   "branding": {
+    "logo": {
+      "src": "/manifest/backend.ai-webui-white.svg",
+      "srcCollapsed": "/manifest/backend.ai-brand-simple-white.svg",
+      "srcDark": "/manifest/backend.ai-webui-black.svg",
+      "srcCollapsedDark": "/manifest/backend.ai-brand-simple-black.svg",
+      "alt": "Backend.AI Logo",
+      "href": "/start",
+      "size": {
+        "width": 159,
+        "height": 24
+      },
+      "sizeCollapsed": {
+        "width": 34,
+        "height": 34
+      },
+      "aboutLogoSize": {
+        "width": 159,
+        "height": 24
+      }
+    },
     "companyName": "Lablup Inc.",
-    "brandName": "Backend.AI"
+    "brandName": "Backend.AI",
+    "familyLabels": {
+      "stained": "Stained",
+      "glass": "Glass",
+      "reverie": "Reverie",
+      "bliss": "Bliss"
+    }
   }
 }

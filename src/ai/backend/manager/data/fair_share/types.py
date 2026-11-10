@@ -8,7 +8,9 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.types import FieldData
 from ai.backend.common.types import ResourceSlot, SlotQuantity
 
 
@@ -140,20 +142,22 @@ class FairShareData:
 
 
 @dataclass(frozen=True)
-class DomainFairShareData:
+class DomainFairShareData(FieldData):
     """Domain-level fair share data."""
 
     resource_group: str
+    resource_group_id: ResourceGroupID
     domain_name: str
     data: FairShareData
     """Nested fair share data structure."""
 
 
 @dataclass(frozen=True)
-class ProjectFairShareData:
+class ProjectFairShareData(FieldData):
     """Project-level fair share data."""
 
     resource_group: str
+    resource_group_id: ResourceGroupID
     project_id: uuid.UUID
     domain_name: str
     data: FairShareData
@@ -161,10 +165,11 @@ class ProjectFairShareData:
 
 
 @dataclass(frozen=True)
-class UserFairShareData:
+class UserFairShareData(FieldData):
     """User-level fair share data."""
 
     resource_group: str
+    resource_group_id: ResourceGroupID
     user_uuid: uuid.UUID
     project_id: uuid.UUID
     domain_name: str
@@ -241,7 +246,7 @@ class FairSharesByLevel:
     domain: Mapping[str, DomainFairShareData]
     """Domain fair shares keyed by domain_name."""
 
-    project: Mapping[uuid.UUID, ProjectFairShareData]
+    project: Mapping[ProjectID, ProjectFairShareData]
     """Project fair shares keyed by project_id."""
 
     user: Mapping[UserProjectKey, UserFairShareData]
@@ -416,23 +421,15 @@ class DomainUsageBucketKey:
 
 
 @dataclass
-class BucketDelta:
-    """Separated resource amount and duration for a usage bucket.
+class UsageBucketAggregationResult:
+    """Resource-seconds to add to each bucket, from one observation tick.
 
-    Stores raw resource amounts and duration separately instead of
-    pre-multiplied resource-seconds.  The product ``amount * duration_seconds``
-    is computed at SQL query time where PostgreSQL auto-extends NUMERIC precision,
-    eliminating overflow risk for large memory values.
+    Each value is ``sum(amount_k * duration_k)`` over the slices folded into that
+    bucket.  It must be accumulated as a sum of per-slice products: summing the
+    amounts and the durations separately and multiplying afterwards gives a cross
+    product inflated by the number of slices.
     """
 
-    slots: ResourceSlot = field(default_factory=ResourceSlot)
-    duration_seconds: int = 0
-
-
-@dataclass
-class UsageBucketAggregationResult:
-    """Result of aggregating kernel usage into daily buckets."""
-
-    user_usage_deltas: dict[UserUsageBucketKey, BucketDelta] = field(default_factory=dict)
-    project_usage_deltas: dict[ProjectUsageBucketKey, BucketDelta] = field(default_factory=dict)
-    domain_usage_deltas: dict[DomainUsageBucketKey, BucketDelta] = field(default_factory=dict)
+    user_usage_deltas: dict[UserUsageBucketKey, ResourceSlot] = field(default_factory=dict)
+    project_usage_deltas: dict[ProjectUsageBucketKey, ResourceSlot] = field(default_factory=dict)
+    domain_usage_deltas: dict[DomainUsageBucketKey, ResourceSlot] = field(default_factory=dict)

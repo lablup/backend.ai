@@ -11,6 +11,4 @@ class RolePresetRepositories:
 
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
-        return cls(
-            repository=RolePresetRepository(args.ops_provider),
-        )
+        return cls(repository=RolePresetRepository(args.role_preset_ops_provider))

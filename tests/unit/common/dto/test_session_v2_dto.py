@@ -23,6 +23,7 @@ from ai.backend.common.dto.manager.v2.session.types import (
     ClusterModeEnum,
     CreateSessionTypeEnum,
 )
+from ai.backend.common.dto.manager.v2.session_options.types import AgentSelectionPolicyEnum
 from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
@@ -45,7 +46,7 @@ class TestEnqueueSessionInput:
         assert result.session_type == CreateSessionTypeEnum.INTERACTIVE
         assert result.cluster_size == 1
         assert result.cluster_mode == ClusterModeEnum.SINGLE_NODE
-        assert result.priority == 10
+        assert result.effective_tier() == 10
         assert result.job_priority == 0
         assert result.is_preemptible is True
         assert result.batch is None
@@ -67,6 +68,31 @@ class TestEnqueueSessionInput:
         # Neutral-baseline design: values may go above 100 and below 0.
         assert _make(500).job_priority == 500
         assert _make(-5).job_priority == -5
+
+    def test_agent_selection_policy_parsing(self) -> None:
+        """agent_selection_policy accepts the enum values and defaults to None."""
+
+        def _make(**kwargs: object) -> EnqueueSessionInput:
+            return EnqueueSessionInput.model_validate({
+                "session_name": "policy-session",
+                "session_type": "interactive",
+                "image_id": str(uuid4()),
+                "resource_entries": [{"resource_type": "cpu", "quantity": "1"}],
+                "project_id": str(uuid4()),
+                **kwargs,
+            })
+
+        assert _make().agent_selection_policy is None
+        assert (
+            _make(agent_selection_policy="strict").agent_selection_policy
+            == AgentSelectionPolicyEnum.STRICT
+        )
+        assert (
+            _make(agent_selection_policy="preferred").agent_selection_policy
+            == AgentSelectionPolicyEnum.PREFERRED
+        )
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+            _make(agent_selection_policy="invalid")
 
     def test_valid_batch_session(self) -> None:
         """Valid batch session with batch config."""
@@ -123,7 +149,16 @@ class TestEnqueueSessionInput:
             )
 
     def test_priority_out_of_range(self) -> None:
-        """Priority > 100 should fail."""
+        """A tier above 100 fails under either name."""
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+            EnqueueSessionInput(
+                session_name="test",
+                session_type=CreateSessionTypeEnum.INTERACTIVE,
+                image_id=uuid4(),
+                resource_entries=[ResourceSlotEntryInput(resource_type="cpu", quantity="1")],
+                project_id=uuid4(),
+                tier=101,
+            )
         with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             EnqueueSessionInput(
                 session_name="test",
@@ -133,6 +168,27 @@ class TestEnqueueSessionInput:
                 project_id=uuid4(),
                 priority=101,
             )
+
+    def test_tier_reads_either_name(self) -> None:
+        """``tier`` answers when both names carry a value, and 0 is kept."""
+
+        def _make(tier: int | None, priority: int | None) -> EnqueueSessionInput:
+            return EnqueueSessionInput(
+                session_name="test",
+                session_type=CreateSessionTypeEnum.INTERACTIVE,
+                image_id=uuid4(),
+                resource_entries=[ResourceSlotEntryInput(resource_type="cpu", quantity="1")],
+                project_id=uuid4(),
+                tier=tier,
+                priority=priority,
+            )
+
+        assert _make(tier=3, priority=None).effective_tier() == 3
+        assert _make(tier=None, priority=7).effective_tier() == 7
+        assert _make(tier=3, priority=7).effective_tier() == 3
+        assert _make(tier=0, priority=None).effective_tier() == 0
+        assert _make(tier=None, priority=0).effective_tier() == 0
+        assert _make(tier=None, priority=None).effective_tier() == 10
 
     def test_with_mounts(self) -> None:
         """Session with virtual folder mounts."""
@@ -347,6 +403,21 @@ class TestMountItemInput:
         result = MountItemInput(vfolder_id=vfolder_id)
         assert result.mount_path is None
         assert result.permission is None
+
+    def test_paths_inside_root_accepted(self) -> None:
+        result = MountItemInput(vfolder_id=uuid4(), mount_path="/home/work/data", subpath="a/b")
+        assert result.mount_path == "/home/work/data"
+        assert result.subpath == "a/b"
+
+    @pytest.mark.parametrize("subpath", ["..", "../other", "a/../../other", "/etc"])
+    def test_subpath_escaping_root_rejected(self, subpath: str) -> None:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+            MountItemInput(vfolder_id=uuid4(), subpath=subpath)
+
+    @pytest.mark.parametrize("mount_path", ["/home/work/../../etc", "data/../x", ".."])
+    def test_mount_path_with_parent_segment_rejected(self, mount_path: str) -> None:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+            MountItemInput(vfolder_id=uuid4(), mount_path=mount_path)
 
 
 class TestResourceOptsInput:

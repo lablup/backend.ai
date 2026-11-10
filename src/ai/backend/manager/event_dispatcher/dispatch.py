@@ -1,4 +1,3 @@
-from collections.abc import Callable
 from dataclasses import dataclass
 
 from ai.backend.common.clients.valkey_client.valkey_container_log.client import (
@@ -104,6 +103,9 @@ from ai.backend.common.events.event_types.session.broadcast import (
     SessionTerminatedBroadcastEvent,
     SessionTerminatingBroadcastEvent,
 )
+from ai.backend.common.events.event_types.storage_status.anycast import (
+    StorageStatusReportEvent,
+)
 from ai.backend.common.events.event_types.vfolder.anycast import (
     VFolderCloneFailureEvent,
     VFolderCloneSuccessEvent,
@@ -125,12 +127,15 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.repositories import Repositories
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
-from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.artifact.service import ArtifactService
+from ai.backend.manager.services.notification.service import NotificationService
 from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
 from ai.backend.manager.sokovan.deployment.route.coordinator import RouteCoordinator
 from ai.backend.manager.sokovan.reconciler.coordinator import ReconcilerCoordinator
 from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
-from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
+    SchedulingController,
+)
 
 from .handlers.agent import AgentEventHandler
 from .handlers.idle_check import IdleCheckEventHandler
@@ -139,6 +144,7 @@ from .handlers.kernel import KernelEventHandler
 from .handlers.notification import NotificationEventHandler
 from .handlers.service_catalog import ServiceCatalogEventHandler
 from .handlers.session import SessionEventHandler
+from .handlers.storage_status import StorageStatusEventHandler
 from .handlers.stream_cleanup import StreamCleanupEventHandler
 from .handlers.vfolder import VFolderEventHandler
 from .reporters import EventLogger
@@ -163,7 +169,8 @@ class DispatcherArgs:
     idle_checker_host: IdleCheckerHost
     event_dispatcher_plugin_ctx: EventDispatcherPluginContext
     repositories: Repositories
-    processors_factory: Callable[[], Processors]
+    notification_service: NotificationService
+    artifact_service: ArtifactService
     storage_manager: StorageSessionManager
     config_provider: ManagerConfigProvider
     event_producer: EventProducer
@@ -183,6 +190,7 @@ class Dispatchers:
     _artifact_event_handler: ArtifactEventHandler
     _artifact_registry_event_handler: ArtifactRegistryEventHandler
     _service_catalog_event_handler: ServiceCatalogEventHandler
+    _storage_status_event_handler: StorageStatusEventHandler
     stream_cleanup_handler: StreamCleanupEventHandler
 
     def __init__(self, args: DispatcherArgs) -> None:
@@ -192,7 +200,11 @@ class Dispatchers:
         self._db = args.db
         self._propagator_handler = PropagatorEventHandler(args.event_hub)
         self._agent_event_handler = AgentEventHandler(
-            args.agent_registry, args.db, args.event_dispatcher_plugin_ctx, args.processors_factory
+            args.agent_registry,
+            args.db,
+            args.event_dispatcher_plugin_ctx,
+            args.repositories.agent.repository,
+            args.event_producer,
         )
         self._image_event_handler = ImageEventHandler(
             args.agent_registry,
@@ -219,13 +231,14 @@ class Dispatchers:
         self._session_event_handler = SessionEventHandler(
             args.agent_registry,
             args.db,
+            args.repositories.session.repository,
             args.event_dispatcher_plugin_ctx,
             args.scheduling_controller,
             args.valkey_live,
         )
         self._vfolder_event_handler = VFolderEventHandler(args.db)
         self._idle_check_event_handler = IdleCheckEventHandler(args.idle_checker_host)
-        self._notification_event_handler = NotificationEventHandler(args.processors_factory)
+        self._notification_event_handler = NotificationEventHandler(args.notification_service)
         self._artifact_event_handler = ArtifactEventHandler(
             args.repositories.artifact.repository,
             args.repositories.huggingface_registry.repository,
@@ -234,7 +247,7 @@ class Dispatchers:
             args.event_producer,
         )
         self._artifact_registry_event_handler = ArtifactRegistryEventHandler(
-            args.processors_factory,
+            args.artifact_service,
             args.repositories.artifact.repository,
             args.repositories.artifact_registry.repository,
             args.repositories.reservoir_registry.repository,
@@ -243,7 +256,12 @@ class Dispatchers:
             args.storage_manager,
             args.config_provider,
         )
-        self._service_catalog_event_handler = ServiceCatalogEventHandler(args.db)
+        self._service_catalog_event_handler = ServiceCatalogEventHandler(
+            args.db, args.repositories.service_catalog.repository
+        )
+        self._storage_status_event_handler = StorageStatusEventHandler(
+            args.repositories.storage_status.repository
+        )
         self.stream_cleanup_handler = StreamCleanupEventHandler(args.db)
 
     def dispatch(self, event_dispatcher: EventDispatcher) -> None:
@@ -262,6 +280,7 @@ class Dispatchers:
         self._dispatch_artifact_events(event_dispatcher)
         self._dispatch_artifact_registry_events(event_dispatcher)
         self._dispatch_service_catalog_events(event_dispatcher)
+        self._dispatch_storage_status_events(event_dispatcher)
         self._dispatch_session_broadcast_propagation(event_dispatcher)
         self._dispatch_stream_cleanup_events(event_dispatcher)
 
@@ -641,6 +660,17 @@ class Dispatchers:
             None,
             self._service_catalog_event_handler.handle_sweep_stale_services,
             name="service-catalog.sweep",
+        )
+
+    def _dispatch_storage_status_events(
+        self,
+        event_dispatcher: EventDispatcher,
+    ) -> None:
+        event_dispatcher.consume(
+            StorageStatusReportEvent,
+            None,
+            self._storage_status_event_handler.handle_reported,
+            name="storage-status.reported",
         )
 
     def _dispatch_session_broadcast_propagation(

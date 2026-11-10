@@ -14,13 +14,15 @@ from decimal import Decimal
 import pytest
 import sqlalchemy as sa
 from dateutil.tz import tzutc
-from sqlalchemy.orm import selectinload
 
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.common.identifier.session import SessionID
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
+from ai.backend.common.data.entity.agent import AgentUUID
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.types import (
     AccessKey,
+    AgentId,
     ClusterMode,
     DefaultForUnspecified,
     KernelId,
@@ -29,30 +31,36 @@ from ai.backend.common.types import (
     SessionResult,
     SessionTypes,
 )
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.agent.types import AgentStatus
+from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.errors.kernel import SessionNotFound
+from ai.backend.manager.data.session_template.types import TemplateType
+from ai.backend.manager.errors.kernel import SessionAlreadyExists, SessionNotFound
 from ai.backend.manager.models.agent.row import AgentRow
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import GroupRow, ProjectType
-from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.kernel import KernelRow, KernelStatus
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.project.row import ProjectRow, ProjectType
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.resource_slot import ResourceAllocationRow, ResourceSlotTypeRow
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
-from ai.backend.manager.models.session import SessionRow, batch_populate_session_occupied_slots
-from ai.backend.manager.models.session_template import TemplateType, session_templates
-from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
+from ai.backend.manager.models.resource_slot.aggregates import batch_load_session_allocations
+from ai.backend.manager.models.resource_slot.row import ResourceAllocationRow, ResourceSlotTypeRow
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.session_designated_agent.row import SessionDesignatedAgentRow
+from ai.backend.manager.models.session_template.row import SessionTemplateRow
+from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.container_registry.db_source import ContainerRegistryDBSource
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.session.repository import SessionRepository
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
 
 
@@ -60,7 +68,7 @@ from ai.backend.testutils.db import with_tables
 class SessionTestData:
     domain_id: DomainID
     domain_name: str
-    scaling_group_id: ResourceGroupID
+    resource_group_id: ResourceGroupID
     user_id: uuid.UUID
     group_id: uuid.UUID
     session_id: SessionId
@@ -90,13 +98,13 @@ class TestSessionRepository:
             [
                 # FK dependency order: parents before children
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 AgentRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
                 UserRow,
-                GroupRow,
+                ProjectRow,
                 KeyPairRow,
                 ContainerRegistryRow,
                 ImageRow,
@@ -110,7 +118,11 @@ class TestSessionRepository:
 
     @pytest.fixture
     def repository(self, db_with_cleanup: ExtendedAsyncSAEngine) -> SessionRepository:
-        return SessionRepository(db_with_cleanup)
+        return SessionRepository(
+            db_with_cleanup,
+            V2DBOpsProvider(db_with_cleanup),
+            registry_db_source=ContainerRegistryDBSource(V2DBOpsProvider(db_with_cleanup)),
+        )
 
     @pytest.fixture
     async def session_with_kernel(
@@ -142,7 +154,7 @@ class TestSessionRepository:
             db_sess.add(domain)
 
             # Create scaling group
-            scaling_group = ScalingGroupRow(
+            resource_group = ResourceGroupRow(
                 id=test_scaling_group_id,
                 name="default",
                 is_active=True,
@@ -150,9 +162,9 @@ class TestSessionRepository:
                 driver="static",
                 driver_opts={},
                 scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(),
+                scheduler_opts=ResourceGroupOpts(),
             )
-            db_sess.add(scaling_group)
+            db_sess.add(resource_group)
 
             # Create resource policies
             user_resource_policy = UserResourcePolicyRow(
@@ -202,12 +214,12 @@ class TestSessionRepository:
                 resource_policy=user_resource_policy.name,
                 allowed_client_ip=None,
                 totp_key=None,
-                main_access_key=None,
+                domain_id=test_domain_id,
             )
             db_sess.add(user)
 
             # Create group
-            group = GroupRow(
+            group = ProjectRow(
                 id=group_id,
                 name="test-group",
                 description="Test group",
@@ -224,10 +236,9 @@ class TestSessionRepository:
 
             # Create keypair
             keypair = KeyPairRow(
-                user_id="test@example.com",
                 user=user_id,
                 access_key=access_key,
-                secret_key="test-secret-key",
+                secret_key=SecretValue("test-secret-key"),
                 is_active=True,
                 is_admin=False,
                 resource_policy=keypair_resource_policy.name,
@@ -262,8 +273,6 @@ class TestSessionRepository:
                 starts_at=None,
                 startup_command=None,
                 callback_url=None,
-                occupying_slots=ResourceSlot({"cpu": "1", "mem": "1073741824"}),
-                requested_slots=ResourceSlot({"cpu": "1", "mem": "1073741824"}),
                 vfolder_mounts=[],
                 environ=None,
                 bootstrap_script=None,
@@ -312,8 +321,6 @@ class TestSessionRepository:
                 created_at=now,
                 terminated_at=None,
                 starts_at=None,
-                occupied_slots=ResourceSlot({"cpu": "1", "mem": "1073741824"}),
-                requested_slots=ResourceSlot({"cpu": "1", "mem": "1073741824"}),
                 occupied_shares={},
                 environ=None,
                 vfolder_mounts=[],
@@ -330,103 +337,13 @@ class TestSessionRepository:
         return SessionTestData(
             domain_id=test_domain_id,
             domain_name=domain_name,
-            scaling_group_id=test_scaling_group_id,
+            resource_group_id=test_scaling_group_id,
             user_id=user_id,
             group_id=group_id,
             session_id=session_id,
             kernel_id=kernel_id,
             access_key=access_key,
         )
-
-    # =========================================================================
-    # Tests - SearchKernels
-    # =========================================================================
-
-    async def test_search_kernels(
-        self,
-        repository: SessionRepository,
-        session_with_kernel: SessionTestData,
-    ) -> None:
-        """Test search_kernels returns kernel info when kernels exist"""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[],
-            orders=[],
-        )
-        result = await repository.search_kernels(querier)
-
-        assert result.total_count == 1
-        assert len(result.items) == 1
-        assert result.has_next_page is False
-        assert result.has_previous_page is False
-
-        kernel_info = result.items[0]
-        assert kernel_info.id == session_with_kernel.kernel_id
-        assert kernel_info.session.session_id == str(session_with_kernel.session_id)
-
-    async def test_search_kernels_empty_result(
-        self,
-        repository: SessionRepository,
-    ) -> None:
-        """Test search_kernels returns empty result when no kernels exist"""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[],
-            orders=[],
-        )
-        result = await repository.search_kernels(querier)
-
-        assert result.total_count == 0
-        assert len(result.items) == 0
-        assert result.has_next_page is False
-        assert result.has_previous_page is False
-
-    # =========================================================================
-    # Tests - SearchSessions
-    # =========================================================================
-
-    async def test_search_sessions(
-        self,
-        repository: SessionRepository,
-        session_with_kernel: SessionTestData,
-    ) -> None:
-        """Test search returns session data when sessions exist"""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[],
-            orders=[],
-        )
-        result = await repository.search(querier=querier)
-
-        assert result.total_count == 1
-        assert len(result.items) == 1
-        assert result.has_next_page is False
-        assert result.has_previous_page is False
-
-        session_data = result.items[0]
-        assert session_data.id == session_with_kernel.session_id
-        assert session_data.name == "test-session"
-        assert session_data.domain_name == session_with_kernel.domain_name
-        assert session_data.group_id == session_with_kernel.group_id
-        assert session_data.user_uuid == session_with_kernel.user_id
-        assert session_data.access_key == session_with_kernel.access_key
-
-    async def test_search_sessions_empty_result(
-        self,
-        repository: SessionRepository,
-    ) -> None:
-        """Test search returns empty result when no sessions exist"""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[],
-            orders=[],
-        )
-        result = await repository.search(querier=querier)
-
-        assert result.total_count == 0
-        assert len(result.items) == 0
-        assert result.has_next_page is False
-        assert result.has_previous_page is False
 
     # =========================================================================
     # Tests - resolve_session_id
@@ -468,18 +385,35 @@ class TestSessionRepository:
                     starts_at=None,
                     startup_command=None,
                     callback_url=None,
-                    occupying_slots=ResourceSlot(),
-                    requested_slots=ResourceSlot(),
                     vfolder_mounts=[],
                     environ=None,
                     bootstrap_script=None,
                     use_host_network=False,
-                    resource_group_id=base.scaling_group_id,
+                    resource_group_id=base.resource_group_id,
                     scaling_group_name="default",
                 )
             )
             await db_sess.commit()
         return session_id
+
+    async def _insert_other_keypair(
+        self, db: ExtendedAsyncSAEngine, base: SessionTestData
+    ) -> AccessKey:
+        other_key = AccessKey("OTHERKEY1234567")
+        async with db.begin_session() as db_sess:
+            db_sess.add(
+                KeyPairRow(
+                    user=base.user_id,
+                    access_key=other_key,
+                    secret_key=SecretValue("other-secret-key"),
+                    is_active=True,
+                    is_admin=False,
+                    resource_policy="default-keypair-policy",
+                    rate_limit=1000,
+                )
+            )
+            await db_sess.commit()
+        return other_key
 
     async def test_resolve_session_id_by_name_and_user(
         self,
@@ -508,21 +442,7 @@ class TestSessionRepository:
     ) -> None:
         """A terminal (TERMINATED) session sharing the name must not shadow the live one,
         even when created under a different access key of the same user."""
-        other_key = AccessKey("OTHERKEY1234567")
-        async with db_with_cleanup.begin_session() as db_sess:
-            db_sess.add(
-                KeyPairRow(
-                    user_id="test@example.com",
-                    user=session_with_kernel.user_id,
-                    access_key=other_key,
-                    secret_key="other-secret-key",
-                    is_active=True,
-                    is_admin=False,
-                    resource_policy="default-keypair-policy",
-                    rate_limit=1000,
-                )
-            )
-            await db_sess.commit()
+        other_key = await self._insert_other_keypair(db_with_cleanup, session_with_kernel)
         await self._insert_session(
             db_with_cleanup,
             session_with_kernel,
@@ -545,6 +465,24 @@ class TestSessionRepository:
         some_id = uuid.uuid4()
         resolved = await repository.resolve_session_id(str(some_id), session_with_kernel.user_id)
         assert resolved == SessionId(some_id)
+
+    async def test_rename_rejects_name_of_same_user_session_under_other_keypair(
+        self,
+        repository: SessionRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        session_with_kernel: SessionTestData,
+    ) -> None:
+        other_key = await self._insert_other_keypair(db_with_cleanup, session_with_kernel)
+        await self._insert_session(
+            db_with_cleanup,
+            session_with_kernel,
+            name="taken",
+            access_key=other_key,
+            status=SessionStatus.RUNNING,
+        )
+
+        with pytest.raises(SessionAlreadyExists):
+            await repository.update_session_name(session_with_kernel.session_id, "taken")
 
     # =========================================================================
     # Tests - get_session_with_routing_minimal
@@ -586,10 +524,9 @@ class TestSessionRepository:
             await repository.get_session_with_routing_minimal(SessionID(terminated_id))
 
 
-class TestBatchPopulateSessionOccupiedSlots:
-    """Test batch_populate_session_occupied_slots computes occupied_slots
-    from the normalized resource_allocations table instead of the deprecated
-    JSONB column."""
+class TestBatchLoadSessionAllocations:
+    """Test that the session slot values are aggregated from the normalized
+    resource_allocations table instead of the deprecated JSONB columns."""
 
     @pytest.fixture
     async def db_with_resource_tables(
@@ -599,13 +536,13 @@ class TestBatchPopulateSessionOccupiedSlots:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 AgentRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
                 UserRow,
-                GroupRow,
+                ProjectRow,
                 KeyPairRow,
                 ContainerRegistryRow,
                 ImageRow,
@@ -613,6 +550,7 @@ class TestBatchPopulateSessionOccupiedSlots:
                 KernelRow,
                 ResourceSlotTypeRow,
                 ResourceAllocationRow,
+                SessionDesignatedAgentRow,
             ],
         ):
             yield database_connection
@@ -645,7 +583,7 @@ class TestBatchPopulateSessionOccupiedSlots:
             )
             db_sess.add(domain)
 
-            scaling_group = ScalingGroupRow(
+            resource_group = ResourceGroupRow(
                 id=test_scaling_group_id,
                 name="default",
                 is_active=True,
@@ -653,9 +591,9 @@ class TestBatchPopulateSessionOccupiedSlots:
                 driver="static",
                 driver_opts={},
                 scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(),
+                scheduler_opts=ResourceGroupOpts(),
             )
-            db_sess.add(scaling_group)
+            db_sess.add(resource_group)
 
             user_resource_policy = UserResourcePolicyRow(
                 name="default-user-policy",
@@ -702,11 +640,11 @@ class TestBatchPopulateSessionOccupiedSlots:
                 resource_policy=user_resource_policy.name,
                 allowed_client_ip=None,
                 totp_key=None,
-                main_access_key=None,
+                domain_id=test_domain_id,
             )
             db_sess.add(user)
 
-            group = GroupRow(
+            group = ProjectRow(
                 id=group_id,
                 name="test-group",
                 description="Test group",
@@ -721,10 +659,9 @@ class TestBatchPopulateSessionOccupiedSlots:
             await db_sess.flush()
 
             keypair = KeyPairRow(
-                user_id="test@example.com",
                 user=user_id,
                 access_key=access_key,
-                secret_key="test-secret-key",
+                secret_key=SecretValue("test-secret-key"),
                 is_active=True,
                 is_admin=False,
                 resource_policy=keypair_resource_policy.name,
@@ -758,8 +695,6 @@ class TestBatchPopulateSessionOccupiedSlots:
                 starts_at=None,
                 startup_command=None,
                 callback_url=None,
-                occupying_slots=ResourceSlot(),  # Empty! (post-Phase 3)
-                requested_slots=ResourceSlot({"cpu": "2", "mem": "2147483648"}),
                 vfolder_mounts=[],
                 environ=None,
                 bootstrap_script=None,
@@ -806,8 +741,6 @@ class TestBatchPopulateSessionOccupiedSlots:
                 created_at=now,
                 terminated_at=None,
                 starts_at=None,
-                occupied_slots=ResourceSlot(),
-                requested_slots=ResourceSlot({"cpu": "2", "mem": "2147483648"}),
                 occupied_shares={},
                 environ=None,
                 vfolder_mounts=[],
@@ -847,7 +780,7 @@ class TestBatchPopulateSessionOccupiedSlots:
         return SessionTestData(
             domain_id=test_domain_id,
             domain_name=domain_name,
-            scaling_group_id=test_scaling_group_id,
+            resource_group_id=test_scaling_group_id,
             user_id=user_id,
             group_id=group_id,
             session_id=session_id,
@@ -855,64 +788,117 @@ class TestBatchPopulateSessionOccupiedSlots:
             access_key=access_key,
         )
 
-    async def test_batch_populate_computes_slots_from_resource_allocations(
+    async def test_used_slots_come_from_resource_allocations(
         self,
         db_with_resource_tables: ExtendedAsyncSAEngine,
         session_with_allocations: SessionTestData,
     ) -> None:
-        """Verify that batch_populate reads from resource_allocations
-        instead of the deprecated JSONB column."""
+        """Verify the aggregate reads resource_allocations, not the JSONB column."""
+        session_id = SessionId(session_with_allocations.session_id)
         async with db_with_resource_tables.begin_readonly_session() as db_sess:
-            stmt = (
-                sa.select(SessionRow)
-                .where(SessionRow.id == session_with_allocations.session_id)
-                .options(selectinload(SessionRow.kernels))
-            )
+            stmt = sa.select(SessionRow).where(SessionRow.id == session_id)
             session_row = await db_sess.scalar(stmt)
             assert session_row is not None
 
-            # Before: JSONB column is empty (post-Phase 3)
-            assert session_row.occupying_slots == ResourceSlot()
+            aggregates = await batch_load_session_allocations(db_sess, [session_id])
 
-            # Act: batch_populate computes from resource_allocations
-            await batch_populate_session_occupied_slots(db_sess, [session_row])
+        slots = aggregates[session_id].used
+        assert len(slots) == 2
+        # cpu: used=1.5 takes precedence over requested=2.0
+        assert slots["cpu"] == Decimal("1.500000")
+        # mem: used=NULL -> requested=2147483648
+        assert slots["mem"] == Decimal("2147483648")
 
-            # After: occupying_slots is populated from resource_allocations
-            slots = session_row.occupying_slots
-            assert slots is not None
-            assert len(slots) == 2
-            # cpu: used=1.5 takes precedence over requested=2.0
-            assert slots["cpu"] == Decimal("1.500000")
-            # mem: used=NULL -> requested=2147483648
-            assert slots["mem"] == Decimal("2147483648")
-
-    async def test_batch_populate_empty_sessions(
+    async def test_empty_session_ids(
         self,
         db_with_resource_tables: ExtendedAsyncSAEngine,
     ) -> None:
-        """Verify that batch_populate handles empty list gracefully."""
+        """Verify that an empty id list is handled gracefully."""
         async with db_with_resource_tables.begin_readonly_session() as db_sess:
-            await batch_populate_session_occupied_slots(db_sess, [])
+            assert await batch_load_session_allocations(db_sess, []) == {}
 
-    async def test_search_returns_computed_occupied_slots(
+    @pytest.fixture
+    async def designated_agent_id(
+        self,
+        db_with_resource_tables: ExtendedAsyncSAEngine,
+        session_with_allocations: SessionTestData,
+    ) -> AgentId:
+        """An agent the session designates."""
+        agent_id = AgentId(f"i-{uuid.uuid4().hex[:12]}")
+        agent_uuid = AgentUUID(uuid.uuid4())
+        async with db_with_resource_tables.begin_session() as db_sess:
+            db_sess.add(
+                AgentRow(
+                    id=agent_id,
+                    uuid=agent_uuid,
+                    status=AgentStatus.ALIVE,
+                    region="local",
+                    scaling_group="default",
+                    resource_group_id=session_with_allocations.resource_group_id,
+                    addr="127.0.0.1:6001",
+                    version="1.0.0",
+                    architecture="x86_64",
+                )
+            )
+            await db_sess.flush()
+            db_sess.add(
+                SessionDesignatedAgentRow(
+                    session_id=SessionID(session_with_allocations.session_id),
+                    agent_uuid=agent_uuid,
+                )
+            )
+        return agent_id
+
+    async def test_the_designated_agents_come_back_by_agent_id(
+        self,
+        db_with_resource_tables: ExtendedAsyncSAEngine,
+        session_with_allocations: SessionTestData,
+        designated_agent_id: AgentId,
+    ) -> None:
+        repository = SessionRepository(
+            db_with_resource_tables,
+            V2DBOpsProvider(db_with_resource_tables),
+            registry_db_source=ContainerRegistryDBSource(V2DBOpsProvider(db_with_resource_tables)),
+        )
+        session_id = SessionID(session_with_allocations.session_id)
+
+        designated = await repository.bulk_get_designated_agent_ids_by_session([session_id])
+
+        assert designated == {session_id: [designated_agent_id]}
+
+    async def test_a_session_designating_no_agent_is_absent(
         self,
         db_with_resource_tables: ExtendedAsyncSAEngine,
         session_with_allocations: SessionTestData,
     ) -> None:
-        """Verify the search() repository method returns computed occupied_slots
-        from resource_allocations, not the empty JSONB column."""
-        repository = SessionRepository(db_with_resource_tables)
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[],
-            orders=[],
+        repository = SessionRepository(
+            db_with_resource_tables,
+            V2DBOpsProvider(db_with_resource_tables),
+            registry_db_source=ContainerRegistryDBSource(V2DBOpsProvider(db_with_resource_tables)),
         )
-        result = await repository.search(querier=querier)
 
-        assert result.total_count == 1
-        session_data = result.items[0]
-        slots = session_data.occupying_slots
-        assert slots is not None
+        designated = await repository.bulk_get_designated_agent_ids_by_session([
+            SessionID(session_with_allocations.session_id)
+        ])
+
+        assert designated == {}
+
+    async def test_repository_aggregate_returns_computed_slots(
+        self,
+        db_with_resource_tables: ExtendedAsyncSAEngine,
+        session_with_allocations: SessionTestData,
+    ) -> None:
+        """Verify the repository aggregate returns values computed from
+        resource_allocations, not the empty JSONB column."""
+        repository = SessionRepository(
+            db_with_resource_tables,
+            V2DBOpsProvider(db_with_resource_tables),
+            registry_db_source=ContainerRegistryDBSource(V2DBOpsProvider(db_with_resource_tables)),
+        )
+        session_id = SessionId(session_with_allocations.session_id)
+        aggregates = await repository.batch_get_resource_allocation_by_session([session_id])
+
+        slots = aggregates[session_id].used
         assert slots["cpu"] == Decimal("1.500000")
         assert slots["mem"] == Decimal("2147483648")
 
@@ -932,14 +918,14 @@ class TestGetTemplateInfoById:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 AgentRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
                 UserRow,
-                GroupRow,
-                session_templates,
+                ProjectRow,
+                SessionTemplateRow,
                 KeyPairRow,
                 ContainerRegistryRow,
                 ImageRow,
@@ -953,18 +939,24 @@ class TestGetTemplateInfoById:
 
     @pytest.fixture
     def repository(self, db_with_cleanup: ExtendedAsyncSAEngine) -> SessionRepository:
-        return SessionRepository(db_with_cleanup)
+        return SessionRepository(
+            db_with_cleanup,
+            V2DBOpsProvider(db_with_cleanup),
+            registry_db_source=ContainerRegistryDBSource(V2DBOpsProvider(db_with_cleanup)),
+        )
 
     @pytest.fixture
     async def active_template(
-        self, db_with_cleanup: ExtendedAsyncSAEngine
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> tuple[uuid.UUID, str]:
         """Insert an active session_template. Returns (template_id, name)."""
         return await self._create_template(db_with_cleanup, is_active=True, name="test-template")
 
     @pytest.fixture
     async def inactive_template(
-        self, db_with_cleanup: ExtendedAsyncSAEngine
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> tuple[uuid.UUID, str]:
         """Insert an inactive session_template. Returns (template_id, name)."""
         return await self._create_template(
@@ -982,6 +974,7 @@ class TestGetTemplateInfoById:
 
         Returns (template_id, name).
         """
+        domain_id = DomainID(uuid.uuid4())
         template_id = uuid.uuid4()
         domain_name = f"test-domain-{template_id.hex[:8]}"
         user_uuid = uuid.uuid4()
@@ -990,6 +983,7 @@ class TestGetTemplateInfoById:
         async with db.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -1023,6 +1017,7 @@ class TestGetTemplateInfoById:
                         rounds=100_000,
                         salt_size=32,
                     ),
+                    domain_id=domain_id,
                     need_password_change=False,
                     full_name="Test User",
                     description="",
@@ -1036,7 +1031,7 @@ class TestGetTemplateInfoById:
             await db_sess.flush()
 
             await db_sess.execute(
-                sa.insert(session_templates).values(
+                sa.insert(SessionTemplateRow).values(
                     id=template_id,
                     is_active=is_active,
                     domain_name=domain_name,

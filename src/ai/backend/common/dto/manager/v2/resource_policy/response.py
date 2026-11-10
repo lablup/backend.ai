@@ -5,6 +5,7 @@ Response DTOs for resource policy DTO v2.
 from __future__ import annotations
 
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import Field
 
@@ -37,6 +38,7 @@ class KeypairResourcePolicyNode(BaseResponseModel):
     """Node model representing a keypair resource policy entity."""
 
     id: str = Field(description="Policy name (primary key).")
+    entity_id: UUID = Field(description="UUID of the policy. Added in 26.9.0.")
     name: str = Field(description="Unique name of the keypair resource policy.")
     created_at: datetime | None = Field(
         default=None,
@@ -57,6 +59,10 @@ class KeypairResourcePolicyNode(BaseResponseModel):
     max_pending_session_count: int | None = Field(
         default=None,
         description="Maximum number of sessions in pending state. Null means unlimited.",
+    )
+    max_priority: int | None = Field(
+        default=None,
+        description="Highest scheduling priority a session may declare. Null means uncapped.",
     )
     max_pending_session_resource_slots: list[ResourceLimitEntryInfo] | None = Field(
         default=None,
@@ -96,12 +102,16 @@ class DeleteKeypairResourcePolicyPayload(BaseResponseModel):
     """Payload for keypair resource policy deletion mutation result."""
 
     name: str = Field(description="Name of the deleted keypair resource policy.")
+    entity_id: UUID = Field(
+        description="UUID of the deleted keypair resource policy. Added in 26.10.0.",
+    )
 
 
 class UserResourcePolicyNode(BaseResponseModel):
     """Node model representing a user resource policy entity."""
 
     id: str = Field(description="Policy name (primary key).")
+    entity_id: UUID = Field(description="UUID of the policy. Added in 26.9.0.")
     name: str = Field(description="Unique name of the user resource policy.")
     created_at: datetime | None = Field(
         default=None,
@@ -149,12 +159,16 @@ class DeleteUserResourcePolicyPayload(BaseResponseModel):
     """Payload for user resource policy deletion mutation result."""
 
     name: str = Field(description="Name of the deleted user resource policy.")
+    entity_id: UUID = Field(
+        description="UUID of the deleted user resource policy. Added in 26.10.0.",
+    )
 
 
 class ProjectResourcePolicyNode(BaseResponseModel):
     """Node model representing a project resource policy entity."""
 
     id: str = Field(description="Policy name (primary key).")
+    entity_id: UUID = Field(description="UUID of the policy. Added in 26.9.0.")
     name: str = Field(description="Unique name of the project resource policy.")
     created_at: datetime | None = Field(
         default=None,
@@ -191,6 +205,9 @@ class DeleteProjectResourcePolicyPayload(BaseResponseModel):
     """Payload for project resource policy deletion mutation result."""
 
     name: str = Field(description="Name of the deleted project resource policy.")
+    entity_id: UUID = Field(
+        description="UUID of the deleted project resource policy. Added in 26.10.0.",
+    )
 
 
 class SearchKeypairResourcePoliciesPayload(BaseResponseModel):

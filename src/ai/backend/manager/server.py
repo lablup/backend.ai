@@ -33,44 +33,56 @@ import click
 import uvloop
 from aiohttp import web
 from aiohttp.typedefs import Handler, Middleware
-from opentelemetry.instrumentation.aiohttp_server import (
-    middleware as otel_server_middleware,
-)
 from setproctitle import setproctitle
 
 from ai.backend.common.cli import LazyGroup
 from ai.backend.common.config import find_config_file
 from ai.backend.common.dependencies import DependencyBuilderStack
 from ai.backend.common.json import dump_json_str
-from ai.backend.common.metrics.http import build_prometheus_metrics_handler
+from ai.backend.common.metrics.http import (
+    SystemMetricUpdater,
+    build_prometheus_metrics_handler,
+)
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.metrics.multiprocess_setup import cleanup_prometheus_multiprocess_dir
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
+from ai.backend.common.networking import force_threaded_dns_resolver
+from ai.backend.common.plugin import load_configured_wheelhouse
 from ai.backend.common.utils import env_info
-from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
+from ai.backend.logging import Logger, LogLevel
 from ai.backend.logging.otel import (
+    LegacyOtelLogging,
     OpenTelemetrySpec,
+    apply_otel_tracer,
+    build_otel_server_middleware,
     instrument_aiohttp_client,
-    instrument_aiohttp_server,
+)
+from ai.backend.logging.structured import StructuredLogger
+from ai.backend.logging.structured_otel import StructuredOtelLogging
+from ai.backend.manager.api.rest.middleware.auth import build_auth_middleware
+from ai.backend.manager.api.rest.middleware.exception import build_exception_middleware
+from ai.backend.manager.dependencies.composer import (
+    DependencyInput,
+    DependencyResources,
+    ManagerDependencyComposer,
 )
 
 from . import __version__
 from .api.rest.app import _mount_registry_tree
 from .api.rest.internal.tree import build_internal_api_routes
-from .api.rest.middleware import (
-    build_auth_middleware,
-    build_exception_middleware,
-)
+from .api.rest.middleware.auth import TRUSTED_PROXY_NETWORKS_KEY, parse_trusted_proxy_networks
 from .api.rest.routing import RouteRegistry
+from .api.rest.shutdown import ServerDrainNotifier
 from .config.bootstrap import BootstrapConfig
 from .config.unified import EventLoopType
 from .data.manager_status.types import ManagerStatus
-from .dependencies import DependencyInput, DependencyResources, ManagerDependencyComposer
 from .plugin.webapp import WebappPluginContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 EVENT_DISPATCHER_CONSUMER_GROUP: Final = "manager"
+SHUTDOWN_CLEANUP_MARGIN: Final = 10.0
+IN_FLIGHT_SHUTDOWN_TIMEOUT: Final = 5.0
 
 
 @asynccontextmanager
@@ -95,9 +107,13 @@ async def webapp_plugin_ctx(
     root_app["_config_provider"] = r.bootstrap.config_provider
     root_app["_etcd"] = r.bootstrap.etcd
     root_app["_valkey_stat"] = r.infrastructure.valkey.stat
+    root_app["_valkey_session"] = r.infrastructure.valkey.session
+    root_app["_sentinel_monitors"] = r.infrastructure.sentinel_monitors
+    root_app["_key_provider_pool"] = r.bootstrap.key_provider_pool
+    root_app["_auth_repository"] = r.domain.repositories.auth.repository
     for plugin_name, plugin_instance in plugin_ctx.plugins.items():
         if pidx == 0:
-            log.info("Loading webapp plugin: {0}", plugin_name)
+            log.info("loading webapp plugin", plugin_name=plugin_name)
         subapp, global_middlewares = await plugin_instance.create_app(cors_options)
         _init_subapp(plugin_name, root_app, subapp, global_middlewares)
     try:
@@ -119,9 +135,9 @@ async def manager_status_ctx(
                 ManagerStatus.RUNNING
             )
             mgr_status = ManagerStatus.RUNNING
-        log.info("Manager status: {}", mgr_status)
+        log.info("manager status loaded", manager_status=mgr_status)
         tz = config_provider.config.system.timezone
-        log.info("Configured timezone: {}", tz.tzname(datetime.now(UTC)))
+        log.info("timezone configured", timezone_name=tz.tzname(datetime.now(UTC)))
     yield
 
 
@@ -136,12 +152,12 @@ def handle_loop_error(
     msg = context.get("message", "(empty message)")
     if exception is not None:
         if sys.exc_info()[0] is not None:
-            log.exception("Error inside event loop: {0}", msg)
+            log.exception("error inside the event loop", loop_error_message=str(msg))
             if _error_monitor_ref is not None:
                 loop.create_task(_error_monitor_ref.capture_exception())
         else:
             exc_info = (type(exception), exception, exception.__traceback__)
-            log.error("Error inside event loop: {0}", msg, exc_info=exc_info)
+            log.error("error inside the event loop", loop_error_message=str(msg), exc_info=exc_info)
             if _error_monitor_ref is not None:
                 loop.create_task(_error_monitor_ref.capture_exception(exc_instance=exception))
 
@@ -174,12 +190,27 @@ def build_prometheus_service_discovery_handler(
     async def _handler(_request: web.Request) -> web.Response:
         services = await service_discovery.discover()
         resp = []
+        # Every worker of a multi-process component registers itself, but they all share
+        # one listening socket, so their endpoints carry the same address. Metrics are
+        # collected in prometheus_client's multi-process mode, where any scrape of that
+        # address already returns the sum across the workers on that host. Emitting a
+        # target per registration therefore makes Prometheus scrape the same totals once
+        # per worker, and every `sum()` over them comes out that many times too large
+        # (observed: raising `num-proc` from 1 to 4 tripled the reported request rate
+        # while the real traffic held steady).
+        #
+        # One target per address is what the exposition actually describes. ``service_id``
+        # is dropped with the duplicates, since no single worker's id speaks for the host.
+        seen_addresses: set[str] = set()
         for service in services:
+            address = f"{service.endpoint.prometheus_address}"
+            if address in seen_addresses:
+                continue
+            seen_addresses.add(address)
             resp.append({
-                "targets": [f"{service.endpoint.prometheus_address}"],
+                "targets": [address],
                 "labels": {
                     **service.labels,
-                    "service_id": service.id,
                     "service_group": service.service_group,
                     "display_name": service.display_name,
                     "version": service.version,
@@ -195,9 +226,12 @@ def build_prometheus_service_discovery_handler(
     return _handler
 
 
-def build_internal_app(dep_resources: DependencyResources) -> web.Application:
+def build_internal_app(
+    dep_resources: DependencyResources, drain_notifier: ServerDrainNotifier
+) -> web.Application:
     app = web.Application()
     metric_registry = CommonMetricRegistry.instance()
+    app.cleanup_ctx.append(SystemMetricUpdater(metric_registry.system).cleanup_ctx)
     app.router.add_route("GET", r"/metrics", build_prometheus_metrics_handler(metric_registry))
     app.router.add_route(
         "GET",
@@ -205,7 +239,9 @@ def build_internal_app(dep_resources: DependencyResources) -> web.Application:
         build_prometheus_service_discovery_handler(dep_resources.system.service_discovery),
     )
     root_reg = RouteRegistry.create("", {})
-    for sub in build_internal_api_routes(health_probe=dep_resources.system.health_probe):
+    for sub in build_internal_api_routes(
+        health_probe=dep_resources.system.health_probe, drain_notifier=drain_notifier
+    ):
         root_reg.add_subregistry(sub)
     _mount_registry_tree(app, root_reg)
     return app
@@ -228,6 +264,7 @@ async def server_main(
     boostrap_config = args.bootstrap_cfg
     loop.set_debug(boostrap_config.debug.asyncio)
     manager_init_stack = AsyncExitStack()
+    drain_notifier = ServerDrainNotifier()
 
     @asynccontextmanager
     async def aiomonitor_ctx() -> AsyncIterator[aiomonitor.Monitor]:
@@ -264,11 +301,22 @@ async def server_main(
         dep_resources: DependencyResources,
     ) -> AsyncGenerator[None]:
         config_provider = dep_resources.bootstrap.config_provider
+        shutdown_config = boostrap_config.manager
 
-        runner = web.AppRunner(root_app, keepalive_timeout=30.0)
+        root_app.on_response_prepare.append(drain_notifier.on_response_prepare)
+        runner = web.AppRunner(
+            root_app,
+            keepalive_timeout=30.0,
+            shutdown_timeout=IN_FLIGHT_SHUTDOWN_TIMEOUT,
+        )
 
-        internal_app = build_internal_app(dep_resources)
-        internal_runner = web.AppRunner(internal_app, keepalive_timeout=30.0)
+        internal_app = build_internal_app(dep_resources, drain_notifier)
+        internal_app.on_response_prepare.append(drain_notifier.on_response_prepare)
+        internal_runner = web.AppRunner(
+            internal_app,
+            keepalive_timeout=30.0,
+            shutdown_timeout=IN_FLIGHT_SHUTDOWN_TIMEOUT,
+        )
 
         ssl_ctx = None
         if config_provider.config.manager.ssl_enabled:
@@ -277,36 +325,47 @@ async def server_main(
                 str(config_provider.config.manager.ssl_cert),
                 config_provider.config.manager.ssl_privkey,
             )
-        await runner.setup()  # The cleanup context initialization happens here.
-        await internal_runner.setup()
-        service_addr = config_provider.config.manager.service_addr
-        internal_addr = config_provider.config.manager.internal_addr
-        site = web.TCPSite(
-            runner,
-            service_addr.host,
-            service_addr.port,
-            backlog=1024,
-            reuse_port=True,
-            ssl_context=ssl_ctx,
-        )
-        internal_site = web.TCPSite(
-            internal_runner,
-            internal_addr.host,
-            internal_addr.port,
-            backlog=1024,
-            reuse_port=True,
-        )
-        await site.start()
-        await internal_site.start()
-        log.info(
-            "started handling API requests at {}",
-            service_addr,
-        )
-
+        started = False
         try:
+            await runner.setup()  # The cleanup context initialization happens here.
+            await internal_runner.setup()
+            service_addr = config_provider.config.manager.service_addr
+            internal_addr = config_provider.config.manager.internal_addr
+            site = web.TCPSite(
+                runner,
+                service_addr.host,
+                service_addr.port,
+                backlog=1024,
+                reuse_port=True,
+                ssl_context=ssl_ctx,
+            )
+            internal_site = web.TCPSite(
+                internal_runner,
+                internal_addr.host,
+                internal_addr.port,
+                backlog=1024,
+                reuse_port=True,
+            )
+            await site.start()
+            await internal_site.start()
+            log.info("started handling API requests", service_addr=str(service_addr))
+            started = True
             yield
         finally:
-            await runner.cleanup()
+            try:
+                if started:
+                    log.info(
+                        "draining API requests",
+                        grace_period=shutdown_config.shutdown_grace_period,
+                    )
+                    await drain_notifier.drain(shutdown_config.shutdown_grace_period)
+            finally:
+                results = await asyncio.gather(
+                    runner.cleanup(), internal_runner.cleanup(), return_exceptions=True
+                )
+                for result in results:
+                    if isinstance(result, BaseException):
+                        raise result
 
     await manager_init_stack.__aenter__()
     try:
@@ -338,9 +397,9 @@ async def server_main(
         _error_monitor_ref = dep_resources.monitoring.error_monitor
 
         # Insert DI-based middlewares now that dependencies are available.
-        # Maintain order: request_id(0) → exception(1) → auth(2) → api → metric
+        # Maintain order: request_id(0) → client_ip(1) → exception(2) → auth(3) → metric → api
         root_app.middlewares.insert(
-            1,
+            2,
             build_exception_middleware(
                 error_monitor=dep_resources.monitoring.error_monitor,
                 stats_monitor=dep_resources.monitoring.stats_monitor,
@@ -348,48 +407,35 @@ async def server_main(
             ),
         )
         root_app.middlewares.insert(
-            2,
+            3,
             build_auth_middleware(
                 db=dep_resources.infrastructure.db,
+                key_provider_pool=dep_resources.bootstrap.key_provider_pool,
                 jwt_validator=dep_resources.system.jwt_validator,
                 valkey_stat=dep_resources.infrastructure.valkey.stat,
                 hook_plugin_ctx=dep_resources.plugins.hook_plugin_ctx,
             ),
         )
 
-        # Set up XForwardedStrict middleware if trusted proxies are configured.
-        # This must be inserted BEFORE auth middleware so that request.remote is
-        # resolved to the real client IP before authentication runs.
+        # Resolve forwarding headers only for requests arriving from these proxies.
         trusted_proxies = dep_resources.bootstrap.config_provider.config.manager.trusted_proxies
+        root_app[TRUSTED_PROXY_NETWORKS_KEY] = parse_trusted_proxy_networks(trusted_proxies)
         if trusted_proxies:
-            from aiohttp_remotes import XForwardedStrict
-
-            xff_middleware = XForwardedStrict(
-                [trusted_proxies],
-                white_paths=root_app.get("auth_middleware_allowlist", []),
-            )
-            await xff_middleware.setup(root_app)
-            root_app["_trusted_proxies_enabled"] = True
             log.info(
-                "XForwardedStrict middleware enabled with trusted proxies: {}", trusted_proxies
+                "trusting the forwarding headers set by proxies",
+                trusted_proxies=", ".join(map(str, trusted_proxies)),
             )
-        else:
-            root_app["_trusted_proxies_enabled"] = False
 
         # Build and mount the API module tree.
         # Must happen before runner.setup() which freezes the application router.
         from .api.rest.setup import setup_api
 
-        setup_api(root_app, dep_resources, pidx)
+        setup_api(root_app, dep_resources, pidx, drain_notifier=drain_notifier)
 
         # Manager status check
         config_provider = dep_resources.bootstrap.config_provider
         await manager_init_stack.enter_async_context(manager_status_ctx(pidx, config_provider))
 
-        # TODO: Remove manual middleware injection once the manager startup is
-        # decoupled from the aiohttp Application lifecycle. Currently root_app is
-        # instantiated before OTel config is available, so instrument_aiohttp_server()
-        # (which patches the class via setattr) cannot take effect automatically.
         if config_provider.config.otel.enabled:
             meta = dep_resources.system.sd_loop.metadata
             otel_spec = OpenTelemetrySpec(
@@ -402,10 +448,11 @@ async def server_main(
                 max_queue_size=config_provider.config.otel.max_queue_size,
                 max_export_batch_size=config_provider.config.otel.max_export_batch_size,
             )
-            BraceStyleAdapter.apply_otel(otel_spec)
-            instrument_aiohttp_server()
+            LegacyOtelLogging(otel_spec).attach()
+            apply_otel_tracer(otel_spec)
+            StructuredOtelLogging(otel_spec).attach(config_provider.config.logging.pkg_ns.keys())
             instrument_aiohttp_client()
-            root_app.middlewares.insert(0, otel_server_middleware)
+            root_app.middlewares.insert(0, build_otel_server_middleware())
 
         # Plugin webapps should be loaded before runner.setup() because root_app is frozen upon on_startup event.
         await manager_init_stack.enter_async_context(
@@ -424,18 +471,18 @@ async def server_main(
             ])
             os.setgid(gid)
             os.setuid(uid)
-            log.info("changed process uid and gid to {}:{}", uid, gid)
+            log.info("changed the process uid and gid", uid=uid, gid=gid)
 
-        log.info("Started the manager service.")
+        log.info("started the manager service")
     except Exception:
-        log.exception("Server initialization failure; triggering shutdown...")
+        log.exception("server initialization failed; triggering shutdown")
         loop.call_later(0.2, os.kill, 0, signal.SIGINT)
 
     try:
         yield
     finally:
         _error_monitor_ref = None
-        log.info("shutting down...")
+        log.info("shutting down")
         await manager_init_stack.__aexit__(None, None, None)
 
 
@@ -499,6 +546,7 @@ def main(
     """
     Start the manager service as a foreground process.
     """
+    force_threaded_dns_resolver()
     log_level = LogLevel.DEBUG if debug else log_level
 
     if config_path is None:
@@ -526,15 +574,16 @@ def main(
             with logger:
                 ns = bootstrap_cfg.etcd.namespace
                 setproctitle(f"backend.ai: manager {ns}")
-                log.info("Backend.AI Manager {0}", __version__)
-                log.info("runtime: {0}", env_info())
+                log.info("Backend.AI Manager starting", version=__version__)
+                log.info("runtime environment", runtime_info=env_info())
+                load_configured_wheelhouse(bootstrap_cfg.wheelhouse)
                 log_config = logging.getLogger("ai.backend.manager.config")
                 log_config.debug("debug mode enabled.")
                 runner: Callable[..., Any]
                 match bootstrap_cfg.manager.event_loop:
                     case EventLoopType.UVLOOP:
                         runner = uvloop.run
-                        log.info("Using uvloop as the event loop backend")
+                        log.info("using uvloop as the event loop backend")
                     case EventLoopType.ASYNCIO:
                         runner = asyncio.run
                 try:
@@ -542,12 +591,14 @@ def main(
                         server_main_logwrapper,
                         num_workers=bootstrap_cfg.manager.num_proc,
                         args=(bootstrap_cfg, discovered_cfg_path, log_endpoint, log_level),
-                        wait_timeout=5.0,
+                        wait_timeout=(
+                            bootstrap_cfg.manager.shutdown_grace_period + SHUTDOWN_CLEANUP_MARGIN
+                        ),
                         runner=runner,
                     )
                 finally:
                     cleanup_prometheus_multiprocess_dir()
-                    log.info("terminated.")
+                    log.info("terminated")
         finally:
             if bootstrap_cfg.manager.pid_file.is_file():
                 # check is_file() to prevent deleting /dev/null!

@@ -10,11 +10,13 @@ import strawberry
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.dto.manager.v2.fair_share.types import (
     ProjectFairShareScopeDTO,
     ProjectUsageScopeDTO,
 )
 from ai.backend.common.dto.manager.v2.group.response import ProjectNode
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -23,10 +25,10 @@ from ai.backend.manager.api.gql.decorators import (
     gql_field,
     gql_pydantic_input,
 )
-from ai.backend.manager.api.gql.fair_share.types import ProjectFairShareGQL
+from ai.backend.manager.api.gql.fair_share.types.project import ProjectFairShareGQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticNodeMixin
 from ai.backend.manager.api.gql.resource_slot.overview_types import ActiveResourceOverviewGQL
-from ai.backend.manager.api.gql.resource_usage.types import (
+from ai.backend.manager.api.gql.resource_usage.types.project_usage import (
     ProjectUsageBucketConnection,
     ProjectUsageBucketFilter,
     ProjectUsageBucketOrderBy,
@@ -42,8 +44,28 @@ from .nested import (
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
+    from ai.backend.manager.api.gql.model_card.types import (
+        ModelCardFilterGQL,
+        ModelCardOrderByGQL,
+        ModelCardV2Connection,
+    )
+    from ai.backend.manager.api.gql.resource_group.types import (
+        ResourceGroupConnection,
+        ResourceGroupFilterGQL,
+        ResourceGroupOrderByGQL,
+    )
+    from ai.backend.manager.api.gql.system_session_environ.types import (
+        SystemSessionEnvironConnectionGQL,
+        SystemSessionEnvironFilterGQL,
+        SystemSessionEnvironOrderByGQL,
+    )
     from ai.backend.manager.api.gql.user.types.filters import UserFilterGQL, UserOrderByGQL
     from ai.backend.manager.api.gql.user.types.node import UserV2Connection
+    from ai.backend.manager.api.gql.vfolder_auto_mount.types import (
+        VFolderAutoMountConnectionGQL,
+        VFolderAutoMountFilterGQL,
+        VFolderAutoMountOrderByGQL,
+    )
 
 
 @gql_pydantic_input(
@@ -89,6 +111,12 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
     """Project entity with structured field groups."""
 
     id: NodeID[str] = gql_field(description="Unique identifier for the project (UUID).")
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="UUID of the project.",
+        ),
+    )
     basic_info: ProjectBasicInfoGQL = gql_field(
         description="Basic project information including name, type, and description."
     )
@@ -155,21 +183,15 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
         from strawberry.relay import PageInfo
 
         from ai.backend.manager.api.gql.base import encode_cursor
-        from ai.backend.manager.api.gql.resource_usage.types import (
+        from ai.backend.manager.api.gql.resource_usage.types.project_usage import (
             ProjectUsageBucketEdge,
             ProjectUsageBucketGQL,
         )
-        from ai.backend.manager.repositories.resource_usage_history.types import (
-            ProjectUsageBucketSearchScope,
-        )
 
-        repository_scope = ProjectUsageBucketSearchScope(
-            resource_group=scope.resource_group_name,
+        payload = await info.context.adapters.resource_usage.gql_search_project_scoped(
+            resource_group_name=scope.resource_group_name,
             domain_name=self.organization.domain_name,
             project_id=UUID(str(self.id)),
-        )
-        payload = await info.context.adapters.resource_usage.gql_search_project_scoped(
-            scope=repository_scope,
             filter=filter.to_pydantic() if filter else None,
             order=[o.to_pydantic() for o in order_by] if order_by else None,
             first=first,
@@ -207,8 +229,13 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
     ):
         from ai.backend.manager.errors.resource import DomainNotFound
 
-        domain: DomainV2GQL | None = await info.context.data_loaders.domain_loader.load(
+        domain_id = await info.context.data_loaders.domain_id_by_name_loader.load(
             self.organization.domain_name
+        )
+        if domain_id is None:
+            raise DomainNotFound(self.organization.domain_name)
+        domain: DomainV2GQL | None = await info.context.data_loaders.domain_by_id_loader.load(
+            domain_id
         )
         if domain is None:
             raise DomainNotFound(self.organization.domain_name)
@@ -251,11 +278,9 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
             UserV2Edge,
             UserV2GQL,
         )
-        from ai.backend.manager.repositories.user.types import ProjectUserSearchScope
 
-        repo_scope = ProjectUserSearchScope(project_id=UUID(str(self.id)))
         payload = await info.context.adapters.user.gql_search_by_project(
-            scope=repo_scope,
+            project_id=ProjectID(UUID(str(self.id))),
             input=AdminSearchUsersInput(
                 filter=filter.to_pydantic() if filter else None,
                 order=[o.to_pydantic() for o in order_by] if order_by else None,
@@ -280,6 +305,294 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
             count=payload.total_count,
         )
 
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="Resource groups this project may schedule on.",
+        )
+    )  # type: ignore[misc]
+    async def resource_groups(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: Annotated[
+            ResourceGroupFilterGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.resource_group.types"),
+        ]
+        | None = None,
+        order_by: list[
+            Annotated[
+                ResourceGroupOrderByGQL,
+                strawberry.lazy("ai.backend.manager.api.gql.resource_group.types"),
+            ]
+        ]
+        | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> (
+        Annotated[
+            ResourceGroupConnection,
+            strawberry.lazy("ai.backend.manager.api.gql.resource_group.types"),
+        ]
+        | None
+    ):
+        from strawberry.relay import PageInfo
+
+        from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
+        from ai.backend.common.dto.manager.v2.resource_group.request import (
+            ScopedSearchResourceGroupsInput,
+        )
+        from ai.backend.common.dto.manager.v2.resource_group.types import ResourceGroupScope
+        from ai.backend.manager.api.gql.base import encode_cursor
+        from ai.backend.manager.api.gql.resource_group.types import (
+            ResourceGroupConnection,
+            ResourceGroupEdge,
+            ResourceGroupGQL,
+        )
+
+        payload = await info.context.adapters.resource_group.scoped_search(
+            ScopedSearchResourceGroupsInput(
+                scope=ResourceGroupScope(project=[UUIDScope(value=UUID(str(self.id)))]),
+                filter=filter.to_pydantic() if filter else None,
+                order=[o.to_pydantic() for o in order_by] if order_by else None,
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+                limit=limit,
+                offset=offset,
+            )
+        )
+        nodes = [ResourceGroupGQL.from_pydantic(data) for data in payload.items]
+        edges = [ResourceGroupEdge(node=node, cursor=encode_cursor(node.id)) for node in nodes]
+        return ResourceGroupConnection(
+            edges=edges,
+            page_info=PageInfo(
+                has_next_page=payload.has_next_page,
+                has_previous_page=payload.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+            count=payload.total_count,
+        )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="Model cards belonging to this project.",
+        )
+    )  # type: ignore[misc]
+    async def model_cards(
+        self,
+        info: Info,
+        filter: Annotated[
+            ModelCardFilterGQL, strawberry.lazy("ai.backend.manager.api.gql.model_card.types")
+        ]
+        | None = None,
+        order_by: list[
+            Annotated[
+                ModelCardOrderByGQL,
+                strawberry.lazy("ai.backend.manager.api.gql.model_card.types"),
+            ]
+        ]
+        | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> (
+        Annotated[
+            ModelCardV2Connection, strawberry.lazy("ai.backend.manager.api.gql.model_card.types")
+        ]
+        | None
+    ):
+        from strawberry.relay import PageInfo
+
+        from ai.backend.common.dto.manager.v2.model_card.request import (
+            ScopedSearchModelCardsInput,
+        )
+        from ai.backend.common.dto.manager.v2.model_card.types import ModelCardScope
+        from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
+        from ai.backend.manager.api.gql.base import encode_cursor
+        from ai.backend.manager.api.gql.model_card.types import (
+            ModelCardGQL,
+            ModelCardV2Connection,
+            ModelCardV2Edge,
+        )
+
+        payload = await info.context.adapters.model_card.scoped_search(
+            ScopedSearchModelCardsInput(
+                scope=ModelCardScope(project=[UUIDScope(value=UUID(str(self.id)))]),
+                filter=filter.to_pydantic() if filter else None,
+                order=[o.to_pydantic() for o in order_by] if order_by else None,
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+                limit=limit,
+                offset=offset,
+            )
+        )
+        nodes = [ModelCardGQL.from_pydantic(node) for node in payload.items]
+        edges = [ModelCardV2Edge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
+        return ModelCardV2Connection(
+            edges=edges,
+            page_info=PageInfo(
+                has_next_page=payload.has_next_page,
+                has_previous_page=payload.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+            count=payload.total_count,
+        )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="VFolders auto-mounted into every session created in this project.",
+        )
+    )  # type: ignore[misc]
+    async def vfolder_auto_mounts(
+        self,
+        info: Info,
+        filter: Annotated[
+            VFolderAutoMountFilterGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.vfolder_auto_mount.types"),
+        ]
+        | None = None,
+        order_by: list[
+            Annotated[
+                VFolderAutoMountOrderByGQL,
+                strawberry.lazy("ai.backend.manager.api.gql.vfolder_auto_mount.types"),
+            ]
+        ]
+        | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> (
+        Annotated[
+            VFolderAutoMountConnectionGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.vfolder_auto_mount.types"),
+        ]
+        | None
+    ):
+        from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
+        from ai.backend.common.dto.manager.v2.vfolder_auto_mount.request import (
+            ScopedSearchVFolderAutoMountsInput,
+        )
+        from ai.backend.common.dto.manager.v2.vfolder_auto_mount.types import (
+            VFolderAutoMountScope,
+        )
+        from ai.backend.manager.api.gql.vfolder_auto_mount.resolver import (
+            build_vfolder_auto_mount_connection,
+        )
+
+        payload = await info.context.adapters.vfolder_auto_mount.scoped_search(
+            ScopedSearchVFolderAutoMountsInput(
+                scope=VFolderAutoMountScope(project=[UUIDScope(value=UUID(str(self.id)))]),
+                filter=filter.to_pydantic() if filter else None,
+                order=[o.to_pydantic() for o in order_by] if order_by else None,
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+                limit=limit,
+                offset=offset,
+            )
+        )
+        return build_vfolder_auto_mount_connection(payload)
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="System session environ rows registered in this project, soft-deleted ones included.",
+        )
+    )  # type: ignore[misc]
+    async def system_session_environs(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: Annotated[
+            SystemSessionEnvironFilterGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.system_session_environ.types"),
+        ]
+        | None = None,
+        order_by: list[
+            Annotated[
+                SystemSessionEnvironOrderByGQL,
+                strawberry.lazy("ai.backend.manager.api.gql.system_session_environ.types"),
+            ]
+        ]
+        | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> (
+        Annotated[
+            SystemSessionEnvironConnectionGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.system_session_environ.types"),
+        ]
+        | None
+    ):
+        from strawberry.relay import PageInfo
+
+        from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
+        from ai.backend.common.dto.manager.v2.system_session_environ.request import (
+            ScopedSearchSystemSessionEnvironsInput,
+        )
+        from ai.backend.common.dto.manager.v2.system_session_environ.types import (
+            SystemSessionEnvironScope,
+        )
+        from ai.backend.manager.api.gql.base import encode_cursor
+        from ai.backend.manager.api.gql.system_session_environ.types import (
+            SystemSessionEnvironConnectionGQL,
+            SystemSessionEnvironEdgeGQL,
+            SystemSessionEnvironGQL,
+        )
+
+        payload = await info.context.adapters.system_session_environ.scoped_search(
+            ScopedSearchSystemSessionEnvironsInput(
+                scope=SystemSessionEnvironScope(project=[UUIDScope(value=UUID(str(self.id)))]),
+                filter=filter.to_pydantic() if filter else None,
+                order=[order.to_pydantic() for order in order_by] if order_by else None,
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+                limit=limit,
+                offset=offset,
+            )
+        )
+        nodes = [
+            SystemSessionEnvironGQL.from_pydantic(item, id_field="entity_id")
+            for item in payload.items
+        ]
+        edges = [
+            SystemSessionEnvironEdgeGQL(node=node, cursor=encode_cursor(str(node.entity_id)))
+            for node in nodes
+        ]
+        return SystemSessionEnvironConnectionGQL(
+            edges=edges,
+            page_info=PageInfo(
+                has_next_page=payload.has_next_page,
+                has_previous_page=payload.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+            count=payload.total_count,
+        )
+
     @classmethod
     @override
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
@@ -290,7 +603,7 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
         required: bool = False,
     ) -> Iterable[Self | None]:
         results = await info.context.data_loaders.project_loader.load_many([
-            UUID(nid) for nid in node_ids
+            ProjectID(UUID(nid)) for nid in node_ids
         ])
         return cast(list[Self | None], results)
 

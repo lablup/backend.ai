@@ -4,52 +4,45 @@ from __future__ import annotations
 
 import uuid
 
-from ai.backend.common.api_handlers import SENTINEL
-from ai.backend.common.data.permission.types import RoleSource, RoleStatus
+from ai.backend.common.data.permission.types import RoleStatus
 from ai.backend.common.dto.manager.v2.rbac.request import (
     CreateRoleInput as CreateRoleInputDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
     UpdateRoleInput as UpdateRoleInputDTO,
 )
+from ai.backend.common.tristate.unset import UNSET
 from ai.backend.manager.api.gql.rbac.types.role import (
     CreateRoleInput,
     RoleSourceGQL,
     RoleStatusGQL,
     UpdateRoleInput,
 )
+from ai.backend.manager.api.gql.rbac.types.scope import ScopeInputGQL
+
+_SCOPE = ScopeInputGQL(scope_type="project", scope_id=str(uuid.uuid4()))
 
 
 class TestCreateRoleInputToPydantic:
     """Tests for CreateRoleInput.to_pydantic() method."""
 
-    def test_source_omitted_defaults_to_custom(self) -> None:
-        """CreateRoleInput with source omitted → dto.source == RoleSource.CUSTOM."""
-        role_input = CreateRoleInput(name="MyRole")
+    def test_the_scope_reaches_the_dto(self) -> None:
+        dto = CreateRoleInput(name="MyRole", scope=_SCOPE).to_pydantic()
+        assert dto.scope_input().scope_id == _SCOPE.scope_id
 
-        dto = role_input.to_pydantic()
-        assert isinstance(dto, CreateRoleInputDTO)
-        assert dto.source == RoleSource.CUSTOM
+    def test_the_deprecated_scopes_field_still_reaches_the_dto(self) -> None:
+        dto = CreateRoleInput(name="MyRole", scopes=[_SCOPE]).to_pydantic()
+        assert dto.scope_input().scope_id == _SCOPE.scope_id
 
-    def test_source_explicit_system(self) -> None:
-        """CreateRoleInput with source=SYSTEM → dto.source == RoleSource.SYSTEM."""
-        role_input = CreateRoleInput(name="SystemRole", source=RoleSourceGQL.SYSTEM)
-
-        dto = role_input.to_pydantic()
-        assert isinstance(dto, CreateRoleInputDTO)
-        assert dto.source == RoleSource.SYSTEM
-
-    def test_source_explicit_custom(self) -> None:
-        """CreateRoleInput with source=CUSTOM → dto.source == RoleSource.CUSTOM."""
-        role_input = CreateRoleInput(name="CustomRole", source=RoleSourceGQL.CUSTOM)
-
-        dto = role_input.to_pydantic()
-        assert isinstance(dto, CreateRoleInputDTO)
-        assert dto.source == RoleSource.CUSTOM
+    def test_a_source_is_ignored(self) -> None:
+        dto = CreateRoleInput(
+            scope=_SCOPE, name="MyRole", source=RoleSourceGQL.SYSTEM
+        ).to_pydantic()
+        assert not hasattr(dto, "source")
 
     def test_description_omitted_defaults_to_none(self) -> None:
         """CreateRoleInput with description omitted → dto.description is None."""
-        role_input = CreateRoleInput(name="MyRole")
+        role_input = CreateRoleInput(scope=_SCOPE, name="MyRole")
 
         dto = role_input.to_pydantic()
         assert isinstance(dto, CreateRoleInputDTO)
@@ -57,7 +50,7 @@ class TestCreateRoleInputToPydantic:
 
     def test_auto_assign_omitted_defaults_to_false(self) -> None:
         """CreateRoleInput with auto_assign omitted → dto.auto_assign is False."""
-        role_input = CreateRoleInput(name="MyRole")
+        role_input = CreateRoleInput(scope=_SCOPE, name="MyRole")
 
         dto = role_input.to_pydantic()
         assert isinstance(dto, CreateRoleInputDTO)
@@ -65,7 +58,7 @@ class TestCreateRoleInputToPydantic:
 
     def test_auto_assign_explicit_true(self) -> None:
         """CreateRoleInput with auto_assign=True → dto.auto_assign is True."""
-        role_input = CreateRoleInput(name="MyRole", auto_assign=True)
+        role_input = CreateRoleInput(scope=_SCOPE, name="MyRole", auto_assign=True)
 
         dto = role_input.to_pydantic()
         assert isinstance(dto, CreateRoleInputDTO)
@@ -74,9 +67,9 @@ class TestCreateRoleInputToPydantic:
     def test_all_fields_provided(self) -> None:
         """CreateRoleInput with all fields → dto has matching values."""
         role_input = CreateRoleInput(
+            scope=_SCOPE,
             name="Admin",
             description="Admin role",
-            source=RoleSourceGQL.SYSTEM,
             auto_assign=True,
         )
 
@@ -84,7 +77,6 @@ class TestCreateRoleInputToPydantic:
         assert isinstance(dto, CreateRoleInputDTO)
         assert dto.name == "Admin"
         assert dto.description == "Admin role"
-        assert dto.source == RoleSource.SYSTEM
         assert dto.auto_assign is True
 
 
@@ -102,8 +94,8 @@ class TestUpdateRoleInputToPydantic:
         assert isinstance(dto, UpdateRoleInputDTO)
         assert dto.description is None
 
-    def test_description_with_unset_produces_sentinel_in_dto(self) -> None:
-        """UpdateRoleInput with description=UNSET → dto.description is SENTINEL (no change)."""
+    def test_description_with_unset_produces_unset_in_dto(self) -> None:
+        """UpdateRoleInput with description=UNSET → dto.description is UNSET (no change)."""
         role_input = UpdateRoleInput(
             id=uuid.uuid4(),
             # description is omitted (UNSET by default)
@@ -111,7 +103,7 @@ class TestUpdateRoleInputToPydantic:
 
         dto = role_input.to_pydantic()
         assert isinstance(dto, UpdateRoleInputDTO)
-        assert dto.description is SENTINEL
+        assert dto.description is UNSET
 
     def test_description_with_string_produces_string_in_dto(self) -> None:
         """UpdateRoleInput with description="text" → dto.description == "text"."""
@@ -124,8 +116,8 @@ class TestUpdateRoleInputToPydantic:
         assert isinstance(dto, UpdateRoleInputDTO)
         assert dto.description == "some text"
 
-    def test_name_with_unset_produces_none_in_dto(self) -> None:
-        """UpdateRoleInput with name=UNSET → dto.name is None (no change)."""
+    def test_name_with_unset_produces_unset_in_dto(self) -> None:
+        """UpdateRoleInput with name=UNSET → dto.name is UNSET (no change)."""
         role_input = UpdateRoleInput(
             id=uuid.uuid4(),
             # name is omitted (UNSET by default)
@@ -133,7 +125,7 @@ class TestUpdateRoleInputToPydantic:
 
         dto = role_input.to_pydantic()
         assert isinstance(dto, UpdateRoleInputDTO)
-        assert dto.name is None
+        assert dto.name is UNSET
 
     def test_name_with_string_produces_string_in_dto(self) -> None:
         """UpdateRoleInput with name="new name" → dto.name == "new name"."""
@@ -146,8 +138,8 @@ class TestUpdateRoleInputToPydantic:
         assert isinstance(dto, UpdateRoleInputDTO)
         assert dto.name == "new name"
 
-    def test_status_with_unset_produces_none_in_dto(self) -> None:
-        """UpdateRoleInput with status=UNSET → dto.status is None (no change)."""
+    def test_status_with_unset_produces_unset_in_dto(self) -> None:
+        """UpdateRoleInput with status=UNSET → dto.status is UNSET (no change)."""
         role_input = UpdateRoleInput(
             id=uuid.uuid4(),
             # status is omitted (UNSET by default)
@@ -155,7 +147,7 @@ class TestUpdateRoleInputToPydantic:
 
         dto = role_input.to_pydantic()
         assert isinstance(dto, UpdateRoleInputDTO)
-        assert dto.status is None
+        assert dto.status is UNSET
 
     def test_status_with_active_produces_role_status_active(self) -> None:
         """UpdateRoleInput with status=RoleStatusGQL.ACTIVE → dto.status == RoleStatus.ACTIVE."""
@@ -179,8 +171,8 @@ class TestUpdateRoleInputToPydantic:
         assert isinstance(dto, UpdateRoleInputDTO)
         assert dto.status == RoleStatus.INACTIVE
 
-    def test_auto_assign_with_unset_produces_none_in_dto(self) -> None:
-        """UpdateRoleInput with auto_assign=UNSET → dto.auto_assign is None (no change)."""
+    def test_auto_assign_with_unset_produces_unset_in_dto(self) -> None:
+        """UpdateRoleInput with auto_assign=UNSET → dto.auto_assign is UNSET (no change)."""
         role_input = UpdateRoleInput(
             id=uuid.uuid4(),
             # auto_assign is omitted (UNSET by default)
@@ -188,7 +180,7 @@ class TestUpdateRoleInputToPydantic:
 
         dto = role_input.to_pydantic()
         assert isinstance(dto, UpdateRoleInputDTO)
-        assert dto.auto_assign is None
+        assert dto.auto_assign is UNSET
 
     def test_auto_assign_with_true_produces_true_in_dto(self) -> None:
         """UpdateRoleInput with auto_assign=True → dto.auto_assign is True."""
@@ -238,10 +230,10 @@ class TestUpdateRoleInputToPydantic:
 
         dto = role_input.to_pydantic()
         assert isinstance(dto, UpdateRoleInputDTO)
-        assert dto.name is None
-        assert dto.description is SENTINEL
-        assert dto.status is None
-        assert dto.auto_assign is None
+        assert dto.name is UNSET
+        assert dto.description is UNSET
+        assert dto.status is UNSET
+        assert dto.auto_assign is UNSET
 
     def test_id_is_on_gql_input_not_in_dto(self) -> None:
         """id is a GQL input field used for routing but not included in the DTO."""

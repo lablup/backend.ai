@@ -15,44 +15,75 @@ import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
-from sqlalchemy.engine.row import Row
 
-from ai.backend.common.data.permission.types import EntityType
-from ai.backend.common.data.permission.types import ScopeType as RBACScopeType
+from ai.backend.common.data.entity.container_registry import (
+    ContainerRegistryID,
+    ContainerRegistryName,
+    ContainerRegistryProjectName,
+)
+from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import (
     GroupNotFound,
     InvalidAPIParameters,
 )
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
-from ai.backend.manager.data.group.types import GroupData
+from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
+from ai.backend.manager.api.adapters.project.adapter import ProjectAdapter
+from ai.backend.manager.api.gql.base import resolve_entity_id
+from ai.backend.manager.data.container_registry.types import (
+    ImageCommitRegistry,
+    ProjectAllowedRegistryData,
+)
 from ai.backend.manager.data.permission.permission_defs import ProjectPermission
-from ai.backend.manager.models.group import (
-    GroupRow,
+from ai.backend.manager.data.project.types import ProjectData
+from ai.backend.manager.dto.container_registry_request import ImageCommitRegistryReq
+from ai.backend.manager.errors.resource import InvalidUserUpdateMode
+from ai.backend.manager.models.minilang import EnumFieldItem, FieldSpecItem, OrderSpecItem
+from ai.backend.manager.models.minilang.ordering import QueryOrderParser
+from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
+from ai.backend.manager.models.project.creators import ProjectCreator
+from ai.backend.manager.models.project.row import (
+    ProjectRow,
     ProjectType,
     get_permission_ctx,
     groups,
 )
-from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
-from ai.backend.manager.models.minilang.ordering import QueryOrderParser
-from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
+from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
+from ai.backend.manager.models.project.updaters import (
+    ProjectRestoreUpdater,
+    ProjectSoftDeleteUpdater,
+    ProjectUpdater,
+)
 from ai.backend.manager.models.rbac import ProjectScope
 from ai.backend.manager.models.rbac.context import ClientContext
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
+from ai.backend.manager.models.user.row import UserRole
+from ai.backend.manager.models.virtual_entity.queries import (
+    user_scope_membership_exists,
+    user_scope_membership_query,
 )
-from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.group.creators import GroupCreatorSpec
-from ai.backend.manager.repositories.group.updaters import GroupUpdaterSpec
-from ai.backend.manager.services.group.actions.create_group import CreateGroupAction
-from ai.backend.manager.services.group.actions.delete_group import (
-    DeleteGroupAction,
+from ai.backend.manager.services.container_registry.actions.read_registry_quota import (
+    ReadRegistryQuotaAction,
 )
-from ai.backend.manager.services.group.actions.modify_group import ModifyGroupAction
-from ai.backend.manager.services.group.actions.purge_group import (
-    PurgeGroupAction,
+from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
+from ai.backend.manager.services.project.actions.clear_default_registry import (
+    ClearProjectDefaultRegistryAction,
 )
+from ai.backend.manager.services.project.actions.create_project import CreateProjectAction
+from ai.backend.manager.services.project.actions.delete_project import (
+    DeleteProjectAction,
+)
+from ai.backend.manager.services.project.actions.purge_project import (
+    PurgeProjectAction,
+)
+from ai.backend.manager.services.project.actions.restore_project import RestoreProjectAction
+from ai.backend.manager.services.project.actions.switch_default_registry import (
+    SwitchProjectDefaultRegistryAction,
+)
+from ai.backend.manager.services.project.actions.update_project import UpdateProjectAction
+from ai.backend.manager.services.rbac.actions.roster.join_project import JoinProjectAction
+from ai.backend.manager.services.rbac.actions.roster.leave_project import LeaveProjectAction
 from ai.backend.manager.types import OptionalState, TriState
 
 from .base import (
@@ -60,8 +91,6 @@ from .base import (
     FilterExprArg,
     OrderExprArg,
     PaginatedConnectionField,
-    batch_multiresult,
-    batch_result,
     generate_sql_info_for_gql_connection,
     privileged_mutation,
 )
@@ -124,9 +153,10 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
     queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
         "id": ("id", None),
         "name": ("name", None),
+        "type": (EnumFieldItem("type", ProjectType), None),
         "is_active": ("is_active", None),
         "created_at": ("created_at", dtparse),
-        "modified_at": ("modified_at", dtparse),
+        "modified_at": ("updated_at", dtparse),
         "domain_name": ("domain_name", None),
         "resource_policy": ("resource_policy", None),
     }
@@ -136,33 +166,46 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
         "name": ("name", None),
         "is_active": ("is_active", None),
         "created_at": ("created_at", None),
-        "modified_at": ("modified_at", None),
+        "modified_at": ("updated_at", None),
         "domain_name": ("domain_name", None),
         "resource_policy": ("resource_policy", None),
     }
 
     @classmethod
-    def from_row(
+    def from_data(
         cls,
-        graph_ctx: GraphQueryContext,
-        row: GroupRow,
+        data: ProjectData,
     ) -> Self:
         return cls(
-            id=row.id,
-            row_id=row.id,
-            name=row.name,
-            description=row.description,
-            is_active=row.is_active,
-            created_at=row.created_at,
-            modified_at=row.modified_at,
-            domain_name=row.domain_name,
-            total_resource_slots=row.total_resource_slots.to_json() or {},
-            allowed_vfolder_hosts=row.allowed_vfolder_hosts.to_json(),
-            integration_id=row.integration_id,
-            resource_policy=row.resource_policy,
-            type=row.type.name,
-            container_registry=row.container_registry,
+            id=data.id,
+            row_id=data.id,
+            name=data.name,
+            description=data.description,
+            is_active=data.is_active,
+            created_at=data.created_at,
+            modified_at=data.modified_at,
+            domain_name=data.domain_name,
+            total_resource_slots=data.total_resource_slots.to_json() or {},
+            allowed_vfolder_hosts=data.allowed_vfolder_hosts.to_json(),
+            integration_id=data.integration_name,
+            resource_policy=data.resource_policy,
+            type=data.type.name,
         )
+
+    async def resolve_container_registry(
+        self, info: graphene.ResolveInfo
+    ) -> dict[str, str | None] | None:
+        graph_ctx: GraphQueryContext = info.context
+        loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, "Group.registries")
+        project_registries: list[ProjectAllowedRegistryData] = await loader.load(ProjectID(self.id))
+        for project_registry in project_registries:
+            if not project_registry.is_default:
+                continue
+            registry = project_registry.registry
+            return ImageCommitRegistry(
+                registry_name=registry.registry_name, project_name=registry.project
+            ).to_json()
+        return None
 
     async def resolve_scaling_groups(self, info: graphene.ResolveInfo) -> Sequence[ScalingGroup]:
         graph_ctx: GraphQueryContext = info.context
@@ -183,8 +226,8 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
         first: int | None = None,
         before: str | None = None,
         last: int | None = None,
-    ) -> ConnectionResolverResult[Self]:
-        from ai.backend.manager.models.user import UserRow
+    ) -> ConnectionResolverResult[UserNode]:
+        from ai.backend.manager.models.user.row import UserRow
 
         graph_ctx: GraphQueryContext = info.context
         _filter_arg = (
@@ -216,26 +259,15 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
             before=before,
             last=last,
         )
-        # Project membership comes from association_scopes_entities (PROJECT/USER).
-        # Cast UserRow.uuid (GUID) to String to match the non-UUID String(64)
-        # entity_id column safely.
-        j = sa.join(
-            UserRow,
-            AssociationScopesEntitiesRow,
-            sa.cast(UserRow.uuid, sa.String) == AssociationScopesEntitiesRow.entity_id,
-        )
-        membership_filter = sa.and_(
-            AssociationScopesEntitiesRow.scope_type == RBACScopeType.PROJECT,
-            AssociationScopesEntitiesRow.scope_id == str(self.id),
-            AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-        )
-        user_query = query.select_from(j).where(membership_filter)
-        cnt_query = sa.select(sa.func.count()).select_from(j).where(membership_filter)
+        # Project membership comes from the virtual-entity chain (PROJECT/USER).
+        membership_filter = user_scope_membership_exists(ProjectEntityType(), self.id, UserRow.uuid)
+        user_query = query.where(membership_filter)
+        cnt_query = sa.select(sa.func.count()).select_from(UserRow).where(membership_filter)
         for cond in conditions:
             cnt_query = cnt_query.where(cond)
         async with graph_ctx.db.begin_readonly_session() as db_session:
             user_rows = (await db_session.scalars(user_query)).all()
-            result = [type(self).from_row(graph_ctx, row) for row in user_rows]
+            result = [UserNode.from_row(graph_ctx, row) for row in user_rows]
             total_cnt = await db_session.scalar(cnt_query) or 0
             return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
@@ -243,20 +275,37 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
         graph_ctx: GraphQueryContext = info.context
         scope_id = ProjectScope(project_id=self.id, domain_name=None)
 
-        return await graph_ctx.services_ctx.per_project_container_registries_quota.read_quota(
-            scope_id,
+        result = await graph_ctx.processors.container_registry.read_registry_quota.run(
+            ReadRegistryQuotaAction(scope_id=scope_id)
         )
+        return result.quota
 
     @classmethod
     async def get_node(cls, info: graphene.ResolveInfo, id: str) -> Self:
         graph_ctx: GraphQueryContext = info.context
-        _, group_id = AsyncNode.resolve_global_id(info, id)
-        query = sa.select(GroupRow).where(GroupRow.id == group_id)
-        async with graph_ctx.db.begin_readonly_session() as db_session:
+        group_id = resolve_entity_id(id, ProjectID)
+        user = graph_ctx.user
+        visible: sa.ColumnElement[bool]
+        match user["role"]:
+            case UserRole.SUPERADMIN:
+                visible = sa.true()
+            case UserRole.ADMIN:
+                visible = ProjectRow.domain_name == user["domain_name"]
+            case UserRole.USER:
+                member_projects = user_scope_membership_query(
+                    ProjectEntityType(), user["uuid"]
+                ).subquery()
+                visible = (ProjectRow.domain_name == user["domain_name"]) & ProjectRow.id.in_(
+                    sa.select(member_projects.c.scope_id)
+                )
+            case _:
+                visible = sa.false()
+        query = sa.select(ProjectRow).where(visible & (ProjectRow.id == group_id))
+        async with graph_ctx.db.begin_readonly_session_read_committed() as db_session:
             group_row = (await db_session.scalars(query)).first()
-            if group_row is None:
-                raise GroupNotFound(f"Group not found: {group_id}")
-            return cls.from_row(graph_ctx, group_row)
+        if group_row is None:
+            raise GroupNotFound(f"Group not found: {group_id}")
+        return cls.from_data(ProjectSearchableFields.own.to_data(group_row))
 
     @classmethod
     async def get_connection(
@@ -293,8 +342,8 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
             page_size,
         ) = generate_sql_info_for_gql_connection(
             info,
-            GroupRow,
-            GroupRow.id,
+            ProjectRow,
+            ProjectRow.id,
             _filter_arg,
             _order_expr,
             offset,
@@ -320,7 +369,9 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
             async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
                 group_rows = (await db_session.scalars(query)).all()
                 total_cnt = await db_session.scalar(cnt_query)
-                result = [cls.from_row(graph_ctx, row) for row in group_rows]
+                result = [
+                    cls.from_data(ProjectSearchableFields.own.to_data(row)) for row in group_rows
+                ]
 
         return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
@@ -373,29 +424,7 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
     scaling_groups = graphene.List(lambda: graphene.String)
 
     @classmethod
-    def from_row(cls, graph_ctx: GraphQueryContext, row: Row[Any] | None) -> Group | None:
-        if row is None:
-            return None
-        return cls(
-            id=row.id,
-            name=row.name,
-            description=row.description,
-            is_active=row.is_active,
-            created_at=row.created_at,
-            modified_at=row.modified_at,
-            domain_name=row.domain_name,
-            total_resource_slots=(
-                row.total_resource_slots.to_json() if row.total_resource_slots is not None else {}
-            ),
-            allowed_vfolder_hosts=row.allowed_vfolder_hosts.to_json(),
-            integration_id=row.integration_id,
-            resource_policy=row.resource_policy,
-            type=row.type.name,
-            container_registry=row.container_registry,
-        )
-
-    @classmethod
-    def from_dto(cls, dto: GroupData | None) -> Self | None:
+    def from_dto(cls, dto: ProjectData | None) -> Self | None:
         if dto is None:
             return None
         return cls(
@@ -410,11 +439,25 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
             if dto.total_resource_slots
             else {},
             allowed_vfolder_hosts=dto.allowed_vfolder_hosts.to_json(),
-            integration_id=dto.integration_name,  # GroupData uses integration_name
+            integration_id=dto.integration_name,  # ProjectData uses integration_name
             resource_policy=dto.resource_policy,
             type=dto.type.name,
-            container_registry=dto.container_registry,
         )
+
+    async def resolve_container_registry(
+        self, info: graphene.ResolveInfo
+    ) -> dict[str, str | None] | None:
+        graph_ctx: GraphQueryContext = info.context
+        loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, "Group.registries")
+        project_registries: list[ProjectAllowedRegistryData] = await loader.load(ProjectID(self.id))
+        for project_registry in project_registries:
+            if not project_registry.is_default:
+                continue
+            registry = project_registry.registry
+            return ImageCommitRegistry(
+                registry_name=registry.registry_name, project_name=registry.project
+            ).to_json()
+        return None
 
     async def resolve_scaling_groups(self, info: graphene.ResolveInfo) -> Sequence[ScalingGroup]:
         graph_ctx: GraphQueryContext = info.context
@@ -424,6 +467,17 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
         )
         sgroups = await loader.load(self.id)
         return [sg.name for sg in sgroups]
+
+    @classmethod
+    async def batch_load_registries(
+        cls, graph_ctx: GraphQueryContext, project_ids: Sequence[ProjectID]
+    ) -> Sequence[list[ProjectAllowedRegistryData] | Exception | None]:
+        return await ProjectAdapter(
+            graph_ctx.processors.project,
+            graph_ctx.processors.rbac,
+            graph_ctx.processors.domain,
+            graph_ctx.processors.user,
+        ).batch_load_registries(project_ids)
 
     @classmethod
     async def load_all(
@@ -436,16 +490,16 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
     ) -> Sequence[Group]:
         if type is None:
             type = [ProjectType.GENERAL]
-        query = sa.select(groups).select_from(groups).where(groups.c.type.in_(type))
+        query = sa.select(ProjectRow).select_from(groups).where(groups.c.type.in_(type))
         if domain_name is not None:
             query = query.where(groups.c.domain_name == domain_name)
         if is_active is not None:
             query = query.where(groups.c.is_active == is_active)
-        async with graph_ctx.db.begin_readonly() as conn:
+        async with graph_ctx.db.begin_readonly_session() as session:
             return [
                 obj
-                async for row in (await conn.stream(query))
-                if (obj := cls.from_row(graph_ctx, row)) is not None
+                for row in await session.scalars(query)
+                if (obj := cls.from_dto(ProjectSearchableFields.own.to_data(row))) is not None
             ]
 
     @classmethod
@@ -457,20 +511,17 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
         domain_name: str | None = None,
         is_active: bool | None = None,
     ) -> Sequence[Group | None]:
-        query = sa.select(groups).select_from(groups).where(groups.c.id.in_(group_ids))
+        query = sa.select(ProjectRow).select_from(groups).where(groups.c.id.in_(group_ids))
         if domain_name is not None:
             query = query.where(groups.c.domain_name == domain_name)
         if is_active is not None:
             query = query.where(groups.c.is_active == is_active)
-        async with graph_ctx.db.begin_readonly() as conn:
-            return await batch_result(
-                graph_ctx,
-                conn,
-                query,
-                cls,
-                group_ids,
-                lambda row: row.id,
-            )
+        async with graph_ctx.db.begin_readonly_session() as session:
+            objects = {
+                row.id: cls.from_dto(ProjectSearchableFields.own.to_data(row))
+                for row in await session.scalars(query)
+            }
+            return [objects.get(ProjectID(id)) for id in group_ids]
 
     @classmethod
     async def batch_load_by_name(
@@ -481,20 +532,16 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
         domain_name: str | None = None,
         is_active: bool | None = None,
     ) -> Sequence[Sequence[Group | None]]:
-        query = sa.select(groups).select_from(groups).where(groups.c.name.in_(group_names))
+        query = sa.select(ProjectRow).select_from(groups).where(groups.c.name.in_(group_names))
         if domain_name is not None:
             query = query.where(groups.c.domain_name == domain_name)
         if is_active is not None:
             query = query.where(groups.c.is_active == is_active)
-        async with graph_ctx.db.begin_readonly() as conn:
-            return await batch_multiresult(
-                graph_ctx,
-                conn,
-                query,
-                cls,
-                group_names,
-                lambda row: row.name,
-            )
+        async with graph_ctx.db.begin_readonly_session() as session:
+            objects: dict[str, list[Group | None]] = {name: [] for name in group_names}
+            for row in await session.scalars(query):
+                objects[row.name].append(cls.from_dto(ProjectSearchableFields.own.to_data(row)))
+            return [objects[name] for name in group_names]
 
     @classmethod
     async def batch_load_by_user(
@@ -509,33 +556,23 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
             _type = [ProjectType.GENERAL]
         else:
             _type = type
-        ase = AssociationScopesEntitiesRow.__table__
-        user_id_strs = [str(uid) for uid in user_ids]
-        j = sa.join(
-            groups,
-            ase,
-            sa.and_(
-                sa.cast(groups.c.id, sa.String) == ase.c.scope_id,
-                ase.c.scope_type == RBACScopeType.PROJECT,
-                ase.c.entity_type == EntityType.USER,
-            ),
-        )
+        ms = user_scope_membership_query(ProjectEntityType()).subquery()
+        j = sa.join(groups, ms, groups.c.id == ms.c.scope_id)
         query = (
-            sa.select(groups, ase.c.entity_id.label("user_id_str"))
+            sa.select(
+                ProjectRow,
+                ms.c.user_id,
+            )
             .select_from(j)
-            .where(ase.c.entity_id.in_(user_id_strs) & (groups.c.type.in_(_type)))
+            .where(ms.c.user_id.in_(user_ids) & (groups.c.type.in_(_type)))
         )
         if is_active is not None:
             query = query.where(groups.c.is_active == is_active)
-        async with graph_ctx.db.begin_readonly() as conn:
-            return await batch_multiresult(
-                graph_ctx,
-                conn,
-                query,
-                cls,
-                user_ids,
-                lambda row: uuid.UUID(row.user_id_str),
-            )
+        async with graph_ctx.db.begin_readonly_session() as session:
+            objects: dict[uuid.UUID, list[Group | None]] = {id: [] for id in user_ids}
+            for row, user_id in (await session.execute(query)).tuples():
+                objects[user_id].append(cls.from_dto(ProjectSearchableFields.own.to_data(row)))
+            return [objects[id] for id in user_ids]
 
     @classmethod
     async def get_groups_for_user(
@@ -543,22 +580,14 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
         graph_ctx: GraphQueryContext,
         user_id: uuid.UUID,
     ) -> Sequence[Group]:
-        ase = AssociationScopesEntitiesRow.__table__
-        j = sa.join(
-            groups,
-            ase,
-            sa.and_(
-                sa.cast(groups.c.id, sa.String) == ase.c.scope_id,
-                ase.c.scope_type == RBACScopeType.PROJECT,
-                ase.c.entity_type == EntityType.USER,
-            ),
+        query = sa.select(ProjectRow).where(
+            user_scope_membership_exists(ProjectEntityType(), groups.c.id, user_id)
         )
-        query = sa.select(groups).select_from(j).where(ase.c.entity_id == str(user_id))
-        async with graph_ctx.db.begin_readonly() as conn:
+        async with graph_ctx.db.begin_readonly_session() as session:
             return [
                 obj
-                async for row in (await conn.stream(query))
-                if (obj := cls.from_row(graph_ctx, row)) is not None
+                for row in await session.scalars(query)
+                if (obj := cls.from_dto(ProjectSearchableFields.own.to_data(row))) is not None
             ]
 
 
@@ -581,7 +610,7 @@ class GroupInput(graphene.InputObjectType):  # type: ignore[misc]
         required=False, default_value={}, description="Added in 24.03.0"
     )
 
-    def to_action(self, name: str) -> CreateGroupAction:
+    def to_action(self, name: str, domain_id: DomainID) -> CreateProjectAction:
         def value_or_none(value: Any) -> Any:
             return value if value is not Undefined else None
 
@@ -600,24 +629,34 @@ class GroupInput(graphene.InputObjectType):  # type: ignore[misc]
         )
         integration_id_val = value_or_none(self.integration_id)
         resource_policy_val = value_or_none(self.resource_policy)
-        container_registry_val = value_or_none(self.container_registry)
 
-        return CreateGroupAction(
-            creator=Creator(
-                spec=GroupCreatorSpec(
-                    name=name,
-                    domain_name=self.domain_name,
-                    type=type_val,
-                    description=description_val,
-                    is_active=is_active_val,
-                    total_resource_slots=total_resource_slots_val,
-                    allowed_vfolder_hosts=allowed_vfolder_hosts_val,
-                    integration_name=integration_id_val,
-                    resource_policy=resource_policy_val,
-                    container_registry=container_registry_val,
-                )
+        return CreateProjectAction(
+            domain_id=domain_id,
+            creator=ProjectCreator(
+                name=name,
+                domain_id=domain_id,
+                domain_name=self.domain_name,
+                type=type_val,
+                description=description_val,
+                is_active=is_active_val,
+                total_resource_slots=total_resource_slots_val,
+                allowed_vfolder_hosts=allowed_vfolder_hosts_val,
+                integration_name=integration_id_val,
+                resource_policy=resource_policy_val,
             ),
-            _domain_name=self.domain_name,
+        )
+
+    def to_image_commit_registry(self) -> ImageCommitRegistry | None:
+        """The registry named to take the project's image commits, ``None`` for none."""
+        registry = self.container_registry
+        if registry is Undefined:
+            return None
+        if not registry:
+            return None
+        parsed = ImageCommitRegistryReq.model_validate(registry)
+        return ImageCommitRegistry(
+            registry_name=parsed.registry,
+            project_name=parsed.project,
         )
 
 
@@ -632,12 +671,11 @@ class ModifyGroupInput(graphene.InputObjectType):  # type: ignore[misc]
     allowed_vfolder_hosts = graphene.JSONString(required=False)
     integration_id = graphene.String(required=False)
     resource_policy = graphene.String(required=False)
-    container_registry = graphene.JSONString(
-        required=False, default_value={}, description="Added in 24.03.0"
-    )
+    container_registry = graphene.JSONString(required=False, description="Added in 24.03.0")
 
-    def to_action(self, group_id: uuid.UUID) -> ModifyGroupAction:
-        spec = GroupUpdaterSpec(
+    def to_action(self, group_id: uuid.UUID) -> UpdateProjectAction:
+        updater = ProjectUpdater(
+            project_id=ProjectID(group_id),
             name=OptionalState[str].from_graphql(
                 self.name,
             ),
@@ -646,9 +684,6 @@ class ModifyGroupInput(graphene.InputObjectType):  # type: ignore[misc]
             ),
             description=TriState[str].from_graphql(
                 self.description,
-            ),
-            is_active=OptionalState[bool].from_graphql(
-                self.is_active,
             ),
             total_resource_slots=OptionalState[ResourceSlot].from_graphql(
                 self.total_resource_slots
@@ -664,19 +699,36 @@ class ModifyGroupInput(graphene.InputObjectType):  # type: ignore[misc]
             resource_policy=OptionalState[str].from_graphql(
                 self.resource_policy,
             ),
-            container_registry=TriState[dict[str, str]].from_graphql(
-                self.container_registry,
-            ),
         )
-        return ModifyGroupAction(
-            updater=Updater[GroupRow](spec=spec, pk_value=group_id),
-            user_update_mode=OptionalState[str].from_graphql(
-                self.user_update_mode,
-            ),
-            user_uuids=OptionalState[list[str]].from_graphql(
-                self.user_uuids,
-            ),
+        return UpdateProjectAction(updater=updater)
+
+    def to_registry_change(self) -> TriState[ImageCommitRegistry]:
+        """The change asked of the project's default registry: omitted keeps it,
+        ``null`` and ``{}`` clear it."""
+        registry = self.container_registry
+        if registry is Undefined:
+            return TriState[ImageCommitRegistry].nop()
+        if not registry:
+            return TriState[ImageCommitRegistry].nullify()
+        parsed = ImageCommitRegistryReq.model_validate(registry)
+        return TriState.update(
+            ImageCommitRegistry(
+                registry_name=parsed.registry,
+                project_name=parsed.project,
+            )
         )
+
+    def roster_change(self, group_id: uuid.UUID) -> tuple[str, list[UserID]] | None:
+        """The roster change asked for beside the edit, if any: the mode and who it
+        names. Writing the roster is its own operation, so the mode does not travel on
+        the update."""
+        mode = None if self.user_update_mode is Undefined else self.user_update_mode
+        raw_user_ids = None if self.user_uuids is Undefined else self.user_uuids
+        if mode is not None and mode not in ("add", "remove"):
+            raise InvalidUserUpdateMode("invalid user_update_mode")
+        if not mode or not raw_user_ids:
+            return None
+        return mode, [UserID(uuid.UUID(raw)) for raw in raw_user_ids]
 
 
 class CreateGroup(graphene.Mutation):  # type: ignore[misc]
@@ -708,8 +760,31 @@ class CreateGroup(graphene.Mutation):  # type: ignore[misc]
                 "Group name cannot be empty or whitespace and must not exceed 64 characters."
             )
 
-        action = props.to_action(name)
-        res = await graph_ctx.processors.group.create_group.wait_for_complete(action)
+        domain_id = (
+            await graph_ctx.processors.domain.lookup_name.run(
+                LookupDomainAction(name=DomainName(props.domain_name))
+            )
+        ).entity_id()
+        registry_adapter = ContainerRegistryAdapter(
+            graph_ctx.processors.container_registry, graph_ctx.processors.rbac
+        )
+        # Resolved before the project is created, so a registry that is not there creates
+        # nothing. Linking it after is a run of its own: a refusal leaves the project.
+        registry_id: ContainerRegistryID | None = None
+        registry = props.to_image_commit_registry()
+        if registry is not None:
+            registry_project_name: ContainerRegistryProjectName | None = None
+            if registry.project_name is not None:
+                registry_project_name = ContainerRegistryProjectName(registry.project_name)
+            registry_id = await registry_adapter.lookup_by_name_and_registry_project(
+                ContainerRegistryName(registry.registry_name), registry_project_name
+            )
+
+        action = props.to_action(name, domain_id)
+        res = await graph_ctx.processors.project.create_project.run(action)
+        if registry_id is not None:
+            project_id = ProjectID(res.data.id)
+            await registry_adapter.link_project_as_default(project_id, registry_id)
         return cls(
             ok=True,
             msg="success",
@@ -741,14 +816,72 @@ class ModifyGroup(graphene.Mutation):  # type: ignore[misc]
         props: ModifyGroupInput,
     ) -> ModifyGroup:
         graph_ctx: GraphQueryContext = info.context
+        project_id = ProjectID(gid)
 
-        action = props.to_action(gid)
-        res = await graph_ctx.processors.group.modify_group.wait_for_complete(action)
+        # Resolved before anything is written, so a registry that is not there changes
+        # nothing. The default is set after the edit, as a run of its own.
+        registry_change = props.to_registry_change()
+        registry_id: ContainerRegistryID | None = None
+        registry = registry_change.optional_value()
+        if registry is not None:
+            registry_adapter = ContainerRegistryAdapter(
+                graph_ctx.processors.container_registry, graph_ctx.processors.rbac
+            )
+            registry_project_name: ContainerRegistryProjectName | None = None
+            if registry.project_name is not None:
+                registry_project_name = ContainerRegistryProjectName(registry.project_name)
+            registry_id = await registry_adapter.lookup_by_name_and_registry_project(
+                ContainerRegistryName(registry.registry_name), registry_project_name
+            )
+
+        roster_change = props.roster_change(gid)
+        if roster_change is not None:
+            mode, user_ids = roster_change
+            if mode == "add":
+                await graph_ctx.processors.rbac.join_project.run(
+                    JoinProjectAction(project_id=project_id, user_ids=user_ids)
+                )
+            else:
+                await graph_ctx.processors.rbac.leave_project.run(
+                    LeaveProjectAction(project_id=project_id, user_ids=user_ids)
+                )
+        res = await graph_ctx.processors.project.update_project.run(props.to_action(gid))
+        data = (
+            await cls._apply_is_active(graph_ctx, res.data, props.is_active) if res.data else None
+        )
+        if registry_id is not None:
+            await graph_ctx.processors.project.switch_default_registry.run(
+                SwitchProjectDefaultRegistryAction(project_id=project_id, registry_id=registry_id)
+            )
+        # If no registry is specified but there was a change, clear the default registry.
+        elif not registry_change.is_nop():
+            await graph_ctx.processors.project.clear_default_registry.run(
+                ClearProjectDefaultRegistryAction(project_id=project_id)
+            )
+        graph_ctx.dataloader_manager.get_loader(graph_ctx, "Group.registries").clear(project_id)
         return cls(
             ok=True,
             msg="success",
-            group=Group.from_dto(res.data) if res.data else None,
+            group=Group.from_dto(data) if data else None,
         )
+
+    @classmethod
+    async def _apply_is_active(
+        cls, graph_ctx: GraphQueryContext, data: ProjectData, is_active: Any
+    ) -> ProjectData:
+        """Soft-delete (``False``) or restore (``True``) the project; nothing when it is
+        already there."""
+        if not isinstance(is_active, bool) or data.is_active is is_active:
+            return data
+        if is_active:
+            restored = await graph_ctx.processors.project.restore_project.run(
+                RestoreProjectAction(updater=ProjectRestoreUpdater(project_id=data.entity_id()))
+            )
+            return restored.data
+        deleted = await graph_ctx.processors.project.delete_project.run(
+            DeleteProjectAction(updater=ProjectSoftDeleteUpdater(project_id=data.entity_id()))
+        )
+        return deleted.data
 
 
 class DeleteGroup(graphene.Mutation):  # type: ignore[misc]
@@ -771,7 +904,10 @@ class DeleteGroup(graphene.Mutation):  # type: ignore[misc]
     )
     async def mutate(cls, root: Any, info: graphene.ResolveInfo, gid: uuid.UUID) -> DeleteGroup:
         ctx: GraphQueryContext = info.context
-        await ctx.processors.group.delete_group.wait_for_complete(DeleteGroupAction(gid))
+        project_id = ProjectID(gid)
+        await ctx.processors.project.delete_project.run(
+            DeleteProjectAction(updater=ProjectSoftDeleteUpdater(project_id=project_id))
+        )
         return cls(ok=True, msg="success")
 
 
@@ -800,5 +936,7 @@ class PurgeGroup(graphene.Mutation):  # type: ignore[misc]
     async def mutate(cls, root: Any, info: graphene.ResolveInfo, gid: uuid.UUID) -> PurgeGroup:
         graph_ctx: GraphQueryContext = info.context
 
-        await graph_ctx.processors.group.purge_group.wait_for_complete(PurgeGroupAction(gid))
+        await graph_ctx.processors.project.purge_project.run(
+            PurgeProjectAction(project_id=ProjectID(gid))
+        )
         return cls(ok=True, msg="success")

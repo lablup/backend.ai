@@ -38,6 +38,7 @@ def _make_revision_node(
     now = datetime.now(tz=UTC)
     return ArtifactRevisionNode(
         id=uuid.uuid4(),
+        field_id=uuid.uuid4(),
         artifact_id=uuid.uuid4(),
         version="v1.0",
         status=status,
@@ -50,6 +51,7 @@ def _make_artifact_node() -> ArtifactNode:
     now = datetime.now(tz=UTC)
     return ArtifactNode(
         id=uuid.uuid4(),
+        entity_id=uuid.uuid4(),
         name="test-model",
         type=ArtifactType.MODEL,
         registry_id=uuid.uuid4(),
@@ -82,6 +84,7 @@ class TestArtifactRevisionNode:
         now = datetime.now(tz=UTC)
         node = ArtifactRevisionNode(
             id=uuid.uuid4(),
+            field_id=uuid.uuid4(),
             artifact_id=uuid.uuid4(),
             version="v2.0",
             size="2048",
@@ -124,6 +127,7 @@ class TestArtifactNode:
         now = datetime.now(tz=UTC)
         rev = ArtifactRevisionNode(
             id=uuid.uuid4(),
+            field_id=uuid.uuid4(),
             artifact_id=uuid.uuid4(),
             version="v1.0",
             status=ArtifactStatus.AVAILABLE,

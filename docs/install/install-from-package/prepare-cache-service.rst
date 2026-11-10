@@ -5,7 +5,7 @@ Backend.AI makes use of Valkey (a Redis-compatible data store) as the message qu
 Launch the service using docker compose by generating the file ``$HOME/halfstack/valkey-cluster-default/docker-compose.yaml`` and populating it with the following YAML.
 Feel free to adjust the volume paths and port settings.
 Please refer `the latest configuration <https://github.com/lablup/backend.ai/blob/main/docker-compose.halfstack-main.yml>`_
-(it's a symbolic link so follow the filename in it) if needed.
+if needed.
 
 .. code-block:: yaml
 
@@ -20,7 +20,7 @@ Please refer `the latest configuration <https://github.com/lablup/backend.ai/blo
       backendai-half-redis:
          <<: *base
          container_name: backendai-halfstack-redis
-         image: valkey/valkey:9.1.0-alpine
+         image: valkey/valkey:9.1.1-alpine
          restart: unless-stopped
          command: >
             valkey-server

@@ -172,6 +172,8 @@ Alias keys are also URL-quoted in the same way.
 
 from __future__ import annotations
 
+import base64
+import binascii
 import enum
 import logging
 import os
@@ -182,8 +184,9 @@ from datetime import UTC, datetime
 from ipaddress import IPv4Network
 from pathlib import Path
 from pprint import pformat
-from typing import Annotated, Any, Literal, override
+from typing import Annotated, Any, Literal, Self, override
 
+import sqlalchemy as sa
 from pydantic import (
     AliasChoices,
     ConfigDict,
@@ -192,8 +195,10 @@ from pydantic import (
     IPvAnyNetwork,
     field_serializer,
     field_validator,
+    model_validator,
 )
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm
 from ai.backend.common.config import BaseConfigSchema
 from ai.backend.common.configs.client import HttpTimeoutConfig
 from ai.backend.common.configs.etcd import EtcdConfig
@@ -202,10 +207,12 @@ from ai.backend.common.configs.otel import OTELConfig
 from ai.backend.common.configs.pyroscope import PyroscopeConfig
 from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.configs.service_discovery import ServiceDiscoveryConfig
+from ai.backend.common.configs.wheelhouse import WheelhouseConfig
 from ai.backend.common.data.storage.types import ArtifactStorageImportStep, NamedStorageTarget
 from ai.backend.common.defs import DEFAULT_FILE_IO_TIMEOUT
 from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
 from ai.backend.common.meta import (
+    NEXT_RELEASE_VERSION,
     BackendAIConfigMeta,
     CompositeType,
     ConfigExample,
@@ -220,13 +227,18 @@ from ai.backend.common.typed_validators import (
     UserID,
     _TimeDurationPydanticAnnotation,
 )
-from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.config import LoggingConfig
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.data.secret.types import (
+    KeyProviderType,
+    SecretKeyId,
+    SecretKeyMaterial,
+)
 from ai.backend.manager.defs import DEFAULT_METRIC_RANGE_VECTOR_TIMEWINDOW
 from ai.backend.manager.pglock import PgAdvisoryLock
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 _default_smtp_template = """
 Action type: {{ action_type }}
@@ -267,16 +279,47 @@ class DatabaseConfig(BaseConfigSchema):
         ),
     ]
     addr: Annotated[
-        HostPortPair,
-        Field(default=HostPortPair(host="127.0.0.1", port=5432)),
+        HostPortPair | None,
+        Field(default=None),
         BackendAIConfigMeta(
             description=(
                 "Network address and port of the PostgreSQL database server. "
-                "Default is the standard PostgreSQL port (5432) on localhost. "
-                "In production, point this to your database server or cluster endpoint."
+                "Read as a one-member addrs list when addrs is not set."
             ),
             added_version="25.8.0",
-            example=ConfigExample(local="127.0.0.1:5432", prod="db.example.com:5432"),
+            deprecated_version="26.9.0",
+            deprecation_hint="Use addrs instead.",
+        ),
+    ]
+    addrs: Annotated[
+        list[HostPortPair],
+        Field(default_factory=lambda: [HostPortPair(host="127.0.0.1", port=5432)], min_length=1),
+        BackendAIConfigMeta(
+            description=(
+                "Addresses of the PostgreSQL cluster members. "
+                "List every member of an HA cluster, or a single address of a standalone "
+                "server or a proxy in front of the cluster."
+            ),
+            added_version="26.9.0",
+            composite=CompositeType.LIST,
+            example=ConfigExample(local="127.0.0.1:5432", prod="db1.example.com:5432"),
+        ),
+    ]
+    connect_timeout: Annotated[
+        float,
+        Field(
+            default=10.0,
+            gt=0,
+            validation_alias=AliasChoices("connect-timeout", "connect_timeout"),
+            serialization_alias="connect-timeout",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Timeout in seconds for connecting to one member of addrs. "
+                "When it expires, the next member is tried."
+            ),
+            added_version="26.9.0",
+            example=ConfigExample(local="10", prod="5"),
         ),
     ]
     name: Annotated[
@@ -415,6 +458,30 @@ class DatabaseConfig(BaseConfigSchema):
         ),
     ]
 
+    @model_validator(mode="before")
+    @classmethod
+    def _read_addr_as_addrs(cls, data: Any) -> Any:
+        if (
+            not isinstance(data, Mapping)
+            or data.get("addr") is None
+            or data.get("addrs") is not None
+        ):
+            return data
+        return {**data, "addrs": [data["addr"]]}
+
+    def sqlalchemy_url(self) -> sa.engine.URL:
+        return sa.engine.URL.create(
+            "postgresql+asyncpg",
+            username=self.user,
+            password=self.password,
+            database=self.name,
+            query={
+                "host": ",".join(addr.host for addr in self.addrs),
+                "port": ",".join(str(addr.port) for addr in self.addrs),
+                "target_session_attrs": "primary",
+            },
+        )
+
 
 class EventLoopType(enum.StrEnum):
     ASYNCIO = "asyncio"
@@ -527,6 +594,96 @@ class AuthConfig(BaseConfigSchema):
     ]
 
 
+class ConfigKeyProviderConfig(BaseConfigSchema):
+    active_key_id: Annotated[
+        SecretKeyId,
+        Field(
+            validation_alias=AliasChoices("active-key-id", "active_key_id"),
+            serialization_alias="active-key-id",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "The key id new values are encrypted under. Rotating a key is adding a new "
+                "id to the key list and pointing this at it; the previous ids stay so their "
+                "values keep decrypting."
+            ),
+            added_version="26.9.0",
+            example=ConfigExample(local="v1", prod="v1"),
+        ),
+    ]
+    keys: Annotated[
+        dict[SecretKeyId, SecretKeyMaterial],
+        Field(),
+        BackendAIConfigMeta(
+            description=(
+                "Key encryption keys by id, each 32 random bytes in base64 as produced by "
+                "`openssl rand -base64 32`; the standard and url-safe alphabets are both "
+                "accepted. A key wraps the per-value data encryption keys rather than the "
+                "values themselves, so an id may be retired only once no stored value still "
+                "names it."
+            ),
+            added_version="26.9.0",
+            secret=True,
+        ),
+    ]
+
+    @model_validator(mode="after")
+    def _validate_keys(self) -> Self:
+        for key_id, material in self.keys.items():
+            if not key_id:
+                raise ValueError("A key encryption key id must not be empty.")
+            try:
+                decoded = base64.b64decode(material, altchars=b"-_", validate=True)
+            except (binascii.Error, ValueError) as e:
+                raise ValueError(f"The key {key_id!r} is not valid base64.") from e
+            if len(decoded) != 32:
+                raise ValueError(
+                    f"The key {key_id!r} must decode to 32 bytes but got {len(decoded)}."
+                )
+        if self.active_key_id not in self.keys:
+            raise ValueError(f"active-key-id {self.active_key_id!r} is not in the key list.")
+        return self
+
+
+class SecretEncryptionConfig(BaseConfigSchema):
+    write_provider_type: Annotated[
+        KeyProviderType,
+        Field(
+            default=KeyProviderType.PLAIN,
+            validation_alias=AliasChoices("write-provider-type", "write_provider_type"),
+            serialization_alias="write-provider-type",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "The key provider new secrets are written through, named by its type. "
+                "'plain' stores them unencrypted; every other type is configured by the "
+                "matching provider section below. Reads are decided by the stored value, so "
+                "secrets written earlier keep decrypting through the provider they name, and "
+                "a batch re-encryption normalizes stored secrets to whatever this names."
+            ),
+            added_version="26.9.0",
+            example=ConfigExample(local="plain", prod="config"),
+        ),
+    ]
+    config_provider: Annotated[
+        ConfigKeyProviderConfig | None,
+        Field(
+            default=None,
+            validation_alias=AliasChoices("config-provider", "config_provider"),
+            serialization_alias="config-provider",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "The key provider that holds its key encryption keys in this file, under the "
+                "id 'config'. Omit this section to leave that provider unconfigured, in which "
+                "case no stored secret naming it can be read."
+            ),
+            added_version="26.9.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
+
+
 class RBACConfig(BaseConfigSchema):
     enforcement_enabled: Annotated[
         bool,
@@ -551,6 +708,25 @@ class RBACConfig(BaseConfigSchema):
 
 
 class ManagerConfig(BaseConfigSchema):
+    shutdown_grace_period: Annotated[
+        float,
+        Field(
+            default=30.0,
+            gt=0,
+            allow_inf_nan=False,
+            validation_alias=AliasChoices("shutdown-grace-period", "shutdown_grace_period"),
+            serialization_alias="shutdown-grace-period",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Seconds to keep accepting and serving requests after announcing the drain, "
+                "before closing the listeners. "
+                "Set it to about three times the health check interval of the clients' endpoint pool."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="30.0", prod="30.0"),
+        ),
+    ]
     ipc_base_path: Annotated[
         AutoDirectoryPath,
         Field(
@@ -818,10 +994,15 @@ class ManagerConfig(BaseConfigSchema):
         BackendAIConfigMeta(
             description=(
                 "List of trusted reverse proxy IP addresses or CIDR ranges. "
-                "When configured, the manager uses aiohttp_remotes.XForwardedStrict middleware "
-                "to securely resolve client IPs from X-Forwarded-For headers. "
-                "Only proxies in this list are trusted to set forwarding headers. "
-                "If empty (default), the manager falls back to manual X-Forwarded-For parsing."
+                "When configured, the client IP is resolved by walking the X-Forwarded-For chain "
+                "inwards from the peer of the connection and taking the first address that is not "
+                "one of these proxies, so any number of proxy hops is supported. "
+                "The X-Forwarded-URL and X-Forwarded-Prefix headers, which override the host and "
+                "path used for HMAC signature verification, are honored only when the request "
+                "comes directly from one of these proxies; X-Forwarded-Prefix is ignored entirely "
+                "when this list is empty. "
+                "If empty (default), the manager falls back to manual X-Forwarded-For parsing and "
+                "accepts X-Forwarded-URL from any client, which is deprecated."
             ),
             added_version="26.4.2",
             example=ConfigExample(local="", prod='["10.0.0.0/8", "172.16.0.0/12"]'),
@@ -1180,25 +1361,6 @@ class ManagerConfig(BaseConfigSchema):
             example=ConfigExample(local="39100", prod="39100"),
         ),
     ]
-    use_experimental_redis_event_dispatcher: Annotated[
-        bool,
-        Field(
-            default=False,
-            validation_alias=AliasChoices(
-                "use-experimental-redis-event-dispatcher", "use_experimental_redis_event_dispatcher"
-            ),
-            serialization_alias="use-experimental-redis-event-dispatcher",
-        ),
-        BackendAIConfigMeta(
-            description=(
-                "Whether to use the experimental Redis-based event dispatcher. "
-                "May provide better performance for event handling in large clusters. "
-                "Not recommended for production use unless specifically tested and needed."
-            ),
-            added_version="25.8.0",
-            example=ConfigExample(local="false", prod="false"),
-        ),
-    ]
     status_update_interval: Annotated[
         float | None,
         Field(
@@ -1283,9 +1445,7 @@ class ManagerConfig(BaseConfigSchema):
     @classmethod
     def _parse_rpc_auth_manager_keypair(cls, v: str) -> str:
         if not Path(v).exists():
-            log.warning(
-                f'RPC authentication keypair file does not exist: "{v}".',
-            )
+            log.warning("RPC authentication keypair file does not exist", keypair_path=v)
         return v
 
 
@@ -1497,6 +1657,49 @@ class ActionMonitorsConfig(BaseConfigSchema):
             example=ConfigExample(local="smtp", prod="smtp"),
         ),
     ]
+
+
+class AuditLogConfig(BaseConfigSchema):
+    """Which action runs are written to the audit log.
+
+    Mutating operations are always recorded and cannot be switched off — the minimum
+    guarantee of an audit trail must not be removable by configuration. Failures and
+    permission denials are likewise always recorded. Only *successful* reads are
+    configurable, because they are what generates volume.
+    """
+
+    record_read_operations: Annotated[
+        list[ActionOperationType],
+        Field(
+            default=[],
+            validation_alias=AliasChoices("record-read-operations", "record_read_operations"),
+            serialization_alias="record-read-operations",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Opt-in list: a read operation is recorded only if it is named here. The "
+                "default is an empty list, so successful reads are not recorded at all and "
+                "read volume stays off until an operator turns it on. A listed operation is "
+                "recorded for every entity type. Must be 'get', 'search' or 'lookup': mutating "
+                "operations are always recorded and listing them here is rejected. Failed "
+                "and denied reads are recorded either way."
+            ),
+            added_version="26.9.0",
+        ),
+    ]
+
+    @field_validator("record_read_operations")
+    @classmethod
+    def _reject_mutating_operations(
+        cls, value: list[ActionOperationType]
+    ) -> list[ActionOperationType]:
+        rejected = [op for op in value if op not in ActionOperationType.read_operations()]
+        if rejected:
+            raise ValueError(
+                f"{', '.join(rejected)} is not a read operation; mutating operations are "
+                "always recorded and cannot be listed here"
+            )
+        return value
 
 
 class ReporterConfig(BaseConfigSchema):
@@ -2889,14 +3092,18 @@ class VolumeProxyConfig(BaseConfigSchema):
         ),
     ]
     manager_api: Annotated[
-        str,
+        CommaSeparatedStrList,
         Field(
             validation_alias=AliasChoices("manager_api", "manager-api"),
             serialization_alias="manager_api",
         ),
         BackendAIConfigMeta(
             description=(
-                "Manager-facing API endpoint URL of the storage proxy. This internal URL is used "
+                "Manager-facing API endpoint URL(s) of storage proxy instances mounting the same storage. "
+                "Accepts a single URL or comma-separated URLs, for example "
+                "http://a:6022,http://b:6022. Each request selects a healthy instance using "
+                "its configured readiness path (default /readyz); failed requests are not retried. "
+                "These internal URLs are used "
                 "by the manager to perform administrative operations like creating/deleting folders, "
                 "managing quotas, and checking storage status. Should only be accessible from "
                 "the manager's network."
@@ -2905,6 +3112,93 @@ class VolumeProxyConfig(BaseConfigSchema):
             example=ConfigExample(
                 local="http://localhost:6022", prod="http://storage-internal:6022"
             ),
+        ),
+    ]
+    health_check_probe_path: Annotated[
+        str,
+        Field(
+            default="/readyz",
+            validation_alias=AliasChoices("health_check_probe_path", "health-check-probe-path"),
+            serialization_alias="health_check_probe_path",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "HTTP path probed on each manager-facing storage proxy endpoint. "
+                "Must return 2xx when ready and be accessible without token authentication."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="/readyz", prod="/readyz"),
+        ),
+    ]
+    health_check_interval: Annotated[
+        float,
+        Field(
+            default=10.0,
+            gt=0,
+            validation_alias=AliasChoices("health_check_interval", "health-check-interval"),
+            serialization_alias="health_check_interval",
+        ),
+        BackendAIConfigMeta(
+            description="Seconds between readiness probe rounds for this storage proxy.",
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="10.0", prod="10.0"),
+        ),
+    ]
+    health_check_failure_threshold: Annotated[
+        int,
+        Field(
+            default=3,
+            ge=1,
+            validation_alias=AliasChoices(
+                "health_check_failure_threshold", "health-check-failure-threshold"
+            ),
+            serialization_alias="health_check_failure_threshold",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Consecutive probe or request connection failures before an endpoint is excluded. "
+                "A successful probe or request resets the count; a successful probe restores "
+                "an excluded endpoint."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="3", prod="3"),
+        ),
+    ]
+    health_check_recovery_timeout: Annotated[
+        float,
+        Field(
+            default=60.0,
+            gt=0,
+            validation_alias=AliasChoices(
+                "health_check_recovery_timeout", "health-check-recovery-timeout"
+            ),
+            serialization_alias="health_check_recovery_timeout",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Recovery timeout in seconds, reserved for future endpoint eviction policies. "
+                "Currently unused by the pool; endpoints recover on the next successful probe."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="60.0", prod="60.0"),
+        ),
+    ]
+    health_check_probe_timeout: Annotated[
+        float,
+        Field(
+            default=2.0,
+            gt=0,
+            validation_alias=AliasChoices(
+                "health_check_probe_timeout", "health-check-probe-timeout"
+            ),
+            serialization_alias="health_check_probe_timeout",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Timeout in seconds for each readiness probe, independent of operation timeouts."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="2.0", prod="2.0"),
         ),
     ]
     secret: Annotated[
@@ -2940,7 +3234,7 @@ class VolumeProxyConfig(BaseConfigSchema):
             example=ConfigExample(local="false", prod="true"),
         ),
     ]
-    sftp_scaling_groups: Annotated[
+    sftp_resource_groups: Annotated[
         CommaSeparatedStrList | None,
         Field(
             default=None,
@@ -2972,6 +3266,14 @@ class VolumeProxyConfig(BaseConfigSchema):
             composite=CompositeType.FIELD,
         ),
     ]
+
+    @field_validator("manager_api")
+    @classmethod
+    def validate_manager_api(cls, endpoints: CommaSeparatedStrList) -> CommaSeparatedStrList:
+        normalized = [endpoint.strip() for endpoint in endpoints]
+        if not normalized or any(not endpoint for endpoint in normalized):
+            raise ValueError("manager_api must contain non-empty endpoint URLs")
+        return CommaSeparatedStrList(list(dict.fromkeys(normalized)))
 
 
 class VolumesConfig(BaseConfigSchema):
@@ -3420,7 +3722,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
     ]
     etcd: Annotated[
         EtcdConfig,
-        Field(default_factory=EtcdConfig),
+        Field(),
         BackendAIConfigMeta(
             description=(
                 "Etcd distributed key-value store configuration. Etcd is used for cluster "
@@ -3494,6 +3796,19 @@ class ManagerUnifiedConfig(BaseConfigSchema):
             composite=CompositeType.FIELD,
         ),
     ]
+    wheelhouse: Annotated[
+        WheelhouseConfig,
+        Field(default_factory=WheelhouseConfig),
+        BackendAIConfigMeta(
+            description=(
+                "Plugin wheels loaded when the manager starts. Read only from the "
+                "config file: etcd values are ignored. Wheels provided here run without "
+                "verification, so keep the path writable only by trusted operators."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            composite=CompositeType.FIELD,
+        ),
+    ]
     debug: Annotated[
         DebugConfig,
         Field(default_factory=DebugConfig),
@@ -3519,6 +3834,24 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "can be independently configured."
             ),
             added_version="25.8.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
+
+    audit_log: Annotated[
+        AuditLogConfig,
+        Field(
+            default_factory=AuditLogConfig,
+            validation_alias=AliasChoices("audit_log", "audit-log"),
+            serialization_alias="audit-log",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Audit log recording policy. Mutating operations are always recorded, as are "
+                "failures and permission denials; this section only opts successful read "
+                "operations in."
+            ),
+            added_version="26.9.0",
             composite=CompositeType.FIELD,
         ),
     ]
@@ -3638,6 +3971,23 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "password requirements in production environments."
             ),
             added_version="25.8.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
+    secret_encryption: Annotated[
+        SecretEncryptionConfig,
+        Field(
+            default_factory=SecretEncryptionConfig,
+            validation_alias=AliasChoices("secret-encryption", "secret_encryption"),
+            serialization_alias="secret-encryption",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "At-rest encryption for secret columns such as the keypair secret key. "
+                "Names which key provider writes new secrets and configures the providers. "
+                "New secrets are stored as plaintext until a write provider is named."
+            ),
+            added_version="26.9.0",
             composite=CompositeType.FIELD,
         ),
     ]

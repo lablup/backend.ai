@@ -1,83 +1,112 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
+from dataclasses import replace
 from typing import Any
 from uuid import uuid4
 
 import pytest
 import sqlalchemy as sa
+from sqlalchemy.exc import IntegrityError
 
-from ai.backend.common.exception import KeypairResourcePolicyNotFound
+from ai.backend.common.data.entity.resource_policy import KeyPairResourcePolicyUUID
 from ai.backend.common.types import (
     DefaultForUnspecified,
     ResourceSlot,
     VFolderHostPermission,
 )
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
-from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
-from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
-from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
-from ai.backend.manager.models.replica_group import ReplicaGroupRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.deployment_auto_scaling_policy.row import (
+    DeploymentAutoScalingPolicyRow,
+)
+from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
+from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.endpoint.row import EndpointRow
+from ai.backend.manager.models.entity_label.row import EntityLabelRow
+from ai.backend.manager.models.entity_share.row import EntityShareRow
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
+from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_policy.creators import (
+    KeyPairResourcePolicyCreator,
+)
+from ai.backend.manager.models.resource_policy.purgers import (
+    KeyPairResourcePolicyPurger,
+)
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.resource_preset import ResourcePresetRow
-from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
-from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.resource_policy.searchable_fields import (
+    KeyPairResourcePolicySearchableFields,
+)
+from ai.backend.manager.models.resource_policy.updaters import (
+    KeyPairResourcePolicyUpdater,
+)
+from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
+from ai.backend.manager.models.routing.row import RoutingRow
+from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.keypair_resource_policy.creators import (
-    KeyPairResourcePolicyCreatorSpec,
+from ai.backend.manager.models.vfolder.row import VFolderRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
+    EntityMembershipCapRow,
 )
-from ai.backend.manager.repositories.keypair_resource_policy.repository import (
-    KeypairResourcePolicyRepository,
+from ai.backend.manager.models.virtual_entity.entity_membership_field import (
+    EntityMembershipFieldRow,
 )
-from ai.backend.manager.repositories.keypair_resource_policy.updaters import (
-    KeyPairResourcePolicyUpdaterSpec,
-)
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
+from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.types import OptionalState, TriState
 from ai.backend.testutils.db import with_tables
 
 
-class TestKeypairResourcePolicyRepository:
-    """Test cases for KeypairResourcePolicyRepository"""
+class TestKeypairResourcePolicyOps:
+    """Test cases for the keypair resource policy ops"""
 
     @pytest.fixture
     async def db_with_cleanup(
         self,
-        database_connection: ExtendedAsyncSAEngine,
+        global_entity_ids: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
         """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
         async with with_tables(
-            database_connection,
+            global_entity_ids,
             [
+                VirtualEntityRow,
+                EntityMembershipRow,
+                EntityMembershipCapRow,
+                EntityMembershipFieldRow,
+                ScopeBindingRow,
+                EntityLabelRow,
                 # FK dependency order: parents before children
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
                 RoleRow,
+                PermissionRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
@@ -93,9 +122,10 @@ class TestKeypairResourcePolicyRepository:
                 ReplicaGroupRow,
                 RoutingRow,
                 ResourcePresetRow,
+                EntityShareRow,
             ],
         ):
-            yield database_connection
+            yield global_entity_ids
 
     @pytest.fixture
     def sample_resource_slots(self) -> ResourceSlot:
@@ -128,9 +158,9 @@ class TestKeypairResourcePolicyRepository:
         self,
         sample_resource_slots: ResourceSlot,
         sample_allowed_vfolder_hosts: dict[str, Any],
-    ) -> KeyPairResourcePolicyCreatorSpec:
-        """Create a sample KeyPairResourcePolicyCreatorSpec for testing"""
-        return KeyPairResourcePolicyCreatorSpec(
+    ) -> KeyPairResourcePolicyCreator:
+        """Create a sample KeyPairResourcePolicyCreator for testing"""
+        return KeyPairResourcePolicyCreator(
             name=str(uuid4()),
             default_for_unspecified=DefaultForUnspecified.LIMITED,
             total_resource_slots=sample_resource_slots,
@@ -142,25 +172,21 @@ class TestKeypairResourcePolicyRepository:
             max_concurrent_sftp_sessions=5,
             max_pending_session_count=5,
             max_pending_session_resource_slots=ResourceSlot({"cpu": "1", "mem": "1g"}),
-            max_quota_scope_size=None,
-            max_vfolder_count=None,
-            max_vfolder_size=None,
+            max_priority=None,
         )
 
     @pytest.fixture
-    async def sample_policy_name(
+    async def sample_policy(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        sample_creator: KeyPairResourcePolicyCreatorSpec,
-    ) -> str:
-        """Create sample keypair resource policy directly in DB and return its name"""
+        sample_creator: KeyPairResourcePolicyCreator,
+    ) -> KeyPairResourcePolicyData:
+        """Seed a policy and answer with it, since a write names it by uuid."""
         async with db_with_cleanup.begin_session() as db_sess:
             policy_row = sample_creator.build_row()
             db_sess.add(policy_row)
             await db_sess.commit()
-
-        assert sample_creator.name is not None
-        return sample_creator.name
+            return KeyPairResourcePolicySearchableFields.own.to_data(policy_row)
 
     @pytest.fixture
     async def multiple_policies(
@@ -173,7 +199,7 @@ class TestKeypairResourcePolicyRepository:
         policy_names: list[str] = []
         async with db_with_cleanup.begin_session() as db_sess:
             for i in range(3):
-                spec = KeyPairResourcePolicyCreatorSpec(
+                spec = KeyPairResourcePolicyCreator(
                     name=str(uuid4()),
                     default_for_unspecified=DefaultForUnspecified.LIMITED,
                     total_resource_slots=sample_resource_slots,
@@ -185,9 +211,7 @@ class TestKeypairResourcePolicyRepository:
                     max_concurrent_sftp_sessions=5,
                     max_pending_session_count=None,
                     max_pending_session_resource_slots=None,
-                    max_quota_scope_size=None,
-                    max_vfolder_count=None,
-                    max_vfolder_size=None,
+                    max_priority=None,
                 )
                 policy_row = spec.build_row()
                 db_sess.add(policy_row)
@@ -198,18 +222,18 @@ class TestKeypairResourcePolicyRepository:
         return policy_names
 
     @pytest.fixture
-    def repository(
+    def ops(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> KeypairResourcePolicyRepository:
-        """Create KeypairResourcePolicyRepository instance with database"""
-        return KeypairResourcePolicyRepository(db=db_with_cleanup)
+    ) -> OpsRepository[KeyPairResourcePolicyData]:
+        """Writes go through the generic ops repository the v2 specs are wired to."""
+        return OpsRepository(V2DBOpsProvider(db_with_cleanup))
 
     @pytest.mark.parametrize(
         "policy_creator",
         [
             pytest.param(
-                KeyPairResourcePolicyCreatorSpec(
+                KeyPairResourcePolicyCreator(
                     name=f"unlimited-policy-{uuid4()}",
                     default_for_unspecified=DefaultForUnspecified.UNLIMITED,
                     total_resource_slots=ResourceSlot({"cpu": "4", "mem": "8g", "gpu": "1"}),
@@ -232,14 +256,12 @@ class TestKeypairResourcePolicyRepository:
                     max_concurrent_sftp_sessions=10,
                     max_pending_session_count=None,
                     max_pending_session_resource_slots=None,
-                    max_quota_scope_size=None,
-                    max_vfolder_count=None,
-                    max_vfolder_size=None,
+                    max_priority=None,
                 ),
                 id="unlimited",
             ),
             pytest.param(
-                KeyPairResourcePolicyCreatorSpec(
+                KeyPairResourcePolicyCreator(
                     name=f"complex-resource-policy-{uuid4()}",
                     default_for_unspecified=DefaultForUnspecified.LIMITED,
                     total_resource_slots=ResourceSlot({
@@ -270,14 +292,12 @@ class TestKeypairResourcePolicyRepository:
                     max_concurrent_sftp_sessions=10,
                     max_pending_session_count=10,
                     max_pending_session_resource_slots=ResourceSlot({"cpu": "2", "mem": "4g"}),
-                    max_quota_scope_size=None,
-                    max_vfolder_count=None,
-                    max_vfolder_size=None,
+                    max_priority=None,
                 ),
                 id="complex_resource",
             ),
             pytest.param(
-                KeyPairResourcePolicyCreatorSpec(
+                KeyPairResourcePolicyCreator(
                     name=f"minimal-policy-{uuid4()}",
                     default_for_unspecified=DefaultForUnspecified.LIMITED,
                     total_resource_slots=ResourceSlot({"cpu": "4", "mem": "8g", "gpu": "1"}),
@@ -292,9 +312,7 @@ class TestKeypairResourcePolicyRepository:
                     max_concurrent_sftp_sessions=1,
                     max_pending_session_count=None,
                     max_pending_session_resource_slots=None,
-                    max_quota_scope_size=None,
-                    max_vfolder_count=None,
-                    max_vfolder_size=None,
+                    max_priority=None,
                 ),
                 id="minimal",
             ),
@@ -302,11 +320,11 @@ class TestKeypairResourcePolicyRepository:
     )
     async def test_create_keypair_resource_policy(
         self,
-        repository: KeypairResourcePolicyRepository,
-        policy_creator: KeyPairResourcePolicyCreatorSpec,
+        ops: OpsRepository[KeyPairResourcePolicyData],
+        policy_creator: KeyPairResourcePolicyCreator,
     ) -> None:
         """Test creating a new keypair resource policy with various configurations"""
-        result = await repository.create_keypair_resource_policy(Creator(spec=policy_creator))
+        result = await ops.create_entity(policy_creator)
 
         assert result.name == policy_creator.name
         assert result.default_for_unspecified == policy_creator.default_for_unspecified
@@ -327,7 +345,8 @@ class TestKeypairResourcePolicyRepository:
         "update_spec,expected_values",
         [
             pytest.param(
-                KeyPairResourcePolicyUpdaterSpec(
+                KeyPairResourcePolicyUpdater(
+                    policy_id=KeyPairResourcePolicyUUID(uuid4()),
                     default_for_unspecified=OptionalState.update(DefaultForUnspecified.UNLIMITED),
                     total_resource_slots=OptionalState.update(
                         ResourceSlot({"cpu": "8", "mem": "16g", "gpu": "2"})
@@ -344,14 +363,16 @@ class TestKeypairResourcePolicyRepository:
                 id="full_update",
             ),
             pytest.param(
-                KeyPairResourcePolicyUpdaterSpec(
+                KeyPairResourcePolicyUpdater(
+                    policy_id=KeyPairResourcePolicyUUID(uuid4()),
                     max_concurrent_sessions=OptionalState.update(15),
                 ),
                 {"max_concurrent_sessions": 15},
                 id="partial_update",
             ),
             pytest.param(
-                KeyPairResourcePolicyUpdaterSpec(
+                KeyPairResourcePolicyUpdater(
+                    policy_id=KeyPairResourcePolicyUUID(uuid4()),
                     max_pending_session_count=TriState.nullify(),
                     max_pending_session_resource_slots=TriState.nullify(),
                 ),
@@ -362,7 +383,8 @@ class TestKeypairResourcePolicyRepository:
                 id="nullify",
             ),
             pytest.param(
-                KeyPairResourcePolicyUpdaterSpec(
+                KeyPairResourcePolicyUpdater(
+                    policy_id=KeyPairResourcePolicyUUID(uuid4()),
                     max_pending_session_count=TriState.update(15),
                 ),
                 {"max_pending_session_count": 15},
@@ -372,16 +394,15 @@ class TestKeypairResourcePolicyRepository:
     )
     async def test_update_keypair_resource_policy(
         self,
-        repository: KeypairResourcePolicyRepository,
-        sample_policy_name: str,
-        update_spec: KeyPairResourcePolicyUpdaterSpec,
+        ops: OpsRepository[KeyPairResourcePolicyData],
+        sample_policy: KeyPairResourcePolicyData,
+        update_spec: KeyPairResourcePolicyUpdater,
         expected_values: dict[str, Any],
     ) -> None:
         """Test updating an existing keypair resource policy with various updaters"""
-        updater = Updater(spec=update_spec, pk_value=sample_policy_name)
-        result = await repository.update_keypair_resource_policy(updater)
+        result = await ops.update(replace(update_spec, policy_id=sample_policy.uuid))
 
-        assert result.name == sample_policy_name
+        assert result.name == sample_policy.name
 
         for field_name, expected_value in expected_values.items():
             actual_value = getattr(result, field_name)
@@ -391,64 +412,103 @@ class TestKeypairResourcePolicyRepository:
 
     async def test_update_nonexistent_policy_raises_error(
         self,
-        repository: KeypairResourcePolicyRepository,
+        ops: OpsRepository[KeyPairResourcePolicyData],
     ) -> None:
-        """Test that updating a non-existent policy raises KeypairResourcePolicyNotFound"""
-        updater = Updater(
-            spec=KeyPairResourcePolicyUpdaterSpec(
-                max_concurrent_sessions=OptionalState.update(99),
-            ),
-            pk_value="nonexistent-policy",
+        """Test that updating a non-existent policy raises EntityNotFoundError"""
+        updater = KeyPairResourcePolicyUpdater(
+            policy_id=KeyPairResourcePolicyUUID(uuid4()),
+            max_concurrent_sessions=OptionalState.update(99),
         )
 
-        with pytest.raises(KeypairResourcePolicyNotFound):
-            await repository.update_keypair_resource_policy(updater)
+        with pytest.raises(EntityNotFoundError):
+            await ops.update(updater)
 
     async def test_remove_keypair_resource_policy(
         self,
-        repository: KeypairResourcePolicyRepository,
-        sample_policy_name: str,
+        ops: OpsRepository[KeyPairResourcePolicyData],
+        sample_policy: KeyPairResourcePolicyData,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> None:
         """Test removing a keypair resource policy"""
-        result = await repository.remove_keypair_resource_policy(sample_policy_name)
+        result = await ops.purge_entity(KeyPairResourcePolicyPurger(policy_id=sample_policy.uuid))
 
-        assert result.name == sample_policy_name
+        assert result.name == sample_policy.name
 
         # Verify policy is deleted
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             query = sa.select(KeyPairResourcePolicyRow).where(
-                KeyPairResourcePolicyRow.name == sample_policy_name
+                KeyPairResourcePolicyRow.name == sample_policy.name
             )
             deleted_policy = await db_sess.scalar(query)
             assert deleted_policy is None
 
     async def test_remove_nonexistent_policy_raises_error(
         self,
-        repository: KeypairResourcePolicyRepository,
+        ops: OpsRepository[KeyPairResourcePolicyData],
     ) -> None:
-        """Test that removing a non-existent policy raises KeypairResourcePolicyNotFound"""
-        with pytest.raises(KeypairResourcePolicyNotFound):
-            await repository.remove_keypair_resource_policy("nonexistent-policy")
+        """Test that removing a non-existent policy raises EntityNotFoundError"""
+        with pytest.raises(EntityNotFoundError):
+            await ops.purge_entity(
+                KeyPairResourcePolicyPurger(policy_id=KeyPairResourcePolicyUUID(uuid4()))
+            )
 
     @pytest.fixture
     async def allowed_vfolder_updater_spec(
         self,
         sample_allowed_vfolder_hosts: dict[str, Any],
-    ) -> KeyPairResourcePolicyUpdaterSpec:
+    ) -> KeyPairResourcePolicyUpdater:
         """Fixture for allowed_vfolder_hosts updater spec"""
-        return KeyPairResourcePolicyUpdaterSpec(
+        return KeyPairResourcePolicyUpdater(
+            policy_id=KeyPairResourcePolicyUUID(uuid4()),
             allowed_vfolder_hosts=OptionalState.update(sample_allowed_vfolder_hosts),
         )
 
     async def test_update_allowed_vfolder_hosts(
         self,
-        repository: KeypairResourcePolicyRepository,
-        sample_policy_name: str,
-        allowed_vfolder_updater_spec: KeyPairResourcePolicyUpdaterSpec,
+        ops: OpsRepository[KeyPairResourcePolicyData],
+        sample_policy: KeyPairResourcePolicyData,
+        allowed_vfolder_updater_spec: KeyPairResourcePolicyUpdater,
         sample_allowed_vfolder_hosts: dict[str, Any],
     ) -> None:
         """Test updating allowed_vfolder_hosts configuration"""
-        updater = Updater(spec=allowed_vfolder_updater_spec, pk_value=sample_policy_name)
-        result = await repository.update_keypair_resource_policy(updater)
+        result = await ops.update(
+            replace(allowed_vfolder_updater_spec, policy_id=sample_policy.uuid)
+        )
         assert result.allowed_vfolder_hosts == sample_allowed_vfolder_hosts
+
+    @pytest.mark.parametrize("max_priority", [None, 0, 10, 100])
+    async def test_max_priority_accepts_values_within_range(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        sample_creator: KeyPairResourcePolicyCreator,
+        max_priority: int | None,
+    ) -> None:
+        row = sample_creator.build_row()
+        row.max_priority = max_priority
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(row)
+            await db_sess.commit()
+
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            stored = await db_sess.scalar(
+                sa.select(KeyPairResourcePolicyRow.max_priority).where(
+                    KeyPairResourcePolicyRow.name == sample_creator.name
+                )
+            )
+        assert stored == max_priority
+
+    @pytest.mark.parametrize("max_priority", [-1, 101])
+    async def test_max_priority_outside_range_is_rejected(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        sample_creator: KeyPairResourcePolicyCreator,
+        max_priority: int,
+    ) -> None:
+        # A cap outside the requestable priority range is unsatisfiable —
+        # a negative one would reject every session create for the keypair.
+        row = sample_creator.build_row()
+        row.max_priority = max_priority
+        with pytest.raises(IntegrityError):
+            async with db_with_cleanup.begin_session() as db_sess:
+                db_sess.add(row)
+                await db_sess.commit()

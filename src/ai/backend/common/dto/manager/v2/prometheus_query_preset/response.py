@@ -38,6 +38,9 @@ class QueryDefinitionNode(BaseResponseModel):
     """Node representing a single prometheus query definition."""
 
     id: UUID = Field(description="Query definition ID")
+    entity_id: UUID = Field(
+        description="UUID of the query preset. Added in 26.9.0.",
+    )
     name: str = Field(description="Human-readable name")
     description: str | None = Field(default=None, description="Human-readable description")
     rank: int = Field(default=0, description="Sort rank")
@@ -66,6 +69,7 @@ class DeleteQueryDefinitionPayload(BaseResponseModel):
     """Payload for deleting a query definition."""
 
     id: UUID = Field(description="Deleted query definition ID")
+    entity_id: UUID = Field(description="UUID of the deleted query definition. Added in 26.10.0.")
 
 
 class GetQueryDefinitionPayload(BaseResponseModel):

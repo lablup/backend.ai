@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import asyncio
+import uuid
 
 import click
 
 from ai.backend.client.cli.v2.helpers import (
+    EntityLabelTerm,
     create_v2_registry,
+    entity_label_filter_options,
+    entity_label_relations,
     load_v2_config,
     parse_order_options,
     print_result,
@@ -39,6 +43,7 @@ def agent() -> None:
     default=None,
     help="Filter by schedulable flag.",
 )
+@entity_label_filter_options
 @click.option(
     "--order-by",
     multiple=True,
@@ -51,21 +56,24 @@ def search(
     scaling_group: str | None,
     schedulable: bool | None,
     order_by: tuple[str, ...],
+    label: tuple[EntityLabelTerm, ...],
 ) -> None:
     """Search agents (superadmin only)."""
+    from ai.backend.common.dto.manager.query import StringFilter
     from ai.backend.common.dto.manager.v2.agent.request import (
         AdminSearchAgentsInput,
         AgentFilter,
         AgentOrder,
     )
-    from ai.backend.common.dto.manager.v2.agent.types import AgentOrderField
+    from ai.backend.common.dto.manager.v2.agent.types import (
+        AgentOrderField,
+        AgentStatusEnum,
+        AgentStatusFilter,
+    )
 
-    # Build filter only if any filter option is provided
+    relations = entity_label_relations(label)
     filter_dto: AgentFilter | None = None
-    if any(opt is not None for opt in (status, scaling_group, schedulable)):
-        from ai.backend.common.dto.manager.query import StringFilter
-        from ai.backend.common.dto.manager.v2.agent.types import AgentStatusEnum, AgentStatusFilter
-
+    if relations or any(opt is not None for opt in (status, scaling_group, schedulable)):
         filter_dto = AgentFilter(
             status=(
                 AgentStatusFilter(equals=AgentStatusEnum(status.upper()))
@@ -76,6 +84,7 @@ def search(
                 StringFilter(contains=scaling_group) if scaling_group is not None else None
             ),
             schedulable=schedulable,
+            AND=[AgentFilter(labels=rel) for rel in relations] or None,
         )
 
     # Build order only if --order-by is provided
@@ -90,6 +99,69 @@ def search(
                     order=orders,
                     limit=limit,
                     offset=offset,
+                ),
+            )
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@agent.command(name="update-resource-group")
+@click.argument("agent_id")
+@click.option(
+    "--resource-group-id",
+    required=True,
+    type=click.UUID,
+    help="UUID of the target resource group to move the agent into.",
+)
+@click.option(
+    "--policy",
+    default=None,
+    type=click.Choice(["terminate", "reschedule"], case_sensitive=False),
+    help=(
+        "How to handle sessions still running on the agent under the old resource group. "
+        "Defaults to the server-side default (terminate)."
+    ),
+)
+@click.option(
+    "--force",
+    is_flag=True,
+    default=False,
+    help=(
+        "Change the group even if the agent still has active sessions or "
+        "unterminated sessions or deployments of other resource groups designate "
+        "it; the sessions are cleaned up per the policy and the designations are "
+        "removed. Without this flag, the change is rejected in those cases."
+    ),
+)
+def update_resource_group(
+    agent_id: str,
+    resource_group_id: uuid.UUID,
+    policy: str | None,
+    force: bool,
+) -> None:
+    """Change an agent's resource group (superadmin only)."""
+    from ai.backend.common.data.entity.resource_group import ResourceGroupID
+    from ai.backend.common.dto.manager.v2.agent.request import (
+        UpdateAgentResourceGroupBody,
+    )
+    from ai.backend.common.dto.manager.v2.agent.types import (
+        ConflictingSessionCleanupPolicyEnum,
+    )
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.agent.update_resource_group(
+                agent_id,
+                UpdateAgentResourceGroupBody(
+                    resource_group_id=ResourceGroupID(resource_group_id),
+                    policy=(
+                        ConflictingSessionCleanupPolicyEnum(policy.lower()) if policy else None
+                    ),
+                    force=force,
                 ),
             )
             print_result(result)

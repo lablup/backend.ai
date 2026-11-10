@@ -20,11 +20,11 @@ from ai.backend.appproxy.common.utils import (
 from ai.backend.appproxy.coordinator.models import Circuit
 from ai.backend.appproxy.coordinator.types import RootContext
 from ai.backend.common.types import BackendAISchema
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .utils import auth_required
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class SlotResponseModel(BackendAISchema):

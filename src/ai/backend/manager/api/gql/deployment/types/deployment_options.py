@@ -19,24 +19,27 @@ from ai.backend.common.dto.manager.v2.deployment_options.response import (
 from ai.backend.common.dto.manager.v2.deployment_options.response import (
     DeploymentOptionsInfo as DeploymentOptionsInfoDTO,
 )
+from ai.backend.common.dto.manager.v2.deployment_options.response import (
+    HandlerOptionsEntryInfo as HandlerOptionsEntryInfoDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment_options.response import (
+    HandlerOptionsInfo as HandlerOptionsInfoDTO,
+)
 from ai.backend.common.dto.manager.v2.session_options.request import (
     HandlerOptionsEntryInput as HandlerOptionsEntryInputDTO,
 )
 from ai.backend.common.dto.manager.v2.session_options.request import (
     HandlerOptionsInput as HandlerOptionsInputDTO,
 )
-from ai.backend.common.dto.manager.v2.session_options.response import (
-    HandlerOptionsEntryInfo as HandlerOptionsEntryInfoDTO,
-)
-from ai.backend.common.dto.manager.v2.session_options.response import (
-    HandlerOptionsInfo as HandlerOptionsInfoDTO,
-)
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
+    gql_added_field,
     gql_pydantic_input,
     gql_pydantic_type,
 )
+from ai.backend.manager.api.gql.session_options.types import AgentSelectionPolicyGQL
 
 
 @gql_pydantic_input(
@@ -85,6 +88,13 @@ class DeploymentHandlerOptionsInputGQL(PydanticInputMixin[DeploymentHandlerOptio
 )
 class DeploymentOptionsInputGQL(PydanticInputMixin[DeploymentOptionsInputDTO]):
     handler_options: DeploymentHandlerOptionsInputGQL
+    agent_selection_policy: AgentSelectionPolicyGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="How the designated agents are enforced. null keeps the stored policy.",
+        ),
+        default=None,
+    )
 
 
 @gql_pydantic_type(
@@ -137,3 +147,9 @@ class DeploymentHandlerOptionsInfoGQL:
 )
 class DeploymentOptionsInfoGQL:
     handler_options: DeploymentHandlerOptionsInfoGQL
+    agent_selection_policy: AgentSelectionPolicyGQL = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="How the designated agents are enforced.",
+        ),
+    )

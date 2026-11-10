@@ -12,6 +12,7 @@ __all__ = (
     "AdminSearchReservoirRegistriesPayload",
     "CreateReservoirRegistryPayload",
     "DeleteReservoirRegistryPayload",
+    "PurgeReservoirRegistryPayload",
     "ReservoirRegistryNode",
     "UpdateReservoirRegistryPayload",
 )
@@ -21,10 +22,15 @@ class ReservoirRegistryNode(BaseResponseModel):
     """Node model representing a Reservoir registry."""
 
     id: UUID = Field(description="Registry ID")
+    entity_id: UUID = Field(
+        description="UUID of the reservoir registry. Added in 26.9.0.",
+    )
     name: str = Field(description="Registry name")
     endpoint: str = Field(description="Reservoir endpoint URL")
     access_key: str = Field(description="Access key for authentication")
-    secret_key: str = Field(description="Secret key for authentication")
+    secret_key: str = Field(
+        description="Secret key for authentication. Masked unless the caller is a superadmin."
+    )
     api_version: str = Field(description="API version string")
 
 
@@ -44,6 +50,14 @@ class DeleteReservoirRegistryPayload(BaseResponseModel):
     """Payload for Reservoir registry deletion mutation result."""
 
     id: UUID = Field(description="ID of the deleted Reservoir registry")
+    entity_id: UUID = Field(description="UUID of the deleted Reservoir registry. Added in 26.10.0.")
+
+
+class PurgeReservoirRegistryPayload(BaseResponseModel):
+    """Payload for Reservoir registry purge result."""
+
+    id: UUID = Field(description="ID of the purged Reservoir registry")
+    entity_id: UUID = Field(description="UUID of the purged Reservoir registry. Added in 26.10.0.")
 
 
 class AdminSearchReservoirRegistriesPayload(BaseResponseModel):

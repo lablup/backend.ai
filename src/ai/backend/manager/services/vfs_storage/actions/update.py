@@ -1,32 +1,30 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.manager.actions.v2.ops.base import UpdateSingleEntityOpsAction
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
-from ai.backend.manager.models.vfs_storage import VFSStorageRow
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.services.vfs_storage.actions.base import VFSStorageAction
+from ai.backend.manager.models.vfs_storage.row import VFSStorageRow
+from ai.backend.manager.models.vfs_storage.updaters import VFSStorageUpdater
 
 
 @dataclass
-class UpdateVFSStorageAction(VFSStorageAction):
-    updater: Updater[VFSStorageRow]
+class UpdateVFSStorageAction(UpdateSingleEntityOpsAction[VFSStorageRow, VFSStorageData]):
+    """Retune one VFS storage registration."""
 
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.updater.pk_value)
+    updater: VFSStorageUpdater
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.UPDATE
-
-
-@dataclass
-class UpdateVFSStorageActionResult(BaseActionResult):
-    result: VFSStorageData
+    def action_name(cls) -> str:
+        return "update_vfs_storage"
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.result.id)
+    def entity_id(self) -> EntityIdentifier:
+        return self.updater.storage_id
+
+    @override
+    def to_updater(self) -> VFSStorageUpdater:
+        return self.updater

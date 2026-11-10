@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import enum
 import os
+import re
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Self
 
 from pydantic import (
     AliasChoices,
@@ -12,18 +13,20 @@ from pydantic import (
     FilePath,
     HttpUrl,
     field_validator,
+    model_validator,
 )
 
 from ai.backend.common.config import BaseConfigSchema
 from ai.backend.common.configs import (
-    EtcdConfig,
     OTELConfig,
     PyroscopeConfig,
     ServiceDiscoveryConfig,
 )
 from ai.backend.common.configs.jwt import SharedJWTConfig
 from ai.backend.common.configs.redis import RedisConfig
+from ai.backend.common.endpoint_pool.strategy import EndpointSelectionPolicy
 from ai.backend.common.meta import (
+    NEXT_RELEASE_VERSION,
     BackendAIConfigMeta,
     CompositeType,
     ConfigExample,
@@ -33,7 +36,6 @@ from ai.backend.common.typed_validators import (
     CommaSeparatedStrList,
 )
 from ai.backend.logging.config import LoggingConfig
-from ai.backend.web.clients.endpoint_pool import EndpointSelectionPolicy
 
 
 class ServiceMode(enum.StrEnum):
@@ -44,6 +46,12 @@ class ServiceMode(enum.StrEnum):
 class ForceEndpointProtocol(enum.StrEnum):
     HTTPS = "https"
     HTTP = "http"
+
+
+class CookieSameSite(enum.StrEnum):
+    STRICT = "Strict"
+    LAX = "Lax"
+    NONE = "None"
 
 
 class WebSocketProxyConfig(BaseConfigSchema):
@@ -240,25 +248,6 @@ class ServiceConfig(BaseConfigSchema):
             example=ConfigExample(local="false", prod="false"),
         ),
     ]
-    allow_project_resource_monitor: Annotated[
-        bool,
-        Field(
-            default=False,
-            validation_alias=AliasChoices(
-                "allow_project_resource_monitor", "allow-project-resource-monitor"
-            ),
-            serialization_alias="allow-project-resource-monitor",
-        ),
-        BackendAIConfigMeta(
-            description=(
-                "Enable project-level resource monitoring in the web UI. Shows aggregated "
-                "resource usage statistics per project (group). Useful for project managers "
-                "to track their team's resource consumption."
-            ),
-            added_version="25.12.0",
-            example=ConfigExample(local="false", prod="true"),
-        ),
-    ]
     allow_change_signin_mode: Annotated[
         bool,
         Field(
@@ -311,25 +300,6 @@ class ServiceConfig(BaseConfigSchema):
             ),
             added_version="25.12.0",
             example=ConfigExample(local="true", prod="false"),
-        ),
-    ]
-    always_enqueue_compute_session: Annotated[
-        bool,
-        Field(
-            default=False,
-            validation_alias=AliasChoices(
-                "always_enqueue_compute_session", "always-enqueue-compute-session"
-            ),
-            serialization_alias="always-enqueue-compute-session",
-        ),
-        BackendAIConfigMeta(
-            description=(
-                "Force all compute session requests to go through the scheduling queue. "
-                "When disabled, sessions may start immediately if resources are available. "
-                "Enable for fair resource allocation in multi-user environments."
-            ),
-            added_version="25.12.0",
-            example=ConfigExample(local="false", prod="true"),
         ),
     ]
     webui_debug: Annotated[
@@ -485,23 +455,6 @@ class ServiceConfig(BaseConfigSchema):
             example=ConfigExample(local="false", prod="true"),
         ),
     ]
-    force_2fa: Annotated[
-        bool,
-        Field(
-            default=False,
-            validation_alias=AliasChoices("force_2FA", "force-2FA"),
-            serialization_alias="force-2FA",
-        ),
-        BackendAIConfigMeta(
-            description=(
-                "Require all users to set up two-factor authentication. Users who haven't "
-                "configured 2FA will be prompted to do so before accessing the system. "
-                "Requires enable_2fa to be true."
-            ),
-            added_version="25.12.0",
-            example=ConfigExample(local="false", prod="false"),
-        ),
-    ]
     system_ssh_image: Annotated[
         str,
         Field(
@@ -517,23 +470,6 @@ class ServiceConfig(BaseConfigSchema):
             ),
             added_version="25.12.0",
             example=ConfigExample(local="", prod="cr.backend.ai/system/ssh:latest"),
-        ),
-    ]
-    directory_based_usage: Annotated[
-        bool,
-        Field(
-            default=False,
-            validation_alias=AliasChoices("directory_based_usage", "directory-based-usage"),
-            serialization_alias="directory-based-usage",
-        ),
-        BackendAIConfigMeta(
-            description=(
-                "Track resource usage based on directory structure. When enabled, usage "
-                "statistics are calculated per directory/project hierarchy rather than "
-                "flat aggregation. Useful for organizational billing."
-            ),
-            added_version="25.12.0",
-            example=ConfigExample(local="false", prod="true"),
         ),
     ]
     allow_custom_resource_allocation: Annotated[
@@ -892,6 +828,11 @@ class CSPConfig(BaseConfigSchema):
     ]
 
 
+_CORS_ORIGIN_PATTERN = re.compile(
+    r"[a-z][a-z0-9+.-]*://([a-z0-9.-]+|\[[0-9a-f:.]+\])(:[0-9]{1,5})?"
+)
+
+
 class SecurityConfig(BaseConfigSchema):
     """Security configuration for the web server.
 
@@ -915,6 +856,22 @@ class SecurityConfig(BaseConfigSchema):
             ),
             added_version="26.4.3",
             example=ConfigExample(local="false", prod="true"),
+        ),
+    ]
+    cookie_samesite: Annotated[
+        CookieSameSite,
+        Field(
+            default=CookieSameSite.LAX,
+            validation_alias=AliasChoices("cookie_samesite", "cookie-samesite"),
+            serialization_alias="cookie-samesite",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "SameSite attribute of session cookies: Strict, Lax, or None. "
+                "None requires cookie-secure to be true."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="Lax", prod="Lax"),
         ),
     ]
     request_policies: Annotated[
@@ -949,6 +906,44 @@ class SecurityConfig(BaseConfigSchema):
             added_version="25.12.0",
         ),
     ]
+    cors_allowed_origins: Annotated[
+        list[str],
+        Field(
+            default_factory=list,
+            validation_alias=AliasChoices("cors_allowed_origins", "cors-allowed-origins"),
+            serialization_alias="cors-allowed-origins",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Origins that receive CORS response headers, with credentials allowed. Each value "
+                "is the exact Origin header a browser sends: lowercase scheme://host[:port], "
+                'without a default port or a trailing slash. Wildcards and "null" are rejected. '
+                "When empty, no origin receives CORS response headers."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(
+                local='["http://localhost:9081"]', prod='["https://console.example.com"]'
+            ),
+        ),
+    ]
+    cors_allow_all_origins: Annotated[
+        bool,
+        Field(
+            default=False,
+            validation_alias=AliasChoices("cors_allow_all_origins", "cors-allow-all-origins"),
+            serialization_alias="cors-allow-all-origins",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Accept CORS requests from any origin, with credentials allowed. This is for "
+                "development environments only, where the WebUI dev server origin changes per "
+                "run. Do not enable it in production: any site can then send credentialed "
+                "requests to the web server."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="true", prod="false"),
+        ),
+    ]
     csp: Annotated[
         CSPConfig | None,
         Field(default=None),
@@ -967,6 +962,20 @@ class SecurityConfig(BaseConfigSchema):
             composite=CompositeType.FIELD,
         ),
     ]
+
+    @field_validator("cors_allowed_origins")
+    @classmethod
+    def validate_cors_allowed_origins(cls, origins: list[str]) -> list[str]:
+        for origin in origins:
+            if _CORS_ORIGIN_PATTERN.fullmatch(origin) is None:
+                raise ValueError(f"Invalid CORS origin: {origin!r}")
+        return origins
+
+    @model_validator(mode="after")
+    def validate_cookie_samesite(self) -> Self:
+        if self.cookie_samesite == CookieSameSite.NONE and not self.cookie_secure:
+            raise ValueError("cookie-samesite = None requires cookie-secure = true")
+        return self
 
 
 class ResourcesConfig(BaseConfigSchema):
@@ -1276,18 +1285,6 @@ class EnvironmentsConfig(BaseConfigSchema):
     Controls which container images are visible to users and how they are presented.
     """
 
-    allowlist: Annotated[
-        CommaSeparatedStrList | None,
-        Field(default=None),
-        BackendAIConfigMeta(
-            description=(
-                "Comma-separated list of allowed environment image name patterns to display. "
-                "When set, only images matching these patterns are shown to users. "
-                "Leave empty (None) to show all available images."
-            ),
-            added_version="25.12.0",
-        ),
-    ]
     show_non_installed_images: Annotated[
         bool,
         Field(
@@ -1495,18 +1492,6 @@ class APIConfig(BaseConfigSchema):
             ),
         ),
     ]
-    text: Annotated[
-        str,
-        Field(default="Backend.AI API"),
-        BackendAIConfigMeta(
-            description=(
-                "Display text for the API endpoint shown in the web UI. This label appears "
-                "in settings and debugging panels. Customize for branded deployments."
-            ),
-            added_version="25.12.0",
-            example=ConfigExample(local="Backend.AI API", prod="Production API"),
-        ),
-    ]
     ssl_verify: Annotated[
         bool,
         Field(
@@ -1610,7 +1595,7 @@ class APIConfig(BaseConfigSchema):
         BackendAIConfigMeta(
             description=(
                 "Consecutive probe (or caller-reported) failures required before an "
-                "endpoint flips from healthy to unhealthy."
+                "endpoint flips from healthy to unhealthy. A 503 probe excludes it immediately."
             ),
             added_version="26.4.4",
             example=ConfigExample(local="3", prod="3"),
@@ -1853,8 +1838,8 @@ class SessionConfig(BaseConfigSchema):
         ),
         BackendAIConfigMeta(
             description=(
-                "Maximum number of failed login attempts before blocking. After this many "
-                "failures, the IP or account is blocked for login_block_time seconds. "
+                "Maximum number of failed login attempts per username before blocking. After "
+                "this many failures, login for that username is blocked for login_block_time seconds. "
                 "Lower values are more secure but may frustrate legitimate users."
             ),
             added_version="25.12.0",
@@ -2102,7 +2087,8 @@ class ApolloRouterConfig(BaseConfigSchema):
         BackendAIConfigMeta(
             description=(
                 "Consecutive probe (or caller-reported) failures required before an "
-                "Apollo Router endpoint flips from healthy to unhealthy."
+                "Apollo Router endpoint flips from healthy to unhealthy. "
+                "A 503 probe excludes it immediately."
             ),
             added_version="26.4.4",
             example=ConfigExample(local="3", prod="3"),
@@ -2326,18 +2312,6 @@ class WebServerUnifiedConfig(BaseConfigSchema):
         Field(default_factory=OTELConfig),
         BackendAIConfigMeta(
             description="OpenTelemetry integration for distributed tracing and metrics collection.",
-            added_version="25.12.0",
-            composite=CompositeType.FIELD,
-        ),
-    ]
-    etcd: Annotated[
-        EtcdConfig,
-        Field(default_factory=EtcdConfig),
-        BackendAIConfigMeta(
-            description=(
-                "etcd connection settings for distributed configuration and "
-                "coordination with other Backend.AI components."
-            ),
             added_version="25.12.0",
             composite=CompositeType.FIELD,
         ),

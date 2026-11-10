@@ -17,6 +17,21 @@ from ai.backend.common.exception import (
 )
 
 
+class AgentAlreadyRunningError(BackendAIError, web.HTTPConflict):
+    """Raised when another process already holds this agent's pid file."""
+
+    error_type = "https://api.backend.ai/probs/agent/already-running"
+    error_title = "Another agent process is already running with this pid file."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.START,
+            error_detail=ErrorDetail.CONFLICT,
+        )
+
+
 class ImageArchitectureMismatchError(BackendAIError, web.HTTPBadRequest):
     """Raised when image architecture does not match the agent's architecture."""
 
@@ -44,6 +59,21 @@ class ImagePullTimeoutError(BackendAIError, web.HTTPGatewayTimeout):
             domain=ErrorDomain.IMAGE,
             operation=ErrorOperation.ACCESS,
             error_detail=ErrorDetail.TIMEOUT,
+        )
+
+
+class ImagePullFailedError(BackendAIError, web.HTTPBadGateway):
+    """Raised when the container runtime reports an image pull failure."""
+
+    error_type = "https://api.backend.ai/probs/agent/image-pull-failed"
+    error_title = "Image pull failed."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.IMAGE,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.UNAVAILABLE,
         )
 
 

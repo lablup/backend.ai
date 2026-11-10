@@ -9,11 +9,9 @@ from ai.backend.common.dto.manager.v2.operations.request import (
     PerformSchedulerOpsInput,
     SubscribeBackgroundTaskInput,
     SubscribeSessionEventsInput,
-    UpdateAnnouncementInput,
     UpdateManagerStatusInput,
 )
 from ai.backend.common.dto.manager.v2.operations.response import (
-    AnnouncementNode,
     AppendErrorLogPayload,
     ClearErrorLogPayload,
     ErrorLogNode,
@@ -47,10 +45,8 @@ __all__ = (
     "PerformSchedulerOpsInput",
     "SubscribeBackgroundTaskInput",
     "SubscribeSessionEventsInput",
-    "UpdateAnnouncementInput",
     "UpdateManagerStatusInput",
     # Node and Payload models (response)
-    "AnnouncementNode",
     "AppendErrorLogPayload",
     "ClearErrorLogPayload",
     "ErrorLogNode",

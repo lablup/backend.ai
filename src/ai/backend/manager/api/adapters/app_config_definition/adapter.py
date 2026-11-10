@@ -5,10 +5,12 @@ from __future__ import annotations
 from collections.abc import Sequence
 from functools import lru_cache
 
+from ai.backend.common.data.entity.app_config_definition import AppConfigDefinitionID
 from ai.backend.common.dto.manager.v2.app_config_definition.request import (
     AppConfigDefinitionFilter,
     AppConfigDefinitionOrder,
     CreateAppConfigDefinitionInput,
+    PartialBulkPurgeAppConfigDefinitionsInput,
     PurgeAppConfigDefinitionInput,
     SearchAppConfigDefinitionsInput,
 )
@@ -21,98 +23,115 @@ from ai.backend.common.dto.manager.v2.app_config_definition.response import (
 from ai.backend.common.dto.manager.v2.app_config_definition.types import (
     AppConfigDefinitionOrderField,
 )
-from ai.backend.common.dto.manager.v2.common import OrderDirection
-from ai.backend.common.identifier.app_config_definition import AppConfigDefinitionID
+from ai.backend.common.dto.manager.v2.common import (
+    OrderDirection,
+    PartialBulkFailure,
+    PartialBulkPayload,
+)
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkResult
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
-from ai.backend.manager.data.app_config_definition.types import AppConfigDefinitionData
+from ai.backend.manager.data.app_config.types import AppConfigDefinitionData
 from ai.backend.manager.models.app_config_definition.conditions import (
     AppConfigDefinitionConditions,
 )
+from ai.backend.manager.models.app_config_definition.creators import (
+    AppConfigDefinitionCreator,
+)
 from ai.backend.manager.models.app_config_definition.orders import AppConfigDefinitionOrders
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
-from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.repositories.app_config_definition.creators import (
-    AppConfigDefinitionCreatorSpec,
+from ai.backend.manager.models.app_config_definition.searchers import (
+    AppConfigDefinitionSearcher,
 )
-from ai.backend.manager.repositories.base import (
-    Purger,
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
     combine_conditions_or,
     negate_conditions,
 )
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.services.app_config_definition.actions.create import (
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
+from ai.backend.manager.services.app_config.actions.definition.admin_search import (
+    AdminSearchAppConfigDefinitionsAction,
+)
+from ai.backend.manager.services.app_config.actions.definition.bulk_get import (
+    BulkGetAppConfigDefinitionsAction,
+)
+from ai.backend.manager.services.app_config.actions.definition.create import (
     CreateAppConfigDefinitionAction,
 )
-from ai.backend.manager.services.app_config_definition.actions.get import (
+from ai.backend.manager.services.app_config.actions.definition.get import (
     GetAppConfigDefinitionAction,
 )
-from ai.backend.manager.services.app_config_definition.actions.purge import (
+from ai.backend.manager.services.app_config.actions.definition.partial_bulk_purge import (
+    PartialBulkPurgeAppConfigDefinitionsAction,
+)
+from ai.backend.manager.services.app_config.actions.definition.purge import (
     PurgeAppConfigDefinitionAction,
 )
-from ai.backend.manager.services.app_config_definition.actions.search import (
-    SearchAppConfigDefinitionsAction,
-)
+from ai.backend.manager.services.app_config.processors import AppConfigProcessors
 
 
 @lru_cache(maxsize=1)
 def _get_app_config_definition_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
         forward_order=AppConfigDefinitionOrders.created_at(ascending=False),
-        backward_order=AppConfigDefinitionOrders.created_at(ascending=True),
-        forward_condition_factory=AppConfigDefinitionConditions.by_cursor_forward,
-        backward_condition_factory=AppConfigDefinitionConditions.by_cursor_backward,
-        tiebreaker_order=AppConfigDefinitionOrders.id(ascending=True),
+        cursor_column=AppConfigDefinitionRow.id,
     )
 
 
 class AppConfigDefinitionAdapter(BaseAdapter):
     """Adapter for app config definition domain operations (admin-only)."""
 
+    _app_config: AppConfigProcessors
+
+    def __init__(self, app_config: AppConfigProcessors) -> None:
+        self._app_config = app_config
+
     async def admin_create(
         self, input: CreateAppConfigDefinitionInput
     ) -> CreateAppConfigDefinitionPayload:
-        creator = Creator(spec=AppConfigDefinitionCreatorSpec(config_name=input.config_name))
-        action_result = await self._processors.app_config_definition.create.wait_for_complete(
+        creator = AppConfigDefinitionCreator(config_name=input.config_name)
+        action_result = await self._app_config.definition_global_create.run(
             CreateAppConfigDefinitionAction(creator=creator)
         )
         return CreateAppConfigDefinitionPayload(
-            app_config_definition=self._data_to_node(action_result.definition),
+            app_config_definition=self._data_to_node(action_result.data),
         )
 
     async def admin_get(self, definition_id: AppConfigDefinitionID) -> AppConfigDefinitionNode:
-        action_result = await self._processors.app_config_definition.get.wait_for_complete(
+        action_result = await self._app_config.definition_get.run(
             GetAppConfigDefinitionAction(definition_id=definition_id)
         )
-        return self._data_to_node(action_result.definition)
+        return self._data_to_node(action_result.data)
 
     async def batch_load_by_ids(
         self, ids: Sequence[AppConfigDefinitionID]
-    ) -> list[AppConfigDefinitionNode | None]:
-        """Batch load app config definitions by id for DataLoader use.
+    ) -> list[AppConfigDefinitionNode | Exception | None]:
+        """Batch load registered config names by id for DataLoader use.
 
-        Returns nodes in the same order as the input ids, with None for missing ones.
+        One answer per id in the given order: the node, ``None`` for an id matching no
+        row, and the denial for one the caller may not read.
         """
         if not ids:
             return []
-        querier = self._build_querier(
-            conditions=[AppConfigDefinitionConditions.by_ids(list(ids))],
-            orders=[],
-            pagination_spec=_get_app_config_definition_pagination_spec(),
-            limit=len(ids),
+        entity_ids = [AppConfigDefinitionID(value) for value in ids]
+        result = await self._app_config.definition_bulk_get.run(
+            BulkGetAppConfigDefinitionsAction(ids=entity_ids)
         )
-        action_result = await self._processors.app_config_definition.search.wait_for_complete(
-            SearchAppConfigDefinitionsAction(querier=querier)
-        )
-        node_map = {node.id: node for node in map(self._data_to_node, action_result.data)}
-        return [node_map.get(definition_id) for definition_id in ids]
+        return [
+            self._data_to_node(item.value)
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
 
     async def admin_search(
         self, input: SearchAppConfigDefinitionsInput
     ) -> SearchAppConfigDefinitionsPayload:
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
-        querier = self._build_querier(
+        searcher = self._build_searcher(
+            AppConfigDefinitionSearcher,
             conditions=conditions,
             orders=orders,
             pagination_spec=_get_app_config_definition_pagination_spec(),
@@ -123,29 +142,57 @@ class AppConfigDefinitionAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.app_config_definition.search.wait_for_complete(
-            SearchAppConfigDefinitionsAction(querier=querier)
+        action_result = await self._app_config.definition_global_search.run(
+            AdminSearchAppConfigDefinitionsAction(
+                searcher=GlobalSearcher(used_by=(), searcher=searcher)
+            )
         )
         return SearchAppConfigDefinitionsPayload(
-            items=[self._data_to_node(item) for item in action_result.data],
+            items=[self._data_to_node(item) for item in action_result.items],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
         )
 
-    async def admin_purge(
-        self, input: PurgeAppConfigDefinitionInput
-    ) -> PurgeAppConfigDefinitionPayload:
-        purger = Purger(row_class=AppConfigDefinitionRow, pk_value=AppConfigDefinitionID(input.id))
-        action_result = await self._processors.app_config_definition.purge.wait_for_complete(
-            PurgeAppConfigDefinitionAction(purger=purger)
+    async def purge(self, input: PurgeAppConfigDefinitionInput) -> PurgeAppConfigDefinitionPayload:
+        """Purge a config name with the allow-list entries and fragments under it."""
+        action_result = await self._app_config.definition_purge.run(
+            PurgeAppConfigDefinitionAction(definition_id=AppConfigDefinitionID(input.id))
         )
-        return PurgeAppConfigDefinitionPayload(id=action_result.definition.id)
+        return PurgeAppConfigDefinitionPayload(
+            id=action_result.data.id, entity_id=action_result.data.id
+        )
+
+    async def partial_bulk_purge(
+        self, input: PartialBulkPurgeAppConfigDefinitionsInput
+    ) -> PartialBulkPayload[AppConfigDefinitionNode]:
+        """Purge several config names with what lies under them, answering for each one."""
+        result = await self._app_config.definition_partial_bulk_purge.run(
+            PartialBulkPurgeAppConfigDefinitionsAction(
+                ids=[AppConfigDefinitionID(definition_id) for definition_id in input.ids]
+            )
+        )
+        return self._to_partial_bulk_payload(result)
+
+    def _to_partial_bulk_payload(
+        self, result: PartialBulkResult[AppConfigDefinitionData]
+    ) -> PartialBulkPayload[AppConfigDefinitionNode]:
+        return PartialBulkPayload[AppConfigDefinitionNode](
+            successes=[
+                self._data_to_node(item.value) for item in result.items if item.value is not None
+            ],
+            failed=[
+                PartialBulkFailure(id=item.entity_id, message=str(item.error))
+                for item in result.items
+                if item.error is not None
+            ],
+        )
 
     @staticmethod
     def _data_to_node(data: AppConfigDefinitionData) -> AppConfigDefinitionNode:
         return AppConfigDefinitionNode(
             id=data.id,
+            entity_id=data.entity_id(),
             config_name=data.config_name,
             created_at=data.created_at,
             updated_at=data.updated_at,
@@ -180,21 +227,30 @@ class AppConfigDefinitionAdapter(BaseAdapter):
             )
             if condition:
                 conditions.append(condition)
+        if filter_.entity_id:
+            condition = self.convert_uuid_filter(
+                filter_.entity_id,
+                equals_factory=AppConfigDefinitionConditions.by_id_equals,
+                in_factory=AppConfigDefinitionConditions.by_id_in,
+            )
+            if condition:
+                conditions.append(condition)
         if filter_.AND:
             for sub_filter in filter_.AND:
                 conditions.extend(self._convert_filter(sub_filter))
         if filter_.OR:
             or_conditions: list[QueryCondition] = []
             for sub_filter in filter_.OR:
-                or_conditions.extend(self._convert_filter(sub_filter))
+                sub_conditions = self._convert_filter(sub_filter)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if filter_.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub_filter in filter_.NOT:
-                not_conditions.extend(self._convert_filter(sub_filter))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_filter(sub_filter)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     def _convert_orders(self, orders: list[AppConfigDefinitionOrder]) -> list[QueryOrder]:

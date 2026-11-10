@@ -12,7 +12,7 @@ from uuid import UUID
 
 import pytest
 
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.manager.services.fair_share.actions import (
     BulkUpsertDomainFairShareWeightAction,
     BulkUpsertDomainFairShareWeightActionResult,

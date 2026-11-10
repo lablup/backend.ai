@@ -5,43 +5,46 @@ from __future__ import annotations
 from collections.abc import AsyncIterator, Sequence
 from dataclasses import dataclass
 from typing import Any, override
-from uuid import UUID
 
-from ai.backend.manager.actions.action.base import BaseActionResult
+from ai.backend.common.data.entity.session import SessionEntityType
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.repositories.base.export import StreamingExportQuery
+from ai.backend.manager.services.export.actions.base import (
+    ExportScopeActionResult,
+    ExportUserScopeAction,
+)
 
-from .base import ExportAction
 
-
-@dataclass
-class ExportMySessionsCSVAction(ExportAction):
+@dataclass(frozen=True)
+class ExportMySessionsCSVAction(ExportUserScopeAction):
     """Export session CSV scoped to the current user."""
 
-    user_uuid: UUID
     query: StreamingExportQuery
     encoding: str = "utf-8"
     filename: str | None = None
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.CREATE
+    def entity_type(cls) -> EntityType:
+        return SessionEntityType()
 
     @override
-    def entity_id(self) -> str | None:
-        return f"sessions:user:{self.user_uuid}"
+    @classmethod
+    def action_name(cls) -> str:
+        return "export_my_sessions_c_s_v"
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
 
 
-@dataclass
-class ExportMySessionsCSVActionResult(BaseActionResult):
+@dataclass(frozen=True)
+class ExportMySessionsCSVActionResult(ExportScopeActionResult):
     """Result of user-scoped session CSV export action."""
 
     field_names: list[str]
     row_iterator: AsyncIterator[Sequence[Sequence[Any]]]
     encoding: str
     filename: str
-
-    @override
-    def entity_id(self) -> str | None:
-        return "sessions"

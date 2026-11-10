@@ -8,8 +8,10 @@ from typing import Any, override
 from ai.backend.manager.data.session.spec import SessionSpec
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.sokovan.scheduling_controller.validators.session_spec_base import (
-    SessionSpecValidationContext,
     SessionSpecValidatorRule,
+)
+from ai.backend.manager.views.sokovan.session_creation import (
+    SessionSpecContext,
 )
 
 _RESERVED_PORTS: frozenset[int] = frozenset({2000, 2001, 2200, 7681})
@@ -26,7 +28,7 @@ class ServicePortRule(SessionSpecValidatorRule):
     def validate(
         self,
         spec: SessionSpec,
-        context: SessionSpecValidationContext,
+        context: SessionSpecContext,
     ) -> None:
         for idx, kernel in enumerate(spec.resource_spec.kernel_specs):
             preopen = set(kernel.preopen_ports)
@@ -40,7 +42,9 @@ class ServicePortRule(SessionSpecValidatorRule):
                         f"collide with reserved ports ({sorted(_RESERVED_PORTS)})."
                     ),
                 )
-            image_info = context.image_infos.get(kernel.execution_spec.resource_input.image_id)
+            image_info = context.global_info.image_infos.get(
+                kernel.execution_spec.resource_input.image_id
+            )
             if image_info is None:
                 continue
             image_service_ports = self._image_service_ports(image_info.labels)

@@ -1,10 +1,7 @@
-import uuid
 from dataclasses import dataclass
 from typing import Any, override
 
-from ai.backend.common.data.permission.types import EntityType
 from ai.backend.common.types import AccessKey
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.services.session.base import SessionAction
 
@@ -16,12 +13,8 @@ class GetStatusHistoryAction(SessionAction):
 
     @override
     @classmethod
-    def entity_type(cls) -> EntityType:
-        return EntityType.SESSION_STATUS_HISTORY
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
+    def action_name(cls) -> str:
+        return "get_status_history"
 
     @override
     @classmethod
@@ -30,10 +23,5 @@ class GetStatusHistoryAction(SessionAction):
 
 
 @dataclass
-class GetStatusHistoryActionResult(BaseActionResult):
+class GetStatusHistoryActionResult:
     status_history: dict[str, Any]
-    session_id: uuid.UUID
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.session_id)

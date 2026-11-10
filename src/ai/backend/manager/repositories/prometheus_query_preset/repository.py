@@ -19,19 +19,15 @@ from ai.backend.common.resilience import (
 )
 from ai.backend.common.resilience.policies.retry import BackoffStrategy
 from ai.backend.manager.clients.prometheus.client import PrometheusClient
-from ai.backend.manager.data.prometheus_query_preset import (
+from ai.backend.manager.data.prometheus_query_preset.types import (
     PrometheusQueryPresetData,
-    PrometheusQueryPresetListResult,
 )
-from ai.backend.manager.repositories.base import BatchQuerier, Creator
-from ai.backend.manager.repositories.base.updater import Updater
-
-from .db_source import PrometheusQueryPresetDBSource
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.prometheus_query_preset.db_source.db_source import (
+    PrometheusQueryPresetDBSource,
+)
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.prometheus_query_preset import (
-        PrometheusQueryPresetRow,
-    )
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 __all__ = ("PrometheusQueryPresetRepository",)
@@ -67,43 +63,15 @@ class PrometheusQueryPresetRepository:
         self,
         db: ExtendedAsyncSAEngine,
         prometheus_client: PrometheusClient,
+        v2_ops_provider: V2DBOpsProvider,
     ) -> None:
-        self._db_source = PrometheusQueryPresetDBSource(db)
+        self._db_source = PrometheusQueryPresetDBSource(db, v2_ops_provider)
         self._prometheus_client = prometheus_client
-
-    @prometheus_query_preset_repository_resilience.apply()
-    async def create(
-        self,
-        creator: Creator[PrometheusQueryPresetRow],
-    ) -> PrometheusQueryPresetData:
-        """Creates a new prometheus query preset."""
-        return await self._db_source.create(creator)
-
-    @prometheus_query_preset_repository_resilience.apply()
-    async def update(
-        self,
-        updater: Updater[PrometheusQueryPresetRow],
-    ) -> PrometheusQueryPresetData:
-        """Updates an existing prometheus query preset."""
-        return await self._db_source.update(updater=updater)
-
-    @prometheus_query_preset_repository_resilience.apply()
-    async def delete(self, preset_id: UUID) -> bool:
-        """Deletes a prometheus query preset."""
-        return await self._db_source.delete(preset_id)
 
     @prometheus_query_preset_repository_resilience.apply()
     async def get_by_id(self, preset_id: UUID) -> PrometheusQueryPresetData:
         """Retrieves a prometheus query preset by ID."""
         return await self._db_source.get_by_id(preset_id)
-
-    @prometheus_query_preset_repository_resilience.apply()
-    async def search(
-        self,
-        querier: BatchQuerier,
-    ) -> PrometheusQueryPresetListResult:
-        """Searches prometheus query presets with total count."""
-        return await self._db_source.search(querier=querier)
 
     @prometheus_query_preset_repository_resilience.apply()
     async def preview_template(

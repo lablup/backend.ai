@@ -1,0 +1,460 @@
+"""리소스 그룹 검색 — 전체 검색은 슈퍼관리자 검사를, 스코프 검색은 스코프마다 권한 검사를 거친다."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any, override
+
+import pytest
+
+from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
+from ai.backend.common.dto.manager.v2.resource_group.request import (
+    AdminSearchResourceGroupsInput,
+    ResourceGroupFilter,
+    ScopedSearchResourceGroupsInput,
+)
+from ai.backend.common.dto.manager.v2.resource_group.types import ResourceGroupScope
+from ai.backend.manager.api.adapters.resource_group.adapter import (
+    ResourceGroupAdapter,
+    ResourceGroupSearchPayload,
+)
+from ai.backend.manager.errors.auth import InsufficientPrivilege
+from ai.backend.manager.errors.permission import NotEnoughPermission
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
+from bai_scenario.components.answers import TheCallIsRefused
+from bai_scenario.components.resource_group import (
+    ADomainGroupsAndACaller,
+    ADomainGroupsAndSomeone,
+    AnActiveAndAnInactiveGroup,
+    ManyGroupsAndACaller,
+    OnlyTheLinkedGroupIsLeft,
+    OnlyTheNamedGroupIsLeft,
+    TheFirstGroupPage,
+    TheLaidGroupsAreLeft,
+    TwoGroupsAndSomeone,
+)
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import TestSeedingSession
+from bai_scenario.runner.steps import run_scenario
+
+type Searched = ResourceGroupSearchPayload
+type SearchingStep = Scenario[TestSeedingSession, Any, ResourceGroupAdapter, Searched]
+
+
+@dataclass(frozen=True)
+class SearchingEveryGroup(When[ManyGroupsAndACaller, ResourceGroupAdapter, Searched]):
+    """필터 없이 전체를 검색한다."""
+
+    @override
+    def operation(self) -> str:
+        return "search"
+
+    @override
+    def describe(self, laid: ManyGroupsAndACaller) -> str:
+        return Says(
+            f"{laid.caller.username}이 필터 없이 전체를 조회합니다",
+            english=(f"{laid.caller.username} searches every resource group without a filter"),
+        )
+
+    @override
+    async def call(self, adapter: ResourceGroupAdapter, laid: ManyGroupsAndACaller) -> Searched:
+        with ActingAs(laid.caller):
+            return await adapter.search(AdminSearchResourceGroupsInput())
+
+
+@dataclass(frozen=True)
+class SearchingByName(When[ManyGroupsAndACaller, ResourceGroupAdapter, Searched]):
+    """골라낸 하나의 이름을 필터로 검색한다."""
+
+    @override
+    def operation(self) -> str:
+        return "search"
+
+    @override
+    def describe(self, laid: ManyGroupsAndACaller) -> str:
+        return Says(
+            f"{laid.caller.username}이 이름 {laid.named.name} 필터로 조회합니다",
+            english=(f"{laid.caller.username} searches with the name {laid.named.name} filter"),
+        )
+
+    @override
+    async def call(self, adapter: ResourceGroupAdapter, laid: ManyGroupsAndACaller) -> Searched:
+        with ActingAs(laid.caller):
+            return await adapter.search(
+                AdminSearchResourceGroupsInput(
+                    filter=ResourceGroupFilter(name=StringFilter(equals=laid.named.name))
+                )
+            )
+
+
+@dataclass(frozen=True)
+class SearchingTheActiveOnes(When[ManyGroupsAndACaller, ResourceGroupAdapter, Searched]):
+    """활성인 그룹만 필터로 검색한다."""
+
+    @override
+    def operation(self) -> str:
+        return "search"
+
+    @override
+    def describe(self, laid: ManyGroupsAndACaller) -> str:
+        return Says(
+            f"{laid.caller.username}이 활성 필터로 조회합니다",
+            english=f"{laid.caller.username} searches with the active filter",
+        )
+
+    @override
+    async def call(self, adapter: ResourceGroupAdapter, laid: ManyGroupsAndACaller) -> Searched:
+        with ActingAs(laid.caller):
+            return await adapter.search(
+                AdminSearchResourceGroupsInput(filter=ResourceGroupFilter(is_active=True))
+            )
+
+
+@dataclass(frozen=True)
+class SearchingTheFirstOne(When[ManyGroupsAndACaller, ResourceGroupAdapter, Searched]):
+    """앞에서 한 건만 요청한다."""
+
+    @override
+    def operation(self) -> str:
+        return "search"
+
+    @override
+    def describe(self, laid: ManyGroupsAndACaller) -> str:
+        return Says(
+            f"{laid.caller.username}이 앞에서 한 건만 조회합니다",
+            english=f"{laid.caller.username} asks for one item from the front",
+        )
+
+    @override
+    async def call(self, adapter: ResourceGroupAdapter, laid: ManyGroupsAndACaller) -> Searched:
+        with ActingAs(laid.caller):
+            return await adapter.search(AdminSearchResourceGroupsInput(first=1))
+
+
+@dataclass(frozen=True)
+class SearchingTheDomainScope(When[ADomainGroupsAndACaller, ResourceGroupAdapter, Searched]):
+    """호출자의 도메인을 스코프로 검색한다."""
+
+    @override
+    def operation(self) -> str:
+        return "scoped_search"
+
+    @override
+    def describe(self, laid: ADomainGroupsAndACaller) -> str:
+        return Says(
+            f"{laid.caller.username}이 도메인 {laid.domain.name} 스코프로 조회합니다",
+            english=(f"{laid.caller.username} searches the domain {laid.domain.name} scope"),
+        )
+
+    @override
+    async def call(self, adapter: ResourceGroupAdapter, laid: ADomainGroupsAndACaller) -> Searched:
+        with ActingAs(laid.caller):
+            return await adapter.scoped_search(
+                ScopedSearchResourceGroupsInput(
+                    scope=ResourceGroupScope(domain=[UUIDScope(value=laid.domain.id)])
+                )
+            )
+
+
+@dataclass(frozen=True)
+class TheSuperadminCountsEveryGroup(
+    Scenario[TestSeedingSession, ManyGroupsAndACaller, ResourceGroupAdapter, Searched]
+):
+    @override
+    def summary(self) -> str:
+        return "the-superadmin-counts-every-resource-group-laid"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "자원 그룹 둘이 있을 때 superadmin 이 필터 없이 조회하면 둘 다 반환됩니다",
+            english=(
+                "when two resource groups exist and the superadmin searches without a filter, "
+                "both come back"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ManyGroupsAndACaller]:
+        return TwoGroupsAndSomeone(role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[ManyGroupsAndACaller, ResourceGroupAdapter, Searched]:
+        return SearchingEveryGroup()
+
+    @override
+    def then(self) -> Then[ManyGroupsAndACaller, Searched]:
+        return TheLaidGroupsAreLeft()
+
+
+@dataclass(frozen=True)
+class ANameFilterNarrows(
+    Scenario[TestSeedingSession, ManyGroupsAndACaller, ResourceGroupAdapter, Searched]
+):
+    @override
+    def summary(self) -> str:
+        return "a-name-filter-narrows-the-answer-to-that-resource-group"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "자원 그룹 둘 중 한쪽 이름을 필터로 조회하면 그 그룹 하나만 반환됩니다",
+            english=(
+                "searching with the name of one of two resource groups as the filter answers "
+                "only that group"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ManyGroupsAndACaller]:
+        return TwoGroupsAndSomeone(role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[ManyGroupsAndACaller, ResourceGroupAdapter, Searched]:
+        return SearchingByName()
+
+    @override
+    def then(self) -> Then[ManyGroupsAndACaller, Searched]:
+        return OnlyTheNamedGroupIsLeft()
+
+
+@dataclass(frozen=True)
+class AnActiveFilterNarrows(
+    Scenario[TestSeedingSession, ManyGroupsAndACaller, ResourceGroupAdapter, Searched]
+):
+    @override
+    def summary(self) -> str:
+        return "an-active-filter-leaves-only-the-active-resource-groups"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "활성 그룹과 비활성 그룹이 섞여 있을 때 활성 필터로 조회하면 활성인 것만 반환됩니다",
+            english=(
+                "when active and inactive groups are mixed, searching with the active filter "
+                "answers only the active ones"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ManyGroupsAndACaller]:
+        return AnActiveAndAnInactiveGroup(role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[ManyGroupsAndACaller, ResourceGroupAdapter, Searched]:
+        return SearchingTheActiveOnes()
+
+    @override
+    def then(self) -> Then[ManyGroupsAndACaller, Searched]:
+        return TheLaidGroupsAreLeft()
+
+
+@dataclass(frozen=True)
+class TheFirstPageSaysThereIsMore(
+    Scenario[TestSeedingSession, ManyGroupsAndACaller, ResourceGroupAdapter, Searched]
+):
+    @override
+    def summary(self) -> str:
+        return "asking-for-the-first-resource-group-only-says-there-is-a-next-page"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "자원 그룹 둘이 있을 때 앞에서 한 건만 요청하면 한 건이 반환되고 다음 페이지가 있다고 "
+            "응답합니다",
+            english=(
+                "when two resource groups exist and only the first item is asked for, one item "
+                "comes back and the response says there is a next page"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ManyGroupsAndACaller]:
+        return TwoGroupsAndSomeone(role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[ManyGroupsAndACaller, ResourceGroupAdapter, Searched]:
+        return SearchingTheFirstOne()
+
+    @override
+    def then(self) -> Then[ManyGroupsAndACaller, Searched]:
+        return TheFirstGroupPage()
+
+
+@dataclass(frozen=True)
+class TheMonitorSearchesLikeTheSuperadmin(
+    Scenario[TestSeedingSession, ManyGroupsAndACaller, ResourceGroupAdapter, Searched]
+):
+    @override
+    def summary(self) -> str:
+        return "the-monitor-searches-resource-groups-like-the-superadmin"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "모니터가 필터 없이 조회하면 superadmin 과 같은 응답을 받습니다",
+            english=(
+                "the monitor searching without a filter gets the same response as the superadmin"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ManyGroupsAndACaller]:
+        return TwoGroupsAndSomeone(role=UserRole.MONITOR)
+
+    @override
+    def when(self) -> When[ManyGroupsAndACaller, ResourceGroupAdapter, Searched]:
+        return SearchingEveryGroup()
+
+    @override
+    def then(self) -> Then[ManyGroupsAndACaller, Searched]:
+        return TheLaidGroupsAreLeft()
+
+
+@dataclass(frozen=True)
+class AUserWhoIsNotTheSuperadminMayNotSearch(
+    Scenario[TestSeedingSession, ManyGroupsAndACaller, ResourceGroupAdapter, Searched]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-who-is-not-the-superadmin-may-not-search-every-resource-group"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "superadmin 이 아닌 사용자가 필터 없이 전체를 조회하면 역할 부족으로 거부됩니다",
+            english=(
+                "when a user who is not the superadmin searches every resource group without a "
+                "filter, the call is rejected for lacking the role"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ManyGroupsAndACaller]:
+        return TwoGroupsAndSomeone()
+
+    @override
+    def when(self) -> When[ManyGroupsAndACaller, ResourceGroupAdapter, Searched]:
+        return SearchingEveryGroup()
+
+    @override
+    def then(self) -> Then[ManyGroupsAndACaller, Searched]:
+        return TheCallIsRefused(InsufficientPrivilege)
+
+
+@dataclass(frozen=True)
+class AUserReadingInTheDomainSearchesItsScope(
+    Scenario[TestSeedingSession, ADomainGroupsAndACaller, ResourceGroupAdapter, Searched]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-granted-read-in-the-domain-searches-the-groups-linked-to-it"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "도메인 범위에서 자원 그룹 읽기 역할을 받은 사용자가 그 도메인 스코프로 조회하면, "
+            "도메인에 건 자원 그룹 하나만 반환되고 걸지 않은 자원 그룹은 나오지 않습니다",
+            english=(
+                "a user granted the resource group read role in the domain scope searching that "
+                "domain scope gets only the resource group linked to the domain, and the "
+                "unlinked resource group does not come back"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ADomainGroupsAndACaller]:
+        return ADomainGroupsAndSomeone(reading=True)
+
+    @override
+    def when(self) -> When[ADomainGroupsAndACaller, ResourceGroupAdapter, Searched]:
+        return SearchingTheDomainScope()
+
+    @override
+    def then(self) -> Then[ADomainGroupsAndACaller, Searched]:
+        return OnlyTheLinkedGroupIsLeft()
+
+
+@dataclass(frozen=True)
+class TheSuperadminSearchesTheDomainScope(
+    Scenario[TestSeedingSession, ADomainGroupsAndACaller, ResourceGroupAdapter, Searched]
+):
+    @override
+    def summary(self) -> str:
+        return "the-superadmin-searching-a-domain-scope-sees-only-the-groups-linked-to-it"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "superadmin 이 도메인 스코프로 조회해도 그 도메인에 건 자원 그룹 하나만 반환됩니다",
+            english=(
+                "the superadmin searching a domain scope gets only the one resource group "
+                "linked to that domain"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ADomainGroupsAndACaller]:
+        return ADomainGroupsAndSomeone(role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[ADomainGroupsAndACaller, ResourceGroupAdapter, Searched]:
+        return SearchingTheDomainScope()
+
+    @override
+    def then(self) -> Then[ADomainGroupsAndACaller, Searched]:
+        return OnlyTheLinkedGroupIsLeft()
+
+
+@dataclass(frozen=True)
+class AUserGrantedNothingMayNotSearchTheDomainScope(
+    Scenario[TestSeedingSession, ADomainGroupsAndACaller, ResourceGroupAdapter, Searched]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-granted-nothing-may-not-search-a-domain-scope"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "아무 권한도 없는 사용자가 자기 도메인 스코프로 조회하면 권한 부족으로 거부됩니다",
+            english=(
+                "a user granted nothing searching their own domain scope is rejected for not "
+                "enough permission"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ADomainGroupsAndACaller]:
+        return ADomainGroupsAndSomeone()
+
+    @override
+    def when(self) -> When[ADomainGroupsAndACaller, ResourceGroupAdapter, Searched]:
+        return SearchingTheDomainScope()
+
+    @override
+    def then(self) -> Then[ADomainGroupsAndACaller, Searched]:
+        return TheCallIsRefused(NotEnoughPermission)
+
+
+SCENARIOS: list[SearchingStep] = [
+    TheSuperadminCountsEveryGroup(),
+    ANameFilterNarrows(),
+    AnActiveFilterNarrows(),
+    TheFirstPageSaysThereIsMore(),
+    TheMonitorSearchesLikeTheSuperadmin(),
+    AUserWhoIsNotTheSuperadminMayNotSearch(),
+    AUserReadingInTheDomainSearchesItsScope(),
+    TheSuperadminSearchesTheDomainScope(),
+    AUserGrantedNothingMayNotSearchTheDomainScope(),
+]
+
+
+@pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
+async def test_searching(
+    scenario: SearchingStep, adapter: ResourceGroupAdapter, engine: ExtendedAsyncSAEngine
+) -> None:
+    await run_scenario(scenario, adapter, engine)

@@ -8,12 +8,10 @@ from unittest.mock import AsyncMock, MagicMock
 import aiohttp
 import pytest
 
+from ai.backend.common.endpoint_pool.pool import HealthyEndpointPool
+from ai.backend.common.endpoint_pool.strategy import RoundRobinStrategy
+from ai.backend.common.endpoint_pool.types import EndpointPoolSpec
 from ai.backend.common.health_checker.types import MANAGER, ComponentId
-from ai.backend.web.clients.endpoint_pool import (
-    EndpointPoolSpec,
-    HealthyEndpointPool,
-    RoundRobinStrategy,
-)
 from ai.backend.web.clients.manager_pool import (
     MANAGER_ENDPOINTS,
     ManagerEndpointsHealthChecker,

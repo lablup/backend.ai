@@ -16,11 +16,13 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID, uuid4
 
+from ai.backend.common.data.entity.domain import DomainName
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.resource_group import ResourceGroupName
+from ai.backend.common.data.entity.resource_slot import ResourceSlotName
+from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.defs.session import SESSION_PRIORITY_DEFAULT
-from ai.backend.common.identifier.domain import DomainName
-from ai.backend.common.identifier.project import ProjectID
-from ai.backend.common.identifier.resource_group import ResourceGroupName
-from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.types import (
     MountInfoEntry,
     ResourceSlotEntry,
@@ -32,6 +34,7 @@ from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
     KernelGroupDraft,
     KernelResourceInput,
+    ResourceSpecDraft,
     SchedulingTargetDraft,
     SessionClassificationDraft,
     SessionIdentityDraft,
@@ -53,8 +56,8 @@ class DeploymentSessionDraftBuilder:
     """Assemble a :class:`SessionSpecDraft` from deployment-originated inputs.
 
     Single entry point :meth:`build`: route executor passes
-    ``(deployment_info, context, route_id, target_revision)`` and
-    receives a draft ready for ``SchedulingController.enqueue_session_from_draft``.
+    ``(deployment_info, context, route_id, target_revision, session_group_id)``
+    and receives a draft ready for ``SchedulingController.enqueue_session_from_draft``.
     Consolidates the behavior the retired ``SessionCreationSpec.from_deployment_info``
     classmethod used to provide, moved out of the session data layer so
     it no longer imports from ``data/deployment/``.
@@ -67,7 +70,15 @@ class DeploymentSessionDraftBuilder:
         context: DeploymentContext,
         route_id: UUID,
         target_revision: ModelRevisionData,
+        session_group_id: SessionGroupID | None,
     ) -> SessionSpecDraft:
+        """Assemble the draft for one route's session.
+
+        ``session_group_id`` is the SessionGroup owned by the route's
+        replica group (BEP-1064); the session inherits it so the placement
+        policy applies to every replica of that group. ``None`` only when
+        the route has no replica group assigned.
+        """
         environ = cls._resolve_environ(deployment_info, target_revision, context)
         startup_command = target_revision.execution.startup_command
         mounts = cls._resolve_mounts(target_revision)
@@ -112,14 +123,16 @@ class DeploymentSessionDraftBuilder:
                 ),
                 network=SessionNetworkDraft(),
                 callback_url=target_revision.execution.callback_url,
-                options=SessionOptionsDraft(
-                    priority=SESSION_PRIORITY_DEFAULT,
-                    is_preemptible=False,
-                    cluster_mode=target_revision.cluster_config.mode,
-                    cluster_size=target_revision.cluster_config.size,
-                    scheduling_target=SchedulingTargetDraft(),
-                    kernel_groups=kernel_groups,
-                    handler_options=None,
+                resource=ResourceSpecDraft(
+                    options=SessionOptionsDraft(
+                        priority=SESSION_PRIORITY_DEFAULT,
+                        is_preemptible=False,
+                        cluster_mode=target_revision.cluster_config.mode,
+                        cluster_size=target_revision.cluster_config.size,
+                        scheduling_target=SchedulingTargetDraft(),
+                        kernel_groups=kernel_groups,
+                        handler_options=None,
+                    ),
                 ),
                 internal_data_extras=InternalDataExtras(
                     sudo_session_enabled=context.session_owner.sudo_session_enabled,
@@ -133,6 +146,7 @@ class DeploymentSessionDraftBuilder:
                 project_id=ProjectID(context.group_id),
                 resource_group_id=context.resource_group_id,
                 resource_group_name=ResourceGroupName(deployment_info.metadata.resource_group),
+                session_group_id=session_group_id,
             ),
         )
 
@@ -205,7 +219,7 @@ class DeploymentSessionDraftBuilder:
     ) -> tuple[ResourceSlotEntry, ...]:
         resource_slots = dict(target_revision.resource_config.resource_slot)
         return tuple(
-            ResourceSlotEntry(resource_type=str(k), quantity=str(Decimal(v)))
+            ResourceSlotEntry(resource_type=ResourceSlotName(str(k)), quantity=str(Decimal(v)))
             for k, v in resource_slots.items()
             if v is not None
         )

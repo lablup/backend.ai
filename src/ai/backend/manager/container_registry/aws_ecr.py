@@ -5,14 +5,14 @@ from typing import override
 import aiohttp
 import boto3
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.exceptions import ContainerRegistryProjectEmpty
 
 from .base import (
     BaseContainerRegistry,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class AWSElasticContainerRegistry(BaseContainerRegistry):
@@ -63,5 +63,5 @@ class AWSElasticContainerRegistry(BaseContainerRegistry):
 
                 if not next_token:
                     break
-        except Exception as e:
-            log.error("Error occurred: {}", e)
+        except Exception:
+            log.exception("ecr repository listing failed", registry_name=self.registry_name)

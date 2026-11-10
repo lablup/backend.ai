@@ -6,7 +6,7 @@ from __future__ import annotations
 from typing import override
 from uuid import UUID
 
-from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
+from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.manager.data.reconciler.types import HandlerOutcome
 from ai.backend.manager.sokovan.deployment.group.lifecycle.types import (
     GroupLifecycleDecision,

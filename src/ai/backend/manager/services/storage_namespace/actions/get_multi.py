@@ -1,31 +1,29 @@
-import uuid
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.storage_namespace import StorageNamespaceEntityType
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import ScopedSearchOpsAction
 from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
-from ai.backend.manager.services.storage_namespace.actions.base import StorageNamespaceAction
+from ai.backend.manager.models.storage_namespace.row import StorageNamespaceRow
 
 
-@dataclass
-class GetNamespacesAction(StorageNamespaceAction):
-    storage_id: uuid.UUID
+@dataclass(frozen=True)
+class GetNamespacesAction(ScopedSearchOpsAction[StorageNamespaceRow, StorageNamespaceData]):
+    """Read the namespaces the named object storages hold.
 
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.storage_id)
+    Search-shaped rather than a get: what comes back is a list, and the storage
+    selects it rather than identifying a row.
+    """
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.GET
-
-
-@dataclass
-class GetNamespacesActionResult(BaseActionResult):
-    result: list[StorageNamespaceData]
+    def entity_type(cls) -> EntityType:
+        return StorageNamespaceEntityType()
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "search_storage_namespaces_of_storage"

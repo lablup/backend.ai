@@ -7,32 +7,37 @@ from typing import Any
 
 from sqlalchemy.orm.strategy_options import _AbstractLoad
 
-from ai.backend.common.docker import ImageRef
+from ai.backend.common.data.entity.container_registry import (
+    ContainerRegistryID,
+    ContainerRegistryName,
+    ContainerRegistryProjectName,
+)
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.exception import BackendAIError
-from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.common.types import AccessKey, ImageAlias, KernelId, SessionId
-from ai.backend.manager.data.image.types import ImageIdentifier
-from ai.backend.manager.data.kernel.types import KernelListResult
+from ai.backend.common.types import AccessKey, AgentId, KernelId, SessionId
+from ai.backend.manager.data.container_registry.types import ContainerRegistryData
+from ai.backend.manager.data.image.types import ImageData
+from ai.backend.manager.data.resource.types import ResourceGroupProxyConnectionInfo
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.data.session.types import (
     SessionData,
-    SessionListResult,
+    SessionEntityData,
     SessionRoutingInfo,
 )
 from ai.backend.manager.data.user.types import SessionOwnerContext, UserData
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.session.row import KernelLoadingStrategy, SessionRow
+from ai.backend.manager.models.session.updaters import SessionUpdater
+from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.session.db_source import SessionDBSource
-from ai.backend.manager.repositories.session.types import ProjectSessionSearchScope
+from ai.backend.manager.repositories.container_registry.db_source import ContainerRegistryDBSource
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.session.db_source.db_source import SessionDBSource
 
 session_repository_resilience = Resilience(
     policies=[
@@ -51,9 +56,16 @@ session_repository_resilience = Resilience(
 
 class SessionRepository:
     _db_source: SessionDBSource
+    _registry_db_source: ContainerRegistryDBSource
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
-        self._db_source = SessionDBSource(db)
+    def __init__(
+        self,
+        db: ExtendedAsyncSAEngine,
+        ops_provider: V2DBOpsProvider,
+        registry_db_source: ContainerRegistryDBSource,
+    ) -> None:
+        self._db_source = SessionDBSource(db, ops_provider)
+        self._registry_db_source = registry_db_source
 
     @session_repository_resilience.apply()
     async def get_session_name(self, session_id: SessionId) -> str:
@@ -85,15 +97,13 @@ class SessionRepository:
     @session_repository_resilience.apply()
     async def get_session_validated(
         self,
-        session_name_or_id: str | SessionId,
-        owner_access_key: AccessKey,
+        session_id: SessionId,
         kernel_loading_strategy: KernelLoadingStrategy = KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         allow_stale: bool = False,
         eager_loading_op: Sequence[_AbstractLoad] | None = None,
     ) -> SessionRow:
         return await self._db_source.get_session_validated(
-            session_name_or_id,
-            owner_access_key,
+            session_id,
             kernel_loading_strategy,
             allow_stale,
             eager_loading_op,
@@ -104,7 +114,7 @@ class SessionRepository:
         self,
         id_or_name_prefix: str,
         owner_access_key: AccessKey,
-    ) -> list[SessionRow]:
+    ) -> list[SessionEntityData]:
         return await self._db_source.match_sessions(id_or_name_prefix, owner_access_key)
 
     @session_repository_resilience.apply()
@@ -124,55 +134,63 @@ class SessionRepository:
     @session_repository_resilience.apply()
     async def update_session_name(
         self,
-        session_name_or_id: str | SessionId,
+        session_id: SessionId,
         new_name: str,
-        owner_access_key: AccessKey,
     ) -> SessionRow:
-        return await self._db_source.update_session_name(
-            session_name_or_id, new_name, owner_access_key
-        )
+        return await self._db_source.update_session_name(session_id, new_name)
+
+    @session_repository_resilience.apply()
+    async def get_container_registry_by_id(
+        self, registry_id: ContainerRegistryID
+    ) -> ContainerRegistryData:
+        return await self._registry_db_source.fetch_by_id(registry_id)
+
+    @session_repository_resilience.apply()
+    async def get_image_commit_registry(self, project_id: ProjectID) -> ContainerRegistryData:
+        registry_id = await self._registry_db_source.lookup_image_commit_registry_id(project_id)
+        return await self._registry_db_source.fetch_by_id(registry_id)
 
     @session_repository_resilience.apply()
     async def get_container_registry(
         self,
         registry_hostname: str,
-        registry_project: str,
-    ) -> ContainerRegistryRow | None:
-        return await self._db_source.get_container_registry(registry_hostname, registry_project)
+        registry_project: str | None,
+    ) -> ContainerRegistryData:
+        registry_id = await self._registry_db_source.lookup_id_by_name_and_registry_project(
+            ContainerRegistryName(registry_hostname),
+            ContainerRegistryProjectName(registry_project)
+            if registry_project is not None
+            else None,
+        )
+        return await self._registry_db_source.fetch_by_id(registry_id)
 
     @session_repository_resilience.apply()
-    async def resolve_image(
-        self,
-        image_identifiers: list[ImageAlias | ImageRef | ImageIdentifier],
-        alive_only: bool = True,
-    ) -> ImageRow:
-        """Resolve an image from the given identifiers.
-
-        When ``alive_only`` is True (default), only images with the ALIVE status
-        are considered.  Set it to False to also include DELETED images, which is
-        useful when the caller needs to reference images that are no longer active
-        (e.g., committing a session whose base image has been deleted).
-        """
-        return await self._db_source.resolve_image(image_identifiers, alive_only)
+    async def resolve_image(self, reference: str, architecture: str) -> ImageData:
+        """The live image the reference names as a canonical for the architecture, or as an
+        alias."""
+        return await self._db_source.resolve_image(reference, architecture)
 
     @session_repository_resilience.apply()
-    async def get_customized_image_count(
-        self,
-        image_visibility: str,
-        image_owner_id: str,
-    ) -> int:
-        return await self._db_source.get_customized_image_count(image_visibility, image_owner_id)
+    async def resolve_image_by_canonical(
+        self, canonical: str, architecture: str, alive_only: bool = True
+    ) -> ImageData:
+        """``alive_only=False`` also considers DELETED images, for a session whose base
+        image was deleted while it ran."""
+        return await self._db_source.resolve_image_by_canonical(canonical, architecture, alive_only)
+
+    @session_repository_resilience.apply()
+    async def get_customized_image_count(self, user_id: uuid.UUID) -> int:
+        return await self._db_source.get_customized_image_count(user_id)
 
     @session_repository_resilience.apply()
     async def get_existing_customized_image(
         self,
         new_canonical: str,
-        image_visibility: str,
-        image_owner_id: str,
+        user_id: uuid.UUID,
         image_name: str,
     ) -> ImageRow | None:
         return await self._db_source.get_existing_customized_image(
-            new_canonical, image_visibility, image_owner_id, image_name
+            new_canonical, user_id, image_name
         )
 
     @session_repository_resilience.apply()
@@ -184,11 +202,11 @@ class SessionRepository:
         return await self._db_source.get_group_name_by_domain_and_id(domain_name, group_id)
 
     @session_repository_resilience.apply()
-    async def get_scaling_group_wsproxy_addr(
+    async def resource_group_proxy_connection_info(
         self,
-        scaling_group_name: str,
-    ) -> str | None:
-        return await self._db_source.get_scaling_group_wsproxy_addr(scaling_group_name)
+        resource_group_name: str,
+    ) -> ResourceGroupProxyConnectionInfo | None:
+        return await self._db_source.resource_group_proxy_connection_info(resource_group_name)
 
     @session_repository_resilience.apply()
     async def get_session_by_id(
@@ -198,12 +216,12 @@ class SessionRepository:
         return await self._db_source.get_session_by_id(session_id)
 
     @session_repository_resilience.apply()
-    async def modify_session(
+    async def update_session(
         self,
-        updater: Updater[SessionRow],
+        updater: SessionUpdater,
         session_name: str | None = None,
-    ) -> SessionRow | None:
-        return await self._db_source.modify_session(updater, session_name)
+    ) -> SessionData:
+        return await self._db_source.update_session(updater, session_name)
 
     @session_repository_resilience.apply()
     async def query_userinfo(
@@ -231,41 +249,34 @@ class SessionRepository:
     @session_repository_resilience.apply()
     async def get_target_session_ids(
         self,
-        session_name_or_id: str | uuid.UUID,
-        access_key: AccessKey,
+        session_id: SessionId,
         recursive: bool = False,
     ) -> list[SessionId]:
         """
         Get list of session IDs including dependent sessions if recursive.
 
-        :param session_name_or_id: Name or ID of the primary session
-        :param access_key: Access key of the session owner
+        :param session_id: ID of the primary session
         :param recursive: If True, include dependent sessions
         :return: List of session IDs
         """
-        return await self._db_source.get_target_session_ids(
-            session_name_or_id, access_key, recursive
-        )
+        return await self._db_source.get_target_session_ids(session_id, recursive)
 
     @session_repository_resilience.apply()
     async def find_dependency_sessions(
         self,
-        session_name_or_id: uuid.UUID | str,
-        access_key: AccessKey,
+        session_id: SessionId,
     ) -> dict[str, list[Any] | str]:
-        return await self._db_source.find_dependency_sessions(session_name_or_id, access_key)
+        return await self._db_source.find_dependency_sessions(session_id)
 
     @session_repository_resilience.apply()
     async def get_session_with_group(
         self,
-        session_name_or_id: str | SessionId,
-        owner_access_key: AccessKey,
+        session_id: SessionId,
         kernel_loading_strategy: KernelLoadingStrategy = KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         allow_stale: bool = False,
     ) -> SessionRow:
-        """Get session with group information eagerly loaded"""
         return await self._db_source.get_session_with_group(
-            session_name_or_id, owner_access_key, kernel_loading_strategy, allow_stale
+            session_id, kernel_loading_strategy, allow_stale
         )
 
     @session_repository_resilience.apply()
@@ -280,51 +291,12 @@ class SessionRepository:
         return await self._db_source.get_session_with_routing_minimal(session_id)
 
     @session_repository_resilience.apply()
-    async def search(
+    async def bulk_get_designated_agent_ids_by_session(
         self,
-        querier: BatchQuerier,
-    ) -> SessionListResult:
-        """Search sessions with querier pattern.
-
-        Args:
-            querier: BatchQuerier for filtering, ordering, and pagination
-
-        Returns:
-            SessionListResult with items, total count, and pagination info
-        """
-        return await self._db_source.search(querier)
-
-    @session_repository_resilience.apply()
-    async def search_in_project(
-        self,
-        querier: BatchQuerier,
-        scope: ProjectSessionSearchScope,
-    ) -> SessionListResult:
-        """Search sessions scoped to a project.
-
-        Args:
-            querier: BatchQuerier for filtering, ordering, and pagination
-            scope: ProjectSessionSearchScope that filters by project and validates existence
-
-        Returns:
-            SessionListResult with items, total count, and pagination info
-        """
-        return await self._db_source.search_in_project(querier, scope)
-
-    @session_repository_resilience.apply()
-    async def search_kernels(
-        self,
-        querier: BatchQuerier,
-    ) -> KernelListResult:
-        """Search kernels with querier pattern.
-
-        Args:
-            querier: BatchQuerier for filtering, ordering, and pagination
-
-        Returns:
-            KernelListResult with items, total count, and pagination info
-        """
-        return await self._db_source.search_kernels(querier)
+        session_ids: Sequence[SessionID],
+    ) -> dict[SessionID, list[AgentId]]:
+        """Read the agent ids each session designates; one with none is absent."""
+        return await self._db_source.bulk_get_designated_agent_ids_by_session(session_ids)
 
     @session_repository_resilience.apply()
     async def batch_get_resource_allocation_by_session(
@@ -349,14 +321,6 @@ class SessionRepository:
     ) -> ImageRow:
         """Resolve an image by its UUID."""
         return await self._db_source.resolve_image_by_id(image_id)
-
-    @session_repository_resilience.apply()
-    async def get_keypair_resource_policy(
-        self,
-        access_key: AccessKey,
-    ) -> dict[str, Any]:
-        """Fetch the keypair resource policy for the given access key."""
-        return await self._db_source.get_keypair_resource_policy(access_key)
 
     @session_repository_resilience.apply()
     async def get_session_data_by_id(

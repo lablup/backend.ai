@@ -2,27 +2,32 @@
 
 from __future__ import annotations
 
-from uuid import UUID
+from typing import Annotated
 
+import strawberry
 from strawberry import ID, Info
 from strawberry.relay import PageInfo
 
+from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.dto.manager.v2.role_preset.request import (
     RolePresetFilter,
     RolePresetOrder,
     SearchRolePresetsInput,
 )
-from ai.backend.common.identifier.role_preset import RolePresetID
+from ai.backend.manager.api.gql.base import encode_cursor, parse_uuid
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_root_field,
 )
-from ai.backend.manager.api.gql.role_preset.types import (
+from ai.backend.manager.api.gql.role_preset.types.filters import (
+    RolePresetFilterGQL,
+    RolePresetOrderByGQL,
+)
+from ai.backend.manager.api.gql.role_preset.types.inputs import RolePresetUsageGQL
+from ai.backend.manager.api.gql.role_preset.types.node import (
     RolePresetConnection,
     RolePresetEdge,
-    RolePresetFilterGQL,
     RolePresetGQL,
-    RolePresetOrderByGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
@@ -39,7 +44,7 @@ async def admin_role_preset(
     id: ID,
 ) -> RolePresetGQL | None:
     check_admin_only()
-    node = await info.context.adapters.role_preset.get(RolePresetID(UUID(str(id))))
+    node = await info.context.adapters.role_preset.get(RolePresetID(parse_uuid(id)))
     return RolePresetGQL.from_pydantic(node)
 
 
@@ -51,6 +56,15 @@ async def admin_role_preset(
 )  # type: ignore[misc]
 async def admin_role_presets(
     info: Info[StrawberryGQLContext],
+    usage: Annotated[
+        RolePresetUsageGQL | None,
+        strawberry.argument(
+            description=(
+                "Added in 26.9.0. Uses narrowing the result. Each listed "
+                "entity must be readable by the caller."
+            )
+        ),
+    ] = None,
     filter: RolePresetFilterGQL | None = None,
     order_by: list[RolePresetOrderByGQL] | None = None,
     before: str | None = None,
@@ -66,6 +80,7 @@ async def admin_role_presets(
         [o.to_pydantic() for o in order_by] if order_by else None
     )
     search_input = SearchRolePresetsInput(
+        usage=usage.to_pydantic() if usage else None,
         filter=filter_dto,
         order=orders_dto,
         first=first,
@@ -79,7 +94,7 @@ async def admin_role_presets(
     edges = [
         RolePresetEdge(
             node=RolePresetGQL.from_pydantic(item),
-            cursor=str(item.id),
+            cursor=encode_cursor(item.id),
         )
         for item in result.items
     ]

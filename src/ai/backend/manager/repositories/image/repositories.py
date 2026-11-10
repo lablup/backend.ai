@@ -11,7 +11,9 @@ class ImageRepositories:
 
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
-        repository = ImageRepository(args.db, args.valkey_image_client, args.config_provider)
+        repository = ImageRepository(
+            args.db, args.v2_ops_provider, args.valkey_image_client, args.config_provider
+        )
 
         return cls(
             repository=repository,

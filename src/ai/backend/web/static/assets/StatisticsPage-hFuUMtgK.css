@@ -1,0 +1,28 @@
+/**
+ @license
+ Copyright (c) 2015-2026 Lablup Inc. All rights reserved.
+
+ Recharts theming for AllocationHistoryStatistics (to-astryx ticket 33).
+ Replaces the antd-style `createStyles` block; the file is imported by the
+ component itself (P17 — component-scoped, not the app stylesheet). Nothing
+ here targets `.ant-*`; the selectors are recharts' own class names, so the
+ rules outlive antd (P6).
+
+ Token mapping (P19-checked against the declared Astryx set — same decisions
+ as SessionMetricGraph.css so the two charts stay visually identical):
+   token.colorBorder          -> var(--color-border-emphasized)
+   token.colorBorderSecondary -> var(--color-border)
+   token.colorTextDescription -> var(--color-text-secondary)  ('self' token)
+   token.colorBgBase          -> var(--color-background-body)
+   token.colorText            -> var(--color-text-primary)
+*/.allocation-history-graph-card .recharts-cartesian-axis-line,.allocation-history-graph-card .recharts-cartesian-axis-tick-line{stroke:var(--color-border-emphasized)}.allocation-history-graph-card .recharts-cartesian-axis-tick-value,.allocation-history-graph-card .recharts-label{fill:var(--color-text-secondary)}.allocation-history-graph-card .recharts-default-tooltip{background-color:var(--color-background-body)!important;border:1px solid var(--color-border)!important;color:var(--color-text-primary)!important}.allocation-history-graph-card .recharts-tooltip-label,.allocation-history-graph-card .recharts-tooltip-item{color:var(--color-text-primary)!important}/**
+ @license
+ Copyright (c) 2015-2026 Lablup Inc. All rights reserved.
+
+ Recharts theming for SessionMetricGraph (astryx ticket 17).
+ Replaces the antd-style `createStyles` block; the file is imported by the
+ component itself (P17 — component-scoped, not the app stylesheet). Token
+ names are declared Astryx variables (P19-checked against dist/astryx.css):
+ --color-text-secondary, --color-border, --color-background-card,
+ --color-text-primary.
+*/.session-metric-graph-recharts .recharts-label{fill:var(--color-text-secondary)}.session-metric-graph-recharts .recharts-cartesian-axis-line,.session-metric-graph-recharts .recharts-cartesian-axis-tick-line{stroke:var(--color-border)}.session-metric-graph-recharts .recharts-cartesian-axis-tick-value{fill:var(--color-text-secondary)}.session-metric-graph-recharts .recharts-default-tooltip{background-color:var(--color-background-card)!important;border:1px solid var(--color-border)!important;color:var(--color-text-primary)!important}

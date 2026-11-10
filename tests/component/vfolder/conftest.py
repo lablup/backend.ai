@@ -4,32 +4,41 @@ import secrets
 import uuid
 from collections.abc import AsyncIterator, Callable, Coroutine
 from typing import Any
-from unittest.mock import AsyncMock
+from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
-from ai.backend.common.data.permission.types import (
-    EntityType,
-    OperationType,
-    Permission,
-    RelationType,
-    RoleStatus,
-    ScopeType,
+from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentEntityType
+from ai.backend.common.data.entity.artifact import ArtifactEntityType
+from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryEntityType
+from ai.backend.common.data.entity.deployment import DeploymentEntityType
+from ai.backend.common.data.entity.image import ImageEntityType
+from ai.backend.common.data.entity.model_card import ModelCardEntityType
+from ai.backend.common.data.entity.notification import (
+    NotificationChannelEntityType,
+    NotificationRuleEntityType,
 )
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.session import SessionEntityType
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.user import UserEntityType
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
+from ai.backend.common.data.permission.types import Permission, RoleStatus
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.types import (
-    HostPortPair,
     QuotaScopeID,
     QuotaScopeType,
     VFolderHostPermission,
     VFolderHostPermissionMap,
+    VFolderMountPolicy,
     VFolderUsageMode,
 )
-from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.actions.validators.rbac import RBACValidators
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import GroupMeta
+from ai.backend.manager.actions.v2.bulk.validator.rbac import BulkOwnCheck
 
 # Statically imported so that Pants includes these modules in the test PEX.
 # build_root_app() loads them at runtime via importlib.import_module(),
@@ -41,31 +50,41 @@ from ai.backend.manager.api.rest.vfolder.handler import VFolderHandler
 from ai.backend.manager.api.rest.vfolder.registry import register_vfolder_routes
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.entity_share.types import EntityShareStatus
 from ai.backend.manager.data.permission.types import RoleSource
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.data.vfolder.types import (
-    VFolderInvitationState,
-    VFolderMountPermission,
     VFolderOperationStatus,
     VFolderOwnershipType,
 )
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
-from ai.backend.manager.models.domain import domains
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
+from ai.backend.manager.models.domain.row import domains
+from ai.backend.manager.models.entity_share.row import EntityShareRow
+from ai.backend.manager.models.project.row import ProjectRow, ProjectType
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
-from ai.backend.manager.models.resource_policy import keypair_resource_policies
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
+from ai.backend.manager.models.resource_policy.row import keypair_resource_policies
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import (
-    vfolder_invitations,
-    vfolder_permissions,
-    vfolders,
+from ai.backend.manager.models.vfolder.row import vfolders
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
+from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
+    ResourcePolicyOpsProvider,
+)
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
+from ai.backend.manager.repositories.rbac.permission_check_repository import (
+    RbacPermissionCheckRepository,
 )
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.auth.processors import AuthProcessors
+from ai.backend.manager.services.user.processors import UserProcessors
+from ai.backend.manager.services.user.service import UserService
 from ai.backend.manager.services.vfolder.processors.file import VFolderFileProcessors
 from ai.backend.manager.services.vfolder.processors.invite import VFolderInviteProcessors
 from ai.backend.manager.services.vfolder.processors.sharing import VFolderSharingProcessors
@@ -84,22 +103,28 @@ InvitationFixtureData = dict[str, Any]
 InvitationFactory = Callable[..., Coroutine[Any, Any, InvitationFixtureData]]
 
 
+_OWNER_ACCESSIBLE_ENTITY_TYPES: tuple[EntityType, ...] = (
+    VFolderEntityType(),
+    ImageEntityType(),
+    SessionEntityType(),
+    ArtifactEntityType(),
+    ArtifactRegistryEntityType(),
+    AppConfigFragmentEntityType(),
+    NotificationChannelEntityType(),
+    NotificationRuleEntityType(),
+    DeploymentEntityType(),
+    ModelCardEntityType(),
+)
+
+
 @pytest.fixture()
 def async_etcd(
     bootstrap_config: Any,
 ) -> AsyncEtcd:
     etcd_config = bootstrap_config.etcd
-    etcd_addr = etcd_config.addr
-    if isinstance(etcd_addr, list):
-        addrs: HostPortPair | list[HostPortPair] = [
-            HostPortPair(host=a.host, port=a.port) for a in etcd_addr
-        ]
-    else:
-        addrs = HostPortPair(host=etcd_addr.host, port=etcd_addr.port)
-    return AsyncEtcd(
-        addrs=addrs,
-        namespace=etcd_config.namespace,
-        scope_prefix_map={
+    return AsyncEtcd.create_from_config(
+        etcd_config.to_dataclass(),
+        {
             ConfigScopes.GLOBAL: "global",
             ConfigScopes.SGROUP: "sgroup/default",
             ConfigScopes.NODE: "node/test",
@@ -115,9 +140,19 @@ def vfolder_processors(
     storage_manager: StorageSessionManager,
     background_task_manager: BackgroundTaskManager,
     valkey_clients: ValkeyClients,
+    processor_registry: ProcessorRegistry[Any],
 ) -> VFolderProcessors:
-    vfolder_repository = VfolderRepository(database_engine)
-    user_repository = UserRepository(database_engine)
+    vfolder_repository = VfolderRepository(database_engine, ShareOpsProvider(database_engine))
+    user_repository = UserRepository(
+        database_engine,
+        V2DBOpsProvider(database_engine),
+        ShareOpsProvider(database_engine),
+        ResourcePolicyOpsProvider(database_engine),
+        KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+    )
+    # The registry here runs no RBAC validator, so the own check answers as enforcement off.
+    rbac_off = MagicMock(spec=ManagerConfigProvider)
+    rbac_off.config.manager.rbac.enforcement_enabled = False
     service = VFolderService(
         config_provider=config_provider,
         etcd=async_etcd,
@@ -126,14 +161,11 @@ def vfolder_processors(
         vfolder_repository=vfolder_repository,
         user_repository=user_repository,
         valkey_stat_client=valkey_clients.stat,
-    )
-    return VFolderProcessors(
-        service=service,
-        action_monitors=[],
-        validators=ActionValidators(
-            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock())
+        own_check=BulkOwnCheck(
+            RbacPermissionCheckRepository(PermissionOpsProvider(database_engine), rbac_off)
         ),
     )
+    return VFolderProcessors(processor_registry.group(GroupMeta(VFolderEntityType())), service)
 
 
 @pytest.fixture()
@@ -141,42 +173,46 @@ def vfolder_file_processors(
     database_engine: ExtendedAsyncSAEngine,
     config_provider: ManagerConfigProvider,
     storage_manager: StorageSessionManager,
+    processor_registry: ProcessorRegistry[Any],
 ) -> VFolderFileProcessors:
-    vfolder_repository = VfolderRepository(database_engine)
-    user_repository = UserRepository(database_engine)
+    vfolder_repository = VfolderRepository(database_engine, ShareOpsProvider(database_engine))
+    user_repository = UserRepository(
+        database_engine,
+        V2DBOpsProvider(database_engine),
+        ShareOpsProvider(database_engine),
+        ResourcePolicyOpsProvider(database_engine),
+        KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+    )
     service = VFolderFileService(
         config_provider=config_provider,
         storage_manager=storage_manager,
         vfolder_repository=vfolder_repository,
         user_repository=user_repository,
     )
-    return VFolderFileProcessors(
-        service=service,
-        action_monitors=[],
-        validators=ActionValidators(
-            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock())
-        ),
-    )
+    return VFolderFileProcessors(processor_registry.group(GroupMeta(VFolderEntityType())), service)
 
 
 @pytest.fixture()
 def vfolder_invite_processors(
     database_engine: ExtendedAsyncSAEngine,
     config_provider: ManagerConfigProvider,
+    processor_registry: ProcessorRegistry[Any],
 ) -> VFolderInviteProcessors:
-    vfolder_repository = VfolderRepository(database_engine)
-    user_repository = UserRepository(database_engine)
+    vfolder_repository = VfolderRepository(database_engine, ShareOpsProvider(database_engine))
+    user_repository = UserRepository(
+        database_engine,
+        V2DBOpsProvider(database_engine),
+        ShareOpsProvider(database_engine),
+        ResourcePolicyOpsProvider(database_engine),
+        KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+    )
     service = VFolderInviteService(
         config_provider=config_provider,
         vfolder_repository=vfolder_repository,
         user_repository=user_repository,
     )
     return VFolderInviteProcessors(
-        service=service,
-        action_monitors=[],
-        validators=ActionValidators(
-            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock())
-        ),
+        processor_registry.group(GroupMeta(VFolderEntityType())), service
     )
 
 
@@ -184,27 +220,53 @@ def vfolder_invite_processors(
 def vfolder_sharing_processors(
     database_engine: ExtendedAsyncSAEngine,
     config_provider: ManagerConfigProvider,
+    processor_registry: ProcessorRegistry[Any],
 ) -> VFolderSharingProcessors:
-    vfolder_repository = VfolderRepository(database_engine)
-    user_repository = UserRepository(database_engine)
+    vfolder_repository = VfolderRepository(database_engine, ShareOpsProvider(database_engine))
+    user_repository = UserRepository(
+        database_engine,
+        V2DBOpsProvider(database_engine),
+        ShareOpsProvider(database_engine),
+        ResourcePolicyOpsProvider(database_engine),
+        KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+    )
     service = VFolderSharingService(
         config_provider=config_provider,
         vfolder_repository=vfolder_repository,
         user_repository=user_repository,
     )
     return VFolderSharingProcessors(
-        service=service,
-        action_monitors=[],
-        validators=ActionValidators(
-            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock())
-        ),
+        processor_registry.group(GroupMeta(VFolderEntityType())), service
     )
+
+
+@pytest.fixture()
+def user_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    processor_registry: ProcessorRegistry[Any],
+) -> UserProcessors:
+    user_repository = UserRepository(
+        database_engine,
+        V2DBOpsProvider(database_engine),
+        ShareOpsProvider(database_engine),
+        ResourcePolicyOpsProvider(database_engine),
+        KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+    )
+    service = UserService(
+        storage_manager=MagicMock(spec=StorageSessionManager),
+        valkey_stat_client=MagicMock(),
+        agent_registry=MagicMock(),
+        user_repository=user_repository,
+        scheduling_controller=MagicMock(),
+    )
+    return UserProcessors(processor_registry.group(GroupMeta(UserEntityType())), service)
 
 
 @pytest.fixture()
 def server_module_registries(
     route_deps: RouteDeps,
     auth_processors: AuthProcessors,
+    user_processors: UserProcessors,
     vfolder_processors: VFolderProcessors,
     vfolder_file_processors: VFolderFileProcessors,
     vfolder_invite_processors: VFolderInviteProcessors,
@@ -215,6 +277,7 @@ def server_module_registries(
         register_vfolder_routes(
             VFolderHandler(
                 auth=auth_processors,
+                user=user_processors,
                 vfolder=vfolder_processors,
                 vfolder_file=vfolder_file_processors,
                 vfolder_invite=vfolder_invite_processors,
@@ -290,7 +353,16 @@ async def vfolder_factory(
     async def _create(**overrides: Any) -> VFolderFixtureData:
         unique = secrets.token_hex(4)
         vfolder_id = uuid.uuid4()
-        user_uuid = admin_user_fixture.user_uuid
+        user_uuid = uuid.UUID(str(overrides.get("user", admin_user_fixture.user_uuid)))
+        async with db_engine.begin() as conn:
+            personal_project_id = (
+                await conn.execute(
+                    sa.select(ProjectRow.__table__.c.id).where(
+                        ProjectRow.__table__.c.creator_id == user_uuid,
+                        ProjectRow.__table__.c.type == ProjectType.PERSONAL,
+                    )
+                )
+            ).scalar_one()
         quota_scope_id = QuotaScopeID(
             scope_type=QuotaScopeType.USER,
             scope_id=user_uuid,
@@ -302,9 +374,11 @@ async def vfolder_factory(
             "domain_name": domain_fixture.domain_name,
             "quota_scope_id": str(quota_scope_id),
             "usage_mode": VFolderUsageMode.GENERAL,
-            "permission": VFolderMountPermission.READ_WRITE,
+            "default_mount_permission": VFolderMountPolicy.READ_WRITE,
             "ownership_type": VFolderOwnershipType.USER,
             "user": str(user_uuid),
+            # A folder lands in a project, which is what holds its name once.
+            "group": str(personal_project_id),
             "creator": "admin-test@test.local",
             "status": VFolderOperationStatus.READY,
             "cloneable": False,
@@ -312,6 +386,64 @@ async def vfolder_factory(
         defaults.update(overrides)
         async with db_engine.begin() as conn:
             await conn.execute(sa.insert(vfolders).values(**defaults))
+            # The node a create writes: the vfolder owns and governs itself.
+            node_id = uuid.uuid4()
+            await conn.execute(
+                sa.insert(VirtualEntityRow.__table__).values(
+                    id=node_id, entity_type=VFolderEntityType(), entity_id=defaults["id"]
+                )
+            )
+            await conn.execute(
+                sa.insert(EntityMembershipRow.__table__).values(
+                    virtual_entity_id=node_id, member_entity_id=node_id, capped=False
+                )
+            )
+            await conn.execute(
+                sa.insert(ScopeBindingRow.__table__).values(
+                    virtual_entity_id=node_id, scope_entity_id=node_id, permission_cap=None
+                )
+            )
+            # A folder is created in its project, which owns and governs it; that is
+            # what a project-scoped read walks.
+            project_node = await conn.scalar(
+                sa.select(VirtualEntityRow.__table__.c.id).where(
+                    VirtualEntityRow.__table__.c.entity_type == ProjectEntityType(),
+                    VirtualEntityRow.__table__.c.entity_id == uuid.UUID(defaults["group"]),
+                )
+            )
+            if project_node is None:
+                project_node = uuid.uuid4()
+                await conn.execute(
+                    sa.insert(VirtualEntityRow.__table__).values(
+                        id=project_node,
+                        entity_type=ProjectEntityType(),
+                        entity_id=uuid.UUID(defaults["group"]),
+                    )
+                )
+                await conn.execute(
+                    sa.insert(EntityMembershipRow.__table__).values(
+                        virtual_entity_id=project_node,
+                        member_entity_id=project_node,
+                        capped=False,
+                    )
+                )
+                await conn.execute(
+                    sa.insert(ScopeBindingRow.__table__).values(
+                        virtual_entity_id=project_node,
+                        scope_entity_id=project_node,
+                        permission_cap=None,
+                    )
+                )
+            await conn.execute(
+                sa.insert(EntityMembershipRow.__table__).values(
+                    virtual_entity_id=project_node, member_entity_id=node_id, capped=False
+                )
+            )
+            await conn.execute(
+                sa.insert(ScopeBindingRow.__table__).values(
+                    virtual_entity_id=node_id, scope_entity_id=project_node, permission_cap=None
+                )
+            )
         created_ids.append(defaults["id"])
         return defaults
 
@@ -321,10 +453,10 @@ async def vfolder_factory(
     async with db_engine.begin() as conn:
         for vid in reversed(created_ids):
             await conn.execute(
-                vfolder_invitations.delete().where(vfolder_invitations.c.vfolder == vid)
-            )
-            await conn.execute(
-                vfolder_permissions.delete().where(vfolder_permissions.c.vfolder == vid)
+                VirtualEntityRow.__table__.delete().where(
+                    VirtualEntityRow.__table__.c.entity_type == VFolderEntityType(),
+                    VirtualEntityRow.__table__.c.entity_id == vid,
+                )
             )
             await conn.execute(vfolders.delete().where(vfolders.c.id == vid))
 
@@ -350,10 +482,10 @@ async def invitation_factory(
     db_engine: SAEngine,
     admin_user_fixture: Any,
 ) -> AsyncIterator[InvitationFactory]:
-    """Factory that inserts vfolder_invitation rows directly into DB.
+    """Factory that inserts vfolder offers into ``entity_shares`` directly.
 
-    Defaults to a PENDING invitation from the admin user to the given invitee.
-    Cleans up all created invitation rows on teardown.
+    Defaults to a PENDING offer from the admin user to the given invitee.
+    Cleans up all created rows on teardown.
     """
     created_ids: list[uuid.UUID] = []
 
@@ -365,15 +497,16 @@ async def invitation_factory(
         inv_id = uuid.uuid4()
         defaults: dict[str, Any] = {
             "id": inv_id,
-            "permission": VFolderMountPermission.READ_ONLY,
-            "inviter": admin_user_fixture.email,
-            "invitee": invitee_email,
-            "state": VFolderInvitationState.PENDING,
-            "vfolder": vfolder_id,
+            "permission_cap": Permission.READ,
+            "sharer_user_id": admin_user_fixture.user_uuid,
+            "recipient_email": invitee_email,
+            "status": EntityShareStatus.PENDING,
+            "target_entity_type": VFolderEntityType(),
+            "target_entity_id": vfolder_id,
         }
         defaults.update(overrides)
         async with db_engine.begin() as conn:
-            await conn.execute(sa.insert(vfolder_invitations).values(**defaults))
+            await conn.execute(sa.insert(EntityShareRow.__table__).values(**defaults))
         created_ids.append(inv_id)
         return defaults
 
@@ -382,7 +515,7 @@ async def invitation_factory(
     async with db_engine.begin() as conn:
         for inv_id in reversed(created_ids):
             await conn.execute(
-                vfolder_invitations.delete().where(vfolder_invitations.c.id == inv_id)
+                EntityShareRow.__table__.delete().where(EntityShareRow.__table__.c.id == inv_id)
             )
 
 
@@ -393,7 +526,7 @@ async def user_system_role(
 ) -> AsyncIterator[uuid.UUID]:
     """Provision the RBAC SYSTEM role for the regular user.
 
-    Replicates what RoleManager does at user-creation time:
+    Replicates what user provisioning does at user-creation time:
     RoleRow (source=SYSTEM) + UserRoleRow + scope mapping + owner PermissionRows.
     The base regular_user_fixture inserts user rows directly and skips this, so
     flows that resolve the user's system role (e.g. accept_invitation) require it.
@@ -408,6 +541,8 @@ async def user_system_role(
                 name=f"user-{str(user_uuid)[:8]}",
                 source=RoleSource.SYSTEM,
                 status=RoleStatus.ACTIVE,
+                scope_type=UserEntityType(),
+                scope_id=user_uuid,
             )
         )
         await conn.execute(
@@ -416,25 +551,15 @@ async def user_system_role(
                 role_id=role_id,
             )
         )
-        await conn.execute(
-            sa.insert(AssociationScopesEntitiesRow.__table__).values(
-                scope_type=ScopeType.USER,
-                scope_id=str(user_uuid),
-                entity_type=EntityType.ROLE,
-                entity_id=str(role_id),
-                relation_type=RelationType.AUTO,
-            )
-        )
-        for entity_type in EntityType.owner_accessible_entity_types_in_user():
-            for operation in OperationType.owner_operations():
+        for entity_type in _OWNER_ACCESSIBLE_ENTITY_TYPES:
+            for bit in Permission:
+                if not bit:
+                    continue
                 await conn.execute(
                     sa.insert(PermissionRow.__table__).values(
                         role_id=role_id,
-                        scope_type=ScopeType.USER,
-                        scope_id=str(user_uuid),
                         entity_type=entity_type,
-                        operation=operation,
-                        permission=Permission.from_operation(operation),
+                        permission=bit,
                     )
                 )
 
@@ -443,11 +568,6 @@ async def user_system_role(
     async with db_engine.begin() as conn:
         await conn.execute(
             PermissionRow.__table__.delete().where(PermissionRow.__table__.c.role_id == role_id)
-        )
-        await conn.execute(
-            AssociationScopesEntitiesRow.__table__.delete().where(
-                AssociationScopesEntitiesRow.__table__.c.entity_id == str(role_id)
-            )
         )
         await conn.execute(
             UserRoleRow.__table__.delete().where(UserRoleRow.__table__.c.role_id == role_id)

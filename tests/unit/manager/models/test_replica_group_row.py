@@ -1,8 +1,12 @@
 import uuid
 
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
-from ai.backend.common.identifier.replica_group import ReplicaGroupID
+import sqlalchemy as sa
+
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
+from ai.backend.common.data.entity.replica_group import ReplicaGroupID
+from ai.backend.common.data.entity.session_group import SessionGroupID
+from ai.backend.common.schema.deployment import IntOrPercent, ReplicaGroupRolloutSpec
 from ai.backend.manager.data.deployment.types import (
     ReplicaGroupLifecycle,
     ReplicaGroupScalingStatus,
@@ -28,17 +32,24 @@ def test_replica_group_status_columns_default_to_stable() -> None:
 
     lifecycle = columns["lifecycle"]
     assert lifecycle.nullable is False
-    assert lifecycle.default.arg is ReplicaGroupLifecycle.STABLE
+    assert isinstance(lifecycle.default, sa.ColumnDefault)
+    lifecycle_default_arg: object = lifecycle.default.arg
+    assert lifecycle_default_arg is ReplicaGroupLifecycle.STABLE
+    assert isinstance(lifecycle.server_default, sa.DefaultClause)
     assert lifecycle.server_default.arg == ReplicaGroupLifecycle.STABLE.value
 
     scaling_status = columns["scaling_status"]
     assert scaling_status.nullable is False
-    assert scaling_status.default.arg is ReplicaGroupScalingStatus.STABLE
+    assert isinstance(scaling_status.default, sa.ColumnDefault)
+    scaling_default_arg: object = scaling_status.default.arg
+    assert scaling_default_arg is ReplicaGroupScalingStatus.STABLE
+    assert isinstance(scaling_status.server_default, sa.DefaultClause)
     assert scaling_status.server_default.arg == ReplicaGroupScalingStatus.STABLE.value
 
 
 def _make_row() -> ReplicaGroupRow:
     return ReplicaGroupRow(
+        session_group_id=SessionGroupID(uuid.uuid4()),
         id=ReplicaGroupID(uuid.uuid4()),
         deployment_id=DeploymentID(uuid.uuid4()),
         current_revision_id=DeploymentRevisionID(uuid.uuid4()),
@@ -48,6 +59,10 @@ def _make_row() -> ReplicaGroupRow:
         traffic_weight=70,
         lifecycle=ReplicaGroupLifecycle.ROLLING,
         scaling_status=ReplicaGroupScalingStatus.SCALING,
+        rollout=ReplicaGroupRolloutSpec(
+            max_surge=IntOrPercent(count=1),
+            max_unavailable=IntOrPercent(count=0),
+        ),
     )
 
 

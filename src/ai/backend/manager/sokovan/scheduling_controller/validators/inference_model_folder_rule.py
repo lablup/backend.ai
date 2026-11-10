@@ -8,8 +8,10 @@ from ai.backend.common.types import SessionTypes, VFolderUsageMode
 from ai.backend.manager.data.session.spec import SessionSpec
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.sokovan.scheduling_controller.validators.session_spec_base import (
-    SessionSpecValidationContext,
     SessionSpecValidatorRule,
+)
+from ai.backend.manager.views.sokovan.session_creation import (
+    SessionSpecContext,
 )
 
 
@@ -31,7 +33,7 @@ class InferenceModelFolderRule(SessionSpecValidatorRule):
     def validate(
         self,
         spec: SessionSpec,
-        _context: SessionSpecValidationContext,
+        _context: SessionSpecContext,
     ) -> None:
         if spec.resource_spec.classification.session_type != SessionTypes.INFERENCE:
             return

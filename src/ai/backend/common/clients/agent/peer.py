@@ -17,6 +17,8 @@ from typing import Any
 
 from callosum.rpc import Peer
 
+from ai.backend.common.message_queue.types import MessageMetadata
+
 
 class PeerInvoker(Peer):
     class _CallStub:
@@ -33,9 +35,11 @@ class PeerInvoker(Peer):
                 return f
 
             async def _wrapped(*args: Any, **kwargs: Any) -> Any:
+                metadata = MessageMetadata.from_current_context()
                 request_body = {
                     "args": args,
                     "kwargs": kwargs,
+                    "metadata": metadata.model_dump(mode="json"),
                 }
                 self.peer.last_used = time.monotonic()  # type: ignore[attr-defined]
                 ret = await self.peer.invoke(name, request_body, order_key=self.order_key.get())

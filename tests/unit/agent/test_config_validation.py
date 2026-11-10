@@ -33,6 +33,8 @@ from ai.backend.logging.types import LogLevel
 
 RawConfigT = dict[str, Any]
 
+CONFIG_LOGGER = "ai.backend.common.config"
+
 
 CONTEXT_DEFAULT_DEBUG = False
 CONTEXT_DEFAULT_LOG_LEVEL = LogLevel.DEBUG
@@ -538,9 +540,10 @@ class TestResourceConfigValidation:
 
 class TestAgentUnifiedConfigValidation:
     @pytest.fixture
-    def default_raw_config(self) -> RawConfigT:
+    def default_raw_config(self, rpc_auth_key_config: dict[str, Path]) -> RawConfigT:
         return {
             "agent": {
+                **rpc_auth_key_config,
                 "backend": AgentBackend.KUBERNETES,
                 "rpc-listen-addr": HostPortPair(host="127.0.0.1", port=6001),
             },
@@ -553,6 +556,8 @@ class TestAgentUnifiedConfigValidation:
             "etcd": {
                 "namespace": "test",
                 "addr": HostPortPair(host="127.0.0.1", port=2379),
+                "user": "test",
+                "password": "test",
             },
         }
 
@@ -578,6 +583,45 @@ class TestAgentUnifiedConfigValidation:
 
         assert config.agent.backend == AgentBackend.KUBERNETES
         assert config.container.scratch_type == ScratchType.K8S_NFS
+
+    def test_unknown_agent_field_is_warned_and_kept(
+        self,
+        default_raw_config: RawConfigT,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        raw_config = {
+            **default_raw_config,
+            "agent": {
+                **default_raw_config["agent"],
+                "use-experimental-redis-event-dispatcher": True,
+            },
+        }
+        with caplog.at_level("WARNING", logger=CONFIG_LOGGER):
+            config = AgentUnifiedConfig.model_validate(raw_config)
+
+        unknown_fields = [
+            r.__dict__["log_tag_unknown_fields"] for r in caplog.records if r.name == CONFIG_LOGGER
+        ]
+        assert any("use-experimental-redis-event-dispatcher" in f for f in unknown_fields)
+        assert config.agent.model_dump()["use-experimental-redis-event-dispatcher"] is True
+        assert "use-experimental-redis-event-dispatcher" in config.agent.model_fields_set
+
+    def test_docker_backend_validation_emits_no_unknown_field_warning(
+        self,
+        default_raw_config: RawConfigT,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        raw_config = {
+            **default_raw_config,
+            "agent": {**default_raw_config["agent"], "backend": AgentBackend.DOCKER},
+            "container": {"scratch-type": ScratchType.HOSTDIR},
+        }
+        config = AgentUnifiedConfig.model_validate(raw_config)
+
+        with caplog.at_level("WARNING", logger=CONFIG_LOGGER):
+            config.validate_agent_specific_config()
+
+        assert [r.getMessage() for r in caplog.records if r.name == CONFIG_LOGGER] == []
 
     def test_kubernetes_backend_with_other_scratch_types(
         self,
@@ -625,12 +669,14 @@ class TestAgentUnifiedConfigValidation:
     def test_docker_backend_validates_swarm_config(
         self,
         default_raw_config: RawConfigT,
+        rpc_auth_key_config: dict[str, Path],
     ) -> None:
         raw_config = default_raw_config.copy()
         # Valid Docker config with swarm-enabled
         raw_config["agent"] = {
             "backend": AgentBackend.DOCKER,
             "rpc-listen-addr": HostPortPair(host="127.0.0.1", port=6001),
+            **rpc_auth_key_config,
         }
         raw_config["container"] = {
             "scratch-type": ScratchType.HOSTDIR,
@@ -644,12 +690,14 @@ class TestAgentUnifiedConfigValidation:
     def test_docker_backend_with_swarm_disabled(
         self,
         default_raw_config: RawConfigT,
+        rpc_auth_key_config: dict[str, Path],
     ) -> None:
         raw_config = default_raw_config.copy()
         # Valid Docker config with swarm disabled
         raw_config["agent"] = {
             "backend": AgentBackend.DOCKER,
             "rpc-listen-addr": HostPortPair(host="127.0.0.1", port=6001),
+            **rpc_auth_key_config,
         }
         raw_config["container"] = {
             "scratch-type": ScratchType.HOSTDIR,
@@ -679,9 +727,10 @@ class TestAgentUnifiedConfigValidation:
 
 class TestAgentUnifiedConfigSingleAgentMode:
     @pytest.fixture
-    def default_raw_config(self) -> RawConfigT:
+    def default_raw_config(self, rpc_auth_key_config: dict[str, Path]) -> RawConfigT:
         return {
             "agent": {
+                **rpc_auth_key_config,
                 "backend": AgentBackend.DOCKER,
                 "rpc-listen-addr": HostPortPair(host="127.0.0.1", port=6001),
             },
@@ -693,6 +742,8 @@ class TestAgentUnifiedConfigSingleAgentMode:
             "etcd": {
                 "namespace": "test",
                 "addr": HostPortPair(host="127.0.0.1", port=2379),
+                "user": "test",
+                "password": "test",
             },
         }
 
@@ -736,9 +787,10 @@ class TestAgentUnifiedConfigSingleAgentMode:
 
 class TestMultipleAgentsConfigValidation:
     @pytest.fixture
-    def default_raw_config(self) -> RawConfigT:
+    def default_raw_config(self, rpc_auth_key_config: dict[str, Path]) -> RawConfigT:
         return {
             "agent": {
+                **rpc_auth_key_config,
                 "backend": AgentBackend.DOCKER,
                 "rpc-listen-addr": HostPortPair(host="127.0.0.1", port=6001),
                 "kernel-creation-concurrency": 4,
@@ -753,6 +805,8 @@ class TestMultipleAgentsConfigValidation:
             "etcd": {
                 "namespace": "test",
                 "addr": HostPortPair(host="127.0.0.1", port=2379),
+                "user": "test",
+                "password": "test",
             },
         }
 
@@ -889,12 +943,14 @@ class TestMultipleAgentsConfigValidation:
     def test_multiple_agents_validate_backend_specific_config(
         self,
         default_raw_config: RawConfigT,
+        rpc_auth_key_config: dict[str, Path],
     ) -> None:
         raw_config = {
             **default_raw_config,
             "agent": {
                 "backend": AgentBackend.KUBERNETES,
                 "rpc-listen-addr": HostPortPair(host="127.0.0.1", port=6001),
+                **rpc_auth_key_config,
             },
             "container": {
                 "scratch-type": "k8s-nfs",
@@ -1079,7 +1135,6 @@ class TestMultipleAgentsConfigValidation:
         agent_configs = config.get_agent_configs()
         assert agent_configs[0].agent.agent_sock_port == 6007
         assert agent_configs[0].agent.force_terminate_abusing_containers is False
-        assert agent_configs[0].agent.use_experimental_redis_event_dispatcher is False
 
         assert agent_configs[1].agent.force_terminate_abusing_containers is True
         assert agent_configs[1].agent.agent_sock_port == 6007
@@ -1125,20 +1180,22 @@ class TestMultipleAgentsConfigValidation:
 
         assert "duplicate" in str(exc_info.value).lower()
 
-    def test_different_scaling_groups_per_agent(self, default_raw_config: RawConfigT) -> None:
+    def test_different_initial_resource_groups_per_agent(
+        self, default_raw_config: RawConfigT
+    ) -> None:
         raw_config = {
             **default_raw_config,
             "agents": [
                 {
                     "agent": {
                         "id": "agent-1",
-                        "scaling-group": "default",
+                        "initial-resource-group-name": "default",
                     }
                 },
                 {
                     "agent": {
                         "id": "agent-2",
-                        "scaling-group": "gpu",
+                        "initial-resource-group-name": "gpu",
                     }
                 },
             ],
@@ -1146,17 +1203,32 @@ class TestMultipleAgentsConfigValidation:
         config = AgentUnifiedConfig.model_validate(raw_config)
 
         agent_configs = config.get_agent_configs()
-        assert agent_configs[0].agent.scaling_group == "default"
-        assert agent_configs[1].agent.scaling_group == "gpu"
+        assert agent_configs[0].agent.initial_resource_group_name == "default"
+        assert agent_configs[1].agent.initial_resource_group_name == "gpu"
+
+    def test_removed_scaling_group_key_fails_fast(self, default_raw_config: RawConfigT) -> None:
+        raw_config = {
+            **default_raw_config,
+            "agent": {
+                **default_raw_config["agent"],
+                "scaling-group": "default",
+            },
+        }
+
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)) as exc_info:
+            AgentUnifiedConfig.model_validate(raw_config)
+
+        assert "initial-resource-group-name" in str(exc_info.value)
 
 
 class TestResourceAllocationModes:
     """Test the new resource allocation modes: SHARED, AUTO_SPLIT, and MANUAL."""
 
     @pytest.fixture
-    def default_raw_config(self) -> RawConfigT:
+    def default_raw_config(self, rpc_auth_key_config: dict[str, Path]) -> RawConfigT:
         return {
             "agent": {
+                **rpc_auth_key_config,
                 "backend": AgentBackend.DOCKER,
                 "rpc-listen-addr": HostPortPair(host="127.0.0.1", port=6001),
             },
@@ -1172,6 +1244,8 @@ class TestResourceAllocationModes:
             "etcd": {
                 "namespace": "test",
                 "addr": HostPortPair(host="127.0.0.1", port=2379),
+                "user": "test",
+                "password": "test",
             },
         }
 

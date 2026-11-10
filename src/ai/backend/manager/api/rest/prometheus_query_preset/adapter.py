@@ -4,11 +4,14 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from ai.backend.common.api_handlers import Sentinel
+from ai.backend.common.data.entity.prometheus_query_preset import (
+    PrometheusQueryPresetID,
+)
 from ai.backend.common.dto.clients.prometheus.response import MetricResponse
 from ai.backend.common.dto.manager.prometheus_query_preset import (
     MetricLabelEntryDTO,
     MetricValueDTO,
+    ModifyQueryDefinitionOptionsRequest,
     ModifyQueryDefinitionRequest,
     OrderDirection,
     QueryDefinitionDTO,
@@ -19,18 +22,19 @@ from ai.backend.common.dto.manager.prometheus_query_preset import (
     QueryDefinitionOrderField,
     SearchQueryDefinitionsRequest,
 )
-from ai.backend.manager.data.prometheus_query_preset import PrometheusQueryPresetData
+from ai.backend.manager.data.prometheus_query_preset.types import PrometheusQueryPresetData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.prometheus_query_preset import PrometheusQueryPresetRow
-from ai.backend.manager.models.prometheus_query_preset.conditions import (
-    PrometheusQueryPresetConditions,
+from ai.backend.manager.models.prometheus_query_preset.searchable_fields import (
+    PrometheusQueryPresetSearchableFields,
 )
-from ai.backend.manager.models.prometheus_query_preset.orders import PrometheusQueryPresetOrders
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination, Updater
+from ai.backend.manager.models.prometheus_query_preset.searchers import (
+    PrometheusQueryPresetSearcher,
+)
+from ai.backend.manager.models.prometheus_query_preset.updaters import (
+    PrometheusQueryPresetUpdater,
+)
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
-from ai.backend.manager.repositories.prometheus_query_preset.updaters import (
-    PrometheusQueryPresetUpdaterSpec,
-)
 from ai.backend.manager.types import OptionalState, TriState
 
 
@@ -64,47 +68,26 @@ class PrometheusQueryPresetAdapter(BaseFilterAdapter):
 
     def build_updater(
         self, request: ModifyQueryDefinitionRequest, preset_id: UUID
-    ) -> Updater[PrometheusQueryPresetRow]:
-        """Build an Updater from a modify request."""
-        spec = PrometheusQueryPresetUpdaterSpec(
-            name=(
-                OptionalState.update(request.name)
-                if request.name is not None
-                else OptionalState.nop()
-            ),
-            metric_name=(
-                OptionalState.update(request.metric_name)
-                if request.metric_name is not None
-                else OptionalState.nop()
-            ),
-            query_template=(
-                OptionalState.update(request.query_template)
-                if request.query_template is not None
-                else OptionalState.nop()
-            ),
-            time_window=TriState.nop()
-            if isinstance(request.time_window, Sentinel)
-            else TriState.nullify()
-            if request.time_window is None
-            else TriState.update(request.time_window),
-            filter_labels=(
-                OptionalState.update(request.options.filter_labels)
-                if request.options is not None and request.options.filter_labels is not None
-                else OptionalState.nop()
-            ),
-            group_labels=(
-                OptionalState.update(request.options.group_labels)
-                if request.options is not None and request.options.group_labels is not None
-                else OptionalState.nop()
-            ),
+    ) -> PrometheusQueryPresetUpdater:
+        """Build the update spec from a modify request."""
+        options = OptionalState[ModifyQueryDefinitionOptionsRequest].from_unset(request.options)
+        return PrometheusQueryPresetUpdater(
+            preset_id=PrometheusQueryPresetID(preset_id),
+            name=OptionalState.from_unset(request.name),
+            metric_name=OptionalState.from_unset(request.metric_name),
+            query_template=OptionalState.from_unset(request.query_template),
+            time_window=TriState.from_unset(request.time_window),
+            filter_labels=options.and_optional(lambda o: o.filter_labels),
+            group_labels=options.and_optional(lambda o: o.group_labels),
         )
-        return Updater(spec=spec, pk_value=preset_id)
 
-    def build_querier(self, request: SearchQueryDefinitionsRequest) -> BatchQuerier:
-        """Build a BatchQuerier from search request."""
+    def build_searcher(
+        self, request: SearchQueryDefinitionsRequest
+    ) -> PrometheusQueryPresetSearcher:
+        """Build the searcher from a search request."""
         conditions = self._convert_filter(request.filter) if request.filter else []
         orders = [self._convert_order(o) for o in request.order] if request.order else []
-        return BatchQuerier(
+        return PrometheusQueryPresetSearcher(
             conditions=conditions,
             orders=orders,
             pagination=OffsetPagination(limit=request.limit, offset=request.offset),
@@ -112,27 +95,17 @@ class PrometheusQueryPresetAdapter(BaseFilterAdapter):
 
     def _convert_filter(self, filter_req: QueryDefinitionFilter) -> list[QueryCondition]:
         """Convert query definition filter to list of query conditions."""
-        conditions: list[QueryCondition] = []
-        if filter_req.name is not None:
-            condition = self.convert_string_filter(
-                filter_req.name,
-                contains_factory=PrometheusQueryPresetConditions.by_name_contains,
-                equals_factory=PrometheusQueryPresetConditions.by_name_equals,
-                starts_with_factory=PrometheusQueryPresetConditions.by_name_starts_with,
-                ends_with_factory=PrometheusQueryPresetConditions.by_name_ends_with,
-                in_factory=PrometheusQueryPresetConditions.by_name_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        return conditions
+        fields = PrometheusQueryPresetSearchableFields.own
+        return self.apply_string_filter(filter_req.name, fields.name.filter)
 
     def _convert_order(self, order: QueryDefinitionOrder) -> QueryOrder:
         """Convert query definition order specification to query order."""
+        fields = PrometheusQueryPresetSearchableFields.own
         ascending = order.direction == OrderDirection.ASC
         if order.field == QueryDefinitionOrderField.NAME:
-            return PrometheusQueryPresetOrders.name(ascending=ascending)
+            return fields.name.order.apply(ascending)
         if order.field == QueryDefinitionOrderField.CREATED_AT:
-            return PrometheusQueryPresetOrders.created_at(ascending=ascending)
+            return fields.created_at.order.apply(ascending)
         if order.field == QueryDefinitionOrderField.UPDATED_AT:
-            return PrometheusQueryPresetOrders.updated_at(ascending=ascending)
+            return fields.updated_at.order.apply(ascending)
         raise ValueError(f"Unknown order field: {order.field}")

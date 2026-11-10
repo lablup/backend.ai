@@ -1,22 +1,9 @@
-from unittest.mock import MagicMock
-
 import pytest
 
-from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.actions.validators.rbac import RBACValidators
-from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
-from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
-from ai.backend.manager.actions.validators.rbac.single_entity import (
-    SingleEntityActionRBACValidator,
-)
+from ai.backend.manager.actions.v2.validators import ActionValidators
+from ai.backend.testutils.action_validators import mock_virtual_entity_rbac_validators
 
 
 @pytest.fixture
 def mock_action_validators() -> ActionValidators:
-    return ActionValidators(
-        rbac=RBACValidators(
-            scope=MagicMock(spec=ScopeActionRBACValidator),
-            single_entity=MagicMock(spec=SingleEntityActionRBACValidator),
-            bulk=MagicMock(spec=BulkActionRBACValidator),
-        ),
-    )
+    return mock_virtual_entity_rbac_validators().to_action_validators()

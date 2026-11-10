@@ -15,14 +15,14 @@ from ai.backend.manager.sokovan.deployment.deployment_controller import (
     DeploymentController,
     DeploymentControllerArgs,
 )
-from ai.backend.manager.sokovan.deployment.revision_draft import RevisionDraftReader
+from ai.backend.manager.sokovan.deployment.revision_draft.reader import RevisionDraftReader
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
     SchedulingController,
 )
 
 if TYPE_CHECKING:
     from ai.backend.manager.repositories.deployment_revision_preset.repository import (
-        DeploymentRevisionPresetRepository,
+        DeploymentPresetRepository,
     )
 
 
@@ -37,7 +37,7 @@ class DeploymentControllerInput:
     event_producer: EventProducer
     valkey_schedule: ValkeyScheduleClient
     revision_draft_reader: RevisionDraftReader
-    deployment_revision_preset_repository: DeploymentRevisionPresetRepository | None
+    deployment_revision_preset_repository: DeploymentPresetRepository | None
 
 
 class DeploymentControllerDependency(

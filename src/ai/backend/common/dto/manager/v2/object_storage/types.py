@@ -15,7 +15,11 @@ __all__ = (
 
 
 class ObjectStorageOrderField(StrEnum):
-    """Fields available for ordering object storages."""
+    """Fields available for ordering object storages.
+
+    ``CREATED_AT`` is deprecated since 26.9.0: the table has no such column, so the
+    value is not used for ordering. It is removed in the next release.
+    """
 
     NAME = "name"
     HOST = "host"

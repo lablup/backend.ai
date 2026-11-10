@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
-import uuid
 from collections.abc import Sequence
 from datetime import datetime
 
 import sqlalchemy as sa
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
-from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentID
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import make_string_in_factory
@@ -73,6 +75,35 @@ class AppConfigFragmentConditions:
     by_config_name_in = staticmethod(make_string_in_factory(AppConfigFragmentRow.config_name))
 
     @staticmethod
+    def by_id_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = AppConfigFragmentRow.id == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_id_in(spec: UUIDInMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = AppConfigFragmentRow.id.in_(spec.values)
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_ids(fragment_ids: Sequence[AppConfigFragmentID]) -> QueryCondition:
+        """Fragments whose id is one of ``fragment_ids``, for batch loading by id."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AppConfigFragmentRow.id.in_(list(fragment_ids))
+
+        return inner
+
+    @staticmethod
     def by_config_names(config_names: Sequence[str]) -> QueryCondition:
         """Fragments whose ``config_name`` is one of ``config_names``.
 
@@ -118,9 +149,12 @@ class AppConfigFragmentConditions:
     # --- scope_id filter ---
 
     @staticmethod
-    def by_scope_id_equals(scope_id: str) -> QueryCondition:
+    def by_scope_id_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return AppConfigFragmentRow.scope_id == scope_id
+            condition = AppConfigFragmentRow.scope_id == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
@@ -135,20 +169,23 @@ class AppConfigFragmentConditions:
 
         return inner
 
+    # Matches the row's own scope columns, not the ownership graph: the graph answers what a
+    # scope reaches, and a domain reaches every fragment its users hold.
     @staticmethod
-    def by_domain_visibility(domain: str) -> QueryCondition:
-        """The ``domain`` scope for ``domain``."""
+    def by_domain_visibility(domain_id: DomainID) -> QueryCondition:
+        """The ``domain`` scope for ``domain_id``."""
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return sa.and_(
                 AppConfigFragmentRow.scope_type == AppConfigScopeType.DOMAIN,
-                AppConfigFragmentRow.scope_id == domain,
+                AppConfigFragmentRow.scope_id == domain_id,
             )
 
         return inner
 
+    # Matches the row's own scope columns, not the ownership graph, as by_domain_visibility.
     @staticmethod
-    def by_user_visibility(user_id: str) -> QueryCondition:
+    def by_user_visibility(user_id: UserID) -> QueryCondition:
         """The ``user`` scope for ``user_id``."""
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
@@ -200,43 +237,5 @@ class AppConfigFragmentConditions:
     def by_updated_at_equals(dt: datetime) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return AppConfigFragmentRow.updated_at == dt
-
-        return inner
-
-    # --- cursor (created_at-based) pagination ---
-
-    @staticmethod
-    def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for forward pagination (after cursor).
-
-        Uses subquery to get created_at of the cursor row and compare.
-        """
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(AppConfigFragmentRow.created_at)
-                .where(AppConfigFragmentRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return AppConfigFragmentRow.created_at < subquery
-
-        return inner
-
-    @staticmethod
-    def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for backward pagination (before cursor).
-
-        Uses subquery to get created_at of the cursor row and compare.
-        """
-        cursor_uuid = uuid.UUID(cursor_id)
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subquery = (
-                sa.select(AppConfigFragmentRow.created_at)
-                .where(AppConfigFragmentRow.id == cursor_uuid)
-                .scalar_subquery()
-            )
-            return AppConfigFragmentRow.created_at > subquery
 
         return inner

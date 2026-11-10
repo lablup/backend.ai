@@ -1,0 +1,106 @@
+from __future__ import annotations
+
+from datetime import datetime
+from uuid import UUID
+
+import sqlalchemy as sa
+from sqlalchemy.orm import (
+    Mapped,
+    mapped_column,
+)
+
+from ai.backend.common.data.entity.role import RoleID
+from ai.backend.common.data.entity.role_preset import RolePresetID
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, RuntimeEntityID
+from ai.backend.manager.data.permission.status import (
+    RoleStatus,
+)
+from ai.backend.manager.data.permission.types import RoleSource
+from ai.backend.manager.models.base import (
+    GUID,
+    Base,
+    StrEnumType,
+)
+from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
+
+
+class RoleRow(LifecycleTimestampsMixin, Base):
+    __tablename__ = "roles"
+    __table_args__ = (
+        sa.Index("ix_id_status", "id", "status"),
+        # The scope must be provisioned in the graph; a scope torn down takes its
+        # roles with it. ``use_alter`` keeps the FK out of the CREATE TABLE so table
+        # subsets that omit ``virtual_entities`` still build.
+        sa.ForeignKeyConstraint(
+            ["scope_type", "scope_id"],
+            ["virtual_entities.entity_type", "virtual_entities.entity_id"],
+            ondelete="CASCADE",
+            deferrable=True,
+            initially="DEFERRED",
+            use_alter=True,
+            name="fk_roles_scope_virtual_entities",
+        ),
+        sa.Index("ix_roles_scope", "scope_type", "scope_id"),
+        sa.Index(
+            "uq_roles_preset_scope",
+            "role_preset_id",
+            "scope_type",
+            "scope_id",
+            unique=True,
+            postgresql_where=sa.text("role_preset_id IS NOT NULL"),
+        ),
+    )
+
+    id: Mapped[RoleID] = mapped_column(
+        "id", GUID(RoleID), primary_key=True, server_default=sa.text("uuid_generate_v7()")
+    )
+    name: Mapped[str] = mapped_column("name", sa.String(64), nullable=False)
+    description: Mapped[str | None] = mapped_column("description", sa.Text, nullable=True)
+    source: Mapped[RoleSource] = mapped_column(
+        "source",
+        StrEnumType(RoleSource, length=16),
+        nullable=False,
+        default=RoleSource.SYSTEM,
+        server_default=str(RoleSource.SYSTEM),
+    )
+    status: Mapped[RoleStatus] = mapped_column(
+        "status",
+        StrEnumType(RoleStatus),
+        nullable=False,
+        default=RoleStatus.ACTIVE,
+        server_default=RoleStatus.ACTIVE,
+    )
+    auto_assign: Mapped[bool] = mapped_column(
+        "auto_assign",
+        sa.Boolean,
+        nullable=False,
+        default=False,
+        server_default=sa.false(),
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        "deleted_at", sa.DateTime(timezone=True), nullable=True
+    )
+    # The one scope the role belongs to.
+    scope_type: Mapped[EntityType] = mapped_column(
+        "scope_type", sa.String(length=32), nullable=False
+    )
+    scope_id: Mapped[UUID] = mapped_column("scope_id", GUID(), nullable=False)
+    # The preset this role was instantiated from; NULL for roles made by hand or
+    # before presets were recorded. `use_alter` keeps the FK out of the CREATE TABLE
+    # so table subsets that omit ``role_presets`` still build.
+    role_preset_id: Mapped[RolePresetID | None] = mapped_column(
+        "role_preset_id",
+        GUID(RolePresetID),
+        sa.ForeignKey(
+            "role_presets.id",
+            ondelete="SET NULL",
+            use_alter=True,
+            name="fk_roles_role_preset_id_role_presets",
+        ),
+        index=True,
+        nullable=True,
+    )
+
+    def scope(self) -> EntityIdentifier:
+        """The scope the role belongs to."""
+        return RuntimeEntityID(EntityType(self.scope_type), self.scope_id)

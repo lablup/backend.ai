@@ -5,6 +5,7 @@ import hashlib
 import io
 import ipaddress
 import logging
+import os
 import platform
 import re
 import resource
@@ -29,18 +30,20 @@ import trafaret as t
 from aiodocker.docker import DockerContainer
 
 from ai.backend.common import identity
-from ai.backend.common.asyncio import current_loop
+from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.cgroup import (
+    CgroupController,
     get_cgroup_of_pid,
     get_container_id_of_cgroup,
     get_container_pids,
 )
 from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.files import open_dir_beneath
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import PID, ContainerId, ContainerPID, HostPID, KernelId
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 IPNetwork = ipaddress.IPv4Network | ipaddress.IPv6Network
 IPAddress = ipaddress.IPv4Address | ipaddress.IPv6Address
@@ -73,6 +76,42 @@ class closing_async(AbstractAsyncContextManager[_SupportsAsyncCloseT]):
     @override
     async def __aexit__(self, *exc_info: Any) -> None:
         await self.obj.close()
+
+
+class ContainerSSHFileWriter:
+    """Writes the SSH files of a kernel work directory, replacing symlinks instead of following them."""
+
+    _work_dir: Path
+    _public_key: bytes
+    _private_key: bytes
+
+    def __init__(self, work_dir: Path, public_key: bytes, private_key: bytes) -> None:
+        self._work_dir = work_dir
+        self._public_key = public_key
+        self._private_key = private_key
+
+    def write(self) -> list[Path]:
+        """Returns the directory and files under the work directory, ready for chown."""
+        ssh_dir = self._work_dir / ".ssh"
+        if ssh_dir.is_symlink():
+            ssh_dir.unlink()
+        ssh_dir.mkdir(parents=True, exist_ok=True)
+        ssh_dir.chmod(0o700)
+
+        authorized_keys = ssh_dir / "authorized_keys"
+        self._replace_file(authorized_keys, self._public_key)
+        id_rsa = ssh_dir / "id_rsa"
+        if id_rsa.is_symlink() or not id_rsa.is_file():
+            self._replace_file(id_rsa, self._private_key)
+        id_container = self._work_dir / "id_container"
+        self._replace_file(id_container, self._private_key)
+        return [ssh_dir, authorized_keys, id_rsa, id_container]
+
+    def _replace_file(self, path: Path, content: bytes) -> None:
+        path.unlink(missing_ok=True)
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "wb") as f:
+            f.write(content)
 
 
 def generate_local_instance_id(hint: str) -> str:
@@ -166,13 +205,12 @@ async def read_tail(path: Path, nbytes: int) -> bytes:
             f.seek(max(file_size - nbytes, 0), io.SEEK_SET)
             return f.read(nbytes)
 
-    loop = current_loop()
-    return await loop.run_in_executor(None, _read_tail)
+    return await run_in_executor_with_context(None, _read_tail)
 
 
 async def get_kernel_id_from_container(val: str | DockerContainer) -> KernelId | None:
     if isinstance(val, DockerContainer):
-        if "Name" not in val._container:
+        if not val._container.get("Name"):
             await val.show()
         name = val["Name"]
     elif isinstance(val, str):
@@ -196,7 +234,9 @@ async def get_subnet_ip(etcd: AsyncEtcd, network: str, fallback_addr: str = "0.0
             addr = fallback_addr
         else:
             local_ipaddrs = [*identity.fetch_local_ipaddrs(subnet)]
-            log.debug("get_subnet_ip(): subnet {} candidates: {}", subnet, local_ipaddrs)
+            log.debug(
+                "subnet ip candidates found", subnet=str(subnet), candidates=str(local_ipaddrs)
+            )
             if local_ipaddrs:
                 addr = str(local_ipaddrs[0])
             else:
@@ -307,7 +347,11 @@ async def host_pid_to_container_pid(container_id: str, host_pid: HostPID) -> Con
                 container_pids = [x.pid for x in container_procs if x.command == cmd]
 
                 container_pid = ContainerPID(PID(container_pids[process_idx]))
-                log.debug("host pid {} is mapped to container pid {}", host_pid, container_pid)
+                log.debug(
+                    "host pid mapped to container pid",
+                    host_pid=host_pid,
+                    container_pid=container_pid,
+                )
                 return container_pid
             except asyncio.CancelledError:
                 raise
@@ -318,7 +362,7 @@ async def host_pid_to_container_pid(container_id: str, host_pid: HostPID) -> Con
                     await docker.close()
 
     try:
-        cgroup = get_cgroup_of_pid("pids", host_pid)
+        cgroup = get_cgroup_of_pid(CgroupController.PIDS, host_pid)
         cgroup_container_id = get_container_id_of_cgroup(cgroup)
         if cgroup_container_id is None:
             return NotContainerPID
@@ -351,7 +395,11 @@ async def container_pid_to_host_pid(container_id: str, container_pid: ContainerP
                 host_pids = [x.pid for x in host_procs if x.command == cmd]
 
                 host_pid = HostPID(PID(host_pids[process_idx]))
-                log.debug("container pid {} is mapped to host pid {}", container_pid, host_pid)
+                log.debug(
+                    "container pid mapped to host pid",
+                    container_pid=container_pid,
+                    host_pid=host_pid,
+                )
                 return host_pid
             except asyncio.CancelledError:
                 raise
@@ -427,19 +475,35 @@ def get_safe_ulimit(name: str, desired_soft: int, desired_hard: int) -> DockerUl
         # Log if we had to adjust the limits
         if safe_soft != desired_soft or safe_hard != desired_hard:
             log.debug(
-                "Adjusted ulimit {}: desired=({}, {}) -> safe=({}, {}) (system limits: {}, {})",
-                name,
-                desired_soft,
-                desired_hard,
-                safe_soft,
-                safe_hard,
-                current_soft_limit,
-                current_hard_limit,
+                "ulimit adjusted to system limits",
+                ulimit_name=name,
+                desired_soft=desired_soft,
+                desired_hard=desired_hard,
+                safe_soft=safe_soft,
+                safe_hard=safe_hard,
+                system_soft=current_soft_limit,
+                system_hard=current_hard_limit,
             )
 
         return {"Name": name, "Soft": safe_soft, "Hard": safe_hard}
 
     except (OSError, ValueError, AttributeError) as e:
         # If we can't get system limits, log and use desired values
-        log.warning("Could not get system ulimit for {}: {}", name, e)
+        log.warning("system ulimit read failed", ulimit_name=name, error_repr=repr(e))
         return {"Name": name, "Soft": desired_soft, "Hard": desired_hard}
+
+
+def write_file_beneath(root: Path, target: Path, data: bytes) -> None:
+    """Write ``data`` to ``target`` inside ``root``, creating parents and refusing any symlink."""
+    parts = target.relative_to(root).parts
+    if not parts:
+        raise IsADirectoryError(target)
+    with open_dir_beneath(root, parts[:-1], mkdir_mode=0o777) as dir_fd:
+        fd = os.open(
+            parts[-1],
+            os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW,
+            0o666,
+            dir_fd=dir_fd,
+        )
+    with os.fdopen(fd, "wb") as f:
+        f.write(data)

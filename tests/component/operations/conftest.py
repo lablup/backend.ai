@@ -3,42 +3,57 @@ from __future__ import annotations
 import secrets
 from collections.abc import AsyncIterator
 from typing import Any
-from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
-from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
-from ai.backend.common.types import HostPortPair, ResourceSlot
-from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.common.data.entity.error_log import ErrorLogFieldType
+from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
+from ai.backend.common.data.entity.types import GlobalEntityType
+from ai.backend.common.data.entity.user import UserEntityType
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import (
+    FieldGroupMeta,
+    GroupMeta,
+)
 from ai.backend.manager.api.rest.error_log.handler import ErrorLogHandler
 from ai.backend.manager.api.rest.error_log.registry import register_error_log_routes
 from ai.backend.manager.api.rest.manager.handler import ManagerHandler
 from ai.backend.manager.api.rest.manager.registry import register_manager_api_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
-from ai.backend.manager.config.bootstrap import BootstrapConfig
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.error_log.types import ErrorLogData
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
-from ai.backend.manager.models.agent import agents
-from ai.backend.manager.models.error_logs import error_logs
+from ai.backend.manager.models.agent.row import agents
+from ai.backend.manager.models.error_log.row import ErrorLogRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.error_log.repository import ErrorLogRepository
 from ai.backend.manager.repositories.manager_admin.repository import ManagerAdminRepository
-from ai.backend.manager.services.error_log.processors import ErrorLogProcessors
-from ai.backend.manager.services.error_log.service import ErrorLogService
 from ai.backend.manager.services.manager_admin.processors import ManagerAdminProcessors
 from ai.backend.manager.services.manager_admin.service import ManagerAdminService
+from ai.backend.manager.services.user.error_log.actions.lookup_owner import (
+    LookupBulkErrorLogOwnerAction,
+    LookupErrorLogOwnerAction,
+)
+from ai.backend.manager.services.user.error_log.processors import ErrorLogProcessors
+from ai.backend.testutils.processors import ops_processor_group
 
 
 @pytest.fixture()
-def error_log_processors(database_engine: ExtendedAsyncSAEngine) -> ErrorLogProcessors:
-    repo = ErrorLogRepository(database_engine)
-    service = ErrorLogService(repo)
+def error_log_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    config_provider: ManagerConfigProvider,
+) -> ErrorLogProcessors:
     return ErrorLogProcessors(
-        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+        ops_processor_group(
+            database_engine, GroupMeta(UserEntityType()), config_provider
+        ).field_group(
+            FieldGroupMeta(ErrorLogFieldType()),
+            ErrorLogData,
+            LookupErrorLogOwnerAction,
+            LookupBulkErrorLogOwnerAction,
+        )
     )
 
 
@@ -46,37 +61,17 @@ def error_log_processors(database_engine: ExtendedAsyncSAEngine) -> ErrorLogProc
 def manager_admin_processors(
     database_engine: ExtendedAsyncSAEngine,
     config_provider: ManagerConfigProvider,
-    bootstrap_config: BootstrapConfig,
     valkey_clients: ValkeyClients,
+    processor_registry: ProcessorRegistry[Any],
 ) -> ManagerAdminProcessors:
-    etcd_config = bootstrap_config.etcd
-    etcd_addr = etcd_config.addr
-    if isinstance(etcd_addr, list):
-        addrs: HostPortPair | list[HostPortPair] = [
-            HostPortPair(host=a.host, port=a.port) for a in etcd_addr
-        ]
-    else:
-        addrs = HostPortPair(host=etcd_addr.host, port=etcd_addr.port)
-    etcd = AsyncEtcd(
-        addrs=addrs,
-        namespace=etcd_config.namespace,
-        scope_prefix_map={
-            ConfigScopes.GLOBAL: "global",
-            ConfigScopes.SGROUP: "sgroup/default",
-            ConfigScopes.NODE: "node/test",
-        },
-    )
     repo = ManagerAdminRepository(database_engine)
     service = ManagerAdminService(
         repository=repo,
         config_provider=config_provider,
-        etcd=etcd,
         db=database_engine,
         valkey_stat=valkey_clients.stat,
     )
-    return ManagerAdminProcessors(
-        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
-    )
+    return ManagerAdminProcessors(processor_registry.group(GroupMeta(GlobalEntityType())), service)
 
 
 @pytest.fixture()
@@ -97,8 +92,8 @@ def server_module_registries(
 @pytest.fixture()
 async def agent_fixture(
     db_engine: SAEngine,
-    scaling_group_name: ResourceGroupName,
-    scaling_group_id: ResourceGroupID,
+    resource_group_name: ResourceGroupName,
+    resource_group_id: ResourceGroupID,
 ) -> AsyncIterator[str]:
     """Insert a test agent record and yield its ID."""
     agent_id = f"i-test-agent-{secrets.token_hex(4)}"
@@ -107,10 +102,8 @@ async def agent_fixture(
             sa.insert(agents).values(
                 id=agent_id,
                 region="local",
-                scaling_group=scaling_group_name,
-                resource_group_id=scaling_group_id,
-                available_slots=ResourceSlot(),
-                occupied_slots=ResourceSlot(),
+                scaling_group=resource_group_name,
+                resource_group_id=resource_group_id,
                 addr="127.0.0.1:6001",
                 version="test",
                 architecture="x86_64",
@@ -131,5 +124,5 @@ async def _cleanup_side_effects(
     """
     yield
     async with db_engine.begin() as conn:
-        await conn.execute(sa.delete(error_logs))
+        await conn.execute(sa.delete(ErrorLogRow))
         await conn.execute(sa.delete(agents))

@@ -21,6 +21,9 @@ class StorageNamespaceNode(BaseResponseModel):
     """Node model representing a storage namespace."""
 
     id: UUID = Field(description="Namespace ID")
+    entity_id: UUID = Field(
+        description="UUID of the storage namespace. Added in 26.9.0.",
+    )
     storage_id: UUID = Field(description="Parent storage ID")
     namespace: str = Field(description="Namespace bucket or path prefix")
 

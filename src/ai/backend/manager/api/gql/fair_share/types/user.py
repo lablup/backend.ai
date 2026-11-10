@@ -2,16 +2,19 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
-from typing import TYPE_CHECKING, Annotated, Any, Self
+from typing import TYPE_CHECKING, Annotated, Any, Self, override
 from uuid import UUID
 
 import strawberry
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.fair_share.request import (
     BulkUpsertUserFairShareWeightInput as BulkUpsertUserFairShareWeightInputDTO,
 )
@@ -108,7 +111,7 @@ class UserFairShareGQL(PydanticNodeMixin[UserFairShareNode]):
         ]
         | None
     ):
-        user_data = await info.context.data_loaders.user_loader.load(self.user_uuid)
+        user_data = await info.context.data_loaders.user_loader.load(UserID(self.user_uuid))
         if user_data is None:
             return None
         return user_data
@@ -129,7 +132,10 @@ class UserFairShareGQL(PydanticNodeMixin[UserFairShareNode]):
         ]
         | None
     ):
-        return await info.context.data_loaders.domain_loader.load(self.domain_name)
+        domain_id = await info.context.data_loaders.domain_id_by_name_loader.load(self.domain_name)
+        if domain_id is None:
+            return None
+        return await info.context.data_loaders.domain_by_id_loader.load(domain_id)
 
     @gql_added_field(
         BackendAIGQLMeta(
@@ -147,7 +153,9 @@ class UserFairShareGQL(PydanticNodeMixin[UserFairShareNode]):
         ]
         | None
     ):
-        project_data = await info.context.data_loaders.project_loader.load(self.project_id)
+        project_data = await info.context.data_loaders.project_loader.load(
+            ProjectID(self.project_id)
+        )
         if project_data is None:
             return None
         return project_data
@@ -169,6 +177,18 @@ class UserFairShareGQL(PydanticNodeMixin[UserFairShareNode]):
         | None
     ):
         return await info.context.data_loaders.resource_group_loader.load(self.resource_group_name)
+
+    @classmethod
+    @override
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[UserFairShareGQL | None]:
+        """A fair share is computed per resource group and scope, with no row to read by id."""
+        return [None for _ in node_ids]
 
 
 UserFairShareEdge = Edge[UserFairShareGQL]
@@ -192,6 +212,16 @@ class UserFairShareConnection(Connection[UserFairShareGQL]):
     def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.count = count
+
+
+_USER_FILTER_DEPRECATION = (
+    "Deprecated since 26.9.0. A filter on another entity's columns cannot check"
+    " whether the caller may read that row. Search users first, then narrow by userUuid."
+)
+_USER_ORDER_DEPRECATION = (
+    "Deprecated since 26.9.0. An order on another entity's columns cannot check"
+    " whether the caller may read that row. Search users first, then order there."
+)
 
 
 @gql_pydantic_input(
@@ -246,9 +276,10 @@ class UserFairShareFilter(PydanticInputMixin[UserFairShareFilterDTO]):
     user: UserFairShareUserNestedFilter | None = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.2.0",
-            description="Nested filter for user entity properties. Allows filtering by username, email, and active status.",
+            description="Filter by the user this fair share is calculated for.",
         ),
         default=None,
+        deprecation_reason=_USER_FILTER_DEPRECATION,
     )
 
     AND: list[Self] | None = gql_field(
@@ -282,7 +313,9 @@ class RGUserFairShareFilter(PydanticInputMixin[UserFairShareFilterDTO]):
     project_id: UUIDFilter | None = gql_field(description="Filter by project UUID.", default=None)
     domain_name: StringFilter | None = gql_field(description="Filter by domain name.", default=None)
     user: UserFairShareUserNestedFilter | None = gql_field(
-        description="Filter by user properties.", default=None
+        description="Filter by the user this fair share is calculated for.",
+        default=None,
+        deprecation_reason=_USER_FILTER_DEPRECATION,
     )
 
     AND: list[Self] | None = gql_field(description="Combine with AND logic.", default=None)
@@ -302,6 +335,10 @@ class RGUserFairShareFilter(PydanticInputMixin[UserFairShareFilterDTO]):
         ),
     ),
     name="UserFairShareOrderField",
+    deprecated_values={
+        "USER_USERNAME": _USER_ORDER_DEPRECATION,
+        "USER_EMAIL": _USER_ORDER_DEPRECATION,
+    },
 )
 class UserFairShareOrderField(StrEnum):
     FAIR_SHARE_FACTOR = "fair_share_factor"

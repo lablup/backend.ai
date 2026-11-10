@@ -8,6 +8,10 @@ from datetime import UTC, datetime
 from typing import Any
 
 from ai.backend.common.data.endpoint.types import ScalingState
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.model_deployment.types import (
     ActivenessStatus,
     DeploymentStrategy,
@@ -49,14 +53,9 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
 from ai.backend.common.dto.manager.v2.deployment_options.response import (
     DeploymentHandlerOptionsInfo,
     DeploymentOptionsInfo,
-)
-from ai.backend.common.dto.manager.v2.session_options.response import (
     HandlerOptionsInfo,
 )
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
-from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.common.dto.manager.v2.session_options.types import AgentSelectionPolicyEnum
 from ai.backend.common.schema.deployment import IntOrPercent
 from ai.backend.common.types import MountPermission
 
@@ -96,6 +95,7 @@ def _make_deployment_options(**kwargs: object) -> DeploymentOptionsInfo:
             default=HandlerOptionsInfo(timeout_sec=None, max_retry_count=None),
             by_handler=[],
         ),
+        "agent_selection_policy": AgentSelectionPolicyEnum.PREFERRED,
     }
     defaults.update(kwargs)
     return DeploymentOptionsInfo(**defaults)
@@ -129,6 +129,7 @@ def _make_network_access(**kwargs: object) -> DeploymentNetworkAccessInfoDTO:
 
 def _make_replica_state(**kwargs: object) -> ReplicaStateInfo:
     defaults: dict[str, Any] = {
+        "replica_count": 2,
         "desired_replica_count": 2,
         "replica_ids": [],
     }
@@ -145,8 +146,10 @@ def _make_deployment_strategy(**kwargs: object) -> DeploymentStrategyInfoDTO:
 
 
 def _make_revision_node(**kwargs: object) -> RevisionNode:
+    revision_id = uuid.uuid4()
     defaults: dict[str, Any] = {
-        "id": uuid.uuid4(),
+        "id": revision_id,
+        "field_id": revision_id,
         "deployment_id": uuid.uuid4(),
         "revision_number": 1,
         "image_id": ImageID(uuid.uuid4()),
@@ -163,8 +166,10 @@ def _make_revision_node(**kwargs: object) -> RevisionNode:
 
 
 def _make_deployment_node(**kwargs: object) -> DeploymentNode:
+    deployment_id = DeploymentID(uuid.uuid4())
     defaults: dict[str, Any] = {
-        "id": DeploymentID(uuid.uuid4()),
+        "id": deployment_id,
+        "entity_id": deployment_id,
         "metadata": _make_deployment_metadata(),
         "network_access": _make_network_access(),
         "replica_state": _make_replica_state(),
@@ -221,6 +226,7 @@ class TestRevisionNode:
         now = datetime.now(tz=UTC)
         node = RevisionNode(
             id=revision_id,
+            field_id=revision_id,
             deployment_id=deployment_id,
             revision_number=1,
             image_id=ImageID(uuid.uuid4()),
@@ -238,6 +244,7 @@ class TestRevisionNode:
     def test_extra_mounts_defaults_to_empty_list(self) -> None:
         node = RevisionNode(
             id=uuid.uuid4(),
+            field_id=uuid.uuid4(),
             deployment_id=uuid.uuid4(),
             revision_number=1,
             image_id=ImageID(uuid.uuid4()),
@@ -310,6 +317,7 @@ class TestDeploymentNode:
         deployment_id = DeploymentID(uuid.uuid4())
         node = DeploymentNode(
             id=deployment_id,
+            entity_id=deployment_id,
             metadata=_make_deployment_metadata(),
             network_access=_make_network_access(),
             replica_state=_make_replica_state(),
@@ -416,6 +424,7 @@ class TestRouteNode:
         now = datetime.now(tz=UTC)
         node = RouteNode(
             id=route_id,
+            field_id=route_id,
             deployment_id=deployment_id,
             session_id=None,
             status=RouteStatus.RUNNING,
@@ -436,6 +445,7 @@ class TestRouteNode:
     def test_session_id_defaults_to_none(self) -> None:
         node = RouteNode(
             id=uuid.uuid4(),
+            field_id=uuid.uuid4(),
             deployment_id=uuid.uuid4(),
             status=RouteStatus.PROVISIONING,
             health_status=RouteHealthStatus.NOT_CHECKED,
@@ -448,6 +458,7 @@ class TestRouteNode:
     def test_revision_id_defaults_to_none(self) -> None:
         node = RouteNode(
             id=uuid.uuid4(),
+            field_id=uuid.uuid4(),
             deployment_id=uuid.uuid4(),
             status=RouteStatus.RUNNING,
             health_status=RouteHealthStatus.HEALTHY,
@@ -460,6 +471,7 @@ class TestRouteNode:
     def test_error_data_defaults_to_empty_dict(self) -> None:
         node = RouteNode(
             id=uuid.uuid4(),
+            field_id=uuid.uuid4(),
             deployment_id=uuid.uuid4(),
             status=RouteStatus.RUNNING,
             health_status=RouteHealthStatus.HEALTHY,
@@ -475,6 +487,7 @@ class TestRouteNode:
         now = datetime.now(tz=UTC)
         node = RouteNode(
             id=route_id,
+            field_id=route_id,
             deployment_id=deployment_id,
             status=RouteStatus.RUNNING,
             health_status=RouteHealthStatus.HEALTHY,
@@ -497,8 +510,10 @@ class TestReplicaNode:
     """Tests for ReplicaNode model (user-facing view of a routing row)."""
 
     def _make(self, **overrides: Any) -> ReplicaNode:
+        replica_id = uuid.uuid4()
         defaults: dict[str, Any] = dict(
-            id=uuid.uuid4(),
+            id=replica_id,
+            field_id=replica_id,
             deployment_id=uuid.uuid4(),
             revision_id=uuid.uuid4(),
             session_id=None,
@@ -568,22 +583,19 @@ class TestUpdateDeploymentPayload:
 class TestDeleteDeploymentPayload:
     """Tests for DeleteDeploymentPayload model."""
 
-    def test_creation_with_uuid(self) -> None:
-        deployment_id = uuid.uuid4()
-        payload = DeleteDeploymentPayload(id=deployment_id)
-        assert payload.id == deployment_id
-
-    def test_id_is_uuid_instance(self) -> None:
-        deployment_id = uuid.uuid4()
-        payload = DeleteDeploymentPayload(id=deployment_id)
-        assert isinstance(payload.id, uuid.UUID)
+    def test_creation_with_deployment_node(self) -> None:
+        node = _make_deployment_node()
+        payload = DeleteDeploymentPayload(id=node.id, deployment=node)
+        assert payload.id == node.id
+        assert payload.deployment.entity_id == node.entity_id
 
     def test_round_trip(self) -> None:
-        deployment_id = uuid.uuid4()
-        payload = DeleteDeploymentPayload(id=deployment_id)
+        node = _make_deployment_node()
+        payload = DeleteDeploymentPayload(id=node.id, deployment=node)
         json_str = payload.model_dump_json()
         restored = DeleteDeploymentPayload.model_validate_json(json_str)
-        assert restored.id == deployment_id
+        assert restored.id == node.id
+        assert restored.deployment == node
 
 
 class TestActivateDeploymentPayload:

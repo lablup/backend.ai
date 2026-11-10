@@ -5,15 +5,18 @@ Client-facing API
 from __future__ import annotations
 
 import asyncio
+import errno
 import logging
 import os
+import stat
 import urllib.parse
 import uuid
 from collections.abc import AsyncGenerator, Iterator, Mapping, MutableMapping
 from contextlib import AbstractAsyncContextManager
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+from email.utils import format_datetime
 from http import HTTPStatus
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -24,7 +27,6 @@ from typing import (
 )
 
 import aiofiles
-import aiofiles.os
 import aiohttp_cors
 import janus
 import trafaret as t
@@ -37,6 +39,8 @@ from ai.backend.common.api_handlers import (
     QueryParam,
     stream_api_handler,
 )
+from ai.backend.common.asyncio import run_in_executor_with_context
+from ai.backend.common.data.entity.storage_volume import StorageVolumeName
 from ai.backend.common.dto.storage.request import (
     ArchiveDownloadQueryParams,
     ArchiveDownloadTokenData,
@@ -44,13 +48,15 @@ from ai.backend.common.dto.storage.request import (
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.metrics.http import build_api_metric_middleware
 from ai.backend.common.middlewares.exception import general_exception_middleware
+from ai.backend.common.middlewares.request_id import request_id_middleware
 from ai.backend.common.typed_validators import PydanticJWTValidator
 from ai.backend.common.types import BinarySize, VFolderID
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage import __version__
 from ai.backend.storage.dto.context import StorageRootCtx
 from ai.backend.storage.errors import (
     InvalidAPIParameters,
+    InvalidSubpathError,
     UploadOffsetMismatchError,
 )
 from ai.backend.storage.services.file_stream.zip import (
@@ -58,9 +64,12 @@ from ai.backend.storage.services.file_stream.zip import (
 )
 from ai.backend.storage.types import SENTINEL
 from ai.backend.storage.utils import (
+    NOFOLLOW_REFUSED_ERRNOS,
     CheckParamSource,
     build_attachment_headers,
     check_params,
+    open_dir_nofollow,
+    resolve_upload_target,
 )
 
 if TYPE_CHECKING:
@@ -74,10 +83,77 @@ from ai.backend.common.clients.valkey_client.valkey_tus import (
     TusSessionNotFoundError,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 DEFAULT_CHUNK_SIZE: Final = 256 * 1024  # 256 KiB
 DEFAULT_INFLIGHT_CHUNKS: Final = 8
+_STAGING_UNAVAILABLE_ERRNOS: Final = NOFOLLOW_REFUSED_ERRNOS | {errno.ENOENT}
+
+
+def _open_staging_file(path: str | Path, flags: int) -> int:
+    staging_path = Path(path)
+    with open_dir_nofollow(staging_path.parent) as dir_fd:
+        return os.open(staging_path.name, flags | os.O_NOFOLLOW, 0o666, dir_fd=dir_fd)
+
+
+def _staging_file_exists(staging_path: Path) -> bool:
+    try:
+        with open_dir_nofollow(staging_path.parent) as dir_fd:
+            st = os.stat(staging_path.name, dir_fd=dir_fd, follow_symlinks=False)
+    except OSError as e:
+        if e.errno in _STAGING_UNAVAILABLE_ERRNOS:
+            return False
+        raise
+    return stat.S_ISREG(st.st_mode)
+
+
+def _commit_upload(
+    vfid: VFolderID,
+    vfpath: Path,
+    staging_path: Path,
+    relpath: str,
+    dst_dir: str | None,
+) -> None:
+    """Move the staging file to its destination, walking the resolved path without following symlinks."""
+    root = vfpath.resolve()
+    target = resolve_upload_target(vfid, vfpath, relpath, dst_dir)
+    try:
+        with open_dir_nofollow(staging_path.parent) as src_dir_fd:
+            dst_dir_fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY)
+            try:
+                for part in target.relative_to(root).parent.parts:
+                    try:
+                        os.mkdir(part, dir_fd=dst_dir_fd)
+                    except FileExistsError:
+                        pass
+                    next_fd = os.open(
+                        part,
+                        os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+                        dir_fd=dst_dir_fd,
+                    )
+                    os.close(dst_dir_fd)
+                    dst_dir_fd = next_fd
+                try:
+                    os.rename(
+                        staging_path.name,
+                        target.name,
+                        src_dir_fd=src_dir_fd,
+                        dst_dir_fd=dst_dir_fd,
+                    )
+                except IsADirectoryError:
+                    os.unlink(staging_path.name, dir_fd=src_dir_fd)
+                    raise
+            finally:
+                os.close(dst_dir_fd)
+    except OSError as e:
+        if isinstance(e, IsADirectoryError) or e.errno in NOFOLLOW_REFUSED_ERRNOS:
+            raise InvalidSubpathError(vfid, PurePosixPath(dst_dir or "", relpath)) from e
+        raise
+    finally:
+        try:
+            staging_path.parent.rmdir()
+        except OSError:
+            pass
 
 
 async def _drain_into_upload_file(
@@ -92,12 +168,13 @@ async def _drain_into_upload_file(
     ``r+b`` which refuses to create. A continuation with a missing staging
     file means it was wiped out of band (NFS GC, manual ``rm``, etc.) —
     re-creating would silently zero-pad the prefix via ``truncate`` and
-    corrupt the upload. Surface it as a vanished session instead.
+    corrupt the upload. Surface it as a vanished session instead, also when
+    the staging file or its directory is a symlink.
     """
     mode: Literal["w+b", "r+b"] = "w+b" if start_offset == 0 else "r+b"
     bytes_written = 0
     try:
-        async with aiofiles.open(upload_temp_path, mode=mode) as f:
+        async with aiofiles.open(upload_temp_path, mode=mode, opener=_open_staging_file) as f:
             # Discard any orphan tail bytes left by a prior crashed holder.
             await f.truncate(start_offset)
             await f.seek(start_offset)
@@ -108,11 +185,13 @@ async def _drain_into_upload_file(
                 await f.write(chunk)
                 bytes_written += len(chunk)
             await f.flush()
-            await asyncio.get_running_loop().run_in_executor(None, os.fsync, f.fileno())
-    except FileNotFoundError as e:
-        raise TusSessionNotFoundError(
-            f"Upload session {session_id} staging file is missing at offset {start_offset}"
-        ) from e
+            await run_in_executor_with_context(None, os.fsync, f.fileno())
+    except OSError as e:
+        if e.errno in _STAGING_UNAVAILABLE_ERRNOS:
+            raise TusSessionNotFoundError(
+                f"Upload session {session_id} staging file is missing at offset {start_offset}"
+            ) from e
+        raise
     return bytes_written
 
 
@@ -146,6 +225,7 @@ class UploadTokenData(TypedDict):
     relpath: str
     session: str
     size: int
+    exp: int
 
 
 upload_token_data_iv = t.Dict(
@@ -156,6 +236,7 @@ upload_token_data_iv = t.Dict(
         t.Key("relpath"): t.String,
         t.Key("session"): t.String,
         t.Key("size"): t.Int,
+        t.Key("exp"): t.Int,
     },
 ).allow_extra(
     "*",
@@ -194,27 +275,25 @@ async def download(request: web.Request) -> web.StreamResponse:
         archive: bool
         no_cache: bool
 
-    async with (
-        cast(
-            AbstractAsyncContextManager[Params],
-            check_params(
-                request,
-                t.Dict(
-                    {
-                        t.Key("token"): tx.JsonWebToken(
-                            secret=secret,
-                            inner_iv=download_token_data_iv,
-                        ),
-                        t.Key("dst_dir", default=None): t.Null | t.String,
-                        t.Key("archive", default=False): t.ToBool,
-                        t.Key("no_cache", default=False): t.ToBool,
-                    },
-                ),
-                read_from=CheckParamSource.QUERY,
+    async with cast(
+        AbstractAsyncContextManager[Params],
+        check_params(
+            request,
+            t.Dict(
+                {
+                    t.Key("token"): tx.JsonWebToken(
+                        secret=secret,
+                        inner_iv=download_token_data_iv,
+                    ),
+                    t.Key("dst_dir", default=None): t.Null | t.String,
+                    t.Key("archive", default=False): t.ToBool,
+                    t.Key("no_cache", default=False): t.ToBool,
+                },
             ),
-        ) as params,
-        ctx.get_volume(params["token"]["volume"]) as volume,
-    ):
+            read_from=CheckParamSource.QUERY,
+        ),
+    ) as params:
+        volume = ctx.volume_pool.get_volume_by_name(StorageVolumeName(params["token"]["volume"]))
         token_data = params["token"]
         if token_data["unmanaged_path"] is not None:
             vfpath = Path(token_data["unmanaged_path"]).resolve()
@@ -296,17 +375,24 @@ async def download_directory_as_archive(
         def _consume(
             _loop: asyncio.AbstractEventLoop, iter: Iterator[Any], q: janus.SyncQueue[Any]
         ) -> None:
-            for item in iter:
-                q.put(item)
-            q.put(SENTINEL)
+            # The producer always terminates the queue; otherwise the consumer waits forever.
+            try:
+                for item in iter:
+                    q.put(item)
+            except BaseException as e:
+                q.put(e)
+            else:
+                q.put(SENTINEL)
 
         async def _aiter() -> AsyncGenerator[Any, None]:
             loop = asyncio.get_running_loop()
             q: janus.Queue[Any] = janus.Queue(maxsize=DEFAULT_INFLIGHT_CHUNKS)
             try:
-                fut = loop.run_in_executor(None, lambda: _consume(loop, iter, q.sync_q))
+                fut = run_in_executor_with_context(None, lambda: _consume(loop, iter, q.sync_q))
                 while True:
                     item = await q.async_q.get()
+                    if isinstance(item, BaseException):
+                        raise item
                     if item is SENTINEL:
                         break
                     yield item
@@ -320,11 +406,12 @@ async def download_directory_as_archive(
 
     if zip_filename is None:
         zip_filename = file_path.name + ".zip"
-    zf = zipstream.ZipFile(compression=zipstream.ZIP_DEFLATED)
+    zf = zipstream.ZipFile(compression=zipstream.ZIP_DEFLATED, allowZip64=True)
     async for root, dirs, files in _iter2aiter(os.walk(file_path)):
-        for file in files:
+        regular_files = [f for f in files if not (Path(root) / f).is_symlink()]
+        for file in regular_files:
             zf.write(Path(root) / file, Path(root).relative_to(file_path) / file)
-        if len(dirs) == 0 and len(files) == 0:
+        if len(dirs) == 0 and len(regular_files) == 0:
             # Include an empty directory in the archive as well.
             zf.write(root, Path(root).relative_to(file_path))
     ascii_filename = (
@@ -376,8 +463,8 @@ async def tus_check_session(request: web.Request) -> web.Response:
         ),
     ) as params:
         token_data = params["token"]
-        async with ctx.get_volume(token_data["volume"]) as volume:
-            headers = await prepare_tus_session_headers(request, token_data, volume)
+        volume = ctx.volume_pool.get_volume_by_name(StorageVolumeName(token_data["volume"]))
+        headers = await prepare_tus_session_headers(request, token_data, volume)
     return web.Response(headers=headers)
 
 
@@ -390,7 +477,7 @@ async def tus_upload_part(request: web.Request) -> web.Response:
 
     class Params(TypedDict):
         token: UploadTokenData
-        dst_dir: str
+        dst_dir: str | None
 
     async with cast(
         AbstractAsyncContextManager[Params],
@@ -409,72 +496,77 @@ async def tus_upload_part(request: web.Request) -> web.Response:
         ),
     ) as params:
         token_data = params["token"]
-        async with ctx.get_volume(token_data["volume"]) as volume:
-            headers = await prepare_tus_session_headers(request, token_data, volume)
-            vfpath = volume.mangle_vfpath(token_data["vfid"])
-            upload_temp_path: Path = vfpath / ".upload" / token_data["session"]
+        volume = ctx.volume_pool.get_volume_by_name(StorageVolumeName(token_data["volume"]))
+        headers = await prepare_tus_session_headers(request, token_data, volume)
+        vfpath = volume.mangle_vfpath(token_data["vfid"])
+        upload_temp_path: Path = vfpath / ".upload" / token_data["session"]
+        await run_in_executor_with_context(
+            None,
+            resolve_upload_target,
+            token_data["vfid"],
+            vfpath,
+            token_data["relpath"],
+            params["dst_dir"],
+        )
 
-            # TUS protocol requires Upload-Offset validation before appending data
-            upload_offset_header = request.headers.get("Upload-Offset")
-            if upload_offset_header is None:
-                raise InvalidAPIParameters(
-                    "Missing required Upload-Offset header for TUS PATCH request"
-                )
-
-            try:
-                client_offset = int(upload_offset_header)
-            except ValueError as e:
-                raise InvalidAPIParameters(
-                    f"Invalid Upload-Offset header value: {upload_offset_header}"
-                ) from e
-
-            await aiofiles.os.makedirs(upload_temp_path.parent, exist_ok=True)
-
-            session_id = TusSessionId(token_data["session"])
-            holder_token = f"{ctx.node_id}:{uuid.uuid4().hex}"
-            actual_offset = await ctx.valkey_tus_client.try_load_offset(session_id, holder_token)
-            if client_offset != actual_offset:
-                # We hold the lease but the precondition fails — release it
-                # before bailing so the next PATCH does not have to wait for
-                # the TTL.
-                await ctx.valkey_tus_client.release_lease(session_id, holder_token)
-                raise UploadOffsetMismatchError(
-                    f"Upload offset mismatch: expected {actual_offset}, got {client_offset}"
-                )
-            watcher_task = asyncio.create_task(
-                ctx.valkey_tus_client.watch_lease(session_id),
-                name=f"tus-lease-watch-{session_id}",
-            )
-            try:
-                bytes_written = await _drain_into_upload_file(
-                    request.content, upload_temp_path, actual_offset, session_id
-                )
-            except BaseException:
-                await ctx.valkey_tus_client.release_lease(session_id, holder_token)
-                raise
-            finally:
-                watcher_task.cancel()
-                try:
-                    await watcher_task
-                except asyncio.CancelledError:
-                    pass
-            new_offset = await ctx.valkey_tus_client.advance_offset(
-                session_id, holder_token, bytes_written
+        # TUS protocol requires Upload-Offset validation before appending data
+        upload_offset_header = request.headers.get("Upload-Offset")
+        if upload_offset_header is None:
+            raise InvalidAPIParameters(
+                "Missing required Upload-Offset header for TUS PATCH request"
             )
 
-            headers["Upload-Offset"] = str(new_offset)
-            if new_offset >= int(token_data["size"]):
-                parent_dir = vfpath
-                if (dst_dir := params["dst_dir"]) is not None:
-                    parent_dir = vfpath / dst_dir
-                target_path: Path = parent_dir / token_data["relpath"]
-                if not target_path.parent.exists():
-                    target_path.parent.mkdir(parents=True, exist_ok=True)
-                upload_temp_path.rename(target_path)
-                try:
-                    await aiofiles.os.rmdir(upload_temp_path.parent)
-                except OSError:
-                    pass
+        try:
+            client_offset = int(upload_offset_header)
+        except ValueError as e:
+            raise InvalidAPIParameters(
+                f"Invalid Upload-Offset header value: {upload_offset_header}"
+            ) from e
+
+        session_id = TusSessionId(token_data["session"])
+        holder_token = f"{ctx.node_id}:{uuid.uuid4().hex}"
+        actual_offset = await ctx.valkey_tus_client.try_load_offset(session_id, holder_token)
+        if client_offset != actual_offset:
+            # We hold the lease but the precondition fails — release it
+            # before bailing so the next PATCH does not have to wait for
+            # the TTL.
+            await ctx.valkey_tus_client.release_lease(session_id, holder_token)
+            raise UploadOffsetMismatchError(
+                f"Upload offset mismatch: expected {actual_offset}, got {client_offset}"
+            )
+        watcher_task = asyncio.create_task(
+            ctx.valkey_tus_client.watch_lease(session_id),
+            name=f"tus-lease-watch-{session_id}",
+        )
+        try:
+            bytes_written = await _drain_into_upload_file(
+                request.content, upload_temp_path, actual_offset, session_id
+            )
+        except BaseException:
+            await ctx.valkey_tus_client.release_lease(session_id, holder_token)
+            raise
+        finally:
+            watcher_task.cancel()
+            try:
+                await watcher_task
+            except asyncio.CancelledError:
+                pass
+        upload_state = await ctx.valkey_tus_client.advance_offset(
+            session_id, holder_token, bytes_written
+        )
+
+        headers["Upload-Offset"] = str(upload_state.offset)
+        headers["Upload-Expires"] = _upload_expires_at(token_data["exp"], upload_state.ttl_seconds)
+        if upload_state.offset >= int(token_data["size"]):
+            await run_in_executor_with_context(
+                None,
+                _commit_upload,
+                token_data["vfid"],
+                vfpath,
+                upload_temp_path,
+                token_data["relpath"],
+                params["dst_dir"],
+            )
     return web.Response(status=HTTPStatus.NO_CONTENT, headers=headers)
 
 
@@ -489,11 +581,13 @@ async def tus_options(request: web.Request) -> web.Response:
         "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
     )
     headers["Access-Control-Expose-Headers"] = (
-        "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
+        "Tus-Resumable, Tus-Version, Tus-Extension, Tus-Max-Size, Upload-Length, "
+        "Upload-Metadata, Upload-Offset, Upload-Expires, Content-Type"
     )
     headers["Access-Control-Allow-Methods"] = "*"
     headers["Tus-Resumable"] = "1.0.0"
     headers["Tus-Version"] = "1.0.0"
+    headers["Tus-Extension"] = "expiration"
     headers["Tus-Max-Size"] = str(
         int(BinarySize.from_str(ctx.local_config.storage_proxy.max_upload_size)),
     )
@@ -508,7 +602,7 @@ async def prepare_tus_session_headers(
 ) -> MutableMapping[str, str]:
     vfpath = volume.mangle_vfpath(token_data["vfid"])
     upload_temp_path = vfpath / ".upload" / token_data["session"]
-    if not Path(upload_temp_path).exists():
+    if not await run_in_executor_with_context(None, _staging_file_exists, upload_temp_path):
         raise TusSessionNotFoundError(
             f"Upload session {token_data['session']} has no on-disk staging file"
         )
@@ -518,20 +612,30 @@ async def prepare_tus_session_headers(
         "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
     )
     headers["Access-Control-Expose-Headers"] = (
-        "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
+        "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Upload-Expires, Content-Type"
     )
     headers["Access-Control-Allow-Methods"] = "*"
     headers["Cache-Control"] = "no-store"
     headers["Tus-Resumable"] = "1.0.0"
     ctx: RootContext = request.app["ctx"]
-    redis_offset = await ctx.valkey_tus_client.get_offset(TusSessionId(token_data["session"]))
-    if redis_offset is None:
+    upload_state = await ctx.valkey_tus_client.get_upload_state(TusSessionId(token_data["session"]))
+    if upload_state is None:
         raise TusSessionNotFoundError(
             f"Upload session {token_data['session']} is not registered or has expired"
         )
-    headers["Upload-Offset"] = str(redis_offset)
+    headers["Upload-Offset"] = str(upload_state.offset)
     headers["Upload-Length"] = str(token_data["size"])
+    headers["Upload-Expires"] = _upload_expires_at(token_data["exp"], upload_state.ttl_seconds)
     return headers
+
+
+def _upload_expires_at(token_exp: int, ttl_seconds: int) -> str:
+    """The upload token stops being accepted at its ``exp``, which no PATCH extends."""
+    expires_at = min(
+        datetime.fromtimestamp(token_exp, UTC),
+        datetime.now(UTC) + timedelta(seconds=ttl_seconds),
+    )
+    return format_datetime(expires_at, usegmt=True)
 
 
 class DownloadHandler:
@@ -555,30 +659,27 @@ class DownloadHandler:
         """Stream multiple files/directories as a ZIP archive."""
         token_data = self._jwt_validator.validate(query.parsed.token, ArchiveDownloadTokenData)
 
-        async with ctx.root_ctx.get_volume(token_data.volume) as volume:
-            vfolder_root = volume.sanitize_vfpath(token_data.virtual_folder_id)
-            sanitized: list[Path] = [
-                (vfolder_root / relpath).resolve() for relpath in token_data.files
-            ]
-            for file_path, relpath in zip(sanitized, token_data.files, strict=True):
-                if not file_path.is_relative_to(vfolder_root):
-                    raise InvalidAPIParameters(
-                        extra_msg=f"Path escapes vfolder boundary: {relpath}"
-                    )
-                if not file_path.exists():
-                    raise web.HTTPNotFound(reason=f"File not found: {relpath}")
+        volume = ctx.root_ctx.volume_pool.get_volume_by_name(StorageVolumeName(token_data.volume))
+        vfolder_root = volume.sanitize_vfpath(token_data.virtual_folder_id)
+        sanitized: list[Path] = [(vfolder_root / relpath).resolve() for relpath in token_data.files]
+        for file_path, relpath in zip(sanitized, token_data.files, strict=True):
+            if not file_path.is_relative_to(vfolder_root):
+                raise InvalidAPIParameters(extra_msg=f"Path escapes vfolder boundary: {relpath}")
+            if not file_path.exists():
+                raise web.HTTPNotFound(reason=f"File not found: {relpath}")
 
-            reader = ZipArchiveStreamReader(vfolder_root)
-            reader.add_entries(sanitized)
+        reader = ZipArchiveStreamReader(vfolder_root)
+        reader.add_entries(sanitized)
 
-            filename = token_data.filename if token_data.filename is not None else reader.filename()
-            headers = build_attachment_headers(filename, reader.content_type())
-            return APIStreamResponse(body=reader, status=HTTPStatus.OK, headers=headers)
+        filename = token_data.filename if token_data.filename is not None else reader.filename()
+        headers = build_attachment_headers(filename, reader.content_type())
+        return APIStreamResponse(body=reader, status=HTTPStatus.OK, headers=headers)
 
 
 async def init_client_app(ctx: RootContext) -> web.Application:
     app = web.Application(
         middlewares=[
+            request_id_middleware,
             general_exception_middleware,
             build_api_metric_middleware(ctx.metric_registry.api),
         ]

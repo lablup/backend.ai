@@ -3,38 +3,25 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.user import UserEntityType
+from ai.backend.manager.actions.v2.ops.base import GlobalSearcherOpsAction
 from ai.backend.manager.data.user.types import UserData
-from ai.backend.manager.repositories.base.querier import BatchQuerier
-from ai.backend.manager.services.user.actions.base import UserAction
+from ai.backend.manager.models.user.row import UserRow
+
+__all__ = ("GlobalSearchUsersAction",)
 
 
-@dataclass
-class SearchUsersAction(UserAction):
-    """Action for searching users (admin only - no scope)."""
-
-    querier: BatchQuerier
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
+@dataclass(frozen=True)
+class GlobalSearchUsersAction(GlobalSearcherOpsAction[UserRow, UserData]):
+    """Page through every user in the installation."""
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
-
-
-@dataclass
-class SearchUsersActionResult(BaseActionResult):
-    """Result of searching users."""
-
-    users: list[UserData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
+    def entity_type(cls) -> EntityType:
+        return UserEntityType()
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "global_search_users"

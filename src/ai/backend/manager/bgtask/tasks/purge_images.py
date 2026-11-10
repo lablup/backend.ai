@@ -11,15 +11,15 @@ from ai.backend.common.bgtask.task.base import (
     BaseBackgroundTaskResult,
 )
 from ai.backend.common.types import AgentId, BackendAISchema
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.bgtask.types import ManagerBgtaskName
 from ai.backend.manager.services.image.actions.purge_images import PurgeImageAction
 from ai.backend.manager.services.image.types import ImageRefData
 
 if TYPE_CHECKING:
-    from ai.backend.manager.services.processors import Processors
+    from ai.backend.manager.services.image.service import ImageService
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class PurgedImageData(BackendAISchema):
@@ -71,10 +71,10 @@ class PurgeImagesHandler(BaseBackgroundTaskHandler[PurgeImagesManifest, PurgeIma
     Background task handler for purging container images from agents.
     """
 
-    _processors: Processors
+    _image_service: ImageService
 
-    def __init__(self, processors: Processors) -> None:
-        self._processors = processors
+    def __init__(self, image_service: ImageService) -> None:
+        self._image_service = image_service
 
     @classmethod
     @override
@@ -88,13 +88,14 @@ class PurgeImagesHandler(BaseBackgroundTaskHandler[PurgeImagesManifest, PurgeIma
 
     @override
     async def execute(self, manifest: PurgeImagesManifest) -> PurgeImagesTaskResult:
+        # TODO(BA-7978): Move the logic out of the service and call repositories/clients directly.
         total_reserved_bytes = 0
         purged_images: list[PurgedImageData] = []
         errors: list[str] = []
 
         for key in manifest.keys:
             for img in key.images:
-                result = await self._processors.image.purge_image.wait_for_complete(
+                result = await self._image_service.purge_image(
                     PurgeImageAction(
                         ImageRefData(
                             name=img.name,
@@ -117,7 +118,7 @@ class PurgeImagesHandler(BaseBackgroundTaskHandler[PurgeImagesManifest, PurgeIma
                 )
 
                 if result.error is not None:
-                    log.error(result.error)
+                    log.trace("image purge failed", agent_id=key.agent_id, reason=result.error)
                     errors.append(result.error)
 
         return PurgeImagesTaskResult(

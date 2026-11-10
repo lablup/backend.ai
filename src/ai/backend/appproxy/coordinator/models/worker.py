@@ -3,11 +3,8 @@ import uuid
 from collections.abc import Sequence
 from datetime import datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any
+from typing import Any
 from uuid import UUID
-
-if TYPE_CHECKING:
-    pass
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
@@ -15,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column, relationship, selectinload
 from yarl import URL
 
+from ai.backend.appproxy.common.client_ip import ClientIPValidator
 from ai.backend.appproxy.common.errors import (
     ObjectNotFound,
     PortNotAvailable,
@@ -30,15 +28,16 @@ from ai.backend.appproxy.common.types import (
     Slot,
 )
 from ai.backend.appproxy.coordinator.errors import MissingFrontendConfigError
+from ai.backend.appproxy.coordinator.errors.circuit import HTTP2AccessControlNotSupportedError
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.types import Subdomain
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .base import GUID, Base, BaseMixin, EnumType, StrEnumType
 from .circuit import Circuit
 from .subdomain import SubdomainGenerator
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 __all__ = [
     "Worker",
@@ -388,23 +387,26 @@ async def pick_worker(
             Worker.filtered_apps_only & (Worker.accepted_traffics.contains(app_mode))
         )
     result = await session.execute(worker_query)
-    sorted_workers: list[Worker] = [
-        f
-        for f in sorted(
-            result.scalars().all(),
-            key=lambda f: (
-                -1
-                if f.frontend_mode == FrontendMode.WILDCARD_DOMAIN
-                else (f.available_slots - f.occupied_slots) * -1
-            ),
-            reverse=True,
-        )
-        if f.frontend_mode == FrontendMode.WILDCARD_DOMAIN
-        or (f.available_slots - f.occupied_slots) > 0
-    ]
-    if not sorted_workers:
+    workers = result.scalars().all()
+
+    candidates: list[Worker] = []
+    for candidate in workers:
+        is_wildcard = candidate.frontend_mode == FrontendMode.WILDCARD_DOMAIN
+        remaining_slots = candidate.available_slots - candidate.occupied_slots
+        if is_wildcard or remaining_slots > 0:
+            candidates.append(candidate)
+
+    if not candidates:
         raise WorkerNotAvailable
-    worker = sorted_workers[0]
+
+    def priority(worker: Worker) -> tuple[int, int]:
+        # Prioritize wildcard domain workers first, then by remaining slots (descending)
+        if worker.frontend_mode == FrontendMode.WILDCARD_DOMAIN:
+            # Use only occupied_slots for wildcard workers since available_slots is -1
+            return (1, -worker.occupied_slots)
+        return (0, worker.available_slots - worker.occupied_slots)
+
+    worker = max(candidates, key=priority)
     return await Worker.get(
         session,
         worker.id,
@@ -438,6 +440,10 @@ async def add_circuit(
             raise WorkerNotAvailable
     else:
         worker = await pick_worker(session, session_info, endpoint_info, protocol, mode)
+
+    needs_access_control = not open_to_public or ClientIPValidator(allowed_client_ips).is_restricted
+    if worker.protocol == ProxyProtocol.HTTP2 and needs_access_control:
+        raise HTTP2AccessControlNotSupportedError
 
     circuit_params: dict[str, Any] = {}
 

@@ -9,8 +9,9 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
-from ai.backend.client.v2.exceptions import ConflictError, NotFoundError, ServerError
+from ai.backend.client.v2.exceptions import ConflictError, NotFoundError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.domain import (
     CreateDomainResponse,
@@ -22,17 +23,15 @@ from ai.backend.common.dto.manager.domain import (
 )
 from ai.backend.common.dto.manager.domain.types import DomainOrder, DomainOrderField, OrderDirection
 from ai.backend.common.dto.manager.query import StringFilter
-from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.user.types import UserStatus
-from ai.backend.manager.models.domain import domains
-from ai.backend.manager.models.group import groups
-from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.kernel import kernels
-from ai.backend.manager.models.scaling_group.row import ScalingGroupOpts, scaling_groups
-from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.user import users
+from ai.backend.manager.models.domain.row import DomainRow, domains
+from ai.backend.manager.models.kernel.row import kernels
+from ai.backend.manager.models.project.row import groups
+from ai.backend.manager.models.resource_group.row import resource_groups
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.user.row import users
 
 DomainFactory = Callable[..., Coroutine[Any, Any, CreateDomainResponse]]
 
@@ -112,6 +111,9 @@ class TestDomainPurgeValidation:
                     domain_name=domain_name,
                     resource_policy="default",
                     role=UserRole.USER,
+                    domain_id=sa.select(DomainRow.id)
+                    .where(DomainRow.name == domain_name)
+                    .scalar_subquery(),
                 )
             )
 
@@ -133,6 +135,7 @@ class TestDomainPurgeValidation:
         domain_name = created.domain.name
         user_uuid = uuid.uuid4()
         session_id = uuid.uuid4()
+        unique = secrets.token_hex(4)
 
         async with db_engine.begin() as conn:
             group_result = await conn.execute(
@@ -147,7 +150,7 @@ class TestDomainPurgeValidation:
         async with db_engine.begin() as conn:
             sgroup_id = (
                 await conn.execute(
-                    sa.insert(scaling_groups)
+                    sa.insert(resource_groups)
                     .values(
                         name=sgroup_name,
                         description="Test scaling group",
@@ -155,11 +158,35 @@ class TestDomainPurgeValidation:
                         driver="static",
                         driver_opts={},
                         scheduler="fifo",
-                        scheduler_opts=ScalingGroupOpts(),
+                        scheduler_opts=ResourceGroupOpts(),
                     )
-                    .returning(scaling_groups.c.id)
+                    .returning(resource_groups.c.id)
                 )
             ).scalar_one()
+            await conn.execute(
+                sa.insert(users).values(
+                    uuid=str(user_uuid),
+                    username=f"test-user-{unique}",
+                    email=f"test-user-{unique}@test.local",
+                    password=PasswordInfo(
+                        password=secrets.token_urlsafe(8),
+                        algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+                        rounds=600_000,
+                        salt_size=32,
+                    ),
+                    need_password_change=False,
+                    full_name=f"Test User {unique}",
+                    description=f"Test user for kernel conflict test {unique}",
+                    status=UserStatus.ACTIVE,
+                    status_info="test",
+                    domain_name=domain_name,
+                    resource_policy="default",
+                    role=UserRole.USER,
+                    domain_id=sa.select(DomainRow.id)
+                    .where(DomainRow.name == domain_name)
+                    .scalar_subquery(),
+                )
+            )
             await conn.execute(
                 sa.insert(SessionRow.__table__).values(
                     id=session_id,
@@ -171,8 +198,6 @@ class TestDomainPurgeValidation:
                     user_uuid=user_uuid,
                     scaling_group_name=sgroup_name,
                     resource_group_id=sgroup_id,
-                    occupying_slots=ResourceSlot(),
-                    requested_slots=ResourceSlot(),
                     priority=10,
                     cluster_size=1,
                     use_host_network=False,
@@ -192,8 +217,6 @@ class TestDomainPurgeValidation:
                     local_rank=0,
                     cluster_hostname="localhost",
                     status=KernelStatus.RUNNING,
-                    occupied_slots=ResourceSlot(),
-                    requested_slots=ResourceSlot(),
                     occupied_shares={},
                     repl_in_port=0,
                     repl_out_port=0,
@@ -213,15 +236,16 @@ class TestDomainPurgeValidation:
                     SessionRow.__table__.delete().where(SessionRow.__table__.c.id == session_id)
                 )
                 await conn.execute(
-                    scaling_groups.delete().where(scaling_groups.c.name == sgroup_name)
+                    resource_groups.delete().where(resource_groups.c.name == sgroup_name)
                 )
+                await conn.execute(users.delete().where(users.c.uuid == str(user_uuid)))
 
-    async def test_purge_nonexistent_domain_raises_server_error(
+    async def test_purge_nonexistent_domain_raises_not_found(
         self,
         admin_registry: BackendAIClientRegistry,
     ) -> None:
-        """F-PURGE-BIZ-4: Purging nonexistent domain → ServerError (HTTP 500)."""
-        with pytest.raises(ServerError):
+        """F-PURGE-BIZ-4: Purging nonexistent domain → NotFoundError (HTTP 404)."""
+        with pytest.raises(NotFoundError):
             await admin_registry.domain.purge(
                 PurgeDomainRequest(name="nonexistent-domain-xyz-99999")
             )
@@ -252,7 +276,7 @@ class TestDomainPurgeValidation:
         async with db_engine.begin() as conn:
             sgroup_id = (
                 await conn.execute(
-                    sa.insert(scaling_groups)
+                    sa.insert(resource_groups)
                     .values(
                         name=sgroup_name,
                         description="Test scaling group",
@@ -260,53 +284,11 @@ class TestDomainPurgeValidation:
                         driver="static",
                         driver_opts={},
                         scheduler="fifo",
-                        scheduler_opts=ScalingGroupOpts(),
+                        scheduler_opts=ResourceGroupOpts(),
                     )
-                    .returning(scaling_groups.c.id)
+                    .returning(resource_groups.c.id)
                 )
             ).scalar_one()
-            await conn.execute(
-                sa.insert(SessionRow.__table__).values(
-                    id=session_id,
-                    domain_name=domain_name,
-                    # domain_id/resource_group_id only satisfy NOT NULL FKs;
-                    # the purge check reads kernels.domain_name.
-                    domain_id=domain_id,
-                    group_id=group_id,
-                    user_uuid=user_uuid,
-                    scaling_group_name=sgroup_name,
-                    resource_group_id=sgroup_id,
-                    occupying_slots=ResourceSlot(),
-                    requested_slots=ResourceSlot(),
-                    priority=10,
-                    cluster_size=1,
-                    use_host_network=False,
-                )
-            )
-            await conn.execute(
-                sa.insert(kernels).values(
-                    session_id=session_id,
-                    domain_name=domain_name,
-                    group_id=group_id,
-                    user_uuid=user_uuid,
-                    scaling_group=sgroup_name,
-                    resource_group_id=sgroup_id,
-                    cluster_role="main",
-                    cluster_size=1,
-                    cluster_idx=0,
-                    local_rank=0,
-                    cluster_hostname="localhost",
-                    status=KernelStatus.RUNNING,
-                    occupied_slots=ResourceSlot(),
-                    requested_slots=ResourceSlot(),
-                    occupied_shares={},
-                    repl_in_port=0,
-                    repl_out_port=0,
-                    stdin_port=0,
-                    stdout_port=0,
-                    use_host_network=False,
-                )
-            )
             await conn.execute(
                 sa.insert(users).values(
                     uuid=str(user_uuid),
@@ -326,6 +308,47 @@ class TestDomainPurgeValidation:
                     domain_name=domain_name,
                     resource_policy="default",
                     role=UserRole.USER,
+                    domain_id=sa.select(DomainRow.id)
+                    .where(DomainRow.name == domain_name)
+                    .scalar_subquery(),
+                )
+            )
+            await conn.execute(
+                sa.insert(SessionRow.__table__).values(
+                    id=session_id,
+                    domain_name=domain_name,
+                    # domain_id/resource_group_id only satisfy NOT NULL FKs;
+                    # the purge check reads kernels.domain_name.
+                    domain_id=domain_id,
+                    group_id=group_id,
+                    user_uuid=user_uuid,
+                    scaling_group_name=sgroup_name,
+                    resource_group_id=sgroup_id,
+                    priority=10,
+                    cluster_size=1,
+                    use_host_network=False,
+                )
+            )
+            await conn.execute(
+                sa.insert(kernels).values(
+                    session_id=session_id,
+                    domain_name=domain_name,
+                    group_id=group_id,
+                    user_uuid=user_uuid,
+                    scaling_group=sgroup_name,
+                    resource_group_id=sgroup_id,
+                    cluster_role="main",
+                    cluster_size=1,
+                    cluster_idx=0,
+                    local_rank=0,
+                    cluster_hostname="localhost",
+                    status=KernelStatus.RUNNING,
+                    occupied_shares={},
+                    repl_in_port=0,
+                    repl_out_port=0,
+                    stdin_port=0,
+                    stdout_port=0,
+                    use_host_network=False,
                 )
             )
 
@@ -340,7 +363,7 @@ class TestDomainPurgeValidation:
                     SessionRow.__table__.delete().where(SessionRow.__table__.c.id == session_id)
                 )
                 await conn.execute(
-                    scaling_groups.delete().where(scaling_groups.c.name == sgroup_name)
+                    resource_groups.delete().where(resource_groups.c.name == sgroup_name)
                 )
                 await conn.execute(users.delete().where(users.c.uuid == str(user_uuid)))
 

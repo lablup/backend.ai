@@ -5,6 +5,7 @@ from aiohttp import web
 from aiohttp.test_utils import make_mocked_request
 from aiohttp.typedefs import Handler
 
+from ai.backend.web.errors import StaticFileNotFoundError
 from ai.backend.web.security import (
     SecurityPolicy,
     add_self_content_security_policy,
@@ -156,7 +157,7 @@ async def test_csp_policy_drops_nonce_when_unsafe_inline_present(
         ],
     )
     request = make_mocked_request("GET", "/", headers={"Host": "localhost"}, app=test_app)
-    with caplog.at_level("WARNING"):
+    with caplog.at_level("DEBUG"):
         response = await security_policy_middleware(request, async_handler)
 
     csp = response.headers["Content-Security-Policy"]
@@ -224,3 +225,19 @@ def test_csp_policy_without_nonce_keeps_directives_clean() -> None:
     policy = csp_policy_builder({"script-src": ["'self'"]})
     response = policy(web.Response())
     assert response.headers["Content-Security-Policy"] == "script-src 'self';"
+
+
+async def test_response_policies_apply_to_raised_exception() -> None:
+    test_app = web.Application()
+    test_app["security_policy"] = SecurityPolicy(
+        request_policies=[], response_policies=[set_content_type_nosniff_policy]
+    )
+    request = make_mocked_request("GET", "/", app=test_app)
+
+    async def handler(request: web.Request) -> web.Response:
+        raise StaticFileNotFoundError()
+
+    with pytest.raises(StaticFileNotFoundError) as exc_info:
+        await security_policy_middleware(request, handler)
+
+    assert exc_info.value.headers["X-Content-Type-Options"] == "nosniff"

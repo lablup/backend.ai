@@ -7,14 +7,14 @@ from ai.backend.common.types import (
     AcceleratorMetadata,
     DeviceId,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .types import ATOMDevice
 
 PREFIX = "atom"
 VALID_DEVICE_NAME = ("ATOM", "RBLN-CA02")
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ATOMPlugin(AbstractATOMPlugin[ATOMDevice]):

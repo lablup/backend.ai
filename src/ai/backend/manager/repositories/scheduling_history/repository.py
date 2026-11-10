@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -11,8 +12,10 @@ from ai.backend.common.resilience import (
     RetryPolicy,
 )
 from ai.backend.common.resilience.policies.retry import BackoffStrategy
+from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.data.deployment.types import (
     DeploymentHistoryListResult,
+    ReplicaGroupHistoryListResult,
     RouteHistoryListResult,
 )
 from ai.backend.manager.data.kernel.types import (
@@ -21,14 +24,22 @@ from ai.backend.manager.data.kernel.types import (
 from ai.backend.manager.data.session.types import (
     SessionSchedulingHistoryListResult,
 )
-from ai.backend.manager.repositories.base import BatchQuerier
-
-from .db_source import SchedulingHistoryDBSource
-from .types import (
-    DeploymentHistorySearchScope,
-    KernelSchedulingHistorySearchScope,
-    RouteHistorySearchScope,
-    SessionSchedulingHistorySearchScope,
+from ai.backend.manager.models.replica_group_history.searchers import ReplicaGroupHistorySearcher
+from ai.backend.manager.models.scheduling_history.scopes import (
+    DeploymentHistoryTarget,
+    RouteHistoryTarget,
+    SessionSchedulingHistoryTarget,
+)
+from ai.backend.manager.models.scheduling_history.searchers import (
+    DeploymentHistorySearcher,
+    KernelSchedulingHistorySearcher,
+    RouteHistorySearcher,
+    SessionSchedulingHistorySearcher,
+)
+from ai.backend.manager.models.scopes import OperationScope
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.scheduling_history.db_source.db_source import (
+    SchedulingHistoryDBSource,
 )
 
 if TYPE_CHECKING:
@@ -58,89 +69,72 @@ class SchedulingHistoryRepository:
 
     _db_source: SchedulingHistoryDBSource
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
-        self._db_source = SchedulingHistoryDBSource(db)
+    def __init__(self, db: ExtendedAsyncSAEngine, v2_ops: V2DBOpsProvider) -> None:
+        self._db_source = SchedulingHistoryDBSource(db, v2_ops)
 
     # ========== Session History (Admin) ==========
 
     @scheduling_history_repository_resilience.apply()
-    async def search_session_history(
-        self,
-        querier: BatchQuerier,
-    ) -> SessionSchedulingHistoryListResult:
-        """Search session scheduling history with pagination (admin API)."""
-        return await self._db_source.search_session_history(querier)
-
-    # ========== Session History (Scoped) ==========
-
     @scheduling_history_repository_resilience.apply()
     async def search_session_scoped_history(
         self,
-        querier: BatchQuerier,
-        scope: SessionSchedulingHistorySearchScope,
+        searcher: SessionSchedulingHistorySearcher,
+        scope: SessionSchedulingHistoryTarget,
     ) -> SessionSchedulingHistoryListResult:
         """Search session scheduling history within scope."""
-        return await self._db_source.search_session_scoped_history(querier, scope)
+        return await self._db_source.search_session_scoped_history(searcher, scope)
 
     # ========== Kernel History (Admin) ==========
 
     @scheduling_history_repository_resilience.apply()
-    async def search_kernel_history(
-        self,
-        querier: BatchQuerier,
-    ) -> KernelSchedulingHistoryListResult:
-        """Search kernel scheduling history with pagination."""
-        return await self._db_source.search_kernel_history(querier)
+    @scheduling_history_repository_resilience.apply()
+    async def resolve_session_id(self, kernel_id: KernelId) -> SessionId:
+        """Return the id of the session owning ``kernel_id``.
 
-    # ========== Kernel History (Scoped) ==========
+        Raises ``KernelNotFound`` when no such kernel exists.
+        """
+        return await self._db_source.resolve_session_id(kernel_id)
 
     @scheduling_history_repository_resilience.apply()
     async def search_kernel_scoped_history(
         self,
-        querier: BatchQuerier,
-        scope: KernelSchedulingHistorySearchScope,
+        searcher: KernelSchedulingHistorySearcher,
+        scopes: Sequence[OperationScope],
     ) -> KernelSchedulingHistoryListResult:
-        """Search kernel scheduling history within scope."""
-        return await self._db_source.search_kernel_scoped_history(querier, scope)
+        """Search kernel history whose rows match any of ``scopes`` (OR)."""
+        return await self._db_source.search_kernel_scoped_history(searcher, scopes)
 
     # ========== Deployment History (Admin) ==========
 
     @scheduling_history_repository_resilience.apply()
-    async def search_deployment_history(
-        self,
-        querier: BatchQuerier,
-    ) -> DeploymentHistoryListResult:
-        """Search deployment history with pagination (admin API)."""
-        return await self._db_source.search_deployment_history(querier)
-
-    # ========== Deployment History (Scoped) ==========
-
     @scheduling_history_repository_resilience.apply()
     async def search_deployment_scoped_history(
         self,
-        querier: BatchQuerier,
-        scope: DeploymentHistorySearchScope,
+        searcher: DeploymentHistorySearcher,
+        scope: DeploymentHistoryTarget,
     ) -> DeploymentHistoryListResult:
         """Search deployment history within scope."""
-        return await self._db_source.search_deployment_scoped_history(querier, scope)
+        return await self._db_source.search_deployment_scoped_history(searcher, scope)
+
+    # ========== Replica Group History (Scoped) ==========
+
+    @scheduling_history_repository_resilience.apply()
+    async def scoped_search_replica_group_history(
+        self,
+        searcher: ReplicaGroupHistorySearcher,
+        scopes: Sequence[OperationScope],
+    ) -> ReplicaGroupHistoryListResult:
+        """Search replica-group history whose rows match any of ``scopes`` (OR)."""
+        return await self._db_source.scoped_search_replica_group_history(searcher, scopes)
 
     # ========== Route History (Admin) ==========
 
     @scheduling_history_repository_resilience.apply()
-    async def search_route_history(
-        self,
-        querier: BatchQuerier,
-    ) -> RouteHistoryListResult:
-        """Search route history with pagination (admin API)."""
-        return await self._db_source.search_route_history(querier)
-
-    # ========== Route History (Scoped) ==========
-
     @scheduling_history_repository_resilience.apply()
     async def search_route_scoped_history(
         self,
-        querier: BatchQuerier,
-        scope: RouteHistorySearchScope,
+        searcher: RouteHistorySearcher,
+        scope: RouteHistoryTarget,
     ) -> RouteHistoryListResult:
         """Search route history within scope."""
-        return await self._db_source.search_route_scoped_history(querier, scope)
+        return await self._db_source.search_route_scoped_history(searcher, scope)

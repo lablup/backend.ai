@@ -1,63 +1,29 @@
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import ScopeType
-from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.common.types import SearchResult
+from ai.backend.common.data.entity.role import RoleEntityType
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import ScopedSearchOpsAction
 from ai.backend.manager.data.permission.role import RoleData
-from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.permission_controller.types import ScopedRoleSearchScope
-from ai.backend.manager.services.permission_contoller.actions.base import (
-    RoleScopeAction,
-    RoleScopeActionResult,
-)
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+
+__all__ = ("SearchRolesInScopeAction",)
 
 
-@dataclass
-class SearchRolesInScopeAction(RoleScopeAction):
-    scope: ScopedRoleSearchScope
-    querier: BatchQuerier
+@dataclass(frozen=True)
+class SearchRolesInScopeAction(ScopedSearchOpsAction[RoleRow, RoleData]):
+    """Read the roles the named scopes reach, combined with OR.
 
-    @override
-    def entity_id(self) -> str | None:
-        return None
+    A role created before the v2 write path has no virtual entity node yet and is
+    absent from this answer until BA-7571 backfills one.
+    """
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
+    def entity_type(cls) -> EntityType:
+        return RoleEntityType()
 
     @override
-    def scope_type(self) -> ScopeType:
-        return self.scope.element_type.to_scope_type()
-
-    @override
-    def scope_id(self) -> str:
-        return self.scope.scope_id
-
-    @override
-    def target_element(self) -> RBACElementRef:
-        return RBACElementRef(
-            element_type=self.scope.element_type,
-            element_id=self.scope.scope_id,
-        )
-
-
-@dataclass
-class SearchRolesInScopeActionResult(RoleScopeActionResult):
-    result: SearchResult[RoleData]
-    _scope_type: ScopeType
-    _scope_id: str
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
-
-    @override
-    def scope_type(self) -> ScopeType:
-        return self._scope_type
-
-    @override
-    def scope_id(self) -> str:
-        return self._scope_id
+    @classmethod
+    def action_name(cls) -> str:
+        return "search_roles_in_scope"

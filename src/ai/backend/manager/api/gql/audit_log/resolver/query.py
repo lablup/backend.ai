@@ -7,14 +7,14 @@ from ai.backend.common.dto.manager.v2.audit_log.request import (
     AdminSearchAuditLogsInput,
     ScopedSearchAuditLogsInput,
 )
-from ai.backend.manager.api.gql.audit_log.types import (
-    AuditLogFilterGQL,
-    AuditLogOrderByGQL,
-    AuditLogScopeGQL,
+from ai.backend.manager.api.gql.audit_log.types.filter import AuditLogFilterGQL
+from ai.backend.manager.api.gql.audit_log.types.node import (
     AuditLogV2ConnectionGQL,
     AuditLogV2EdgeGQL,
     AuditLogV2GQL,
 )
+from ai.backend.manager.api.gql.audit_log.types.order import AuditLogOrderByGQL
+from ai.backend.manager.api.gql.audit_log.types.scope import AuditLogScopeGQL
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,

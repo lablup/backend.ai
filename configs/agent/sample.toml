@@ -13,21 +13,24 @@
 # can override.
 # Added in 25.12.0
 [agent]
-  # Unique identifier for this agent instance. If not specified, a random UUID
-  # is generated. In multi-agent mode, each agent must have a unique ID. Used
-  # for tracking, logging, and management.
+  # Unique identifier for this agent instance. If not specified, it is detected
+  # automatically on startup: the cloud instance ID on AWS, Azure and GCP, or
+  # 'i-<hostname>' otherwise. Because that value follows the host identity,
+  # renaming the host changes the agent ID and the manager registers it as a
+  # separate new agent; set this field explicitly to pin the ID. In multi-agent
+  # mode, each agent must have a unique ID. Used for tracking, logging, and
+  # management.
   # Added in 25.12.0
-  ## id = "agent-prod-001"
+  ## id = "i-node01"
   # Port number for the agent's socket communication with containers. Containers
   # connect to this port for the kernel runner protocol. In multi-agent mode,
   # each agent must use a unique port.
   # Added in 25.12.0
   agent-sock-port = 6007
-  # Name of the scaling group this agent belongs to. Scaling groups organize
-  # agents into logical clusters for resource allocation. Users can target
-  # specific scaling groups when creating sessions.
-  # Added in 25.12.0
-  scaling-group = "gpu-cluster"
+  # Name of the resource group used as the seed only at the agent's first
+  # registration. When unset, the default resource group is used.
+  # Added in 26.8.0
+  ## initial-resource-group-name = "gpu-cluster"
   # Type of resource group this agent serves. 'compute' for general-purpose
   # computation nodes. 'storage' for storage-optimized nodes. Determines how the
   # agent is used in workload scheduling.
@@ -93,14 +96,16 @@
   ## advertised-rpc-addr = { host = "192.168.1.100", port = 6001 }
   # Path to the manager's public key file for authenticating RPC messages. Used
   # with ZeroMQ CURVE authentication to verify messages from the manager. Part
-  # of the RPC security mechanism for preventing unauthorized access.
+  # of the RPC security mechanism for preventing unauthorized access. Required
+  # since 26.10.0.
   # Added in 25.12.0
-  ## rpc-auth-manager-public-key = "/etc/backend.ai/keys/manager.pub"
+  rpc-auth-manager-public-key = "/etc/backend.ai/keys/manager.pub"
   # Path to the agent's keypair file for RPC authentication. Contains both
   # public and private keys used for ZeroMQ CURVE authentication. The private
-  # key must be kept secure as it proves the agent's identity.
+  # key must be kept secure as it proves the agent's identity. Required since
+  # 26.10.0.
   # Added in 25.12.0
-  ## rpc-auth-agent-keypair = "/etc/backend.ai/keys/agent.keypair"
+  rpc-auth-agent-keypair = "/etc/backend.ai/keys/agent.keypair"
   # Base directory path for Unix domain sockets and other IPC mechanisms. Used
   # for communication between the agent and its child processes. Directory is
   # created automatically with appropriate permissions.
@@ -177,21 +182,21 @@
   # are loaded except those in block_compute_plugins. Plugin names use Python
   # package notation (e.g., 'ai.backend.accelerator.cuda').
   # Added in 25.12.0
-  ## allow-compute-plugins = "[\"ai.backend.accelerator.cuda\", \"ai.backend.accelerator.rocm\"]"
+  ## allow-compute-plugins = ["ai.backend.accelerator.cuda", "ai.backend.accelerator.rocm"]
   # Blocklist of compute plugin names that should not be loaded by this agent.
   # Plugins in this list are excluded even if discovered. Use to disable
   # specific accelerators or features on certain nodes.
   # Added in 25.12.0
-  ## block-compute-plugins = "[\"ai.backend.accelerator.mock\"]"
+  ## block-compute-plugins = ["ai.backend.accelerator.mock"]
   # Allowlist of network plugin names that can be loaded by this agent. Network
   # plugins provide custom networking configurations for containers. If set,
   # only plugins in this list are loaded.
   # Added in 25.12.0
-  ## allow-network-plugins = "[\"ai.backend.network.overlay\"]"
+  ## allow-network-plugins = ["ai.backend.network.overlay"]
   # Blocklist of network plugin names that should not be loaded by this agent.
   # Use to disable specific network configurations on certain nodes.
   # Added in 25.12.0
-  ## block-network-plugins = "[\"ai.backend.network.legacy\"]"
+  ## block-network-plugins = ["ai.backend.network.legacy"]
   # Directory path for storing temporary image commit data. Used when users
   # commit their running containers as new images. Requires sufficient disk
   # space for container filesystem layers.
@@ -202,11 +207,6 @@
   # here for review by administrators.
   # Added in 25.12.0
   ## abuse-report-path = "/var/log/backend.ai/abuse"
-  # Enables the experimental Redis-based event dispatcher for agent-manager
-  # communication. Provides improved event delivery reliability and scalability.
-  # Requires Redis to be configured. Still in experimental phase.
-  # Added in 25.12.0
-  use-experimental-redis-event-dispatcher = false
   # Docker runtime mode, auto-detected based on the kernel version. 'linuxkit'
   # indicates Docker Desktop with LinuxKit VM (macOS/Windows). 'native'
   # indicates native Docker on Linux. Affects filesystem and networking
@@ -279,6 +279,69 @@
       # Added in 26.4.4
       interval = 30.0
 
+  # User, privilege, resource limits, and healthcheck of the socket relay
+  # container that connects kernel containers to the agent socket.
+  # Added in 26.10.0
+  [agent.socket-relay]
+    # Run socat in the socket relay container as a non-root user. A root agent
+    # changes the owner of the socket directory to uid/gid 65534 and runs the
+    # relay as that user; a non-root agent runs the relay as its own user. The
+    # setting applies when the relay container is created, so remove the
+    # backendai-socket-relay.<agent id> container before restarting the agent
+    # after changing it.
+    # Added in 26.10.0
+    run-as-non-root = false
+    # Create the socket relay container with the no-new-privileges security
+    # option, so its processes cannot gain privileges through setuid binaries.
+    # Added in 26.10.0
+    no-new-privileges = false
+    # Drop all Linux capabilities from the socket relay container. Without run-
+    # as-non-root, the relay then runs as root that cannot write to a socket
+    # directory owned by another user, such as the directory of a non-root
+    # agent.
+    # Added in 26.10.0
+    drop-all-capabilities = false
+    # Mount the root filesystem of the socket relay container read-only.
+    # Added in 26.10.0
+    read-only-rootfs = false
+    # Maximum number of processes in the socket relay container. Unlimited if
+    # not set.
+    # Added in 26.10.0
+    ## pids-limit = 64
+    # Maximum number of connections that socat serves at once, each in its own
+    # child process. Must be smaller than pids-limit when both are set.
+    # Unlimited if not set.
+    # Added in 26.10.0
+    ## max-children = 32
+    # Memory limit of the socket relay container. Unlimited if not set.
+    # Added in 26.10.0
+    ## memory = "64M"
+    # CPU limit of the socket relay container, in cores. Unlimited if not set.
+    # Added in 26.10.0
+    ## cpus = 1.0
+
+    # Healthcheck of the socket relay container. The settings apply when the
+    # relay container is created, so remove the backendai-socket-relay.<agent
+    # id> container before restarting the agent after changing them.
+    # Added in 26.10.0
+    [agent.socket-relay.health-check]
+      # Add a healthcheck to the socket relay container that reports it
+      # unhealthy when the agent socket file in the container is missing or not
+      # a socket. The healthcheck only reports the status and does not restart
+      # the container.
+      # Added in 26.10.0
+      enable = true
+      # Seconds between healthcheck runs.
+      # Added in 26.10.0
+      interval = 30.0
+      # Seconds a healthcheck run may take before it counts as a failure.
+      # Added in 26.10.0
+      timeout = 30.0
+      # Number of consecutive failed healthcheck runs before the container is
+      # reported unhealthy.
+      # Added in 26.10.0
+      retries = 3
+
 # Container runtime configuration including execution modes, user settings, and
 # networking. In multi-agent mode (when 'agents' field is populated), this
 # serves as the default configuration that individual agents inherit and can
@@ -295,6 +358,12 @@
   # file permissions on mounted volumes.
   # Added in 25.12.0
   kernel-gid = "1000"
+  # User the kernel container entrypoint starts as, as the container runtime's
+  # User field ("uid", "uid:gid" or a name). None lets the container runtime
+  # decide. Agent-wide: it does not follow the per-user container_uid, so the
+  # two can conflict.
+  # Added in 26.10.0
+  ## entrypoint-user = "0:0"
   # Range of host ports allocated to containers for network services. Format is
   # [start, end] inclusive. Containers get ports from this range for SSH,
   # Jupyter, and other services. In multi-agent mode, ensure non-overlapping
@@ -467,6 +536,19 @@
   # increase overhead. Balance based on your performance monitoring needs.
   # Added in 24.12.1
   ## sample-rate = 100
+
+# Plugin wheels loaded when the agent starts. Wheels run without verification,
+# so keep the path writable only by trusted operators.
+# Added in 26.10.0
+[wheelhouse]
+  # Whether to load the plugin wheels in the path when the server starts.
+  # Added in 26.10.0
+  allow = false
+  # Directory holding the plugin wheels. A relative path starts from the current
+  # directory of the server. The storage-proxy runs from the directory of its
+  # config file.
+  # Added in 26.10.0
+  path = "wheelhouse"
 
 # Logging configuration for the agent. Controls log levels, output destinations,
 # and log formatting. Proper logging setup is essential for debugging and
@@ -755,25 +837,76 @@
   # keys will be stored under this namespace.
   # Added in 22.03.0
   namespace = "backend"
-  # Network address of the etcd server. Default is the standard etcd port on
-  # localhost. In production, should point to one or more etcd instance
-  # endpoint(s).
+  # Username for authenticating with etcd. Set together with the password field.
+  # Required since 26.10.0.
   # Added in 22.03.0
-  addr = { host = "etcd-cluster", port = 2379 }
-  # Username for authenticating with etcd. Optional if etcd doesn't require
-  # authentication. Should be set along with password for secure deployments.
+  user = "backend"
+  # Password for authenticating with etcd. Set together with the user field.
+  # Required since 26.10.0.
   # Added in 22.03.0
-  ## user = "backend"
-  # Password for authenticating with etcd. Should be kept secret in production
-  # environments. Set together with the user field for authentication.
-  # Added in 22.03.0
-  ## password = "ETCD_PASSWORD"
+  password = "ETCD_PASSWORD"
+  # Seconds without a frame from an etcd member before a keep-alive ping is sent
+  # on a connection with requests in flight. Must not be below the server's
+  # --grpc-keepalive-min-time (5 seconds by default).
+  # Added in 26.10.0
+  keep-alive-interval = 5.0
+  # Seconds to wait for a keep-alive ping reply before the connection to that
+  # etcd member is closed and its requests go to the other members.
+  # Added in 26.10.0
+  keep-alive-timeout = 3.0
+
+  # TLS settings for the connection to etcd.
+  # Added in 26.10.0
+  [etcd.tls]
+    # Connect to etcd over TLS.
+    # Added in 26.10.0
+    enabled = false
+
+    # PEM file of the CA certificate that signed the etcd server certificate.
+    # Required if TLS is enabled.
+    # Added in 26.10.0
+    ## ca-cert = "/etc/backend.ai/etcd/ca.pem"
+
+    # PEM file of the client certificate, for an etcd started with --client-
+    # cert-auth. Set together with client-key.
+    # Added in 26.10.0
+    ## client-cert = "/etc/backend.ai/etcd/client.pem"
+
+    # PEM file of the client private key. Set together with client-cert.
+    # Added in 26.10.0
+    ## client-key = "/etc/backend.ai/etcd/client-key.pem"
+
+    # Seconds to wait for the TLS handshake with an etcd member. When not set,
+    # the handshake has no limit: request timeouts do not end it.
+    # Added in 26.10.0
+    ## handshake-timeout = 10.0
+
+  # Addresses of the etcd cluster members. List every member of an etcd cluster,
+  # or a single address of a standalone server.
+  # Added in 26.10.0
+  [[etcd.addrs]]
+  # Add multiple [[etcd.addrs]] sections as needed
+    # Host address of the service. Can be a hostname, IP address, or special
+    # addresses like 0.0.0.0 to bind to all interfaces.
+    # Added in 22.03.0
+    host = "etcd1.example.com"
+    # Port number of the service. Must be between 1 and 65535. Ports below 1024
+    # require root/admin privileges.
+    # Added in 22.03.0
+    port = 2379
 
 # Container log collection and retention configuration. Controls how container
 # stdout/stderr logs are collected, stored, and made available to users.
 # Important for debugging container applications.
 # Added in 25.12.0
 [container-logs]
+  # Log driver used for kernel containers. 'local' is Docker-only and stores
+  # logs in an efficient binary format. 'json-file' is accepted by both Docker
+  # and Podman, but Podman keeps a single size-capped log per container, so only
+  # 'max-length' takes effect there while file count and compression have no
+  # equivalent.
+  # Added in 26.4.10
+  driver = "local"
   # Maximum total size of container logs that the agent will retrieve and store.
   # Logs exceeding this size are truncated from the beginning. Use binary size
   # format (e.g., '10M', '50M').
@@ -827,6 +960,26 @@
   # for containers with heavy startup processes.
   # Added in 25.12.0
   init-timeout-sec = 120.0
+
+# Configuration for the periodic status checks of the volumes.
+# Added in 26.10.0
+[volume-status-check]
+  # Seconds between two status checks of a volume.
+  # Added in 26.10.0
+  check-interval = 60.0
+  # Seconds to wait before the first status check of a volume.
+  # Added in 26.10.0
+  initial-delay = 5.0
+
+# Configuration for the periodic storage status report to the manager.
+# Added in 26.10.0
+[storage-status-report]
+  # Seconds between two storage status reports to the manager.
+  # Added in 26.10.0
+  interval = 30.0
+  # Seconds to wait before the first storage status report.
+  # Added in 26.10.0
+  initial-delay = 10.0
 
 # Configuration overrides for running multiple agents from a single
 # configuration file. Use this field only when defining 2 or more agents;

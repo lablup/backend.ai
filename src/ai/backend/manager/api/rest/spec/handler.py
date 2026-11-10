@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Final
 
 from aiohttp import web
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.dto.context import RequestCtx
 from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.openapi import generate_openapi
@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
     from ai.backend.manager.config.provider import ManagerConfigProvider
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 OPENAPI_HTML = """

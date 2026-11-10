@@ -8,35 +8,34 @@ from typing import TYPE_CHECKING, Any, override
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
-from ai.backend.common.data.artifact.types import ArtifactRegistryType
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.common.data.entity.artifact import ArtifactID
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
-    ArtifactData,
     ArtifactType,
 )
 from ai.backend.manager.models.base import (
     GUID,
     Base,
 )
-from ai.backend.manager.models.huggingface_registry import HuggingFaceRegistryRow
-from ai.backend.manager.models.reservoir_registry import ReservoirRegistryRow
+from ai.backend.manager.models.huggingface_registry.row import HuggingFaceRegistryRow
+from ai.backend.manager.models.reservoir_registry.row import ReservoirRegistryRow
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.artifact_revision import ArtifactRevisionRow
+    from ai.backend.manager.models.artifact_revision.row import ArtifactRevisionRow
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 __all__ = ("ArtifactRow",)
 
 
 def _get_artifact_revision_join_cond() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.artifact_revision import ArtifactRevisionRow
+    from ai.backend.manager.models.artifact_revision.row import ArtifactRevisionRow
 
     return foreign(ArtifactRevisionRow.artifact_id) == ArtifactRow.id
 
 
-class ArtifactRow(Base):  # type: ignore[misc]
+class ArtifactRow(Base):
     """
     Represents an artifact in the system.
     Artifacts can be models, packages, or images.
@@ -45,8 +44,8 @@ class ArtifactRow(Base):  # type: ignore[misc]
 
     __tablename__ = "artifacts"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    id: Mapped[ArtifactID] = mapped_column(
+        "id", GUID(ArtifactID), primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     type: Mapped[ArtifactType] = mapped_column(
         "type", sa.Enum(ArtifactType), index=True, nullable=False
@@ -56,6 +55,8 @@ class ArtifactRow(Base):  # type: ignore[misc]
     registry_type: Mapped[str] = mapped_column(
         "registry_type", sa.String, nullable=False, index=True
     )
+    # Both registry columns hold a per-type registry row's id (huggingface / reservoir),
+    # not an ``artifact_registries`` id, so neither carries a typed identifier.
     source_registry_id: Mapped[uuid.UUID] = mapped_column(
         "source_registry_id", GUID, nullable=False, index=True
     )
@@ -84,21 +85,18 @@ class ArtifactRow(Base):  # type: ignore[misc]
 
     huggingface_registry: Mapped[HuggingFaceRegistryRow] = relationship(
         "HuggingFaceRegistryRow",
-        back_populates="artifacts",
         primaryjoin=lambda: foreign(ArtifactRow.registry_id) == HuggingFaceRegistryRow.id,
-        overlaps="reservoir_registry,artifacts",
+        overlaps="reservoir_registry",
     )
 
     reservoir_registry: Mapped[ReservoirRegistryRow] = relationship(
         "ReservoirRegistryRow",
-        back_populates="artifacts",
         primaryjoin=lambda: foreign(ArtifactRow.registry_id) == ReservoirRegistryRow.id,
-        overlaps="huggingface_registry,artifacts",
+        overlaps="huggingface_registry",
     )
 
     revision_rows: Mapped[list[ArtifactRevisionRow]] = relationship(
         "ArtifactRevisionRow",
-        back_populates="artifact",
         primaryjoin=_get_artifact_revision_join_cond,
     )
 
@@ -124,20 +122,3 @@ class ArtifactRow(Base):  # type: ignore[misc]
     @override
     def __repr__(self) -> str:
         return self.__str__()
-
-    def to_dataclass(self) -> ArtifactData:
-        return ArtifactData(
-            id=self.id,
-            type=self.type,
-            name=self.name,
-            registry_id=self.registry_id,
-            registry_type=ArtifactRegistryType(self.registry_type),
-            source_registry_id=self.source_registry_id,
-            source_registry_type=ArtifactRegistryType(self.source_registry_type),
-            description=self.description,
-            availability=ArtifactAvailability(self.availability),
-            scanned_at=self.scanned_at,
-            updated_at=self.updated_at,
-            readonly=self.readonly,
-            extra=self.extra,
-        )

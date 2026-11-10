@@ -12,7 +12,10 @@ from uuid import UUID
 import click
 
 from ai.backend.client.cli.v2.helpers import (
+    EntityLabelTerm,
     create_v2_registry,
+    entity_label_filter_options,
+    entity_label_relations,
     load_v2_config,
     parse_order_options,
     print_result,
@@ -67,6 +70,7 @@ def role() -> None:
     default=None,
     help="Filter roles assigned to this user id.",
 )
+@entity_label_filter_options
 def search(
     limit: int | None,
     offset: int | None,
@@ -77,6 +81,7 @@ def search(
     scope_type: str | None,
     scope_id: str | None,
     assigned_user_id: str | None,
+    label: tuple[EntityLabelTerm, ...],
 ) -> None:
     """Search roles."""
     from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
@@ -88,8 +93,6 @@ def search(
         UserNestedFilter,
     )
     from ai.backend.common.dto.manager.v2.rbac.types import (
-        RBACElementTypeDTO,
-        RBACElementTypeFilter,
         RoleOrderField,
         RoleSourceFilter,
         RoleStatusFilter,
@@ -99,9 +102,7 @@ def search(
     mapped_scope_dto: MappedScopeNestedFilter | None = None
     if scope_type is not None or scope_id is not None:
         mapped_scope_dto = MappedScopeNestedFilter(
-            scope_type=RBACElementTypeFilter(equals=RBACElementTypeDTO(scope_type))
-            if scope_type is not None
-            else None,
+            scope_type=StringFilter(equals=scope_type) if scope_type is not None else None,
             scope_id=StringFilter(equals=scope_id) if scope_id is not None else None,
         )
 
@@ -111,8 +112,9 @@ def search(
         assigned_user_dto = UserNestedFilter(user_id=UUIDFilter(equals=UUID(assigned_user_id)))
 
     # Build filter only if any filter option is provided
+    relations = entity_label_relations(label)
     filter_dto: RoleFilter | None = None
-    if any([
+    if relations or any([
         name_contains is not None,
         source is not None,
         status is not None,
@@ -125,6 +127,7 @@ def search(
             status=RoleStatusFilter(equals=status) if status is not None else None,
             mapped_scope=mapped_scope_dto,
             assigned_user=assigned_user_dto,
+            AND=[RoleFilter(labels=rel) for rel in relations] or None,
         )
 
     # Build order only if --order-by is provided
@@ -239,22 +242,35 @@ def get(role_id: str) -> None:
 
 @role.command()
 @click.option("--name", required=True, help="Role name.")
+@click.option(
+    "--scope-type", required=True, help="Type of the scope the role belongs to (e.g., project)."
+)
+@click.option("--scope-id", required=True, help="ID of the scope the role belongs to.")
 @click.option("--description", default=None, help="Role description.")
 @click.option(
     "--auto-assign/--no-auto-assign",
     "auto_assign",
     default=False,
-    help="Automatically grant this role to users added to a scope it is registered in.",
+    help="Automatically grant this role to users added to its scope.",
 )
-def create(name: str, description: str | None, auto_assign: bool) -> None:
+def create(
+    name: str, scope_type: str, scope_id: str, description: str | None, auto_assign: bool
+) -> None:
     """Create a new role."""
+    from ai.backend.common.data.entity.types import EntityType
     from ai.backend.common.dto.manager.v2.rbac.request import CreateRoleInput
+    from ai.backend.common.dto.manager.v2.rbac.types import ScopeInputDTO
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.rbac.create_role(
-                CreateRoleInput(name=name, description=description, auto_assign=auto_assign),
+                CreateRoleInput(
+                    name=name,
+                    scope=ScopeInputDTO(scope_type=EntityType(scope_type), scope_id=scope_id),
+                    description=description,
+                    auto_assign=auto_assign,
+                ),
             )
             print_result(result)
         finally:
@@ -287,6 +303,7 @@ def update(
     """Update an existing role. Only the provided fields are changed."""
     from ai.backend.common.dto.manager.v2.rbac.request import UpdateRoleInput
     from ai.backend.common.dto.manager.v2.rbac.types import RoleStatus
+    from ai.backend.common.tristate.unset import UNSET
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
@@ -294,9 +311,9 @@ def update(
             result = await registry.rbac.update_role(
                 role_id,
                 UpdateRoleInput(
-                    name=name,
-                    status=RoleStatus(status) if status is not None else None,
-                    auto_assign=auto_assign,
+                    name=name if name is not None else UNSET,
+                    status=RoleStatus(status) if status is not None else UNSET,
+                    auto_assign=auto_assign if auto_assign is not None else UNSET,
                 ),
             )
             print_result(result)
@@ -310,14 +327,11 @@ def update(
 @click.argument("role_id", type=str)
 def delete(role_id: str) -> None:
     """Soft-delete a role."""
-    from ai.backend.common.dto.manager.v2.rbac.request import DeleteRoleInput
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.rbac.delete_role(
-                DeleteRoleInput(id=UUID(role_id)),
-            )
+            result = await registry.rbac.delete_role(UUID(role_id))
             print_result(result)
         finally:
             await registry.close()

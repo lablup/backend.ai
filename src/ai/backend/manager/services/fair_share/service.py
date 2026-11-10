@@ -2,24 +2,21 @@
 
 from __future__ import annotations
 
-from ai.backend.manager.data.fair_share import (
+from decimal import Decimal
+
+from ai.backend.manager.data.fair_share.types import (
     FairShareSpec,
 )
-from ai.backend.manager.data.scaling_group.types import FairShareScalingGroupSpec
-from ai.backend.manager.repositories.base import (
+from ai.backend.manager.data.resource_group.types import FairShareResourceGroupSpec
+from ai.backend.manager.models.fair_share.upserters import (
+    DomainFairShareUpserter,
+    ProjectFairShareUpserter,
+    UserFairShareUpserter,
+)
+from ai.backend.manager.repositories.base.querier import (
     BatchQuerier,
-    BulkUpserter,
-    Upserter,
 )
-from ai.backend.manager.repositories.fair_share import FairShareRepository
-from ai.backend.manager.repositories.fair_share.upserters import (
-    DomainFairShareBulkWeightUpserterSpec,
-    DomainFairShareUpserterSpec,
-    ProjectFairShareBulkWeightUpserterSpec,
-    ProjectFairShareUpserterSpec,
-    UserFairShareBulkWeightUpserterSpec,
-    UserFairShareUpserterSpec,
-)
+from ai.backend.manager.repositories.fair_share.repository import FairShareRepository
 from ai.backend.manager.types import TriState
 
 from .actions import (
@@ -35,18 +32,18 @@ from .actions import (
     GetProjectFairShareActionResult,
     GetUserFairShareAction,
     GetUserFairShareActionResult,
-    SearchDomainFairSharesAction,
-    SearchDomainFairSharesActionResult,
-    SearchProjectFairSharesAction,
-    SearchProjectFairSharesActionResult,
+    GlobalSearchDomainFairSharesAction,
+    GlobalSearchDomainFairSharesActionResult,
+    GlobalSearchProjectFairSharesAction,
+    GlobalSearchProjectFairSharesActionResult,
+    GlobalSearchUserFairSharesAction,
+    GlobalSearchUserFairSharesActionResult,
     SearchRGDomainFairSharesAction,
     SearchRGDomainFairSharesActionResult,
     SearchRGProjectFairSharesAction,
     SearchRGProjectFairSharesActionResult,
     SearchRGUserFairSharesAction,
     SearchRGUserFairSharesActionResult,
-    SearchUserFairSharesAction,
-    SearchUserFairSharesActionResult,
     UpsertDomainFairShareWeightAction,
     UpsertDomainFairShareWeightActionResult,
     UpsertProjectFairShareWeightAction,
@@ -70,16 +67,25 @@ class FairShareService:
     def __init__(self, repository: FairShareRepository) -> None:
         self._repository = repository
 
+    def _weight_state(self, weight: Decimal | None) -> TriState[Decimal]:
+        """A bulk weight of ``None`` means the resource group's default, which the row
+        records as NULL."""
+        if weight is None:
+            return TriState[Decimal].nullify()
+        return TriState[Decimal].update(weight)
+
     # Helper methods for creating default fair share data
 
-    def _create_default_spec(self, scaling_group_spec: FairShareScalingGroupSpec) -> FairShareSpec:
+    def _create_default_spec(
+        self, resource_group_spec: FairShareResourceGroupSpec
+    ) -> FairShareSpec:
         """Create default FairShareSpec from scaling group spec."""
         return FairShareSpec(
-            weight=scaling_group_spec.default_weight,
-            half_life_days=scaling_group_spec.half_life_days,
-            lookback_days=scaling_group_spec.lookback_days,
-            decay_unit_days=scaling_group_spec.decay_unit_days,
-            resource_weights=scaling_group_spec.resource_weights,
+            weight=resource_group_spec.default_weight,
+            half_life_days=resource_group_spec.half_life_days,
+            lookback_days=resource_group_spec.lookback_days,
+            decay_unit_days=resource_group_spec.decay_unit_days,
+            resource_weights=resource_group_spec.resource_weights,
         )
 
     # Domain Fair Share
@@ -93,14 +99,14 @@ class FairShareService:
         Repository handles default value creation internally.
         """
         result = await self._repository.get_domain_fair_share(
-            resource_group=action.resource_group,
+            resource_group_id=action.resource_group_id,
             domain_name=action.domain_name,
         )
         return GetDomainFairShareActionResult(data=result)
 
     async def search_domain_fair_shares(
-        self, action: SearchDomainFairSharesAction
-    ) -> SearchDomainFairSharesActionResult:
+        self, action: GlobalSearchDomainFairSharesAction
+    ) -> GlobalSearchDomainFairSharesActionResult:
         """Search domain fair shares with pagination."""
         querier = BatchQuerier(
             pagination=action.pagination,
@@ -108,7 +114,7 @@ class FairShareService:
             orders=action.orders,
         )
         result = await self._repository.search_domain_fair_shares(querier)
-        return SearchDomainFairSharesActionResult(
+        return GlobalSearchDomainFairSharesActionResult(
             items=result.items,
             total_count=result.total_count,
         )
@@ -140,14 +146,14 @@ class FairShareService:
         Repository handles default value creation internally.
         """
         result = await self._repository.get_project_fair_share(
-            resource_group=action.resource_group,
+            resource_group_id=action.resource_group_id,
             project_id=action.project_id,
         )
         return GetProjectFairShareActionResult(data=result)
 
     async def search_project_fair_shares(
-        self, action: SearchProjectFairSharesAction
-    ) -> SearchProjectFairSharesActionResult:
+        self, action: GlobalSearchProjectFairSharesAction
+    ) -> GlobalSearchProjectFairSharesActionResult:
         """Search project fair shares with pagination."""
         querier = BatchQuerier(
             pagination=action.pagination,
@@ -155,7 +161,7 @@ class FairShareService:
             orders=action.orders,
         )
         result = await self._repository.search_project_fair_shares(querier)
-        return SearchProjectFairSharesActionResult(
+        return GlobalSearchProjectFairSharesActionResult(
             items=result.items,
             total_count=result.total_count,
         )
@@ -187,15 +193,15 @@ class FairShareService:
         Repository handles default value creation internally.
         """
         result = await self._repository.get_user_fair_share(
-            resource_group=action.resource_group,
+            resource_group_id=action.resource_group_id,
             project_id=action.project_id,
             user_uuid=action.user_uuid,
         )
         return GetUserFairShareActionResult(data=result)
 
     async def search_user_fair_shares(
-        self, action: SearchUserFairSharesAction
-    ) -> SearchUserFairSharesActionResult:
+        self, action: GlobalSearchUserFairSharesAction
+    ) -> GlobalSearchUserFairSharesActionResult:
         """Search user fair shares with pagination."""
         querier = BatchQuerier(
             pagination=action.pagination,
@@ -203,7 +209,7 @@ class FairShareService:
             orders=action.orders,
         )
         result = await self._repository.search_user_fair_shares(querier)
-        return SearchUserFairSharesActionResult(
+        return GlobalSearchUserFairSharesActionResult(
             items=result.items,
             total_count=result.total_count,
         )
@@ -230,13 +236,12 @@ class FairShareService:
         self, action: UpsertDomainFairShareWeightAction
     ) -> UpsertDomainFairShareWeightActionResult:
         """Upsert a domain fair share weight."""
-        spec = DomainFairShareUpserterSpec(
+        upserter = DomainFairShareUpserter(
             resource_group=action.resource_group,
             resource_group_id=action.resource_group_id,
             domain_name=action.domain_name,
             weight=TriState.from_graphql(action.weight),
         )
-        upserter = Upserter(spec=spec)
         result = await self._repository.upsert_domain_fair_share(upserter)
         return UpsertDomainFairShareWeightActionResult(data=result)
 
@@ -244,14 +249,13 @@ class FairShareService:
         self, action: UpsertProjectFairShareWeightAction
     ) -> UpsertProjectFairShareWeightActionResult:
         """Upsert a project fair share weight."""
-        spec = ProjectFairShareUpserterSpec(
+        upserter = ProjectFairShareUpserter(
             resource_group=action.resource_group,
             resource_group_id=action.resource_group_id,
             project_id=action.project_id,
             domain_name=action.domain_name,
             weight=TriState.from_graphql(action.weight),
         )
-        upserter = Upserter(spec=spec)
         result = await self._repository.upsert_project_fair_share(upserter)
         return UpsertProjectFairShareWeightActionResult(data=result)
 
@@ -259,7 +263,7 @@ class FairShareService:
         self, action: UpsertUserFairShareWeightAction
     ) -> UpsertUserFairShareWeightActionResult:
         """Upsert a user fair share weight."""
-        spec = UserFairShareUpserterSpec(
+        upserter = UserFairShareUpserter(
             resource_group=action.resource_group,
             resource_group_id=action.resource_group_id,
             user_uuid=action.user_uuid,
@@ -267,7 +271,6 @@ class FairShareService:
             domain_name=action.domain_name,
             weight=TriState.from_graphql(action.weight),
         )
-        upserter = Upserter(spec=spec)
         result = await self._repository.upsert_user_fair_share(upserter)
         return UpsertUserFairShareWeightActionResult(data=result)
 
@@ -280,18 +283,17 @@ class FairShareService:
         if not action.inputs:
             return BulkUpsertDomainFairShareWeightActionResult(upserted_count=0)
 
-        specs = [
-            DomainFairShareBulkWeightUpserterSpec(
+        upserters = [
+            DomainFairShareUpserter(
                 resource_group=action.resource_group,
                 resource_group_id=action.resource_group_id,
                 domain_name=input_item.domain_name,
-                weight=input_item.weight,
+                weight=self._weight_state(input_item.weight),
             )
             for input_item in action.inputs
         ]
-        bulk_upserter = BulkUpserter(specs=specs)
-        result = await self._repository.bulk_upsert_domain_fair_share(bulk_upserter)
-        return BulkUpsertDomainFairShareWeightActionResult(upserted_count=result.upserted_count)
+        result = await self._repository.bulk_upsert_domain_fair_share(upserters)
+        return BulkUpsertDomainFairShareWeightActionResult(upserted_count=len(result))
 
     async def bulk_upsert_project_fair_share_weight(
         self, action: BulkUpsertProjectFairShareWeightAction
@@ -300,19 +302,18 @@ class FairShareService:
         if not action.inputs:
             return BulkUpsertProjectFairShareWeightActionResult(upserted_count=0)
 
-        specs = [
-            ProjectFairShareBulkWeightUpserterSpec(
+        upserters = [
+            ProjectFairShareUpserter(
                 resource_group=action.resource_group,
                 resource_group_id=action.resource_group_id,
                 project_id=input_item.project_id,
                 domain_name=input_item.domain_name,
-                weight=input_item.weight,
+                weight=self._weight_state(input_item.weight),
             )
             for input_item in action.inputs
         ]
-        bulk_upserter = BulkUpserter(specs=specs)
-        result = await self._repository.bulk_upsert_project_fair_share(bulk_upserter)
-        return BulkUpsertProjectFairShareWeightActionResult(upserted_count=result.upserted_count)
+        result = await self._repository.bulk_upsert_project_fair_share(upserters)
+        return BulkUpsertProjectFairShareWeightActionResult(upserted_count=len(result))
 
     async def bulk_upsert_user_fair_share_weight(
         self, action: BulkUpsertUserFairShareWeightAction
@@ -321,17 +322,16 @@ class FairShareService:
         if not action.inputs:
             return BulkUpsertUserFairShareWeightActionResult(upserted_count=0)
 
-        specs = [
-            UserFairShareBulkWeightUpserterSpec(
+        upserters = [
+            UserFairShareUpserter(
                 resource_group=action.resource_group,
                 resource_group_id=action.resource_group_id,
                 user_uuid=input_item.user_uuid,
                 project_id=input_item.project_id,
                 domain_name=input_item.domain_name,
-                weight=input_item.weight,
+                weight=self._weight_state(input_item.weight),
             )
             for input_item in action.inputs
         ]
-        bulk_upserter = BulkUpserter(specs=specs)
-        result = await self._repository.bulk_upsert_user_fair_share(bulk_upserter)
-        return BulkUpsertUserFairShareWeightActionResult(upserted_count=result.upserted_count)
+        result = await self._repository.bulk_upsert_user_fair_share(upserters)
+        return BulkUpsertUserFairShareWeightActionResult(upserted_count=len(result))

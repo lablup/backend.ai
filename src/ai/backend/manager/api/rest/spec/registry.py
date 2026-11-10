@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Final
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.middleware.auth import auth_required
 from ai.backend.manager.api.rest.routing import RouteRegistry
 
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.config.provider import ManagerConfigProvider
 
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 def register_spec_routes(
@@ -35,10 +35,7 @@ def register_spec_routes(
     async def _spec_startup(_app: web.Application) -> None:
         """Log a warning when OpenAPI schema introspection is enabled."""
         if config_provider.config.api.allow_openapi_schema_introspection:
-            log.warning(
-                "OpenAPI schema introspection is enabled. "
-                "It is strongly advised to disable this in production setups."
-            )
+            log.warning("openapi schema introspection enabled; disable it in production")
 
     reg = RouteRegistry.create("spec", route_deps.cors_options)
 

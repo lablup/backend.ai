@@ -12,6 +12,7 @@ from enum import StrEnum
 from ai.backend.common.dto.manager.v2.common import (
     BinarySizeInfo,
     BinarySizeInput,
+    PartialBulkFailure,
     ResourceLimitEntryInfo,
     ResourceSlotEntryInfo,
     ResourceSlotEntryInput,
@@ -19,6 +20,7 @@ from ai.backend.common.dto.manager.v2.common import (
     VFolderHostPermissionEntryInfo,
     VFolderHostPermissionEntryInput,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -182,3 +184,16 @@ class VFolderHostPermissionEntryGQL(PydanticOutputMixin[VFolderHostPermissionEnt
     permissions: list[VFolderHostPermissionEnum] = gql_field(
         description="List of permissions granted for this host."
     )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="One entity a partial bulk operation named and did not process.",
+    ),
+    model=PartialBulkFailure,
+    all_fields=True,
+    name="PartialBulkFailure",
+)
+class PartialBulkFailureGQL(PydanticOutputMixin[PartialBulkFailure]):
+    pass

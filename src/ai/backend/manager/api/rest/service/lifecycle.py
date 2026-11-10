@@ -12,9 +12,9 @@ import aiotools
 import attrs
 from aiohttp import web
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @attrs.define(slots=True, auto_attribs=True, init=False)

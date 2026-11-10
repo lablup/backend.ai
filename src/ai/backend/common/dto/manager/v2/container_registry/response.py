@@ -17,6 +17,7 @@ __all__ = (
     "ContainerRegistryNode",
     "CreateContainerRegistryPayload",
     "DeleteContainerRegistryPayload",
+    "PurgeContainerRegistryPayload",
     "AdminSearchContainerRegistriesPayload",
     "UpdateContainerRegistryPayload",
 )
@@ -26,6 +27,9 @@ class ContainerRegistryNode(BaseResponseModel):
     """Node model representing a container registry entity. Password is excluded from response."""
 
     id: UUID = Field(description="Unique identifier of the container registry.")
+    entity_id: UUID = Field(
+        description="UUID of the container registry. Added in 26.9.0.",
+    )
     url: str = Field(description="URL of the container registry.")
     registry_name: str = Field(description="Unique name identifying the container registry.")
     type: ContainerRegistryType = Field(description="Type of the container registry.")
@@ -62,6 +66,14 @@ class DeleteContainerRegistryPayload(BaseResponseModel):
     """Payload for container registry deletion mutation result."""
 
     id: UUID = Field(description="ID of the deleted container registry.")
+    entity_id: UUID = Field(description="UUID of the deleted container registry. Added in 26.10.0.")
+
+
+class PurgeContainerRegistryPayload(BaseResponseModel):
+    """Payload for container registry purge mutation result."""
+
+    id: UUID = Field(description="ID of the purged container registry.")
+    entity_id: UUID = Field(description="UUID of the purged container registry. Added in 26.10.0.")
 
 
 class AdminSearchContainerRegistriesPayload(BaseResponseModel):

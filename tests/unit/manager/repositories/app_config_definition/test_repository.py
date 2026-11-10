@@ -7,56 +7,99 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
+from ai.backend.common.data.entity.app_config_definition import AppConfigDefinitionID
 from ai.backend.common.data.filter_specs import StringMatchSpec
-from ai.backend.common.identifier.app_config_definition import AppConfigDefinitionID
-from ai.backend.manager.data.app_config_definition.types import AppConfigDefinitionData
-from ai.backend.manager.errors.app_config import AppConfigDefinitionNotFound
+from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
+from ai.backend.manager.data.app_config.types import AppConfigDefinitionData
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.models.app_config_definition.conditions import (
     AppConfigDefinitionConditions,
 )
+from ai.backend.manager.models.app_config_definition.creators import (
+    AppConfigDefinitionCreator,
+)
 from ai.backend.manager.models.app_config_definition.orders import AppConfigDefinitionOrders
+from ai.backend.manager.models.app_config_definition.purgers import (
+    AppConfigDefinitionPurger,
+)
+from ai.backend.manager.models.app_config_definition.queriers import (
+    AppConfigDefinitionQuerier,
+)
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
+from ai.backend.manager.models.app_config_definition.searchers import (
+    AppConfigDefinitionSearcher,
+)
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.entity_label.row import EntityLabelRow
+from ai.backend.manager.models.entity_share.row import EntityShareRow
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.resource_policy.row import UserResourcePolicyRow
+from ai.backend.manager.models.specs.pagination import CursorForwardPagination, OffsetPagination
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.app_config_definition.creators import (
-    AppConfigDefinitionCreatorSpec,
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
+    EntityMembershipCapRow,
 )
-from ai.backend.manager.repositories.app_config_definition.repository import (
-    AppConfigDefinitionRepository,
+from ai.backend.manager.models.virtual_entity.entity_membership_field import (
+    EntityMembershipFieldRow,
 )
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    Creator,
-    CursorForwardPagination,
-    OffsetPagination,
-    Purger,
-)
-from ai.backend.manager.repositories.ops import DBOpsProvider
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
+from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.testutils.db import with_tables
 
 
 @pytest.fixture
 async def repository(
-    database_connection: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[AppConfigDefinitionRepository, None]:
-    async with with_tables(database_connection, [AppConfigDefinitionRow]):
-        yield AppConfigDefinitionRepository(DBOpsProvider(database_connection))
+    global_entity_ids: ExtendedAsyncSAEngine,
+) -> AsyncGenerator[OpsRepository[AppConfigDefinitionData], None]:
+    async with with_tables(
+        global_entity_ids,
+        [
+            VirtualEntityRow,
+            EntityMembershipRow,
+            EntityMembershipCapRow,
+            EntityMembershipFieldRow,
+            ScopeBindingRow,
+            EntityLabelRow,
+            RoleRow,
+            PermissionRow,
+            AppConfigDefinitionRow,
+            DomainRow,
+            UserResourcePolicyRow,
+            UserRow,
+            EntityShareRow,
+        ],
+    ):
+        yield OpsRepository(V2DBOpsProvider(global_entity_ids))
 
 
 @pytest.fixture
 async def existing_definition(
-    repository: AppConfigDefinitionRepository,
+    repository: OpsRepository[AppConfigDefinitionData],
 ) -> AppConfigDefinitionData:
-    return await repository.create(Creator(spec=AppConfigDefinitionCreatorSpec(config_name="menu")))
+    return await repository.create_entity(AppConfigDefinitionCreator(config_name="menu"))
+
+
+@pytest.fixture
+def pagination_spec() -> PaginationSpec:
+    return PaginationSpec(
+        forward_order=AppConfigDefinitionOrders.created_at(ascending=False),
+        cursor_column=AppConfigDefinitionRow.id,
+    )
 
 
 @pytest.fixture
 async def seeded_definitions(
-    repository: AppConfigDefinitionRepository,
+    repository: OpsRepository[AppConfigDefinitionData],
 ) -> list[AppConfigDefinitionData]:
     definitions: list[AppConfigDefinitionData] = []
     for config_name in ("theme", "menu", "preferences"):
-        definition = await repository.create(
-            Creator(spec=AppConfigDefinitionCreatorSpec(config_name=config_name))
+        definition = await repository.create_entity(
+            AppConfigDefinitionCreator(config_name=config_name)
         )
         definitions.append(definition)
     return definitions
@@ -67,72 +110,74 @@ def _missing_id() -> AppConfigDefinitionID:
 
 
 class TestCreateAndGet:
-    async def test_create_then_get_by_id(self, repository: AppConfigDefinitionRepository) -> None:
-        created = await repository.create(
-            Creator(spec=AppConfigDefinitionCreatorSpec(config_name="theme"))
-        )
-        fetched = await repository.get_by_id(created.id)
+    async def test_create_then_get_by_id(
+        self, repository: OpsRepository[AppConfigDefinitionData]
+    ) -> None:
+        created = await repository.create_entity(AppConfigDefinitionCreator(config_name="theme"))
+        fetched = await repository.get(AppConfigDefinitionQuerier(definition_id=created.id))
         assert fetched.id == created.id
         assert fetched.config_name == "theme"
 
     async def test_get_by_id_missing_raises(
-        self, repository: AppConfigDefinitionRepository
+        self, repository: OpsRepository[AppConfigDefinitionData]
     ) -> None:
-        with pytest.raises(AppConfigDefinitionNotFound):
-            await repository.get_by_id(_missing_id())
+        with pytest.raises(EntityNotFoundError):
+            await repository.get(AppConfigDefinitionQuerier(definition_id=_missing_id()))
 
 
 class TestPurge:
     async def test_purge_removes_row(
         self,
-        repository: AppConfigDefinitionRepository,
+        repository: OpsRepository[AppConfigDefinitionData],
         existing_definition: AppConfigDefinitionData,
     ) -> None:
-        purged = await repository.purge(
-            Purger(row_class=AppConfigDefinitionRow, pk_value=existing_definition.id)
+        purged = await repository.purge_entity(
+            AppConfigDefinitionPurger(definition_id=existing_definition.id)
         )
         assert purged.id == existing_definition.id
-        with pytest.raises(AppConfigDefinitionNotFound):
-            await repository.get_by_id(existing_definition.id)
+        with pytest.raises(EntityNotFoundError):
+            await repository.get(AppConfigDefinitionQuerier(definition_id=existing_definition.id))
 
-    async def test_purge_missing_raises(self, repository: AppConfigDefinitionRepository) -> None:
-        with pytest.raises(AppConfigDefinitionNotFound):
-            await repository.purge(Purger(row_class=AppConfigDefinitionRow, pk_value=_missing_id()))
+    async def test_purge_missing_raises(
+        self, repository: OpsRepository[AppConfigDefinitionData]
+    ) -> None:
+        with pytest.raises(EntityNotFoundError):
+            await repository.purge_entity(AppConfigDefinitionPurger(definition_id=_missing_id()))
 
 
-class TestSearch:
-    async def test_search_returns_all_with_total_count(
+class TestAdminSearch:
+    async def test_admin_search_returns_all_with_total_count(
         self,
-        repository: AppConfigDefinitionRepository,
+        repository: OpsRepository[AppConfigDefinitionData],
         seeded_definitions: list[AppConfigDefinitionData],
     ) -> None:
-        result = await repository.search(
-            BatchQuerier(pagination=OffsetPagination(limit=10, offset=0))
+        result = await repository.search_in_global(
+            AppConfigDefinitionSearcher(pagination=OffsetPagination(limit=10, offset=0))
         )
         assert result.total_count == len(seeded_definitions)
         assert {item.config_name for item in result.items} == {
             definition.config_name for definition in seeded_definitions
         }
 
-    async def test_search_respects_pagination(
+    async def test_admin_search_respects_pagination(
         self,
-        repository: AppConfigDefinitionRepository,
+        repository: OpsRepository[AppConfigDefinitionData],
         seeded_definitions: list[AppConfigDefinitionData],
     ) -> None:
-        result = await repository.search(
-            BatchQuerier(pagination=OffsetPagination(limit=2, offset=0))
+        result = await repository.search_in_global(
+            AppConfigDefinitionSearcher(pagination=OffsetPagination(limit=2, offset=0))
         )
         assert result.total_count == len(seeded_definitions)
         assert len(result.items) == 2
         assert result.has_next_page is True
 
-    async def test_search_filters_by_config_name(
+    async def test_admin_search_filters_by_config_name(
         self,
-        repository: AppConfigDefinitionRepository,
+        repository: OpsRepository[AppConfigDefinitionData],
         seeded_definitions: list[AppConfigDefinitionData],
     ) -> None:
-        result = await repository.search(
-            BatchQuerier(
+        result = await repository.search_in_global(
+            AppConfigDefinitionSearcher(
                 pagination=OffsetPagination(limit=10, offset=0),
                 conditions=[
                     AppConfigDefinitionConditions.by_config_name_equals(
@@ -149,13 +194,13 @@ class TestSearch:
         assert result.total_count == len(expected)
         assert [item.config_name for item in result.items] == expected
 
-    async def test_search_orders_by_config_name_desc(
+    async def test_admin_search_orders_by_config_name_desc(
         self,
-        repository: AppConfigDefinitionRepository,
+        repository: OpsRepository[AppConfigDefinitionData],
         seeded_definitions: list[AppConfigDefinitionData],
     ) -> None:
-        result = await repository.search(
-            BatchQuerier(
+        result = await repository.search_in_global(
+            AppConfigDefinitionSearcher(
                 pagination=OffsetPagination(limit=10, offset=0),
                 orders=[AppConfigDefinitionOrders.config_name(ascending=False)],
             )
@@ -165,27 +210,27 @@ class TestSearch:
         )
         assert [item.config_name for item in result.items] == expected
 
-    async def test_search_filters_by_created_at(
+    async def test_admin_search_filters_by_created_at(
         self,
-        repository: AppConfigDefinitionRepository,
+        repository: OpsRepository[AppConfigDefinitionData],
         seeded_definitions: list[AppConfigDefinitionData],
     ) -> None:
         target = seeded_definitions[1]
-        result = await repository.search(
-            BatchQuerier(
+        result = await repository.search_in_global(
+            AppConfigDefinitionSearcher(
                 pagination=OffsetPagination(limit=10, offset=0),
                 conditions=[AppConfigDefinitionConditions.by_created_at_equals(target.created_at)],
             )
         )
         assert [item.id for item in result.items] == [target.id]
 
-    async def test_search_orders_by_created_at(
+    async def test_admin_search_orders_by_created_at(
         self,
-        repository: AppConfigDefinitionRepository,
+        repository: OpsRepository[AppConfigDefinitionData],
         seeded_definitions: list[AppConfigDefinitionData],
     ) -> None:
-        result = await repository.search(
-            BatchQuerier(
+        result = await repository.search_in_global(
+            AppConfigDefinitionSearcher(
                 pagination=OffsetPagination(limit=10, offset=0),
                 orders=[AppConfigDefinitionOrders.created_at(ascending=True)],
             )
@@ -195,19 +240,20 @@ class TestSearch:
         ]
         assert [item.id for item in result.items] == expected
 
-    async def test_search_cursor_forward(
+    async def test_admin_search_cursor_forward(
         self,
-        repository: AppConfigDefinitionRepository,
+        repository: OpsRepository[AppConfigDefinitionData],
         seeded_definitions: list[AppConfigDefinitionData],
+        pagination_spec: PaginationSpec,
     ) -> None:
         by_created_desc = sorted(seeded_definitions, key=lambda d: d.created_at, reverse=True)
         cursor = by_created_desc[0].id
-        result = await repository.search(
-            BatchQuerier(
+        result = await repository.search_in_global(
+            AppConfigDefinitionSearcher(
                 pagination=CursorForwardPagination(
                     first=10,
                     cursor_order=AppConfigDefinitionOrders.created_at(ascending=False),
-                    cursor_condition=AppConfigDefinitionConditions.by_cursor_forward(str(cursor)),
+                    cursor_condition=pagination_spec.forward_condition(str(cursor)),
                 )
             )
         )

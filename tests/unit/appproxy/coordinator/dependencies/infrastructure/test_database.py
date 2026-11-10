@@ -15,6 +15,7 @@ from ai.backend.appproxy.coordinator.dependencies.infrastructure.database import
     DatabaseProvider,
 )
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
+from ai.backend.testutils.bootstrap import POSTGRES_MAINTENANCE_DB, POSTGRES_PASSWORD, POSTGRES_USER
 
 
 class TestDatabaseProvider:
@@ -31,10 +32,12 @@ class TestDatabaseProvider:
         # Create DB config for testing
         db_config = DBConfig(
             type=DBType.POSTGRESQL,
-            addr=HostPortPair(host=db_addr.host, port=db_addr.port),
-            name="testing",
-            user="postgres",
-            password="develove",
+            addr=None,
+            addrs=[HostPortPair(host=db_addr.host, port=db_addr.port)],
+            connect_timeout=10.0,
+            name=POSTGRES_MAINTENANCE_DB,
+            user=POSTGRES_USER,
+            password=POSTGRES_PASSWORD,
             pool_size=8,
             pool_recycle=-1,
             pool_pre_ping=True,

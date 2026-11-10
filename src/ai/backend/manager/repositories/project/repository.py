@@ -1,0 +1,298 @@
+from __future__ import annotations
+
+import logging
+import uuid
+from collections.abc import Mapping, Sequence
+from datetime import datetime
+from typing import Any
+from uuid import UUID
+
+from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.filter_specs import UUIDInMatchSpec
+from ai.backend.common.exception import BackendAIError
+from ai.backend.common.metrics.metric import DomainType, LayerType
+from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
+from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
+from ai.backend.common.resilience.resilience import Resilience
+from ai.backend.common.types import ResourceSlot
+from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
+from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.container_registry.types import ProjectAllowedRegistryData
+from ai.backend.manager.data.project.types import ProjectData
+from ai.backend.manager.errors.image import ContainerRegistryGroupsAssociationNotFound
+from ai.backend.manager.errors.resource import (
+    ProjectNotFound,
+)
+from ai.backend.manager.models.association_container_registries_groups.scopes import (
+    ProjectContainerRegistryAssociationTarget,
+)
+from ai.backend.manager.models.association_container_registries_groups.searchable_fields import (
+    AssociationContainerRegistriesGroupsSearchableFields,
+)
+from ai.backend.manager.models.association_container_registries_groups.searchers import (
+    AssociationContainerRegistriesGroupsSearcher,
+)
+from ai.backend.manager.models.association_container_registries_groups.updaters import (
+    ClearDefaultRegistryUpdater,
+    SetDefaultRegistryUpdater,
+)
+from ai.backend.manager.models.container_registry.queriers import BulkContainerRegistryQuerier
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.project.creators import ProjectCreator
+from ai.backend.manager.models.project.updaters import ProjectDotfilesUpdater, ProjectUpdater
+from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.models.specs.types import BulkResultWithFailures
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
+    ResourcePolicyOpsProvider,
+)
+from ai.backend.manager.repositories.project.db_source.db_source import ProjectDBSource
+from ai.backend.manager.repositories.project.types import DanglingPersonalProjectPurgeResult
+
+log = StructuredLogger(logging.getLogger(__spec__.name))
+
+
+project_repository_resilience = Resilience(
+    policies=[
+        MetricPolicy(MetricArgs(domain=DomainType.REPOSITORY, layer=LayerType.GROUP_REPOSITORY)),
+        RetryPolicy(
+            RetryArgs(
+                max_retries=10,
+                retry_delay=0.1,
+                backoff_strategy=BackoffStrategy.FIXED,
+                non_retryable_exceptions=(BackendAIError,),
+            )
+        ),
+    ]
+)
+
+
+class ProjectRepository:
+    _db_source: ProjectDBSource
+    _v2_ops: V2DBOpsProvider
+    _policy_ops: ResourcePolicyOpsProvider
+    _config_provider: ManagerConfigProvider
+    _valkey_stat_client: ValkeyStatClient
+    _storage_manager: StorageSessionManager
+
+    def __init__(
+        self,
+        db: ExtendedAsyncSAEngine,
+        v2_ops_provider: V2DBOpsProvider,
+        policy_ops_provider: ResourcePolicyOpsProvider,
+        config_provider: ManagerConfigProvider,
+        valkey_stat_client: ValkeyStatClient,
+        storage_manager: StorageSessionManager,
+    ) -> None:
+        self._db_source = ProjectDBSource(db, v2_ops_provider)
+        self._v2_ops = v2_ops_provider
+        self._policy_ops = policy_ops_provider
+        self._config_provider = config_provider
+        self._valkey_stat_client = valkey_stat_client
+        self._storage_manager = storage_manager
+
+    @project_repository_resilience.apply()
+    async def create_project(self, creator: ProjectCreator) -> ProjectData:
+        """Register a project under its domain and lend it the resource policy it is
+        subject to."""
+        async with self._policy_ops.write_ops() as w:
+            data = await w.create_role_managed_entity(creator)
+            await w.restate_project_resource_policy_share(ProjectID(data.id))
+            return data
+
+    @project_repository_resilience.apply()
+    async def modify_validated(
+        self,
+        updater: ProjectUpdater,
+    ) -> ProjectData | None:
+        """Modify a project. Who belongs to it is the roster's own operation."""
+        async with self._policy_ops.write_ops() as w:
+            data = await w.update_data(updater)
+            if data is None:
+                return None
+            await w.restate_project_resource_policy_share(ProjectID(data.id))
+            return data
+
+    @project_repository_resilience.apply()
+    async def partial_bulk_modify_validated(
+        self, updaters: Sequence[ProjectUpdater]
+    ) -> BulkResultWithFailures[ProjectData]:
+        """Modify each named project the way :meth:`modify_validated` does, in its own
+        savepoint."""
+        successes: dict[EntityIdentifier, ProjectData] = {}
+        errors: dict[EntityIdentifier, Exception] = {}
+        async with self._policy_ops.write_ops() as w:
+            for updater in updaters:
+                try:
+                    async with w.savepoint() as sp:
+                        data = await sp.update_data(updater)
+                        if data is None:
+                            raise ProjectNotFound(f"Project not found: {updater.project_id}")
+                        await sp.restate_project_resource_policy_share(updater.project_id)
+                        successes[updater.project_id] = data
+                except Exception as e:
+                    errors[updater.project_id] = e
+        return BulkResultWithFailures(successes=successes, errors=errors)
+
+    @project_repository_resilience.apply()
+    async def update_dotfiles(self, updater: ProjectDotfilesUpdater) -> ProjectData:
+        """Replace a project's packed dotfile entries."""
+        async with self._v2_ops.write_ops() as w:
+            data = await w.update_data(updater)
+            if data is None:
+                raise ProjectNotFound(f"Project not found: {updater.target_id_value()}")
+            return data
+
+    @project_repository_resilience.apply()
+    async def switch_default_registry(
+        self, project_id: ProjectID, registry_id: ContainerRegistryID
+    ) -> None:
+        """Make ``registry_id``, which the project must already be allowed on, the
+        project's default registry."""
+        scopes = [ProjectContainerRegistryAssociationTarget(project_id)]
+        async with self._v2_ops.write_ops() as w:
+            # The clear locks the project's links, so a concurrent switch waits for this one.
+            await w.batch_update_in_scopes(
+                scopes, ClearDefaultRegistryUpdater(project_id=project_id)
+            )
+            marked = await w.batch_update_in_scopes(
+                scopes, SetDefaultRegistryUpdater(registry_id=registry_id)
+            )
+            if not marked:
+                raise ContainerRegistryGroupsAssociationNotFound(
+                    f"Project {project_id} is not allowed on container registry {registry_id}"
+                )
+
+    @project_repository_resilience.apply()
+    async def clear_default_registry(self, project_id: ProjectID) -> None:
+        """Clear the project's default registry. The project stays allowed on it."""
+        async with self._v2_ops.write_ops() as w:
+            await w.batch_update_in_scopes(
+                [ProjectContainerRegistryAssociationTarget(project_id)],
+                ClearDefaultRegistryUpdater(project_id=project_id),
+            )
+
+    @project_repository_resilience.apply()
+    async def fetch_registries(
+        self, project_ids: Sequence[ProjectID]
+    ) -> Mapping[ProjectID, list[ProjectAllowedRegistryData]]:
+        """The registries each named project is allowed on. A project allowed on none is
+        absent."""
+        fields = AssociationContainerRegistriesGroupsSearchableFields.own
+        searcher = AssociationContainerRegistriesGroupsSearcher(
+            pagination=NoPagination(),
+            conditions=[
+                fields.project_id.filter.in_(UUIDInMatchSpec(values=project_ids, negated=False))
+            ],
+        )
+        async with self._v2_ops.read_ops() as r:
+            associations = (await r.search_in_global(searcher)).items
+            registries = await r.query_bulk_data(
+                BulkContainerRegistryQuerier(),
+                list({association.registry_id for association in associations}),
+            )
+        project_registries: dict[ProjectID, list[ProjectAllowedRegistryData]] = {}
+        for association in associations:
+            registry = registries.get(association.registry_id)
+            if registry is None:
+                continue
+            project_registries.setdefault(association.project_id, []).append(
+                ProjectAllowedRegistryData(registry=registry, is_default=association.is_default)
+            )
+        return project_registries
+
+    @project_repository_resilience.apply()
+    async def get_container_stats_for_period(
+        self,
+        start_date: datetime,
+        end_date: datetime,
+        group_ids: Sequence[UUID] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Get container statistics for groups within a time period."""
+        return await self._db_source.get_container_stats_for_period(
+            start_date,
+            end_date,
+            self._valkey_stat_client,
+            self._config_provider,
+            group_ids,
+        )
+
+    @project_repository_resilience.apply()
+    async def fetch_project_resource_usage(
+        self,
+        start_date: datetime,
+        end_date: datetime,
+        project_ids: Sequence[UUID] | None = None,
+    ) -> tuple[list[KernelRow], dict[UUID, ResourceSlot]]:
+        """Fetch the project's kernels with the slots they were allocated."""
+        return await self._db_source.fetch_project_resource_usage(start_date, end_date, project_ids)
+
+    @project_repository_resilience.apply()
+    async def purge_group(self, group_id: uuid.UUID) -> bool:
+        """Completely remove a group and all its associated data."""
+        return await self._db_source.purge_group(group_id, self._storage_manager)
+
+    @project_repository_resilience.apply()
+    async def purge_dangling_personal_projects(
+        self,
+        threshold: datetime,
+        batch_size: int,
+    ) -> DanglingPersonalProjectPurgeResult:
+        """Purge personal projects whose creator is gone and whose deletion aged past
+        ``threshold``, at most ``batch_size`` of them.
+
+        A project that cannot be removed is counted as failed and left for the next
+        tick; the rest of the batch still runs.
+        """
+        project_ids = await self._db_source.dangling_personal_project_ids(threshold, batch_size)
+        purged = 0
+        failed = 0
+        for project_id in project_ids:
+            try:
+                await self._db_source.purge_group(project_id, self._storage_manager)
+            except Exception:
+                log.warning(
+                    "dangling personal project purge failed",
+                    project_id=project_id,
+                    exc_info=True,
+                )
+                failed += 1
+                continue
+            purged += 1
+        return DanglingPersonalProjectPurgeResult(purged_count=purged, failed_count=failed)
+
+    @project_repository_resilience.apply()
+    async def get_project(self, project_id: UUID) -> ProjectData:
+        """Get a single project by UUID.
+
+        Args:
+            project_id: UUID of the project.
+
+        Returns:
+            ProjectData for the project.
+
+        Raises:
+            ProjectNotFound: If project does not exist.
+        """
+        return await self._db_source.get_project(project_id)
+
+    @project_repository_resilience.apply()
+    async def project_id_by_name_in_domain(
+        self, domain_name: str, project_name: str
+    ) -> ProjectID | None:
+        """Resolve an active project's UUID by its domain-scoped name.
+
+        LEGACY: Exists solely to support existing API handlers that only accept a
+        group name as input (e.g. the REST v1 session/cluster template endpoints).
+        New API handlers and any other new code MUST NOT use this — they should
+        accept a project UUID directly.
+
+        Returns:
+            The project UUID if found, or ``None`` if no matching active project exists.
+        """
+        return await self._db_source.project_id_by_name_in_domain(domain_name, project_name)

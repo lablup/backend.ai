@@ -1,10 +1,10 @@
 # Services Layer
 
-← [Back to Manager](../README.md#manager-architecture-documentation) | [Architecture Overview](../../README.md#manager)
+[Back to Manager](../README.md#manager-architecture-documentation) and [Architecture Overview](../../README.md#manager)
 
 ## Overview
 
-The Services layer encapsulates the business logic of Backend.AI Manager. This layer performs domain-specific operations and provides clear input/output interfaces through Actions and ActionResults.
+The Services layer holds the business logic of the Backend.AI manager. This layer performs domain-specific operations and provides clear input and output interfaces through Actions and ActionResults.
 
 ## Architecture
 
@@ -24,16 +24,16 @@ Database Models (models/)
 
 Services implement 6 standard operations:
 
-1. **create** - Create new entity
-2. **get** - Retrieve single entity
+1. **create** - Create a new entity
+2. **get** - Get a single entity
 3. **search** - Query with filters
-4. **update** - Update entity
-5. **delete** - Delete entity
-6. **purge** - Permanently remove entity
+4. **update** - Update an entity
+5. **delete** - Delete an entity
+6. **purge** - Remove an entity permanently
 
-**Multi-target operations** — two semantics:
-- **Batch** (`batch_*`): many rows in one SQL statement, **atomic** (all-or-nothing); returns only the affected-row count. e.g. `batch_update`, `batch_delete`, `batch_purge`.
-- **Bulk** (`bulk_*`): rows processed individually, **partial failures allowed** (returns successes + errors). e.g. `bulk_create`, `bulk_upsert`.
+**Multi-target operations** have two semantics:
+- **Batch** (`batch_*`): many rows in one SQL statement, **atomic** (all or nothing). Returns the affected row count. For example `batch_update`, `batch_delete`, `batch_purge`.
+- **Bulk** (`bulk_*`): rows processed individually, with **partial failures allowed**. Returns the successes and the errors. For example `bulk_create`, `bulk_upsert`.
 
 **Method naming (no prefix):**
 ```python
@@ -49,7 +49,7 @@ await service.batch_delete_users(action: BatchDeleteUsersAction)
 await service.batch_purge_users(action: BatchPurgeUsersAction)
 ```
 
-**See:** `/service-guide` skill for detailed implementation patterns.
+See the `/service-guide` skill for implementation patterns.
 
 ## Key Responsibilities
 
@@ -59,7 +59,7 @@ await service.batch_purge_users(action: BatchPurgeUsersAction)
 - Validate and transform data
 
 ### 2. External Service Orchestration
-- Communicate with external components via Clients package (Agent, Storage Proxy, etc.)
+- Communicate with external components through the Clients package (Agent, storage proxy and others)
 - Publish events and handle notifications
 - Coordinate multiple external service calls
 
@@ -68,7 +68,7 @@ await service.batch_purge_users(action: BatchPurgeUsersAction)
 - Verify usage limits
 - Apply policy-based constraints
 
-**Note**: Authorization is handled by the Action Processor layer, and transaction management is the responsibility of the Repository layer.
+Authorization is handled by the Action Processor layer. Transaction management is the responsibility of the Repository layer.
 
 
 ## Directory Structure
@@ -89,7 +89,7 @@ services/
 
 ### 1. Single Responsibility Principle
 
-Each service is responsible for only one domain area.
+Each service handles one domain area.
 
 ```python
 # Good example - Clear single responsibility
@@ -166,7 +166,7 @@ class SessionService:
 
 ### 3. Repository Pattern Utilization
 
-Data access is performed only through Repositories.
+Data access is performed only through repositories.
 
 ```python
 class SessionService:
@@ -234,7 +234,7 @@ async def destroy_session(
     return DestroySessionActionResult(session_id=str(session.id))
 ```
 
-**Note**: Avoid the pattern of catching and re-raising exceptions. Exceptions are handled at the Action Processor or API Layer.
+Do not catch and re-raise exceptions. The Action Processor or API layer handles them.
 
 ## Common Patterns
 
@@ -455,13 +455,13 @@ async def create_session(
     return CreateSessionActionResult(session_id=str(session.id))
 ```
 
-**Note**: Avoid the pattern of catching exceptions for transformation or logging. Exceptions are propagated directly to the upper layers.
+Do not catch exceptions to transform or log them. Exceptions propagate directly to the upper layers.
 
 ## Testing Strategy
 
 ### Unit Testing
 
-Service logic is tested by mocking Repositories.
+Service logic is tested with mock repositories.
 
 ```python
 # tests/manager/services/test_session_service.py
@@ -577,7 +577,7 @@ class CreateSessionAction(SessionAction):
 
 ### 3. Clear Naming
 
-Method and variable names should clearly convey intent.
+Method and variable names state their intent.
 
 ```python
 # Good examples
@@ -607,7 +607,7 @@ async def handle(self, id: str) -> None:
 
 ## Implementation Guide
 
-This section provides practical guidance for implementing new services following Backend.AI patterns.
+This section gives practical guidance for implementing new services following Backend.AI patterns.
 
 **For comprehensive step-by-step instructions, see the `/service-guide` skill.**
 
@@ -621,7 +621,7 @@ When creating a new service:
 4. ✅ Define service protocol in `service.py`
 5. ✅ Implement service methods
 6. ✅ Create processor package in `processors.py`
-7. ✅ Write tests with mocked repositories (see `/tdd-guide`)
+7. ✅ Write tests with mock repositories (see `/tdd-guide`)
 8. ✅ Integrate with API handlers (see `/api-guide`)
 
 ### Directory Structure
@@ -642,7 +642,7 @@ services/{domain}/
     └── delete.py          # Delete operation
 ```
 
-**Example**: See `services/storage_namespace/` for complete implementation.
+See `services/storage_namespace/` for a complete implementation.
 
 ### Actions File Structure
 
@@ -690,7 +690,7 @@ class StorageNamespaceActionResult:
 - Implement `operation_type()` for categorization
 - Use `TYPE_CHECKING` for type-only imports
 
-#### Concrete Actions (`actions/create.py`, etc.)
+#### Concrete Actions (`actions/create.py` and others)
 
 Each operation gets its own file:
 
@@ -737,55 +737,44 @@ class CreateStorageNamespaceActionResult(StorageNamespaceActionResult):
 ```
 
 **Naming Conventions:**
-- Action: `{Verb}{Entity}Action` (e.g., `CreateStorageNamespaceAction`)
-- Result: `{ActionName}Result` (e.g., `CreateStorageNamespaceActionResult`)
-- Operation enum: `{VERB}` (e.g., `StorageNamespaceOperation.CREATE`)
+- Action: `{Verb}{Entity}Action` (for example `CreateStorageNamespaceAction`)
+- Result: `{ActionName}Result` (for example `CreateStorageNamespaceActionResult`)
+- Operation enum: `{VERB}` (for example `StorageNamespaceOperation.CREATE`)
 
 ### Processors Pattern
 
 Processors orchestrate action execution with hooks, metrics, and middleware:
 
 ```python
-from ai.backend.manager.services.processors import (
-    AbstractProcessorPackage,
-    ActionProcessor,
-)
+from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.actions.processor import ActionProcessor
 
 
-class StorageNamespaceProcessorPackage(AbstractProcessorPackage):
+class StorageNamespaceProcessors:
     """Processor package for storage namespace operations."""
+
+    create_storage_namespace: ActionProcessor[
+        CreateStorageNamespaceAction,
+        CreateStorageNamespaceActionResult,
+    ]
 
     def __init__(
         self,
-        service: StorageNamespaceServiceProtocol,
+        service: StorageNamespaceService,
+        action_monitors: list[ActionMonitor],
     ) -> None:
-        self._service = service
-        self._create_processor = ActionProcessor[
-            CreateStorageNamespaceAction,
-            CreateStorageNamespaceActionResult,
-        ](
-            action_name="create_storage_namespace",
-            handler=service.create_storage_namespace,
+        self.create_storage_namespace = ActionProcessor(
+            service.create_storage_namespace, action_monitors
         )
-
-    @property
-    def create_storage_namespace(
-        self,
-    ) -> ActionProcessor[
-        CreateStorageNamespaceAction,
-        CreateStorageNamespaceActionResult,
-    ]:
-        return self._create_processor
 ```
 
 **Key Components:**
-- **ProcessorPackage**: Container for all domain processors
-- **ActionProcessor**: Wraps service method with:
+- **Processors package**: Container holding one processor field per action
+- **ActionProcessor**: Wraps a service method with:
   - Pre/post hook execution
   - Metrics collection
   - Error handling
   - Logging
-- **Property Pattern**: Expose processors as properties for clean API
 
 ### Service Implementation Workflow
 
@@ -934,7 +923,7 @@ StorageNamespaceOperation.ARCHIVE
 
 ### Testing Services
 
-**Critical Rule**: Service tests MUST NOT use real database. Mock repositories instead.
+**Critical rule**: Service tests must not use a real database. Mock the repositories instead.
 
 ```python
 from unittest.mock import AsyncMock, Mock
@@ -992,7 +981,7 @@ async def test_create_storage_namespace_success(
 
 ## Service-Specific Documentation
 
-Detailed documentation for individual service implementations:
+Documentation for individual service implementations:
 
 ### Core Services
 - **[Session Service](./session/README.md)**: Session lifecycle management and execution
@@ -1033,7 +1022,7 @@ Detailed documentation for individual service implementations:
 
 ## References
 
-### Related Documentation
+### Related documents
 - [Action Processor Layer](../actions/README.md): Permission validation and request handling
 - [Repositories Layer](../repositories/README.md): Data access and query patterns
 - [Sokovan Orchestration](../sokovan/README.md): Session scheduling and orchestration

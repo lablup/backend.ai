@@ -61,11 +61,6 @@
   # caution as it may reduce security.
   # Added in 25.12.0
   allow-anonymous-change-password = false
-  # Enable project-level resource monitoring in the web UI. Shows aggregated
-  # resource usage statistics per project (group). Useful for project managers
-  # to track their team's resource consumption.
-  # Added in 25.12.0
-  allow-project-resource-monitor = true
   # Allow users to switch between different sign-in methods (e.g., password,
   # SSO). When disabled, users must use the sign-in method configured by the
   # administrator.
@@ -81,11 +76,6 @@
   # is not required. Disable for public-facing services.
   # Added in 25.12.0
   allow-signup-without-confirmation = false
-  # Force all compute session requests to go through the scheduling queue. When
-  # disabled, sessions may start immediately if resources are available. Enable
-  # for fair resource allocation in multi-user environments.
-  # Added in 25.12.0
-  always-enqueue-compute-session = true
   # Enable debug mode for the web UI frontend. Shows additional debugging
   # information in the browser console and may expose internal state. Should be
   # disabled in production for security.
@@ -130,21 +120,11 @@
   # proper 2FA configuration in the Manager.
   # Added in 25.12.0
   enable-2FA = true
-  # Require all users to set up two-factor authentication. Users who haven't
-  # configured 2FA will be prompted to do so before accessing the system.
-  # Requires enable_2fa to be true.
-  # Added in 25.12.0
-  force-2FA = false
   # Default container image for system SSH access sessions. Specifies which
   # image to use when users request SSH access to the system. Leave empty to use
   # the default system image.
   # Added in 25.12.0
   system-SSH-image = "cr.backend.ai/system/ssh:latest"
-  # Track resource usage based on directory structure. When enabled, usage
-  # statistics are calculated per directory/project hierarchy rather than flat
-  # aggregation. Useful for organizational billing.
-  # Added in 25.12.0
-  directory-based-usage = true
   # Allow users to customize resource allocation (CPU, memory, GPU) when
   # creating sessions. When disabled, users must choose from predefined resource
   # templates. Disable for simplified user experience.
@@ -207,6 +187,10 @@
   # Set to false only for local development without HTTPS.
   # Added in 26.4.3
   cookie-secure = true
+  # SameSite attribute of session cookies: Strict, Lax, or None. None requires
+  # cookie-secure to be true.
+  # Added in 26.10.0
+  cookie-samesite = "Lax"
   # List of request security policy names to apply. These policies are processed
   # as middleware on incoming requests. Common policies include CORS handling,
   # request size limits, and rate limiting. Empty list means no additional
@@ -219,6 +203,19 @@
   # additional policies.
   # Added in 25.12.0
   response-policies = []
+  # Origins that receive CORS response headers, with credentials allowed. Each
+  # value is the exact Origin header a browser sends: lowercase
+  # scheme://host[:port], without a default port or a trailing slash. Wildcards
+  # and "null" are rejected. When empty, no origin receives CORS response
+  # headers.
+  # Added in 26.10.0
+  cors-allowed-origins = ["https://console.example.com"]
+  # Accept CORS requests from any origin, with credentials allowed. This is for
+  # development environments only, where the WebUI dev server origin changes per
+  # run. Do not enable it in production: any site can then send credentialed
+  # requests to the web server.
+  # Added in 26.10.0
+  cors-allow-all-origins = false
 
   # Content Security Policy configuration. When set, adds CSP headers to
   # responses to protect against XSS and other injection attacks. Leave unset
@@ -390,11 +387,6 @@
 # preferences.
 # Added in 25.12.0
 [environments]
-  # Comma-separated list of allowed environment image name patterns to display.
-  # When set, only images matching these patterns are shown to users. Leave
-  # empty (None) to show all available images.
-  # Added in 25.12.0
-  ## allowlist = []
   # Show container images that are available but not yet installed on agents.
   # When enabled, users can see and request images that will be pulled on
   # demand. Disable to only show pre-installed images.
@@ -466,10 +458,6 @@
   # server will distribute requests across all endpoints.
   # Added in 25.12.0
   endpoint = "http://manager-api:8080,http://manager-api-2:8080"
-  # Display text for the API endpoint shown in the web UI. This label appears in
-  # settings and debugging panels. Customize for branded deployments.
-  # Added in 25.12.0
-  text = "Production API"
   # Verify SSL certificates when connecting to the Manager API. Disable only for
   # development with self-signed certificates. Always enable in production for
   # security.
@@ -498,7 +486,7 @@
   # Added in 26.4.4
   health-check-interval = 10.0
   # Consecutive probe (or caller-reported) failures required before an endpoint
-  # flips from healthy to unhealthy.
+  # flips from healthy to unhealthy. A 503 probe excludes it immediately.
   # Added in 26.4.4
   health-check-failure-threshold = 3
   # Seconds the unhealthy_since timestamp is retained after an endpoint is
@@ -556,9 +544,9 @@
   # attacks.
   # Added in 25.12.0
   login-block-time = 1200
-  # Maximum number of failed login attempts before blocking. After this many
-  # failures, the IP or account is blocked for login_block_time seconds. Lower
-  # values are more secure but may frustrate legitimate users.
+  # Maximum number of failed login attempts per username before blocking. After
+  # this many failures, login for that username is blocked for login_block_time
+  # seconds. Lower values are more secure but may frustrate legitimate users.
   # Added in 25.12.0
   login-allowed-fail-count = 5
   # Automatically log out users after a period of inactivity. When enabled,
@@ -719,29 +707,6 @@
   # Added in 26.2.0
   max-export-batch-size = 4096
 
-# etcd connection settings for distributed configuration and coordination with
-# other Backend.AI components.
-# Added in 25.12.0
-[etcd]
-  # Namespace prefix for etcd keys used by Backend.AI. Allows multiple
-  # Backend.AI clusters to share the same etcd cluster. All Backend.AI related
-  # keys will be stored under this namespace.
-  # Added in 22.03.0
-  namespace = "backend"
-  # Network address of the etcd server. Default is the standard etcd port on
-  # localhost. In production, should point to one or more etcd instance
-  # endpoint(s).
-  # Added in 22.03.0
-  addr = { host = "etcd-cluster", port = 2379 }
-  # Username for authenticating with etcd. Optional if etcd doesn't require
-  # authentication. Should be set along with password for secure deployments.
-  # Added in 22.03.0
-  ## user = "backend"
-  # Password for authenticating with etcd. Should be kept secret in production
-  # environments. Set together with the user field for authentication.
-  # Added in 22.03.0
-  ## password = "ETCD_PASSWORD"
-
 # Pyroscope continuous profiling integration for performance analysis.
 # Added in 25.12.0
 [pyroscope]
@@ -837,7 +802,8 @@
   # Added in 26.4.4
   health-check-interval = 10.0
   # Consecutive probe (or caller-reported) failures required before an Apollo
-  # Router endpoint flips from healthy to unhealthy.
+  # Router endpoint flips from healthy to unhealthy. A 503 probe excludes it
+  # immediately.
   # Added in 26.4.4
   health-check-failure-threshold = 3
   # Seconds the unhealthy_since timestamp is retained after an Apollo Router

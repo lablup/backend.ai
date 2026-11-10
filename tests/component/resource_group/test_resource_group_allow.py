@@ -5,12 +5,17 @@ from __future__ import annotations
 import secrets
 import uuid
 from collections.abc import AsyncIterator
+from typing import Any
 
 import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
+from ai.backend.common.data.entity.resource_group import (
+    ResourceGroupEntityType,
+    ResourceGroupName,
+)
 from ai.backend.common.dto.manager.v2.resource_group.request import (
     UpdateAllowedDomainsForResourceGroupInput,
     UpdateAllowedProjectsForResourceGroupInput,
@@ -23,8 +28,10 @@ from ai.backend.common.dto.manager.v2.resource_group.response import (
     AllowedResourceGroupsPayload,
 )
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
-from ai.backend.manager.models.domain import domains
-from ai.backend.manager.models.scaling_group.row import ScalingGroupOpts, ScalingGroupRow
+from ai.backend.manager.models.domain.row import domains
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 
@@ -49,6 +56,32 @@ async def clean_domain_fixture(
         await conn.execute(domains.delete().where(domains.c.name == domain_name))
 
 
+async def _seed_scaling_group(conn: Any, name: str, description: str) -> None:
+    """A resource group row and the graph node ops writes when one is created. A
+    relation expects both sides to be in the graph already."""
+    resource_group_id = (
+        await conn.execute(
+            sa.insert(ResourceGroupRow.__table__)
+            .values(
+                name=name,
+                description=description,
+                is_active=True,
+                driver="static",
+                driver_opts={},
+                scheduler="fifo",
+                scheduler_opts=ResourceGroupOpts(),
+            )
+            .returning(ResourceGroupRow.__table__.c.id)
+        )
+    ).scalar_one()
+    await conn.execute(
+        sa.insert(VirtualEntityRow.__table__).values(
+            entity_type=ResourceGroupEntityType(),
+            entity_id=resource_group_id,
+        )
+    )
+
+
 @pytest.fixture()
 async def extra_scaling_group(
     db_engine: SAEngine,
@@ -56,21 +89,11 @@ async def extra_scaling_group(
     """Create an extra scaling group for allow/disallow tests."""
     name = f"test-sg-{secrets.token_hex(6)}"
     async with db_engine.begin() as conn:
-        await conn.execute(
-            sa.insert(ScalingGroupRow.__table__).values(
-                name=name,
-                description="Test scaling group for allow/disallow",
-                is_active=True,
-                driver="static",
-                driver_opts={},
-                scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(),
-            )
-        )
+        await _seed_scaling_group(conn, name, "Test scaling group for allow/disallow")
     yield name
     async with db_engine.begin() as conn:
         await conn.execute(
-            ScalingGroupRow.__table__.delete().where(ScalingGroupRow.__table__.c.name == name)
+            ResourceGroupRow.__table__.delete().where(ResourceGroupRow.__table__.c.name == name)
         )
 
 
@@ -81,21 +104,11 @@ async def second_scaling_group(
     """Create a second scaling group for multi-allow tests."""
     name = f"test-sg2-{secrets.token_hex(6)}"
     async with db_engine.begin() as conn:
-        await conn.execute(
-            sa.insert(ScalingGroupRow.__table__).values(
-                name=name,
-                description="Second test scaling group",
-                is_active=True,
-                driver="static",
-                driver_opts={},
-                scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(),
-            )
-        )
+        await _seed_scaling_group(conn, name, "Second test scaling group")
     yield name
     async with db_engine.begin() as conn:
         await conn.execute(
-            ScalingGroupRow.__table__.delete().where(ScalingGroupRow.__table__.c.name == name)
+            ResourceGroupRow.__table__.delete().where(ResourceGroupRow.__table__.c.name == name)
         )
 
 
@@ -223,13 +236,14 @@ class TestAllowedResourceGroupsForProject:
         self,
         admin_v2_registry: V2ClientRegistry,
         group_fixture: uuid.UUID,
+        resource_group_name: ResourceGroupName,
     ) -> None:
-        """Initially, a project has no allowed resource groups."""
+        """Initially, a project reaches only what its domain allows."""
         result = await admin_v2_registry.resource_group.get_allowed_resource_groups_for_project(
             group_fixture
         )
         assert isinstance(result, AllowedResourceGroupsPayload)
-        assert result.items == []
+        assert result.items == [resource_group_name]
 
     async def test_add_and_get_allowed(
         self,

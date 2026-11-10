@@ -9,6 +9,7 @@ from uuid import UUID
 
 import pytest
 
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.dto.manager.v2.fair_share.response import (
     GetProjectFairSharePayload,
     SearchProjectFairSharesPayload,
@@ -16,11 +17,11 @@ from ai.backend.common.dto.manager.v2.fair_share.response import (
 from ai.backend.common.types import ResourceSlot, SlotQuantity
 from ai.backend.manager.api.adapters.fair_share.adapter import FairShareAdapter
 from ai.backend.manager.api.gql.fair_share.resolver import project as project_resolver
-from ai.backend.manager.api.gql.fair_share.types import (
+from ai.backend.manager.api.gql.fair_share.types.project import (
     ProjectFairShareGQL,
 )
 from ai.backend.manager.api.gql.types import ResourceGroupProjectScope
-from ai.backend.manager.data.fair_share import (
+from ai.backend.manager.data.fair_share.types import (
     FairShareCalculationSnapshot,
     FairShareData,
     FairShareMetadata,
@@ -43,6 +44,7 @@ class TestRGProjectFairShare:
         """Project fair share data for existing record."""
         return ProjectFairShareData(
             resource_group="default",
+            resource_group_id=ResourceGroupID(UUID("880e8400-e29b-41d4-a716-446655440003")),
             project_id=project_id,
             domain_name="test-domain",
             data=FairShareData(

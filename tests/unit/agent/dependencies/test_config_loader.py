@@ -13,19 +13,30 @@ from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.logging.types import LogLevel
 
 
+def _rpc_auth_toml(rpc_auth_key_config: dict[str, Path]) -> str:
+    return "\n".join(f'{key} = "{path}"' for key, path in rpc_auth_key_config.items())
+
+
 class TestAgentConfigLoaderDependency:
-    async def test_config_loader_loads_valid_config(self, tmp_path: Path) -> None:
+    async def test_config_loader_loads_valid_config(
+        self,
+        tmp_path: Path,
+        rpc_auth_key_config: dict[str, Path],
+    ) -> None:
         """Test that config loader can load a valid config file."""
         config_path = tmp_path / "agent.toml"
-        config_path.write_text("""
+        config_path.write_text(f"""
 [agent]
 id = "test-agent-123"
-scaling-group = "test-group"
+initial-resource-group-name = "test-group"
 backend = "docker"
+{_rpc_auth_toml(rpc_auth_key_config)}
 
 [etcd]
 namespace = "test"
-addr = { host = "127.0.0.1", port = 2379 }
+addr = {{ host = "127.0.0.1", port = 2379 }}
+user = "test"
+password = "test"
 
 [container]
 scratch-root = "/tmp/test"
@@ -42,7 +53,7 @@ reserved-cpu = 1
 
         async with loader.provide(input_data) as config:
             assert config.agent.id == "test-agent-123"
-            assert config.agent.scaling_group == "test-group"
+            assert config.agent.initial_resource_group_name == "test-group"
             assert config.etcd.namespace == "test"
             assert config.container.scratch_root.resolve() == Path("/tmp/test").resolve()
 
@@ -50,18 +61,22 @@ reserved-cpu = 1
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
+        rpc_auth_key_config: dict[str, Path],
     ) -> None:
         """Test that config loader applies environment variable overrides."""
         config_path = tmp_path / "agent.toml"
-        config_path.write_text("""
+        config_path.write_text(f"""
 [agent]
 id = "original-id"
-scaling-group = "original-group"
+initial-resource-group-name = "original-group"
 backend = "docker"
+{_rpc_auth_toml(rpc_auth_key_config)}
 
 [etcd]
 namespace = "original"
-addr = { host = "127.0.0.1", port = 2379 }
+addr = {{ host = "127.0.0.1", port = 2379 }}
+user = "test"
+password = "test"
 
 [container]
 scratch-root = "/tmp/original"
@@ -93,7 +108,7 @@ reserved-cpu = 1
         # Missing required fields
         config_path.write_text("""
 [agent]
-# Missing id and scaling-group
+# Missing required fields
 """)
 
         loader = AgentConfigLoaderDependency()
@@ -106,18 +121,25 @@ reserved-cpu = 1
             async with loader.provide(input_data):
                 pass
 
-    async def test_config_loader_with_debug_log_level(self, tmp_path: Path) -> None:
+    async def test_config_loader_with_debug_log_level(
+        self,
+        tmp_path: Path,
+        rpc_auth_key_config: dict[str, Path],
+    ) -> None:
         """Test that config loader respects log level in validation context."""
         config_path = tmp_path / "agent.toml"
-        config_path.write_text("""
+        config_path.write_text(f"""
 [agent]
 id = "debug-test"
-scaling-group = "default"
+initial-resource-group-name = "default"
 backend = "docker"
+{_rpc_auth_toml(rpc_auth_key_config)}
 
 [etcd]
 namespace = "local"
-addr = { host = "127.0.0.1", port = 2379 }
+addr = {{ host = "127.0.0.1", port = 2379 }}
+user = "test"
+password = "test"
 
 [container]
 scratch-root = "/tmp/test"

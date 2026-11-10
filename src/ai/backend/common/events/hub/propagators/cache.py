@@ -7,9 +7,9 @@ from typing import override
 from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventPropagator
 from ai.backend.common.events.types import AbstractEvent
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class WithCachePropagator(EventPropagator):
@@ -46,7 +46,7 @@ class WithCachePropagator(EventPropagator):
         try:
             return await self._event_fetcher.fetch_cached_event(cache_id)
         except Exception as e:
-            log.warning("Failed to fetch cached event for cache_id {}: {}", cache_id, e)
+            log.warning("cached event fetch failed", exc_info=e, cache_id=cache_id)
             return None
 
     async def receive(self, cache_id: str) -> AsyncIterator[AbstractEvent]:
@@ -73,8 +73,8 @@ class WithCachePropagator(EventPropagator):
                 cached_event = await self._fetch_cached_event_safe(cache_id)
                 if cached_event is not None:
                     yield cached_event
-            except Exception as e:
-                log.error("Error propagating event: {}", e)
+            except Exception:
+                log.exception("event propagation failed")
 
     @override
     async def propagate_event(self, event: AbstractEvent) -> None:

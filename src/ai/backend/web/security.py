@@ -9,9 +9,9 @@ from typing import Self
 from aiohttp import web
 from aiohttp.typedefs import Handler
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 type RequestPolicy = Callable[[web.Request], None]
 
@@ -46,6 +46,11 @@ async def security_policy_middleware(request: web.Request, handler: Handler) -> 
     try:
         security_policy.check_request_policies(request)
         response = await handler(request)
+    except web.HTTPException as e:
+        # An HTTPException is also a Response, so the policies apply to it as well.
+        security_policy.apply_response_policies(e)
+        raise
+    else:
         return security_policy.apply_response_policies(response)
     finally:
         csp_nonce_var.reset(token)
@@ -158,9 +163,9 @@ def _resolve_csp_sources(directive: str, sources: list[str], nonce: str) -> list
         return sources
     has_unsafe_inline = any(_is_unsafe_inline_keyword(source) for source in sources)
     if has_unsafe_inline:
-        log.warning(
+        log.debug(
             "CSP directive {} lists both the nonce keyword and 'unsafe-inline'; "
-            "dropping the nonce so 'unsafe-inline' keeps effect.",
+            "dropping the nonce so 'unsafe-inline' keeps effect",
             directive,
         )
     if has_unsafe_inline or not nonce:

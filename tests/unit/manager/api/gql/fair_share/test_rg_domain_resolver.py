@@ -5,9 +5,11 @@ from __future__ import annotations
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
+from uuid import UUID
 
 import pytest
 
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.dto.manager.v2.fair_share.response import (
     GetDomainFairSharePayload,
     SearchDomainFairSharesPayload,
@@ -15,11 +17,11 @@ from ai.backend.common.dto.manager.v2.fair_share.response import (
 from ai.backend.common.types import ResourceSlot, SlotQuantity
 from ai.backend.manager.api.adapters.fair_share.adapter import FairShareAdapter
 from ai.backend.manager.api.gql.fair_share.resolver import domain as domain_resolver
-from ai.backend.manager.api.gql.fair_share.types import (
+from ai.backend.manager.api.gql.fair_share.types.domain import (
     DomainFairShareGQL,
 )
 from ai.backend.manager.api.gql.types import ResourceGroupDomainScope
-from ai.backend.manager.data.fair_share import (
+from ai.backend.manager.data.fair_share.types import (
     DomainFairShareData,
     FairShareCalculationSnapshot,
     FairShareData,
@@ -37,6 +39,7 @@ class TestRGDomainFairShare:
         """Domain fair share data for existing record."""
         return DomainFairShareData(
             resource_group="default",
+            resource_group_id=ResourceGroupID(UUID("880e8400-e29b-41d4-a716-446655440003")),
             domain_name="test-domain",
             data=FairShareData(
                 spec=FairShareSpec(

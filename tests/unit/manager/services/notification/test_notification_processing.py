@@ -8,33 +8,48 @@ tests/component/notification/test_notification.py and exercise the HTTP API laye
 
 from __future__ import annotations
 
+import dataclasses
+import logging
 import uuid
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import aiohttp
 import pytest
 
+from ai.backend.common.contexts.user import with_user_context
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.notification import (
+    NotificationChannelEntityType,
+    NotificationChannelID,
+    NotificationRuleEntityType,
+    NotificationRuleID,
+)
 from ai.backend.common.data.notification import SessionStartedMessage
 from ai.backend.common.data.notification.types import (
     NotificationChannelType,
     NotificationRuleType,
     WebhookSpec,
 )
-from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.data.notification import (
+from ai.backend.common.data.user.types import UserData, UserRole
+from ai.backend.manager.actions.registry.types import GroupMeta
+from ai.backend.manager.data.notification.types import (
+    MatchingNotificationRuleData,
     NotificationChannelData,
     NotificationRuleData,
 )
+from ai.backend.manager.errors.notification import NotificationProcessingFailure
 from ai.backend.manager.notification.notification_center import NotificationCenter
 from ai.backend.manager.notification.types import SendResult
 from ai.backend.manager.repositories.notification.repository import NotificationRepository
-from ai.backend.manager.services.notification.actions import (
+from ai.backend.manager.services.notification.actions.process_notification import (
     ProcessNotificationAction,
     ProcessNotificationActionResult,
 )
 from ai.backend.manager.services.notification.processors import NotificationProcessors
 from ai.backend.manager.services.notification.service import NotificationService
+from ai.backend.testutils.processors import ops_processor_group
 
 
 @pytest.fixture()
@@ -50,24 +65,45 @@ def mock_repository() -> MagicMock:
 
 
 @pytest.fixture()
+def superadmin() -> UserData:
+    """Dispatch runs behind the global processor's SUPERADMIN gate, so give it a caller."""
+    return UserData(
+        user_id=uuid.uuid4(),
+        is_authorized=True,
+        is_admin=True,
+        is_superadmin=True,
+        role=UserRole.SUPERADMIN,
+        domain_name="default",
+        domain_id=DomainID(uuid.uuid4()),
+    )
+
+
+@pytest.fixture()
 def notification_processors(
     mock_repository: MagicMock,
     notification_center: NotificationCenter,
 ) -> NotificationProcessors:
     service = NotificationService(mock_repository, notification_center)
-    # Create properly structured ActionValidators mock with async validators
-    validators = MagicMock(spec=ActionValidators)
-    validators.rbac = MagicMock()
-    validators.rbac.scope = AsyncMock()
-    validators.rbac.single_entity = AsyncMock()
-    return NotificationProcessors(service=service, action_monitors=[], validators=validators)
+    # Only the dispatch path is exercised here, and its caller is a super admin, whom
+    # the global gate passes without a read. So the groups may sit on stand-ins.
+    engine = MagicMock()
+    config_provider = MagicMock()
+    return NotificationProcessors(
+        channel_group=ops_processor_group(
+            engine, GroupMeta(NotificationChannelEntityType()), config_provider
+        ),
+        rule_group=ops_processor_group(
+            engine, GroupMeta(NotificationRuleEntityType()), config_provider
+        ),
+        service=service,
+    )
 
 
 @pytest.fixture()
 def sample_channel_data() -> NotificationChannelData:
     now = datetime.now(tz=UTC)
     return NotificationChannelData(
-        id=uuid.uuid4(),
+        id=NotificationChannelID(uuid.uuid4()),
         name="test-webhook",
         description="Test webhook channel",
         channel_type=NotificationChannelType.WEBHOOK,
@@ -83,11 +119,11 @@ def sample_channel_data() -> NotificationChannelData:
 def sample_rule_data(sample_channel_data: NotificationChannelData) -> NotificationRuleData:
     now = datetime.now(tz=UTC)
     return NotificationRuleData(
-        id=uuid.uuid4(),
+        id=NotificationRuleID(uuid.uuid4()),
         name="fixture-notification-rule",
         description="Fixture rule for unit tests",
         rule_type=NotificationRuleType.SESSION_STARTED,
-        channel=sample_channel_data,
+        channel_id=sample_channel_data.id,
         message_template="Session {{ session_name }} started ({{ session_type }})",
         enabled=True,
         created_by=uuid.uuid4(),
@@ -100,13 +136,19 @@ class TestNotificationProcessing:
     async def test_event_triggers_matching_rule(
         self,
         notification_processors: NotificationProcessors,
+        superadmin: UserData,
         notification_center: NotificationCenter,
         mock_repository: MagicMock,
         sample_rule_data: NotificationRuleData,
+        sample_channel_data: NotificationChannelData,
     ) -> None:
         """A matching rule is found and the channel is called exactly once."""
         send_result = SendResult(message="Notification delivered")
-        mock_repository.get_matching_rules = AsyncMock(return_value=[sample_rule_data])
+        mock_repository.get_matching_rules = AsyncMock(
+            return_value=[
+                MatchingNotificationRuleData(rule=sample_rule_data, channel=sample_channel_data)
+            ]
+        )
 
         with patch.object(
             notification_center,
@@ -124,7 +166,8 @@ class TestNotificationProcessing:
                     status="RUNNING",
                 ),
             )
-            result = await notification_processors.process_notification.wait_for_complete(action)
+            with with_user_context(superadmin):
+                result = await notification_processors.process_notification.run(action)
 
         assert isinstance(result, ProcessNotificationActionResult)
         assert result.rules_matched >= 1
@@ -134,6 +177,7 @@ class TestNotificationProcessing:
     async def test_partial_channel_failure_tolerance(
         self,
         notification_processors: NotificationProcessors,
+        superadmin: UserData,
         notification_center: NotificationCenter,
         mock_repository: MagicMock,
         sample_channel_data: NotificationChannelData,
@@ -141,7 +185,7 @@ class TestNotificationProcessing:
         """When one channel send fails, other channels still receive the notification."""
         now = datetime.now(tz=UTC)
         channel2_data = NotificationChannelData(
-            id=uuid.uuid4(),
+            id=NotificationChannelID(uuid.uuid4()),
             name="partial-failure-channel-2",
             description="Second channel for partial failure test",
             channel_type=NotificationChannelType.WEBHOOK,
@@ -152,11 +196,11 @@ class TestNotificationProcessing:
             updated_at=now,
         )
         rule1_data = NotificationRuleData(
-            id=uuid.uuid4(),
+            id=NotificationRuleID(uuid.uuid4()),
             name="partial-fail-rule-1",
             description=None,
             rule_type=NotificationRuleType.SESSION_STARTED,
-            channel=sample_channel_data,
+            channel_id=sample_channel_data.id,
             message_template="Rule 1: {{ session_name }}",
             enabled=True,
             created_by=uuid.uuid4(),
@@ -164,18 +208,23 @@ class TestNotificationProcessing:
             updated_at=now,
         )
         rule2_data = NotificationRuleData(
-            id=uuid.uuid4(),
+            id=NotificationRuleID(uuid.uuid4()),
             name="partial-fail-rule-2",
             description=None,
             rule_type=NotificationRuleType.SESSION_STARTED,
-            channel=channel2_data,
+            channel_id=channel2_data.id,
             message_template="Rule 2: {{ session_name }}",
             enabled=True,
             created_by=uuid.uuid4(),
             created_at=now,
             updated_at=now,
         )
-        mock_repository.get_matching_rules = AsyncMock(return_value=[rule1_data, rule2_data])
+        mock_repository.get_matching_rules = AsyncMock(
+            return_value=[
+                MatchingNotificationRuleData(rule=rule1_data, channel=sample_channel_data),
+                MatchingNotificationRuleData(rule=rule2_data, channel=sample_channel_data),
+            ]
+        )
 
         call_count = 0
         send_result = SendResult(message="ok")
@@ -203,9 +252,77 @@ class TestNotificationProcessing:
                     status="RUNNING",
                 ),
             )
-            result = await notification_processors.process_notification.wait_for_complete(action)
+            with with_user_context(superadmin):
+                result = await notification_processors.process_notification.run(action)
 
         assert isinstance(result, ProcessNotificationActionResult)
         assert result.rules_matched >= 2
         assert len(result.successes) >= 1
         assert len(result.errors) >= 1
+
+
+_TRACE_LEVEL = 5
+
+
+class TestRuleFailureLogLevel:
+    """Failures of a user-configured webhook are the user's; mail server and internal ones are not."""
+
+    @pytest.mark.parametrize(
+        ("channel_type", "error", "log_level"),
+        [
+            (NotificationChannelType.WEBHOOK, aiohttp.ClientConnectionError(), _TRACE_LEVEL),
+            (NotificationChannelType.WEBHOOK, TimeoutError(), _TRACE_LEVEL),
+            (
+                NotificationChannelType.WEBHOOK,
+                NotificationProcessingFailure("Webhook delivery failed with status 500"),
+                _TRACE_LEVEL,
+            ),
+            (
+                NotificationChannelType.EMAIL,
+                NotificationProcessingFailure("SMTP authentication failed"),
+                logging.ERROR,
+            ),
+            (NotificationChannelType.WEBHOOK, RuntimeError("bug"), logging.ERROR),
+        ],
+    )
+    async def test_failure_level_follows_channel_and_cause(
+        self,
+        notification_processors: NotificationProcessors,
+        superadmin: UserData,
+        notification_center: NotificationCenter,
+        mock_repository: MagicMock,
+        sample_channel_data: NotificationChannelData,
+        sample_rule_data: NotificationRuleData,
+        caplog: pytest.LogCaptureFixture,
+        channel_type: NotificationChannelType,
+        error: BaseException,
+        log_level: int,
+    ) -> None:
+        channel = dataclasses.replace(sample_channel_data, channel_type=channel_type)
+        mock_repository.get_matching_rules = AsyncMock(
+            return_value=[MatchingNotificationRuleData(rule=sample_rule_data, channel=channel)]
+        )
+        action = ProcessNotificationAction(
+            rule_type=NotificationRuleType.SESSION_STARTED,
+            timestamp=datetime.now(UTC),
+            notification_data=SessionStartedMessage(
+                session_id=str(uuid.uuid4()),
+                session_name="failing-session",
+                session_type="batch",
+                cluster_mode="single-node",
+                status="RUNNING",
+            ),
+        )
+        with (
+            patch.object(notification_center, "process_rule", new=AsyncMock(side_effect=error)),
+            caplog.at_level(_TRACE_LEVEL, logger="ai.backend.manager.services.notification"),
+            with_user_context(superadmin),
+        ):
+            await notification_processors.process_notification.run(action)
+
+        failures = [
+            r
+            for r in caplog.records
+            if r.getMessage().startswith("notification rule processing failed")
+        ]
+        assert [r.levelno for r in failures] == [log_level]

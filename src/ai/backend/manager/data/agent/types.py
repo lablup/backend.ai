@@ -1,14 +1,24 @@
 from __future__ import annotations
 
 import enum
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Self, override
 
 from ai.backend.common.auth import PublicKey
 from ai.backend.common.data.agent.types import AgentInfo
-from ai.backend.common.types import AgentId, DeviceName, ResourceSlot, SlotName, SlotTypes
+from ai.backend.common.data.entity.agent import AgentUUID
+from ai.backend.common.data.entity.types import EntityData
+from ai.backend.common.types import (
+    AgentId,
+    DeviceName,
+    ResourceSlot,
+    ResourceSlotEntry,
+    SlotName,
+    SlotTypes,
+)
+from ai.backend.manager.data.resource_slot.types import AgentResourceData
 
 if TYPE_CHECKING:
     from ai.backend.manager.data.permission.permission_defs import AgentPermission
@@ -63,16 +73,14 @@ class AgentDataForHeartbeatUpdate:
 
 
 @dataclass
-class AgentData:
+class AgentData(EntityData):
+    uuid: AgentUUID
     id: AgentId
     status: AgentStatus
     status_changed: datetime | None
     region: str
-    scaling_group: str
+    resource_group: str
     schedulable: bool
-    available_slots: ResourceSlot
-    cached_occupied_slots: ResourceSlot
-    actual_occupied_slots: ResourceSlot
     addr: str
     public_host: str | None
     first_contact: datetime | None
@@ -83,13 +91,17 @@ class AgentData:
     public_key: PublicKey | None
     auto_terminate_abusing_kernel: bool
 
+    @override
+    def entity_id(self) -> AgentUUID:
+        return self.uuid
+
 
 @dataclass
 class AgentMetadata:
     id: AgentId
     status: AgentStatus
     region: str | None
-    scaling_group: str
+    resource_group: str | None
     architecture: str
     version: str
     auto_terminate_abusing_kernel: bool
@@ -123,7 +135,6 @@ class AgentHeartbeatUpsert:
             "id": self.metadata.id,
             "status": AgentStatus.ALIVE,
             "region": self.metadata.region,
-            "available_slots": self.resource_info.available_slots,
             "addr": self.network_info.addr,
             "public_host": self.network_info.public_host,
             "public_key": self.network_info.public_key,
@@ -132,7 +143,6 @@ class AgentHeartbeatUpsert:
             "architecture": self.metadata.architecture,
             "auto_terminate_abusing_kernel": self.metadata.auto_terminate_abusing_kernel,
             "lost_at": None,
-            "occupied_slots": ResourceSlot(),
             "first_contact": self.heartbeat_received,
         }
 
@@ -142,7 +152,6 @@ class AgentHeartbeatUpsert:
             "id": self.metadata.id,
             "status": AgentStatus.ALIVE,
             "region": self.metadata.region,
-            "available_slots": self.resource_info.available_slots,
             "addr": self.network_info.addr,
             "public_host": self.network_info.public_host,
             "public_key": self.network_info.public_key,
@@ -162,7 +171,7 @@ class AgentHeartbeatUpsert:
                 id=agent_id,
                 status=AgentStatus.ALIVE,
                 region=agent_info.region,
-                scaling_group=agent_info.scaling_group,
+                resource_group=agent_info.scaling_group,
                 architecture=agent_info.architecture,
                 auto_terminate_abusing_kernel=agent_info.auto_terminate_abusing_kernel,
                 version=agent_info.version,
@@ -172,9 +181,17 @@ class AgentHeartbeatUpsert:
                 public_host=agent_info.public_host,
                 public_key=agent_info.public_key,
             ),
+            # The heartbeat carries the list-friendly `ResourceSlotEntry` form, while the
+            # agents table still stores a `ResourceSlot`, so the wire form is collapsed
+            # back here at the boundary rather than downstream.
             resource_info=AgentResourceInfo(
-                slot_key_and_units=agent_info.slot_key_and_units,
-                available_slots=agent_info.available_resource_slots,
+                slot_key_and_units={
+                    SlotName(slot_name): slot_type
+                    for slot_name, slot_type in agent_info.slot_key_and_units.items()
+                },
+                available_slots=ResourceSlotEntry.inputs_to_resource_slot(
+                    agent_info.available_resource_slots
+                ),
                 compute_plugins=agent_info.compute_plugins,
             ),
             lost_at=None,
@@ -216,23 +233,25 @@ class UpsertResult:
 
 
 @dataclass
-class AgentListResult:
-    """Search result with total count for agents."""
-
-    items: list[AgentDetailData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
-
-
-@dataclass
 class AgentDetailData:
-    """
-    Agent data with associated permissions.
+    """An agent with its slot rows and the caller's permissions on it.
 
-    This encapsulates an agent's data together with the permissions
-    the current user has on that agent.
+    The slot rows are field rows of the agent, read beside it rather than folded
+    into :class:`AgentData`; ``resources`` is in slot catalog rank order.
     """
 
     agent: AgentData
+    resources: Sequence[AgentResourceData]
     permissions: list[AgentPermission]
+
+    def available_slots(self) -> ResourceSlot:
+        available = ResourceSlot()
+        for resource in self.resources:
+            available[SlotName(resource.slot_name)] = resource.capacity
+        return available
+
+    def occupied_slots(self) -> ResourceSlot:
+        occupied = ResourceSlot()
+        for resource in self.resources:
+            occupied[SlotName(resource.slot_name)] = resource.used
+        return occupied

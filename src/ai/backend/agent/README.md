@@ -2,45 +2,45 @@
 
 ## Purpose
 
-The Agent is a compute node component responsible for container lifecycle management. It runs computing sessions as containers, monitors resource usage, and reports status to the Manager.
+The Agent is a component that manages the container lifecycle on a node. It runs sessions as containers, monitors resource usage, and reports status to the manager.
 
 ## Key Responsibilities
 
 ### 1. Container Lifecycle Management
 - Create and start containers from session specifications
-- Initialize kernels and execute runtime configuration
+- Initialize kernels and apply runtime configuration
 - Monitor container health and status
-- Delete containers upon session termination
+- Delete containers when a session terminates
 - Handle container restarts and error recovery
 
 ### 2. Resource Monitoring
-- Track CPU, memory, GPU usage per container
+- Track CPU, memory, and GPU usage per container
 - Monitor disk I/O and network traffic
 - Collect accelerator metrics (CUDA, ROCm, TPU)
-- Report resource availability to Manager
-- Enforce resource limits via cgroups
+- Report resource availability to the manager
+- Enforce resource limits through cgroups
 
 ### 3. Local Storage Management
 - Manage scratch storage for temporary files
-- Mount virtual folders (vfolders) to containers
+- Mount vfolders to containers
 - Handle file permissions and ownership
-- Clean up storage after session termination
+- Clean up storage when a session terminates
 
 ### 4. Service Port Management
-- Expose container service ports (Jupyter, SSH, TensorBoard, etc.)
-- Forward traffic from App Proxy to containers
+- Expose container service ports (Jupyter, SSH, TensorBoard, and others)
+- Forward traffic from the app proxy to containers
 - Manage port allocation from configured ranges
 - Handle SSL/TLS termination when needed
 
 ### 5. Agent Status Reporting
-- Periodically report agent status to Manager
-- Send heartbeat signals indicating availability
+- Periodically report agent status to the manager
+- Send agent heartbeats that indicate availability
 - Update occupied and available resource slots
 - Report errors and exceptional conditions
 
 ## Entry Points
 
-Agent has 4 entry points. The RPC Server handles Manager requests, Event Dispatcher sends and receives events, Background Task Handler performs async tasks, and Internal REST API is used exclusively for metrics exposure.
+The Agent has four entry points. The RPC Server handles manager requests, the Event Dispatcher sends and receives events, the Background Task Handler runs asynchronous tasks, and the Internal REST API serves metrics only.
 
 ### 1. RPC Server (Primary Request Handler)
 
@@ -49,56 +49,56 @@ Agent has 4 entry points. The RPC Server handles Manager requests, Event Dispatc
 **Port**: 6011 (default)
 
 **Key Features**:
-- Only Manager can send RPC requests to Agent (no direct user access)
+- The manager is the only client that sends RPC requests to the Agent. Users do not access the Agent directly.
 
 ### 2. Event Dispatcher
 
 **System**: Backend.AI Event Dispatcher
 
-Agent sends Agent and Kernel lifecycle events to Manager.
+The Agent sends Agent and Kernel lifecycle events to the manager.
 
 **Published Events**: Agent and Kernel lifecycle events
 
 **Consumed Events**: Plugin integration events
 
-**Related Documentation**: [Event Dispatcher System](../common/events/README.md)
+**Related documents**: [Event Dispatcher System](../common/events/README.md)
 
 ### 3. Background Task Handler
 
 **System**: Backend.AI Background Task Handler
 
-Handles long-running tasks asynchronously, issues Task IDs, and notifies completion via events.
+It handles long-running tasks asynchronously, issues a task ID, and notifies completion through events.
 
 **Usage Examples**:
 - Image pulling tasks
 - Large-scale container cleanup tasks
 
-**Related Documentation**: [Background Task Handler System](../common/bgtask/README.md)
+**Related documents**: [Background Task Handler System](../common/bgtask/README.md)
 
 ### 4. Internal REST API (Metrics Only)
 
 **Framework**: aiohttp
 
-**Port**: 6003 (metrics only, separate from RPC port)
+**Port**: 6003 (metrics only, separate from the RPC port)
 
 **Endpoints**:
 - `GET /metrics` - Expose Prometheus metrics
 
 
 **Key Features**:
-- Metrics exposure only (no service logic triggering)
-- Prometheus scrapes periodically
-- Auto-registered via Manager's Service Discovery
+- Metrics exposure only. It does not trigger service logic.
+- Prometheus scrapes it periodically.
+- It registers automatically through the manager's service discovery.
 
 ### Entry Point Interactions
 
-Each Entry Point operates independently. However, service logic can coordinate them:
+Each entry point runs independently. Service logic can coordinate them:
 
 **Background Task Triggering**:
-- Service logic in RPC Server or Event Dispatcher can trigger long-running tasks as Background Tasks.
+- Service logic in the RPC Server or the Event Dispatcher can start long-running tasks as background tasks.
 
 **Event Publishing**:
-- RPC Server or Background Task can publish events via Event Dispatcher after task completion.
+- The RPC Server or a background task can publish events through the Event Dispatcher after the task completes.
 
 **Integrated Architecture**:
 
@@ -167,30 +167,30 @@ agent/
 ## Core Concepts
 
 ### Kernels
-Kernels represent running containers executing computing sessions:
+Kernels are containers that run sessions:
 - **Kernel ID**: Unique identifier for the container
-- **Session ID**: Associated session in Manager
-- **Image**: Container image (e.g., `lablup/python:3.11-ubuntu20.04`)
-- **Resources**: Allocated CPU, memory, GPU slots
+- **Session ID**: Associated session in the manager
+- **Image**: Container image (for example, `lablup/python:3.11-ubuntu20.04`)
+- **Resources**: Allocated CPU, memory, and GPU slots
 - **Status**: PREPARING, RUNNING, RESTARTING, TERMINATING, TERMINATED
-- **Service Ports**: Exposed ports for services (Jupyter, SSH, etc.)
+- **Service Ports**: Exposed ports for services (Jupyter, SSH, and others)
 
 ### Container Backend
 The Agent supports multiple container runtimes:
 - **Docker**: Standard Docker containers
 
 The Docker backend implements these interfaces:
-- `create_kernel()`: Create new container
-- `destroy_kernel()`: Remove container
-- `restart_kernel()`: Restart container
+- `create_kernel()`: Create a new container
+- `destroy_kernel()`: Terminate a container
+- `restart_kernel()`: Restart a container
 - `get_kernel_status()`: Query container status
-- `execute_code()`: Execute code in container
+- `execute_code()`: Execute code in a container
 
 ### Resource Allocation
 Resources are allocated from the agent's capacity:
-- **CPU Slots**: Measured in cores (e.g., 2.0 cores)
-- **Memory Slots**: Measured in bytes (e.g., 4GB)
-- **GPU Slots**: Number of GPU devices (e.g., 1 GPU)
+- **CPU Slots**: Measured in cores (for example, 2.0 cores)
+- **Memory Slots**: Measured in bytes (for example, 4GB)
+- **GPU Slots**: Number of GPU devices (for example, 1 GPU)
 - **Accelerator Slots**: Custom accelerator resources
 
 The Agent tracks:
@@ -202,18 +202,18 @@ The Agent tracks:
 Each kernel receives local scratch storage:
 - **Location**: `/scratches/{kernel_id}`
 - **Quota**: Configurable size limit per kernel
-- **Cleanup**: Automatically removed after kernel termination
+- **Cleanup**: Removed automatically after kernel termination
 
-### Virtual Folder Mounting
-VFolders are mounted to containers at runtime:
+### vfolder mounting
+vfolders are mounted to containers at runtime:
 - **Mount Point**: `/home/work/{vfolder_name}`
 - **Permissions**: RO, RW, or RW-DELETE
-- **Backend**: Storage Proxy manages actual storage
+- **Backend**: The storage proxy manages the actual storage
 
 ## Resource Monitoring
 
 ### CPU Monitoring
-- Track per-container CPU usage via cgroups
+- Track per-container CPU usage through cgroups
 - Measure CPU time in user and system modes
 - Calculate CPU utilization percentages
 - Enforce CPU quotas and limits
@@ -222,7 +222,7 @@ VFolders are mounted to containers at runtime:
 - Track RSS (Resident Set Size) per container
 - Measure cache and swap usage
 - Detect OOM (Out-of-Memory) conditions
-- Enforce memory limits via cgroups
+- Enforce memory limits through cgroups
 
 ### Shared Memory (shmem)
 Containers can request shared memory (`/dev/shm`) for inter-process communication.
@@ -239,7 +239,7 @@ Containers can request shared memory (`/dev/shm`) for inter-process communicatio
 | SIGBUS | 135 | shm > ShmSize |
 
 **Configuration**:
-- Set via `resource_opts.shmem` in session specification
+- Set through `resource_opts.shmem` in the session specification
 - Docker HostConfig: `ShmSize` parameter
 
 **References**:
@@ -247,8 +247,8 @@ Containers can request shared memory (`/dev/shm`) for inter-process communicatio
 - [Linux Kernel cgroup v2](https://docs.kernel.org/admin-guide/cgroup-v2.html) - shmem in memory.stat
 
 ### GPU Monitoring
-- Query NVIDIA GPUs via NVML (nvidia-ml-py)
-- Query AMD GPUs via ROCm SMI
+- Query NVIDIA GPUs through NVML (nvidia-ml-py)
+- Query AMD GPUs through ROCm SMI
 - Track GPU utilization and memory usage
 - Measure GPU temperature and power consumption
 
@@ -260,19 +260,19 @@ Containers can request shared memory (`/dev/shm`) for inter-process communicatio
 
 ## Plugin System
 
-Agent can uses plugin system for accelerator support:
+The Agent uses the plugin system for accelerator support:
 
 ### CUDA Plugin
-- Detect NVIDIA GPUs via `nvidia-smi`
+- Detect NVIDIA GPUs through `nvidia-smi`
 - Allocate GPU devices to containers
-- Set `CUDA_VISIBLE_DEVICES` environment variable
-- Monitor GPU metrics via NVML
+- Set the `CUDA_VISIBLE_DEVICES` environment variable
+- Monitor GPU metrics through NVML
 
 ### ROCm Plugin
-- Detect AMD GPUs via `rocm-smi`
+- Detect AMD GPUs through `rocm-smi`
 - Allocate GPU devices to containers
-- Set `HIP_VISIBLE_DEVICES` environment variable
-- Monitor GPU metrics via ROCm
+- Set the `HIP_VISIBLE_DEVICES` environment variable
+- Monitor GPU metrics through ROCm
 
 ### TPU Plugin
 - Detect Google TPUs
@@ -281,30 +281,30 @@ Agent can uses plugin system for accelerator support:
 
 ## Communication Protocols
 
-### Manager → Agent (ZeroMQ RPC)
+### manager → Agent (ZeroMQ RPC)
 - **Port**: 6011 (default)
 - **Protocol**: ZeroMQ request-response
 - **Operations**:
-  - `create_kernel`: Create new container
-  - `destroy_kernel`: Terminate container
-  - `restart_kernel`: Restart container
-  - `execute_code`: Execute code in container
+  - `create_kernel`: Create a new container
+  - `destroy_kernel`: Terminate a container
+  - `restart_kernel`: Restart a container
+  - `execute_code`: Execute code in a container
   - `get_status`: Query agent and kernel status
 
-### Agent → Manager (HTTP Watcher API)
+### Agent → manager (HTTP Watcher API)
 - **Port**: 6009 (default)
 - **Protocol**: HTTP
 - **Operations**:
-  - Heartbeat signals
+  - Agent heartbeat signals
   - Resource usage reporting
   - Kernel status updates
   - Error notifications
 
-### Agent → Storage Proxy
+### Agent → storage proxy
 - **Protocol**: HTTP
 - **Operations**:
-  - Mount vfolder
-  - Unmount vfolder
+  - Mount a vfolder
+  - Unmount a vfolder
   - Query vfolder metadata
 
 ## Container Execution Flow
@@ -343,10 +343,10 @@ Containers can expose service ports:
 - **Custom Services**: User-defined ports
 
 Service ports are:
-- **Allocated** from configured range (default 30000-31000)
-- **Registered** with App Proxy for external access
-- **Forwarded** from agent host to container
-- **Cleaned up** upon container termination
+- **Allocated** from a configured range (default 30000-31000)
+- **Registered** with the app proxy for external access
+- **Forwarded** from the agent host to the container
+- **Cleaned up** when the container terminates
 
 ## Configuration
 
@@ -379,20 +379,20 @@ See `configs/agent/halfstack.toml` for configuration file examples.
 
 #### Valkey (Event and State Management)
 - **Purpose**:
-  - Send heartbeat events (for Manager registration)
+  - Send agent heartbeat events for manager registration
   - Update agent status
   - Manage background tasks
-- **Note**: Agent registers with Manager via Valkey and receives RPC commands from Manager.
+- The Agent registers with the manager through Valkey and receives RPC commands from the manager.
 
 #### Manager Connection
 - **Protocol**: ZeroMQ RPC (6011), HTTP Watcher API (6009)
-- **Purpose**: Receive session commands from Manager, report status
-- **Note**: Agent only receives commands from Manager, not directly from users or other components.
+- **Purpose**: Receive session commands from the manager and report status
+- The Agent receives commands from the manager only. Users and other components do not send commands directly.
 
 #### etcd (Global Configuration)
 - **Purpose**:
-  - Retrieve global configuration (storage volumes, etc.)
-  - Auto-discover Manager address
+  - Retrieve global configuration (such as storage volumes)
+  - Auto-discover the manager address
 
 ### Optional Infrastructure (Observability)
 
@@ -402,18 +402,18 @@ Optional infrastructure for Agent monitoring.
 - **Purpose**:
   - Monitor agent resource utilization
   - Collect kernel (container) metrics
-  - Track heartbeat and health status
+  - Track agent heartbeat and health status
 - **HTTP Service Port**: 6003 (separate from RPC port 6011)
 - **Exposed Endpoint**: `http://localhost:6003/metrics`
 - **Key Metrics**:
-  - `backendai_agent_heartbeat` - Last heartbeat timestamp
+  - `backendai_agent_heartbeat` - Last agent heartbeat timestamp
   - `backendai_agent_cpu_usage` - CPU usage percentage
   - `backendai_agent_mem_usage` - Memory usage (bytes)
   - `backendai_agent_gpu_usage` - GPU usage percentage
   - `backendai_kernel_count` - Number of running kernels
-- **Service Discovery**: Automatically registered via Manager's HTTP SD
-  - Agent auto-registers with Manager at startup
-  - Manager provides agent information to Prometheus SD
+- **Service discovery**: Registered automatically through the manager's HTTP service discovery
+  - The Agent registers with the manager automatically at startup.
+  - The manager provides agent information to the Prometheus service discovery.
 
 #### Loki (Log Aggregation)
 - **Purpose**:
@@ -429,8 +429,8 @@ Optional infrastructure for Agent monitoring.
   - `level` - Log level
 
 #### Container Runtime Metrics
-- **Docker**: Container metrics via cAdvisor or Docker API
-- **cgroups**: Direct cgroups filesystem reading
+- **Docker**: Container metrics through cAdvisor or the Docker API
+- **cgroups**: Direct reads from the cgroups filesystem
 
 ### Container Runtime Requirements
 
@@ -449,8 +449,8 @@ Optional infrastructure for Agent monitoring.
   - Minimum 100GB free space
   - Configurable per-session quota
 
-#### VFolder Mount
-- **Dependencies**: Storage Proxy or direct storage access
+#### vfolder mount
+- **Dependencies**: storage proxy or direct storage access
 - **Recommendations**:
   - High-performance network (10GbE or higher)
   - Low-latency storage
@@ -469,27 +469,27 @@ Optional infrastructure for Agent monitoring.
 ```
 
 #### Observability Integration
-Agent automatically registers with Prometheus via Manager's Service Discovery.
+The Agent registers with Prometheus automatically through the manager's service discovery.
 
 ## Metrics and Monitoring
 
 ### Prometheus Metrics
-Agent exposes metrics:
+The Agent exposes metrics:
 
 #### RPC Related Metrics
-Metrics related to processing RPC commands received from Manager.
+Metrics for RPC commands received from the manager.
 
 **`backendai_rpc_requests`** (Counter)
 - **Description**: Total RPC requests processed by the agent
 - **Labels**:
-  - `method`: RPC method name (e.g., "create_kernel", "destroy_kernel", "execute_code")
-- Tracks processing frequency by Manager command type
+  - `method`: RPC method name (for example, "create_kernel", "destroy_kernel", "execute_code")
+- Tracks processing frequency by manager command type
 
 **`backendai_rpc_failure_requests`** (Counter)
 - **Description**: Failed RPC request count
 - **Labels**:
   - `method`: RPC method name that failed
-  - `exception`: Exception class name (e.g., "ContainerNotFound", "ResourceExhausted")
+  - `exception`: Exception class name (for example, "ContainerNotFound", "ResourceExhausted")
 - Analyzes RPC command processing failure causes
 
 **`backendai_rpc_request_duration_seconds`** (Histogram)
@@ -497,10 +497,10 @@ Metrics related to processing RPC commands received from Manager.
 - **Labels**:
   - `method`: RPC method name
 - **Buckets**: [0.001, 0.01, 0.1, 0.5, 1, 2, 5, 10, 30, 60] seconds
-- Measures performance of RPC commands like kernel creation/deletion
+- Measures performance of RPC commands such as kernel creation and deletion
 
 #### Resource Utilization Metrics
-Metrics related to container and hardware resource usage.
+Metrics for container and hardware resource usage.
 
 **`backendai_container_utilization`** (Gauge)
 - **Description**: Container resource utilization per kernel
@@ -509,28 +509,28 @@ Metrics related to container and hardware resource usage.
   - `agent_id`: Agent identifier
   - `kernel_id`: Kernel identifier (Backend.AI's container wrapper, not the actual container ID)
   - `session_id`: Session identifier
-  - `user_id`: User UUID who owns the session
+  - `user_id`: User UUID that owns the session
   - `project_id`: Project UUID that the session belongs to
   - `value_type`: Value interpretation (current, capacity, pct)
-- Tracks resource usage per kernel (CPU, memory, GPU, network, etc.)
+- Tracks resource usage per kernel (CPU, memory, GPU, network, and others)
 
 **`backendai_device_utilization`** (Gauge)
 - **Description**: Physical device utilization on the agent node
 - **Labels**:
   - `device_metric_name`: Metric type (cpu_util, mem, cuda_mem, cuda_util, cuda_temp, cuda_power)
   - `agent_id`: Agent identifier
-  - `device_id`: Hardware device identifier (e.g., GPU index)
+  - `device_id`: Hardware device identifier (for example, GPU index)
   - `value_type`: Value interpretation (current, capacity, pct)
 - Tracks hardware device usage (GPU, CPU, memory) on the agent node
 
 #### Container Lifecycle Synchronization Metrics
-Metrics related to container state synchronization operations between Manager and Agent.
+Metrics for container state synchronization between the manager and the Agent.
 
 **`backendai_sync_container_lifecycle_trigger_count`** (Counter)
 - **Description**: Number of times container lifecycle sync was triggered
 - **Labels**:
   - `agent_id`: Agent identifier
-- Frequency of container state synchronization between Manager and Agent
+- Frequency of container state synchronization between the manager and the Agent
 
 **`backendai_sync_container_lifecycle_success_count`** (Counter)
 - **Description**: Number of successfully synchronized containers
@@ -546,14 +546,14 @@ Metrics related to container state synchronization operations between Manager an
 - Tracks synchronization failure causes
 
 #### Statistics Collection Task Metrics
-Metrics related to node, container, and process level statistics collection.
+Metrics for statistics collection at the node, container, and process levels.
 
 **`backendai_stat_task_trigger_count`** (Counter)
 - **Description**: Number of times statistics collection was triggered
 - **Labels**:
   - `agent_id`: Agent identifier
   - `stat_scope`: Statistics scope (node, container, process)
-- Collection frequency by Node/Container/Process level
+- Collection frequency by node, container, and process level
 
 **`backendai_stat_task_success_count`** (Counter)
 - **Description**: Number of successful statistics collection operations
@@ -572,22 +572,22 @@ Metrics related to node, container, and process level statistics collection.
 
 ### Prometheus Query Examples
 
-The following examples demonstrate common Prometheus queries for Agent metrics. Note that Counter metrics use the `_total` suffix and Histogram metrics use `_bucket`, `_sum`, `_count` suffixes in actual queries.
+The following examples show common Prometheus queries for Agent metrics. Counter metrics use the `_total` suffix and Histogram metrics use the `_bucket`, `_sum`, and `_count` suffixes in actual queries.
 
 **Important Notes:**
-- When using `increase()` or `rate()` functions, the time range must be at least 2-4x longer than your Prometheus scrape interval to get reliable data. If the time range is too short, metrics may not appear or show incomplete data.
-- Default Prometheus scrape interval is typically 15s-30s
-- **Time range selection trade-offs**:
-  - Shorter ranges (e.g., `[1m]`): Detect changes faster with more granular data, but more sensitive to noise and short-term fluctuations
-  - Longer ranges (e.g., `[5m]`): Smoother graphs with reduced noise, better for identifying trends, but slower to detect sudden changes
-  - For real-time alerting: Use shorter ranges like `[1m]` or `[2m]`
-  - For dashboards and trend analysis: Use longer ranges like `[5m]` or `[10m]`
+- With `increase()` or `rate()`, the time range must be at least 2-4x the Prometheus scrape interval to get reliable data. A shorter time range can hide metrics or return incomplete data.
+- The default Prometheus scrape interval is typically 15s-30s.
+- **Time range trade-offs**:
+  - Shorter ranges (for example, `[1m]`): Detect changes faster with more granular data, but they are more sensitive to noise and short-term fluctuations
+  - Longer ranges (for example, `[5m]`): Smoother graphs with reduced noise, better for identifying trends, but slower to detect sudden changes
+  - For real-time alerting: Use shorter ranges such as `[1m]` or `[2m]`
+  - For dashboards and trend analysis: Use longer ranges such as `[5m]` or `[10m]`
 
 #### RPC Request Monitoring
 
 **RPC Request Rate by Method**
 
-Monitor RPC request rate by method. This shows how frequently the Manager sends commands to agents. Use this to understand agent workload and command distribution.
+Monitor the RPC request rate by method. It shows how often the manager sends commands to agents. Use it to understand agent workload and command distribution.
 
 ```promql
 sum(rate(backendai_rpc_requests_total{service_group="$service_groups"}[5m])) by (method)
@@ -595,7 +595,7 @@ sum(rate(backendai_rpc_requests_total{service_group="$service_groups"}[5m])) by 
 
 **RPC Failure Rate by Method**
 
-Track RPC failure rate by method and exception type. This helps identify which RPC operations are failing and why.
+Track the RPC failure rate by method and exception type. It shows which RPC operations fail and why.
 
 ```promql
 sum(rate(backendai_rpc_failure_requests_total{service_group="$service_groups"}[5m])) by (method, exception)
@@ -603,7 +603,7 @@ sum(rate(backendai_rpc_failure_requests_total{service_group="$service_groups"}[5
 
 **P95 RPC Request Duration**
 
-Calculate P95 RPC request duration by method. This shows how long critical operations like kernel creation take. Use this to identify performance bottlenecks in agent operations.
+Calculate P95 RPC request duration by method. It shows how long critical operations such as kernel creation take. Use it to find performance bottlenecks in agent operations.
 
 ```promql
 histogram_quantile(0.95,
@@ -615,7 +615,7 @@ histogram_quantile(0.95,
 
 **Top 5 GPU Memory Usage by Kernel**
 
-Monitor GPU memory usage by kernel (top 5). This identifies kernels consuming the most GPU memory. Note: `topk` returns the top N items at each evaluation time. Over multiple time points, you may see more than 5 unique kernels if different kernels appear in the top 5 at different times.
+Monitor GPU memory usage by kernel (top 5). It identifies the kernels that consume the most GPU memory. `topk` returns the top N items at each evaluation time. Over multiple time points, more than 5 unique kernels may appear when different kernels enter the top 5 at different times.
 
 ```promql
 topk(5, sum(backendai_container_utilization{container_metric_name="cuda_mem", value_type="current"}) by (kernel_id))
@@ -623,7 +623,7 @@ topk(5, sum(backendai_container_utilization{container_metric_name="cuda_mem", va
 
 **Top 5 GPU Utilization by Kernel**
 
-Monitor GPU utilization by kernel (top 5). This shows which kernels are actively using GPU compute. Note: `topk` returns the top N items at each evaluation time. Over multiple time points, you may see more than 5 unique kernels if different kernels appear in the top 5 at different times.
+Monitor GPU utilization by kernel (top 5). It shows which kernels are actively using GPU compute. `topk` returns the top N items at each evaluation time. Over multiple time points, more than 5 unique kernels may appear when different kernels enter the top 5 at different times.
 
 ```promql
 topk(5, sum(backendai_container_utilization{container_metric_name="cuda_util", value_type="current"}) by (kernel_id))
@@ -631,7 +631,7 @@ topk(5, sum(backendai_container_utilization{container_metric_name="cuda_util", v
 
 **Top 5 CPU Utilization Increase by Kernel**
 
-Track CPU utilization increase rate by kernel (top 5). This shows CPU consumption trends over time. Note: Divided by 1000 to convert from per-mille to percentage. `topk` returns the top N items at each evaluation time. Over multiple time points, you may see more than 5 unique kernels if different kernels appear in the top 5 at different times.
+Track CPU utilization increase rate by kernel (top 5). It shows CPU consumption trends over time. The query divides by 1000 to convert per-mille to percentage. `topk` returns the top N items at each evaluation time. Over multiple time points, more than 5 unique kernels may appear when different kernels enter the top 5 at different times.
 
 ```promql
 topk(5, sum(increase(backendai_container_utilization{container_metric_name="cpu_util", value_type="current"}[5m])) by (kernel_id)) / 1000
@@ -639,7 +639,7 @@ topk(5, sum(increase(backendai_container_utilization{container_metric_name="cpu_
 
 **Network RX Traffic by Kernel**
 
-Monitor network RX (receive) traffic by kernel. This tracks inbound network bandwidth usage per container.
+Monitor network RX (receive) traffic by kernel. It tracks inbound network bandwidth usage per container.
 
 ```promql
 sum(increase(backendai_container_utilization{container_metric_name="net_rx", value_type="current"}[5m])) by (kernel_id)
@@ -647,7 +647,7 @@ sum(increase(backendai_container_utilization{container_metric_name="net_rx", val
 
 **Network TX Traffic by Kernel**
 
-Monitor network TX (transmit) traffic by kernel. This tracks outbound network bandwidth usage per container.
+Monitor network TX (transmit) traffic by kernel. It tracks outbound network bandwidth usage per container.
 
 ```promql
 sum(increase(backendai_container_utilization{container_metric_name="net_tx", value_type="current"}[5m])) by (kernel_id)
@@ -657,7 +657,7 @@ sum(increase(backendai_container_utilization{container_metric_name="net_tx", val
 
 **GPU Memory Usage by Agent**
 
-Monitor GPU memory usage at the agent level. This shows total GPU memory consumption on each agent node.
+Monitor GPU memory usage at the agent level. It shows total GPU memory consumption on each agent node.
 
 ```promql
 sum(backendai_device_utilization{device_metric_name="cuda_mem", value_type="current"}) by (agent_id)
@@ -665,7 +665,7 @@ sum(backendai_device_utilization{device_metric_name="cuda_mem", value_type="curr
 
 **GPU Memory Capacity by Agent**
 
-Monitor GPU memory capacity. This shows the maximum available GPU memory on each agent.
+Monitor GPU memory capacity. It shows the maximum available GPU memory on each agent.
 
 ```promql
 sum(backendai_device_utilization{device_metric_name="cuda_mem", value_type="capacity"}) by (agent_id)
@@ -673,7 +673,7 @@ sum(backendai_device_utilization{device_metric_name="cuda_mem", value_type="capa
 
 **GPU Utilization Percentage by Agent**
 
-Monitor GPU utilization percentage at the agent level. This shows overall GPU usage across all kernels on the agent.
+Monitor GPU utilization percentage at the agent level. It shows overall GPU usage across all kernels on the agent.
 
 ```promql
 sum(backendai_device_utilization{device_metric_name="cuda_util", value_type="current"}) by (agent_id)
@@ -681,7 +681,7 @@ sum(backendai_device_utilization{device_metric_name="cuda_util", value_type="cur
 
 **CPU Utilization Increase by Agent**
 
-Track CPU utilization increase rate at the agent level. This shows agent-wide CPU consumption trends.
+Track CPU utilization increase rate at the agent level. It shows agent-wide CPU consumption trends.
 
 ```promql
 sum(increase(backendai_device_utilization{device_metric_name="cpu_util", value_type="current"}[5m])) by (agent_id) / 1000
@@ -689,7 +689,7 @@ sum(increase(backendai_device_utilization{device_metric_name="cpu_util", value_t
 
 **Network RX Traffic by Agent**
 
-Monitor network RX (receive) traffic at the agent level. This tracks total inbound network bandwidth usage on each agent node.
+Monitor network RX (receive) traffic at the agent level. It tracks total inbound network bandwidth usage on each agent node.
 
 ```promql
 sum(increase(backendai_device_utilization{device_metric_name="net_rx", value_type="current"}[5m])) by (agent_id)
@@ -697,7 +697,7 @@ sum(increase(backendai_device_utilization{device_metric_name="net_rx", value_typ
 
 **Network TX Traffic by Agent**
 
-Monitor network TX (transmit) traffic at the agent level. This tracks total outbound network bandwidth usage on each agent node.
+Monitor network TX (transmit) traffic at the agent level. It tracks total outbound network bandwidth usage on each agent node.
 
 ```promql
 sum(increase(backendai_device_utilization{device_metric_name="net_tx", value_type="current"}[5m])) by (agent_id)
@@ -707,7 +707,7 @@ sum(increase(backendai_device_utilization{device_metric_name="net_tx", value_typ
 
 **Container Sync Trigger Frequency**
 
-Monitor container sync trigger frequency. This shows how often the agent synchronizes container state with the Manager.
+Monitor container sync trigger frequency. It shows how often the agent synchronizes container state with the manager.
 
 ```promql
 sum(rate(backendai_sync_container_lifecycle_trigger_count_total[5m])) by (agent_id)
@@ -715,7 +715,7 @@ sum(rate(backendai_sync_container_lifecycle_trigger_count_total[5m])) by (agent_
 
 **Container Sync Success Rate**
 
-Track container sync success rate. This helps ensure containers are properly synchronized.
+Track container sync success rate. It confirms that containers are synchronized correctly.
 
 ```promql
 sum(rate(backendai_sync_container_lifecycle_success_count_total[5m])) by (agent_id)
@@ -723,7 +723,7 @@ sum(rate(backendai_sync_container_lifecycle_success_count_total[5m])) by (agent_
 
 **Container Sync Failure Rate**
 
-Monitor container sync failures. This identifies issues with container state synchronization.
+Monitor container sync failures. It identifies issues with container state synchronization.
 
 ```promql
 sum(rate(backendai_sync_container_lifecycle_failure_count_total[5m])) by (agent_id, exception)
@@ -733,7 +733,7 @@ sum(rate(backendai_sync_container_lifecycle_failure_count_total[5m])) by (agent_
 
 **Statistics Collection Trigger Rate**
 
-Monitor statistics collection trigger rate by scope. This shows how frequently statistics are collected at different levels.
+Monitor statistics collection trigger rate by scope. It shows how often statistics are collected at different levels.
 
 ```promql
 sum(rate(backendai_stat_task_trigger_count_total[5m])) by (agent_id, stat_scope)
@@ -741,7 +741,7 @@ sum(rate(backendai_stat_task_trigger_count_total[5m])) by (agent_id, stat_scope)
 
 **Statistics Collection Success Rate**
 
-Track statistics collection success rate. This ensures statistics collection is working properly.
+Track statistics collection success rate. It confirms that statistics collection works correctly.
 
 ```promql
 sum(rate(backendai_stat_task_success_count_total[5m])) by (agent_id, stat_scope)
@@ -749,7 +749,7 @@ sum(rate(backendai_stat_task_success_count_total[5m])) by (agent_id, stat_scope)
 
 **Statistics Collection Failure Rate**
 
-Monitor statistics collection failures. This identifies issues with resource monitoring.
+Monitor statistics collection failures. It identifies issues with resource monitoring.
 
 ```promql
 sum(rate(backendai_stat_task_failure_count_total[5m])) by (agent_id, stat_scope, exception)
@@ -766,8 +766,8 @@ Agent logs include:
 
 See [README.md](./README.md) for development setup instructions.
 
-## Related Documentation
+## Related documents
 
-- [Manager Component](../manager/README.md) - Session orchestration
-- [Storage Proxy Component](../storage/README.md) - Virtual folder management
-- [Overall Architecture](../README.md) - System-wide architecture
+- [Manager component](../manager/README.md) - Session orchestration
+- [Storage proxy component](../storage/README.md) - vfolder management
+- [Overall architecture](../README.md) - System-wide architecture

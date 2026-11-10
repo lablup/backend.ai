@@ -3,33 +3,37 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import EntityType
-from ai.backend.manager.actions.action import SearchActionResult
+from ai.backend.common.data.entity.role import RoleEntityType
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
+from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.permission.role import AssignedUserData
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.services.permission_contoller.actions.base import RoleAction
+from ai.backend.manager.models.rbac_models.user_role.searchers import RoleAssignmentSearcher
 
 
-@dataclass
-class SearchUsersAssignedToRoleAction(RoleAction):
-    querier: BatchQuerier
+@dataclass(frozen=True)
+class GlobalSearchRoleAssignmentsAction(BaseGlobalAction):
+    """Page through every role assignment, whichever user or role it joins."""
+
+    searcher: RoleAssignmentSearcher
 
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return EntityType.ROLE_USER
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
+        return RoleEntityType()
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.SEARCH
 
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "global_search_role_assignments"
 
-@dataclass
-class SearchUsersAssignedToRoleActionResult(SearchActionResult[AssignedUserData]):
-    pass
+
+@dataclass(frozen=True)
+class GlobalSearchRoleAssignmentsActionResult:
+    result: SearchResult[AssignedUserData]

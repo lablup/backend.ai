@@ -13,6 +13,9 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.data.endpoint.types import ScalingState
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.model_deployment.types import (
     ActivenessStatus,
     LivenessStatus,
@@ -37,9 +40,6 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     RollingUpdateStrategySpecInfo,
 )
 from ai.backend.common.dto.manager.v2.deployment_options import DeploymentOptionsInfo
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import MountPermission
 
 __all__ = (
@@ -104,6 +104,9 @@ class RevisionNode(BaseResponseModel):
     """Node model representing a deployment revision."""
 
     id: UUID = Field(description="Revision ID")
+    field_id: UUID = Field(
+        description="UUID of the revision. Added in 26.9.0.",
+    )
     deployment_id: UUID = Field(
         description=(
             "ID of the parent deployment that owns this revision. "
@@ -150,6 +153,9 @@ class DeploymentNode(BaseResponseModel):
     """Node model representing a deployment entity."""
 
     id: DeploymentID = Field(description="Deployment ID")
+    entity_id: UUID = Field(
+        description="UUID of the deployment. Added in 26.9.0.",
+    )
     metadata: DeploymentMetadataInfoDTO = Field(description="Deployment metadata")
     network_access: DeploymentNetworkAccessInfoDTO = Field(
         description="Network access configuration"
@@ -185,6 +191,9 @@ class RouteNode(BaseResponseModel):
     """Node model representing a deployment route."""
 
     id: UUID = Field(description="Route ID")
+    field_id: UUID = Field(
+        description="UUID of the route. Added in 26.9.0.",
+    )
     deployment_id: UUID = Field(description="Deployment ID")
     session_id: str | None = Field(default=None, description="Session ID")
     status: RouteStatus = Field(description="Lifecycle status of the route")
@@ -212,6 +221,7 @@ class DeleteDeploymentPayload(BaseResponseModel):
     """Payload for deployment deletion mutation result."""
 
     id: UUID = Field(description="ID of the deleted deployment")
+    deployment: DeploymentNode = Field(description="The soft-deleted deployment. Added in 26.10.0.")
 
 
 class ActivateDeploymentPayload(BaseResponseModel):
@@ -270,6 +280,9 @@ class AccessTokenNode(BaseResponseModel):
     """Node model representing a deployment access token."""
 
     id: UUID = Field(description="Access token ID")
+    field_id: UUID = Field(
+        description="UUID of the access token. Added in 26.9.0.",
+    )
     token: str = Field(description="Token value")
     expires_at: datetime | None = Field(default=None, description="Token expiration timestamp")
     created_at: datetime = Field(description="Creation timestamp")
@@ -279,6 +292,9 @@ class AutoScalingRuleNode(BaseResponseModel):
     """Node model representing a deployment auto-scaling rule."""
 
     id: UUID = Field(description="Auto-scaling rule ID")
+    field_id: UUID = Field(
+        description="UUID of the auto scaling rule. Added in 26.9.0.",
+    )
     deployment_id: UUID = Field(description="Parent deployment ID")
     metric_source: str = Field(description="Metric source")
     metric_name: str = Field(description="Metric name")
@@ -299,6 +315,9 @@ class DeploymentPolicyNode(BaseResponseModel):
     """Node model representing a deployment update policy."""
 
     id: UUID = Field(description="Policy ID")
+    field_id: UUID = Field(
+        description="UUID of the deployment policy. Added in 26.9.0.",
+    )
     deployment_id: UUID = Field(description="Parent deployment ID")
     strategy_spec: RollingUpdateStrategySpecInfo | BlueGreenStrategySpecInfo = Field(
         description="Deployment strategy specification"
@@ -364,6 +383,7 @@ class DeleteAccessTokenPayload(BaseResponseModel):
     """Payload for access token deletion result."""
 
     id: UUID = Field(description="ID of the deleted access token")
+    field_id: UUID = Field(description="UUID of the deleted access token. Added in 26.10.0.")
 
 
 class BulkDeleteAccessTokensPayload(BaseResponseModel):
@@ -394,6 +414,7 @@ class DeleteAutoScalingRulePayload(BaseResponseModel):
     """Payload for auto-scaling rule deletion result."""
 
     id: UUID = Field(description="ID of the deleted auto-scaling rule")
+    field_id: UUID = Field(description="UUID of the deleted auto-scaling rule. Added in 26.10.0.")
 
 
 class BulkDeleteAutoScalingRulesPayload(BaseResponseModel):
@@ -436,6 +457,9 @@ class ReplicaNode(BaseResponseModel):
     """Node model representing a deployment replica (user-facing view of routing row)."""
 
     id: UUID = Field(description="Replica ID")
+    field_id: UUID = Field(
+        description="UUID of the replica. Added in 26.9.0.",
+    )
     deployment_id: UUID = Field(description="ID of the deployment this replica belongs to")
     revision_id: UUID = Field(description="Associated revision ID")
     session_id: UUID | None = Field(

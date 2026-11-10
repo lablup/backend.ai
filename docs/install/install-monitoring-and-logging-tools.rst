@@ -21,8 +21,6 @@ Guide variables
      - >The Datadog API key
    * - ``{DDAPPKEY}``
      - The Datadog application key
-   * - ``{SENTRYURL}``
-     - The private Sentry report URL
 
 
 Install Datadog agent
@@ -33,12 +31,3 @@ Install Datadog agent
 .. code-block:: console
 
    $ DD_API_KEY={DDAPIKEY} bash -c "$(curl -L https://raw.githubusercontent.com/DataDog/dd-agent/master/packaging/datadog-agent/source/install_agent.sh)"
-
-Install Raven (Sentry client)
------------------------------
-
-Raven is the official client package name of `Sentry <https://sentry.io>`_\ , which reports detailed contextual information such as stack and package versions when an unhandled exception occurs.
-
-.. code-block:: console
-
-   $ pip install "raven>=6.1"

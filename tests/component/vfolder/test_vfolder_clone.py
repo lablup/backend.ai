@@ -24,9 +24,13 @@ from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.bgtask.types import TaskID
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.dto.manager.v2.vfolder.request import CloneVFolderInput
 from ai.backend.common.dto.manager.vfolder import CloneVFolderReq
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
@@ -36,21 +40,22 @@ from ai.backend.manager.api.rest.vfolder.handler import VFolderHandler
 from ai.backend.manager.api.rest.vfolder.registry import register_vfolder_routes
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.project.row import ProjectRow, ProjectType
+from ai.backend.manager.models.resource_policy.row import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.user import users
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.vfolder.admin_repository import VFolderAdminRepository
+from ai.backend.manager.models.vfolder.row import vfolders
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.vfolder.processors.file import VFolderFileProcessors
 from ai.backend.manager.services.vfolder.processors.invite import VFolderInviteProcessors
 from ai.backend.manager.services.vfolder.processors.sharing import VFolderSharingProcessors
 from ai.backend.manager.services.vfolder.processors.vfolder import VFolderProcessors
 from ai.backend.manager.services.vfolder.processors.vfolder_admin import VFolderAdminProcessors
-from ai.backend.manager.services.vfolder.services.vfolder_admin import VFolderAdminService
 
 if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData
@@ -66,17 +71,16 @@ VFolderFactory = Callable[..., Coroutine[Any, Any, VFolderFixtureData]]
 
 @pytest.fixture()
 def vfolder_admin_processors(
-    database_engine: ExtendedAsyncSAEngine,
+    processor_registry: ProcessorRegistry[Any],
 ) -> VFolderAdminProcessors:
-    repo = VFolderAdminRepository(database_engine)
-    service = VFolderAdminService(vfolder_admin_repository=repo)
-    return VFolderAdminProcessors(service=service, action_monitors=[])
+    return VFolderAdminProcessors(processor_registry.group(GroupMeta(VFolderEntityType())))
 
 
 @pytest.fixture()
 def server_module_registries(
     route_deps: RouteDeps,
     auth_processors: AuthProcessors,
+    user_processors: UserProcessors,
     vfolder_processors: VFolderProcessors,
     vfolder_admin_processors: VFolderAdminProcessors,
     vfolder_file_processors: VFolderFileProcessors,
@@ -88,6 +92,7 @@ def server_module_registries(
     v1_reg = register_vfolder_routes(
         VFolderHandler(
             auth=auth_processors,
+            user=user_processors,
             vfolder=vfolder_processors,
             vfolder_file=vfolder_file_processors,
             vfolder_invite=vfolder_invite_processors,
@@ -100,7 +105,9 @@ def server_module_registries(
     processors = MagicMock(spec=Processors)
     processors.vfolder = vfolder_processors
     processors.vfolder_admin = vfolder_admin_processors
-    adapter = VFolderAdapter(processors)
+    adapter = VFolderAdapter(
+        processors.vfolder, MagicMock(), processors.vfolder_admin, MagicMock(), MagicMock()
+    )
     handler = V2VFolderHandler(adapter=adapter)
     v2_reg = RouteRegistry.create("v2", route_deps.cors_options)
     v2_reg.add_subregistry(register_v2_vfolder_routes(handler, route_deps))
@@ -147,31 +154,61 @@ def _configure_clone_storage_mock(storage_manager: StorageSessionManager) -> Asy
     return mock_client
 
 
-@pytest.fixture()
-async def set_main_access_key(
-    db_engine: SAEngine,
-    admin_user_fixture: Any,
-) -> AsyncIterator[None]:
-    """Populate main_access_key on the admin user so that the
-    ``main_keypair`` ORM relationship resolves correctly.
+async def _fetch_scope_graph(
+    db_engine: SAEngine, vfolder_name: str, owner_id: uuid.UUID
+) -> tuple[int, int]:
+    """Count the vfolder's own virtual entity node and its memberships in the owner's
+    personal project, which is where a personal folder is created."""
+    scopes = VirtualEntityRow.__table__
+    memberships = EntityMembershipRow.__table__
+    async with db_engine.begin() as conn:
+        vfolder_id = (
+            await conn.execute(sa.select(vfolders.c.id).where(vfolders.c.name == vfolder_name))
+        ).scalar_one()
+        owner_project_id = (
+            await conn.execute(
+                sa.select(ProjectRow.__table__.c.id).where(
+                    ProjectRow.__table__.c.creator_id == owner_id,
+                    ProjectRow.__table__.c.type == ProjectType.PERSONAL,
+                )
+            )
+        ).scalar_one()
+        own_nodes = (
+            await conn.execute(
+                sa.select(sa.func.count())
+                .select_from(scopes)
+                .where(
+                    scopes.c.entity_type == VFolderEntityType(),
+                    scopes.c.entity_id == vfolder_id,
+                )
+            )
+        ).scalar_one()
+        members = VirtualEntityRow.__table__.alias("member_virtual_entity")
+        owner_memberships = (
+            await conn.execute(
+                sa.select(sa.func.count())
+                .select_from(
+                    memberships.join(scopes, scopes.c.id == memberships.c.virtual_entity_id).join(
+                        members, members.c.id == memberships.c.member_entity_id
+                    )
+                )
+                .where(
+                    members.c.entity_type == VFolderEntityType(),
+                    members.c.entity_id == vfolder_id,
+                    scopes.c.entity_type == ProjectEntityType(),
+                    scopes.c.entity_id == owner_project_id,
+                )
+            )
+        ).scalar_one()
+    return own_nodes, owner_memberships
 
-    The global ``admin_user_fixture`` does not set this column, but the
-    clone flow needs it to look up ``allowed_vfolder_hosts`` from the
-    user's keypair resource policy.
-    """
-    async with db_engine.begin() as conn:
-        await conn.execute(
-            sa.update(users)
-            .where(users.c.uuid == str(admin_user_fixture.user_uuid))
-            .values(main_access_key=admin_user_fixture.keypair.access_key)
-        )
-    yield
-    async with db_engine.begin() as conn:
-        await conn.execute(
-            sa.update(users)
-            .where(users.c.uuid == str(admin_user_fixture.user_uuid))
-            .values(main_access_key=None)
-        )
+
+@pytest.fixture()
+async def cloneable_user_vfolder(
+    vfolder_factory: VFolderFactory,
+) -> VFolderFixtureData:
+    """A cloneable user-owned vfolder as the clone source."""
+    return await vfolder_factory(name="user-source-clone-rbac", cloneable=True)
 
 
 @pytest.fixture()
@@ -260,7 +297,6 @@ class TestVFolderClonePolicyCheck:
         self,
         admin_registry: BackendAIClientRegistry,
         vfolder_factory: VFolderFactory,
-        set_main_access_key: None,
         user_policy_capped_at_1: None,
         cloneable_project_vfolder: VFolderFixtureData,
     ) -> None:
@@ -280,7 +316,7 @@ class TestVFolderClonePolicyCheck:
 
         with pytest.raises(BackendAPIError) as exc_info:
             await admin_registry.vfolder.clone(
-                cloneable_project_vfolder["name"],
+                str(cloneable_project_vfolder["id"]),
                 CloneVFolderReq(target_name="cloned-should-fail"),
             )
         assert exc_info.value.status == 400
@@ -289,7 +325,6 @@ class TestVFolderClonePolicyCheck:
         self,
         admin_registry: BackendAIClientRegistry,
         vfolder_factory: VFolderFactory,
-        set_main_access_key: None,
         user_policy_unlimited_project_capped_at_1: None,
         cloneable_project_vfolder: VFolderFixtureData,
         storage_manager: StorageSessionManager,
@@ -313,7 +348,7 @@ class TestVFolderClonePolicyCheck:
         await vfolder_factory(name="user-vf-2-clone-ok")
 
         result = await admin_registry.vfolder.clone(
-            cloneable_project_vfolder["name"],
+            str(cloneable_project_vfolder["id"]),
             CloneVFolderReq(target_name="cloned-should-succeed"),
         )
         assert result.root.name == "cloned-should-succeed"
@@ -331,7 +366,6 @@ class TestVFolderCloneResponseFormat:
         self,
         admin_registry: BackendAIClientRegistry,
         vfolder_factory: VFolderFactory,
-        set_main_access_key: None,
         user_policy_unlimited_project_capped_at_1: None,
         cloneable_project_vfolder: VFolderFixtureData,
         storage_manager: StorageSessionManager,
@@ -345,7 +379,7 @@ class TestVFolderCloneResponseFormat:
         """
         _configure_clone_storage_mock(storage_manager)
 
-        source_name = cloneable_project_vfolder["name"]
+        source_name = str(cloneable_project_vfolder["id"])
         raw = await admin_registry._client._request(
             "POST",
             f"/folders/{source_name}/clone",
@@ -372,7 +406,6 @@ class TestVFolderCloneV2PolicyCheck:
         self,
         admin_v2_registry: V2ClientRegistry,
         vfolder_factory: VFolderFactory,
-        set_main_access_key: None,
         user_policy_capped_at_1: None,
         cloneable_project_vfolder: VFolderFixtureData,
     ) -> None:
@@ -390,7 +423,6 @@ class TestVFolderCloneV2PolicyCheck:
         self,
         admin_v2_registry: V2ClientRegistry,
         vfolder_factory: VFolderFactory,
-        set_main_access_key: None,
         user_policy_unlimited_project_capped_at_1: None,
         cloneable_project_vfolder: VFolderFixtureData,
         storage_manager: StorageSessionManager,
@@ -406,3 +438,58 @@ class TestVFolderCloneV2PolicyCheck:
             CloneVFolderInput(name="cloned-v2-should-succeed"),
         )
         assert result.vfolder.metadata.name == "cloned-v2-should-succeed"
+
+
+# ---------------------------------------------------------------------------
+# RBAC scope graph on the clone target
+# ---------------------------------------------------------------------------
+
+
+class TestVFolderCloneScopeProvisioning:
+    """A cloned vfolder must enter the RBAC graph under its owner, like a created one."""
+
+    async def test_clone_provisions_owner_scope_graph(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        admin_user_fixture: UserFixtureData,
+        db_engine: SAEngine,
+        cloneable_user_vfolder: VFolderFixtureData,
+        storage_manager: StorageSessionManager,
+    ) -> None:
+        """v1 clone gives the target its own scope node and membership in the requester's."""
+        _configure_clone_storage_mock(storage_manager)
+
+        target_name = "cloned-scope-v1"
+        await admin_registry.vfolder.clone(
+            cloneable_user_vfolder["name"],
+            CloneVFolderReq(target_name=target_name),
+        )
+
+        own_nodes, owner_memberships = await _fetch_scope_graph(
+            db_engine, target_name, admin_user_fixture.user_uuid
+        )
+        assert own_nodes == 1
+        assert owner_memberships == 1
+
+    async def test_clone_v2_provisions_owner_scope_graph(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        admin_user_fixture: UserFixtureData,
+        db_engine: SAEngine,
+        cloneable_user_vfolder: VFolderFixtureData,
+        storage_manager: StorageSessionManager,
+    ) -> None:
+        """v2 clone gives the target its own scope node and membership in the requester's."""
+        _configure_clone_storage_mock(storage_manager)
+
+        target_name = "cloned-scope-v2"
+        await admin_v2_registry.vfolder.clone(
+            cloneable_user_vfolder["id"],
+            CloneVFolderInput(name=target_name),
+        )
+
+        own_nodes, owner_memberships = await _fetch_scope_graph(
+            db_engine, target_name, admin_user_fixture.user_uuid
+        )
+        assert own_nodes == 1
+        assert owner_memberships == 1

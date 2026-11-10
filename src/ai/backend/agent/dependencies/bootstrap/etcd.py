@@ -38,27 +38,14 @@ class AgentEtcdDependency(DependencyProvider[AgentUnifiedConfig, AsyncEtcd]):
             The scope_prefix_map depends on auto-detected agent identity,
             but for dependencies verify, we use the config as-is.
         """
-        # Prepare credentials if configured
-        etcd_credentials = None
-        if setup_input.etcd.user and setup_input.etcd.password:
-            etcd_credentials = {
-                "user": setup_input.etcd.user,
-                "password": setup_input.etcd.password,
-            }
-
         # Build scope prefix map (same as server.py's etcd_ctx)
         scope_prefix_map = {
             ConfigScopes.GLOBAL: "",
+            ConfigScopes.SGROUP: f"sgroup/{setup_input.agent.legacy_sgroup_name()}",
             ConfigScopes.NODE: f"nodes/agents/{setup_input.agent.id}",
         }
-
-        # Convert config to dataclass format and initialize etcd
-        etcd_config_data = setup_input.etcd.to_dataclass()
-        async with AsyncEtcd(
-            [addr.to_legacy() for addr in etcd_config_data.addrs],
-            setup_input.etcd.namespace,
-            scope_prefix_map,
-            credentials=etcd_credentials,
+        async with AsyncEtcd.create_from_config(
+            setup_input.etcd.to_dataclass(), scope_prefix_map
         ) as etcd:
             yield etcd
 

@@ -1,11 +1,12 @@
 import asyncio
+import hmac
 import logging
 import os
 import signal
 import ssl
 import subprocess
 import sys
-from collections.abc import AsyncGenerator, Awaitable, Callable, Sequence
+from collections.abc import AsyncGenerator, Awaitable, Callable, Mapping, Sequence
 from http import HTTPStatus
 from pathlib import Path
 from pprint import pformat, pprint
@@ -18,19 +19,33 @@ import trafaret as t
 from aiohttp import web
 from setproctitle import setproctitle
 
+from ai.backend.agent.errors.watcher import (
+    InvalidMountNameError,
+    InvalidWatcherTokenError,
+    VolumeMountFailedError,
+    VolumeUnmountFailedError,
+    WatcherTokenNotConfiguredError,
+)
 from ai.backend.common import config, utils
 from ai.backend.common import validators as tx
-from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+from ai.backend.common.configs.etcd import EtcdConfig
+from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.exception import BackendAIError
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.utils import Fstab
-from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
+from ai.backend.logging import Logger, LogLevel
 from ai.backend.logging.config import LoggingConfig
+from ai.backend.logging.structured import StructuredLogger
 
 __version__ = (Path(__file__).parent.parent / "VERSION").read_text().strip()
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 shutdown_enabled = False
+
+_SECRET_KEY_WORDS = ("password", "passwd", "secret", "token")
+
+WATCHER_TOKEN_ETCD_KEY = "config/watcher/token"
 
 
 @web.middleware
@@ -38,18 +53,22 @@ async def auth_middleware(
     request: web.Request, handler: Callable[[web.Request], Awaitable[web.StreamResponse]]
 ) -> web.StreamResponse:
     token = request.headers.get("X-BackendAI-Watcher-Token", None)
-    if token == request.app["token"]:
+    if token is not None and hmac.compare_digest(
+        token.encode("utf-8", "surrogateescape"), request.app["token"].encode("utf-8")
+    ):
         try:
             return await handler(request)
         except FileNotFoundError as e:
-            log.info(repr(e))
+            log.trace("watcher target service not loaded", error_repr=repr(e))
             message = "Agent is not loaded with systemctl."
             return web.json_response({"message": message}, status=HTTPStatus.OK)
-        except Exception as e:
-            log.exception(repr(e))
+        except BackendAIError:
             raise
-    log.info("invalid requested token")
-    return web.HTTPForbidden()
+        except Exception:
+            log.exception("watcher request failed")
+            raise
+    log.trace("watcher request rejected, invalid token")
+    raise InvalidWatcherTokenError()
 
 
 async def handle_status(request: web.Request) -> web.Response:
@@ -130,16 +149,15 @@ async def handle_agent_restart(request: web.Request) -> web.Response:
 
 
 async def handle_fstab_detail(request: web.Request) -> web.Response:
-    log.info("HANDLE_FSTAB_DETAIL")
-    params = request.query
-    fstab_path = params.get("fstab_path", "/etc/fstab")
+    log.trace("fstab detail requested")
+    fstab_path = request.app["config"]["watcher"]["fstab-path"]
     async with aiofiles.open(fstab_path) as fp:
         content = await fp.read()
         return web.Response(text=content)
 
 
 async def handle_list_mounts(request: web.Request) -> web.Response:
-    log.info("HANDLE_LIST_MOUNT")
+    log.trace("mount list requested")
     config = request.app["config_server"]
     mount_prefix = await config.get("volumes/_mount")
     if mount_prefix is None:
@@ -151,14 +169,32 @@ async def handle_list_mounts(request: web.Request) -> web.Response:
     return web.json_response(sorted(mounts))
 
 
+def _mountpoint_under_prefix(mount_prefix: str, name: str) -> Path:
+    prefix_dir = os.path.normpath(mount_prefix).rstrip(os.sep) + os.sep
+    real_prefix = os.path.realpath(mount_prefix)
+    real_prefix_dir = real_prefix.rstrip(os.sep) + os.sep
+    mountpoint = os.path.normpath(Path(mount_prefix) / name)
+    if not mountpoint.startswith(prefix_dir):
+        raise InvalidMountNameError(f"{name!r} resolves to {mountpoint}, outside {mount_prefix}")
+    real_mountpoint = os.path.realpath(mountpoint)
+    if not real_mountpoint.startswith(real_prefix_dir):
+        raise InvalidMountNameError(
+            f"{name!r} follows a symlink to {real_mountpoint}, outside {mount_prefix}"
+        )
+    # With `/` as the prefix, the prefix itself also passes the checks above
+    if real_mountpoint == real_prefix:
+        raise InvalidMountNameError(f"{name!r} resolves to the mount prefix {mount_prefix} itself")
+    return Path(mountpoint)
+
+
 async def handle_mount(request: web.Request) -> web.Response:
-    log.info("HANDLE_MOUNT")
+    log.trace("mount requested")
     params = await request.json()
     config = request.app["config_server"]
     mount_prefix = await config.get("volumes/_mount")
     if mount_prefix is None:
         mount_prefix = "/mnt"
-    mountpoint = Path(mount_prefix) / params["name"]
+    mountpoint = _mountpoint_under_prefix(mount_prefix, params["name"])
     mountpoint.mkdir(exist_ok=True)
     if params.get("options", None):
         cmd = [
@@ -181,11 +217,11 @@ async def handle_mount(request: web.Request) -> web.Response:
     err = raw_err.decode("utf8")
     await proc.wait()
     if err:
-        log.error("Mount error: " + err)
-        return web.Response(text=err, status=HTTPStatus.INTERNAL_SERVER_ERROR)
-    log.info("Mounted " + params["name"] + " on " + mount_prefix)
+        log.error("volume mount failed", mountpoint=mountpoint, stderr=err)
+        raise VolumeMountFailedError(extra_msg=err)
+    log.info("volume mounted", volume_name=params["name"], mount_prefix=mount_prefix)
     if params["edit_fstab"]:
-        fstab_path = params["fstab_path"] if params["fstab_path"] else "/etc/fstab"
+        fstab_path = request.app["config"]["watcher"]["fstab-path"]
         # FIXME: Remove ignore if https://github.com/python/typeshed/pull/4650 is released
         async with aiofiles.open(fstab_path, mode="r+") as fp:
             fstab = Fstab(fp)
@@ -196,18 +232,13 @@ async def handle_mount(request: web.Request) -> web.Response:
 
 
 async def handle_umount(request: web.Request) -> web.Response:
-    log.info("HANDLE_UMOUNT")
+    log.trace("unmount requested")
     params = await request.json()
     config = request.app["config_server"]
     mount_prefix = await config.get("volumes/_mount")
     if mount_prefix is None:
         mount_prefix = "/mnt"
-    mountpoint = Path(mount_prefix) / params["name"]
-    if Path(mount_prefix) == mountpoint:
-        return web.Response(
-            text="Cannot unmount the mount prefix directory itself.",
-            status=HTTPStatus.BAD_REQUEST,
-        )
+    mountpoint = _mountpoint_under_prefix(mount_prefix, params["name"])
     proc = await asyncio.create_subprocess_exec(
         *[
             "sudo",
@@ -222,15 +253,15 @@ async def handle_umount(request: web.Request) -> web.Response:
     err = raw_err.decode("utf8")
     await proc.wait()
     if err:
-        log.error("Unmount error: " + err)
-        return web.Response(text=err, status=HTTPStatus.INTERNAL_SERVER_ERROR)
-    log.info("Unmounted " + params["name"] + " from " + mount_prefix)
+        log.error("volume unmount failed", mountpoint=mountpoint, stderr=err)
+        raise VolumeUnmountFailedError(extra_msg=err)
+    log.info("volume unmounted", volume_name=params["name"], mount_prefix=mount_prefix)
     try:
         mountpoint.rmdir()  # delete directory if empty
     except OSError:
         pass
     if params["edit_fstab"]:
-        fstab_path = params["fstab_path"] if params["fstab_path"] else "/etc/fstab"
+        fstab_path = request.app["config"]["watcher"]["fstab-path"]
         # FIXME: Remove ignore if https://github.com/python/typeshed/pull/4650 is released
         async with aiofiles.open(fstab_path, mode="r+") as fp:
             fstab = Fstab(fp)
@@ -284,27 +315,14 @@ async def watcher_server(
         },
     )
     with logger:
-        etcd_credentials = None
-        if app["config"]["etcd"]["user"]:
-            etcd_credentials = {
-                "user": app["config"]["etcd"]["user"],
-                "password": app["config"]["etcd"]["password"],
-            }
-        scope_prefix_map = {
-            ConfigScopes.GLOBAL: "",
-        }
-        async with AsyncEtcd(
-            app["config"]["etcd"]["addr"],
-            app["config"]["etcd"]["namespace"],
-            scope_prefix_map=scope_prefix_map,
-            credentials=etcd_credentials,
-        ) as etcd:
+        async with AsyncEtcd.create_from_config(app["config"]["etcd"].to_dataclass()) as etcd:
             app["config_server"] = etcd
 
-            token = await etcd.get("config/watcher/token")
-            if token is None:
-                token = "insecure"
-            log.debug("watcher authentication token: {}", token)
+            token = await etcd.get(WATCHER_TOKEN_ETCD_KEY)
+            if not token:
+                log.error("watcher token not configured", etcd_key=WATCHER_TOKEN_ETCD_KEY)
+                raise WatcherTokenNotConfiguredError()
+            log.debug("watcher authentication token loaded")
             app["token"] = token
 
             app.middlewares.append(auth_middleware)
@@ -316,7 +334,7 @@ async def watcher_server(
                 ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
                 ssl_ctx.load_cert_chain(
                     str(app["config"]["watcher"]["ssl-cert"]),
-                    str(app["config"]["watcher"]["ssl-privkey"]),
+                    str(app["config"]["watcher"]["ssl-key"]),
                 )
             runner = web.AppRunner(app)
             await runner.setup()
@@ -330,15 +348,28 @@ async def watcher_server(
                 ssl_context=ssl_ctx,
             )
             await site.start()
-            log.info("started at {}", watcher_addr)
+            log.info("watcher started", listen_addr=str(watcher_addr))
             try:
                 stop_sig = yield
             finally:
-                log.info("shutting down...")
+                log.info("watcher shutting down")
                 if stop_sig == signal.SIGALRM and shutdown_enabled:
-                    log.warning("shutting down the agent node!")
+                    log.warning("agent node shutting down")
                     await asyncio.to_thread(subprocess.run, ["shutdown", "-h", "now"])
                 await runner.cleanup()
+
+
+def _mask_secrets(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {
+            k: "***"
+            if any(word in str(k).lower() for word in _SECRET_KEY_WORDS)
+            else _mask_secrets(v)
+            for k, v in value.items()
+        }
+    if isinstance(value, list):
+        return [_mask_secrets(item) for item in value]
+    return value
 
 
 @click.command()
@@ -368,24 +399,22 @@ def main(
     log_level: LogLevel,
     debug: bool,
 ) -> None:
-    watcher_config_iv = (
-        t.Dict({
-            t.Key("watcher"): t.Dict({
-                t.Key("service-addr", default=("0.0.0.0", 6009)): tx.HostPortPair,
-                t.Key("ssl-enabled", default=False): t.Bool,
-                t.Key("ssl-cert", default=None): t.Null | tx.Path(type="file"),
-                t.Key("ssl-key", default=None): t.Null | tx.Path(type="file"),
-                t.Key("target-service", default="backendai-agent.service"): t.String,
-                t.Key("soft-reset-available", default=False): t.Bool,
-            }).allow_extra("*"),
-            t.Key("logging"): t.Any,  # checked in ai.backend.logging
-            t.Key("debug"): t.Dict({
-                t.Key("enabled", default=False): t.Bool,
-            }).allow_extra("*"),
-        })
-        .merge(config.etcd_config_iv)
-        .allow_extra("*")
-    )
+    watcher_config_iv = t.Dict({
+        t.Key("watcher"): t.Dict({
+            t.Key("service-addr", default=("0.0.0.0", 6009)): tx.HostPortPair,
+            t.Key("ssl-enabled", default=False): t.Bool,
+            t.Key("ssl-cert", default=None): t.Null | tx.Path(type="file"),
+            t.Key("ssl-key", default=None): t.Null | tx.Path(type="file"),
+            t.Key("target-service", default="backendai-agent.service"): t.String,
+            t.Key("soft-reset-available", default=False): t.Bool,
+            t.Key("fstab-path", default="/etc/fstab"): t.String,
+        }).allow_extra("*"),
+        t.Key("logging"): t.Any,  # checked in ai.backend.logging
+        t.Key("etcd"): t.Any,  # checked by EtcdConfig
+        t.Key("debug"): t.Dict({
+            t.Key("enabled", default=False): t.Bool,
+        }).allow_extra("*"),
+    }).allow_extra("*")
 
     raw_cfg, cfg_src_path = config.read_from_file(config_path, "agent")
 
@@ -411,9 +440,10 @@ def main(
         cfg = config.check(raw_cfg, watcher_config_iv)
         if "debug" in cfg and cfg["debug"]["enabled"]:
             print("== Watcher configuration ==")
-            pprint(cfg)
+            pprint(_mask_secrets(cfg))
         cfg["_src"] = cfg_src_path
         cfg["logging"] = logging_config
+        cfg["etcd"] = EtcdConfig.model_validate(cfg["etcd"])
     except config.ConfigurationError as e:
         print("Validation of watcher configuration has failed:", file=sys.stderr)
         print(pformat(e.invalid_data), file=sys.stderr)
@@ -440,10 +470,10 @@ def main(
         fn = Path(logging_config.file.filename)
         logging_config.file.filename = f"{fn.stem}-watcher{fn.suffix}"
 
-    setproctitle(f"backend.ai: watcher {cfg['etcd']['namespace']}")
+    setproctitle(f"backend.ai: watcher {cfg['etcd'].namespace}")
     with logger:
-        log.info("Backend.AI Agent Watcher {0}", __version__)
-        log.info("runtime: {0}", utils.env_info())
+        log.info("watcher starting", version=__version__)
+        log.info("runtime environment", runtime_info=utils.env_info())
 
         log_config = logging.getLogger("ai.backend.agent.config")
         log_config.debug("debug mode enabled.")
@@ -454,4 +484,4 @@ def main(
             args=(cfg, log_endpoint),
             stop_signals={signal.SIGINT, signal.SIGTERM, signal.SIGALRM},
         )
-        log.info("exit.")
+        log.info("watcher exited")

@@ -4,7 +4,6 @@ from typing import override
 
 from ai.backend.common.data.session.types import CustomizedImageVisibilityScope
 from ai.backend.common.types import AccessKey
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.session.types import SessionData
 from ai.backend.manager.services.session.base import SessionAction
@@ -21,8 +20,9 @@ class ConvertSessionToImageAction(SessionAction):
     max_customized_image_count: int
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "convert_session_to_image"
 
     @override
     @classmethod
@@ -31,11 +31,7 @@ class ConvertSessionToImageAction(SessionAction):
 
 
 @dataclass
-class ConvertSessionToImageActionResult(BaseActionResult):
+class ConvertSessionToImageActionResult:
     task_id: uuid.UUID
 
     session_data: SessionData
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.session_data.id)

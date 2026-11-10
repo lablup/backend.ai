@@ -23,6 +23,7 @@ from .types import (
 )
 
 __all__ = (
+    "BulkDeleteVFolderV2Error",
     "BulkDeleteVFoldersPayload",
     "BulkPurgeVFolderV2Error",
     "BulkPurgeVFoldersPayload",
@@ -59,6 +60,9 @@ class VFolderNode(BaseResponseModel):
     """Node model representing a virtual folder entity with nested sub-models."""
 
     id: UUID = Field(description="Unique identifier of the virtual folder")
+    entity_id: UUID = Field(
+        description="UUID of the vfolder. Added in 26.9.0.",
+    )
     status: VFolderOperationStatusField = Field(description="Current operation status")
     host: str = Field(description="Storage host where the virtual folder is located")
     metadata: VFolderMetadataInfo = Field(description="Descriptive metadata fields")
@@ -93,6 +97,40 @@ class VFolderInvitationNode(BaseResponseModel):
     )
 
 
+class VFolderMountPolicyNode(BaseResponseModel):
+    """The mount level one user gets on a virtual folder."""
+
+    id: UUID = Field(description="Mount policy row ID")
+    field_id: UUID = Field(
+        description="UUID of the vfolder mount policy. Added in 26.9.0.",
+    )
+    vfolder_id: UUID = Field(description="ID of the virtual folder")
+    user_id: UUID = Field(description="User the mount level is set for")
+    permission: VFolderPermissionField = Field(description="Mount level: none, ro or rw")
+    created_at: datetime = Field(description="When the row was first set")
+    updated_at: datetime = Field(description="When the level was last replaced")
+
+
+class SetVFolderMountPolicyPayload(BaseResponseModel):
+    """Payload for setting a mount policy."""
+
+    policy: VFolderMountPolicyNode = Field(description="The mount level now set")
+
+
+class UnsetVFolderMountPolicyPayload(BaseResponseModel):
+    """Payload for unsetting a mount policy."""
+
+    vfolder_id: UUID = Field(description="ID of the virtual folder")
+    user_id: UUID = Field(description="User whose mount level was taken back")
+    removed: bool = Field(description="Whether a row was removed")
+
+
+class VFolderMountPoliciesPayload(BaseResponseModel):
+    """Payload listing the mount levels set on a virtual folder."""
+
+    items: list[VFolderMountPolicyNode] = Field(description="One row per user")
+
+
 class FileEntryNode(BaseResponseModel):
     """Node model representing a file entry inside a virtual folder."""
 
@@ -125,18 +163,45 @@ class DeleteVFolderPayload(BaseResponseModel):
     """Payload for virtual folder soft-deletion mutation result."""
 
     id: UUID = Field(description="ID of the deleted virtual folder")
+    vfolder: VFolderNode = Field(description="The soft-deleted virtual folder. Added in 26.10.0.")
 
 
 class PurgeVFolderPayload(BaseResponseModel):
     """Payload for virtual folder purge mutation result."""
 
     id: UUID = Field(description="ID of the purged virtual folder.")
+    vfolder: VFolderNode = Field(description="The virtual folder being purged. Added in 26.10.0.")
+
+
+class BulkDeleteVFolderV2Error(BaseResponseModel):
+    """Error information for a single vfolder that failed during bulk soft-deletion."""
+
+    vfolder_id: UUID = Field(description="UUID of the vfolder that failed to be soft-deleted.")
+    message: str = Field(description="Error message describing the failure.")
 
 
 class BulkDeleteVFoldersPayload(BaseResponseModel):
     """Payload for bulk virtual folder soft-deletion."""
 
-    deleted_count: int = Field(description="Number of virtual folders successfully soft-deleted.")
+    items: list[VFolderNode] = Field(
+        default_factory=list,
+        description=(
+            "The vfolders that were soft-deleted, in the order they were requested. "
+            "A soft-deleted vfolder is still addressable, so it is returned whole. "
+            "Together with `failed` this answers for every requested vfolder exactly once."
+        ),
+    )
+    deleted_count: int = Field(
+        description=(
+            "Number of virtual folders successfully soft-deleted. "
+            "Deprecated since 26.9.0. Use the length of items."
+        ),
+        deprecated=True,
+    )
+    failed: list[BulkDeleteVFolderV2Error] = Field(
+        default_factory=list,
+        description="List of errors for vfolders that failed to be soft-deleted.",
+    )
 
 
 class BulkPurgeVFolderV2Error(BaseResponseModel):
@@ -149,7 +214,20 @@ class BulkPurgeVFolderV2Error(BaseResponseModel):
 class BulkPurgeVFoldersPayload(BaseResponseModel):
     """Payload for bulk virtual folder purge."""
 
-    purged_count: int = Field(description="Number of virtual folders successfully purged.")
+    successes: list[UUID] = Field(
+        default_factory=list,
+        description=(
+            "UUIDs of the vfolders that were purged, in the order they were requested. "
+            "Together with `failed` this answers for every requested vfolder exactly once."
+        ),
+    )
+    purged_count: int = Field(
+        description=(
+            "Number of virtual folders successfully purged. "
+            "Deprecated since 26.9.0. Use the length of successes."
+        ),
+        deprecated=True,
+    )
     failed: list[BulkPurgeVFolderV2Error] = Field(
         description="List of errors for vfolders that failed to purge."
     )

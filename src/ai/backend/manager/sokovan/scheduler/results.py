@@ -6,16 +6,39 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import (
     AccessKey,
     KernelId,
     SessionId,
 )
 from ai.backend.manager.data.kernel.types import KernelStatus
-from ai.backend.manager.data.sokovan.allocation import SchedulingFailure
-from ai.backend.manager.models.session import SessionStatus
+from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.views.sokovan.allocation import SchedulingFailure
 
 __all__ = ["ScheduleResult"]
+
+
+@dataclass
+class PreemptionPlanEntry:
+    """One session's preemption plan: it reserved its resources and the
+    listed victims must be preempted before it can start."""
+
+    session_id: SessionId
+    victim_session_ids: tuple[SessionId, ...]
+
+
+@dataclass
+class SchedulingSkip:
+    """A session that was not attempted this pass.
+
+    Distinct from a :class:`SchedulingFailure`: nothing was tried, so no
+    retry pressure (and no eventual deprioritization) may be charged to it.
+    """
+
+    session_id: SessionId
+    # Human-readable skip reason (transition reason / pending queue)
+    msg: str
 
 
 @dataclass
@@ -27,6 +50,13 @@ class ScheduleResult:
     # Sessions whose scheduling attempt failed this pass (predicate failure,
     # no suitable agent, etc.), as reported by the provisioner.
     scheduling_failures: list[SchedulingFailure]
+    # Sessions that reserved their resources via a preemption plan this pass.
+    reserved_session_ids: list[SessionId]
+    # The preemption plans backing those reservations.
+    preemption_plan: list[PreemptionPlanEntry]
+    # Sessions left unattempted because an earlier session exhausted the
+    # group's resources, in sequencing order.
+    scheduling_skips: list[SchedulingSkip] = field(default_factory=list)
 
     def success_count(self) -> int:
         """Get the count of successfully scheduled sessions."""
@@ -50,7 +80,8 @@ class SessionTransitionInfo:
 
     session_id: SessionId
     from_status: SessionStatus
-    reason: str | None = None
+    reason: KernelLifecycleEventReason | None = None
+    message: str | None = None
     error_code: str | None = None
     creation_id: str | None = None
     access_key: AccessKey | None = None
@@ -101,8 +132,9 @@ class KernelTransitionInfo:
     """
 
     kernel_id: KernelId
+    session_id: SessionId
     from_status: KernelStatus
-    reason: str | None = None
+    reason: KernelLifecycleEventReason | None = None
 
 
 @dataclass

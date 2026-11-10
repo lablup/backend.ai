@@ -5,6 +5,7 @@ import os
 import socket
 import sys
 import textwrap
+from enum import StrEnum
 from pathlib import Path
 from pprint import pformat
 from typing import Annotated, Self
@@ -29,17 +30,22 @@ from ai.backend.appproxy.common.types import (
     EventLoopType,
     FrontendMode,
     FrontendServerMode,
+    IngressDeliveryMode,
     ProxyProtocol,
 )
 from ai.backend.common import config
 from ai.backend.common.configs import (
-    EtcdConfig,
     OTELConfig,
     PyroscopeConfig,
     ServiceDiscoveryConfig,
 )
 from ai.backend.common.exception import BackendAISchemaValidationFailed
-from ai.backend.common.meta import BackendAIConfigMeta, CompositeType, ConfigExample
+from ai.backend.common.meta import (
+    NEXT_RELEASE_VERSION,
+    BackendAIConfigMeta,
+    CompositeType,
+    ConfigExample,
+)
 from ai.backend.common.typed_validators import AutoDirectoryPath
 from ai.backend.common.types import ServiceDiscoveryType
 from ai.backend.logging import LogLevel
@@ -370,6 +376,132 @@ class TraefikConfig(BaseSchema):
         return self
 
 
+class IngressLayerType(StrEnum):
+    IN_MEMORY = "in-memory"
+    REDIS = "redis"
+
+
+class IngressInMemoryConfig(BaseSchema):
+    ttl: Annotated[
+        float | None,
+        Field(default=None, gt=0),
+        BackendAIConfigMeta(
+            description=(
+                "Seconds an ingress filled from a later layer is held. "
+                "Unset holds it until removed. Requires a layer after in-memory."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="", prod="60.0"),
+        ),
+    ]
+    negative_ttl: Annotated[
+        float | None,
+        Field(default=None, gt=0, alias="negative-ttl"),
+        BackendAIConfigMeta(
+            description=(
+                "Seconds a removed key is remembered as missing, so lookups right after the "
+                "removal skip the later layers. Unset does not remember removals. "
+                "Requires a layer after in-memory."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="", prod="5.0"),
+        ),
+    ]
+
+
+class IngressRedisConfig(BaseSchema):
+    key_prefix: Annotated[
+        str,
+        Field(default="appproxy:ingress", min_length=1, alias="key-prefix"),
+        BackendAIConfigMeta(
+            description=(
+                "Prefix of the Redis keys holding ingresses. "
+                "The connection is the worker's redis config."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="appproxy:ingress", prod="appproxy:ingress"),
+        ),
+    ]
+
+
+class IngressConfig(BaseSchema):
+    delivery_mode: Annotated[
+        IngressDeliveryMode,
+        Field(default=IngressDeliveryMode.REDIS),
+        BackendAIConfigMeta(
+            description=(
+                "How ingresses are delivered to the worker, announced through service discovery. "
+                "api takes what the coordinator sends to the API port, redis reads what the "
+                "manager writes to Redis. Circuit events are written in either delivery mode."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="redis", prod="api"),
+        ),
+    ]
+    layers: Annotated[
+        list[IngressLayerType],
+        Field(
+            default_factory=lambda: [IngressLayerType.IN_MEMORY, IngressLayerType.REDIS],
+            min_length=1,
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Where the worker reads ingresses, in lookup order. "
+                "in-memory, when present, comes first."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local='["in-memory"]', prod='["in-memory", "redis"]'),
+        ),
+    ]
+    in_memory: Annotated[
+        IngressInMemoryConfig,
+        Field(default_factory=IngressInMemoryConfig, alias="in-memory"),
+        BackendAIConfigMeta(
+            description="In-memory layer settings. Read only when layers include in-memory.",
+            added_version=NEXT_RELEASE_VERSION,
+            composite=CompositeType.FIELD,
+        ),
+    ]
+    redis: Annotated[
+        IngressRedisConfig,
+        Field(default_factory=IngressRedisConfig),
+        BackendAIConfigMeta(
+            description="Redis layer settings. Read only when layers include redis.",
+            added_version=NEXT_RELEASE_VERSION,
+            composite=CompositeType.FIELD,
+        ),
+    ]
+
+    @model_validator(mode="after")
+    def _check_layers(self) -> Self:
+        if len(set(self.layers)) != len(self.layers):
+            raise ValueError("ingress layers must not repeat")
+        if (
+            IngressLayerType.IN_MEMORY in self.layers
+            and self.layers[0] != IngressLayerType.IN_MEMORY
+        ):
+            raise ValueError("the in-memory ingress layer must come first")
+        if self.layers == [IngressLayerType.IN_MEMORY] and (
+            self.in_memory.ttl is not None or self.in_memory.negative_ttl is not None
+        ):
+            raise ValueError("in-memory ttl requires a layer after in-memory")
+        return self
+
+    @model_validator(mode="after")
+    def _check_delivery_mode(self) -> Self:
+        if (
+            self.delivery_mode == IngressDeliveryMode.API
+            and IngressLayerType.IN_MEMORY not in self.layers
+        ):
+            raise ValueError("the api ingress delivery mode requires the in-memory layer")
+        if (
+            self.delivery_mode == IngressDeliveryMode.REDIS
+            and IngressLayerType.REDIS not in self.layers
+        ):
+            raise ValueError("the redis ingress delivery mode requires the redis layer")
+        return self
+
+
 class ProxyWorkerConfig(BaseSchema):
     ipc_base_path: Annotated[
         Path,
@@ -479,6 +611,15 @@ class ProxyWorkerConfig(BaseSchema):
             example=ConfigExample(local="", prod="worker.example.com:10201"),
         ),
     ]
+    max_header_field_size: Annotated[
+        int,
+        Field(default=8190, gt=0),
+        BackendAIConfigMeta(
+            description="Maximum bytes of a single request header. Larger ones get 400.",
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="8190", prod="8190"),
+        ),
+    ]
 
     coordinator_endpoint: Annotated[
         AnyUrl,
@@ -518,20 +659,6 @@ class ProxyWorkerConfig(BaseSchema):
             ),
             added_version="25.9.0",
             example=ConfigExample(local="worker-local", prod="worker-1"),
-        ),
-    ]
-
-    use_experimental_redis_event_dispatcher: Annotated[
-        bool,
-        Field(default=False),
-        BackendAIConfigMeta(
-            description=(
-                "Enable the experimental Redis-based event dispatcher for real-time event "
-                "propagation from the coordinator. This feature is under development "
-                "and may have stability issues. Use with caution in production."
-            ),
-            added_version="25.9.0",
-            example=ConfigExample(local="false", prod="false"),
         ),
     ]
 
@@ -649,7 +776,9 @@ class ProxyWorkerConfig(BaseSchema):
             description=(
                 "The protocol to use for proxied connections. 'http' for HTTP/1.1 traffic, "
                 "'h2' for HTTP/2 traffic (requires http2 config), 'tcp' for raw TCP proxying. "
-                "'grpc' is not directly supported; use 'h2' instead for gRPC traffic."
+                "'grpc' is not directly supported; use 'h2' instead for gRPC traffic. "
+                "An 'h2' worker cannot check credentials or client addresses, so it serves only "
+                "circuits that are open to public and have no 'allowed_client_ips'."
             ),
             added_version="25.9.0",
             example=ConfigExample(local="http", prod="http"),
@@ -772,6 +901,20 @@ class ProxyWorkerConfig(BaseSchema):
         ),
     ]
 
+    client_pool_keep_inflight_sessions: Annotated[
+        bool,
+        Field(default=False),
+        BackendAIConfigMeta(
+            description=(
+                "Skip idle-session cleanup for sessions with a request still in flight, "
+                "so streamed responses longer than client_pool_cleanup_interval are not cut off. "
+                "Experimental; off by default."
+            ),
+            added_version="26.9.0",
+            example=ConfigExample(local="false", prod="false"),
+        ),
+    ]
+
     announce_addr: Annotated[
         HostPortPair | None,
         Field(default=None),
@@ -791,15 +934,24 @@ class ProxyWorkerConfig(BaseSchema):
         Field(default_factory=list),
         BackendAIConfigMeta(
             description=(
-                "CIDR blocks (or bare IP addresses) of load balancers / reverse proxies that sit "
-                "in front of this worker and may be trusted to set the 'X-Forwarded-For' header. "
-                "Client-IP allowlist checks honor 'X-Forwarded-For' only when the immediate peer "
-                "matches one of these networks; otherwise the direct connection address is used, so "
-                "a directly-exposed worker cannot be spoofed by a forged header. Leave empty when "
-                "clients connect directly to the worker."
+                "CIDR blocks (or bare IP addresses) of load balancers / reverse proxies in front "
+                "of this worker, trusted to set 'X-Forwarded-For', 'X-Forwarded-Host' and "
+                "'X-Forwarded-Proto'. Leave empty when clients connect directly to the worker; "
+                "the worker then ignores these headers and uses the connection address, the "
+                "'Host' header and its TLS configuration."
             ),
             added_version="26.4.5",
             example=ConfigExample(local="[]", prod='["10.0.0.0/8"]'),
+        ),
+    ]
+
+    ingress: Annotated[
+        IngressConfig,
+        Field(default_factory=IngressConfig),
+        BackendAIConfigMeta(
+            description="Where the worker reads the ingresses it serves.",
+            added_version=NEXT_RELEASE_VERSION,
+            composite=CompositeType.FIELD,
         ),
     ]
 
@@ -844,6 +996,25 @@ class ProxyWorkerConfig(BaseSchema):
                 if not self.http2:
                     raise ValueError("http2 config must be set when protocol = 'h2'")
         return self
+
+    def served_wildcard_domain(self) -> str | None:
+        match self.frontend_mode:
+            case FrontendServerMode.PORT:
+                return None
+            case FrontendServerMode.WILDCARD_DOMAIN:
+                if self.wildcard_domain is None:
+                    return None
+                return self.wildcard_domain.domain
+            case FrontendServerMode.TRAEFIK:
+                if self.traefik is None:
+                    return None
+                match self.traefik.frontend_mode:
+                    case FrontendMode.PORT:
+                        return None
+                    case FrontendMode.WILDCARD_DOMAIN:
+                        if self.traefik.wildcard_domain is None:
+                            return None
+                        return self.traefik.wildcard_domain.domain
 
 
 class ServerConfig(BaseSchema):
@@ -957,18 +1128,6 @@ class ServerConfig(BaseSchema):
             description=(
                 "Service discovery configuration for locating the coordinator and other Backend.AI "
                 "components. Supports Redis-based or etcd-based service registration and discovery."
-            ),
-            added_version="25.9.0",
-            composite=CompositeType.FIELD,
-        ),
-    ]
-    etcd: Annotated[
-        EtcdConfig,
-        Field(default_factory=EtcdConfig),
-        BackendAIConfigMeta(
-            description=(
-                "etcd connection configuration for distributed coordination. "
-                "Used for service discovery (if etcd-based) and shared configuration management."
             ),
             added_version="25.9.0",
             composite=CompositeType.FIELD,

@@ -1,9 +1,6 @@
-from typing import override
-
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
-from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
+from ai.backend.manager.data.deployment.types import ModelDeploymentData
 from ai.backend.manager.services.model_serving.actions.create_auto_scaling_rule import (
     CreateEndpointAutoScalingRuleAction,
     CreateEndpointAutoScalingRuleActionResult,
@@ -12,55 +9,43 @@ from ai.backend.manager.services.model_serving.actions.delete_auto_scaling_rule 
     DeleteEndpointAutoScalingRuleAction,
     DeleteEndpointAutoScalingRuleActionResult,
 )
-from ai.backend.manager.services.model_serving.actions.modify_auto_scaling_rule import (
-    ModifyEndpointAutoScalingRuleAction,
-    ModifyEndpointAutoScalingRuleActionResult,
-)
 from ai.backend.manager.services.model_serving.actions.scale_service_replicas import (
     ScaleServiceReplicasAction,
     ScaleServiceReplicasActionResult,
 )
+from ai.backend.manager.services.model_serving.actions.update_auto_scaling_rule import (
+    UpdateEndpointAutoScalingRuleAction,
+    UpdateEndpointAutoScalingRuleActionResult,
+)
 from ai.backend.manager.services.model_serving.services.auto_scaling import AutoScalingService
 
 
-class ModelServingAutoScalingProcessors(AbstractProcessorPackage):
-    scale_service_replicas: ActionProcessor[
+class ModelServingAutoScalingProcessors:
+    scale_service_replicas: SingleEntityActionProcessor[
         ScaleServiceReplicasAction, ScaleServiceReplicasActionResult
     ]
-    create_endpoint_auto_scaling_rule: ActionProcessor[
+    create_endpoint_auto_scaling_rule: SingleEntityActionProcessor[
         CreateEndpointAutoScalingRuleAction, CreateEndpointAutoScalingRuleActionResult
     ]
-    delete_endpoint_auto_scaling_rule: ActionProcessor[
+    delete_endpoint_auto_scaling_rule: SingleEntityActionProcessor[
         DeleteEndpointAutoScalingRuleAction, DeleteEndpointAutoScalingRuleActionResult
     ]
-    modify_endpoint_auto_scaling_rule: ActionProcessor[
-        ModifyEndpointAutoScalingRuleAction, ModifyEndpointAutoScalingRuleActionResult
+    update_endpoint_auto_scaling_rule: SingleEntityActionProcessor[
+        UpdateEndpointAutoScalingRuleAction, UpdateEndpointAutoScalingRuleActionResult
     ]
 
     def __init__(
-        self,
-        service: AutoScalingService,
-        action_monitors: list[ActionMonitor],
-        validators: ActionValidators,
+        self, group: ProcessorGroup[ModelDeploymentData], service: AutoScalingService
     ) -> None:
-        self.scale_service_replicas = ActionProcessor(
-            service.scale_service_replicas, action_monitors
+        self.scale_service_replicas = group.single_entity(
+            ScaleServiceReplicasAction, service.scale_service_replicas
         )
-        self.create_endpoint_auto_scaling_rule = ActionProcessor(
-            service.create_endpoint_auto_scaling_rule, action_monitors
+        self.create_endpoint_auto_scaling_rule = group.single_entity(
+            CreateEndpointAutoScalingRuleAction, service.create_endpoint_auto_scaling_rule
         )
-        self.delete_endpoint_auto_scaling_rule = ActionProcessor(
-            service.delete_endpoint_auto_scaling_rule, action_monitors
+        self.delete_endpoint_auto_scaling_rule = group.single_entity(
+            DeleteEndpointAutoScalingRuleAction, service.delete_endpoint_auto_scaling_rule
         )
-        self.modify_endpoint_auto_scaling_rule = ActionProcessor(
-            service.modify_endpoint_auto_scaling_rule, action_monitors
+        self.update_endpoint_auto_scaling_rule = group.single_entity(
+            UpdateEndpointAutoScalingRuleAction, service.update_endpoint_auto_scaling_rule
         )
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            ScaleServiceReplicasAction.spec(),
-            CreateEndpointAutoScalingRuleAction.spec(),
-            DeleteEndpointAutoScalingRuleAction.spec(),
-            ModifyEndpointAutoScalingRuleAction.spec(),
-        ]

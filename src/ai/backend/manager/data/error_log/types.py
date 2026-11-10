@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import enum
-import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
+
+from ai.backend.common.data.entity.error_log import ErrorLogID
+from ai.backend.common.data.entity.types import FieldData
+from ai.backend.common.data.entity.user import UserID
 
 
 class ErrorLogSeverity(enum.StrEnum):
@@ -16,7 +19,7 @@ class ErrorLogSeverity(enum.StrEnum):
 @dataclass
 class ErrorLogMeta:
     created_at: datetime
-    user: uuid.UUID | None
+    user: UserID | None
     source: str
     is_read: bool
     is_cleared: bool
@@ -34,17 +37,9 @@ class ErrorLogContent:
 
 
 @dataclass
-class ErrorLogData:
-    id: uuid.UUID
+class ErrorLogData(FieldData):
+    """One recorded error, read through the user it happened to."""
+
+    id: ErrorLogID
     meta: ErrorLogMeta
     content: ErrorLogContent
-
-
-@dataclass
-class ErrorLogListResult:
-    """Search result with total count and pagination info for error logs."""
-
-    items: list[ErrorLogData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool

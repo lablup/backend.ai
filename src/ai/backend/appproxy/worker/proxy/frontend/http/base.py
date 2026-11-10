@@ -4,11 +4,18 @@ from typing import override
 
 import aiohttp_jinja2
 import jwt
-from aiohttp import web
+from aiohttp import hdrs, web
 from aiohttp_remotes import XForwardedStrict
 
-from ai.backend.appproxy.common.defs import PERMIT_COOKIE_NAME
+from ai.backend.appproxy.common.config import ContentEncodingConfig
+from ai.backend.appproxy.common.defs import (
+    ERROR_TEMPLATE_NAME,
+    MEDIA_TYPE_HTML,
+    MEDIA_TYPE_JSON,
+    PERMIT_COOKIE_NAME,
+)
 from ai.backend.appproxy.common.errors import ClientIPNotAllowed, InvalidCredentials
+from ai.backend.appproxy.common.errors.http import ContentEncodingNotAllowed
 from ai.backend.appproxy.common.types import RouteInfo, WebRequestHandler
 from ai.backend.appproxy.common.utils import ensure_json_serializable, is_permit_valid, mime_match
 from ai.backend.appproxy.worker.proxy.backend.http import HTTPBackend
@@ -19,34 +26,30 @@ from ai.backend.appproxy.worker.types import (
     InteractiveAppInfo,
     RootContext,
 )
+from ai.backend.common.dto.appproxy.v2.ingress.types import IngressAccess
 from ai.backend.common.exception import BackendAIError
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class BaseHTTPFrontend[TCircuitKeyType: (int, str)](BaseFrontend[HTTPBackend, TCircuitKeyType]):
     root_context: RootContext
     _xff_strict: XForwardedStrict | None
+    _content_encoding: ContentEncodingConfig
 
     def __init__(self, root_context: RootContext) -> None:
         super().__init__(root_context)
+        self._content_encoding = ContentEncodingConfig(rejected_encodings=[])
         # With trusted proxies set, an XForwardedStrict middleware resolves request.remote from X-Forwarded-For.
         # Empty means directly exposed — no middleware.
         trusted_proxies = root_context.local_config.proxy_worker.trusted_proxies
         self._xff_strict = XForwardedStrict([list(trusted_proxies)]) if trusted_proxies else None
 
-    def ensure_allowed_ip(self, request: web.Request, circuit: Circuit) -> None:
-        validator = circuit.ip_validator
-        if not validator.is_restricted:
-            return
+    def ensure_allowed_ip(self, request: web.Request, access: IngressAccess) -> None:
         client_ip = request.remote
-        if not client_ip or not validator.is_allowed(client_ip):
-            log.debug(
-                "rejecting client {} for circuit {} (not in allowed_client_ips)",
-                client_ip,
-                circuit.id,
-            )
+        if not self._is_client_ip_allowed(client_ip, access):
+            log.trace("rejecting client {} (not in allowed_client_ips)", client_ip)
             raise ClientIPNotAllowed("E20011: Client address not allowed")
 
     def ensure_credential(self, request: web.Request, circuit: Circuit) -> None:
@@ -105,8 +108,8 @@ class BaseHTTPFrontend[TCircuitKeyType: (int, str)](BaseFrontend[HTTPBackend, TC
     async def list_inactive_circuits(self, threshold: int) -> list[Circuit]:
         now = time.time()
         return [
-            self.circuits[key]
-            for key, backend in self.backends.items()
+            backend.circuit
+            for backend in self.backends.values()
             if (backend.last_used - now) >= threshold
         ]
 
@@ -116,7 +119,35 @@ class BaseHTTPFrontend[TCircuitKeyType: (int, str)](BaseFrontend[HTTPBackend, TC
             and request.headers.get("upgrade", "").lower() == "websocket"
         )
 
+    @override
+    def apply_content_encoding_config(self, config: ContentEncodingConfig) -> None:
+        self._content_encoding = config
+
+    def _find_rejected_content_encoding(self, content_encoding_headers: list[str]) -> str | None:
+        rejected_encodings = self._content_encoding.rejected_encodings
+        # Each header line may list several codings, e.g. "gzip, br" (RFC 9110 section 8.4).
+        # Codings are case-insensitive (RFC 9110 section 8.4.1), and some session apps decode
+        # "BR" as brotli, so the header is lowercased like the configured codings.
+        for header_value in content_encoding_headers:
+            for coding in header_value.split(","):
+                lowercased_coding = coding.strip().lower()
+                if lowercased_coding in rejected_encodings:
+                    return lowercased_coding
+        return None
+
     async def proxy(self, request: web.Request) -> web.StreamResponse | web.WebSocketResponse:
+        rejected_encoding = self._find_rejected_content_encoding(
+            request.headers.getall(hdrs.CONTENT_ENCODING, [])
+        )
+        if rejected_encoding is not None:
+            log.trace(
+                "rejecting a request body encoded with {} from {}",
+                rejected_encoding,
+                request.remote,
+            )
+            raise ContentEncodingNotAllowed(
+                f"Request bodies encoded with {rejected_encoding} are not accepted"
+            )
         backend: HTTPBackend = request["backend"]
 
         if self._is_websocket_request(request):
@@ -130,17 +161,16 @@ class BaseHTTPFrontend[TCircuitKeyType: (int, str)](BaseFrontend[HTTPBackend, TC
             resp = await handler(request)
         except BackendAIError as ex:
             if ex.status_code == 500:
-                log.exception("Internal server error raised inside handlers")
-            if mime_match(
-                request.headers.get("accept", "text/html"), "application/json", strict=True
-            ):
+                log.exception("internal server error raised inside the proxy handler")
+            accept = request.headers.get(hdrs.ACCEPT, MEDIA_TYPE_HTML)
+            if mime_match(accept, MEDIA_TYPE_JSON, strict=True):
                 return web.json_response(
                     ensure_json_serializable(ex.body_dict),
                     status=ex.status_code,
                     headers={"Access-Control-Allow-Origin": "*"},
                 )
             return aiohttp_jinja2.render_template(
-                "error.jinja2",
+                ERROR_TEMPLATE_NAME,
                 request,
                 ex.body_dict,
                 status=ex.status_code,

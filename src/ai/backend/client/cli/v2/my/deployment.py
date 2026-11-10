@@ -6,7 +6,15 @@ import asyncio
 
 import click
 
-from ai.backend.client.cli.v2.helpers import create_v2_registry, load_v2_config, print_result
+from ai.backend.client.cli.v2.helpers import (
+    EntityLabelTerm,
+    create_v2_registry,
+    entity_label_filter_options,
+    entity_label_relations,
+    load_v2_config,
+    print_result,
+)
+from ai.backend.common.data.model_deployment.types import ModelDeploymentStatus
 
 
 @click.group()
@@ -22,8 +30,10 @@ def deployment() -> None:
 @click.option("--last", default=None, type=int, help="Cursor-based: return last N items.")
 @click.option("--before", default=None, type=str, help="Cursor-based: return items before cursor.")
 @click.option("--name-contains", default=None, type=str, help="Filter by name (contains).")
+@entity_label_filter_options
 @click.option(
     "--status",
+    type=click.Choice([status.value for status in ModelDeploymentStatus], case_sensitive=False),
     multiple=True,
     help="Filter by status (repeatable, e.g., --status DEPLOYING --status READY).",
 )
@@ -36,6 +46,7 @@ def search(
     before: str | None,
     name_contains: str | None,
     status: tuple[str, ...],
+    label: tuple[EntityLabelTerm, ...],
 ) -> None:
     """Search my deployments."""
 
@@ -46,11 +57,13 @@ def search(
         DeploymentStatusFilter,
     )
 
+    relations = entity_label_relations(label)
     filter_dto: DeploymentFilter | None = None
-    if name_contains or status:
+    if relations or name_contains or status:
         filter_dto = DeploymentFilter(
             name=StringFilter(contains=name_contains) if name_contains else None,
             status=DeploymentStatusFilter(in_=list(status)) if status else None,
+            AND=[DeploymentFilter(labels=rel) for rel in relations] or None,
         )
 
     async def _run() -> None:

@@ -1,3 +1,3 @@
 # Backend.AI Account Manager
 
-Backend.AI Account Manager is a daemon that manages user accounts, including Backend.AI 's first-party service.
+The account manager is a daemon that manages user accounts, including the accounts of the Backend.AI first-party service.

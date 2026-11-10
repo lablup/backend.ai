@@ -12,6 +12,7 @@ from ai.backend.agent.proxy import DomainSocketProxy, proxy_connection
 from ai.backend.agent.resources import Mount
 from ai.backend.agent.types import VolumeInfo
 from ai.backend.agent.utils import closing_async
+from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.stage.types import (
     ArgsSpecGenerator,
@@ -196,7 +197,6 @@ class IntrinsicMountProvisioner(Provisioner[IntrinsicMountSpec, IntrinsicMountRe
     async def _prepare_domain_socket_proxies(
         self, spec: IntrinsicMountSpec
     ) -> tuple[list[DomainSocketProxy], list[Mount]]:
-        loop = asyncio.get_running_loop()
         ipc_base_path = spec.ipc_base_path
         domain_socket_proxies = []
         mounts = []
@@ -204,7 +204,7 @@ class IntrinsicMountProvisioner(Provisioner[IntrinsicMountSpec, IntrinsicMountRe
         # domain-socket proxy mount
         # (used for special service containers such image importer)
         if spec.domain_socket_proxies:
-            await loop.run_in_executor(
+            await run_in_executor_with_context(
                 None, partial((ipc_base_path / "proxy").mkdir, parents=True, exist_ok=True)
             )
         for proxy in spec.domain_socket_proxies:
@@ -212,7 +212,7 @@ class IntrinsicMountProvisioner(Provisioner[IntrinsicMountSpec, IntrinsicMountRe
             proxy_server = await asyncio.start_unix_server(
                 partial(proxy_connection, proxy.host_sock_path), str(host_proxy_path)
             )
-            await loop.run_in_executor(None, host_proxy_path.chmod, 0o666)
+            await run_in_executor_with_context(None, host_proxy_path.chmod, 0o666)
             domain_socket_proxies.append(
                 DomainSocketProxy(
                     Path(proxy.host_sock_path),

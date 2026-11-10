@@ -1,12 +1,9 @@
-ARG PYTHON_VERSION
-FROM python:${PYTHON_VERSION} AS builder
+# Build context MUST be the repository root.  Starts FROM the shared
+# backend.ai-base image (docker/backend.ai-base.dockerfile), which must be
+# buildable at the same PKGVER — bake builds both (see docker-bake.hcl):
+#   docker buildx bake backend_ai-storage-proxy --set '*.platform=linux/amd64' --load
 ARG PKGVER
-COPY dist /dist
-RUN pip wheel --wheel-dir=/wheels --no-cache-dir backend.ai-storage-proxy==${PKGVER} --find-links=/dist
-
-FROM python:${PYTHON_VERSION}
-COPY --from=builder /wheels /wheels
-RUN pip install --no-cache-dir /wheels/*.whl
+FROM lablup/backend.ai-base:${PKGVER}
 
 # Create necessary directories
 RUN mkdir -p /var/log/backend.ai /etc/backend.ai
@@ -14,5 +11,4 @@ RUN mkdir -p /var/log/backend.ai /etc/backend.ai
 # Set working directory
 WORKDIR /app
 
-CMD ["python", "-m", "ai.backend.storage.server", "-f", "/etc/backend.ai/storage-proxy.toml"]
-
+CMD ["backend.ai", "storage", "start-server", "-f", "/etc/backend.ai/storage-proxy.toml"]

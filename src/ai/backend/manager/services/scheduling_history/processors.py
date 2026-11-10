@@ -1,87 +1,240 @@
 from __future__ import annotations
 
-from typing import override
-
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
-from ai.backend.manager.actions.validators import ActionValidators
-
-from .actions import (
+from ai.backend.common.data.entity.deployment_history import DeploymentHistoryFieldType
+from ai.backend.common.data.entity.kernel_scheduling_history import (
+    KernelSchedulingHistoryFieldType,
+)
+from ai.backend.common.data.entity.replica_group_history import ReplicaGroupHistoryFieldType
+from ai.backend.common.data.entity.route_history import RouteHistoryFieldType
+from ai.backend.common.data.entity.session_scheduling_history import (
+    SessionSchedulingHistoryFieldType,
+)
+from ai.backend.manager.actions.registry.field import LookupFieldGroup
+from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.registry.types import FieldGroupMeta
+from ai.backend.manager.actions.v2.field.bulk_processor import PartialBulkFieldActionProcessor
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
+from ai.backend.manager.actions.v2.ops.result import BatchOpsResult, FieldOwnerLookupOpsResult
+from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
+from ai.backend.manager.data.deployment.types import (
+    DeploymentHistoryData,
+    ModelDeploymentData,
+    ReplicaGroupHistoryData,
+    RouteHistoryData,
+)
+from ai.backend.manager.data.kernel.types import KernelSchedulingHistoryData
+from ai.backend.manager.data.session.types import SessionData, SessionSchedulingHistoryData
+from ai.backend.manager.services.scheduling_history.actions.bulk_get_deployment_histories import (
+    BulkGetDeploymentHistoriesAction,
+)
+from ai.backend.manager.services.scheduling_history.actions.bulk_get_kernel_histories import (
+    BulkGetKernelHistoriesAction,
+)
+from ai.backend.manager.services.scheduling_history.actions.bulk_get_replica_group_histories import (
+    BulkGetReplicaGroupHistoriesAction,
+)
+from ai.backend.manager.services.scheduling_history.actions.bulk_get_route_histories import (
+    BulkGetRouteHistoriesAction,
+)
+from ai.backend.manager.services.scheduling_history.actions.bulk_get_session_histories import (
+    BulkGetSessionHistoriesAction,
+)
+from ai.backend.manager.services.scheduling_history.actions.global_search_replica_group_history import (
+    GlobalSearchReplicaGroupHistoryAction,
+)
+from ai.backend.manager.services.scheduling_history.actions.lookup_owner import (
+    LookupBulkDeploymentHistoryOwnerAction,
+    LookupBulkKernelSchedulingHistoryOwnerAction,
+    LookupBulkReplicaGroupHistoryOwnerAction,
+    LookupBulkRouteHistoryOwnerAction,
+    LookupBulkSessionSchedulingHistoryOwnerAction,
+    LookupDeploymentHistoryOwnerAction,
+    LookupKernelSchedulingHistoryOwnerAction,
+    LookupReplicaGroupHistoryOwnerAction,
+    LookupRouteHistoryOwnerAction,
+    LookupSessionSchedulingHistoryOwnerAction,
+)
+from ai.backend.manager.services.scheduling_history.actions.lookup_replica_deployment import (
+    LookupReplicaDeploymentAction,
+)
+from ai.backend.manager.services.scheduling_history.actions.scoped_search_replica_group_history import (
+    ScopedSearchReplicaGroupHistoryAction,
+    ScopedSearchReplicaGroupHistoryActionResult,
+)
+from ai.backend.manager.services.scheduling_history.actions.search_deployment_history import (
     SearchDeploymentHistoryAction,
-    SearchDeploymentHistoryActionResult,
+)
+from ai.backend.manager.services.scheduling_history.actions.search_deployment_scoped_history import (
     SearchDeploymentScopedHistoryAction,
     SearchDeploymentScopedHistoryActionResult,
+)
+from ai.backend.manager.services.scheduling_history.actions.search_kernel_history import (
+    SearchKernelHistoryAction,
+)
+from ai.backend.manager.services.scheduling_history.actions.search_kernel_scoped_history import (
+    SearchKernelScopedHistoryAction,
+    SearchKernelScopedHistoryActionResult,
+)
+from ai.backend.manager.services.scheduling_history.actions.search_route_history import (
     SearchRouteHistoryAction,
-    SearchRouteHistoryActionResult,
+)
+from ai.backend.manager.services.scheduling_history.actions.search_route_scoped_history import (
     SearchRouteScopedHistoryAction,
     SearchRouteScopedHistoryActionResult,
+)
+from ai.backend.manager.services.scheduling_history.actions.search_session_history import (
     SearchSessionHistoryAction,
-    SearchSessionHistoryActionResult,
+)
+from ai.backend.manager.services.scheduling_history.actions.search_session_scoped_history import (
     SearchSessionScopedHistoryAction,
     SearchSessionScopedHistoryActionResult,
 )
+
 from .service import SchedulingHistoryService
 
 
-class SchedulingHistoryProcessors(AbstractProcessorPackage):
+class SchedulingHistoryProcessors:
     """Processor package for scheduling history operations."""
 
+    # What the DataLoaders read: checked per session or deployment the row belongs to.
+    bulk_get_session_histories: PartialBulkFieldActionProcessor[
+        BulkGetSessionHistoriesAction, SessionSchedulingHistoryData
+    ]
+    bulk_get_kernel_histories: PartialBulkFieldActionProcessor[
+        BulkGetKernelHistoriesAction, KernelSchedulingHistoryData
+    ]
+    bulk_get_deployment_histories: PartialBulkFieldActionProcessor[
+        BulkGetDeploymentHistoriesAction, DeploymentHistoryData
+    ]
+    bulk_get_route_histories: PartialBulkFieldActionProcessor[
+        BulkGetRouteHistoriesAction, RouteHistoryData
+    ]
+    bulk_get_replica_group_histories: PartialBulkFieldActionProcessor[
+        BulkGetReplicaGroupHistoriesAction, ReplicaGroupHistoryData
+    ]
+
     # Admin processors
-    search_session_history: ActionProcessor[
-        SearchSessionHistoryAction, SearchSessionHistoryActionResult
+    search_session_history: GlobalActionProcessor[
+        SearchSessionHistoryAction, BatchOpsResult[SessionSchedulingHistoryData]
     ]
-    search_deployment_history: ActionProcessor[
-        SearchDeploymentHistoryAction, SearchDeploymentHistoryActionResult
+    search_kernel_history: GlobalActionProcessor[
+        SearchKernelHistoryAction, BatchOpsResult[KernelSchedulingHistoryData]
     ]
-    search_route_history: ActionProcessor[SearchRouteHistoryAction, SearchRouteHistoryActionResult]
+    search_deployment_history: GlobalActionProcessor[
+        SearchDeploymentHistoryAction, BatchOpsResult[DeploymentHistoryData]
+    ]
+    global_search_replica_group_history: GlobalActionProcessor[
+        GlobalSearchReplicaGroupHistoryAction, BatchOpsResult[ReplicaGroupHistoryData]
+    ]
+    search_route_history: GlobalActionProcessor[
+        SearchRouteHistoryAction, BatchOpsResult[RouteHistoryData]
+    ]
 
     # Scoped processors (added in 26.2.0)
-    search_session_scoped_history: ActionProcessor[
+    search_session_scoped_history: ScopeActionProcessor[
         SearchSessionScopedHistoryAction, SearchSessionScopedHistoryActionResult
     ]
-    search_deployment_scoped_history: ActionProcessor[
+    search_kernel_scoped_history: ScopeActionProcessor[
+        SearchKernelScopedHistoryAction, SearchKernelScopedHistoryActionResult
+    ]
+    search_deployment_scoped_history: ScopeActionProcessor[
         SearchDeploymentScopedHistoryAction, SearchDeploymentScopedHistoryActionResult
     ]
-    search_route_scoped_history: ActionProcessor[
+    scoped_search_replica_group_history: ScopeActionProcessor[
+        ScopedSearchReplicaGroupHistoryAction, ScopedSearchReplicaGroupHistoryActionResult
+    ]
+    search_route_scoped_history: ScopeActionProcessor[
         SearchRouteScopedHistoryAction, SearchRouteScopedHistoryActionResult
+    ]
+    lookup_replica_deployment: LookupActionProcessor[
+        LookupReplicaDeploymentAction, FieldOwnerLookupOpsResult
     ]
 
     def __init__(
         self,
+        session: ProcessorGroup[SessionData],
+        deployment: ProcessorGroup[ModelDeploymentData],
+        replica_group: ProcessorGroup[ModelDeploymentData],
         service: SchedulingHistoryService,
-        action_monitors: list[ActionMonitor],
-        validators: ActionValidators,
     ) -> None:
+        session_histories: LookupFieldGroup[SessionSchedulingHistoryData] = session.field_group(
+            FieldGroupMeta(SessionSchedulingHistoryFieldType()),
+            SessionSchedulingHistoryData,
+            LookupSessionSchedulingHistoryOwnerAction,
+            LookupBulkSessionSchedulingHistoryOwnerAction,
+        )
+        kernel_histories: LookupFieldGroup[KernelSchedulingHistoryData] = session.field_group(
+            FieldGroupMeta(KernelSchedulingHistoryFieldType()),
+            KernelSchedulingHistoryData,
+            LookupKernelSchedulingHistoryOwnerAction,
+            LookupBulkKernelSchedulingHistoryOwnerAction,
+        )
+        deployment_histories: LookupFieldGroup[DeploymentHistoryData] = deployment.field_group(
+            FieldGroupMeta(DeploymentHistoryFieldType()),
+            DeploymentHistoryData,
+            LookupDeploymentHistoryOwnerAction,
+            LookupBulkDeploymentHistoryOwnerAction,
+        )
+        route_histories: LookupFieldGroup[RouteHistoryData] = deployment.field_group(
+            FieldGroupMeta(RouteHistoryFieldType()),
+            RouteHistoryData,
+            LookupRouteHistoryOwnerAction,
+            LookupBulkRouteHistoryOwnerAction,
+        )
+        replica_group_histories: LookupFieldGroup[ReplicaGroupHistoryData] = (
+            replica_group.field_group(
+                FieldGroupMeta(ReplicaGroupHistoryFieldType()),
+                ReplicaGroupHistoryData,
+                LookupReplicaGroupHistoryOwnerAction,
+                LookupBulkReplicaGroupHistoryOwnerAction,
+            )
+        )
+        self.bulk_get_session_histories = session_histories.partial_bulk_get_ops(
+            BulkGetSessionHistoriesAction
+        )
+        self.bulk_get_kernel_histories = kernel_histories.partial_bulk_get_ops(
+            BulkGetKernelHistoriesAction
+        )
+        self.bulk_get_deployment_histories = deployment_histories.partial_bulk_get_ops(
+            BulkGetDeploymentHistoriesAction
+        )
+        self.bulk_get_route_histories = route_histories.partial_bulk_get_ops(
+            BulkGetRouteHistoriesAction
+        )
+        self.bulk_get_replica_group_histories = replica_group_histories.partial_bulk_get_ops(
+            BulkGetReplicaGroupHistoriesAction
+        )
+
         # Admin processors
-        self.search_session_history = ActionProcessor(
-            service.search_session_history, action_monitors
+        self.search_session_history = session_histories.global_searcher_ops(
+            SearchSessionHistoryAction
         )
-        self.search_deployment_history = ActionProcessor(
-            service.search_deployment_history, action_monitors
+        self.search_kernel_history = kernel_histories.global_searcher_ops(SearchKernelHistoryAction)
+        self.search_deployment_history = deployment_histories.global_searcher_ops(
+            SearchDeploymentHistoryAction
         )
-        self.search_route_history = ActionProcessor(service.search_route_history, action_monitors)
+        self.global_search_replica_group_history = replica_group_histories.global_searcher_ops(
+            GlobalSearchReplicaGroupHistoryAction
+        )
+        self.search_route_history = route_histories.global_searcher_ops(SearchRouteHistoryAction)
 
         # Scoped processors (added in 26.2.0)
-        self.search_session_scoped_history = ActionProcessor(
-            service.search_session_scoped_history, action_monitors
+        self.search_session_scoped_history = session.scope(
+            SearchSessionScopedHistoryAction, service.search_session_scoped_history
         )
-        self.search_deployment_scoped_history = ActionProcessor(
-            service.search_deployment_scoped_history, action_monitors
+        self.search_kernel_scoped_history = session.scope(
+            SearchKernelScopedHistoryAction, service.search_kernel_scoped_history
         )
-        self.search_route_scoped_history = ActionProcessor(
-            service.search_route_scoped_history, action_monitors
+        self.search_deployment_scoped_history = deployment.scope(
+            SearchDeploymentScopedHistoryAction, service.search_deployment_scoped_history
         )
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            # Admin actions
-            SearchSessionHistoryAction.spec(),
-            SearchDeploymentHistoryAction.spec(),
-            SearchRouteHistoryAction.spec(),
-            # Scoped actions (added in 26.2.0)
-            SearchSessionScopedHistoryAction.spec(),
-            SearchDeploymentScopedHistoryAction.spec(),
-            SearchRouteScopedHistoryAction.spec(),
-        ]
+        self.scoped_search_replica_group_history = replica_group.scope(
+            ScopedSearchReplicaGroupHistoryAction, service.scoped_search_replica_group_history
+        )
+        self.search_route_scoped_history = deployment.scope(
+            SearchRouteScopedHistoryAction, service.search_route_scoped_history
+        )
+        self.lookup_replica_deployment = deployment.key_owner_lookup_ops(
+            LookupReplicaDeploymentAction
+        )

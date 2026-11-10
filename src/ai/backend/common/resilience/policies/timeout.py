@@ -14,9 +14,9 @@ from ai.backend.common.exception import (
     ErrorOperation,
 )
 from ai.backend.common.resilience.policy import Policy
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -79,5 +79,4 @@ class TimeoutPolicy(Policy):
             async with asyncio.timeout(self._timeout):
                 return await next_call(*args, **kwargs)
         except TimeoutError as e:
-            log.warning("Operation exceeded timeout of {:.3f}s", self._timeout)
             raise ResilienceTimeoutError(f"Operation exceeded timeout of {self._timeout}s") from e

@@ -13,9 +13,9 @@ import aiotools
 import attrs
 from aiohttp import web
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 async def storage_task_exception_handler(
@@ -23,7 +23,7 @@ async def storage_task_exception_handler(
     exc_obj: BaseException,
     exc_tb: TracebackType,  # noqa: ARG001
 ) -> None:
-    log.exception("Error while removing vFolder", exc_info=exc_obj)
+    log.error("vfolder removal failed", exc_info=exc_obj)
 
 
 @attrs.define(slots=True, auto_attribs=True, init=False)

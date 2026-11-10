@@ -13,16 +13,25 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.data.entity.idle_checker import IdleCheckerID
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.dto.manager.pagination import PaginationInfo
+from ai.backend.common.dto.manager.v2.session.types import SessionTerminationStatusEnum
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import SessionId
 
 __all__ = (
     "AdminSearchSessionsPayload",
     "CommitSessionPayload",
     "DestroySessionPayload",
+    "ExcludeSessionIdleChecksFailureInfo",
+    "ExcludeSessionIdleChecksPayload",
     "ExecutePayload",
+    "IncludeSessionIdleChecksFailureInfo",
+    "IncludeSessionIdleChecksPayload",
     "RestartSessionPayload",
     "SearchSessionsPayload",
+    "SessionIdleCheckTargetInfo",
     "SessionLifecycleInfo",
     "SessionLifecycleInfoGQLDTO",
     "SessionLogsPayload",
@@ -34,6 +43,7 @@ __all__ = (
     "SessionResourceInfoGQLDTO",
     "SessionRuntimeInfo",
     "SessionRuntimeInfoGQLDTO",
+    "SessionTerminationInfo",
     "StartServicePayload",
     "StartSessionServicePayload",
     "TerminateSessionsPayload",
@@ -56,13 +66,30 @@ class SessionMetadataInfo(BaseResponseModel):
     name: str | None = Field(default=None, description="Human-readable name of the session.")
     session_type: str = Field(description="Type of the session (interactive, batch, inference).")
     access_key: str | None = Field(
-        default=None, description="Access key used to create this session."
+        default=None,
+        deprecated=True,
+        description=f"Access key used to create this session. Deprecated since {NEXT_RELEASE_VERSION}. Use `user_id`.",
     )
     cluster_mode: str = Field(
         description="Cluster mode for distributed sessions (single-node, multi-node)."
     )
     cluster_size: int = Field(description="Number of nodes in the cluster.")
-    priority: int = Field(description="Scheduling priority of the session.")
+    tier: int = Field(description="Scheduling tier of the session.")
+    priority: int = Field(
+        deprecated=True,
+        description="Scheduling tier of the session. Renamed to `tier`.",
+    )
+    job_priority: int = Field(
+        description=(
+            "Preemption priority among the owner's own sessions. A pending "
+            "session may reclaim another session's resources only when both "
+            "belong to the same user and the other session's value is strictly "
+            "lower, so equal values never preempt each other; among the "
+            "eligible sessions the lowest value is reclaimed first. Independent "
+            "of `priority`, which orders the pending queue and takes no part in "
+            "this comparison."
+        )
+    )
     is_preemptible: bool = Field(
         description="Whether this session is eligible for preemption by higher-priority sessions."
     )
@@ -153,6 +180,9 @@ class SessionNode(BaseResponseModel):
     """Node model representing a session entity with nested info sub-models."""
 
     id: UUID = Field(description="Session ID.")
+    entity_id: UUID = Field(
+        description="UUID of the session. Added in 26.9.0.",
+    )
     image_ids: list[UUID] | None = Field(
         default=None,
         description=(
@@ -161,7 +191,9 @@ class SessionNode(BaseResponseModel):
         ),
     )
     domain_name: str = Field(description="Domain name the session belongs to.")
-    user_id: UUID = Field(description="UUID of the user who owns this session.")
+    user_id: UUID | None = Field(
+        description="UUID of the user who owns this session. Null once the owner is purged."
+    )
     project_id: UUID = Field(description="Group (project) ID the session belongs to.")
     metadata: SessionMetadataInfoGQLDTO = Field(
         description="Metadata including name, type, and cluster information."
@@ -256,6 +288,68 @@ class TerminateSessionsPayload(BaseResponseModel):
     )
 
 
+class SessionTerminationInfo(BaseResponseModel):
+    """What a termination request did to one session."""
+
+    id: SessionID = Field(description="ID of the session.")
+    status: SessionTerminationStatusEnum = Field(
+        description="State the session ended in: cancelled, terminating, force-terminated, or skipped."
+    )
+
+
+class SessionIdleCheckTargetInfo(BaseResponseModel):
+    """One (checker, session) pair an idle-check exclusion or inclusion applied to."""
+
+    checker_id: IdleCheckerID = Field(description="Added in 26.9.0. Idle checker UUID of the pair.")
+    session_id: SessionID = Field(description="Added in 26.9.0. Session UUID of the pair.")
+
+
+class ExcludeSessionIdleChecksFailureInfo(BaseResponseModel):
+    """Why one pair could not be excluded from idle checks."""
+
+    checker_id: IdleCheckerID = Field(
+        description="Added in 26.9.0. Idle checker of the pair the failure applies to."
+    )
+    session_id: SessionID = Field(
+        description="Added in 26.9.0. Session of the pair the failure applies to."
+    )
+    message: str = Field(description="Added in 26.9.0. Why the pair was not excluded.")
+
+
+class ExcludeSessionIdleChecksPayload(BaseResponseModel):
+    """Payload for idle-check exclusion with per-pair partial success."""
+
+    items: list[SessionIdleCheckTargetInfo] = Field(
+        description="Added in 26.9.0. Pairs successfully excluded."
+    )
+    failed: list[ExcludeSessionIdleChecksFailureInfo] = Field(
+        description="Added in 26.9.0. Pairs that could not be excluded."
+    )
+
+
+class IncludeSessionIdleChecksFailureInfo(BaseResponseModel):
+    """Why one pair could not be included into idle checks."""
+
+    checker_id: IdleCheckerID = Field(
+        description="Added in 26.9.0. Idle checker of the pair the failure applies to."
+    )
+    session_id: SessionID = Field(
+        description="Added in 26.9.0. Session of the pair the failure applies to."
+    )
+    message: str = Field(description="Added in 26.9.0. Why the pair was not included.")
+
+
+class IncludeSessionIdleChecksPayload(BaseResponseModel):
+    """Payload for idle-check inclusion with per-pair partial success."""
+
+    items: list[SessionIdleCheckTargetInfo] = Field(
+        description="Added in 26.9.0. Pairs successfully included."
+    )
+    failed: list[IncludeSessionIdleChecksFailureInfo] = Field(
+        description="Added in 26.9.0. Pairs that could not be included."
+    )
+
+
 class StartSessionServicePayload(BaseResponseModel):
     """Payload for starting a service in a session."""
 
@@ -295,13 +389,30 @@ class SessionMetadataInfoGQLDTO(BaseResponseModel):
     name: str | None = Field(default=None, description="Human-readable name of the session.")
     session_type: str = Field(description="Type of the session (interactive, batch, inference).")
     access_key: str | None = Field(
-        default=None, description="Access key used to create this session."
+        default=None,
+        deprecated=True,
+        description=f"Access key used to create this session. Deprecated since {NEXT_RELEASE_VERSION}. Use `user_id`.",
     )
     cluster_mode: str = Field(
         description="Cluster mode for distributed sessions (single-node, multi-node)."
     )
     cluster_size: int = Field(description="Number of nodes in the cluster.")
-    priority: int = Field(description="Scheduling priority of the session.")
+    tier: int = Field(description="Scheduling tier of the session.")
+    priority: int = Field(
+        deprecated=True,
+        description="Scheduling tier of the session. Renamed to `tier`.",
+    )
+    job_priority: int = Field(
+        description=(
+            "Preemption priority among the owner's own sessions. A pending "
+            "session may reclaim another session's resources only when both "
+            "belong to the same user and the other session's value is strictly "
+            "lower, so equal values never preempt each other; among the "
+            "eligible sessions the lowest value is reclaimed first. Independent "
+            "of `priority`, which orders the pending queue and takes no part in "
+            "this comparison."
+        )
+    )
     is_preemptible: bool = Field(
         description="Whether this session is eligible for preemption by higher-priority sessions."
     )
@@ -324,6 +435,13 @@ class SessionResourceInfoGQLDTO(BaseResponseModel):
         default=None,
         description="The resource group (scaling group) this session is assigned to.",
     )
+    session_group_id: UUID | None = Field(
+        default=None,
+        description="Placement group ID. Null if the session does not belong to a session group.",
+    )
+    designated_agent_ids: list[str] | None = Field(
+        default=None, description="Agent IDs designated at session creation."
+    )
 
 
 class SessionLifecycleInfoGQLDTO(BaseResponseModel):
@@ -342,7 +460,11 @@ class SessionLifecycleInfoGQLDTO(BaseResponseModel):
         description="Timestamp when the session was terminated. Null if still active.",
     )
     starts_at: datetime | None = Field(
-        default=None, description="Scheduled start time for the session, if applicable."
+        default=None, description="When the session started running. Null until it reaches RUNNING."
+    )
+    requested_starts_at: datetime | None = Field(
+        default=None,
+        description="Reserved start time requested at creation. The scheduler honors it only for batch sessions.",
     )
     batch_timeout: int | None = Field(
         default=None,

@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.models.rbac import ProjectScope
 from ai.backend.manager.services.container_registry.actions.base import ContainerRegistryAction
@@ -9,12 +8,16 @@ from ai.backend.manager.services.container_registry.actions.base import Containe
 
 @dataclass
 class UpdateRegistryQuotaAction(ContainerRegistryAction):
+    """Deprecated: authorized only by the API-layer gates of its callers.
+    Add a scope-gated action and service method instead of extending this one."""
+
     scope_id: ProjectScope
     quota: int
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.scope_id.project_id)
+    @classmethod
+    def action_name(cls) -> str:
+        return "update_registry_quota"
 
     @override
     @classmethod
@@ -23,7 +26,5 @@ class UpdateRegistryQuotaAction(ContainerRegistryAction):
 
 
 @dataclass
-class UpdateRegistryQuotaActionResult(BaseActionResult):
-    @override
-    def entity_id(self) -> str | None:
-        return None
+class UpdateRegistryQuotaActionResult:
+    pass

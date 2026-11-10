@@ -1,23 +1,20 @@
 from dataclasses import dataclass
 from typing import override
-from uuid import UUID
 
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.model_card.types import ModelCardData
-from ai.backend.manager.models.model_card.row import ModelCardRow
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.services.model_card.actions.base import ModelCardAction
+from ai.backend.manager.models.model_card.updaters import ModelCardUpdater
+from ai.backend.manager.services.model_card.actions.base import ModelCardSingleEntityAction
 
 
 @dataclass
-class UpdateModelCardAction(ModelCardAction):
-    id: UUID
-    updater: Updater[ModelCardRow]
+class UpdateModelCardAction(ModelCardSingleEntityAction):
+    updater: ModelCardUpdater
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.id)
+    @classmethod
+    def action_name(cls) -> str:
+        return "update_model_card"
 
     @override
     @classmethod
@@ -26,9 +23,5 @@ class UpdateModelCardAction(ModelCardAction):
 
 
 @dataclass
-class UpdateModelCardActionResult(BaseActionResult):
+class UpdateModelCardActionResult:
     model_card: ModelCardData
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.model_card.id)

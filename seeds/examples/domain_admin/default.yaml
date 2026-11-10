@@ -1,0 +1,5 @@
+kind: domain_admin
+version: 1
+items:
+- domain_id: b9e676dc-e23e-54c6-b350-e83fba4127e9  # default
+  user_id: 4f13d193-f646-425a-a340-270c4d2b9860  # domain-admin

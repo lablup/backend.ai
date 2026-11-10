@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.appproxy.worker.config import ServerConfig
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STATISTICS_DB, RedisRole
@@ -23,7 +24,13 @@ class WorkerValkeyClients:
     valkey_stat: ValkeyStatClient
 
 
-class RedisProvider(DependencyProvider[ServerConfig, WorkerValkeyClients]):
+@dataclass
+class RedisProviderInput:
+    config: ServerConfig
+    sentinel_monitors: SentinelMonitorSet
+
+
+class RedisProvider(DependencyProvider[RedisProviderInput, WorkerValkeyClients]):
     """Provider for Redis configuration and Valkey clients."""
 
     @property
@@ -33,21 +40,24 @@ class RedisProvider(DependencyProvider[ServerConfig, WorkerValkeyClients]):
 
     @asynccontextmanager
     @override
-    async def provide(self, setup_input: ServerConfig) -> AsyncIterator[WorkerValkeyClients]:
+    async def provide(self, setup_input: RedisProviderInput) -> AsyncIterator[WorkerValkeyClients]:
         """Create and provide Valkey clients."""
-        redis_profile_target = RedisProfileTarget.from_dict(setup_input.redis.to_dict())
+        sentinel_monitors = setup_input.sentinel_monitors
+        redis_profile_target = RedisProfileTarget.from_dict(setup_input.config.redis.to_dict())
+        live_target = redis_profile_target.profile_target(RedisRole.LIVE).to_valkey_target()
+        stat_target = redis_profile_target.profile_target(RedisRole.STATISTICS).to_valkey_target()
 
         valkey_live = await ValkeyLiveClient.create(
-            valkey_target=redis_profile_target.profile_target(RedisRole.LIVE).to_valkey_target(),
+            valkey_target=live_target,
             db_id=REDIS_LIVE_DB,
             human_readable_name="appproxy-worker",
+            sentinel_monitor=sentinel_monitors.monitor_for(live_target),
         )
         valkey_stat = await ValkeyStatClient.create(
-            valkey_target=redis_profile_target.profile_target(
-                RedisRole.STATISTICS
-            ).to_valkey_target(),
+            valkey_target=stat_target,
             db_id=REDIS_STATISTICS_DB,
             human_readable_name="appproxy-worker",
+            sentinel_monitor=sentinel_monitors.monitor_for(stat_target),
         )
 
         try:

@@ -1,0 +1,385 @@
+from __future__ import annotations
+
+from collections.abc import Iterable
+from datetime import datetime
+from enum import StrEnum
+from typing import TYPE_CHECKING, Annotated, override
+from uuid import UUID
+
+import strawberry
+from strawberry import UNSET, Info
+from strawberry.relay import Connection, Edge, NodeID
+
+from ai.backend.common.data.entity.entity_share import EntityShareID
+from ai.backend.common.data.entity.types import EntityType, RuntimeEntityID
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.dto.manager.v2.entity_share.request import (
+    CreateEntityShareInput as CreateInputDTO,
+)
+from ai.backend.common.dto.manager.v2.entity_share.request import (
+    EntityShareFilter as FilterDTO,
+)
+from ai.backend.common.dto.manager.v2.entity_share.request import (
+    EntityShareOrderBy as OrderByDTO,
+)
+from ai.backend.common.dto.manager.v2.entity_share.request import (
+    EntityShareRecipientInput as RecipientInputDTO,
+)
+from ai.backend.common.dto.manager.v2.entity_share.request import (
+    EntityShareScope as ScopeDTO,
+)
+from ai.backend.common.dto.manager.v2.entity_share.request import (
+    EntityShareStatusFilter as StatusFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.entity_share.request import (
+    EntityShareTargetScope as TargetScopeDTO,
+)
+from ai.backend.common.dto.manager.v2.entity_share.request import (
+    MySearchEntitySharesInput as MySearchInputDTO,
+)
+from ai.backend.common.dto.manager.v2.entity_share.response import (
+    EntityShareNode as NodeDTO,
+)
+from ai.backend.common.dto.manager.v2.entity_share.response import (
+    EntitySharePayload as PayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.entity_share.types import (
+    EntityShareSideDTO,
+    EntityShareStatusDTO,
+)
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.base import StringFilter, UUIDFilter, UUIDScopeGQL
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    PydanticInputMixin,
+    gql_added_field,
+    gql_connection_type,
+    gql_enum,
+    gql_field,
+    gql_node_type,
+    gql_pydantic_input,
+    gql_pydantic_type,
+)
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
+from ai.backend.manager.api.gql.rbac.types.scope import PermissionBitGQL
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
+
+if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.rbac.types.entity_node import EntityNodeGQL
+    from ai.backend.manager.api.gql.user.types.node import UserV2GQL
+
+EntityShareStatusGQL: type[EntityShareStatusDTO] = gql_enum(
+    BackendAIGQLMeta(added_version="26.9.0", description="Where a share stands."),
+    EntityShareStatusDTO,
+    name="EntityShareStatus",
+)
+
+EntityShareSideGQL: type[EntityShareSideDTO] = gql_enum(
+    BackendAIGQLMeta(
+        added_version="26.9.0",
+        description="Which side of a share the caller stands on.",
+    ),
+    EntityShareSideDTO,
+    name="EntityShareSide",
+)
+
+
+@gql_enum(
+    BackendAIGQLMeta(added_version="26.9.0", description="Order fields for entity shares."),
+    name="EntityShareOrderField",
+)
+class EntityShareOrderFieldGQL(StrEnum):
+    CREATED_AT = "created_at"
+    UPDATED_AT = "updated_at"
+    STATUS = "status"
+
+
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.9.0",
+        description="One entity handed to one scope: offered, taken, or taken back.",
+    ),
+    name="EntityShare",
+)
+class EntityShareGQL(PydanticNodeMixin[NodeDTO]):
+    id: NodeID[str] = gql_field(description="Relay-style global node identifier.")
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="UUID of the entity share.",
+        ),
+    )
+    sharer_user_id: UUID | None = gql_field(
+        default=None, description="Who sent the offer, while that account is still there."
+    )
+    recipient_entity_type: str | None = gql_field(
+        default=None, description="Type of the scope the offer goes to, once it names one."
+    )
+    recipient_entity_id: UUID | None = gql_field(
+        default=None, description="Id of the scope the offer goes to, once it names one."
+    )
+    recipient_email: str | None = gql_field(
+        default=None, description="Address the offer goes to, when it names one."
+    )
+    target_entity_type: str = gql_field(description="Type of the entity being offered.")
+    target_entity_id: UUID = gql_field(description="Id of the entity being offered.")
+    permissions: list[PermissionBitGQL] = gql_field(
+        description="Permissions the offer caps at; empty for no ceiling."
+    )
+    status: EntityShareStatusGQL = gql_field(description="Where the share stands.")
+    expires_at: datetime | None = gql_field(
+        default=None, description="When the offer stops being answerable; empty for never."
+    )
+    created_at: datetime = gql_field(description="When the offer was made.")
+    updated_at: datetime = gql_field(description="When it was last written.")
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Who sent the offer, when the caller may read that user.",
+        )
+    )  # type: ignore[misc]
+    async def sharer(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            UserV2GQL,
+            strawberry.lazy("ai.backend.manager.api.gql.user.types.node"),
+        ]
+        | None
+    ):
+        if self.sharer_user_id is None:
+            return None
+        return await info.context.data_loaders.user_loader.load(UserID(self.sharer_user_id))
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "The scope or person the offer goes to, when the caller may read it. "
+                "An address resolves to the user holding it."
+            ),
+        )
+    )  # type: ignore[misc]
+    async def recipient_entity(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            EntityNodeGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.rbac.types.entity_node"),
+        ]
+        | None
+    ):
+        data_loaders = info.context.data_loaders
+        if self.recipient_entity_type is not None and self.recipient_entity_id is not None:
+            return await data_loaders.entity_node_loader.load(
+                RuntimeEntityID(
+                    EntityType.from_name(self.recipient_entity_type), self.recipient_entity_id
+                )
+            )
+        if self.recipient_email is None:
+            return None
+        user_id = await data_loaders.user_id_by_email_loader.load(self.recipient_email)
+        return await data_loaders.user_loader.load(user_id)
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The entity being offered, when the caller may read it.",
+        )
+    )  # type: ignore[misc]
+    async def target_entity(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            EntityNodeGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.rbac.types.entity_node"),
+        ]
+        | None
+    ):
+        return await info.context.data_loaders.entity_node_loader.load(
+            RuntimeEntityID(EntityType.from_name(self.target_entity_type), self.target_entity_id)
+        )
+
+    @classmethod
+    @override
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[EntityShareGQL | None]:
+        return await info.context.data_loaders.entity_share_loader.load_many([
+            EntityShareID(UUID(nid)) for nid in node_ids
+        ])
+
+
+@gql_connection_type(
+    BackendAIGQLMeta(added_version="26.9.0", description="One entity share within a connection.")
+)
+class EntityShareEdge(Edge[EntityShareGQL]):
+    pass
+
+
+@gql_connection_type(
+    BackendAIGQLMeta(added_version="26.9.0", description="Paginated list of entity shares.")
+)
+class EntityShareConnection(Connection[EntityShareGQL]):
+    # Restated so the schema's edge type is the described one above rather than the
+    # one Strawberry would generate from the generic, which carries no version.
+    edges: list[EntityShareEdge] = gql_field(  # type: ignore[assignment]
+        description="Contains the nodes in this connection."
+    )
+    count: int
+
+    def __init__(self, *args, count: int, **kwargs) -> None:  # type: ignore[no-untyped-def]
+        super().__init__(*args, **kwargs)
+        self.count = count
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Filter for entity share status with equality and membership operators.",
+    ),
+    name="EntityShareStatusFilter",
+)
+class EntityShareStatusFilterGQL(PydanticInputMixin[StatusFilterDTO]):
+    equals: EntityShareStatusGQL | None = gql_field(
+        default=None, description="Matches shares with this exact status."
+    )
+    in_: list[EntityShareStatusGQL] | None = gql_field(
+        default=None, description="Matches shares whose status is in this list.", name="in"
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(added_version="26.9.0", description="Filter for entity shares."),
+    name="EntityShareFilter",
+)
+class EntityShareFilterGQL(PydanticInputMixin[FilterDTO]):
+    status: EntityShareStatusFilterGQL | None = gql_field(
+        default=None, description="Status filter."
+    )
+    recipient_entity_id: UUIDFilter | None = gql_field(
+        default=None, description="Recipient scope filter."
+    )
+    recipient_email: StringFilter | None = gql_field(
+        default=None, description="Recipient address filter."
+    )
+    target_entity_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by the shared entity's ID."
+        ),
+        default=None,
+    )
+    entity_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by entity share ID."
+        ),
+        default=None,
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(added_version="26.9.0", description="Order specification."),
+    name="EntityShareOrderBy",
+)
+class EntityShareOrderByGQL(PydanticInputMixin[OrderByDTO]):
+    field: EntityShareOrderFieldGQL = gql_field(description="Field to order by.")
+    direction: str = gql_field(default="DESC", description="ASC or DESC.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version="26.9.0",
+        description="One entity whose shares are being read.",
+    ),
+    name="EntityShareTargetScope",
+)
+class EntityShareTargetScopeGQL(PydanticInputMixin[TargetScopeDTO]):
+    entity_type: str = gql_field(description="Type of the entity being offered.")
+    entity_id: UUID = gql_field(description="Id of the entity being offered.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version="26.9.0",
+        description=(
+            "Scope for the scoped entity share query. "
+            "All items are OR'd; raises an error if every field is empty."
+        ),
+    ),
+    name="EntityShareScope",
+)
+class EntityShareScopeGQL(PydanticInputMixin[ScopeDTO]):
+    recipient: list[UUIDScopeGQL] | None = gql_field(
+        default=None, description="Users the shares are addressed to."
+    )
+    recipient_project: list[UUIDScopeGQL] | None = gql_field(
+        default=None, description="Projects the shares are addressed to."
+    )
+    sharer: list[UUIDScopeGQL] | None = gql_field(
+        default=None, description="Users who sent the shares."
+    )
+    target: list[EntityShareTargetScopeGQL] | None = gql_field(
+        default=None, description="Entities the shares lend."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version="26.9.0",
+        description="Who an offer goes to; exactly one of the three.",
+    ),
+    name="EntityShareRecipientInput",
+    one_of=True,
+)
+class EntityShareRecipientInputGQL(PydanticInputMixin[RecipientInputDTO]):
+    project_id: UUID | None = gql_field(default=UNSET, description="Project the offer goes to.")
+    user_id: UUID | None = gql_field(
+        default=UNSET, description="Person the offer goes to; it lands in their own project."
+    )
+    email: str | None = gql_field(default=UNSET, description="Address the offer goes to.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version="26.9.0",
+        description="Create entity share input.",
+    ),
+    name="CreateEntityShareInput",
+)
+class CreateEntityShareInputGQL(PydanticInputMixin[CreateInputDTO]):
+    target_entity_type: str = gql_field(description="Type of the entity being offered.")
+    target_entity_id: UUID = gql_field(description="Id of the entity being offered.")
+    recipient: EntityShareRecipientInputGQL = gql_field(description="Who the offer goes to.")
+    permissions: list[PermissionBitGQL] = gql_field(
+        default=(), description="Permissions the offer caps at; empty for no ceiling."
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(added_version="26.9.0", description="Entity share payload."),
+    model=PayloadDTO,
+    name="EntitySharePayload",
+)
+class EntitySharePayloadGQL(PydanticOutputMixin[PayloadDTO]):
+    share: EntityShareGQL = gql_field(description="The share the run touched.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version="26.9.0",
+        description="Read the shares the caller stands on a side of.",
+    ),
+    name="MySearchEntitySharesInput",
+)
+class MySearchEntitySharesInputGQL(PydanticInputMixin[MySearchInputDTO]):
+    sides: list[EntityShareSideGQL] = gql_field(
+        default=(), description="Sides the caller stands on; empty for both."
+    )

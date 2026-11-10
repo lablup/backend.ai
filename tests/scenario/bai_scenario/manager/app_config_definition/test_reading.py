@@ -1,0 +1,251 @@
+"""설정 정의 조회 — 개별 엔티티 권한 검사를 확인한다.
+
+설정 정의는 도메인·프로젝트·사용자 스코프에 자동 귀속되지 않는다. 따라서 현재 기본 역할로는
+도달할 수 없고, 슈퍼관리자만 조회할 수 있다.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Mapping
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Any, override
+from uuid import UUID, uuid4
+
+import pytest
+
+from ai.backend.common.data.entity.app_config_definition import AppConfigDefinitionID
+from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.dto.manager.v2.app_config_definition.response import (
+    AppConfigDefinitionNode,
+)
+from ai.backend.manager.api.adapters.app_config_definition.adapter import (
+    AppConfigDefinitionAdapter,
+)
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.errors.permission import NotEnoughPermission
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.testutils.scenario_steps import Configured, Given, Says, Scenario, Then, When
+from bai_scenario.components.answers import TheCallIsRefused
+from bai_scenario.components.app_config import ENFORCEMENT
+from bai_scenario.components.app_config_definition import (
+    ADefinitionAndACaller,
+    ADefinitionAndSomeone,
+    TheDefinitionNode,
+)
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import TestSeedingSession
+from bai_scenario.runner.steps import run_scenario
+
+type ReadingStep = Scenario[
+    TestSeedingSession, ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode
+]
+
+
+@dataclass(frozen=True)
+class ReadingById(When[ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode]):
+    """ID로 조회한다. ID를 지정하지 않으면 미리 만든 정의의 ID를 쓴다."""
+
+    other: UUID | None = None
+
+    @override
+    def operation(self) -> str:
+        return "admin_get"
+
+    @override
+    def describe(self, laid: ADefinitionAndACaller) -> str:
+        if self.other is not None:
+            return Says(
+                f"{laid.caller.username} 이 존재하지 않는 ID 로 조회합니다",
+                english=f"{laid.caller.username} reads by a missing id",
+            )
+        return Says(
+            f"{laid.caller.username} 이 {laid.definition.config_name} 로 조회합니다",
+            english=f"{laid.caller.username} reads {laid.definition.config_name} by id",
+        )
+
+    @override
+    async def call(
+        self, adapter: AppConfigDefinitionAdapter, laid: ADefinitionAndACaller
+    ) -> AppConfigDefinitionNode:
+        wanted = AppConfigDefinitionID(self.other) if self.other is not None else laid.definition.id
+        with ActingAs(laid.caller):
+            return await adapter.admin_get(wanted)
+
+
+@dataclass(frozen=True)
+class TheSuperadminReadsIt(
+    Scenario[
+        TestSeedingSession,
+        ADefinitionAndACaller,
+        AppConfigDefinitionAdapter,
+        AppConfigDefinitionNode,
+    ]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "the-superadmin-reads-a-definition-by-id"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "설정 정의 하나가 있고 superadmin 이 ID 로 조회하면, 그 정의의 모든 필드가 반환됩니다",
+            english=(
+                "when one config definition exists and the superadmin reads it by id, "
+                "every field of the definition comes back"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ADefinitionAndACaller]:
+        return ADefinitionAndSomeone(role=UserRole.SUPERADMIN)
+
+    @override
+    def when(
+        self,
+    ) -> When[ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode]:
+        return ReadingById()
+
+    @override
+    def then(self) -> Then[ADefinitionAndACaller, AppConfigDefinitionNode]:
+        return TheDefinitionNode(started=self.started)
+
+
+@dataclass(frozen=True)
+class AUserGrantedNothingMayNotRead(
+    Scenario[
+        TestSeedingSession,
+        ADefinitionAndACaller,
+        AppConfigDefinitionAdapter,
+        AppConfigDefinitionNode,
+    ]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-who-is-not-the-superadmin-may-not-read-a-definition"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "같은 설정 정의가 있고 권한이 없는 일반 사용자가 조회하면, 엔티티 읽기 권한이 없어 "
+            "거부됩니다",
+            english=(
+                "when a regular user with no permission reads the same config definition, "
+                "it is rejected because the user has no entity read permission"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ADefinitionAndACaller]:
+        return ADefinitionAndSomeone()
+
+    @override
+    def when(
+        self,
+    ) -> When[ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode]:
+        return ReadingById()
+
+    @override
+    def then(self) -> Then[ADefinitionAndACaller, AppConfigDefinitionNode]:
+        return TheCallIsRefused(NotEnoughPermission)
+
+
+@dataclass(frozen=True)
+class AnUnknownIdIsNotFoundForASuperadmin(
+    Scenario[
+        TestSeedingSession,
+        ADefinitionAndACaller,
+        AppConfigDefinitionAdapter,
+        AppConfigDefinitionNode,
+    ]
+):
+    @override
+    def summary(self) -> str:
+        return "an-id-nothing-answers-to-is-not-found-for-a-superadmin"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "superadmin 이 존재하지 않는 ID 로 조회하면, 대상을 찾을 수 없다는 이유로 거부됩니다. "
+            "권한 검사를 통과하는 사용자만 이 응답을 봅니다",
+            english=(
+                "when the superadmin reads by a missing id, it is rejected because no such "
+                "target exists. Only a user who passes the permission check sees this answer"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ADefinitionAndACaller]:
+        return ADefinitionAndSomeone(role=UserRole.SUPERADMIN)
+
+    @override
+    def when(
+        self,
+    ) -> When[ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode]:
+        return ReadingById(other=uuid4())
+
+    @override
+    def then(self) -> Then[ADefinitionAndACaller, AppConfigDefinitionNode]:
+        return TheCallIsRefused(EntityNotFoundError)
+
+
+@dataclass(frozen=True)
+class EnforcementOffLetsAnyoneRead(
+    Scenario[
+        TestSeedingSession,
+        ADefinitionAndACaller,
+        AppConfigDefinitionAdapter,
+        AppConfigDefinitionNode,
+    ],
+    Configured,
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "turning-enforcement-off-lets-a-plain-user-read"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "RBAC 강제를 끄면 권한이 없는 일반 사용자도 설정 정의를 조회할 수 있습니다",
+            english=(
+                "turning RBAC enforcement off lets a regular user with no permission "
+                "read a config definition"
+            ),
+        )
+
+    @override
+    def config(self) -> Mapping[str, Any]:
+        return {ENFORCEMENT: False}
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ADefinitionAndACaller]:
+        return ADefinitionAndSomeone()
+
+    @override
+    def when(
+        self,
+    ) -> When[ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode]:
+        return ReadingById()
+
+    @override
+    def then(self) -> Then[ADefinitionAndACaller, AppConfigDefinitionNode]:
+        return TheDefinitionNode(started=self.started)
+
+
+SCENARIOS: list[ReadingStep] = [
+    TheSuperadminReadsIt(started=datetime.now(UTC)),
+    AUserGrantedNothingMayNotRead(),
+    AnUnknownIdIsNotFoundForASuperadmin(),
+    EnforcementOffLetsAnyoneRead(started=datetime.now(UTC)),
+]
+
+
+@pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
+async def test_reading(
+    scenario: ReadingStep, adapter: AppConfigDefinitionAdapter, engine: ExtendedAsyncSAEngine
+) -> None:
+    await run_scenario(scenario, adapter, engine)

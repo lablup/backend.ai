@@ -8,14 +8,16 @@ import re
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import Field, field_validator
+from pydantic import Field, NonNegativeInt, field_validator
 
-from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.clients.prometheus.defs import PROMETHEUS_DURATION_PATTERN
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.v2.common import NonEmptyList
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 from .types import OrderDirection, QueryDefinitionOrderField
-from .validators import validate_query_template
 
 __all__ = (
     # Options inputs
@@ -26,6 +28,9 @@ __all__ = (
     "CreateQueryDefinitionInput",
     "ModifyQueryDefinitionInput",
     "DeleteQueryDefinitionInput",
+    "PartialBulkUpdateQueryDefinitionItemInput",
+    "PartialBulkUpdateQueryDefinitionsInput",
+    "PartialBulkPurgeQueryDefinitionsInput",
     # Search
     "QueryDefinitionFilter",
     "QueryDefinitionOrder",
@@ -38,8 +43,6 @@ __all__ = (
     # Query time range
     "QueryTimeRangeInputDTO",
 )
-
-_DEFAULT_PAGE_LIMIT = 50
 
 
 class QueryTimeRangeInputDTO(BaseRequestModel):
@@ -65,7 +68,9 @@ class CreateQueryDefinitionInput(BaseRequestModel):
     rank: int = Field(default=0, ge=0, description="Sort rank (lower = higher priority)")
     category_id: UUID | None = Field(default=None, description="Category ID")
     metric_name: str = Field(description="Prometheus metric name")
-    query_template: str = Field(description="PromQL template with placeholders")
+    query_template: str = Field(
+        description=("PromQL template with placeholders (${{labels}}, ${{window}}, ${{group_by}})")
+    )
     time_window: str | None = Field(
         default=None,
         pattern=PROMETHEUS_DURATION_PATTERN,
@@ -81,12 +86,6 @@ class CreateQueryDefinitionInput(BaseRequestModel):
             raise ValueError("name must not be blank or whitespace-only")
         return stripped
 
-    @field_validator("query_template")
-    @classmethod
-    def _validate_query_template(cls, v: str) -> str:
-        validate_query_template(v)
-        return v
-
 
 class ModifyQueryDefinitionOptionsInput(BaseRequestModel):
     """Options for modifying a prometheus query definition.
@@ -94,51 +93,56 @@ class ModifyQueryDefinitionOptionsInput(BaseRequestModel):
     Each field is optional — only provided fields are updated.
     """
 
-    filter_labels: list[str] | None = Field(default=None, description="Allowed filter label keys")
-    group_labels: list[str] | None = Field(default=None, description="Allowed group-by label keys")
+    filter_labels: list[str] | None | Unset = Field(
+        default=UNSET, description="Allowed filter label keys. Omit to leave unchanged."
+    )
+    group_labels: list[str] | None | Unset = Field(
+        default=UNSET, description="Allowed group-by label keys. Omit to leave unchanged."
+    )
 
 
 class ModifyQueryDefinitionInput(BaseRequestModel):
     """Input for modifying a prometheus query definition.
 
-    Nullable DB columns (``time_window``, ``description``, ``category_id``) use the
-    ``Sentinel`` pattern so callers can distinguish "leave unchanged" from "clear to null".
-    Non-nullable fields use ``None`` to mean "do not update".
+    Every field defaults to ``Unset``; only fields the caller sends are updated.
     """
 
-    name: str | None = Field(default=None, description="Updated human-readable name")
-    description: str | Sentinel | None = Field(
-        default=SENTINEL,
+    name: str | None | Unset = Field(
+        default=UNSET, description="Updated human-readable name. Omit to leave unchanged."
+    )
+    description: str | None | Unset = Field(
+        default=UNSET,
+        description="Updated description. Omit to leave unchanged; null clears.",
+    )
+    rank: NonNegativeInt | None | Unset = Field(
+        default=UNSET, description="Updated sort rank. Omit to leave unchanged."
+    )
+    category_id: UUID | None | Unset = Field(
+        default=UNSET,
+        description="Updated category ID. Omit to leave unchanged; null clears.",
+    )
+    metric_name: str | None | Unset = Field(
+        default=UNSET, description="Updated Prometheus metric name. Omit to leave unchanged."
+    )
+    query_template: str | None | Unset = Field(
+        default=UNSET,
         description=(
-            "Updated description. Pass SENTINEL (default) to leave unchanged; pass None to clear."
+            "Updated PromQL template with placeholders (${{labels}}, ${{window}}, ${{group_by}}). "
+            "Omit to leave unchanged."
         ),
     )
-    rank: int | None = Field(default=None, ge=0, description="Updated sort rank")
-    category_id: UUID | Sentinel | None = Field(
-        default=SENTINEL,
-        description=(
-            "Updated category ID. Pass SENTINEL (default) to leave unchanged; pass None to clear."
-        ),
+    time_window: str | None | Unset = Field(
+        default=UNSET,
+        description="Updated default time window. Omit to leave unchanged; null clears.",
     )
-    metric_name: str | None = Field(default=None, description="Updated Prometheus metric name")
-    query_template: str | None = Field(
-        default=None, description="Updated PromQL template with placeholders"
-    )
-    time_window: str | Sentinel | None = Field(
-        default=SENTINEL,
-        description=(
-            "Updated default time window. "
-            "Pass SENTINEL (default) to leave unchanged; pass None to clear."
-        ),
-    )
-    options: ModifyQueryDefinitionOptionsInput | None = Field(
-        default=None, description="Updated query definition options"
+    options: ModifyQueryDefinitionOptionsInput | None | Unset = Field(
+        default=UNSET, description="Updated query definition options. Omit to leave unchanged."
     )
 
     @field_validator("name")
     @classmethod
-    def name_must_not_be_blank(cls, v: str | None) -> str | None:
-        if v is None:
+    def name_must_not_be_blank(cls, v: str | None | Unset) -> str | None | Unset:
+        if not isinstance(v, str):
             return v
         stripped = v.strip()
         if not stripped:
@@ -147,16 +151,9 @@ class ModifyQueryDefinitionInput(BaseRequestModel):
 
     @field_validator("time_window", mode="after")
     @classmethod
-    def _validate_time_window(cls, v: str | Sentinel | None) -> str | Sentinel | None:
+    def _validate_time_window(cls, v: str | Unset | None) -> str | Unset | None:
         if isinstance(v, str) and not re.match(PROMETHEUS_DURATION_PATTERN, v):
             raise ValueError(f"Invalid Prometheus duration format: {v!r}")
-        return v
-
-    @field_validator("query_template")
-    @classmethod
-    def _validate_query_template(cls, v: str | None) -> str | None:
-        if v is not None:
-            validate_query_template(v)
         return v
 
 
@@ -166,11 +163,38 @@ class DeleteQueryDefinitionInput(BaseRequestModel):
     id: UUID = Field(description="Query definition ID to delete")
 
 
+class PartialBulkUpdateQueryDefinitionItemInput(BaseRequestModel):
+    """One query definition of a partial bulk update and the fields to update on it."""
+
+    id: UUID = Field(description="ID of the query definition to update.")
+    input: ModifyQueryDefinitionInput = Field(
+        description="Fields to update on the query definition."
+    )
+
+
+class PartialBulkUpdateQueryDefinitionsInput(BaseRequestModel):
+    """Input for updating several query definitions, each answered for separately."""
+
+    items: NonEmptyList[PartialBulkUpdateQueryDefinitionItemInput] = Field(
+        description="The query definitions to update, each with its fields."
+    )
+
+
+class PartialBulkPurgeQueryDefinitionsInput(BaseRequestModel):
+    """Input for purging several query definitions, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the query definitions to purge.")
+
+
 class QueryDefinitionFilter(BaseRequestModel):
     """Filter for prometheus query definition search."""
 
     name: StringFilter | None = Field(default=None, description="Filter by name")
     category_id: UUIDFilter | None = Field(default=None, description="Filter by category ID")
+    entity_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by query definition ID",
+    )
     AND: list[QueryDefinitionFilter] | None = Field(
         default=None, description="AND logical combinator."
     )
@@ -238,12 +262,6 @@ class PreviewQueryDefinitionInput(BaseRequestModel):
     """Input for previewing a prometheus query template before saving (admin only)."""
 
     query_template: str = Field(description="PromQL template to validate")
-
-    @field_validator("query_template")
-    @classmethod
-    def _validate_query_template(cls, v: str) -> str:
-        validate_query_template(v)
-        return v
 
 
 class ExecuteQueryDefinitionInput(BaseRequestModel):

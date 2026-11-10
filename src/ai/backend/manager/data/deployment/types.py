@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
 from functools import lru_cache
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 from uuid import UUID
 
 import yarl
@@ -14,6 +14,18 @@ from pydantic import ConfigDict, Field
 
 from ai.backend.common.config import ModelDefinition, ModelDefinitionDraft, ModelHealthCheck
 from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
+from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.replica import ReplicaID
+from ai.backend.common.data.entity.replica_group import ReplicaGroupID
+from ai.backend.common.data.entity.replica_group_history import ReplicaGroupHistoryID
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
+from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetID
+from ai.backend.common.data.entity.session_group import SessionGroupID
+from ai.backend.common.data.entity.types import EntityData, EntityIdentifier, FieldData
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.model_deployment.types import (
     ActivenessStatus,
     DeploymentStrategy,
@@ -22,19 +34,15 @@ from ai.backend.common.data.model_deployment.types import (
     ReadinessStatus,
 )
 from ai.backend.common.exception import InvalidAPIParameters
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
-from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
-from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.identifier.replica_group import ReplicaGroupID
-from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
-from ai.backend.common.identifier.runtime_variant_preset import RuntimeVariantPresetID
-from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.manager.data.reconciler.types import BaseReconcilerCategory
-from ai.backend.manager.data.session.options import HandlerOptions
+from ai.backend.manager.data.session.options import AgentSelectionPolicy, HandlerOptions
 
 if TYPE_CHECKING:
-    from ai.backend.common.schema.deployment import BlueGreenSpec, RollingUpdateSpec
+    from ai.backend.common.schema.deployment import (
+        BlueGreenSpec,
+        ReplicaGroupRolloutSpec,
+        RollingUpdateSpec,
+    )
     from ai.backend.manager.data.session.types import SchedulingResult, SubStepResult
 
 from ai.backend.common.types import (
@@ -364,10 +372,10 @@ class RouteStatusTransitions:
 
 
 @dataclass
-class ScalingGroupCleanupConfig:
+class ResourceGroupCleanupConfig:
     """Cleanup configuration for a scaling group."""
 
-    scaling_group_name: str
+    resource_group_name: str
     cleanup_target_statuses: list[RouteHealthStatus]
 
 
@@ -529,6 +537,10 @@ class DeploymentOptions(ConfiguredModel):
     """
 
     handler_options: DeploymentHandlerOptions = Field(default_factory=DeploymentHandlerOptions)
+    agent_selection_policy: AgentSelectionPolicy = Field(
+        default=AgentSelectionPolicy.PREFERRED,
+        description="How the deployment's designated agents are enforced on its route sessions.",
+    )
 
 
 class ResourceSpec(ConfiguredModel):
@@ -930,7 +942,7 @@ class ScaleOutDecision:
 
 
 @dataclass
-class RouteInfo:
+class RouteInfo(FieldData):
     """Route information for deployment."""
 
     route_id: UUID
@@ -945,6 +957,65 @@ class RouteInfo:
     health_check: ModelHealthCheck | None
     replica_group_id: ReplicaGroupID | None = None
     error_data: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class RouteData:
+    """Data structure for model service route."""
+
+    route_id: ReplicaID
+    deployment_id: DeploymentID
+    session_id: SessionId | None
+    status: RouteStatus
+    health_status: RouteHealthStatus
+    traffic_ratio: float
+    created_at: datetime
+    revision_id: DeploymentRevisionID
+    traffic_status: RouteTrafficStatus
+    health_check: ModelHealthCheck | None
+    termination_grace_period: float
+    replica_host: str | None = None
+    replica_port: int | None = None
+    updated_at: datetime | None = None
+    sub_status: RouteSubStatus | None = None
+    last_transition_at: datetime | None = None
+    error_data: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def enabled_health_check(self) -> ModelHealthCheck | None:
+        """The health check to enforce, or ``None`` when absent or disabled.
+
+        A ``health_check`` with ``enable=False`` means the route activates
+        immediately and the remaining fields are ignored, so it must be
+        treated the same as no health check at all.
+        """
+        if self.health_check is None or not self.health_check.enable:
+            return None
+        return self.health_check
+
+    def is_termination_grace_elapsed(self, now: datetime) -> bool:
+        """Whether the session may be cleaned up at ``now``.
+
+        The grace period counts from ``last_transition_at`` — for a
+        COOLING_DOWN route, the moment the draining stage finished. When
+        no transition history exists (pre-migration rows) or the grace
+        period is non-positive, the session is cleaned up immediately.
+        """
+        if self.last_transition_at is None:
+            return True
+        if self.termination_grace_period <= 0:
+            return True
+        elapsed = (now - self.last_transition_at).total_seconds()
+        return elapsed >= self.termination_grace_period
+
+
+@dataclass(frozen=True)
+class RevisionResourceSlotData(FieldData):
+    """One slot's amount on the revision that owns it."""
+
+    revision_id: DeploymentRevisionID
+    slot_name: str
+    quantity: Decimal
 
 
 @dataclass
@@ -964,7 +1035,7 @@ class DeploymentInfoWithAutoScalingRules:
 
 
 @dataclass
-class ModelDeploymentAutoScalingRuleData:
+class ModelDeploymentAutoScalingRuleData(FieldData):
     id: UUID
     model_deployment_id: UUID
     metric_source: AutoScalingMetricSource
@@ -981,7 +1052,7 @@ class ModelDeploymentAutoScalingRuleData:
 
 
 @dataclass
-class ModelDeploymentAccessTokenData:
+class ModelDeploymentAccessTokenData(FieldData):
     id: UUID
     token: str
     expires_at: datetime | None
@@ -989,7 +1060,7 @@ class ModelDeploymentAccessTokenData:
 
 
 @dataclass
-class ModelReplicaData:
+class ModelReplicaData(FieldData):
     id: UUID
     deployment_id: UUID
     revision_id: UUID
@@ -1082,7 +1153,7 @@ class PresetAttributionData:
 
 
 @dataclass
-class ModelRevisionData:
+class ModelRevisionData(FieldData):
     # Identity
     id: DeploymentRevisionID
     deployment_id: DeploymentID
@@ -1174,12 +1245,13 @@ class ModelDeploymentMetadataInfo:
 
 @dataclass
 class ReplicaStateData:
+    replica_count: int
     desired_replica_count: int
     replica_ids: list[UUID]
 
 
 @dataclass
-class ModelDeploymentData:
+class ModelDeploymentData(EntityData):
     """Modern (v2 / GraphQL) deployment projection.
 
     Carries revisions as ids only (``current_revision_id`` /
@@ -1206,6 +1278,11 @@ class ModelDeploymentData:
     policy: DeploymentPolicyData | None = None
     access_token_ids: list[UUID] | None = None
     sub_step: DeploymentLifecycleSubStep | None = None
+    primary_replica_group_id: ReplicaGroupID | None = None
+
+    @override
+    def entity_id(self) -> EntityIdentifier:
+        return self.id
 
 
 @dataclass
@@ -1229,65 +1306,8 @@ class LegacyDeploymentData:
     sub_step: DeploymentLifecycleSubStep | None = None
 
 
-@dataclass(frozen=True)
-class DeploymentSummaryData:
-    id: UUID
-    name: str
-    created_user: UUID
-    session_owner: UUID
-    domain: str
-    project: UUID
-    resource_group: str
-    lifecycle_stage: EndpointLifecycle
-    tag: str | None
-    open_to_public: bool
-    url: str | None
-    current_revision: UUID | None
-    deploying_revision: UUID | None
-    replicas: int
-    desired_replicas: int | None
-    created_at: datetime | None
-    destroyed_at: datetime | None
-    sub_step: DeploymentLifecycleSubStep | None
-
-
 @dataclass
-class DeploymentSummarySearchResult:
-    items: list[DeploymentSummaryData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
-
-
-class DeploymentOrderField(enum.StrEnum):
-    CREATED_AT = "CREATED_AT"
-    UPDATED_AT = "UPDATED_AT"
-    NAME = "NAME"
-
-
-class ModelRevisionOrderField(enum.StrEnum):
-    CREATED_AT = "CREATED_AT"
-    NAME = "NAME"
-
-
-class ReplicaOrderField(enum.StrEnum):
-    CREATED_AT = "CREATED_AT"
-    ID = "ID"
-
-
-class AccessTokenOrderField(enum.StrEnum):
-    CREATED_AT = "CREATED_AT"
-
-
-class AutoScalingRuleOrderField(enum.StrEnum):
-    CREATED_AT = "CREATED_AT"
-
-
-# ========== Scheduling History Types ==========
-
-
-@dataclass
-class DeploymentHistoryData:
+class DeploymentHistoryData(FieldData):
     """Domain model for deployment history."""
 
     id: UUID
@@ -1315,7 +1335,7 @@ class DeploymentHistoryData:
 
 
 @dataclass
-class RouteHistoryData:
+class RouteHistoryData(FieldData):
     """Domain model for route history."""
 
     id: UUID
@@ -1341,10 +1361,10 @@ class RouteHistoryData:
 
 
 @dataclass
-class ReplicaGroupHistoryData:
+class ReplicaGroupHistoryData(FieldData):
     """Domain model for replica-group history."""
 
-    id: UUID
+    id: ReplicaGroupHistoryID
     replica_group_id: ReplicaGroupID
     deployment_id: DeploymentID
 
@@ -1362,6 +1382,16 @@ class ReplicaGroupHistoryData:
     attempts: int
     created_at: datetime
     updated_at: datetime
+
+
+@dataclass
+class ReplicaGroupHistoryListResult:
+    """Search result with pagination for replica-group history."""
+
+    items: list[ReplicaGroupHistoryData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
 
 
 @dataclass
@@ -1435,7 +1465,26 @@ class AutoScalingRuleSearchResult:
 
 
 @dataclass
-class DeploymentPolicyData:
+class ReplicaGroupData(FieldData):
+    """Data class for ReplicaGroupRow."""
+
+    id: ReplicaGroupID
+    deployment_id: DeploymentID
+    current_revision_id: DeploymentRevisionID | None
+    target_revision_id: DeploymentRevisionID | None
+    desired_current_replica_count: int
+    desired_target_replica_count: int
+    traffic_weight: int
+    session_group_id: SessionGroupID
+    lifecycle: ReplicaGroupLifecycle
+    scaling_status: ReplicaGroupScalingStatus
+    rollout: ReplicaGroupRolloutSpec
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass
+class DeploymentPolicyData(FieldData):
     """Data class for DeploymentPolicyRow."""
 
     id: UUID
@@ -1480,35 +1529,35 @@ class AccessTokenSearchResult:
 
 
 @dataclass(frozen=True)
-class RouteSearchScope:
+class RouteOperationScope:
     """Scope for searching routes within a specific deployment."""
 
     deployment_id: UUID
 
 
 @dataclass(frozen=True)
-class ReplicaSearchScope:
+class ReplicaOperationScope:
     """Scope for searching replicas within a specific deployment."""
 
     deployment_id: UUID
 
 
 @dataclass(frozen=True)
-class AccessTokenSearchScope:
+class AccessTokenOperationScope:
     """Scope for searching access tokens within a specific deployment."""
 
     deployment_id: UUID
 
 
 @dataclass(frozen=True)
-class AutoScalingRuleSearchScope:
+class AutoScalingRuleOperationScope:
     """Scope for searching auto-scaling rules within a specific deployment."""
 
     deployment_id: UUID
 
 
 @dataclass(frozen=True)
-class RevisionSearchScope:
+class RevisionOperationScope:
     """Scope for searching revisions within a specific deployment."""
 
     deployment_id: UUID

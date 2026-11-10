@@ -1,45 +1,46 @@
-"""Action for searching routes of a deployment."""
-
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.deployment.types import (
-    RouteInfo,
-)
-from ai.backend.manager.repositories.base import BatchQuerier
-
-from .base import RouteBaseAction
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.manager.actions.v2.ops.base import BulkScopedSearchOpsAction
+from ai.backend.manager.data.deployment.types import RouteInfo
+from ai.backend.manager.models.routing.row import RoutingRow
+from ai.backend.manager.models.routing.scopes import DeploymentReplicaTarget
+from ai.backend.manager.models.routing.searchers import RouteInfoSearcher
+from ai.backend.manager.models.scopes import OperationScope
 
 
 @dataclass
-class SearchRoutesAction(RouteBaseAction):
-    """Action to search routes with filtering and pagination."""
+class SearchRoutesAction(BulkScopedSearchOpsAction[RoutingRow, RouteInfo]):
+    """Page through the routes of the deployments named, combined with OR.
 
-    querier: BatchQuerier
+    Every deployment is authorized before the read runs. A route and a replica are the
+    same routing row read two ways, so both share one scope target.
+    """
 
-    @override
-    def entity_id(self) -> str | None:
-        return None
+    deployment_ids: Sequence[DeploymentID]
+    searcher: RouteInfoSearcher
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
-
-
-@dataclass
-class SearchRoutesActionResult(BaseActionResult):
-    """Result of searching routes."""
-
-    routes: list[RouteInfo]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
+    def action_name(cls) -> str:
+        return "search_routes"
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
+        return tuple(self.deployment_ids)
+
+    @override
+    def operation_scopes(self) -> Sequence[OperationScope]:
+        return [
+            DeploymentReplicaTarget(deployment_id=deployment_id)
+            for deployment_id in self.deployment_ids
+        ]
+
+    @override
+    def to_searcher(self) -> RouteInfoSearcher:
+        return self.searcher

@@ -7,8 +7,12 @@ import asyncio
 import click
 
 from ai.backend.client.cli.v2.helpers import (
+    EntityLabelTerm,
     create_v2_registry,
+    entity_label_filter_options,
+    entity_label_relations,
     load_v2_config,
+    nullable_option,
     parse_order_options,
     print_result,
 )
@@ -34,6 +38,12 @@ def resource_group() -> None:
     help="Filter by active status.",
 )
 @click.option(
+    "--is-default/--no-is-default",
+    default=None,
+    help="Filter by whether the resource group is the default one.",
+)
+@entity_label_filter_options
+@click.option(
     "--order-by",
     multiple=True,
     help="Order by field:direction (e.g., name:asc, created_at:desc).",
@@ -43,7 +53,9 @@ def search(
     offset: int | None,
     name_contains: str | None,
     is_active: bool | None,
+    is_default: bool | None,
     order_by: tuple[str, ...],
+    label: tuple[EntityLabelTerm, ...],
 ) -> None:
     """Search resource groups (superadmin only)."""
     from ai.backend.common.dto.manager.v2.resource_group.request import (
@@ -53,13 +65,16 @@ def search(
     )
     from ai.backend.common.dto.manager.v2.resource_group.types import ResourceGroupOrderField
 
+    relations = entity_label_relations(label)
     filter_dto: ResourceGroupFilter | None = None
-    if name_contains is not None or is_active is not None:
+    if relations or any(opt is not None for opt in (name_contains, is_active, is_default)):
         from ai.backend.common.dto.manager.query import StringFilter
 
         filter_dto = ResourceGroupFilter(
             name=StringFilter(contains=name_contains) if name_contains is not None else None,
             is_active=is_active,
+            is_default=is_default,
+            AND=[ResourceGroupFilter(labels=rel) for rel in relations] or None,
         )
 
     orders = (
@@ -106,7 +121,13 @@ def get(name: str) -> None:
 @click.option("--name", required=True, help="Resource group name.")
 @click.option("--domain-name", required=True, help="Domain name.")
 @click.option("--description", default=None, help="Description.")
-def create(name: str, domain_name: str, description: str | None) -> None:
+@click.option(
+    "--set-default/--unset-default",
+    "is_default",
+    default=False,
+    help="Make this the default resource group. Clear the current default first.",
+)
+def create(name: str, domain_name: str, description: str | None, is_default: bool) -> None:
     """Create a new resource group (superadmin only)."""
     from ai.backend.common.dto.manager.v2.resource_group.request import CreateResourceGroupInput
 
@@ -118,6 +139,69 @@ def create(name: str, domain_name: str, description: str | None) -> None:
                     name=name,
                     domain_name=domain_name,
                     description=description,
+                    is_default=is_default,
+                ),
+            )
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@resource_group.command()
+@click.argument("name", type=str)
+@click.option("--description", default=None, help="Human-readable description.")
+@click.option(
+    "--set-null-description",
+    is_flag=True,
+    default=False,
+    help="Clear the description. Mutually exclusive with --description.",
+)
+@click.option(
+    "--set-active/--unset-active",
+    "is_active",
+    default=None,
+    help="Whether the resource group accepts new sessions.",
+)
+@click.option(
+    "--set-public/--unset-public",
+    "is_public",
+    default=None,
+    help="Whether the resource group is visible to all users.",
+)
+@click.option(
+    "--set-default/--unset-default",
+    "is_default",
+    default=None,
+    help="Make this the default resource group. Clear the current default first.",
+)
+def update(
+    name: str,
+    description: str | None,
+    set_null_description: bool,
+    is_active: bool | None,
+    is_public: bool | None,
+    is_default: bool | None,
+) -> None:
+    """Update a resource group (superadmin only). Omitted options keep their current value."""
+    from ai.backend.common.dto.manager.v2.resource_group.request import (
+        UpdateResourceGroupConfigInput,
+    )
+
+    description_value = nullable_option(description, set_null_description, option="description")
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.resource_group.update_config(
+                name,
+                UpdateResourceGroupConfigInput(
+                    resource_group_name=name,
+                    description=description_value,
+                    is_active=is_active,
+                    is_public=is_public,
+                    is_default=is_default,
                 ),
             )
             print_result(result)
@@ -367,7 +451,7 @@ def default_options() -> None:
 @click.argument("name", type=str)
 def default_options_get(name: str) -> None:
     """Show the current ``default_deployment_options`` surface."""
-    from ai.backend.common.identifier.resource_group import ResourceGroupName
+    from ai.backend.common.data.entity.resource_group import ResourceGroupName
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
@@ -425,11 +509,18 @@ def _parse_timeout_value(raw: str) -> int | None:
         "(e.g., --config @options.json). Overrides --default-timeout / --handler."
     ),
 )
+@click.option(
+    "--agent-selection-policy",
+    type=click.Choice(["strict", "preferred"]),
+    default=None,
+    help="How designated agents are enforced. Omit to keep the stored policy.",
+)
 def default_options_replace(
     name: str,
     default_timeout: str | None,
     handlers: tuple[str, ...],
     config_path: str | None,
+    agent_selection_policy: str | None,
 ) -> None:
     """Fully replace a resource group's ``default_deployment_options`` (superadmin only)."""
     import json
@@ -446,6 +537,7 @@ def default_options_replace(
         HandlerOptionsEntryInput,
         HandlerOptionsInput,
     )
+    from ai.backend.common.dto.manager.v2.session_options.types import AgentSelectionPolicyEnum
 
     if config_path is not None:
         if not config_path.startswith("@"):
@@ -481,10 +573,15 @@ def default_options_replace(
                     default=HandlerOptionsInput(timeout_sec=default_value),
                     by_handler=entries,
                 ),
+                agent_selection_policy=(
+                    AgentSelectionPolicyEnum(agent_selection_policy)
+                    if agent_selection_policy is not None
+                    else None
+                ),
             ),
         )
 
-    from ai.backend.common.identifier.resource_group import ResourceGroupName
+    from ai.backend.common.data.entity.resource_group import ResourceGroupName
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
@@ -513,7 +610,7 @@ def default_session_options() -> None:
 @click.argument("name", type=str)
 def default_session_options_get(name: str) -> None:
     """Show the current ``default_session_options`` surface."""
-    from ai.backend.common.identifier.resource_group import ResourceGroupName
+    from ai.backend.common.data.entity.resource_group import ResourceGroupName
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
@@ -579,7 +676,7 @@ def default_session_options_replace(
             options=DefaultSessionOptionsInput.model_validate(raw),
         )
 
-    from ai.backend.common.identifier.resource_group import ResourceGroupName
+    from ai.backend.common.data.entity.resource_group import ResourceGroupName
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())

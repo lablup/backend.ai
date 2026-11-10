@@ -1,6 +1,6 @@
 """
-Tests for VfolderRepository invitation getters focused on the inviter_username
-fallback behavior introduced for BA-6193 (SSO-created accounts with empty email).
+Tests for VfolderRepository invitation getters focused on the inviter fields read
+from the sharer account (BA-6193: SSO-created accounts with empty email).
 """
 
 from __future__ import annotations
@@ -10,26 +10,33 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
-from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderUsageMode
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.user import UserEntityType, UserID
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
+from ai.backend.common.data.permission.types import Permission
+from ai.backend.common.types import (
+    QuotaScopeID,
+    QuotaScopeType,
+    VFolderMountPolicy,
+    VFolderUsageMode,
+)
+from ai.backend.manager.data.entity_share.types import EntityShareStatus
 from ai.backend.manager.data.vfolder.types import (
-    VFolderInvitationState,
-    VFolderMountPermission,
     VFolderOwnershipType,
 )
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.entity_share.row import EntityShareRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
+from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder.row import (
-    VFolderInvitationRow,
-    VFolderRow,
-)
+from ai.backend.manager.models.vfolder.row import VFolderRow, VFolderUserMountPolicyRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFactory, DomainFixtureData
@@ -44,8 +51,8 @@ def _password() -> PasswordInfo:
     )
 
 
-class TestInvitationGettersUsernameFallback:
-    """Inviter username fallback (BA-6193) for invitation getter methods."""
+class TestInvitationGettersInviterFields:
+    """Inviter email and username of invitation getter methods."""
 
     @pytest.fixture
     async def db_with_cleanup(
@@ -55,13 +62,15 @@ class TestInvitationGettersUsernameFallback:
             database_connection,
             [
                 # FK order: parents first
+                VirtualEntityRow,
                 DomainRow,
                 UserResourcePolicyRow,
                 KeyPairResourcePolicyRow,
                 UserRow,
                 KeyPairRow,
                 VFolderRow,
-                VFolderInvitationRow,
+                VFolderUserMountPolicyRow,
+                EntityShareRow,
             ],
         ):
             yield database_connection
@@ -93,6 +102,7 @@ class TestInvitationGettersUsernameFallback:
         db: ExtendedAsyncSAEngine,
         *,
         domain_name: str,
+        domain_id: DomainID,
         resource_policy: str,
         email: str,
         username: str | None,
@@ -110,6 +120,7 @@ class TestInvitationGettersUsernameFallback:
                 domain_name=domain_name,
                 role=UserRole.USER,
                 resource_policy=resource_policy,
+                domain_id=domain_id,
             )
             session.add(user)
             await session.flush()
@@ -126,24 +137,10 @@ class TestInvitationGettersUsernameFallback:
         return await self._create_user(
             db_with_cleanup,
             domain_name=sample_domain.domain_name,
+            domain_id=sample_domain.domain_id,
             resource_policy=user_resource_policy,
             email=f"inviter-{uuid.uuid4().hex[:8]}@example.com",
             username=f"inviter-{uuid.uuid4().hex[:8]}",
-        )
-
-    @pytest.fixture
-    async def username_null_inviter(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        sample_domain: DomainFixtureData,
-        user_resource_policy: str,
-    ) -> UserRow:
-        return await self._create_user(
-            db_with_cleanup,
-            domain_name=sample_domain.domain_name,
-            resource_policy=user_resource_policy,
-            email=f"nullname-{uuid.uuid4().hex[:8]}@example.com",
-            username=None,
         )
 
     @pytest.fixture
@@ -156,6 +153,7 @@ class TestInvitationGettersUsernameFallback:
         return await self._create_user(
             db_with_cleanup,
             domain_name=sample_domain.domain_name,
+            domain_id=sample_domain.domain_id,
             resource_policy=user_resource_policy,
             email=f"invitee-{uuid.uuid4().hex[:8]}@example.com",
             username=f"invitee-{uuid.uuid4().hex[:8]}",
@@ -177,11 +175,12 @@ class TestInvitationGettersUsernameFallback:
                 quota_scope_id=QuotaScopeID(QuotaScopeType.USER, owner.uuid),
                 name=f"vf-{vfolder_id.hex[:8]}",
                 usage_mode=VFolderUsageMode.GENERAL,
-                permission=VFolderMountPermission.READ_WRITE,
+                default_mount_permission=VFolderMountPolicy.READ_WRITE,
                 ownership_type=VFolderOwnershipType.USER,
                 user=owner.uuid,
             )
             session.add(vfolder)
+            session.add(VirtualEntityRow(entity_type=VFolderEntityType(), entity_id=vfolder_id))
             await session.flush()
             await session.refresh(vfolder)
             return vfolder
@@ -191,16 +190,17 @@ class TestInvitationGettersUsernameFallback:
         db: ExtendedAsyncSAEngine,
         *,
         vfolder: VFolderRow,
-        inviter_email: str,
+        inviter: UserRow | None,
         invitee_email: str,
-    ) -> VFolderInvitationRow:
+    ) -> EntityShareRow:
         async with db.begin_session() as session:
-            invitation = VFolderInvitationRow(
-                vfolder=vfolder.id,
-                inviter=inviter_email,
-                invitee=invitee_email,
-                permission=VFolderMountPermission.READ_ONLY,
-                state=VFolderInvitationState.PENDING,
+            invitation = EntityShareRow(
+                sharer_user_id=UserID(inviter.uuid) if inviter is not None else None,
+                recipient_email=invitee_email,
+                target_entity_type=VFolderEntityType(),
+                target_entity_id=vfolder.id,
+                permission_cap=Permission.READ,
+                status=EntityShareStatus.PENDING,
             )
             session.add(invitation)
             await session.flush()
@@ -209,13 +209,15 @@ class TestInvitationGettersUsernameFallback:
 
     @pytest.fixture
     def repository(self, db_with_cleanup: ExtendedAsyncSAEngine) -> VfolderRepository:
-        return VfolderRepository(db=db_with_cleanup)
+        return VfolderRepository(
+            db=db_with_cleanup, v2_ops_provider=ShareOpsProvider(db_with_cleanup)
+        )
 
     # ------------------------------------------------------------------
     # get_invitation_by_id
     # ------------------------------------------------------------------
 
-    async def test_get_invitation_by_id_returns_username(
+    async def test_get_invitation_by_id_returns_inviter(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         sample_domain: DomainFixtureData,
@@ -229,7 +231,7 @@ class TestInvitationGettersUsernameFallback:
         invitation = await self._create_invitation(
             db_with_cleanup,
             vfolder=vfolder,
-            inviter_email=normal_inviter.email,
+            inviter=normal_inviter,
             invitee_email=invitee_user.email,
         )
 
@@ -238,8 +240,11 @@ class TestInvitationGettersUsernameFallback:
         assert result is not None
         assert result.inviter == normal_inviter.email
         assert result.inviter_username == normal_inviter.username
+        assert result.invitee == invitee_user.email
+        # No policy row stands for the invitee, so the folder's default answers.
+        assert result.permission == VFolderMountPolicy.READ_WRITE
 
-    async def test_get_invitation_by_id_no_matching_user(
+    async def test_get_invitation_by_id_without_sharer(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         sample_domain: DomainFixtureData,
@@ -253,46 +258,21 @@ class TestInvitationGettersUsernameFallback:
         invitation = await self._create_invitation(
             db_with_cleanup,
             vfolder=vfolder,
-            inviter_email="orphan-inviter@example.com",
+            inviter=None,
             invitee_email=invitee_user.email,
         )
 
         result = await repository.get_invitation_by_id(invitation.id)
 
         assert result is not None
-        assert result.inviter == "orphan-inviter@example.com"
-        assert result.inviter_username is None
-
-    async def test_get_invitation_by_id_username_null(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        sample_domain: DomainFixtureData,
-        username_null_inviter: UserRow,
-        invitee_user: UserRow,
-        repository: VfolderRepository,
-    ) -> None:
-        vfolder = await self._create_vfolder(
-            db_with_cleanup,
-            domain_name=sample_domain.domain_name,
-            owner=username_null_inviter,
-        )
-        invitation = await self._create_invitation(
-            db_with_cleanup,
-            vfolder=vfolder,
-            inviter_email=username_null_inviter.email,
-            invitee_email=invitee_user.email,
-        )
-
-        result = await repository.get_invitation_by_id(invitation.id)
-
-        assert result is not None
+        assert result.inviter == ""
         assert result.inviter_username is None
 
     # ------------------------------------------------------------------
     # get_pending_invitations_for_user
     # ------------------------------------------------------------------
 
-    async def test_get_pending_invitations_returns_username(
+    async def test_get_pending_invitations_returns_inviter(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         sample_domain: DomainFixtureData,
@@ -306,18 +286,20 @@ class TestInvitationGettersUsernameFallback:
         await self._create_invitation(
             db_with_cleanup,
             vfolder=vfolder,
-            inviter_email=normal_inviter.email,
+            inviter=normal_inviter,
             invitee_email=invitee_user.email,
         )
 
-        results = await repository.get_pending_invitations_for_user(invitee_user.email)
+        results = await repository.get_pending_invitations_for_user(
+            UserID(invitee_user.uuid), invitee_user.email
+        )
 
         assert len(results) == 1
         invitation_data, _ = results[0]
         assert invitation_data.inviter == normal_inviter.email
         assert invitation_data.inviter_username == normal_inviter.username
 
-    async def test_get_pending_invitations_no_matching_user(
+    async def test_get_pending_invitations_without_sharer(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         sample_domain: DomainFixtureData,
@@ -331,37 +313,13 @@ class TestInvitationGettersUsernameFallback:
         await self._create_invitation(
             db_with_cleanup,
             vfolder=vfolder,
-            inviter_email="orphan-inviter@example.com",
+            inviter=None,
             invitee_email=invitee_user.email,
         )
 
-        results = await repository.get_pending_invitations_for_user(invitee_user.email)
-
-        assert len(results) == 1
-        invitation_data, _ = results[0]
-        assert invitation_data.inviter_username is None
-
-    async def test_get_pending_invitations_username_null(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        sample_domain: DomainFixtureData,
-        username_null_inviter: UserRow,
-        invitee_user: UserRow,
-        repository: VfolderRepository,
-    ) -> None:
-        vfolder = await self._create_vfolder(
-            db_with_cleanup,
-            domain_name=sample_domain.domain_name,
-            owner=username_null_inviter,
+        results = await repository.get_pending_invitations_for_user(
+            UserID(invitee_user.uuid), invitee_user.email
         )
-        await self._create_invitation(
-            db_with_cleanup,
-            vfolder=vfolder,
-            inviter_email=username_null_inviter.email,
-            invitee_email=invitee_user.email,
-        )
-
-        results = await repository.get_pending_invitations_for_user(invitee_user.email)
 
         assert len(results) == 1
         invitation_data, _ = results[0]
@@ -371,7 +329,7 @@ class TestInvitationGettersUsernameFallback:
     # get_sent_invitations_for_user
     # ------------------------------------------------------------------
 
-    async def test_get_sent_invitations_returns_username(
+    async def test_get_sent_invitations_returns_inviter(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         sample_domain: DomainFixtureData,
@@ -385,18 +343,18 @@ class TestInvitationGettersUsernameFallback:
         await self._create_invitation(
             db_with_cleanup,
             vfolder=vfolder,
-            inviter_email=normal_inviter.email,
+            inviter=normal_inviter,
             invitee_email=invitee_user.email,
         )
 
-        results = await repository.get_sent_invitations_for_user(normal_inviter.email)
+        results = await repository.get_sent_invitations_for_user(UserID(normal_inviter.uuid))
 
         assert len(results) == 1
         invitation_data, _ = results[0]
         assert invitation_data.inviter == normal_inviter.email
         assert invitation_data.inviter_username == normal_inviter.username
 
-    async def test_get_sent_invitations_no_matching_user(
+    async def test_get_sent_invitations_returns_invitee_email_for_user_recipient(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         sample_domain: DomainFixtureData,
@@ -404,122 +362,26 @@ class TestInvitationGettersUsernameFallback:
         invitee_user: UserRow,
         repository: VfolderRepository,
     ) -> None:
-        # Inviter row has an email that does not match any UserRow.
         vfolder = await self._create_vfolder(
             db_with_cleanup, domain_name=sample_domain.domain_name, owner=normal_inviter
         )
-        orphan_email = "orphan-inviter@example.com"
-        await self._create_invitation(
-            db_with_cleanup,
-            vfolder=vfolder,
-            inviter_email=orphan_email,
-            invitee_email=invitee_user.email,
-        )
+        async with db_with_cleanup.begin_session() as session:
+            session.add(VirtualEntityRow(entity_type=UserEntityType(), entity_id=invitee_user.uuid))
+            await session.flush()
+            session.add(
+                EntityShareRow(
+                    sharer_user_id=UserID(normal_inviter.uuid),
+                    recipient_entity_type=UserEntityType(),
+                    recipient_entity_id=invitee_user.uuid,
+                    target_entity_type=VFolderEntityType(),
+                    target_entity_id=vfolder.id,
+                    permission_cap=Permission.READ,
+                    status=EntityShareStatus.PENDING,
+                )
+            )
 
-        results = await repository.get_sent_invitations_for_user(orphan_email)
+        results = await repository.get_sent_invitations_for_user(UserID(normal_inviter.uuid))
 
         assert len(results) == 1
         invitation_data, _ = results[0]
-        assert invitation_data.inviter_username is None
-
-    async def test_get_sent_invitations_username_null(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        sample_domain: DomainFixtureData,
-        username_null_inviter: UserRow,
-        invitee_user: UserRow,
-        repository: VfolderRepository,
-    ) -> None:
-        vfolder = await self._create_vfolder(
-            db_with_cleanup,
-            domain_name=sample_domain.domain_name,
-            owner=username_null_inviter,
-        )
-        await self._create_invitation(
-            db_with_cleanup,
-            vfolder=vfolder,
-            inviter_email=username_null_inviter.email,
-            invitee_email=invitee_user.email,
-        )
-
-        results = await repository.get_sent_invitations_for_user(username_null_inviter.email)
-
-        assert len(results) == 1
-        invitation_data, _ = results[0]
-        assert invitation_data.inviter_username is None
-
-    # ------------------------------------------------------------------
-    # get_vfolder_invitations_by_vfolder
-    # ------------------------------------------------------------------
-
-    async def test_get_vfolder_invitations_returns_username(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        sample_domain: DomainFixtureData,
-        normal_inviter: UserRow,
-        invitee_user: UserRow,
-        repository: VfolderRepository,
-    ) -> None:
-        vfolder = await self._create_vfolder(
-            db_with_cleanup, domain_name=sample_domain.domain_name, owner=normal_inviter
-        )
-        await self._create_invitation(
-            db_with_cleanup,
-            vfolder=vfolder,
-            inviter_email=normal_inviter.email,
-            invitee_email=invitee_user.email,
-        )
-
-        results = await repository.get_vfolder_invitations_by_vfolder(vfolder.id)
-
-        assert len(results) == 1
-        assert results[0].inviter == normal_inviter.email
-        assert results[0].inviter_username == normal_inviter.username
-
-    async def test_get_vfolder_invitations_no_matching_user(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        sample_domain: DomainFixtureData,
-        normal_inviter: UserRow,
-        invitee_user: UserRow,
-        repository: VfolderRepository,
-    ) -> None:
-        vfolder = await self._create_vfolder(
-            db_with_cleanup, domain_name=sample_domain.domain_name, owner=normal_inviter
-        )
-        await self._create_invitation(
-            db_with_cleanup,
-            vfolder=vfolder,
-            inviter_email="orphan-inviter@example.com",
-            invitee_email=invitee_user.email,
-        )
-
-        results = await repository.get_vfolder_invitations_by_vfolder(vfolder.id)
-
-        assert len(results) == 1
-        assert results[0].inviter_username is None
-
-    async def test_get_vfolder_invitations_username_null(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        sample_domain: DomainFixtureData,
-        username_null_inviter: UserRow,
-        invitee_user: UserRow,
-        repository: VfolderRepository,
-    ) -> None:
-        vfolder = await self._create_vfolder(
-            db_with_cleanup,
-            domain_name=sample_domain.domain_name,
-            owner=username_null_inviter,
-        )
-        await self._create_invitation(
-            db_with_cleanup,
-            vfolder=vfolder,
-            inviter_email=username_null_inviter.email,
-            invitee_email=invitee_user.email,
-        )
-
-        results = await repository.get_vfolder_invitations_by_vfolder(vfolder.id)
-
-        assert len(results) == 1
-        assert results[0].inviter_username is None
+        assert invitation_data.invitee == invitee_user.email

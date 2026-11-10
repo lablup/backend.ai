@@ -11,6 +11,7 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     QueryDefinitionOrder as QueryDefinitionOrderDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     OrderDirection,
     StringFilter,
@@ -38,6 +39,12 @@ class QueryDefinitionFilter(PydanticInputMixin[QueryDefinitionFilterDTO]):
         BackendAIGQLMeta(
             description="Filter by category ID.",
             added_version="26.4.4",
+        ),
+        default=None,
+    )
+    entity_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by query definition ID."
         ),
         default=None,
     )

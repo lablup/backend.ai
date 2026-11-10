@@ -9,6 +9,7 @@ from uuid import UUID
 
 import pytest
 
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.dto.manager.v2.fair_share.response import (
     GetUserFairSharePayload,
     SearchUserFairSharesPayload,
@@ -16,11 +17,11 @@ from ai.backend.common.dto.manager.v2.fair_share.response import (
 from ai.backend.common.types import ResourceSlot, SlotQuantity
 from ai.backend.manager.api.adapters.fair_share.adapter import FairShareAdapter
 from ai.backend.manager.api.gql.fair_share.resolver import user as user_resolver
-from ai.backend.manager.api.gql.fair_share.types import (
+from ai.backend.manager.api.gql.fair_share.types.user import (
     UserFairShareGQL,
 )
 from ai.backend.manager.api.gql.types import ResourceGroupUserScope
-from ai.backend.manager.data.fair_share import (
+from ai.backend.manager.data.fair_share.types import (
     FairShareCalculationSnapshot,
     FairShareData,
     FairShareMetadata,
@@ -44,10 +45,18 @@ class TestRGUserFairShare:
         return UUID("11111111-2222-3333-4444-555555555555")
 
     @pytest.fixture
-    def user_fair_share_data(self, project_id: UUID, user_uuid: UUID) -> UserFairShareData:
+    def resource_group_id(self) -> ResourceGroupID:
+        """Test resource group ID."""
+        return ResourceGroupID(UUID("880e8400-e29b-41d4-a716-446655440003"))
+
+    @pytest.fixture
+    def user_fair_share_data(
+        self, project_id: UUID, user_uuid: UUID, resource_group_id: ResourceGroupID
+    ) -> UserFairShareData:
         """User fair share data for existing record."""
         return UserFairShareData(
             resource_group="default",
+            resource_group_id=resource_group_id,
             user_uuid=user_uuid,
             project_id=project_id,
             domain_name="test-domain",

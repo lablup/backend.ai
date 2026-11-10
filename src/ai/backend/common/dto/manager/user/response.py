@@ -51,7 +51,13 @@ class UserDTO(BackendAISchema):
     )
     totp_activated: bool | None = Field(default=None, description="Whether TOTP is activated")
     sudo_session_enabled: bool = Field(description="Whether sudo session is enabled")
-    main_access_key: str | None = Field(default=None, description="Main access key")
+    main_access_key: str | None = Field(
+        default=None,
+        description=(
+            "Main access key. Deprecated since 26.9.0. Use the keypair's is_default field."
+        ),
+        deprecated=True,
+    )
     container_uid: int | None = Field(default=None, description="Container UID")
     container_main_gid: int | None = Field(default=None, description="Container main GID")
     container_gids: list[int] | None = Field(default=None, description="Container additional GIDs")

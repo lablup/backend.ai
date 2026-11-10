@@ -4,7 +4,6 @@ Config files stage for kernel lifecycle.
 This stage handles creation of environment and resource configuration files.
 """
 
-import asyncio
 import shutil
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -12,7 +11,9 @@ from io import StringIO
 from pathlib import Path
 from typing import override
 
+from ai.backend.agent.defs import SESSION_NAME_CONFIG_FILENAME
 from ai.backend.agent.resources import ComputerContext, KernelResourceSpec
+from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.stage.types import ArgsSpecGenerator, Provisioner, ProvisionStage
 from ai.backend.common.types import DeviceName
 
@@ -21,6 +22,7 @@ from ai.backend.common.types import DeviceName
 class ConfigFileSpec:
     config_dir: Path
     environ: Mapping[str, str]
+    session_name: str
     resource_spec: KernelResourceSpec
     computers: Mapping[DeviceName, ComputerContext]
     accelerator_envs: Mapping[str, str]  # Additional envs from accelerators
@@ -36,6 +38,7 @@ class ConfigFileResult:
     resource_path: Path
     environ_base_path: Path
     resource_base_path: Path
+    session_name_path: Path
 
 
 class ConfigFileProvisioner(Provisioner[ConfigFileSpec, ConfigFileResult]):
@@ -56,12 +59,14 @@ class ConfigFileProvisioner(Provisioner[ConfigFileSpec, ConfigFileResult]):
         await self._write_environ(spec)
         await self._write_resource_txt(spec)
         await self._write_backup_files(spec)
+        await self._write_session_name(spec)
 
         return ConfigFileResult(
             environ_path=self._environ_path(spec),
             resource_path=self._resource_path(spec),
             environ_base_path=self._environ_base_path(spec),
             resource_base_path=self._resource_base_path(spec),
+            session_name_path=self._session_name_path(spec),
         )
 
     def _environ_path(self, spec: ConfigFileSpec) -> Path:
@@ -76,8 +81,10 @@ class ConfigFileProvisioner(Provisioner[ConfigFileSpec, ConfigFileResult]):
     def _resource_base_path(self, spec: ConfigFileSpec) -> Path:
         return spec.config_dir / "resource_base.txt"
 
+    def _session_name_path(self, spec: ConfigFileSpec) -> Path:
+        return spec.config_dir / SESSION_NAME_CONFIG_FILENAME
+
     async def _write_environ(self, spec: ConfigFileSpec) -> None:
-        loop = asyncio.get_running_loop()
         with StringIO() as buf:
             # Write basic environment variables
             for k, v in spec.environ.items():
@@ -87,14 +94,13 @@ class ConfigFileProvisioner(Provisioner[ConfigFileSpec, ConfigFileResult]):
             for k, v in spec.accelerator_envs.items():
                 buf.write(f"{k}={v}\n")
 
-            await loop.run_in_executor(
+            await run_in_executor_with_context(
                 None,
                 (self._environ_path(spec)).write_bytes,
                 buf.getvalue().encode("utf8"),
             )
 
     async def _write_resource_txt(self, spec: ConfigFileSpec) -> None:
-        loop = asyncio.get_running_loop()
         with StringIO() as buf:
             spec.resource_spec.write_to_file(buf)
 
@@ -106,7 +112,7 @@ class ConfigFileProvisioner(Provisioner[ConfigFileSpec, ConfigFileResult]):
                     for k, v in kvpairs.items():
                         buf.write(f"{k}={v}\n")
 
-            await loop.run_in_executor(
+            await run_in_executor_with_context(
                 None,
                 (self._resource_path(spec)).write_bytes,
                 buf.getvalue().encode("utf8"),
@@ -119,9 +125,13 @@ class ConfigFileProvisioner(Provisioner[ConfigFileSpec, ConfigFileResult]):
         resource_path = self._resource_path(spec)
         resource_base_path = self._resource_base_path(spec)
 
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(None, shutil.copyfile, environ_path, environ_base_path)
-        await loop.run_in_executor(None, shutil.copyfile, resource_path, resource_base_path)
+        await run_in_executor_with_context(None, shutil.copyfile, environ_path, environ_base_path)
+        await run_in_executor_with_context(None, shutil.copyfile, resource_path, resource_base_path)
+
+    async def _write_session_name(self, spec: ConfigFileSpec) -> None:
+        await run_in_executor_with_context(
+            None, self._session_name_path(spec).write_text, spec.session_name
+        )
 
     @override
     async def teardown(self, resource: ConfigFileResult) -> None:

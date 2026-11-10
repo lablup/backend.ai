@@ -4,7 +4,7 @@ import os
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Self
+from typing import Final, Self
 
 import psutil
 
@@ -116,7 +116,6 @@ class GraphQLMetricObserver:
                 "operation_type",
                 "field_name",
                 "parent_type",
-                "operation_name",
                 "domain",
                 "operation",
                 "error_detail",
@@ -130,7 +129,6 @@ class GraphQLMetricObserver:
                 "operation_type",
                 "field_name",
                 "parent_type",
-                "operation_name",
                 "domain",
                 "operation",
                 "error_detail",
@@ -151,7 +149,6 @@ class GraphQLMetricObserver:
         operation_type: str,
         field_name: str,
         parent_type: str,
-        operation_name: str,
         error_code: ErrorCode | None,
         success: bool,
     ) -> None:
@@ -159,7 +156,6 @@ class GraphQLMetricObserver:
             operation_type=operation_type,
             field_name=field_name,
             parent_type=parent_type,
-            operation_name=operation_name,
             domain=error_code.domain if error_code else "",
             operation=error_code.operation if error_code else "",
             error_detail=error_code.error_detail if error_code else "",
@@ -172,7 +168,6 @@ class GraphQLMetricObserver:
         operation_type: str,
         field_name: str,
         parent_type: str,
-        operation_name: str,
         error_code: ErrorCode | None,
         success: bool,
         duration: float,
@@ -181,7 +176,6 @@ class GraphQLMetricObserver:
             operation_type=operation_type,
             field_name=field_name,
             parent_type=parent_type,
-            operation_name=operation_name,
             domain=error_code.domain if error_code else "",
             operation=error_code.operation if error_code else "",
             error_detail=error_code.error_detail if error_code else "",
@@ -194,7 +188,6 @@ class GraphQLMetricObserver:
         operation_type: str,
         field_name: str,
         parent_type: str,
-        operation_name: str,
         error_code: ErrorCode | None,
         success: bool,
         duration: float,
@@ -203,7 +196,6 @@ class GraphQLMetricObserver:
             operation_type=operation_type,
             field_name=field_name,
             parent_type=parent_type,
-            operation_name=operation_name,
             error_code=error_code,
             success=success,
         )
@@ -211,7 +203,6 @@ class GraphQLMetricObserver:
             operation_type=operation_type,
             field_name=field_name,
             parent_type=parent_type,
-            operation_name=operation_name,
             error_code=error_code,
             success=success,
             duration=duration,
@@ -344,6 +335,12 @@ class BgTaskMetricObserver:
         ).inc()
 
 
+# Status label for a run that reached some of its entities but not others. Metrics
+# only: an audit row covers one entity, which is never partly done, so this is not an
+# ``OperationStatus``.
+ACTION_STATUS_PARTIAL: Final[str] = "partial"
+
+
 class ActionMetricObserver:
     _instance: Self | None = None
 
@@ -354,6 +351,11 @@ class ActionMetricObserver:
         self._action_count = Counter(
             name="backendai_action_count",
             documentation="Total number of actions",
+            labelnames=["operation_type", "status"],
+        )
+        self._action_entity_count = Counter(
+            name="backendai_action_entity_count",
+            documentation="Total number of entities processed by actions",
             labelnames=[
                 "entity_type",
                 "operation_type",
@@ -363,17 +365,15 @@ class ActionMetricObserver:
                 "error_detail",
             ],
         )
+        self._action_lookup_count = Counter(
+            name="backendai_action_lookup_count",
+            documentation="Total number of external-key lookups, by the key's shape",
+            labelnames=["entity_type", "lookup_kind", "status"],
+        )
         self._action_duration_sec = Histogram(
             name="backendai_action_duration_sec",
             documentation="Duration of actions in seconds",
-            labelnames=[
-                "entity_type",
-                "operation_type",
-                "status",
-                "domain",
-                "operation",
-                "error_detail",
-            ],
+            labelnames=["operation_type", "status"],
             buckets=[0.001, 0.01, 0.1, 0.5, 1, 2, 5, 10, 30],
         )
 
@@ -386,13 +386,52 @@ class ActionMetricObserver:
     def observe_action(
         self,
         *,
-        entity_type: EntityType,
         operation_type: str,
         status: str,
         duration: float,
+    ) -> None:
+        """Count one run and how long it took.
+
+        Names no entity and no error: a run may reach several kinds at once, and which
+        entity failed and why is what :meth:`observe_action_entity` counts.
+        """
+        self._action_count.labels(operation_type=operation_type, status=status).inc()
+        self._action_duration_sec.labels(operation_type=operation_type, status=status).observe(
+            duration
+        )
+
+    def observe_lookup(
+        self,
+        *,
+        entity_type: EntityType,
+        lookup_kind: str,
+        status: str,
+    ) -> None:
+        """Count one attempt to resolve an external key into an internal id.
+
+        Labelled by the key's shape, never its value. This counter is how much of the
+        legacy by-name access is left: once a lookup stops being called, it can go.
+        """
+        self._action_lookup_count.labels(
+            entity_type=entity_type,
+            lookup_kind=lookup_kind,
+            status=status,
+        ).inc()
+
+    def observe_action_entity(
+        self,
+        *,
+        entity_type: EntityType,
+        operation_type: str,
+        status: str,
         error_code: ErrorCode | None,
     ) -> None:
-        self._action_count.labels(
+        """Count one entity an action processed.
+
+        A bulk or scope run touches many entities under one action, so the per-run
+        ``observe_action`` cannot show how much work was done or how much of it failed.
+        """
+        self._action_entity_count.labels(
             entity_type=entity_type,
             operation_type=operation_type,
             status=status,
@@ -400,14 +439,6 @@ class ActionMetricObserver:
             operation=error_code.operation if error_code else "",
             error_detail=error_code.error_detail if error_code else "",
         ).inc()
-        self._action_duration_sec.labels(
-            entity_type=entity_type,
-            operation_type=operation_type,
-            status=status,
-            domain=error_code.domain if error_code else "",
-            operation=error_code.operation if error_code else "",
-            error_detail=error_code.error_detail if error_code else "",
-        ).observe(duration)
 
 
 class DomainType(enum.StrEnum):
@@ -453,8 +484,10 @@ class LayerType(enum.StrEnum):
     SCHEDULE_REPOSITORY = "schedule_repository"
     SCHEDULER_REPOSITORY = "scheduler_repository"
     SCHEDULING_HISTORY_REPOSITORY = "scheduling_history_repository"
+    SERVICE_CATALOG_REPOSITORY = "service_catalog_repository"
     SESSION_REPOSITORY = "session_repository"
     STORAGE_NAMESPACE_REPOSITORY = "storage_namespace_repository"
+    STORAGE_STATUS_REPOSITORY = "storage_status_repository"
     USER_REPOSITORY = "user_repository"
     USER_RESOURCE_POLICY_REPOSITORY = "user_resource_policy_repository"
     VFOLDER_ADMIN_REPOSITORY = "vfolder_admin_repository"
@@ -486,7 +519,6 @@ class LayerType(enum.StrEnum):
 
     # Cache Source layers
     AGENT_CACHE_SOURCE = "agent_cache_source"
-    RESOURCE_PRESET_CACHE_SOURCE = "resource_preset_cache_source"
     SCHEDULE_CACHE_SOURCE = "schedule_cache_source"
     SCHEDULER_CACHE_SOURCE = "scheduler_cache_source"
 
@@ -504,6 +536,7 @@ class LayerType(enum.StrEnum):
     VALKEY_BGTASK = "valkey_bgtask"
     VALKEY_VOLUME_STATS = "valkey_volume_stats"
     VALKEY_TUS = "valkey_tus"
+    VALKEY_LOCK = "valkey_lock"
 
     # Client layers
     AGENT_CLIENT = "agent_client"
@@ -637,22 +670,22 @@ class SystemMetricObserver:
         self._async_task_count = Gauge(
             name="backendai_async_task_count",
             documentation="Number of active async tasks",
-            multiprocess_mode="livesum",
+            multiprocess_mode="liveall",
         )
         self._cpu_usage_percent = Gauge(
             name="backendai_cpu_usage_percent",
             documentation="CPU usage of the process",
-            multiprocess_mode="livesum",
+            multiprocess_mode="liveall",
         )
         self._memory_used_rss = Gauge(
             name="backendai_memory_used_rss",
             documentation="Memory used by the process in RSS",
-            multiprocess_mode="livesum",
+            multiprocess_mode="liveall",
         )
         self._memory_used_vms = Gauge(
             name="backendai_memory_used_vms",
             documentation="Memory used by the process in VMS",
-            multiprocess_mode="livesum",
+            multiprocess_mode="liveall",
         )
 
     @classmethod
@@ -742,7 +775,6 @@ class CommonMetricRegistry:
         return cls._instance
 
     def to_prometheus(self) -> str:
-        self.system.observe()
         return generate_latest_multiprocess().decode("utf-8")
 
     def to_prometheus_singleprocess(self) -> str:

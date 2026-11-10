@@ -3,37 +3,27 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.agent.types import AgentDetailData
-from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.common.data.entity.agent import AgentEntityType
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import GlobalSearcherOpsAction
+from ai.backend.manager.data.agent.types import AgentData
+from ai.backend.manager.models.agent.row import AgentRow
 
-from .base import AgentAction
 
+@dataclass(frozen=True)
+class SearchAgentsAction(GlobalSearcherOpsAction[AgentRow, AgentData]):
+    """A page read across every agent, behind the SUPERADMIN gate.
 
-@dataclass
-class SearchAgentsAction(AgentAction):
-    querier: BatchQuerier
+    The admin search surfaces are the only callers: the agent DataLoaders name
+    their entities and are checked per entity through the bulk get.
+    """
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
+    def entity_type(cls) -> EntityType:
+        return AgentEntityType()
 
     @override
-    def entity_id(self) -> str | None:
-        return None
-
-
-@dataclass
-class SearchAgentsActionResult(BaseActionResult):
-    """Result of searching agents with their permissions."""
-
-    agents: list[AgentDetailData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "global_search_agents"

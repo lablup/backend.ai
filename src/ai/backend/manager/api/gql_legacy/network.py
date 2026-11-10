@@ -12,27 +12,30 @@ import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.exc import NoResultFound
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import selectinload
 
-from ai.backend.common.data.permission.types import RBACElementType
-from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.common.data.entity.network import NetworkID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
+from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.data.network.types import NetworkData
+from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import (
     GenericForbidden,
-    ObjectNotFound,
     ServerMisconfiguredError,
 )
-from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
+from ai.backend.manager.errors.network import NetworkNotFound
+from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
-from ai.backend.manager.models.network import NetworkRow
-from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.repositories.base.rbac.entity_creator import (
-    RBACEntityCreator,
-    execute_rbac_entity_creator,
-)
-from ai.backend.manager.repositories.network.creators import NetworkCreatorSpec
+from ai.backend.manager.models.network.creators import NetworkCreator
+from ai.backend.manager.models.network.purgers import NetworkPurger
+from ai.backend.manager.models.network.row import NetworkRow
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.user.row import UserRole
+from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_query
 
 from .base import (
     FilterExprArg,
@@ -55,7 +58,7 @@ __all__ = (
     "NetworkNode",
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @graphene_federation.key("id")
@@ -123,6 +126,21 @@ class NetworkNode(graphene.ObjectType):  # type: ignore[misc]
             updated_at=row.updated_at,
         )
 
+    @classmethod
+    def from_data(cls, data: NetworkData) -> NetworkNode:
+        return cls(
+            id=data.id,
+            row_id=data.id,
+            name=data.name,
+            ref_name=data.ref_name,
+            driver=data.driver,
+            project=data.project_id,
+            domain_name=data.domain_name,
+            options=data.options,
+            created_at=data.created_at,
+            updated_at=data.updated_at,
+        )
+
     async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs: Any) -> NetworkNode:
         return await NetworkNode.get_node(info, self.id)
 
@@ -133,14 +151,37 @@ class NetworkNode(graphene.ObjectType):  # type: ignore[misc]
         _, raw_network_id = AsyncNode.resolve_global_id(info, id)
         if not raw_network_id:
             raw_network_id = id
+        try:
+            network_id = uuid.UUID(raw_network_id)
+        except ValueError as e:
+            raise InvalidAPIParameters(f"Invalid id: {id}") from e
 
         async with graph_ctx.db.begin_readonly_session() as db_session:
-            try:
-                return cls.from_row(
-                    await NetworkRow.get(db_session, uuid.UUID(raw_network_id), load_project=True)
+            visible = await cls._visible_networks_condition(db_session, graph_ctx)
+            query = sa.select(NetworkRow).where(visible & (NetworkRow.id == network_id))
+            network_row = await db_session.scalar(query)
+        if network_row is None:
+            raise NetworkNotFound(f"Network not found (id: {raw_network_id})")
+        return cls.from_row(network_row)
+
+    @staticmethod
+    async def _visible_networks_condition(
+        db_session: SASession, graph_ctx: GraphQueryContext
+    ) -> sa.ColumnElement[bool]:
+        match graph_ctx.user["role"]:
+            case UserRole.SUPERADMIN:
+                return sa.true()
+            case UserRole.ADMIN:
+                domain_name: str = graph_ctx.user["domain_name"]
+                return NetworkRow.domain_name == domain_name
+            case UserRole.USER:
+                project_query = user_scope_membership_query(
+                    ProjectEntityType(), graph_ctx.user["uuid"]
                 )
-            except NoResultFound as e:
-                raise ValueError(f"Network not found (id: {raw_network_id})") from e
+                available_projects = (await db_session.execute(project_query)).all()
+                return NetworkRow.project.in_([p.scope_id for p in available_projects])
+            case _:
+                return sa.false()
 
     @classmethod
     async def get_connection(
@@ -185,21 +226,7 @@ class NetworkNode(graphene.ObjectType):  # type: ignore[misc]
             last=last,
         )
         async with graph_ctx.db.begin_readonly_session() as db_session:
-            additional_cond: sa.ColumnElement[bool]
-            match graph_ctx.user["role"]:
-                case UserRole.SUPERADMIN:
-                    additional_cond = sa.true()
-                case UserRole.ADMIN:
-                    additional_cond = NetworkRow.domain_name == graph_ctx.user["domain_name"]
-                case UserRole.USER:
-                    project_query = sa.select(AssocGroupUserRow).where(
-                        AssocGroupUserRow.user_id == graph_ctx.user["uuid"]
-                    )
-                    available_projects = (await db_session.execute(project_query)).scalars().all()
-                    additional_cond = NetworkRow.project.in_([
-                        p.group_id for p in available_projects
-                    ])
-
+            additional_cond = await cls._visible_networks_condition(db_session, graph_ctx)
             query = query.where(additional_cond)
             cnt_query = cnt_query.where(additional_cond)
             query = query.options(
@@ -253,9 +280,9 @@ class CreateNetwork(graphene.Mutation):  # type: ignore[misc]
 
         async with graph_ctx.db.begin_readonly_session() as db_session:
             try:
-                project = await GroupRow.get(db_session, project_id, load_resource_policy=True)
+                project = await ProjectRow.get(db_session, project_id, load_resource_policy=True)
             except NoResultFound as e:
-                raise ObjectNotFound(object_name="project") from e
+                raise ProjectNotFound() from e
 
             if (
                 graph_ctx.user["role"] != UserRole.SUPERADMIN
@@ -275,36 +302,25 @@ class CreateNetwork(graphene.Mutation):  # type: ignore[misc]
                 )
 
         network_plugin = graph_ctx.network_plugin_ctx.plugins[_driver]
-        try:
-            network_info = await network_plugin.create_network()
-            network_name = network_info.network_id
-        except Exception:
-            log.exception("Failed to create the inter-container network (plugin: {})", _driver)
-            raise
+        network_info = await network_plugin.create_network()
+        network_name = network_info.network_id
 
         async def _do_mutate() -> CreateNetwork:
-            async with graph_ctx.db.begin_session(commit_on_end=True) as db_session:
-                rbac_creator = RBACEntityCreator(
-                    spec=NetworkCreatorSpec(
-                        name=name,
-                        ref_name=network_name,
-                        driver=_driver,
-                        domain_name=project.domain_name,
-                        project_id=project.id,
-                        options=network_info.options,
-                    ),
-                    element_type=RBACElementType.NETWORK,
-                    scope_ref=RBACElementRef(
-                        element_type=RBACElementType.PROJECT,
-                        element_id=str(project.id),
-                    ),
+            data = await graph_ctx.network_repository.create_entity(
+                NetworkCreator(
+                    name=name,
+                    ref_name=network_name,
+                    driver=_driver,
+                    domain_name=project.domain_name,
+                    project_id=ProjectID(project.id),
+                    options=network_info.options,
                 )
-                result = await execute_rbac_entity_creator(db_session, rbac_creator)
-                return CreateNetwork(
-                    ok=True,
-                    msg="Network created",
-                    network=NetworkNode.from_row(result.row),
-                )
+            )
+            return CreateNetwork(
+                ok=True,
+                msg="Network created",
+                network=NetworkNode.from_data(data),
+            )
 
         return await gql_mutation_wrapper(CreateNetwork, _do_mutate)
 
@@ -342,14 +358,14 @@ class ModifyNetwork(graphene.Mutation):  # type: ignore[misc]
         try:
             _network_id = uuid.UUID(raw_network_id)
         except ValueError as e:
-            raise ObjectNotFound("network") from e
+            raise NetworkNotFound(operation=ActionOperationType.UPDATE) from e
 
         graph_ctx: GraphQueryContext = info.context
         async with graph_ctx.db.begin_session(commit_on_end=True) as db_session:
             try:
                 row = await NetworkRow.get(db_session, _network_id, load_project=True)
             except NoResultFound as e:
-                raise ObjectNotFound(object_name="network") from e
+                raise NetworkNotFound(operation=ActionOperationType.UPDATE) from e
 
             if (
                 graph_ctx.user["role"] != UserRole.SUPERADMIN
@@ -391,13 +407,13 @@ class DeleteNetwork(graphene.Mutation):  # type: ignore[misc]
         try:
             _network_id = uuid.UUID(raw_network_id)
         except ValueError as e:
-            raise ObjectNotFound("network") from e
+            raise NetworkNotFound(operation=ActionOperationType.PURGE) from e
 
         async with graph_ctx.db.begin_session(commit_on_end=True) as db_session:
             try:
                 row = await NetworkRow.get(db_session, _network_id, load_project=True)
             except NoResultFound as e:
-                raise ObjectNotFound(object_name="network") from e
+                raise NetworkNotFound(operation=ActionOperationType.PURGE) from e
 
             if (
                 graph_ctx.user["role"] != UserRole.SUPERADMIN
@@ -412,8 +428,9 @@ class DeleteNetwork(graphene.Mutation):  # type: ignore[misc]
             await network_plugin.destroy_network(row.ref_name)
 
             async def _do_mutate() -> DeleteNetwork:
-                update_query = sa.delete(NetworkRow).where(NetworkRow.id == _network_id)
-                await db_session.execute(update_query)
+                await graph_ctx.network_repository.purge_entity(
+                    NetworkPurger(network_id=NetworkID(_network_id))
+                )
                 return DeleteNetwork(ok=True, msg="Network deleted")
 
             return await gql_mutation_wrapper(DeleteNetwork, _do_mutate)

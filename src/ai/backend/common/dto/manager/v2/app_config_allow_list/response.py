@@ -23,6 +23,9 @@ class AppConfigAllowListNode(BaseResponseModel):
     """Node model representing an app config allow-list entry."""
 
     id: UUID = Field(description="App config allow-list entry UUID.")
+    entity_id: UUID = Field(
+        description="UUID of the app config allow list. Added in 26.9.0.",
+    )
     config_name: str = Field(description="Gated config name.")
     scope_type: AppConfigScopeType = Field(description="Scope type the entry permits writes at.")
     rank: int = Field(
@@ -52,6 +55,9 @@ class PurgeAppConfigAllowListPayload(BaseResponseModel):
     """Payload for app config allow-list entry purge."""
 
     id: UUID = Field(description="UUID of the purged app config allow-list entry.")
+    entity_id: UUID = Field(
+        description="UUID of the purged app config allow-list entry. Added in 26.10.0."
+    )
 
 
 class SearchAppConfigAllowListPayload(BaseResponseModel):

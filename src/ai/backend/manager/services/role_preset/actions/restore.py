@@ -1,30 +1,30 @@
-from dataclasses import dataclass, field
+from __future__ import annotations
+
+from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.common.bulk import BulkUpdateFailure
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.manager.actions.v2.ops.base import RestoreSingleEntityOpsAction
 from ai.backend.manager.data.role_preset.types import RolePresetData
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.services.role_preset.actions.base import RolePresetBulkAction
+from ai.backend.manager.models.specs.soft_delete import RestoreUpdater
 
 
-@dataclass
-class BulkRestoreRolePresetsAction(RolePresetBulkAction):
-    updaters: list[Updater[RolePresetRow]]
+@dataclass(frozen=True)
+class RestoreRolePresetAction(RestoreSingleEntityOpsAction[RolePresetRow, RolePresetData]):
+    """Undo the soft delete on one preset."""
+
+    updater: RestoreUpdater[RolePresetRow, RolePresetData]
+
+    @override
+    def entity_id(self) -> EntityIdentifier:
+        return self.updater.target_id
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.UPDATE
-
-
-@dataclass
-class BulkRestoreRolePresetsActionResult(BaseActionResult):
-    successes: list[RolePresetData] = field(default_factory=list)
-    failures: list[BulkUpdateFailure] = field(default_factory=list)
+    def action_name(cls) -> str:
+        return "restore_role_preset"
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    def to_updater(self) -> RestoreUpdater[RolePresetRow, RolePresetData]:
+        return self.updater

@@ -8,32 +8,29 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Self,
-    TypedDict,
     override,
 )
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
-from sqlalchemy.engine import Row
-from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import Mapped, foreign, load_only, mapped_column, relationship
+from sqlalchemy.orm import Mapped, load_only, mapped_column, relationship
+from sqlalchemy.sql.expression import SQLColumnExpression
 
-from ai.backend.common import msgpack
-from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
-from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.domain.types import DomainData
+from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.data.domain.types import DomainStatus
 from ai.backend.manager.data.permission.permission_defs import DomainPermission
-from ai.backend.manager.defs import RESERVED_DOTFILES
 from ai.backend.manager.models.base import (
     GUID,
     Base,
     ResourceSlotColumn,
     SlugType,
+    StrEnumType,
     VFolderHostPermissionColumn,
 )
-from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
+from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
@@ -48,70 +45,50 @@ from ai.backend.manager.models.rbac import (
 from ai.backend.manager.models.rbac.context import ClientContext
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.group import GroupRow
-    from ai.backend.manager.models.network import NetworkRow
-    from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
-    from ai.backend.manager.models.session import SessionRow
-    from ai.backend.manager.models.user import UserRow
+    from ai.backend.manager.models.resource_group.row import ResourceGroupForDomainRow
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
-__all__: Sequence[str] = (
-    "MAXIMUM_DOTFILE_SIZE",
-    "DomainDotfile",
-    "DomainRow",
-    "domains",
-    "query_domain_dotfiles",
-    "verify_dotfile_name",
-)
+__all__: Sequence[str] = ("DomainRow",)
 
 MAXIMUM_DOTFILE_SIZE = 64 * 1024  # 61 KiB
 
 
-def row_to_data(row: DomainRow | Row[Any]) -> DomainData:
-    return DomainData(
-        id=row.id,
-        name=row.name,
-        description=row.description,
-        is_active=row.is_active,
-        created_at=row.created_at,
-        modified_at=row.modified_at,
-        total_resource_slots=row.total_resource_slots,
-        allowed_vfolder_hosts=row.allowed_vfolder_hosts,
-        allowed_docker_registries=row.allowed_docker_registries,
-        integration_name=row.integration_id,  # DB column is integration_id
-        dotfiles=row.dotfiles,
-    )
-
-
-def _get_network_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.network import NetworkRow
-
-    return DomainRow.name == foreign(NetworkRow.domain_name)
-
-
-class DomainRow(CreatedAtMixin, Base):  # type: ignore[misc]
+class DomainRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "domains"
+    __table_args__ = (
+        # Partial unique index: at most one domain may have is_default = true.
+        sa.Index(
+            "uq_domains_is_default",
+            "is_default",
+            unique=True,
+            postgresql_where=sa.text("is_default"),
+        ),
+    )
 
     name: Mapped[str] = mapped_column(
         "name", SlugType(length=64, allow_unicode=True, allow_dot=True), primary_key=True
     )
     id: Mapped[DomainID] = mapped_column(
         "id",
-        GUID,
+        GUID(DomainID),
         nullable=False,
         unique=True,
-        server_default=sa.text("uuid_generate_v4()"),
+        server_default=sa.text("uuid_generate_v7()"),
     )
     description: Mapped[str | None] = mapped_column("description", sa.String(length=512))
     is_active: Mapped[bool] = mapped_column("is_active", sa.Boolean, default=True, nullable=False)
-    modified_at: Mapped[datetime] = mapped_column(
-        "modified_at",
-        sa.DateTime(timezone=True),
-        server_default=sa.func.now(),
-        onupdate=sa.func.current_timestamp(),
+    status: Mapped[DomainStatus] = mapped_column(
+        "status",
+        StrEnumType(DomainStatus),
+        default=DomainStatus.ACTIVE,
+        server_default=DomainStatus.ACTIVE,
         nullable=False,
+        index=True,
+    )
+    is_default: Mapped[bool] = mapped_column(
+        "is_default", sa.Boolean, nullable=False, default=False, server_default=sa.false()
     )
     # TODO: separate resource-related fields with new domain resource policy table when needed.
     total_resource_slots: Mapped[ResourceSlot] = mapped_column(
@@ -133,25 +110,20 @@ class DomainRow(CreatedAtMixin, Base):  # type: ignore[misc]
         "dotfiles", sa.LargeBinary(length=MAXIMUM_DOTFILE_SIZE), nullable=False, default=b"\x90"
     )
 
-    sessions: Mapped[list[SessionRow]] = relationship(
-        "SessionRow",
-        back_populates="domain",
-        foreign_keys="[SessionRow.domain_name]",
-    )
-    users: Mapped[list[UserRow]] = relationship("UserRow", back_populates="domain")
-    groups: Mapped[list[GroupRow]] = relationship("GroupRow", back_populates="domain")
-    sgroup_for_domains_rows: Mapped[list[ScalingGroupForDomainRow]] = relationship(
-        "ScalingGroupForDomainRow",
-        back_populates="domain_row",
-    )
-    networks: Mapped[list[NetworkRow]] = relationship(
-        "NetworkRow",
-        back_populates="domain_row",
-        primaryjoin=_get_network_join_condition,
+    # Read only by build_ctx_in_domain_scope (the legacy RBAC) in
+    # models/resource_group/row.py, whose entry point _ensure_sgroup_permission in
+    # api/gql_legacy/domain.py nothing calls. Delete it with the legacy RBAC.
+    sgroup_for_domains_rows: Mapped[list[ResourceGroupForDomainRow]] = relationship(
+        "ResourceGroupForDomainRow",
     )
 
-    def to_data(self) -> DomainData:
-        return row_to_data(self)
+    @classmethod
+    def scope_id_expr(cls) -> SQLColumnExpression[DomainID]:
+        return cls.id
+
+    @classmethod
+    def scope_name_expr(cls) -> SQLColumnExpression[str]:
+        return cls.name
 
 
 # NOTE: Deprecated legacy table reference for backward compatibility.
@@ -159,6 +131,9 @@ class DomainRow(CreatedAtMixin, Base):  # type: ignore[misc]
 domains = DomainRow.__table__
 
 
+# Everything below serves the legacy RBAC path alone: api/gql_legacy/domain.py imports
+# get_permission_ctx and DomainModel, and nothing else reads these names. Delete the
+# whole block together with gql_legacy.
 @dataclass
 class DomainModel(RBACModel[DomainPermission]):
     id: DomainID
@@ -166,7 +141,7 @@ class DomainModel(RBACModel[DomainPermission]):
     description: str | None
     is_active: bool
     created_at: datetime
-    modified_at: datetime
+    updated_at: datetime
 
     _total_resource_slots: ResourceSlot
     _allowed_vfolder_hosts: VFolderHostPermissionMap
@@ -215,7 +190,7 @@ class DomainModel(RBACModel[DomainPermission]):
             description=row.description,
             is_active=row.is_active,
             created_at=row.created_at,
-            modified_at=row.modified_at,
+            updated_at=row.updated_at,
             _total_resource_slots=row.total_resource_slots,
             _allowed_vfolder_hosts=row.allowed_vfolder_hosts,
             _allowed_docker_registries=row.allowed_docker_registries,
@@ -224,28 +199,6 @@ class DomainModel(RBACModel[DomainPermission]):
             _permissions=frozenset(permissions),
             orm_obj=row,
         )
-
-
-class DomainDotfile(TypedDict):
-    data: str
-    path: str
-    perm: str
-
-
-async def query_domain_dotfiles(
-    conn: SAConnection,
-    name: str,
-) -> tuple[list[DomainDotfile], int]:
-    query = sa.select(DomainRow.dotfiles).where(DomainRow.name == name)
-    packed_dotfile = await conn.scalar(query)
-    if packed_dotfile is None:
-        return [], MAXIMUM_DOTFILE_SIZE
-    rows = msgpack.unpackb(packed_dotfile)
-    return rows, MAXIMUM_DOTFILE_SIZE - len(packed_dotfile)
-
-
-def verify_dotfile_name(dotfile: str) -> bool:
-    return dotfile not in RESERVED_DOTFILES
 
 
 ALL_DOMAIN_PERMISSIONS = frozenset([perm for perm in DomainPermission])
@@ -263,6 +216,8 @@ MEMBER_PERMISSIONS: frozenset[DomainPermission] = frozenset([DomainPermission.RE
 type WhereClauseType = sa.sql.expression.BinaryExpression[Any] | sa.sql.expression.BooleanClauseList
 
 
+# Built by DomainPermissionContextBuilder below and read by
+# api/gql_legacy/domain.py:256, :319; the v2 path judges through models/scopes.py instead.
 @dataclass
 class DomainPermissionContext(AbstractPermissionContext[DomainPermission, DomainRow, str]):
     @property
@@ -307,6 +262,7 @@ class DomainPermissionContext(AbstractPermissionContext[DomainPermission, Domain
         return permissions
 
 
+# Reached only through get_permission_ctx below; no other name refers to it.
 class DomainPermissionContextBuilder(
     AbstractPermissionContextBuilder[DomainPermission, DomainPermissionContext]
 ):
@@ -395,6 +351,7 @@ class DomainPermissionContextBuilder(
         return MEMBER_PERMISSIONS
 
 
+# Called only by api/gql_legacy/domain.py:256, :319 — the way into everything above.
 async def get_permission_ctx(
     target_scope: ScopeType,
     requested_permission: DomainPermission,
@@ -404,27 +361,3 @@ async def get_permission_ctx(
 ) -> DomainPermissionContext:
     builder = DomainPermissionContextBuilder(db_session)
     return await builder.build(ctx, target_scope, requested_permission)
-
-
-async def get_domains(
-    target_scope: ScopeType,
-    requested_permission: DomainPermission,
-    domain_names: Iterable[str] | None = None,
-    *,
-    ctx: ClientContext,
-    db_session: SASession,
-) -> list[DomainModel]:
-    ret: list[DomainModel] = []
-    permission_ctx = await get_permission_ctx(
-        target_scope, requested_permission, ctx=ctx, db_session=db_session
-    )
-    cond = permission_ctx.query_condition
-    if cond is None:
-        return ret
-    query_stmt = sa.select(DomainRow).where(cond)
-    if domain_names is not None:
-        query_stmt = query_stmt.where(DomainRow.name.in_(domain_names))
-    async for row in await db_session.stream_scalars(query_stmt):
-        permissions = await permission_ctx.calculate_final_permission(row)
-        ret.append(DomainModel.from_row(row, permissions))
-    return ret

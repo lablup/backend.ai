@@ -1,53 +1,57 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import override
+from typing import final, override
 
-from ai.backend.common.data.permission.types import EntityType
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.common.data.entity.deployment import DeploymentEntityType
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.data.deployment.types import RouteHistoryData
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.scheduling_history.types import RouteHistorySearchScope
+from ai.backend.manager.models.scheduling_history.scopes import RouteHistoryTarget
+from ai.backend.manager.models.scheduling_history.searchers import RouteHistorySearcher
 
-from .base import SchedulingHistoryAction
+from .base import SchedulingHistoryScopeActionResult
 
 
 @dataclass
-class SearchRouteScopedHistoryAction(SchedulingHistoryAction):
+class SearchRouteScopedHistoryAction(BaseScopeAction):
     """Action to search route history within a route scope.
 
-    This is the scoped version used by entity-scoped APIs.
-    Scope is required and specifies which route to query history for.
+    The scope names the replica the rows are narrowed to and the deployment that owns it,
+    which is what the read is answered for.
     """
 
-    scope: RouteHistorySearchScope
-    querier: BatchQuerier
+    scope: RouteHistoryTarget
+    searcher: RouteHistorySearcher
+
+    @final
+    @override
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return (self.scope.scope_id(),)
 
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return EntityType.ROUTE_SCOPED_HISTORY
+        return DeploymentEntityType()
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "search_route_scoped_history"
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.SEARCH
 
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.scope.route_id)
-
 
 @dataclass
-class SearchRouteScopedHistoryActionResult(BaseActionResult):
+class SearchRouteScopedHistoryActionResult(SchedulingHistoryScopeActionResult):
     """Result of searching route history within scope."""
 
     histories: list[RouteHistoryData]
     total_count: int
     has_next_page: bool
     has_previous_page: bool
-
-    @override
-    def entity_id(self) -> str | None:
-        return None

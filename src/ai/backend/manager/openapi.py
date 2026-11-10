@@ -19,15 +19,15 @@ import ai.backend.common.validators as tx
 from ai.backend.common.api_handlers import BodyParam, PathParam, QueryParam
 from ai.backend.common.json import pretty_json_str
 from ai.backend.common.types import BackendAISchema
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager import __version__
 from ai.backend.manager.api.rest.routing import RouteRegistry
+from ai.backend.manager.api.rest.shutdown import ServerDrainNotifier
 from ai.backend.manager.api.rest.tree import build_api_routes
 from ai.backend.manager.data.common.sentinel import Undefined, undefined
 from ai.backend.manager.data.manager_status.types import ManagerStatus
-from ai.backend.manager.models.vfolder import VFolderPermissionValidator
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class UndefChecker(t.Trafaret):
@@ -167,8 +167,6 @@ def _traverse(scheme: t.Trafaret) -> dict[str, Any]:
         return {"type": "string", "format": "uri"}
     if isinstance(scheme, tx.UUID):
         return {"type": "string", "format": "uuid"}
-    if isinstance(scheme, VFolderPermissionValidator):
-        return {"type": "string", "enum": ["ro", "rw", "wd"]}
 
     if scheme == t.Email:
         return {"type": "string", "format": "email"}
@@ -410,9 +408,9 @@ def generate_openapi(subapps: list[web.Application], verbose: bool = False) -> d
                             # field type pydantic can't render as JSON schema; document
                             # the operation without its request-body schema
                             log.warning(
-                                "openapi: skipping request-body schema for {} ({})",
-                                operation_id,
-                                exc,
+                                "openapi: skipping the request-body schema",
+                                operation_id=operation_id,
+                                exc_info=exc,
                             )
                     else:
                         raise RuntimeError(
@@ -472,9 +470,9 @@ def generate_openapi(subapps: list[web.Application], verbose: bool = False) -> d
                     # param field type pydantic can't render as JSON schema; document
                     # the operation without those param/body schemas
                     log.warning(
-                        "openapi: skipping request/param schema for {} ({})",
-                        operation_id,
-                        exc,
+                        "openapi: skipping the request and param schemas",
+                        operation_id=operation_id,
+                        exc_info=exc,
                     )
 
                 # TODO: Extract response model from @api_handler decorated functions.
@@ -564,9 +562,9 @@ def generate_openapi(subapps: list[web.Application], verbose: bool = False) -> d
                     # unrenderable response model; document the operation without
                     # its response schema
                     log.warning(
-                        "openapi: skipping response schema for {} ({})",
-                        operation_id,
-                        exc,
+                        "openapi: skipping the response schema",
+                        operation_id=operation_id,
+                        exc_info=exc,
                     )
             openapi["paths"][path][method.lower()] = route_def
     return openapi
@@ -606,6 +604,7 @@ async def generate() -> dict[str, Any]:
         root_app=web.Application(),
         stream_cleanup_handler=stub,
         health_probe=stub,
+        drain_notifier=ServerDrainNotifier(),
         pidx=0,
     ):
         root_registry.add_subregistry(sub)

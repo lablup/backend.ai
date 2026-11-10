@@ -56,3 +56,10 @@ class TestRuntimeVariantPresetFilterCombinators:
         assert len(dto.NOT) == 1
         assert dto.NOT[0].name is not None
         assert dto.NOT[0].name.equals == "x"
+
+
+class TestRuntimeVariantPresetFilterRuntimeVersion:
+    def test_runtime_version_reaches_the_dto(self) -> None:
+        dto = RuntimeVariantPresetFilterGQL(runtime_version="0.9.1").to_pydantic()
+        assert isinstance(dto, RuntimeVariantPresetFilterDTO)
+        assert dto.runtime_version == "0.9.1"

@@ -1,34 +1,32 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import override
-from uuid import UUID
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.manager.actions.v2.ops.base import UpdateSingleEntityOpsAction
 from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.services.runtime_variant.actions.base import RuntimeVariantAction
+from ai.backend.manager.models.runtime_variant.updaters import RuntimeVariantUpdater
 
 
 @dataclass
-class UpdateRuntimeVariantAction(RuntimeVariantAction):
-    id: UUID
-    updater: Updater[RuntimeVariantRow]
+class UpdateRuntimeVariantAction(
+    UpdateSingleEntityOpsAction[RuntimeVariantRow, RuntimeVariantData]
+):
+    """Rename a runtime variant or retouch its description."""
 
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.id)
+    updater: RuntimeVariantUpdater
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.UPDATE
-
-
-@dataclass
-class UpdateRuntimeVariantActionResult(BaseActionResult):
-    runtime_variant: RuntimeVariantData
+    def action_name(cls) -> str:
+        return "update_runtime_variant"
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.runtime_variant.id)
+    def entity_id(self) -> EntityIdentifier:
+        return self.updater.variant_id
+
+    @override
+    def to_updater(self) -> RuntimeVariantUpdater:
+        return self.updater

@@ -29,7 +29,7 @@ When creating a new project resource policy, the service:
 The modification process:
 1. Receives modification request via `ModifyProjectResourcePolicyAction`
 2. Uses `ProjectResourcePolicyModifier` to specify which fields to update
-3. Retrieves the existing policy by name
+3. Gets the existing policy by name
 4. Updates only the specified fields (partial updates supported)
 5. Returns the updated policy data
 
@@ -91,11 +91,11 @@ result = await service.modify_project_resource_policy(action)
 ### Deleting a Policy
 
 ```python
-from ai.backend.manager.services.project_resource_policy.actions.delete_project_resource_policy import (
-    DeleteProjectResourcePolicyAction
+from ai.backend.manager.services.project_resource_policy.actions.purge_project_resource_policy import (
+    PurgeProjectResourcePolicyAction
 )
 
-action = DeleteProjectResourcePolicyAction(name="development-policy")
+action = PurgeProjectResourcePolicyAction(name="development-policy")
 result = await service.delete_project_resource_policy(action)
 ```
 
@@ -103,12 +103,12 @@ result = await service.delete_project_resource_policy(action)
 
 ### Repository Layer
 
-The service integrates with `ProjectResourcePolicyRepository` which provides:
-- Database persistence with proper transaction handling
+The service integrates with `ProjectResourcePolicyRepository`, which provides:
+- Database persistence with transaction handling
 - Layer-aware decorators for monitoring and metrics
 - Error handling for not-found scenarios
 - Additional operations:
-  - `get_by_name`: Retrieve a specific policy by name
+  - `get_by_name`: Get a specific policy by name
   - Atomic operations with transaction support
 
 ### Database Models
@@ -132,7 +132,7 @@ The service follows the action-based pattern with:
 
 ### Test Coverage
 
-The project includes comprehensive test coverage at multiple layers:
+The project includes test coverage at multiple layers:
 
 #### Service Layer Tests
 - Integration tests through service actions
@@ -141,7 +141,7 @@ The project includes comprehensive test coverage at multiple layers:
 
 #### Repository Layer Tests
 - Direct repository method testing
-- Database constraint validation (e.g., unique constraints, non-null fields)
+- Database constraint validation (for example unique constraints and non-null fields)
 - Concurrent operation handling
 - Edge cases (zero values, empty updates)
 - Transaction rollback scenarios
@@ -158,7 +158,7 @@ Key fixtures provided for reliable test data management:
 
 Tests use fixture-based cleanup to ensure:
 - No orphaned test data remains after test failures
-- Proper isolation between tests
+- Isolation between tests
 - Consistent database state
 
 ### Running Tests
@@ -187,11 +187,11 @@ The service and repository handle the following error scenarios:
 - `ObjectNotFound`: Raised when policy lookup fails
 - `IntegrityError`: Raised when creating duplicate policies (unique constraint violation)
 - Database constraint violations: Non-null constraints on numeric fields
-- Transaction failures: Proper rollback on errors
+- Transaction failures: Rollback on errors
 
 ## Best Practices
 
-1. **Use Partial Updates**: When modifying policies, only specify fields that need to change
+1. **Use Partial Updates**: When modifying policies, specify only the fields that need to change
 2. **Handle Errors Gracefully**: 
    - Always catch `ObjectNotFound` exceptions in client code
    - Handle `IntegrityError` when creating policies with duplicate names
@@ -200,9 +200,9 @@ The service and repository handle the following error scenarios:
    - All numeric fields are required (cannot be NULL)
    - Zero values are valid for testing or special cases
 4. **Policy Naming**: 
-   - Use descriptive names that indicate the policy's purpose or target group
+   - Use descriptive names that indicate the policy's purpose or target project
    - Policy names must be unique across the system
 5. **Testing**: 
-   - Use provided fixtures for consistent test data management
-   - Ensure proper cleanup with context managers
+   - Use the provided fixtures for consistent test data management
+   - Ensure cleanup with context managers
    - Test both success and failure scenarios

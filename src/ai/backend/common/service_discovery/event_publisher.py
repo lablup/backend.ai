@@ -18,9 +18,9 @@ from ai.backend.common.events.event_types.service_discovery.anycast import (
     ServiceEndpointInfo,
     ServiceRegisteredEvent,
 )
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 __all__ = ("ServiceDiscoveryEventPublisher",)
 
@@ -120,9 +120,9 @@ class ServiceDiscoveryEventPublisher:
         event = self._build_registered_event()
         await self._event_producer.anycast_event(event)
         log.debug(
-            "Published ServiceRegisteredEvent for {}/{}",
-            event.service_group,
-            event.instance_id,
+            "service registered event published",
+            service_group=event.service_group,
+            instance_id=event.instance_id,
         )
 
     async def publish_deregistered(self) -> None:
@@ -130,9 +130,9 @@ class ServiceDiscoveryEventPublisher:
         event = self._build_deregistered_event()
         await self._event_producer.anycast_event(event)
         log.debug(
-            "Published ServiceDeregisteredEvent for {}/{}",
-            event.service_group,
-            event.instance_id,
+            "service deregistered event published",
+            service_group=event.service_group,
+            instance_id=event.instance_id,
         )
 
     async def start(self) -> None:
@@ -146,4 +146,4 @@ class ServiceDiscoveryEventPublisher:
         try:
             await self.publish_deregistered()
         except Exception:
-            log.exception("Error publishing SD deregistration")
+            log.exception("service deregistered event publish failed")

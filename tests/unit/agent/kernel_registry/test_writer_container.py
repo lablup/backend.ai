@@ -1,17 +1,13 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import MutableMapping
 from pathlib import Path
-from typing import cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from ai.backend.agent.kernel import AbstractKernel
 from ai.backend.agent.kernel_registry.exception import KernelRecoveryDataParseError
 from ai.backend.agent.kernel_registry.writer.container import ContainerBasedKernelRegistryWriter
-from ai.backend.agent.kernel_registry.writer.types import KernelRegistrySaveMetadata
 from ai.backend.agent.types import KernelOwnershipData
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import AgentId, KernelId, SessionId, SessionTypes
@@ -21,12 +17,6 @@ from ai.backend.common.types import AgentId, KernelId, SessionId, SessionTypes
 def writer() -> ContainerBasedKernelRegistryWriter:
     """Writer instance with scratch root."""
     return ContainerBasedKernelRegistryWriter(Path("/tmp/scratch"))
-
-
-@pytest.fixture
-def metadata() -> KernelRegistrySaveMetadata:
-    """Default save metadata."""
-    return KernelRegistrySaveMetadata(force=False)
 
 
 @pytest.fixture
@@ -69,17 +59,6 @@ def mock_kernel() -> MagicMock:
 
 
 @pytest.fixture
-def kernel_registry_data(
-    mock_kernel: MagicMock,
-) -> MutableMapping[KernelId, AbstractKernel]:
-    """Registry data with single kernel."""
-    return cast(
-        MutableMapping[KernelId, AbstractKernel],
-        {mock_kernel.kernel_id: mock_kernel},
-    )
-
-
-@pytest.fixture
 def mock_config_mgr() -> MagicMock:
     """Mock ScratchConfig manager."""
     mgr = MagicMock()
@@ -87,16 +66,43 @@ def mock_config_mgr() -> MagicMock:
     return mgr
 
 
-class TestSaveKernelRegistry:
-    """Tests for save_kernel_registry method."""
-
-    async def test_save_kernel_registry_skips_kernel_on_parse_error(
+class TestSaveKernel:
+    async def test_saves_recovery_data_of_the_given_kernel_only(
         self,
         writer: ContainerBasedKernelRegistryWriter,
-        kernel_registry_data: MutableMapping[KernelId, AbstractKernel],
-        metadata: KernelRegistrySaveMetadata,
+        mock_kernel: MagicMock,
+        mock_config_mgr: MagicMock,
     ) -> None:
-        """Skip kernel with parse error and continue processing others."""
+        recovery_data = MagicMock()
+        with (
+            patch.object(writer, "_parse_recovery_data_from_kernel", return_value=recovery_data),
+            patch(
+                "ai.backend.agent.kernel_registry.writer.container.ScratchUtils"
+            ) as scratch_utils,
+            patch(
+                "ai.backend.agent.kernel_registry.writer.container.ScratchConfig",
+                return_value=mock_config_mgr,
+            ),
+            patch(
+                "ai.backend.agent.kernel_registry.writer.container.KernelRecoveryScratchData"
+            ) as scratch_data,
+        ):
+            await writer.save_kernel(mock_kernel)
+
+        scratch_utils.get_scratch_kernel_config_dir.assert_called_once_with(
+            Path("/tmp/scratch"), mock_kernel.kernel_id
+        )
+        scratch_data.from_kernel_recovery_data.assert_called_once_with(recovery_data)
+        mock_config_mgr.save_json_recovery_data.assert_awaited_once_with(
+            scratch_data.from_kernel_recovery_data.return_value
+        )
+
+    async def test_raises_on_parse_error(
+        self,
+        writer: ContainerBasedKernelRegistryWriter,
+        mock_kernel: MagicMock,
+        mock_config_mgr: MagicMock,
+    ) -> None:
         with (
             patch.object(
                 writer,
@@ -104,32 +110,30 @@ class TestSaveKernelRegistry:
                 side_effect=KernelRecoveryDataParseError(),
             ),
             patch("ai.backend.agent.kernel_registry.writer.container.ScratchUtils"),
-            patch("ai.backend.agent.kernel_registry.writer.container.ScratchConfig"),
+            patch(
+                "ai.backend.agent.kernel_registry.writer.container.ScratchConfig",
+                return_value=mock_config_mgr,
+            ),
+            pytest.raises(KernelRecoveryDataParseError),
         ):
-            # Should not raise, just skip the kernel
-            await writer.save_kernel_registry(kernel_registry_data, metadata)
+            await writer.save_kernel(mock_kernel)
 
-    async def test_save_kernel_registry_skips_none_recovery_data(
+        mock_config_mgr.save_json_recovery_data.assert_not_called()
+
+    async def test_skips_kernel_without_recovery_data(
         self,
         writer: ContainerBasedKernelRegistryWriter,
-        kernel_registry_data: MutableMapping[KernelId, AbstractKernel],
-        metadata: KernelRegistrySaveMetadata,
+        mock_kernel: MagicMock,
         mock_config_mgr: MagicMock,
     ) -> None:
-        """Skip kernels that return None from parse method."""
         with (
-            patch.object(
-                writer,
-                "_parse_recovery_data_from_kernel",
-                return_value=None,
-            ),
+            patch.object(writer, "_parse_recovery_data_from_kernel", return_value=None),
             patch("ai.backend.agent.kernel_registry.writer.container.ScratchUtils"),
             patch(
                 "ai.backend.agent.kernel_registry.writer.container.ScratchConfig",
                 return_value=mock_config_mgr,
             ),
         ):
-            await writer.save_kernel_registry(kernel_registry_data, metadata)
+            await writer.save_kernel(mock_kernel)
 
-        # Verify save was not called since recovery data was None
         mock_config_mgr.save_json_recovery_data.assert_not_called()

@@ -1,37 +1,43 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from collections.abc import Collection, Mapping, Sequence
+from typing import TYPE_CHECKING, Any
 
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.orm import selectinload
 
-from ai.backend.common.exception import AgentNotFound
-from ai.backend.common.types import AgentId, ImageID
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.data.entity.agent import AgentUUID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.types import AgentId, ImageID, ResourceSlot
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.agent.types import (
     AgentData,
-    AgentDetailData,
+    AgentDataForHeartbeatUpdate,
     AgentHeartbeatUpsert,
-    AgentListResult,
-    AgentStatus,
     UpsertResult,
 )
-from ai.backend.manager.data.image.types import ImageDataWithDetails, ImageIdentifier
-from ai.backend.manager.errors.resource import UnresolvableResourceGroup
-from ai.backend.manager.models.agent import ADMIN_PERMISSIONS as ADMIN_AGENT_PERMISSIONS
-from ai.backend.manager.models.agent import AgentRow, agents
-from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.resource_slot import AgentResourceRow
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
+from ai.backend.manager.data.image.types import ImageIdentifier
+from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
+from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.errors.agent import AgentHasConflictingSessions, AgentNotFound
+from ai.backend.manager.errors.resource import ResourceGroupNotFound, UnresolvableResourceGroup
+from ai.backend.manager.models.agent.row import AgentRow, agents
+from ai.backend.manager.models.agent.searchable_fields import AgentSearchableFields
+from ai.backend.manager.models.agent.upserters import AgentHeartbeatUpserter
+from ai.backend.manager.models.deployment_designated_agent.row import DeploymentDesignatedAgentRow
+from ai.backend.manager.models.endpoint.row import EndpointRow
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_slot.row import AgentResourceRow
+from ai.backend.manager.models.resource_slot.upserters import AgentResourceUpserter
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.session_designated_agent.row import SessionDesignatedAgentRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.agent.updaters import AgentStatusUpdaterSpec
-from ai.backend.manager.repositories.base import BulkUpserter, execute_bulk_upserter
-from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
-from ai.backend.manager.repositories.base.updater import Updater, execute_updater
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -41,57 +47,83 @@ class AgentDBSource:
     """Database source for agent-related operations."""
 
     _db: ExtendedAsyncSAEngine
+    _v2_ops: ShareOpsProvider
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+    def __init__(self, db: ExtendedAsyncSAEngine, v2_ops: ShareOpsProvider) -> None:
         self._db = db
+        self._v2_ops = v2_ops
 
-    async def get_images_by_image_identifiers(
+    async def image_ids_by_identifiers(
         self, image_identifiers: list[ImageIdentifier]
-    ) -> dict[ImageID, ImageDataWithDetails]:
+    ) -> list[ImageID]:
+        """The ids of the images matching a canonical and architecture pair."""
+        identifier_tuples = [
+            (identifier.canonical, identifier.architecture) for identifier in image_identifiers
+        ]
+        query = sa.select(ImageRow.id).where(
+            sa.tuple_(ImageRow.name, ImageRow.architecture).in_(identifier_tuples)
+        )
         async with self._db.begin_readonly_session_read_committed() as db_session:
-            identifier_tuples = [
-                (identifier.canonical, identifier.architecture) for identifier in image_identifiers
-            ]
+            return list((await db_session.scalars(query)).all())
 
-            query = (
-                sa.select(ImageRow)
-                .where(sa.tuple_(ImageRow.name, ImageRow.architecture).in_(identifier_tuples))
-                .options(selectinload(ImageRow.aliases))
-            )
-            image_rows = list((await db_session.scalars(query)).all())
-            images_data: dict[ImageID, ImageDataWithDetails] = {}
-            for image_row in image_rows:
-                images_data[ImageID(image_row.id)] = image_row.to_detailed_dataclass()
-            return images_data
-
-    async def get_images_by_digest(self, digests: list[str]) -> dict[ImageID, ImageDataWithDetails]:
+    async def image_ids_by_digest(self, digests: list[str]) -> list[ImageID]:
+        """The ids of the images whose config digest is one of the given digests."""
+        query = sa.select(ImageRow.id).where(ImageRow.config_digest.in_(digests))
         async with self._db.begin_readonly_session_read_committed() as db_session:
-            query = (
-                sa.select(ImageRow)
-                .where(ImageRow.config_digest.in_(digests))
-                .options(selectinload(ImageRow.aliases))
-            )
-            results = list((await db_session.scalars(query)).all())
-            images_data: dict[ImageID, ImageDataWithDetails] = {}
-            for image_row in results:
-                images_data[ImageID(image_row.id)] = image_row.to_detailed_dataclass()
-            return images_data
+            return list((await db_session.scalars(query)).all())
+
+    async def agent_names_by_uuid(
+        self, agent_uuids: Sequence[AgentUUID]
+    ) -> Mapping[AgentUUID, AgentId]:
+        """The name column of each named agent; an unknown uuid is absent."""
+        if not agent_uuids:
+            return {}
+        async with self._db.begin_readonly_session_read_committed() as db_session:
+            rows = (
+                await db_session.execute(
+                    sa.select(AgentRow.uuid, AgentRow.id).where(AgentRow.uuid.in_(agent_uuids))
+                )
+            ).all()
+        return {AgentUUID(row[0]): AgentId(row[1]) for row in rows}
 
     async def get_by_id(self, agent_id: AgentId) -> AgentData:
         async with self._db.begin_readonly_session_read_committed() as db_session:
             agent_row: AgentRow | None = await db_session.scalar(
-                sa.select(AgentRow)
-                .where(AgentRow.id == agent_id)
-                .options(
-                    selectinload(AgentRow.agent_resource_rows).joinedload(
-                        AgentResourceRow.slot_type_row
-                    )
-                )
+                sa.select(AgentRow).where(AgentRow.id == agent_id)
             )
             if agent_row is None:
-                log.error("Agent with id {} not found", agent_id)
                 raise AgentNotFound(f"Agent with id {agent_id} not found")
-            return agent_row.to_data()
+            return AgentSearchableFields.own.to_data(agent_row)
+
+    async def _heartbeat_update_data(
+        self, session: AsyncSession, row: AgentRow
+    ) -> AgentDataForHeartbeatUpdate:
+        """The stored state a heartbeat is compared against.
+
+        ``available_slots`` is read from ``agent_resources`` in its own statement; the
+        remaining fields are columns of the agent row.
+        """
+        slot_rows = (
+            await session.execute(
+                sa.select(AgentResourceRow.slot_name, AgentResourceRow.capacity).where(
+                    AgentResourceRow.agent_id == row.id
+                )
+            )
+        ).all()
+        return AgentDataForHeartbeatUpdate(
+            status=row.status,
+            status_changed=row.status_changed,
+            available_slots=ResourceSlot({
+                slot_name: capacity for slot_name, capacity in slot_rows
+            }),
+            addr=row.addr,
+            public_host=row.public_host,
+            version=row.version,
+            architecture=row.architecture,
+            compute_plugins=row.compute_plugins,
+            public_key=row.public_key,
+            auto_terminate_abusing_kernel=row.auto_terminate_abusing_kernel,
+        )
 
     async def upsert_agent_with_state(self, upsert_data: AgentHeartbeatUpsert) -> UpsertResult:
         async with self._db.begin_session_read_committed() as session:
@@ -99,137 +131,202 @@ class AgentDBSource:
                 sa.select(AgentRow).where(AgentRow.id == upsert_data.metadata.id).with_for_update()
             )
             row: AgentRow | None = await session.scalar(query)
-            agent_data = row.to_heartbeat_update_data() if row is not None else None
+            agent_data = (
+                await self._heartbeat_update_data(session, row) if row is not None else None
+            )
             upsert_result = UpsertResult.from_state_comparison(agent_data, upsert_data)
 
-            if row is None:
-                await self._insert_new_agent(session, upsert_data)
-            else:
+            if row is not None:
                 await session.execute(
                     sa.update(agents)
                     .where(agents.c.id == upsert_data.metadata.id)
                     .values(upsert_data.update_fields)
                 )
-
-            return upsert_result
-
-    async def _insert_new_agent(
-        self, session: AsyncSession, upsert_data: AgentHeartbeatUpsert
-    ) -> None:
-        resource_group_name = upsert_data.metadata.scaling_group
-        group_select = (
-            sa.select(
-                *[
-                    sa.literal(value, type_=agents.c[key].type).label(key)
-                    for key, value in upsert_data.insert_fields.items()
-                ],
-                ScalingGroupRow.name.label("scaling_group"),
-                ScalingGroupRow.id.label("resource_group_id"),
+                return upsert_result
+            resource_group_id, resource_group_name = await self._resolve_resource_group(
+                session, upsert_data.metadata.resource_group
             )
-            .select_from(ScalingGroupRow)
-            .where(
-                sa.or_(
-                    ScalingGroupRow.name == resource_group_name,
-                    ScalingGroupRow.is_default,
+        # A concurrent registration inserting first is answered by the upsert's conflict key.
+        async with self._v2_ops.write_ops() as w:
+            await w.upsert_entity(
+                AgentHeartbeatUpserter(
+                    upsert_data=upsert_data,
+                    resource_group_id=resource_group_id,
+                    resource_group_name=resource_group_name,
                 )
             )
-            .order_by(sa.case((ScalingGroupRow.name == resource_group_name, 0), else_=1))
-            .limit(1)
-        )
-        stmt = (
-            pg_insert(agents)
-            .from_select(
-                [*upsert_data.insert_fields.keys(), "scaling_group", "resource_group_id"],
-                group_select,
+        return upsert_result
+
+    async def _resolve_resource_group(
+        self, session: AsyncSession, resource_group_name: str | None
+    ) -> tuple[ResourceGroupID, str]:
+        """The group a new agent joins: the named one, else the default one."""
+        group_filter: sa.ColumnElement[bool]
+        group_order: sa.ColumnElement[Any]
+        if resource_group_name is not None:
+            group_filter = sa.or_(
+                ResourceGroupRow.name == resource_group_name,
+                ResourceGroupRow.is_default,
             )
-            # Guard a rare race where a concurrent registration inserted first
-            .on_conflict_do_update(
-                index_elements=["id"],
-                set_={**upsert_data.update_fields},
+            group_order = sa.case((ResourceGroupRow.name == resource_group_name, 0), else_=1)
+        else:
+            group_filter = ResourceGroupRow.is_default.is_(True)
+            group_order = sa.asc(ResourceGroupRow.name)
+        resolved = (
+            await session.execute(
+                sa.select(ResourceGroupRow.id, ResourceGroupRow.name)
+                .where(group_filter)
+                .order_by(group_order)
+                .limit(1)
             )
-            .returning(agents.c.id)
-        )
-        affected = (await session.execute(stmt)).scalar_one_or_none()
-        if affected is None:
+        ).first()
+        if resolved is None:
+            if resource_group_name is not None:
+                raise UnresolvableResourceGroup(
+                    f"Scaling group '{resource_group_name}' not found "
+                    "and no default scaling group is set."
+                )
             raise UnresolvableResourceGroup(
-                f"Scaling group '{resource_group_name}' not found "
-                "and no default scaling group is set."
+                "No initial resource group name is configured and no default scaling group is set."
             )
+        return ResourceGroupID(resolved.id), resolved.name
 
-    async def update_agent_status_exit(self, updater: Updater[AgentRow]) -> None:
-        async with self._db.begin_session() as session:
-            fetch_query = (
-                sa.select(AgentRow.status)
-                .select_from(AgentRow)
-                .where(AgentRow.id == updater.pk_value)
-                .with_for_update()
-            )
-            prev_status = await session.scalar(fetch_query)
-            if prev_status in (None, AgentStatus.LOST, AgentStatus.TERMINATED):
-                return
-
-            spec = updater.spec
-            if isinstance(spec, AgentStatusUpdaterSpec):
-                if spec.status == AgentStatus.LOST:
-                    log.warning("agent {0} heartbeat timeout detected.", updater.pk_value)
-                elif spec.status == AgentStatus.TERMINATED:
-                    log.info("agent {0} has terminated.", updater.pk_value)
-
-            await execute_updater(session, updater)
-
-    async def update_agent_status(self, updater: Updater[AgentRow]) -> None:
-        async with self._db.begin_session() as session:
-            await execute_updater(session, updater)
-
-    async def search_agents(
+    async def update_resource_group(
         self,
-        querier: BatchQuerier,
-    ) -> AgentListResult:
-        """Searches agents with total count."""
+        agent_id: AgentId,
+        resource_group_id: ResourceGroupID,
+        *,
+        force: bool,
+    ) -> list[KernelInfo]:
+        """
+        Change the agent's resource group in one transaction and drop the unterminated designations.
+        Without ``force``, raises AgentHasConflictingSessions when active kernels or unterminated
+        designations by other resource groups exist. Returns the active kernels.
+        """
+        active_statuses = (
+            KernelStatus.resource_occupied_statuses() | KernelStatus.resource_requested_statuses()
+        )
+        async with self._db.begin_session_read_committed() as session:
+            resource_group_name = await session.scalar(
+                sa.select(ResourceGroupRow.name).where(ResourceGroupRow.id == resource_group_id)
+            )
+            if resource_group_name is None:
+                raise ResourceGroupNotFound(str(resource_group_id))
+            agent = (
+                await session.execute(
+                    sa.select(AgentRow.uuid, AgentRow.resource_group_id).where(
+                        AgentRow.id == agent_id
+                    )
+                )
+            ).first()
+            if agent is None:
+                raise AgentNotFound(f"Agent with id {agent_id} not found")
 
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(AgentRow).options(
-                selectinload(AgentRow.agent_resource_rows).joinedload(
-                    AgentResourceRow.slot_type_row
+            rows = (
+                (
+                    await session.execute(
+                        sa.select(KernelRow).where(
+                            KernelRow.agent == agent_id,
+                            KernelRow.status.in_(active_statuses),
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            kernels = [row.to_kernel_info() for row in rows]
+
+            session_designations = (
+                SessionDesignatedAgentRow.agent_uuid == agent.uuid,
+                SessionDesignatedAgentRow.session_id.in_(
+                    sa.select(SessionRow.id).where(
+                        SessionRow.resource_group_id != resource_group_id,
+                        SessionRow.status.not_in(SessionStatus.terminal_statuses()),
+                    )
                 ),
             )
-
-            result = await execute_batch_querier(
-                db_sess,
-                query,
-                querier,
+            deployment_designations = (
+                DeploymentDesignatedAgentRow.agent_uuid == agent.uuid,
+                DeploymentDesignatedAgentRow.endpoint_id.in_(
+                    sa.select(EndpointRow.id).where(
+                        EndpointRow.resource_group != resource_group_name,
+                        EndpointRow.lifecycle_stage != EndpointLifecycle.DESTROYED,
+                    )
+                ),
             )
-            agent_rows: list[AgentRow] = [row.AgentRow for row in result.rows]
-            items = [agent_row.to_data() for agent_row in agent_rows]
-            admin_permissions = list(ADMIN_AGENT_PERMISSIONS)
-            agents_with_permissions = [
-                AgentDetailData(agent=agent_data, permissions=admin_permissions)
-                for agent_data in items
-            ]
+            if not force:
+                allocated_session_count = len({kernel.session.session_id for kernel in kernels})
+                designating_session_count = await session.scalar(
+                    sa.select(sa.func.count())
+                    .select_from(SessionDesignatedAgentRow)
+                    .where(*session_designations)
+                )
+                designating_deployment_count = await session.scalar(
+                    sa.select(sa.func.count())
+                    .select_from(DeploymentDesignatedAgentRow)
+                    .where(*deployment_designations)
+                )
+                if (
+                    allocated_session_count
+                    or designating_session_count
+                    or designating_deployment_count
+                ):
+                    raise AgentHasConflictingSessions(
+                        agent_id,
+                        allocated_session_count=allocated_session_count,
+                        designating_session_count=designating_session_count or 0,
+                        designating_deployment_count=designating_deployment_count or 0,
+                    )
 
-            return AgentListResult(
-                items=agents_with_permissions,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
+            await session.execute(
+                sa.update(agents)
+                .where(agents.c.id == agent_id)
+                .values(
+                    resource_group_id=resource_group_id,
+                    scaling_group=resource_group_name,
+                )
             )
+            await session.execute(sa.delete(SessionDesignatedAgentRow).where(*session_designations))
+            await session.execute(
+                sa.delete(DeploymentDesignatedAgentRow).where(*deployment_designations)
+            )
+        if agent.resource_group_id != resource_group_id:
+            async with self._v2_ops.write_ops() as w:
+                await w.transfer(
+                    [ResourceGroupID(agent.resource_group_id)],
+                    [resource_group_id],
+                    AgentUUID(agent.uuid),
+                )
+        return kernels
 
-    async def upsert_agent_resource_capacity(
+    async def sync_agent_resource_capacity(
         self,
-        bulk_upserter: BulkUpserter[AgentResourceRow],
+        agent_id: AgentId,
+        agent_uuid: AgentUUID,
+        upserters: Sequence[AgentResourceUpserter],
+        reported_slot_names: Collection[str],
     ) -> int:
-        """Bulk UPSERT agent resource capacity rows.
+        """UPSERT agent resource capacity rows and drop the slots the agent no
+        longer reports.
 
         On INSERT: sets capacity (used defaults to 0).
         On CONFLICT: updates capacity only.
+        Rows for unreported slots are deleted only when nothing holds them, so a
+        slot that still carries an allocation survives until it is released.
 
         Returns:
             Number of rows upserted.
         """
+        async with self._v2_ops.write_ops() as w:
+            written = await w.atomic_upsert_field_entities(agent_uuid, upserters)
         async with self._db.begin_session_read_committed() as db_sess:
-            result = await execute_bulk_upserter(
-                db_sess,
-                bulk_upserter,
-                index_elements=["agent_id", "slot_name"],
+            await db_sess.execute(
+                sa.delete(AgentResourceRow).where(
+                    (AgentResourceRow.agent_id == str(agent_id))
+                    & AgentResourceRow.slot_name.not_in(reported_slot_names)
+                    & (AgentResourceRow.used == 0)
+                    & (AgentResourceRow.reserved == 0)
+                    & (AgentResourceRow.prereserved == 0)
+                )
             )
-            return result.upserted_count
+        return len(written)

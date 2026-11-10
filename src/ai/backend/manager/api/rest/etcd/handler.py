@@ -26,23 +26,25 @@ from ai.backend.common.dto.manager.etcd.response import (
     VfolderTypesResponse,
 )
 from ai.backend.common.dto.manager.resource.response import ContainerRegistriesResponse
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.services.container_registry.actions.get_container_registries import (
     GetContainerRegistriesAction,
 )
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
-from ai.backend.manager.services.etcd_config import (
-    DeleteConfigAction,
-    GetConfigAction,
+from ai.backend.manager.services.etcd_config.actions.delete_config import DeleteConfigAction
+from ai.backend.manager.services.etcd_config.actions.get_config import GetConfigAction
+from ai.backend.manager.services.etcd_config.actions.get_resource_metadata import (
     GetResourceMetadataAction,
-    GetResourceSlotsAction,
-    GetVfolderTypesAction,
-    SetConfigAction,
 )
+from ai.backend.manager.services.etcd_config.actions.get_resource_slots import (
+    GetResourceSlotsAction,
+)
+from ai.backend.manager.services.etcd_config.actions.get_vfolder_types import GetVfolderTypesAction
+from ai.backend.manager.services.etcd_config.actions.set_config import SetConfigAction
 from ai.backend.manager.services.etcd_config.processors import EtcdConfigProcessors
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class EtcdHandler:
@@ -62,9 +64,8 @@ class EtcdHandler:
     # ------------------------------------------------------------------
 
     async def get_resource_slots(self) -> APIResponse:
-        log.info("ETCD.GET_RESOURCE_SLOTS ()")
         action = GetResourceSlotsAction()
-        result = await self._etcd_config.get_resource_slots.wait_for_complete(action)
+        result = await self._etcd_config.get_resource_slots.run(action)
         resp = ResourceSlotsResponse(root=result.slots)
         return APIResponse.build(HTTPStatus.OK, resp)
 
@@ -77,9 +78,8 @@ class EtcdHandler:
         query: QueryParam[GetResourceMetadataQuery],
     ) -> APIResponse:
         params = query.parsed
-        log.info("ETCD.GET_RESOURCE_METADATA (sg:{})", params.sgroup)
         action = GetResourceMetadataAction(sgroup=params.sgroup)
-        result = await self._etcd_config.get_resource_metadata.wait_for_complete(action)
+        result = await self._etcd_config.get_resource_metadata.run(action)
         resp = ResourceMetadataResponse(root=result.metadata)
         return APIResponse.build(HTTPStatus.OK, resp)
 
@@ -88,9 +88,8 @@ class EtcdHandler:
     # ------------------------------------------------------------------
 
     async def get_vfolder_types(self) -> APIResponse:
-        log.info("ETCD.GET_VFOLDER_TYPES ()")
         action = GetVfolderTypesAction()
-        result = await self._etcd_config.get_vfolder_types.wait_for_complete(action)
+        result = await self._etcd_config.get_vfolder_types.run(action)
         resp = VfolderTypesResponse(root=result.types)
         return APIResponse.build(HTTPStatus.OK, resp)
 
@@ -99,12 +98,8 @@ class EtcdHandler:
     # ------------------------------------------------------------------
 
     async def get_docker_registries(self, ctx: UserContext) -> APIResponse:
-        log.info("ETCD.GET_DOCKER_REGISTRIES ()")
-        log.warning(
-            "ETCD.GET_DOCKER_REGISTRIES has been deprecated because it no longer uses etcd."
-            " Use /resource/container-registries API instead."
-        )
-        result = await self._container_registry.get_container_registries.wait_for_complete(
+        log.trace("deprecated docker registries api called")
+        result = await self._container_registry.get_container_registries.run(
             GetContainerRegistriesAction()
         )
         return APIResponse.build(HTTPStatus.OK, ContainerRegistriesResponse(root=result.registries))
@@ -126,14 +121,8 @@ class EtcdHandler:
            is used.  Prefer dedicated CRUD APIs when possible.
         """
         params = body.parsed
-        log.info(
-            "ETCD.GET_CONFIG (ak:{}, key:{}, prefix:{})",
-            ctx.access_key,
-            params.key,
-            params.prefix,
-        )
         action = GetConfigAction(key=params.key, prefix=params.prefix)
-        result = await self._etcd_config.get_config.wait_for_complete(action)
+        result = await self._etcd_config.get_config.run(action)
         return APIResponse.build(HTTPStatus.OK, ConfigResultResponse(result=result.result))
 
     # ------------------------------------------------------------------
@@ -147,14 +136,8 @@ class EtcdHandler:
     ) -> APIResponse:
         """Raw etcd key-value write."""
         params = body.parsed
-        log.info(
-            "ETCD.SET_CONFIG (ak:{}, key:{}, val:{})",
-            ctx.access_key,
-            params.key,
-            params.value,
-        )
         action = SetConfigAction(key=params.key, value=params.value)
-        await self._etcd_config.set_config.wait_for_complete(action)
+        await self._etcd_config.set_config.run(action)
         return APIResponse.build(HTTPStatus.OK, OkResultResponse())
 
     # ------------------------------------------------------------------
@@ -174,12 +157,6 @@ class EtcdHandler:
            is used.  This may delete sibling keys unexpectedly.
         """
         params = body.parsed
-        log.info(
-            "ETCD.DELETE_CONFIG (ak:{}, key:{}, prefix:{})",
-            ctx.access_key,
-            params.key,
-            params.prefix,
-        )
         action = DeleteConfigAction(key=params.key, prefix=params.prefix)
-        await self._etcd_config.delete_config.wait_for_complete(action)
+        await self._etcd_config.delete_config.run(action)
         return APIResponse.build(HTTPStatus.OK, OkResultResponse())

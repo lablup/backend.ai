@@ -1,10 +1,10 @@
 ---
 Author: HyeokJin Kim (hyeokjin@lablup.com)
-Status: Draft
+Status: Implemented
 Created: 2026-07-09
 Created-Version:
 Target-Version:
-Implemented-Version:
+Implemented-Version: 26.8.0
 ---
 
 # Agent↔Resource Group Registration: Make the Manager DB the Source of Truth

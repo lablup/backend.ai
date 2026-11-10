@@ -1,22 +1,32 @@
-from typing import override
-
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
-from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
-from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
+from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
+from ai.backend.manager.actions.v2.ops.result import LookupOpsResult
+from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
+from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
+from ai.backend.manager.data.huggingface_registry.types import (
+    HuggingFaceRegistryConnectionData,
+    HuggingFaceRegistryData,
+)
+from ai.backend.manager.data.reservoir_registry.types import (
+    ReservoirRegistryConnectionData,
+    ReservoirRegistryData,
+)
 from ai.backend.manager.services.artifact_registry.actions.common.get_meta import (
     GetArtifactRegistryMetaAction,
     GetArtifactRegistryMetaActionResult,
 )
 from ai.backend.manager.services.artifact_registry.actions.common.get_multi import (
     GetArtifactRegistryMetasAction,
-    GetArtifactRegistryMetasActionResult,
 )
 from ai.backend.manager.services.artifact_registry.actions.common.search import (
     SearchArtifactRegistriesAction,
     SearchArtifactRegistriesActionResult,
+)
+from ai.backend.manager.services.artifact_registry.actions.huggingface.bulk_get import (
+    BulkGetHuggingFaceRegistriesAction,
 )
 from ai.backend.manager.services.artifact_registry.actions.huggingface.create import (
     CreateHuggingFaceRegistryAction,
@@ -38,6 +48,12 @@ from ai.backend.manager.services.artifact_registry.actions.huggingface.list impo
     ListHuggingFaceRegistryAction,
     ListHuggingFaceRegistryActionResult,
 )
+from ai.backend.manager.services.artifact_registry.actions.huggingface.partial_bulk_purge import (
+    PartialBulkPurgeHuggingFaceRegistriesAction,
+)
+from ai.backend.manager.services.artifact_registry.actions.huggingface.partial_bulk_update import (
+    PartialBulkUpdateHuggingFaceRegistriesAction,
+)
 from ai.backend.manager.services.artifact_registry.actions.huggingface.search import (
     SearchHuggingFaceRegistriesAction,
     SearchHuggingFaceRegistriesActionResult,
@@ -45,6 +61,12 @@ from ai.backend.manager.services.artifact_registry.actions.huggingface.search im
 from ai.backend.manager.services.artifact_registry.actions.huggingface.update import (
     UpdateHuggingFaceRegistryAction,
     UpdateHuggingFaceRegistryActionResult,
+)
+from ai.backend.manager.services.artifact_registry.actions.lookup import (
+    LookupArtifactRegistryAction,
+)
+from ai.backend.manager.services.artifact_registry.actions.reservoir.bulk_get import (
+    BulkGetReservoirRegistriesAction,
 )
 from ai.backend.manager.services.artifact_registry.actions.reservoir.create import (
     CreateReservoirActionResult,
@@ -66,6 +88,12 @@ from ai.backend.manager.services.artifact_registry.actions.reservoir.list import
     ListReservoirRegistriesAction,
     ListReservoirRegistriesActionResult,
 )
+from ai.backend.manager.services.artifact_registry.actions.reservoir.partial_bulk_purge import (
+    PartialBulkPurgeReservoirRegistriesAction,
+)
+from ai.backend.manager.services.artifact_registry.actions.reservoir.partial_bulk_update import (
+    PartialBulkUpdateReservoirRegistriesAction,
+)
 from ai.backend.manager.services.artifact_registry.actions.reservoir.search import (
     SearchReservoirRegistriesAction,
     SearchReservoirRegistriesActionResult,
@@ -78,8 +106,9 @@ from ai.backend.manager.services.artifact_registry.actions.reservoir.update impo
 from .service import ArtifactRegistryService
 
 
-class ArtifactRegistryProcessors(AbstractProcessorPackage):
-    create_huggingface_registry: ActionProcessor[
+class ArtifactRegistryProcessors:
+    lookup: LookupActionProcessor[LookupArtifactRegistryAction, LookupOpsResult[ArtifactRegistryID]]
+    create_huggingface_registry: GlobalActionProcessor[
         CreateHuggingFaceRegistryAction, CreateHuggingFaceRegistryActionResult
     ]
     update_huggingface_registry: SingleEntityActionProcessor[
@@ -88,19 +117,25 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
     delete_huggingface_registry: SingleEntityActionProcessor[
         DeleteHuggingFaceRegistryAction, DeleteHuggingFaceRegistryActionResult
     ]
+    partial_bulk_update_huggingface_registries: PartialBulkActionProcessor[
+        PartialBulkUpdateHuggingFaceRegistriesAction, HuggingFaceRegistryData
+    ]
+    partial_bulk_purge_huggingface_registries: PartialBulkActionProcessor[
+        PartialBulkPurgeHuggingFaceRegistriesAction, ArtifactRegistryID
+    ]
     get_huggingface_registry: SingleEntityActionProcessor[
         GetHuggingFaceRegistryAction, GetHuggingFaceRegistryActionResult
     ]
-    get_huggingface_registries: ActionProcessor[
+    get_huggingface_registries: GlobalActionProcessor[
         GetHuggingFaceRegistriesAction, GetHuggingFaceRegistriesActionResult
     ]
-    list_huggingface_registries: ScopeActionProcessor[
+    list_huggingface_registries: GlobalActionProcessor[
         ListHuggingFaceRegistryAction, ListHuggingFaceRegistryActionResult
     ]
-    search_huggingface_registries: ActionProcessor[
+    search_huggingface_registries: GlobalActionProcessor[
         SearchHuggingFaceRegistriesAction, SearchHuggingFaceRegistriesActionResult
     ]
-    create_reservoir_registry: ActionProcessor[
+    create_reservoir_registry: GlobalActionProcessor[
         CreateReservoirRegistryAction, CreateReservoirActionResult
     ]
     update_reservoir_registry: SingleEntityActionProcessor[
@@ -109,122 +144,124 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
     delete_reservoir_registry: SingleEntityActionProcessor[
         DeleteReservoirRegistryAction, DeleteReservoirActionResult
     ]
+    partial_bulk_update_reservoir_registries: PartialBulkActionProcessor[
+        PartialBulkUpdateReservoirRegistriesAction, ReservoirRegistryData
+    ]
+    partial_bulk_purge_reservoir_registries: PartialBulkActionProcessor[
+        PartialBulkPurgeReservoirRegistriesAction, ArtifactRegistryID
+    ]
     get_reservoir_registry: SingleEntityActionProcessor[
         GetReservoirRegistryAction, GetReservoirRegistryActionResult
     ]
-    get_reservoir_registries: ActionProcessor[
+    get_reservoir_registries: GlobalActionProcessor[
         GetReservoirRegistriesAction, GetReservoirRegistriesActionResult
     ]
-    list_reservoir_registries: ActionProcessor[
+    list_reservoir_registries: GlobalActionProcessor[
         ListReservoirRegistriesAction, ListReservoirRegistriesActionResult
     ]
-    search_reservoir_registries: ActionProcessor[
+    search_reservoir_registries: GlobalActionProcessor[
         SearchReservoirRegistriesAction, SearchReservoirRegistriesActionResult
     ]
     get_registry_meta: SingleEntityActionProcessor[
         GetArtifactRegistryMetaAction, GetArtifactRegistryMetaActionResult
     ]
-    get_registry_metas: ActionProcessor[
-        GetArtifactRegistryMetasAction, GetArtifactRegistryMetasActionResult
+    get_registry_metas: PartialBulkActionProcessor[
+        GetArtifactRegistryMetasAction, ArtifactRegistryData
     ]
-    search_artifact_registries: ActionProcessor[
+    # What the DataLoaders read: checked per registry.
+    bulk_get_huggingface_registries: PartialBulkActionProcessor[
+        BulkGetHuggingFaceRegistriesAction, HuggingFaceRegistryConnectionData
+    ]
+    bulk_get_reservoir_registries: PartialBulkActionProcessor[
+        BulkGetReservoirRegistriesAction, ReservoirRegistryConnectionData
+    ]
+    search_artifact_registries: GlobalActionProcessor[
         SearchArtifactRegistriesAction, SearchArtifactRegistriesActionResult
     ]
 
     def __init__(
         self,
+        group: ProcessorGroup[ArtifactRegistryData],
+        huggingface_group: ProcessorGroup[HuggingFaceRegistryConnectionData],
+        reservoir_group: ProcessorGroup[ReservoirRegistryConnectionData],
         service: ArtifactRegistryService,
-        action_monitors: list[ActionMonitor],
-        validators: ActionValidators,
     ) -> None:
+        self.lookup = group.public_lookup_ops(LookupArtifactRegistryAction)
         # Scope actions with RBAC validator
-        self.create_huggingface_registry = ActionProcessor(
-            service.create_huggingface_registry, action_monitors
+        self.create_huggingface_registry = group.global_scope(
+            CreateHuggingFaceRegistryAction, service.create_huggingface_registry
         )
-        self.list_huggingface_registries = ScopeActionProcessor(
-            service.list_huggingface_registry, action_monitors, validators=[validators.rbac.scope]
+        self.list_huggingface_registries = group.global_scope(
+            ListHuggingFaceRegistryAction, service.list_huggingface_registry
         )
-        self.search_huggingface_registries = ActionProcessor(
-            service.search_huggingface_registries, action_monitors
+        self.search_huggingface_registries = group.global_scope(
+            SearchHuggingFaceRegistriesAction, service.search_huggingface_registries
         )
-        self.create_reservoir_registry = ActionProcessor(
-            service.create_reservoir_registry, action_monitors
+        self.create_reservoir_registry = group.global_scope(
+            CreateReservoirRegistryAction, service.create_reservoir_registry
         )
-        self.list_reservoir_registries = ActionProcessor(
-            service.list_reservoir_registries, action_monitors
+        self.list_reservoir_registries = group.global_scope(
+            ListReservoirRegistriesAction, service.list_reservoir_registries
         )
-        self.search_reservoir_registries = ActionProcessor(
-            service.search_reservoir_registries, action_monitors
+        self.search_reservoir_registries = group.global_scope(
+            SearchReservoirRegistriesAction, service.search_reservoir_registries
         )
-        self.search_artifact_registries = ActionProcessor(
-            service.search_artifact_registries, action_monitors
+        self.search_artifact_registries = group.global_scope(
+            SearchArtifactRegistriesAction, service.search_artifact_registries
         )
 
         # Single entity actions with RBAC validator
-        self.update_huggingface_registry = SingleEntityActionProcessor(
-            service.update_huggingface_registry,
-            action_monitors,
-            validators=[validators.rbac.single_entity],
+        self.update_huggingface_registry = group.single_entity(
+            UpdateHuggingFaceRegistryAction, service.update_huggingface_registry
         )
-        self.delete_huggingface_registry = SingleEntityActionProcessor(
-            service.delete_huggingface_registry,
-            action_monitors,
-            validators=[validators.rbac.single_entity],
+        self.delete_huggingface_registry = group.single_entity(
+            DeleteHuggingFaceRegistryAction, service.delete_huggingface_registry
         )
-        self.get_huggingface_registry = SingleEntityActionProcessor(
-            service.get_huggingface_registry,
-            action_monitors,
-            validators=[validators.rbac.single_entity],
+        self.get_huggingface_registry = group.single_entity(
+            GetHuggingFaceRegistryAction, service.get_huggingface_registry
         )
-        self.update_reservoir_registry = SingleEntityActionProcessor(
-            service.update_reservoir_registry,
-            action_monitors,
-            validators=[validators.rbac.single_entity],
+        self.update_reservoir_registry = group.single_entity(
+            UpdateReservoirRegistryAction, service.update_reservoir_registry
         )
-        self.delete_reservoir_registry = SingleEntityActionProcessor(
-            service.delete_reservoir_registry,
-            action_monitors,
-            validators=[validators.rbac.single_entity],
+        self.delete_reservoir_registry = group.single_entity(
+            DeleteReservoirRegistryAction, service.delete_reservoir_registry
         )
-        self.get_reservoir_registry = SingleEntityActionProcessor(
-            service.get_reservoir_registry,
-            action_monitors,
-            validators=[validators.rbac.single_entity],
+        self.get_reservoir_registry = group.single_entity(
+            GetReservoirRegistryAction, service.get_reservoir_registry
         )
 
-        self.get_registry_meta = SingleEntityActionProcessor(
-            service.get_registry_meta,
-            action_monitors,
-            validators=[validators.rbac.single_entity],
+        self.partial_bulk_update_huggingface_registries = group.partial_bulk(
+            PartialBulkUpdateHuggingFaceRegistriesAction,
+            service.partial_bulk_update_huggingface_registries,
+        )
+        self.partial_bulk_purge_huggingface_registries = group.partial_bulk(
+            PartialBulkPurgeHuggingFaceRegistriesAction,
+            service.partial_bulk_purge_huggingface_registries,
+        )
+        self.partial_bulk_update_reservoir_registries = group.partial_bulk(
+            PartialBulkUpdateReservoirRegistriesAction,
+            service.partial_bulk_update_reservoir_registries,
+        )
+        self.partial_bulk_purge_reservoir_registries = group.partial_bulk(
+            PartialBulkPurgeReservoirRegistriesAction,
+            service.partial_bulk_purge_reservoir_registries,
+        )
+
+        self.get_registry_meta = group.single_entity(
+            GetArtifactRegistryMetaAction, service.get_registry_meta
+        )
+        self.get_registry_metas = group.partial_bulk_get_ops(GetArtifactRegistryMetasAction)
+        self.bulk_get_huggingface_registries = huggingface_group.partial_bulk(
+            BulkGetHuggingFaceRegistriesAction, service.bulk_get_huggingface_registries
+        )
+        self.bulk_get_reservoir_registries = reservoir_group.partial_bulk(
+            BulkGetReservoirRegistriesAction, service.bulk_get_reservoir_registries
         )
 
         # Internal/batch actions without RBAC
-        self.get_huggingface_registries = ActionProcessor(
-            service.get_huggingface_registries, action_monitors
+        self.get_huggingface_registries = group.global_scope(
+            GetHuggingFaceRegistriesAction, service.get_huggingface_registries
         )
-        self.get_reservoir_registries = ActionProcessor(
-            service.get_reservoir_registries, action_monitors
+        self.get_reservoir_registries = group.global_scope(
+            GetReservoirRegistriesAction, service.get_reservoir_registries
         )
-        self.get_registry_metas = ActionProcessor(service.get_registry_metas, action_monitors)
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            CreateHuggingFaceRegistryAction.spec(),
-            UpdateHuggingFaceRegistryAction.spec(),
-            DeleteHuggingFaceRegistryAction.spec(),
-            GetHuggingFaceRegistryAction.spec(),
-            GetHuggingFaceRegistriesAction.spec(),
-            ListHuggingFaceRegistryAction.spec(),
-            SearchHuggingFaceRegistriesAction.spec(),
-            CreateReservoirRegistryAction.spec(),
-            UpdateReservoirRegistryAction.spec(),
-            DeleteReservoirRegistryAction.spec(),
-            GetReservoirRegistryAction.spec(),
-            GetReservoirRegistriesAction.spec(),
-            ListReservoirRegistriesAction.spec(),
-            SearchReservoirRegistriesAction.spec(),
-            GetArtifactRegistryMetaAction.spec(),
-            GetArtifactRegistryMetasAction.spec(),
-            SearchArtifactRegistriesAction.spec(),
-        ]

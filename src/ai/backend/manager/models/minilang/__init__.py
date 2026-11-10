@@ -15,7 +15,11 @@ class JSONFieldItem(NamedTuple):
 
 
 class ORMFieldItem(NamedTuple):
-    column: sa.orm.attributes.InstrumentedAttribute[Any] | sa.Column[Any]
+    column: (
+        sa.orm.attributes.InstrumentedAttribute[Any]
+        | sa.Column[Any]
+        | sa.sql.elements.ColumnElement[Any]
+    )
 
 
 TEnum = TypeVar("TEnum", bound=Enum)
@@ -31,7 +35,7 @@ FieldSpecItem = tuple[
     Callable[[str], Any] | None,
 ]
 OrderSpecItem = tuple[
-    str | ArrayFieldItem | JSONFieldItem | EnumFieldItem[Any],
+    str | ArrayFieldItem | JSONFieldItem | EnumFieldItem[Any] | ORMFieldItem,
     Callable[[sa.Column[Any]], Any] | None,
 ]
 
@@ -54,7 +58,7 @@ def get_col_from_table(
 class ExternalTableFilterSpec:
     """
     Specification for filtering on external tables that require JOINs.
-    This allows filters on related tables (like project_name from GroupRow)
+    This allows filters on related tables (like project_name from ProjectRow)
     to be handled separately and passed to repository layer for JOIN operations.
     """
 
@@ -69,7 +73,7 @@ class ExternalTableFilterSpec:
         """
         Args:
             field_name: Name of the field in the filter expression (e.g., "project_name")
-            target_table: SQLAlchemy table to apply the filter on (e.g., GroupRow.__table__)
+            target_table: SQLAlchemy table to apply the filter on (e.g., ProjectRow.__table__)
             target_column: Column name in the target table (e.g., "name")
             join_builder: Function that builds the JOIN clause given the base table or existing join
             transform: Optional transform function for the field value

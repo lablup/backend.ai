@@ -10,14 +10,14 @@ import aiohttp_cors
 from aiohttp import web
 
 from ai.backend.common.api_handlers import APIStreamResponse, extract_param_value, parse_response
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .types import ApiHandler, CORSOptions, RouteMiddleware, WebRequestHandler
 
 if TYPE_CHECKING:
     from aiohttp.typedefs import Middleware
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 async def _handle_stream_response(
@@ -28,22 +28,31 @@ async def _handle_stream_response(
     resp = web.StreamResponse(status=result.status, headers=result.headers)
     body_iter = result.body.read()
 
+    # Pull the first chunk before sending headers so that a failing source
+    # can still be reported with an error status code.
     try:
-        first_chunk = await body_iter.__anext__()
-        await resp.prepare(request)
-        await resp.write(first_chunk)
+        first_chunk = await anext(body_iter, None)
     except Exception:
-        log.exception("Failed to send first chunk from stream")
+        log.exception("stream response first chunk read failed")
         raise web.HTTPInternalServerError(
             reason="Failed to initialize streaming response"
         ) from None
 
+    if first_chunk is None:
+        resp.content_length = 0
+
     try:
-        async for chunk in body_iter:
-            await resp.write(chunk)
+        await resp.prepare(request)
+        if first_chunk is not None:
+            await resp.write(first_chunk)
+            async for chunk in body_iter:
+                await resp.write(chunk)
         await resp.write_eof()
+    except ConnectionError as e:
+        log.trace("client disconnected during stream response", reason=repr(e))
+        resp.force_close()
     except Exception:
-        log.exception("Error during streaming response body iteration")
+        log.exception("stream response body iteration failed")
         resp.force_close()
 
     return resp

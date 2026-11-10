@@ -3,41 +3,23 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action.base import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
+from ai.backend.manager.actions.v2.ops.base import GlobalSearcherOpsAction
 from ai.backend.manager.data.vfolder.types import VFolderData
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.services.vfolder.actions.base import VFolderAction
+from ai.backend.manager.models.vfolder.row import VFolderRow
 
 
-@dataclass
-class AdminSearchVFoldersAction(VFolderAction):
-    """Search all vfolders with filtering, ordering, and pagination.
-
-    Admin-only action without scope restriction.
-    """
-
-    querier: BatchQuerier
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
+@dataclass(frozen=True)
+class GlobalSearchVFoldersAction(GlobalSearcherOpsAction[VFolderRow, VFolderData]):
+    """Page through vfolders across every scope."""
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
-
-
-@dataclass
-class AdminSearchVFoldersActionResult(BaseActionResult):
-    """Result of AdminSearchVFoldersAction."""
-
-    data: list[VFolderData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
+    def entity_type(cls) -> EntityType:
+        return VFolderEntityType()
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "global_search_vfolders"

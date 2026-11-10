@@ -1,39 +1,48 @@
+import logging
 import uuid
 
-from ai.backend.common.contexts.request_id import (
-    current_request_id,
-    with_request_id,
-)
+import pytest
+
+from ai.backend.common.contexts.request_id import current_request_id, with_request_context
+from ai.backend.logging.structured import StructuredLogger
+
+LOGGER_NAME = "tests.common.request_id"
 
 
 def test_current_request_id_without_context() -> None:
     assert current_request_id() is None
 
 
-def test_with_request_id_context() -> None:
-    # Test with explicit request ID
+def test_given_request_id_is_set_on_both(caplog: pytest.LogCaptureFixture) -> None:
+    log = StructuredLogger(logging.getLogger(LOGGER_NAME))
     test_id = str(uuid.uuid4())
-    with with_request_id(test_id):
+    with caplog.at_level(logging.INFO, logger=LOGGER_NAME), with_request_context(test_id):
         assert current_request_id() == test_id
-    assert current_request_id() is None
+        log.info("inside")
 
-    # Test with auto-generated request ID
-    with with_request_id():
-        req_id = current_request_id()
-        assert req_id is not None
-        assert isinstance(req_id, str)
-        # Verify it's a valid UUID
-        uuid.UUID(req_id)
+    assert caplog.records[0].__dict__["log_tag_request_id"] == test_id
     assert current_request_id() is None
 
 
-def test_nested_request_id_contexts() -> None:
+def test_generated_request_id_is_the_same_on_both(caplog: pytest.LogCaptureFixture) -> None:
+    log = StructuredLogger(logging.getLogger(LOGGER_NAME))
+    with caplog.at_level(logging.INFO, logger=LOGGER_NAME), with_request_context():
+        request_id = current_request_id()
+        log.info("inside")
+
+    assert request_id is not None
+    uuid.UUID(request_id)
+    assert caplog.records[0].__dict__["log_tag_request_id"] == request_id
+    assert current_request_id() is None
+
+
+def test_nested_request_contexts() -> None:
     outer_id = str(uuid.uuid4())
     inner_id = str(uuid.uuid4())
 
-    with with_request_id(outer_id):
+    with with_request_context(outer_id):
         assert current_request_id() == outer_id
-        with with_request_id(inner_id):
+        with with_request_context(inner_id):
             assert current_request_id() == inner_id
         assert current_request_id() == outer_id
     assert current_request_id() is None

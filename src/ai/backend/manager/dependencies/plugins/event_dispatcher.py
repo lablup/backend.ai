@@ -6,11 +6,11 @@ from contextlib import asynccontextmanager
 from typing import override
 
 from ai.backend.common.plugin.event import EventDispatcherPluginContext
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .base import PluginDependency, PluginsInput
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class EventDispatcherPluginDependency(PluginDependency[EventDispatcherPluginContext]):
@@ -41,8 +41,8 @@ class EventDispatcherPluginDependency(PluginDependency[EventDispatcherPluginCont
             blocklist=setup_input.disabled_plugins,
         )
         log.info(
-            "EventDispatcherPluginContext initialized with plugins: {}",
-            list(ctx.plugins.keys()),
+            "event dispatcher plugins initialized",
+            plugin_names=", ".join(ctx.plugins.keys()),
         )
         try:
             yield ctx

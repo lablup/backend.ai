@@ -1,15 +1,24 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable, Coroutine
+import contextlib
+import logging
+from collections.abc import AsyncIterator, Callable, Coroutine
 from typing import Any
 
 import pytest
-from aiohttp import ClientTimeout, web
+from aiohttp import ClientSession, ClientTimeout, web
 from aiohttp.test_utils import TestClient
+from opentelemetry import trace
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from ai.backend.common.configs.client import HttpTimeoutConfig
+from ai.backend.common.contexts.request_id import with_request_context
+from ai.backend.common.endpoint_pool.pool import HealthyEndpointPool
+from ai.backend.common.endpoint_pool.strategy import RoundRobinStrategy
+from ai.backend.common.endpoint_pool.types import EndpointPoolSpec
 from ai.backend.common.exception import ErrorDetail, ErrorDomain, ErrorOperation, PassthroughError
+from ai.backend.common.middlewares.request_id import REQUEST_ID_HEADER
 from ai.backend.manager.clients.storage_proxy.base import (
     DEFAULT_TIMEOUT,
     StorageProxyClientArgs,
@@ -19,40 +28,118 @@ from ai.backend.manager.clients.storage_proxy.manager_facing_client import (
     StorageProxyManagerFacingClient,
 )
 from ai.backend.manager.config.unified import StorageProxyClientTimeoutConfig
-from ai.backend.manager.errors.storage import StorageProxyTimeoutError
+from ai.backend.manager.errors.storage import (
+    StorageProxyTimeoutError,
+    VFolderNotFound,
+    VFolderOperationFailed,
+)
 
 type HandlerType = Callable[[web.Request], Coroutine[Any, Any, web.Response]]
 type StorageProxyClientFactory = Callable[
-    [str, HandlerType], Coroutine[Any, Any, StorageProxyHTTPClient]
+    [str, HandlerType], Coroutine[Any, Any, tuple[StorageProxyHTTPClient, HealthyEndpointPool]]
 ]
 
 
 @pytest.fixture
-def storage_proxy_client_factory(
+async def storage_proxy_client_factory(
     aiohttp_client: Any,  # pytest-aiohttp plugin fixture
-) -> StorageProxyClientFactory:
+) -> AsyncIterator[StorageProxyClientFactory]:
     """Factory fixture to create StorageProxyHTTPClient with a mock handler."""
+
+    pools: list[HealthyEndpointPool] = []
 
     async def _factory(
         endpoint_path: str,
         handler: HandlerType,
-    ) -> StorageProxyHTTPClient:
+    ) -> tuple[StorageProxyHTTPClient, HealthyEndpointPool]:
         app = web.Application()
         app.router.add_get(f"/{endpoint_path}", handler)
         client: TestClient[Any] = await aiohttp_client(app)  # type: ignore[type-arg]
 
+        pool = HealthyEndpointPool(
+            endpoints=[str(client.make_url("/"))],
+            spec=EndpointPoolSpec("/readyz", 3600, 1, 60, 2),
+            strategy=RoundRobinStrategy(),
+            probe_session_factory=lambda endpoint: ClientSession(base_url=endpoint),
+        )
+        pools.append(pool)
         return StorageProxyHTTPClient(
             client_session=client.session,
             args=StorageProxyClientArgs(
-                endpoint=client.make_url("/"),
                 secret="test-secret",
             ),
-        )
+        ), pool
 
-    return _factory
+    try:
+        yield _factory
+    finally:
+        for pool in pools:
+            await pool.close()
 
 
 class TestStorageProxyClient:
+    @pytest.mark.parametrize("request_id", ["req-from-manager", None])
+    async def test_request_id_header_follows_the_request_context(
+        self, storage_proxy_client_factory: StorageProxyClientFactory, request_id: str | None
+    ) -> None:
+        received: list[str | None] = []
+
+        async def handler(request: web.Request) -> web.Response:
+            received.append(request.headers.get(REQUEST_ID_HEADER))
+            return web.Response(status=204)
+
+        client, pool = await storage_proxy_client_factory("echo", handler)
+        if request_id is None:
+            await client.request(
+                endpoint=pool.all_endpoints()[0],
+                method="GET",
+                url="echo",
+                request_timeout=DEFAULT_TIMEOUT,
+            )
+        else:
+            with with_request_context(request_id):
+                await client.request(
+                    endpoint=pool.all_endpoints()[0],
+                    method="GET",
+                    url="echo",
+                    request_timeout=DEFAULT_TIMEOUT,
+                )
+
+        assert received == [request_id]
+
+    @pytest.mark.parametrize("in_span", [True, False])
+    async def test_traceparent_header_follows_the_current_span(
+        self,
+        storage_proxy_client_factory: StorageProxyClientFactory,
+        span_exporter: InMemorySpanExporter,
+        in_span: bool,
+    ) -> None:
+        received: list[str | None] = []
+
+        async def handler(request: web.Request) -> web.Response:
+            received.append(request.headers.get("traceparent"))
+            return web.Response(status=204)
+
+        client, pool = await storage_proxy_client_factory("echo", handler)
+        expected: str | None = None
+        with contextlib.ExitStack() as stack:
+            if in_span:
+                span = stack.enter_context(
+                    trace.get_tracer(__name__).start_as_current_span("manager")
+                )
+                context = span.get_span_context()
+                expected = (
+                    f"00-{context.trace_id:032x}-{context.span_id:016x}-{context.trace_flags:02x}"
+                )
+            await client.request(
+                endpoint=pool.all_endpoints()[0],
+                method="GET",
+                url="echo",
+                request_timeout=DEFAULT_TIMEOUT,
+            )
+
+        assert received == [expected]
+
     async def test_client_gracefully_handle_non_json_response(
         self, storage_proxy_client_factory: StorageProxyClientFactory
     ) -> None:
@@ -67,14 +154,17 @@ class TestStorageProxyClient:
                 content_type="text/plain",
             )
 
-        storage_proxy_client = await storage_proxy_client_factory(
+        storage_proxy_client, pool = await storage_proxy_client_factory(
             test_endpoint, invalid_endpoint_handler
         )
 
         # Verify that non-JSON response raises PassthroughError with correct error code
         with pytest.raises(PassthroughError) as exc_info:
             await storage_proxy_client.request(
-                method="GET", url=test_endpoint, request_timeout=DEFAULT_TIMEOUT
+                endpoint=pool.all_endpoints()[0],
+                method="GET",
+                url=test_endpoint,
+                request_timeout=DEFAULT_TIMEOUT,
             )
 
         assert exc_info.value.status_code == test_status_code
@@ -83,6 +173,53 @@ class TestStorageProxyClient:
         assert error_code.domain == ErrorDomain.STORAGE_PROXY
         assert error_code.operation == ErrorOperation.REQUEST
         assert error_code.error_detail == ErrorDetail.CONTENT_TYPE_MISMATCH
+
+    @pytest.mark.parametrize(
+        ("status", "log_level", "error_type", "extra_msg"),
+        [
+            (404, 5, VFolderNotFound, "Requested resource not found"),
+            (
+                500,
+                logging.WARNING,
+                VFolderOperationFailed,
+                "Internal server error from storage proxy",
+            ),
+        ],
+    )
+    async def test_error_response_code_is_logged_not_exposed(
+        self,
+        storage_proxy_client_factory: StorageProxyClientFactory,
+        caplog: pytest.LogCaptureFixture,
+        status: int,
+        log_level: int,
+        error_type: type[Exception],
+        extra_msg: str,
+    ) -> None:
+        async def handler(_request: web.Request) -> web.Response:
+            return web.json_response(
+                {"error_code": "vfolder_read_internal-error", "title": "Disk failure"},
+                status=status,
+            )
+
+        client, pool = await storage_proxy_client_factory("failing", handler)
+        with (
+            caplog.at_level(5, logger="ai.backend.manager.clients.storage_proxy.base"),
+            pytest.raises(error_type) as exc_info,
+        ):
+            await client.request(
+                endpoint=pool.all_endpoints()[0],
+                method="GET",
+                url="failing",
+                request_timeout=DEFAULT_TIMEOUT,
+            )
+
+        assert getattr(exc_info.value, "extra_msg", None) == extra_msg
+        records = [r for r in caplog.records if r.getMessage() == "storage proxy error response"]
+        assert len(records) == 1
+        assert records[0].levelno == log_level
+        assert records[0].__dict__["log_tag_error_code"] == "vfolder_read_internal-error"
+        assert records[0].__dict__["log_tag_error_title"] == "Disk failure"
+        assert records[0].__dict__["log_tag_response_status"] == status
 
     async def test_request_timeout_expiration(
         self, storage_proxy_client_factory: StorageProxyClientFactory
@@ -95,20 +232,19 @@ class TestStorageProxyClient:
             await asyncio.sleep(2.0)
             return web.json_response({"status": "success"})
 
-        storage_proxy_client = await storage_proxy_client_factory(
+        storage_proxy_client, pool = await storage_proxy_client_factory(
             test_endpoint, slow_endpoint_handler
         )
 
         # Make request with very short timeout
         timeout = ClientTimeout(total=0.1)
-        with pytest.raises(StorageProxyTimeoutError) as exc_info:
+        with pytest.raises(TimeoutError):
             await storage_proxy_client.request(
+                endpoint=pool.all_endpoints()[0],
                 method="GET",
                 url=test_endpoint,
                 request_timeout=timeout,
             )
-
-        assert "Request to storage proxy timed out" in str(exc_info.value)
 
     async def test_configured_client_timeout_causes_timeout_error(
         self, storage_proxy_client_factory: StorageProxyClientFactory
@@ -123,13 +259,15 @@ class TestStorageProxyClient:
             await asyncio.sleep(0.5)
             return web.json_response({"volumes": []})
 
-        http_client = await storage_proxy_client_factory("volumes", volumes_handler)
+        http_client, pool = await storage_proxy_client_factory("volumes", volumes_handler)
 
         # Create manager client with custom very short timeout for get_volumes
         custom_timeout = HttpTimeoutConfig(total=0.1, sock_connect=0.05)  # type: ignore[call-arg]
         timeout_config = StorageProxyClientTimeoutConfig(get_volumes=custom_timeout)  # type: ignore[call-arg]
         manager_client = StorageProxyManagerFacingClient(
             client=http_client,
+            endpoint_pool=pool,
+            proxy_name="test",
             timeout_config=timeout_config,
         )
 
@@ -150,13 +288,15 @@ class TestStorageProxyClient:
             await asyncio.sleep(0.1)
             return web.json_response({"volumes": ["volume1", "volume2"]})
 
-        http_client = await storage_proxy_client_factory("volumes", volumes_handler)
+        http_client, pool = await storage_proxy_client_factory("volumes", volumes_handler)
 
         # Create manager client with sufficient timeout for get_volumes
         custom_timeout = HttpTimeoutConfig(total=5.0, sock_connect=1.0)  # type: ignore[call-arg]
         timeout_config = StorageProxyClientTimeoutConfig(get_volumes=custom_timeout)  # type: ignore[call-arg]
         manager_client = StorageProxyManagerFacingClient(
             client=http_client,
+            endpoint_pool=pool,
+            proxy_name="test",
             timeout_config=timeout_config,
         )
 

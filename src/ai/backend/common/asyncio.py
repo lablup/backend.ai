@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import inspect
 from collections.abc import Awaitable, Callable, Collection, Sequence
+from concurrent.futures import Executor
 from contextlib import AbstractAsyncContextManager
+from types import TracebackType
 from typing import (
     Any,
     Protocol,
@@ -14,8 +17,11 @@ from typing import (
 
 __all__ = (
     "AsyncBarrier",
+    "ConsecutiveFailures",
+    "IgnoreTaskExceptionHandler",
     "cancel_tasks",
     "current_loop",
+    "run_in_executor_with_context",
     "run_through",
 )
 
@@ -57,6 +63,14 @@ if hasattr(asyncio, "get_running_loop"):
     current_loop = asyncio.get_running_loop
 else:
     current_loop = asyncio.get_event_loop
+
+
+def run_in_executor_with_context[T, *Ts](
+    executor: Executor | None, fn: Callable[[*Ts], T], *args: *Ts
+) -> asyncio.Future[T]:
+    """`loop.run_in_executor()` that runs `fn` in a copy of the caller's contextvars."""
+    context = contextvars.copy_context()
+    return asyncio.get_running_loop().run_in_executor(executor, context.run, fn, *args)
 
 
 async def run_through(
@@ -104,6 +118,47 @@ async def run_through(
             if isinstance(e, cast(tuple[Any, ...], ignored_exceptions)):
                 continue
             raise
+
+
+class IgnoreTaskExceptionHandler:
+    """A `PersistentTaskGroup` exception handler for tasks whose failure the caller already
+    receives through the result future or has logged. The default handler prints it to stderr."""
+
+    async def __call__(
+        self,
+        exc_type: type[BaseException],
+        exc_obj: BaseException,
+        exc_tb: TracebackType,
+    ) -> None:
+        pass
+
+
+class ConsecutiveFailures:
+    """The failure streak of a retried loop and the exponential delay before its next retry."""
+
+    count: int
+    _initial_delay_sec: float
+    _max_delay_sec: float
+
+    def __init__(self, initial_delay_sec: float = 1.0, max_delay_sec: float = 30.0) -> None:
+        self.count = 0
+        self._initial_delay_sec = initial_delay_sec
+        self._max_delay_sec = max_delay_sec
+
+    def record_failure(self) -> bool:
+        """Count a failure and return whether it starts a new streak."""
+        self.count += 1
+        return self.count == 1
+
+    def record_success(self) -> int:
+        """End the streak and return how many failures it had."""
+        count, self.count = self.count, 0
+        return count
+
+    def delay_sec(self) -> float:
+        if self.count == 0:
+            return self._initial_delay_sec
+        return min(self._initial_delay_sec * 2.0 ** (self.count - 1), self._max_delay_sec)
 
 
 class AsyncBarrier:

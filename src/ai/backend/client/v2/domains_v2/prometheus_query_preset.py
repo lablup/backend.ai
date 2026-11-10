@@ -5,11 +5,14 @@ from __future__ import annotations
 from uuid import UUID
 
 from ai.backend.client.v2.base_domain import BaseDomainClient
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     CreateQueryDefinitionInput,
     DeleteQueryDefinitionInput,
     ExecuteQueryDefinitionInput,
     ModifyQueryDefinitionInput,
+    PartialBulkPurgeQueryDefinitionsInput,
+    PartialBulkUpdateQueryDefinitionsInput,
     PreviewQueryDefinitionInput,
     SearchQueryDefinitionsInput,
 )
@@ -19,6 +22,7 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
     ExecuteQueryDefinitionPayload,
     GetQueryDefinitionPayload,
     ModifyQueryDefinitionPayload,
+    QueryDefinitionNode,
     SearchQueryDefinitionsPayload,
 )
 
@@ -65,8 +69,38 @@ class V2PrometheusQueryPresetClient(BaseDomainClient):
             response_model=ModifyQueryDefinitionPayload,
         )
 
+    async def purge(self, preset_id: UUID) -> DeleteQueryDefinitionPayload:
+        """Permanently remove a query definition."""
+        return await self._client.typed_request(
+            "DELETE",
+            f"{_PATH}/{preset_id}",
+            response_model=DeleteQueryDefinitionPayload,
+        )
+
+    async def partial_bulk_update(
+        self, request: PartialBulkUpdateQueryDefinitionsInput
+    ) -> PartialBulkPayload[QueryDefinitionNode]:
+        """Update several query definitions, answering for each one."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/partial-bulk-update",
+            request=request,
+            response_model=PartialBulkPayload[QueryDefinitionNode],
+        )
+
+    async def partial_bulk_purge(
+        self, request: PartialBulkPurgeQueryDefinitionsInput
+    ) -> PartialBulkPayload[QueryDefinitionNode]:
+        """Permanently remove several query definitions, answering for each one."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/partial-bulk-purge",
+            request=request,
+            response_model=PartialBulkPayload[QueryDefinitionNode],
+        )
+
     async def delete(self, request: DeleteQueryDefinitionInput) -> DeleteQueryDefinitionPayload:
-        """Delete a query definition by ID."""
+        """Deprecated. Use :meth:`purge`."""
         return await self._client.typed_request(
             "POST",
             f"{_PATH}/delete",

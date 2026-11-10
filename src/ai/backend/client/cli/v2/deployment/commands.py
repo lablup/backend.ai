@@ -8,7 +8,15 @@ from uuid import UUID
 
 import click
 
-from ai.backend.client.cli.v2.helpers import create_v2_registry, load_v2_config, print_result
+from ai.backend.client.cli.v2.helpers import (
+    EntityLabelTerm,
+    create_v2_registry,
+    entity_label_filter_options,
+    entity_label_relations,
+    load_v2_config,
+    print_result,
+)
+from ai.backend.common.data.model_deployment.types import ModelDeploymentStatus
 
 
 @click.group()
@@ -28,8 +36,9 @@ def deployment() -> None:
 @click.option("--name-contains", default=None, type=str, help="Filter by name (contains).")
 @click.option(
     "--status",
+    type=click.Choice([status.value for status in ModelDeploymentStatus], case_sensitive=False),
     multiple=True,
-    help="Filter by status (repeatable, e.g., --status ACTIVE --status DEGRADED).",
+    help="Filter by status (repeatable, e.g., --status DEPLOYING --status READY).",
 )
 @click.option(
     "--open-to-public",
@@ -37,6 +46,7 @@ def deployment() -> None:
     type=bool,
     help="Filter by public access (true/false).",
 )
+@entity_label_filter_options
 def project_search(
     project_id: str,
     limit: int,
@@ -45,6 +55,7 @@ def project_search(
     name_contains: str | None,
     status: tuple[str, ...],
     open_to_public: bool | None,
+    label: tuple[EntityLabelTerm, ...],
 ) -> None:
     """Search deployments within a project."""
 
@@ -57,12 +68,14 @@ def project_search(
     )
     from ai.backend.common.dto.manager.v2.deployment.types import DeploymentOrderField
 
+    relations = entity_label_relations(label)
     filter_dto: DeploymentFilter | None = None
-    if name_contains or status or open_to_public is not None:
+    if relations or name_contains or status or open_to_public is not None:
         filter_dto = DeploymentFilter(
             name=StringFilter(contains=name_contains) if name_contains else None,
             status=DeploymentStatusFilter(in_=list(status)) if status else None,
             open_to_public=open_to_public,
+            AND=[DeploymentFilter(labels=rel) for rel in relations] or None,
         )
 
     orders: list[DeploymentOrder] | None = None
@@ -146,6 +159,7 @@ def create(
 
     from pathlib import Path
 
+    from ai.backend.common.data.entity.resource_group import ResourceGroupName
     from ai.backend.common.data.model_deployment.types import DeploymentStrategy
     from ai.backend.common.dto.manager.v2.deployment.request import (
         CreateDeploymentInput,
@@ -154,7 +168,6 @@ def create(
         ModelDeploymentMetadataInput,
         ModelDeploymentNetworkAccessInput,
     )
-    from ai.backend.common.identifier.resource_group import ResourceGroupName
 
     revision_dto: CreateRevisionInput | None = None
     if initial_revision is not None:
@@ -211,12 +224,15 @@ def update(
     from ai.backend.common.dto.manager.v2.deployment.request import (
         UpdateDeploymentInput,
     )
+    from ai.backend.common.tristate.unset import UNSET
 
     body = UpdateDeploymentInput(
-        name=name,
-        replica_count=replicas,
-        open_to_public=open_to_public,
-        preferred_domain_name=preferred_domain_name,
+        name=name if name is not None else UNSET,
+        replica_count=replicas if replicas is not None else UNSET,
+        open_to_public=open_to_public if open_to_public is not None else UNSET,
+        preferred_domain_name=(
+            preferred_domain_name if preferred_domain_name is not None else UNSET
+        ),
     )
 
     async def _run() -> None:

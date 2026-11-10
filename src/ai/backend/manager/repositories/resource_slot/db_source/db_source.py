@@ -13,37 +13,25 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from ai.backend.common.types import SlotQuantity
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.resource_slot.types import (
-    AgentResourceData,
     AgentResourceDrift,
-    AgentResourceSearchResult,
-    NumberFormatData,
     OrphanedAllocation,
     ReconciliationResult,
-    ResourceAllocationData,
-    ResourceAllocationSearchResult,
     ResourceOccupancy,
-    ResourceSlotTypeData,
-    ResourceSlotTypeSearchResult,
     TerminalSessionKernelReconciliation,
 )
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.resource_slot import (
     AgentResourceNotFound,
     ResourceAllocationNotFound,
-    ResourceSlotTypeNotFound,
 )
-from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.resource_slot import (
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.resource_slot.row import (
     AgentResourceRow,
     ResourceAllocationRow,
     ResourceSlotTypeRow,
 )
-from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.utils import sql_json_merge
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    execute_batch_querier,
-)
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -81,72 +69,7 @@ class ResourceSlotDBSource:
             result = await db_sess.execute(stmt)
             return list(result.scalars().all())
 
-    async def get_slot_type(
-        self,
-        slot_name: str,
-    ) -> ResourceSlotTypeRow:
-        """Get a specific resource slot type by name.
-
-        Args:
-            slot_name: The slot type name to look up.
-
-        Returns:
-            ResourceSlotTypeRow for the given slot name.
-
-        Raises:
-            ResourceSlotTypeNotFound: If the slot type does not exist.
-        """
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            stmt = sa.select(ResourceSlotTypeRow).where(
-                ResourceSlotTypeRow.slot_name == slot_name,
-            )
-            result = await db_sess.execute(stmt)
-            row = result.scalar_one_or_none()
-            if row is None:
-                raise ResourceSlotTypeNotFound(f"Resource slot type '{slot_name}' not found.")
-            return row
-
-    async def search_slot_types(self, querier: BatchQuerier) -> ResourceSlotTypeSearchResult:
-        """Paginated search across all resource_slot_types rows."""
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(ResourceSlotTypeRow)
-            result = await execute_batch_querier(db_sess, query, querier)
-            items = [
-                ResourceSlotTypeData(
-                    slot_name=row.ResourceSlotTypeRow.slot_name,
-                    slot_type=row.ResourceSlotTypeRow.slot_type,
-                    display_name=row.ResourceSlotTypeRow.display_name,
-                    description=row.ResourceSlotTypeRow.description,
-                    display_unit=row.ResourceSlotTypeRow.display_unit,
-                    display_icon=row.ResourceSlotTypeRow.display_icon,
-                    number_format=NumberFormatData(
-                        binary=row.ResourceSlotTypeRow.number_format.binary,
-                        round_length=row.ResourceSlotTypeRow.number_format.round_length,
-                    ),
-                    rank=row.ResourceSlotTypeRow.rank,
-                )
-                for row in result.rows
-            ]
-            return ResourceSlotTypeSearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
     # ==================== agent_resources Read ====================
-
-    async def get_agent_resources(self, agent_id: str) -> list[AgentResourceRow]:
-        # Returns all slot capacity/usage rows for one agent, ordered by slot_name for consistency.
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            stmt = (
-                sa.select(AgentResourceRow)
-                .where(AgentResourceRow.agent_id == agent_id)
-                .order_by(AgentResourceRow.slot_name)
-            )
-            result = await db_sess.execute(stmt)
-            return list(result.scalars().all())
-
     async def get_agent_resource_by_slot(self, agent_id: str, slot_name: str) -> AgentResourceRow:
         """Get a single slot capacity/usage row for a specific agent+slot combination.
 
@@ -166,42 +89,7 @@ class ResourceSlotDBSource:
                 )
             return row
 
-    async def search_agent_resources(self, querier: BatchQuerier) -> AgentResourceSearchResult:
-        # Paginated search across all agent_resources rows.
-        # Caller injects conditions (e.g. by_slot_name, by_agent_id) via querier.
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(AgentResourceRow)
-            result = await execute_batch_querier(db_sess, query, querier)
-            items = [
-                AgentResourceData(
-                    agent_id=row.AgentResourceRow.agent_id,
-                    slot_name=row.AgentResourceRow.slot_name,
-                    capacity=row.AgentResourceRow.capacity,
-                    reserved=row.AgentResourceRow.reserved,
-                    used=row.AgentResourceRow.used,
-                )
-                for row in result.rows
-            ]
-            return AgentResourceSearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
     # ==================== resource_allocations Read ====================
-
-    async def get_kernel_allocations(self, kernel_id: uuid.UUID) -> list[ResourceAllocationRow]:
-        # Returns all per-slot requested/used allocation rows for one kernel (container).
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            stmt = (
-                sa.select(ResourceAllocationRow)
-                .where(ResourceAllocationRow.kernel_id == kernel_id)
-                .order_by(ResourceAllocationRow.slot_name)
-            )
-            result = await db_sess.execute(stmt)
-            return list(result.scalars().all())
-
     async def get_kernel_allocation_by_slot(
         self, kernel_id: uuid.UUID, slot_name: str
     ) -> ResourceAllocationRow:
@@ -222,30 +110,6 @@ class ResourceSlotDBSource:
                     f"Resource allocation not found for kernel='{kernel_id}', slot='{slot_name}'."
                 )
             return row
-
-    async def search_resource_allocations(
-        self, querier: BatchQuerier
-    ) -> ResourceAllocationSearchResult:
-        # Paginated search across all resource_allocations rows.
-        # Caller injects conditions (e.g. by_slot_name, by_kernel_id) via querier.
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(ResourceAllocationRow)
-            result = await execute_batch_querier(db_sess, query, querier)
-            items = [
-                ResourceAllocationData(
-                    kernel_id=row.ResourceAllocationRow.kernel_id,
-                    slot_name=row.ResourceAllocationRow.slot_name,
-                    requested=row.ResourceAllocationRow.requested,
-                    used=row.ResourceAllocationRow.used,
-                )
-                for row in result.rows
-            ]
-            return ResourceAllocationSearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
 
     # ==================== Aggregation Queries ====================
 

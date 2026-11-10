@@ -1,13 +1,19 @@
-import uuid
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, override
 
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.data.entity.container_registry import (
+    AssociationContainerRegistriesGroupsID,
+    ContainerRegistryID,
+)
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.types import EntityData
 
 
 @dataclass
-class ContainerRegistryData:
-    id: uuid.UUID
+class ContainerRegistryData(EntityData):
+    id: ContainerRegistryID
     url: str
     registry_name: str
     type: ContainerRegistryType
@@ -15,9 +21,13 @@ class ContainerRegistryData:
     username: str | None
     password: str | None
     ssl_verify: bool | None
-    is_global: bool | None
+    is_global: bool
     # TODO: Add proper type
     extra: dict[str, Any] | None
+
+    @override
+    def entity_id(self) -> ContainerRegistryID:
+        return self.id
 
 
 @dataclass
@@ -30,21 +40,34 @@ class ContainerRegistrySearchResult:
     has_previous_page: bool
 
 
-@dataclass
-class PerProjectContainerRegistryInfo:
-    """Container registry info resolved from a project's container_registry config.
-
-    Unlike ContainerRegistryData, all fields are non-nullable because
-    the data is validated during the lookup process (GroupRow → ContainerRegistryRow).
-    """
-
-    id: uuid.UUID
-    url: str
+@dataclass(frozen=True)
+class ImageCommitRegistry:
     registry_name: str
-    type: ContainerRegistryType
-    project: str
-    username: str
-    password: str
-    ssl_verify: bool
-    is_global: bool
-    extra: dict[str, Any]
+    project_name: str | None
+
+    def to_json(self) -> dict[str, str | None]:
+        return {"registry": self.registry_name, "project": self.project_name}
+
+
+@dataclass(frozen=True)
+class AssociationContainerRegistriesGroupsData:
+    id: AssociationContainerRegistriesGroupsID
+    project_id: ProjectID
+    registry_id: ContainerRegistryID
+    is_default: bool
+
+
+@dataclass(frozen=True)
+class DomainContainerRegistryRelationData:
+    """A container registry a domain is allowed on."""
+
+    domain_id: DomainID
+    container_registry_id: ContainerRegistryID
+
+
+@dataclass(frozen=True)
+class ProjectAllowedRegistryData:
+    """A registry a project is allowed on, and whether it is the project's default."""
+
+    registry: ContainerRegistryData
+    is_default: bool

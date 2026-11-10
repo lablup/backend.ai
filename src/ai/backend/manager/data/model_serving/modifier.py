@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any, override
 
-from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.types import (
     AutoScalingMetricComparator,
     AutoScalingMetricSource,

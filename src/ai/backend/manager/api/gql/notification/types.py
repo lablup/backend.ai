@@ -12,6 +12,9 @@ import strawberry
 from strawberry import ID, UNSET, Info
 from strawberry.relay import NodeID
 
+from ai.backend.common.data.entity.notification import NotificationChannelID, NotificationRuleID
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
+
 # NOTE: NotificationChannelSpecGQL uses @gql_pydantic_interface so Strawberry
 # dispatches from_pydantic() to the concrete implementor (WebhookSpecGQL /
 # EmailSpecGQL) based on the runtime DTO type.  No _pydantic_extra needed in
@@ -55,6 +58,24 @@ from ai.backend.common.dto.manager.v2.notification.request import (
     NotificationRuleTypeFilter as NotificationRuleTypeFilterDTO,
 )
 from ai.backend.common.dto.manager.v2.notification.request import (
+    PartialBulkPurgeNotificationChannelsInput as PartialBulkPurgeNotificationChannelsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.notification.request import (
+    PartialBulkPurgeNotificationRulesInput as PartialBulkPurgeNotificationRulesInputDTO,
+)
+from ai.backend.common.dto.manager.v2.notification.request import (
+    PartialBulkUpdateNotificationChannelItemInput as PartialBulkUpdateNotificationChannelItemInputDTO,
+)
+from ai.backend.common.dto.manager.v2.notification.request import (
+    PartialBulkUpdateNotificationChannelsInput as PartialBulkUpdateNotificationChannelsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.notification.request import (
+    PartialBulkUpdateNotificationRuleItemInput as PartialBulkUpdateNotificationRuleItemInputDTO,
+)
+from ai.backend.common.dto.manager.v2.notification.request import (
+    PartialBulkUpdateNotificationRulesInput as PartialBulkUpdateNotificationRulesInputDTO,
+)
+from ai.backend.common.dto.manager.v2.notification.request import (
     UpdateNotificationChannelInput as UpdateNotificationChannelInputDTO,
 )
 from ai.backend.common.dto.manager.v2.notification.request import (
@@ -83,6 +104,12 @@ from ai.backend.common.dto.manager.v2.notification.response import (
     NotificationRuleNode,
 )
 from ai.backend.common.dto.manager.v2.notification.response import (
+    PurgeNotificationChannelPayload as PurgeNotificationChannelPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.notification.response import (
+    PurgeNotificationRulePayload as PurgeNotificationRulePayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.notification.response import (
     UpdateNotificationChannelPayload as UpdateNotificationChannelPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.notification.response import (
@@ -104,10 +131,13 @@ from ai.backend.common.dto.manager.v2.notification.types import (
     SMTPConnectionInfo,
     WebhookSpecInfo,
 )
-from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter
+from ai.backend.manager.api.gql.common_types import PartialBulkFailureGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
+    gql_added_field,
     gql_enum,
     gql_field,
     gql_node_type,
@@ -117,6 +147,7 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.errors.notification import NotificationChannelNotFound
 
 # GraphQL enum types
 
@@ -207,6 +238,12 @@ class EmailSpecGQL(NotificationChannelSpecGQL):
 @gql_node_type(BackendAIGQLMeta(added_version="26.3.0", description="Notification channel."))
 class NotificationChannel(PydanticNodeMixin[NotificationChannelNode]):
     id: NodeID[str]
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="UUID of the notification channel.",
+        ),
+    )
     name: str
     description: str | None
     channel_type: NotificationChannelTypeGQL
@@ -224,20 +261,45 @@ class NotificationChannel(PydanticNodeMixin[NotificationChannelNode]):
         required: bool = False,
     ) -> Iterable[NotificationChannel | None]:
         return await info.context.data_loaders.notification_channel_loader.load_many([
-            UUID(nid) for nid in node_ids
+            NotificationChannelID(UUID(nid)) for nid in node_ids
         ])
 
 
 @gql_node_type(BackendAIGQLMeta(added_version="26.3.0", description="Notification rule."))
 class NotificationRule(PydanticNodeMixin[NotificationRuleNode]):
     id: NodeID[str]
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="UUID of the notification rule.",
+        ),
+    )
     name: str
     description: str | None
     rule_type: NotificationRuleTypeGQL
-    channel: NotificationChannel
+    channel_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.8.0",
+            description="ID of the channel this rule dispatches through.",
+        )
+    )
     message_template: str
     enabled: bool
     created_at: datetime
+
+    @gql_field(description="The channel this rule dispatches through.")  # type: ignore[misc]
+    async def channel(self, info: Info[StrawberryGQLContext]) -> NotificationChannel:
+        """Loaded on demand rather than carried by the rule.
+
+        The rule names its channel by id, so a client that skips the channel skips the
+        read. Non-null because ``notification_rules.channel_id`` is.
+        """
+        channel = await info.context.data_loaders.notification_channel_loader.load(
+            NotificationChannelID(self.channel_id)
+        )
+        if channel is None:
+            raise NotificationChannelNotFound(f"Notification channel {self.channel_id} not found")
+        return channel
 
     @classmethod
     @override
@@ -249,7 +311,7 @@ class NotificationRule(PydanticNodeMixin[NotificationRuleNode]):
         required: bool = False,
     ) -> Iterable[NotificationRule | None]:
         return await info.context.data_loaders.notification_rule_loader.load_many([
-            UUID(nid) for nid in node_ids
+            NotificationRuleID(UUID(nid)) for nid in node_ids
         ])
 
 
@@ -297,6 +359,10 @@ class NotificationChannelFilter(PydanticInputMixin[NotificationChannelFilterDTO]
     name: StringFilter | None = None
     channel_type: NotificationChannelTypeFilterGQL | None = None
     enabled: bool | None = None
+    entity_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter by channel ID."),
+        default=None,
+    )
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None
@@ -355,6 +421,10 @@ class NotificationRuleFilter(PydanticInputMixin[NotificationRuleFilterDTO]):
     name: StringFilter | None = None
     rule_type: NotificationRuleTypeFilterGQL | None = None
     enabled: bool | None = None
+    entity_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter by rule ID."),
+        default=None,
+    )
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None
@@ -568,6 +638,210 @@ class UpdateNotificationRulePayload(PydanticOutputMixin[UpdateNotificationRulePa
 )
 class DeleteNotificationRulePayload(PydanticOutputMixin[DeleteNotificationRulePayloadDTO]):
     id: UUID = gql_field(description="ID of the deleted notification rule.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION, description="Payload for notification channel purge."
+    ),
+    model=PurgeNotificationChannelPayloadDTO,
+    name="PurgeNotificationChannelPayload",
+)
+class PurgeNotificationChannelPayloadGQL(PydanticOutputMixin[PurgeNotificationChannelPayloadDTO]):
+    id: UUID = gql_field(
+        description="ID of the purged notification channel.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `purgedId` or `entityId`.",
+    )
+    purged_id: strawberry.ID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Global ID of the purged notification channel.",
+        ),
+    )
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the purged notification channel.",
+        ),
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION, description="Payload for notification rule purge."
+    ),
+    model=PurgeNotificationRulePayloadDTO,
+    name="PurgeNotificationRulePayload",
+)
+class PurgeNotificationRulePayloadGQL(PydanticOutputMixin[PurgeNotificationRulePayloadDTO]):
+    id: UUID = gql_field(
+        description="ID of the purged notification rule.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `purgedId` or `entityId`.",
+    )
+    purged_id: strawberry.ID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Global ID of the purged notification rule.",
+        ),
+    )
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="UUID of the purged notification rule."
+        ),
+    )
+
+
+# Partial bulk mutations
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "One notification channel of a partial bulk update and the fields to update on it."
+        ),
+    ),
+    name="PartialBulkUpdateNotificationChannelItemInput",
+)
+class PartialBulkUpdateNotificationChannelItemInputGQL(
+    PydanticInputMixin[PartialBulkUpdateNotificationChannelItemInputDTO]
+):
+    id: UUID = gql_field(description="ID of the channel to update.")
+    name: str | None = gql_field(default=UNSET, description="Updated channel name.")
+    description: str | None = gql_field(
+        default=UNSET,
+        description="Updated channel description. Omit to leave unchanged; null clears.",
+    )
+    spec: NotificationChannelSpecInput | None = gql_field(
+        default=UNSET, description="Updated channel specification."
+    )
+    enabled: bool | None = gql_field(default=UNSET, description="Updated enabled status.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Input for updating several notification channels, each answered for separately."
+        ),
+    ),
+    name="PartialBulkUpdateNotificationChannelsInput",
+)
+class PartialBulkUpdateNotificationChannelsInputGQL(
+    PydanticInputMixin[PartialBulkUpdateNotificationChannelsInputDTO]
+):
+    items: list[PartialBulkUpdateNotificationChannelItemInputGQL] = gql_field(
+        description="The channels to update, each with its fields."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Input for purging several notification channels, each answered for separately."
+        ),
+    ),
+    name="PartialBulkPurgeNotificationChannelsInput",
+)
+class PartialBulkPurgeNotificationChannelsInputGQL(
+    PydanticInputMixin[PartialBulkPurgeNotificationChannelsInputDTO]
+):
+    ids: list[UUID] = gql_field(description="IDs of the channels to purge.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Result of a partial bulk notification channel operation: the channels processed "
+            "and the ones that failed."
+        ),
+    ),
+    model=PartialBulkPayload[NotificationChannelNode],
+    name="PartialBulkNotificationChannelsPayload",
+)
+class PartialBulkNotificationChannelsPayloadGQL(
+    PydanticOutputMixin[PartialBulkPayload[NotificationChannelNode]]
+):
+    """Payload for partial bulk notification channel mutations."""
+
+    successes: list[NotificationChannel] = gql_field(description="The channels processed.")
+    failed: list[PartialBulkFailureGQL] = gql_field(
+        description="The channels not processed, each with the reason."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="One notification rule of a partial bulk update and the fields to update on it.",
+    ),
+    name="PartialBulkUpdateNotificationRuleItemInput",
+)
+class PartialBulkUpdateNotificationRuleItemInputGQL(
+    PydanticInputMixin[PartialBulkUpdateNotificationRuleItemInputDTO]
+):
+    id: UUID = gql_field(description="ID of the rule to update.")
+    name: str | None = gql_field(default=UNSET, description="Updated rule name.")
+    description: str | None = gql_field(
+        default=UNSET,
+        description="Updated rule description. Omit to leave unchanged; null clears.",
+    )
+    message_template: str | None = gql_field(
+        default=UNSET, description="Updated message template (max 64KB)."
+    )
+    enabled: bool | None = gql_field(default=UNSET, description="Updated enabled status.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for updating several notification rules, each answered for separately.",
+    ),
+    name="PartialBulkUpdateNotificationRulesInput",
+)
+class PartialBulkUpdateNotificationRulesInputGQL(
+    PydanticInputMixin[PartialBulkUpdateNotificationRulesInputDTO]
+):
+    items: list[PartialBulkUpdateNotificationRuleItemInputGQL] = gql_field(
+        description="The rules to update, each with its fields."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for purging several notification rules, each answered for separately.",
+    ),
+    name="PartialBulkPurgeNotificationRulesInput",
+)
+class PartialBulkPurgeNotificationRulesInputGQL(
+    PydanticInputMixin[PartialBulkPurgeNotificationRulesInputDTO]
+):
+    ids: list[UUID] = gql_field(description="IDs of the rules to purge.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Result of a partial bulk notification rule operation: the rules processed and the "
+            "ones that failed."
+        ),
+    ),
+    model=PartialBulkPayload[NotificationRuleNode],
+    name="PartialBulkNotificationRulesPayload",
+)
+class PartialBulkNotificationRulesPayloadGQL(
+    PydanticOutputMixin[PartialBulkPayload[NotificationRuleNode]]
+):
+    """Payload for partial bulk notification rule mutations."""
+
+    successes: list[NotificationRule] = gql_field(description="The rules processed.")
+    failed: list[PartialBulkFailureGQL] = gql_field(
+        description="The rules not processed, each with the reason."
+    )
 
 
 # Validate mutations

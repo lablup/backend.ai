@@ -10,7 +10,9 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.pagination import PaginationInfo
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 from .types import (
     ImageLabelInfo,
@@ -25,7 +27,10 @@ __all__ = (
     "AdminSearchImageAliasesPayload",
     "AdminSearchImagesPayload",
     "AliasImagePayload",
+    "DeleteImagePayload",
     "ForgetImagePayload",
+    "RestoreImagePayload",
+    "ScopedSearchImagesPayload",
     "GetImagePayload",
     "ImageAliasNode",
     "ImageIdentityInfoDTO",
@@ -34,7 +39,8 @@ __all__ = (
     "ImagePermissionInfoDTO",
     "ImageRequirementsInfoDTO",
     "PurgeImagePayload",
-    "RescanImagesPayload",
+    "ScanImagePayload",
+    "SearchImageAliasesPayload",
     "SearchImagesPayload",
     "UpdateImagePayload",
 )
@@ -44,6 +50,9 @@ class ImageNode(BaseResponseModel):
     """Node model representing an image entity with full details."""
 
     id: UUID = Field(description="Image ID")
+    entity_id: UUID = Field(
+        description="UUID of the image. Added in 26.9.0.",
+    )
     name: str = Field(description="Image canonical name")
     image: str = Field(
         description="Image namespace/path within the registry (e.g. 'stable/python')"
@@ -69,6 +78,16 @@ class ImageNode(BaseResponseModel):
         default=None,
         description="Timestamp of the most recent session created with this image.",
     )
+    customized: bool = Field(
+        description=f"Whether a session commit made this image. Added in {NEXT_RELEASE_VERSION}.",
+    )
+    creator_id: UserID | None = Field(
+        default=None,
+        description=(
+            "The user a customized image was committed for. Null where the image is not "
+            f"customized, or where that user is gone. Added in {NEXT_RELEASE_VERSION}."
+        ),
+    )
     identity: ImageIdentityInfoDTO | None = Field(
         default=None, description="Identity information (name, architecture)."
     )
@@ -93,11 +112,10 @@ class GetImagePayload(BaseResponseModel):
     item: ImageNode = Field(description="Retrieved image")
 
 
-class RescanImagesPayload(BaseResponseModel):
-    """Payload for image rescan result."""
+class ScanImagePayload(BaseResponseModel):
+    """Scanned image matching the requested architecture."""
 
-    item: ImageNode = Field(description="Rescanned image")
-    errors: list[str] = Field(default_factory=list, description="Errors encountered during rescan")
+    item: ImageNode = Field(description="Scanned image matching the requested architecture")
 
 
 class AliasImagePayload(BaseResponseModel):
@@ -112,6 +130,18 @@ class ForgetImagePayload(BaseResponseModel):
     """Payload for image forget (soft-delete) result."""
 
     item: ImageNode = Field(description="Forgotten image")
+
+
+class DeleteImagePayload(BaseResponseModel):
+    """Payload for image soft-delete result."""
+
+    item: ImageNode = Field(description="Soft-deleted image")
+
+
+class RestoreImagePayload(BaseResponseModel):
+    """Payload for image restore result."""
+
+    item: ImageNode = Field(description="Restored image")
 
 
 class PurgeImagePayload(BaseResponseModel):
@@ -135,15 +165,36 @@ class AdminSearchImagesPayload(BaseResponseModel):
     has_previous_page: bool = Field(description="Whether there is a previous page.")
 
 
+class ScopedSearchImagesPayload(BaseResponseModel):
+    """Payload for a scoped paginated image search."""
+
+    items: list[ImageNode] = Field(description="List of image nodes.")
+    total_count: int = Field(description="Total number of images matching the filter.")
+    has_next_page: bool = Field(description="Whether there is a next page.")
+    has_previous_page: bool = Field(description="Whether there is a previous page.")
+
+
 class ImageAliasNode(BaseResponseModel):
     """Node representing a single image alias."""
 
     id: UUID = Field(description="Alias ID.")
+    field_id: UUID = Field(
+        description="UUID of the image alias. Added in 26.9.0.",
+    )
     alias: str = Field(description="Alias string.")
 
 
 class AdminSearchImageAliasesPayload(BaseResponseModel):
     """Payload for admin-scoped paginated image alias search results."""
+
+    items: list[ImageAliasNode] = Field(description="List of image alias nodes.")
+    total_count: int = Field(description="Total number of aliases matching the filter.")
+    has_next_page: bool = Field(description="Whether there is a next page.")
+    has_previous_page: bool = Field(description="Whether there is a previous page.")
+
+
+class SearchImageAliasesPayload(BaseResponseModel):
+    """Payload for the paginated aliases of one image."""
 
     items: list[ImageAliasNode] = Field(description="List of image alias nodes.")
     total_count: int = Field(description="Total number of aliases matching the filter.")

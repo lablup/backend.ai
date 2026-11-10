@@ -1,0 +1,531 @@
+from __future__ import annotations
+
+import logging
+import uuid
+from collections.abc import Container, Iterable, Sequence
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Self,
+    override,
+)
+
+import sqlalchemy as sa
+import trafaret as t
+from sqlalchemy.exc import NoResultFound
+from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import (
+    Mapped,
+    foreign,
+    load_only,
+    mapped_column,
+    relationship,
+    selectinload,
+)
+from sqlalchemy.sql.expression import SQLColumnExpression
+
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
+from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.data.permission.permission_defs import ProjectPermission
+from ai.backend.manager.data.project.types import ProjectStatus, ProjectType
+from ai.backend.manager.models.association_container_registries_groups.row import (
+    AssociationContainerRegistriesGroupsRow,
+)
+from ai.backend.manager.models.base import (
+    GUID,
+    Base,
+    ResourceSlotColumn,
+    SlugType,
+    StrEnumType,
+    StructuredJSONColumn,
+    VFolderHostPermissionColumn,
+)
+from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
+from ai.backend.manager.models.rbac import (
+    AbstractPermissionContext,
+    AbstractPermissionContextBuilder,
+    DomainScope,
+    ProjectScope,
+    RBACModel,
+    ScopeType,
+    UserScope,
+    get_predefined_roles_in_scope,
+    required_permission,
+)
+from ai.backend.manager.models.rbac.context import ClientContext
+
+if TYPE_CHECKING:
+    from ai.backend.manager.models.rbac import ContainerRegistryScope
+    from ai.backend.manager.models.resource_group.row import ResourceGroupForProjectRow
+    from ai.backend.manager.models.resource_policy.row import ProjectResourcePolicyRow
+
+log = StructuredLogger(logging.getLogger(__spec__.name))
+
+
+def _get_association_container_registries_groups_join_condition() -> sa.ColumnElement[bool]:
+    return ProjectRow.id == foreign(AssociationContainerRegistriesGroupsRow.project_id)
+
+
+__all__: Sequence[str] = (
+    "MAXIMUM_DOTFILE_SIZE",
+    "AssocGroupUserRow",
+    "ProjectRow",
+    "ProjectType",
+    "association_groups_users",
+    "groups",
+)
+
+MAXIMUM_DOTFILE_SIZE = 64 * 1024  # 61 KiB
+
+
+container_registry_iv = t.Dict({}) | t.Dict({
+    t.Key("registry"): t.String(),
+    t.Key("project"): t.String(),
+})
+
+
+class AssocGroupUserRow(Base):
+    """DEPRECATED -- scheduled for sunset.
+
+    Project membership is moving to the virtual entity graph, where the user is a
+    member of the project's virtual entity. New code MUST read the graph; do not add
+    new readers or writers against this table. The table itself will be dropped after
+    every reader is migrated.
+    """
+
+    __tablename__ = "association_groups_users"
+    __table_args__ = (
+        sa.UniqueConstraint("user_id", "group_id", name="uq_association_user_id_group_id"),
+    )
+
+    id: Mapped[ProjectID] = mapped_column(
+        "id", GUID(ProjectID), primary_key=True, server_default=sa.text("uuid_generate_v7()")
+    )
+    user_id: Mapped[UserID] = mapped_column(
+        "user_id",
+        GUID(UserID),
+        sa.ForeignKey("users.uuid", onupdate="CASCADE", ondelete="CASCADE"),
+        nullable=False,
+    )
+    group_id: Mapped[ProjectID] = mapped_column(
+        "group_id",
+        GUID(ProjectID),
+        sa.ForeignKey("groups.id", onupdate="CASCADE", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+
+# DEPRECATED: scheduled for sunset; project membership lives in the virtual entity
+# graph. Do not use in new code.
+association_groups_users = AssocGroupUserRow.__table__
+
+
+class ProjectRow(LifecycleTimestampsMixin, Base):
+    __tablename__ = "groups"
+    __table_args__ = (
+        sa.UniqueConstraint("name", "domain_name", name="uq_groups_name_domain_name"),
+        # A user has at most one personal project. A dangling one — its creator gone —
+        # holds NULL, and NULLs do not collide here.
+        sa.Index(
+            "uq_groups_personal_creator",
+            "creator_id",
+            unique=True,
+            postgresql_where=sa.text("type = 'personal'"),
+        ),
+    )
+
+    id: Mapped[ProjectID] = mapped_column(
+        "id", GUID(ProjectID), primary_key=True, server_default=sa.text("uuid_generate_v7()")
+    )
+    name: Mapped[str] = mapped_column(
+        "name", SlugType(length=64, allow_unicode=True, allow_dot=True), nullable=False
+    )
+    description: Mapped[str | None] = mapped_column("description", sa.String(length=512))
+    is_active: Mapped[bool | None] = mapped_column("is_active", sa.Boolean, default=True)
+    status: Mapped[ProjectStatus] = mapped_column(
+        "status",
+        StrEnumType(ProjectStatus),
+        default=ProjectStatus.ACTIVE,
+        server_default=ProjectStatus.ACTIVE,
+        nullable=False,
+        index=True,
+    )
+    #: Field for synchronization with external services.
+    integration_id: Mapped[str | None] = mapped_column("integration_id", sa.String(length=512))
+    domain_name: Mapped[str] = mapped_column(
+        "domain_name",
+        sa.String(length=64),
+        sa.ForeignKey("domains.name", onupdate="CASCADE", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    # TODO: separate resource-related fields with new domain resource policy table when needed.
+    total_resource_slots: Mapped[ResourceSlot] = mapped_column(
+        "total_resource_slots", ResourceSlotColumn(), default=ResourceSlot, nullable=False
+    )
+    allowed_vfolder_hosts: Mapped[VFolderHostPermissionMap] = mapped_column(
+        "allowed_vfolder_hosts",
+        VFolderHostPermissionColumn(),
+        nullable=False,
+        default=VFolderHostPermissionMap,
+    )
+    # dotfiles column, \x90 means empty list in msgpack
+    dotfiles: Mapped[bytes] = mapped_column(
+        "dotfiles", sa.LargeBinary(length=MAXIMUM_DOTFILE_SIZE), nullable=False, default=b"\x90"
+    )
+    resource_policy: Mapped[str] = mapped_column(
+        "resource_policy",
+        sa.String(length=256),
+        sa.ForeignKey("project_resource_policies.name"),
+        nullable=False,
+    )
+    type: Mapped[ProjectType] = mapped_column(
+        "type",
+        StrEnumType(ProjectType),
+        nullable=False,
+        default=ProjectType.GENERAL,
+    )
+    # Provenance, not ownership: ownership is the scope-virtual entity-entity path
+    # alone. Nulled when the user goes; a personal project left holding NULL is
+    # dangling and the retention sweep takes it.
+    creator_id: Mapped[UserID | None] = mapped_column(
+        "creator_id",
+        GUID(UserID),
+        sa.ForeignKey("users.uuid", ondelete="SET NULL"),
+        nullable=True,
+    )
+    container_registry: Mapped[dict[str, Any] | None] = mapped_column(
+        "container_registry",
+        StructuredJSONColumn(container_registry_iv),
+        nullable=True,
+        default=None,
+    )
+
+    # Relationships (defined with deferred join conditions to avoid circular imports)
+    # Only ResourceGroupPermissionContextBuilder in resource_group/row.py (legacy RBAC)
+    # reads this. Delete it together with the legacy RBAC cleanup.
+    sgroup_for_groups_rows: Mapped[list[ResourceGroupForProjectRow]] = relationship(
+        "ResourceGroupForProjectRow"
+    )
+    # Read by gql_legacy (network.py, resource_policy.py, vfolder.py), ProjectRow.get and
+    # the vfolder repository. Delete it once the vfolder repository joins
+    # ProjectResourcePolicyRow directly and gql_legacy is cleaned up.
+    resource_policy_row: Mapped[ProjectResourcePolicyRow] = relationship("ProjectResourcePolicyRow")
+    # Only ProjectPermissionContext in this file (legacy RBAC) reads this. Delete it
+    # together with the legacy RBAC cleanup.
+    association_container_registries_groups_rows: Mapped[
+        list[AssociationContainerRegistriesGroupsRow]
+    ] = relationship(
+        "AssociationContainerRegistriesGroupsRow",
+        primaryjoin=_get_association_container_registries_groups_join_condition,
+    )
+
+    @classmethod
+    def scope_id_expr(cls) -> SQLColumnExpression[ProjectID]:
+        return cls.id
+
+    @classmethod
+    def scope_name_expr(cls) -> SQLColumnExpression[str]:
+        return cls.name
+
+    # Only CreateNetwork in gql_legacy's network.py calls this. Delete it together
+    # with the gql_legacy cleanup.
+    @classmethod
+    async def get(
+        cls,
+        session: AsyncSession,
+        project_id: uuid.UUID,
+        load_resource_policy: bool = False,
+    ) -> ProjectRow:
+        query = sa.select(ProjectRow).filter(ProjectRow.id == project_id)
+        if load_resource_policy:
+            query = query.options(selectinload(ProjectRow.resource_policy_row))
+        row = await session.scalar(query)
+        if not row:
+            raise NoResultFound
+
+        return row
+
+
+# NOTE: Deprecated legacy table reference for backward compatibility.
+# Use ProjectRow class directly for new code.
+groups = ProjectRow.__table__
+
+
+# Everything below serves the legacy RBAC path alone: api/gql_legacy/group.py calls
+# get_permission_ctx, which is the way in. Delete the whole block together with gql_legacy.
+@dataclass
+class ProjectModel(RBACModel[ProjectPermission]):
+    id: uuid.UUID
+    name: str
+    description: str | None
+    is_active: bool | None
+    created_at: datetime | None
+    modified_at: datetime | None
+    domain_name: str
+    type: str
+
+    _integration_name: str | None
+    _total_resource_slots: ResourceSlot
+    _allowed_vfolder_hosts: VFolderHostPermissionMap
+    _dotfiles: bytes
+    _resource_policy: str
+
+    _permissions: frozenset[ProjectPermission] = field(default_factory=frozenset)
+
+    @property
+    @override
+    def permissions(self) -> Container[ProjectPermission]:
+        return self._permissions
+
+    @property
+    @required_permission(ProjectPermission.READ_SENSITIVE_ATTRIBUTE)
+    def integration_name(self) -> str | None:
+        return self._integration_name
+
+    @property
+    @required_permission(ProjectPermission.READ_SENSITIVE_ATTRIBUTE)
+    def total_resource_slots(self) -> ResourceSlot:
+        return self._total_resource_slots
+
+    @property
+    @required_permission(ProjectPermission.READ_SENSITIVE_ATTRIBUTE)
+    def allowed_vfolder_hosts(self) -> VFolderHostPermissionMap:
+        return self._allowed_vfolder_hosts
+
+    @property
+    @required_permission(ProjectPermission.READ_SENSITIVE_ATTRIBUTE)
+    def dotfiles(self) -> bytes:
+        return self._dotfiles
+
+    @property
+    @required_permission(ProjectPermission.READ_SENSITIVE_ATTRIBUTE)
+    def resource_policy(self) -> str:
+        return self._resource_policy
+
+    @classmethod
+    def from_row(cls, row: ProjectRow, permissions: Iterable[ProjectPermission]) -> Self:
+        return cls(
+            id=row.id,
+            name=row.name,
+            description=row.description,
+            is_active=row.is_active,
+            created_at=row.created_at,
+            modified_at=row.updated_at,
+            domain_name=row.domain_name,
+            type=row.type,
+            _integration_name=row.integration_id,  # DB column is integration_id
+            _total_resource_slots=row.total_resource_slots,
+            _allowed_vfolder_hosts=row.allowed_vfolder_hosts,
+            _dotfiles=row.dotfiles,
+            _resource_policy=row.resource_policy,
+            _permissions=frozenset(permissions),
+        )
+
+
+ALL_PROJECT_PERMISSIONS = frozenset([perm for perm in ProjectPermission])
+OWNER_PERMISSIONS: frozenset[ProjectPermission] = ALL_PROJECT_PERMISSIONS
+ADMIN_PERMISSIONS: frozenset[ProjectPermission] = ALL_PROJECT_PERMISSIONS
+MONITOR_PERMISSIONS: frozenset[ProjectPermission] = frozenset([
+    ProjectPermission.READ_ATTRIBUTE,
+    ProjectPermission.READ_SENSITIVE_ATTRIBUTE,
+    ProjectPermission.UPDATE_ATTRIBUTE,
+])
+PRIVILEGED_MEMBER_PERMISSIONS: frozenset[ProjectPermission] = frozenset([
+    ProjectPermission.READ_ATTRIBUTE
+])
+MEMBER_PERMISSIONS: frozenset[ProjectPermission] = frozenset([ProjectPermission.READ_ATTRIBUTE])
+
+type WhereClauseType = (
+    sa.sql.expression.BinaryExpression[Any]
+    | sa.sql.expression.BooleanClauseList
+    | sa.sql.elements.ColumnElement[bool]
+)
+
+
+@dataclass
+class ProjectPermissionContext(AbstractPermissionContext[ProjectPermission, ProjectRow, uuid.UUID]):
+    registry_id_to_additional_permission_map: dict[uuid.UUID, frozenset[ProjectPermission]] = field(
+        default_factory=dict
+    )
+
+    @property
+    def query_condition(self) -> WhereClauseType | None:
+        cond: WhereClauseType | None = None
+
+        def _OR_coalesce(
+            base_cond: WhereClauseType | None,
+            _cond: WhereClauseType,
+        ) -> WhereClauseType:
+            return base_cond | _cond if base_cond is not None else _cond
+
+        if self.registry_id_to_additional_permission_map:
+            registry_id = list(self.registry_id_to_additional_permission_map)[0]
+
+            cond = _OR_coalesce(
+                cond,
+                ProjectRow.association_container_registries_groups_rows.any(
+                    AssociationContainerRegistriesGroupsRow.registry_id == registry_id
+                ),
+            )
+        if self.domain_name_to_permission_map:
+            cond = _OR_coalesce(
+                cond, ProjectRow.domain_name.in_(self.domain_name_to_permission_map.keys())
+            )
+        if self.object_id_to_additional_permission_map:
+            cond = _OR_coalesce(
+                cond, ProjectRow.id.in_(self.object_id_to_additional_permission_map.keys())
+            )
+        if self.object_id_to_overriding_permission_map:
+            cond = _OR_coalesce(
+                cond, ProjectRow.id.in_(self.object_id_to_overriding_permission_map.keys())
+            )
+        return cond
+
+    @override
+    async def build_query(self) -> sa.sql.Select[Any] | None:
+        cond = self.query_condition
+        if cond is None:
+            return None
+        return sa.select(ProjectRow).where(cond)
+
+    @override
+    async def calculate_final_permission(
+        self, rbac_obj: ProjectRow
+    ) -> frozenset[ProjectPermission]:
+        project_row = rbac_obj
+        project_id = project_row.id
+        permissions: frozenset[ProjectPermission] = frozenset()
+
+        if (
+            overriding_perm := self.object_id_to_overriding_permission_map.get(project_id)
+        ) is not None:
+            permissions = overriding_perm
+        else:
+            permissions |= self.object_id_to_additional_permission_map.get(project_id, set())
+            permissions |= self.domain_name_to_permission_map.get(project_row.domain_name, set())
+        return permissions
+
+
+class ProjectPermissionContextBuilder(
+    AbstractPermissionContextBuilder[ProjectPermission, ProjectPermissionContext]
+):
+    db_session: AsyncSession
+
+    def __init__(self, db_session: AsyncSession) -> None:
+        self.db_session = db_session
+
+    @override
+    async def calculate_permission(
+        self,
+        ctx: ClientContext,
+        target_scope: ScopeType,
+    ) -> frozenset[ProjectPermission]:
+        roles = await get_predefined_roles_in_scope(ctx, target_scope, self.db_session)
+        return await self._calculate_permission_by_predefined_roles(roles)
+
+    @override
+    async def build_ctx_in_system_scope(
+        self,
+        ctx: ClientContext,
+    ) -> ProjectPermissionContext:
+        from ai.backend.manager.models.domain.row import DomainRow
+
+        perm_ctx = ProjectPermissionContext()
+        _domain_query_stmt = sa.select(DomainRow).options(load_only(DomainRow.name))
+        for row in await self.db_session.scalars(_domain_query_stmt):
+            to_be_merged = await self.build_ctx_in_domain_scope(ctx, DomainScope(row.name))
+            perm_ctx.merge(to_be_merged)
+        return perm_ctx
+
+    @override
+    async def build_ctx_in_domain_scope(
+        self,
+        ctx: ClientContext,
+        scope: DomainScope,
+    ) -> ProjectPermissionContext:
+        permissions = await self.calculate_permission(ctx, scope)
+        return ProjectPermissionContext(
+            domain_name_to_permission_map={scope.domain_name: permissions}
+        )
+
+    @override
+    async def build_ctx_in_project_scope(
+        self, ctx: ClientContext, scope: ProjectScope
+    ) -> ProjectPermissionContext:
+        permissions = await self.calculate_permission(ctx, scope)
+        return ProjectPermissionContext(
+            object_id_to_additional_permission_map={scope.project_id: permissions}
+        )
+
+    @override
+    async def build_ctx_in_user_scope(
+        self, ctx: ClientContext, scope: UserScope
+    ) -> ProjectPermissionContext:
+        return ProjectPermissionContext()
+
+    async def build_ctx_in_container_registry_scope(
+        self, _ctx: ClientContext, scope: ContainerRegistryScope
+    ) -> ProjectPermissionContext:
+        permissions = MEMBER_PERMISSIONS
+        return ProjectPermissionContext(
+            registry_id_to_additional_permission_map={scope.registry_id: permissions}
+        )
+
+    @override
+    @classmethod
+    async def _permission_for_owner(
+        cls,
+    ) -> frozenset[ProjectPermission]:
+        return OWNER_PERMISSIONS
+
+    @override
+    @classmethod
+    async def _permission_for_admin(
+        cls,
+    ) -> frozenset[ProjectPermission]:
+        return ADMIN_PERMISSIONS
+
+    @override
+    @classmethod
+    async def _permission_for_monitor(
+        cls,
+    ) -> frozenset[ProjectPermission]:
+        return MONITOR_PERMISSIONS
+
+    @override
+    @classmethod
+    async def _permission_for_privileged_member(
+        cls,
+    ) -> frozenset[ProjectPermission]:
+        return PRIVILEGED_MEMBER_PERMISSIONS
+
+    @override
+    @classmethod
+    async def _permission_for_member(
+        cls,
+    ) -> frozenset[ProjectPermission]:
+        return MEMBER_PERMISSIONS
+
+
+# Called only by api/gql_legacy/group.py.
+async def get_permission_ctx(
+    db_conn: SAConnection,
+    ctx: ClientContext,
+    requested_permission: ProjectPermission,
+    target_scope: ScopeType,
+    container_registry_scope: ContainerRegistryScope | None = None,
+) -> ProjectPermissionContext:
+    async with ctx.db.begin_readonly_session(db_conn) as db_session:
+        builder = ProjectPermissionContextBuilder(db_session)
+
+        if container_registry_scope is not None:
+            return await builder.build_ctx_in_container_registry_scope(
+                ctx, container_registry_scope
+            )
+        return await builder.build(ctx, target_scope, requested_permission)

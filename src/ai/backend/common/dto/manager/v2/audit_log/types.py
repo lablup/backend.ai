@@ -7,7 +7,9 @@ from enum import StrEnum
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 
 __all__ = (
+    "AuditLogActionKind",
     "AuditLogOrderField",
+    "AuditLogScopeOrderField",
     "AuditLogStatus",
     "OrderDirection",
 )
@@ -20,6 +22,19 @@ class AuditLogStatus(StrEnum):
     ERROR = "error"
     UNKNOWN = "unknown"
     RUNNING = "running"
+    DENIED = "denied"
+
+
+class AuditLogActionKind(StrEnum):
+    """Shape of the action that wrote an audit log entry."""
+
+    SINGLE_ENTITY = "single_entity"
+    BULK = "bulk"
+    SCOPE = "scope"
+    RELATION = "relation"
+    MEMBERSHIP = "membership"
+    GLOBAL = "global"
+    LOOKUP = "lookup"
 
 
 class AuditLogOrderField(StrEnum):
@@ -29,3 +44,12 @@ class AuditLogOrderField(StrEnum):
     ENTITY_TYPE = "entity_type"
     OPERATION = "operation"
     STATUS = "status"
+    ACTION_NAME = "action_name"
+    ACTION_KIND = "action_kind"
+
+
+class AuditLogScopeOrderField(StrEnum):
+    """Fields available for ordering the scopes of an audit log."""
+
+    SCOPE_TYPE = "scope_type"
+    SCOPE_ID = "scope_id"

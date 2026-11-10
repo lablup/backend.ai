@@ -3,34 +3,22 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.types import EntityType, GlobalEntityType
+from ai.backend.manager.actions.v2.ops.base import GlobalSearcherOpsAction
 from ai.backend.manager.data.audit_log.types import AuditLogData
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.services.audit_log.actions.base import AuditLogAction
+from ai.backend.manager.models.audit_log.row import AuditLogRow
 
 
-@dataclass
-class SearchAuditLogsAction(AuditLogAction):
-    querier: BatchQuerier
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
+@dataclass(frozen=True)
+class SearchAuditLogsAction(GlobalSearcherOpsAction[AuditLogRow, AuditLogData]):
+    """Page through every audit record — the super-admin read."""
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
-
-
-@dataclass
-class SearchAuditLogsActionResult(BaseActionResult):
-    data: list[AuditLogData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
+    def entity_type(cls) -> EntityType:
+        return GlobalEntityType()
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "search_audit_logs"

@@ -11,6 +11,8 @@ from ai.backend.common.clients.http_client.client_pool import (
     ClientPool,
 )
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.request import (
     BulkCreateEndpointRequest,
     BulkDeleteEndpointRequest,
@@ -27,21 +29,20 @@ from ai.backend.common.exception import (
     FailedToGetMetric,
     PrometheusConnectionError,
 )
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.types import (
     AutoScalingMetricSource,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.appproxy.client import AppProxyClient
 from ai.backend.manager.clients.prometheus.client import PrometheusClient
+from ai.backend.manager.clients.prometheus.preset import LabelMatcher, MetricPreset
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.scale import AutoScalingRule
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
 )
-from ai.backend.manager.data.prometheus_query_preset import PrometheusQueryPresetData
-from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
+from ai.backend.manager.data.prometheus_query_preset.types import PrometheusQueryPresetData
+from ai.backend.manager.data.resource.types import ResourceGroupProxyTarget
 from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound
 from ai.backend.manager.repositories.deployment.repository import (
     AutoScalingMetricsData,
@@ -52,7 +53,9 @@ from ai.backend.manager.repositories.prometheus_query_preset.repository import (
 )
 from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVariantRepository
 from ai.backend.manager.sokovan.deployment.recorder.context import DeploymentRecorderContext
-from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
+    SchedulingController,
+)
 
 from .types import (
     DeploymentExecutionError,
@@ -61,7 +64,7 @@ from .types import (
     EndpointRegistrationResult,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 REGISTER_ENDPOINT_TIMEOUT_SEC = 30
 
@@ -132,9 +135,11 @@ class DeploymentExecutor:
 
         with DeploymentRecorderContext.shared_phase("load_configuration"):
             with DeploymentRecorderContext.shared_step("load_proxy_targets"):
-                scaling_groups = {dep.deployment_info.metadata.resource_group for dep, _ in entries}
-                scaling_group_targets = (
-                    await self._deployment_repo.fetch_scaling_group_proxy_targets(scaling_groups)
+                resource_groups = {
+                    dep.deployment_info.metadata.resource_group for dep, _ in entries
+                }
+                resource_group_targets = (
+                    await self._deployment_repo.fetch_resource_group_proxy_targets(resource_groups)
                 )
 
         registered: list[DeploymentWithHistory] = []
@@ -143,16 +148,16 @@ class DeploymentExecutor:
         # Group entries by proxy target so each target receives one bulk call.
         groups: dict[
             tuple[str, str],
-            list[tuple[DeploymentWithHistory, DeploymentRevisionID, ScalingGroupProxyTarget]],
+            list[tuple[DeploymentWithHistory, DeploymentRevisionID, ResourceGroupProxyTarget]],
         ] = {}
         for deployment, revision_id in entries:
             info = deployment.deployment_info
-            target = scaling_group_targets.get(info.metadata.resource_group)
+            target = resource_group_targets.get(info.metadata.resource_group)
             if not target:
-                log.warning(
-                    "No proxy target found for scaling group {} of deployment {}",
-                    info.metadata.resource_group,
-                    info.id,
+                log.trace(
+                    "no proxy target for resource group",
+                    deployment_id=info.id,
+                    resource_group_name=info.metadata.resource_group,
                 )
                 failures.append(
                     DeploymentExecutionError(
@@ -192,7 +197,7 @@ class DeploymentExecutor:
         addr: str,
         token: str,
         group_entries: Sequence[
-            tuple[DeploymentWithHistory, DeploymentRevisionID, ScalingGroupProxyTarget]
+            tuple[DeploymentWithHistory, DeploymentRevisionID, ResourceGroupProxyTarget]
         ],
         registered: list[DeploymentWithHistory],
         failures: list[DeploymentExecutionError],
@@ -208,11 +213,7 @@ class DeploymentExecutor:
                 for dep, rev, _ in group_entries
             ]
         except BaseException as exc:
-            log.error(
-                "Failed to build endpoint items for proxy {}: {}",
-                addr,
-                exc,
-            )
+            log.error("endpoint item build failed", proxy_address=addr, exc_info=exc)
             for deployment, _, _ in group_entries:
                 failures.append(
                     DeploymentExecutionError(
@@ -230,11 +231,7 @@ class DeploymentExecutor:
                 BulkCreateEndpointRequest(endpoints=items)
             )
         except BaseException as exc:
-            log.error(
-                "Bulk endpoint create failed against proxy {}: {}",
-                addr,
-                exc,
-            )
+            log.warning("bulk endpoint creation failed", proxy_address=addr, exc_info=exc)
             for deployment, _, _ in group_entries:
                 failures.append(
                     DeploymentExecutionError(
@@ -252,11 +249,7 @@ class DeploymentExecutor:
             try:
                 await self._deployment_repo.update_endpoint_url(dep_id, str(result_item.url))
             except BaseException as exc:
-                log.error(
-                    "Failed to persist endpoint URL for deployment {}: {}",
-                    dep_id,
-                    exc,
-                )
+                log.error("endpoint URL not persisted", deployment_id=dep_id, exc_info=exc)
                 failures.append(
                     DeploymentExecutionError(
                         deployment_info=deployment,
@@ -267,10 +260,8 @@ class DeploymentExecutor:
                 )
                 continue
             registered.append(deployment)
-            log.info(
-                "Successfully registered endpoint for deployment {} with URL: {}",
-                dep_id,
-                result_item.url,
+            log.trace(
+                "endpoint registered", deployment_id=dep_id, endpoint_url=str(result_item.url)
             )
 
     async def calculate_desired_replicas(
@@ -330,10 +321,8 @@ class DeploymentExecutor:
         for deployment, result in zip(deployments_to_calculate, results, strict=True):
             dep_id = deployment.deployment_info.id
             if isinstance(result, BaseException):
-                log.warning(
-                    "Failed to calculate desired replicas for deployment {}: {}",
-                    dep_id,
-                    result,
+                log.error(
+                    "desired replica calculation failed", deployment_id=dep_id, exc_info=result
                 )
                 errors.append(
                     DeploymentExecutionError(
@@ -370,11 +359,11 @@ class DeploymentExecutor:
         deployment_ids = {dep.deployment_info.id for dep in deployments}
         with DeploymentRecorderContext.shared_phase("load_termination_config"):
             with DeploymentRecorderContext.shared_step("load_proxy_config"):
-                scaling_groups = {
+                resource_groups = {
                     dep.deployment_info.metadata.resource_group for dep in deployments
                 }
-                proxy_targets = await self._deployment_repo.fetch_scaling_group_proxy_targets(
-                    scaling_groups
+                proxy_targets = await self._deployment_repo.fetch_resource_group_proxy_targets(
+                    resource_groups
                 )
 
         # Phase 2: Retire replica groups and clear the deploying-revision pointer in one
@@ -395,10 +384,10 @@ class DeploymentExecutor:
             info = deployment.deployment_info
             target = proxy_targets.get(info.metadata.resource_group)
             if not target:
-                log.warning(
-                    "No proxy target found for scaling group {}, skipping unregister for {}",
-                    info.metadata.resource_group,
-                    info.id,
+                log.trace(
+                    "no proxy target for resource group, unregister skipped",
+                    deployment_id=info.id,
+                    resource_group_name=info.metadata.resource_group,
                 )
                 successes.append(deployment)
                 continue
@@ -432,7 +421,7 @@ class DeploymentExecutor:
         try:
             response = await client.delete_endpoints_bulk(request)
         except BaseException as exc:
-            log.warning("Bulk endpoint delete failed against proxy {}: {}", addr, exc)
+            log.warning("bulk endpoint deletion failed", proxy_address=addr, exc_info=exc)
             for deployment in group:
                 errors.append(
                     DeploymentExecutionError(
@@ -498,10 +487,7 @@ class DeploymentExecutor:
         if target_revision.model_definition:
             health_check_config = target_revision.model_definition.health_check_config()
         if not health_check_config:
-            log.debug(
-                "No health check configuration found in model definition for deployment {}",
-                deployment.id,
-            )
+            log.trace("no health check configuration", deployment_id=deployment.id)
 
         variant = await self._runtime_variant_repo.get_by_id(
             target_revision.model_runtime_config.runtime_variant_id
@@ -557,7 +543,7 @@ class DeploymentExecutor:
             try:
                 presets[pid] = await self._preset_repo.get_by_id(pid)
             except Exception:
-                log.warning("AUTOSCALE: failed to load preset {}", pid)
+                log.warning("autoscaling preset not loaded", preset_id=pid, exc_info=True)
 
         # Execute queries concurrently
         tasks = [
@@ -567,7 +553,7 @@ class DeploymentExecutor:
 
         for (_, rule), result in zip(prometheus_rules, results, strict=True):
             if isinstance(result, BaseException):
-                log.warning("AUTOSCALE(rule:{}): prometheus query failed: {}", rule.id, result)
+                log.error("autoscaling metric query failed", rule_id=rule.id, exc_info=result)
             elif result is not None:
                 metrics_data.prometheus_metrics[rule.id] = result
 
@@ -583,7 +569,7 @@ class DeploymentExecutor:
         """
         preset_id = rule.condition.prometheus_query_preset_id
         if preset_id is None or preset_id not in presets:
-            log.warning("AUTOSCALE(rule:{}): preset {} not found", rule.id, preset_id)
+            log.warning("autoscaling preset not found", rule_id=rule.id, preset_id=preset_id)
             return None
 
         preset_data: PrometheusQueryPresetData = presets[preset_id]
@@ -594,33 +580,38 @@ class DeploymentExecutor:
             "project": str(deployment.metadata.project),
             "session_owner": str(deployment.metadata.session_owner),
         }
-        labels = {k: v for k, v in available_labels.items() if k in preset_data.filter_labels}
+        labels = {
+            k: LabelMatcher.exact(v)
+            for k, v in available_labels.items()
+            if k in preset_data.filter_labels
+        }
 
         # time_window: preset default → fallback to "5m"
         time_window = preset_data.time_window or "5m"
 
         try:
             response = await self._prometheus_client.execute_preset(
-                query_template=preset_data.query_template,
-                filter_labels=labels,
-                group_labels=[],
-                time_window=time_window,
+                MetricPreset(
+                    template=preset_data.query_template,
+                    labels=labels,
+                    window=time_window,
+                ),
                 time_range=None,
             )
         except (PrometheusConnectionError, FailedToGetMetric) as e:
             log.warning(
-                "AUTOSCALE(e:{}, rule:{}): prometheus query failed: {}",
-                deployment.id,
-                rule.id,
-                e,
+                "autoscaling prometheus query failed",
+                deployment_id=deployment.id,
+                rule_id=rule.id,
+                exc_info=e,
             )
             return None
 
         if not response.data.result:
-            log.debug(
-                "AUTOSCALE(e:{}, rule:{}): prometheus query returned empty result",
-                deployment.id,
-                rule.id,
+            log.trace(
+                "autoscaling prometheus query returned empty result",
+                deployment_id=deployment.id,
+                rule_id=rule.id,
             )
             return None
 
@@ -629,10 +620,10 @@ class DeploymentExecutor:
             return Decimal(value_str)
         except DecimalException:
             log.warning(
-                "AUTOSCALE(e:{}, rule:{}): failed to parse prometheus value '{}'",
-                deployment.id,
-                rule.id,
-                value_str,
+                "autoscaling prometheus value not parsable",
+                deployment_id=deployment.id,
+                rule_id=rule.id,
+                metric_value=value_str,
             )
             return None
 
@@ -672,8 +663,5 @@ class DeploymentExecutor:
                 )
 
                 if desired_replica is None:
-                    log.debug(
-                        "No change in desired replicas for deployment {}, skipping",
-                        deployment.id,
-                    )
+                    log.trace("desired replicas unchanged", deployment_id=deployment.id)
                 return desired_replica

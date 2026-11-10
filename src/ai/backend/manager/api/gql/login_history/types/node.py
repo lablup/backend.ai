@@ -2,15 +2,18 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any, override
 from uuid import UUID
 
 import strawberry
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.login_history import LoginHistoryID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.login_history.response import LoginHistoryNode
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -56,11 +59,27 @@ class LoginAttemptResultGQL(StrEnum):
 )
 class LoginHistoryV2GQL(PydanticNodeMixin[LoginHistoryNode]):
     id: NodeID[str] = gql_field(description="Unique identifier of the login history entry (UUID).")
+    field_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="UUID of the login history record.",
+        ),
+    )
 
     user_id: UUID = gql_field(description="UUID of the user who attempted to log in.")
     domain_name: str = gql_field(description="Domain name of the user at the time of the attempt.")
     result: LoginAttemptResultGQL = gql_field(description="Result of the login attempt.")
     fail_reason: str | None = gql_field(description="Detailed reason for the login failure.")
+    client_ip: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description=(
+                "IP address of the request that produced this entry, masked per the client "
+                "IP masking policy. Null when the policy records none, or when the address "
+                "was unavailable or unusable."
+            ),
+        )
+    )
     created_at: datetime = gql_field(description="Timestamp when the login attempt occurred.")
 
     @gql_added_field(
@@ -79,7 +98,7 @@ class LoginHistoryV2GQL(PydanticNodeMixin[LoginHistoryNode]):
         ]
         | None
     ):
-        return await info.context.data_loaders.user_loader.load(self.user_id)
+        return await info.context.data_loaders.user_loader.load(UserID(self.user_id))
 
     @gql_added_field(
         BackendAIGQLMeta(
@@ -97,7 +116,23 @@ class LoginHistoryV2GQL(PydanticNodeMixin[LoginHistoryNode]):
         ]
         | None
     ):
-        return await info.context.data_loaders.domain_loader.load(self.domain_name)
+        domain_id = await info.context.data_loaders.domain_id_by_name_loader.load(self.domain_name)
+        if domain_id is None:
+            return None
+        return await info.context.data_loaders.domain_by_id_loader.load(domain_id)
+
+    @classmethod
+    @override
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[LoginHistoryV2GQL | None]:
+        return await info.context.data_loaders.login_history_loader.load_many([
+            LoginHistoryID(UUID(nid)) for nid in node_ids
+        ])
 
 
 LoginHistoryV2EdgeGQL = Edge[LoginHistoryV2GQL]

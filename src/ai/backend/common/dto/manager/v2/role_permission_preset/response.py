@@ -3,15 +3,18 @@
 from __future__ import annotations
 
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
-from ai.backend.common.dto.manager.v2.rbac.types import OperationTypeDTO, RBACElementTypeDTO
-from ai.backend.common.identifier.role_permission_preset import RolePermissionPresetID
-from ai.backend.common.identifier.role_preset import RolePresetID
+from ai.backend.common.data.entity.role_permission_preset import RolePermissionPresetID
+from ai.backend.common.data.entity.role_preset import RolePresetID
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO
 
 __all__ = (
+    "AtomicBulkAddRolePresetPermissionsPayload",
     "BulkAddRolePermissionPresetFailureInfo",
     "BulkAddRolePermissionPresetsPayload",
     "BulkRemoveRolePermissionPresetsPayload",
@@ -25,11 +28,14 @@ class RolePermissionPresetNode(BaseResponseModel):
     """Node model for a stored permission entry under a role preset."""
 
     id: RolePermissionPresetID = Field(description="Permission entry UUID.")
+    field_id: UUID = Field(
+        description="UUID of the role permission preset. Added in 26.9.0.",
+    )
     role_preset_id: RolePresetID = Field(description="UUID of the parent role preset.")
-    entity_type: RBACElementTypeDTO = Field(
+    entity_type: EntityType = Field(
         description="Entity type the permission applies to.",
     )
-    operation: OperationTypeDTO = Field(description="Operation granted by the permission.")
+    permission: PermissionBitDTO = Field(description="The operation bit the entry grants.")
     created_at: datetime = Field(description="Creation timestamp.")
 
 
@@ -57,16 +63,22 @@ class BulkAddRolePermissionPresetFailureInfo(BaseResponseModel):
     """Failure detail for a single permission entry in a bulk add operation.
 
     Added entries have no row ID yet, so failures are keyed by the
-    ``(entity_type, operation)`` pair that could not be inserted (e.g., a duplicate).
+    ``(entity_type, permission)`` pair that could not be inserted (e.g., a duplicate).
     """
 
-    entity_type: RBACElementTypeDTO = Field(
+    entity_type: EntityType = Field(
         description="Entity type of the permission entry that failed.",
     )
-    operation: OperationTypeDTO = Field(
-        description="Operation of the permission entry that failed.",
+    permission: PermissionBitDTO = Field(
+        description="The operation bit of the permission entry that failed.",
     )
     message: str = Field(description="Error message describing the failure.")
+
+
+class AtomicBulkAddRolePresetPermissionsPayload(BaseResponseModel):
+    """Payload for adding permission entries to a role preset, all or none."""
+
+    items: list[RolePermissionPresetNode] = Field(description="Permission entries that were added.")
 
 
 class BulkAddRolePermissionPresetsPayload(BaseResponseModel):

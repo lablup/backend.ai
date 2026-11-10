@@ -1,4 +1,4 @@
-"""Repository result types for the idle-check reconciler batch."""
+"""Repository result types for idle checkers."""
 
 from __future__ import annotations
 
@@ -6,11 +6,10 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 
-from ai.backend.common.data.idle_checker.types import CheckerType, IdleCheckerSpec
-from ai.backend.common.identifier.idle_checker import IdleCheckerID
+from ai.backend.common.data.entity.idle_checker import IdleCheckerID
+from ai.backend.common.data.idle_checker.types import CheckerType, IdleCheckerSpec, IdleCheckPhase
 from ai.backend.common.types import SessionId, SessionTypes
 from ai.backend.manager.data.idle_checker.types import IdleCheckSession
-from ai.backend.manager.data.permission.id import ScopeId
 
 
 @dataclass(frozen=True)
@@ -24,57 +23,86 @@ class IdleCheckerDefinitionData:
 
 
 @dataclass(frozen=True)
-class BoundCheckerData:
-    """A checker applied through a concrete scope binding.
+class IdleCheckAssignmentData:
+    """One existing session idle-check row with data needed for judgment."""
 
-    ``binding_created_at`` is the stable tiebreak within the same scope.
-    """
-
-    scope: ScopeId
-    binding_created_at: datetime
+    session: IdleCheckSession
     checker: IdleCheckerDefinitionData
-
-
-@dataclass(frozen=True)
-class IdleCheckSessionData:
-    """Session data plus scope refs needed to attach bound idle checkers."""
-
-    session: IdleCheckSession
-    session_type: SessionTypes
-    scopes: Sequence[ScopeId]
-
-
-@dataclass(frozen=True)
-class IdleCheckTargetData:
-    """One session and the checkers applicable to it in this batch."""
-
-    session: IdleCheckSession
-    checkers: Sequence[BoundCheckerData]
 
 
 @dataclass(frozen=True)
 class IdleCheckBatchData:
     """Handler-oriented idle-check input for one reconciler tick."""
 
-    targets: Sequence[IdleCheckTargetData]
+    assignments: Sequence[IdleCheckAssignmentData]
+
+
+@dataclass(frozen=True)
+class SessionIdleCheckPairResult:
+    """How one pair of a batch exclusion or inclusion fared.
+
+    ``applied`` says whether the pair moved; a session the checker does not apply to
+    answers false with no error, because there was nothing to switch.
+    """
+
+    pair: SessionIdleCheckPair
+    applied: bool
+    error: Exception | None = None
+
+
+@dataclass(frozen=True)
+class SessionIdleCheckBatchResult:
+    """How each pair a batch exclusion or inclusion named fared, in the order named.
+
+    A list rather than a mapping keyed by the pair: the caller reads its own list
+    back, and naming a pair twice stays expressible.
+    """
+
+    results: Sequence[SessionIdleCheckPairResult]
+
+
+@dataclass(frozen=True)
+class SessionIdleCheckPair:
+    session_id: SessionId
+    checker_id: IdleCheckerID
+
+
+@dataclass(frozen=True)
+class InitialGracePeriodCheckData:
+    pair: SessionIdleCheckPair
+    initial_grace_period_seconds: int
+    grace_started_at: datetime
+
+
+@dataclass(frozen=True)
+class InitialGracePeriodBatchData:
+    checks: Sequence[InitialGracePeriodCheckData]
+    now: datetime
+
+
+@dataclass(frozen=True)
+class SessionIdleCheckAssignmentData:
+    # Pairs that should exist, derived from enabled checker scope bindings.
+    desired_pairs: Sequence[SessionIdleCheckPair]
+    # Existing pairs for sessions in the target statuses, excluding terminal sessions.
+    current_pairs: Sequence[SessionIdleCheckPair]
+    now: datetime
 
 
 @dataclass(frozen=True)
 class ExpiredIdleCheckData:
-    """One stored judgment whose deadline has passed, kept per checker as its own reason."""
+    """One stored IDLE_EXPIRED judgment, kept per checker as its own reason."""
 
     session_id: SessionId
     checker_id: IdleCheckerID
     expire_at: datetime
-    last_status: str
+    last_status: IdleCheckPhase
     last_message: str
 
 
 @dataclass(frozen=True)
 class ExpiredIdleCheckBatchData:
-    """Idle checks expired as of the DB timestamp.
-    `now` is the same timestamp passed to the reconciler.
-    """
+    """Stored IDLE_EXPIRED judgments and the DB timestamp for the reconciler."""
 
     checks: Sequence[ExpiredIdleCheckData]
     now: datetime

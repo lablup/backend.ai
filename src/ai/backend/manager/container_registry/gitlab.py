@@ -6,14 +6,14 @@ from typing import override
 import aiohttp
 
 from ai.backend.common.exception import ErrorDomain, ErrorOperation, PassthroughError
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.exceptions import ContainerRegistryProjectEmpty
 
 from .base import (
     BaseContainerRegistry,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class GitLabRegistry(BaseContainerRegistry):

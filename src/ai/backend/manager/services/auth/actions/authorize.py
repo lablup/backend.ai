@@ -4,15 +4,15 @@ from uuid import UUID
 
 from aiohttp import web
 
+from ai.backend.common.data.entity.types import EntityType, GlobalEntityType
 from ai.backend.common.dto.manager.auth.types import AuthTokenType
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.data.auth.types import AuthorizationResult
-from ai.backend.manager.services.auth.actions.base import AuthAction
 
 
-@dataclass
-class AuthorizeAction(AuthAction):
+@dataclass(frozen=True)
+class AuthorizeAction(BaseGlobalAction):
     request: web.Request
     type: AuthTokenType
     domain_name: str
@@ -24,13 +24,19 @@ class AuthorizeAction(AuthAction):
     force: bool = False
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return GlobalEntityType()
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.CREATE
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "authorize"
 
     @property
     def hook_params(self) -> dict[str, str]:
@@ -45,11 +51,7 @@ class AuthorizeAction(AuthAction):
         }
 
 
-@dataclass
-class AuthorizeActionResult(BaseActionResult):
+@dataclass(frozen=True)
+class AuthorizeActionResult:
     stream_response: web.StreamResponse | None
     authorization_result: AuthorizationResult | None
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.authorization_result.user_id) if self.authorization_result else None

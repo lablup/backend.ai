@@ -12,6 +12,11 @@ from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID, PageInfo
 
 from ai.backend.common.data.endpoint.types import ScalingState
+from ai.backend.common.data.entity.deployment import DeploymentEntityType, DeploymentID
+from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.types import RuntimeEntityID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.model_deployment.types import (
     ModelDeploymentStatus,
 )
@@ -32,6 +37,9 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
     DeploymentOrder as DeploymentOrderDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    DeploymentScalingStateFilter as DeploymentScalingStateFilterDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
     DeploymentStatusFilter as DeploymentStatusFilterDTO,
@@ -94,9 +102,17 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
 from ai.backend.common.dto.manager.v2.deployment.types import (
     ProjectDeploymentScope as ProjectDeploymentScopeDTO,
 )
+from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
+from ai.backend.common.dto.manager.v2.scheduling_history.request import (
+    ScopedSearchReplicaGroupHistoriesInput,
+)
+from ai.backend.common.dto.manager.v2.scheduling_history.types import (
+    ReplicaGroupHistoryScopeDTO,
+)
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
+    IntFilter,
     NullableDateTimeFilter,
     OrderDirection,
     StringFilter,
@@ -154,20 +170,37 @@ from ai.backend.manager.api.gql.deployment.types.revision import (
     ModelRevisionOrderBy,
 )
 from ai.backend.manager.api.gql.domain import Domain
+from ai.backend.manager.api.gql.entity_label.types.field import resolve_entity_labels
+from ai.backend.manager.api.gql.entity_label.types.filters import (
+    EntityLabelFilterGQL,
+    EntityLabelNestedFilterGQL,
+    EntityLabelOrderByGQL,
+)
+from ai.backend.manager.api.gql.entity_label.types.node import EntityLabelConnection
 from ai.backend.manager.api.gql.project import Project
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.deployment.types import (
-    AccessTokenSearchScope,
-    AutoScalingRuleSearchScope,
-    ReplicaSearchScope,
-    RevisionSearchScope,
+    AccessTokenOperationScope,
+    AutoScalingRuleOperationScope,
+    ReplicaOperationScope,
+    RevisionOperationScope,
 )
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
     from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
     from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
+
+    # Kept lazy below: a runtime import closes the scheduling_history -> rbac
+    # -> deployment cycle.
+    from ai.backend.manager.api.gql.scheduling_history.resolver import (
+        ReplicaGroupHistoryConnectionGQL,
+    )
+    from ai.backend.manager.api.gql.scheduling_history.types import (
+        ReplicaGroupHistoryFilterGQL,
+        ReplicaGroupHistoryOrderByGQL,
+    )
     from ai.backend.manager.api.gql.user.types.node import UserV2GQL
 
 DeploymentStatusGQL: type[ModelDeploymentStatus] = gql_enum(
@@ -216,6 +249,15 @@ class DeploymentStrategyGQL:
 )
 class ReplicaState:
     desired_replica_count: int
+    replica_count: int = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "The replica count the user set. Autoscaling changes only desiredReplicaCount,"
+                " so the two differ when an autoscaling rule set the count."
+            ),
+        )
+    )
 
 
 @gql_pydantic_type(
@@ -281,7 +323,9 @@ class ModelDeploymentMetadata:
         ]
         | None
     ):
-        return await info.context.data_loaders.project_loader.load(UUID(str(self.project_id)))
+        return await info.context.data_loaders.project_loader.load(
+            ProjectID(UUID(str(self.project_id)))
+        )
 
     @gql_field(
         description="The domain of this entity.",
@@ -307,7 +351,10 @@ class ModelDeploymentMetadata:
         ]
         | None
     ):
-        return await info.context.data_loaders.domain_loader.load(self.domain_name)
+        domain_id = await info.context.data_loaders.domain_id_by_name_loader.load(self.domain_name)
+        if domain_id is None:
+            return None
+        return await info.context.data_loaders.domain_by_id_loader.load(domain_id)
 
 
 @gql_pydantic_type(
@@ -332,6 +379,12 @@ class ModelDeploymentNetworkAccess:
 )
 class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
     id: NodeID[str]
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="UUID of the deployment.",
+        ),
+    )
     metadata: ModelDeploymentMetadata
     network_access: ModelDeploymentNetworkAccess
     current_revision_id: ID | None = None
@@ -363,7 +416,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
         if self.current_revision_id is None:
             return None
         return await info.context.data_loaders.revision_loader.load(
-            UUID(str(self.current_revision_id))
+            DeploymentRevisionID(UUID(str(self.current_revision_id)))
         )
 
     @gql_added_field(
@@ -376,7 +429,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
         if self.deploying_revision_id is None:
             return None
         return await info.context.data_loaders.revision_loader.load(
-            UUID(str(self.deploying_revision_id))
+            DeploymentRevisionID(UUID(str(self.deploying_revision_id)))
         )
 
     @gql_added_field(
@@ -394,7 +447,9 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
         ]
         | None
     ):
-        return await info.context.data_loaders.user_loader.load(UUID(str(self.created_user_id)))
+        return await info.context.data_loaders.user_loader.load(
+            UserID(UUID(str(self.created_user_id)))
+        )
 
     @gql_added_field(
         BackendAIGQLMeta(added_version="25.19.0", description="Deployment policy configuration.")
@@ -404,7 +459,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
     ) -> DeploymentPolicyGQL | None:
         """Get the deployment policy for this deployment."""
         policy_data = await info.context.data_loaders.deployment_policy_by_endpoint_loader.load(
-            UUID(str(self.id))
+            DeploymentID(UUID(str(self.id)))
         )
         if policy_data is None:
             return None
@@ -426,7 +481,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
         pydantic_filter = filter.to_pydantic() if filter else None
         pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
         payload = await info.context.adapters.deployment.search_revisions(
-            scope=RevisionSearchScope(deployment_id=UUID(str(self.id))),
+            scope=RevisionOperationScope(deployment_id=UUID(str(self.id))),
             input=AdminSearchRevisionsInput(
                 filter=pydantic_filter,
                 order=pydantic_order,
@@ -467,7 +522,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
         pydantic_filter = filter.to_pydantic() if filter else None
         pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
         payload = await info.context.adapters.deployment.search_replicas(
-            scope=ReplicaSearchScope(deployment_id=UUID(str(self.id))),
+            scope=ReplicaOperationScope(deployment_id=UUID(str(self.id))),
             input=SearchReplicasInput(
                 filter=pydantic_filter,
                 order=pydantic_order,
@@ -480,8 +535,87 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
             ),
         )
         nodes = [ModelReplica.from_pydantic(item) for item in payload.items]
-        edges = [ModelReplicaEdge(node=node, cursor=str(node.id)) for node in nodes]
+        edges = [ModelReplicaEdge(node=node, cursor=encode_cursor(node.id)) for node in nodes]
         return ModelReplicaConnection(
+            count=payload.total_count,
+            edges=edges,
+            page_info=PageInfo(
+                has_next_page=payload.has_next_page,
+                has_previous_page=payload.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+        )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.8.0",
+            description=(
+                "The scheduling history of this deployment's replica groups. This is the"
+                " per-replica-group scaling status that the deprecated ``scaling_state``"
+                " field points to."
+            ),
+        )
+    )  # type: ignore[misc]
+    async def replica_group_histories(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: Annotated[
+            ReplicaGroupHistoryFilterGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.scheduling_history.types"),
+        ]
+        | None = None,
+        order_by: list[
+            Annotated[
+                ReplicaGroupHistoryOrderByGQL,
+                strawberry.lazy("ai.backend.manager.api.gql.scheduling_history.types"),
+            ]
+        ]
+        | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> (
+        Annotated[
+            ReplicaGroupHistoryConnectionGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.scheduling_history.resolver"),
+        ]
+        | None
+    ):
+        from ai.backend.manager.api.gql.scheduling_history.resolver import (
+            ReplicaGroupHistoryConnectionGQL,
+            ReplicaGroupHistoryEdgeGQL,
+        )
+        from ai.backend.manager.api.gql.scheduling_history.types import (
+            ReplicaGroupHistoryGQL,
+        )
+
+        payload = (
+            await info.context.adapters.scheduling_history.scoped_search_replica_group_history(
+                ScopedSearchReplicaGroupHistoriesInput(
+                    scope=ReplicaGroupHistoryScopeDTO(
+                        deployment=[UUIDScope(value=UUID(str(self.id)))]
+                    ),
+                    filter=filter.to_pydantic() if filter else None,
+                    order=[o.to_pydantic() for o in order_by] if order_by else None,
+                    first=first,
+                    after=after,
+                    last=last,
+                    before=before,
+                    limit=limit,
+                    offset=offset,
+                )
+            )
+        )
+        nodes = [ReplicaGroupHistoryGQL.from_pydantic(item) for item in payload.items]
+        edges = [
+            ReplicaGroupHistoryEdgeGQL(node=node, cursor=encode_cursor(str(node.id)))
+            for node in nodes
+        ]
+        return ReplicaGroupHistoryConnectionGQL(
             count=payload.total_count,
             edges=edges,
             page_info=PageInfo(
@@ -508,7 +642,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
         pydantic_filter = filter.to_pydantic() if filter else None
         pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
         payload = await info.context.adapters.deployment.search_rules(
-            scope=AutoScalingRuleSearchScope(deployment_id=UUID(str(self.id))),
+            scope=AutoScalingRuleOperationScope(deployment_id=UUID(str(self.id))),
             input=SearchAutoScalingRulesInput(
                 filter=pydantic_filter,
                 order=pydantic_order,
@@ -551,7 +685,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
         pydantic_filter = filter.to_pydantic() if filter else None
         pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
         payload = await info.context.adapters.deployment.search_access_tokens(
-            scope=AccessTokenSearchScope(deployment_id=UUID(str(self.id))),
+            scope=AccessTokenOperationScope(deployment_id=UUID(str(self.id))),
             input=SearchAccessTokensInput(
                 filter=pydantic_filter,
                 order=pydantic_order,
@@ -576,6 +710,37 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
             ),
         )
 
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="The labels on this deployment.",
+        )
+    )  # type: ignore[misc]
+    async def entity_labels(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: EntityLabelFilterGQL | None = None,
+        order_by: list[EntityLabelOrderByGQL] | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> EntityLabelConnection | None:
+        return await resolve_entity_labels(
+            info,
+            RuntimeEntityID(DeploymentEntityType(), UUID(str(self.id))),
+            filter=filter,
+            order_by=order_by,
+            before=before,
+            after=after,
+            first=first,
+            last=last,
+            limit=limit,
+            offset=offset,
+        )
+
     @classmethod
     @override
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
@@ -586,7 +751,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
         required: bool = False,
     ) -> Iterable[Self | None]:
         results = await info.context.data_loaders.deployment_loader.load_many([
-            UUID(nid) for nid in node_ids
+            DeploymentID(UUID(nid)) for nid in node_ids
         ])
         return cast(list[Self | None], results)
 
@@ -622,11 +787,21 @@ class ProjectDeploymentScopeGQL(PydanticInputMixin[ProjectDeploymentScopeDTO]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Filter deployments by conditions on their replicas.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
     ),
     name="ReplicaNestedFilter",
 )
 class ReplicaNestedFilterGQL(PydanticInputMixin[ReplicaNestedFilterDTO]):
+    exists: bool | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description=(
+                "Matches parents that have at least one replica when true, and parents "
+                "with none when false. Says nothing about what the replicas hold."
+            ),
+        ),
+        default=None,
+    )
     some: ReplicaFilter | None = gql_field(
         description="Matches parents with at least one replica satisfying all conditions.",
         default=None,
@@ -641,6 +816,28 @@ class ReplicaNestedFilterGQL(PydanticInputMixin[ReplicaNestedFilterDTO]):
     none: ReplicaFilter | None = gql_field(
         description="Matches parents with no replica satisfying all conditions.",
         default=None,
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for the deployment scaling state.",
+        added_version="26.9.0",
+    ),
+    name="ScalingStateFilter",
+)
+class ScalingStateFilterGQL(PydanticInputMixin[DeploymentScalingStateFilterDTO]):
+    in_: list[ScalingStateGQL] | None = gql_field(
+        description="Scaling states to match.", name="in", default=None
+    )
+    equals: ScalingStateGQL | None = gql_field(
+        description="Exact scaling state match.", default=None
+    )
+    not_in: list[ScalingStateGQL] | None = gql_field(
+        description="Excludes scaling states in the list.", name="notIn", default=None
+    )
+    not_equals: ScalingStateGQL | None = gql_field(
+        description="Excludes exact scaling state match.", name="notEquals", default=None
     )
 
 
@@ -689,9 +886,35 @@ class DeploymentFilter(PydanticInputMixin[DeploymentFilterDTO]):
     )
     replicas: ReplicaNestedFilterGQL | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.8.0",
             description="Filter by conditions on deployment replicas.",
         ),
+        default=None,
+    )
+
+    labels: EntityLabelNestedFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="Select entities by the labels on them.",
+        ),
+        default=None,
+    )
+    entity_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(added_version="26.9.0", description="Filter by deployment ID."),
+        default=None,
+    )
+    desired_replicas: IntFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description=(
+                "Filter by the desired replica count."
+                " Falls back to the user-set replica count until autoscaling sets one."
+            ),
+        ),
+        default=None,
+    )
+    scaling_state: ScalingStateFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(added_version="26.9.0", description="Filter by scaling state."),
         default=None,
     )
 
@@ -736,7 +959,16 @@ class UpdateDeploymentPayload:
     model=DeleteDeploymentPayloadDTO,
 )
 class DeleteDeploymentPayload:
-    id: ID
+    id: ID = gql_field(
+        description="ID of the deleted deployment.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `deployment`.",
+    )
+    deployment: ModelDeployment = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The soft-deleted deployment.",
+        ),
+    )
 
 
 @gql_pydantic_type(
@@ -887,10 +1119,11 @@ class AdminRefreshDeploymentRevisionsPayload:
 # Replace deployment options types
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version="26.4.4",
+        added_version=NEXT_RELEASE_VERSION,
         description=(
             "Input for the replaceDeploymentOptions mutation. Full-replace"
-            " semantics — the supplied payload is the complete new value."
+            " semantics — the supplied payload is the complete new value,"
+            " except an omitted agent selection policy, which keeps the stored one."
         ),
     ),
     name="ReplaceDeploymentOptionsInput",
@@ -902,12 +1135,10 @@ class ReplaceDeploymentOptionsInputGQL(PydanticInputMixin[ReplaceDeploymentOptio
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version="26.4.4",
+        added_version=NEXT_RELEASE_VERSION,
         description=(
             "Payload returned after replacing a deployment's options. Only"
-            " the refreshed options surface is returned; the server path uses"
-            " ``UPDATE ... RETURNING`` and does not re-read the surrounding"
-            " deployment node."
+            " the refreshed options surface is returned."
         ),
     ),
     model=ReplaceDeploymentOptionsPayloadDTO,

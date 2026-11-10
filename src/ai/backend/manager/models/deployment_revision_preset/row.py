@@ -1,23 +1,14 @@
 from __future__ import annotations
 
-from datetime import datetime
-from typing import TYPE_CHECKING
-
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 
-from ai.backend.common.config import ModelDefinition
+from ai.backend.common.config import PresetModelDefinition
+from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
-from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
-from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
-from ai.backend.manager.data.deployment_revision_preset.types import (
-    DeploymentRevisionPresetData,
-    EnvironEntryData,
-    ResourceOptsEntryData,
-)
-from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetValueData
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -26,17 +17,15 @@ from ai.backend.manager.models.base import (
     ResourceOptsEntry,
     StrEnumType,
 )
+from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 from ai.backend.manager.models.runtime_variant_preset.types import (
     RuntimeVariantPresetValueEntry,
 )
 
-if TYPE_CHECKING:
-    from ai.backend.manager.models.resource_slot.row import PresetResourceSlotRow
-
 __all__ = ("DeploymentRevisionPresetRow",)
 
 
-class DeploymentRevisionPresetRow(Base):  # type: ignore[misc]
+class DeploymentRevisionPresetRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "deployment_revision_presets"
 
     __table_args__ = (
@@ -50,7 +39,7 @@ class DeploymentRevisionPresetRow(Base):  # type: ignore[misc]
         "id",
         GUID(DeploymentPresetID),
         primary_key=True,
-        server_default=sa.text("uuid_generate_v4()"),
+        server_default=sa.text("uuid_generate_v7()"),
     )
     runtime_variant: Mapped[RuntimeVariantID] = mapped_column(
         "runtime_variant", GUID(RuntimeVariantID), nullable=False
@@ -60,8 +49,8 @@ class DeploymentRevisionPresetRow(Base):  # type: ignore[misc]
     rank: Mapped[int] = mapped_column("rank", sa.Integer, nullable=False)
 
     image_id: Mapped[ImageID] = mapped_column("image_id", GUID(ImageID), nullable=False)
-    model_definition: Mapped[ModelDefinition | None] = mapped_column(
-        "model_definition", PydanticColumn(ModelDefinition), nullable=True
+    model_definition: Mapped[PresetModelDefinition | None] = mapped_column(
+        "model_definition", PydanticColumn(PresetModelDefinition, exclude_unset=True), nullable=True
     )
     resource_opts: Mapped[list[ResourceOptsEntry]] = mapped_column(
         "resource_opts", PydanticListColumn(ResourceOptsEntry), nullable=False, server_default="[]"
@@ -111,53 +100,3 @@ class DeploymentRevisionPresetRow(Base):  # type: ignore[misc]
         nullable=False,
         server_default=sa.text("'{}'::jsonb"),
     )
-
-    created_at: Mapped[datetime] = mapped_column(
-        "created_at",
-        sa.DateTime(timezone=True),
-        server_default=sa.func.now(),
-        nullable=False,
-    )
-    updated_at: Mapped[datetime | None] = mapped_column(
-        "updated_at",
-        sa.DateTime(timezone=True),
-        nullable=True,
-        onupdate=sa.func.now(),
-    )
-
-    resource_slot_rows: Mapped[list[PresetResourceSlotRow]] = relationship(
-        "PresetResourceSlotRow",
-        cascade="all, delete-orphan",
-        lazy="selectin",
-    )
-
-    def to_data(self) -> DeploymentRevisionPresetData:
-        return DeploymentRevisionPresetData(
-            id=self.id,
-            runtime_variant_id=self.runtime_variant,
-            name=self.name,
-            description=self.description,
-            rank=self.rank,
-            image_id=self.image_id,
-            model_definition=self.model_definition,
-            resource_opts=[
-                ResourceOptsEntryData(name=e.name, value=e.value)
-                for e in (self.resource_opts or [])
-            ],
-            cluster_mode=self.cluster_mode,
-            cluster_size=self.cluster_size,
-            startup_command=self.startup_command,
-            bootstrap_script=self.bootstrap_script,
-            environ=[EnvironEntryData(key=k, value=v) for k, v in (self.environ or {}).items()],
-            runtime_variant_preset_values=[
-                RuntimeVariantPresetValueData(preset_id=pv.preset_id, value=pv.value)
-                for pv in (self.preset_values or [])
-            ],
-            open_to_public=self.open_to_public,
-            replica_count=self.replica_count,
-            revision_history_limit=self.revision_history_limit,
-            deployment_strategy=self.deployment_strategy,
-            deployment_strategy_spec=dict(self.deployment_strategy_spec),
-            created_at=self.created_at,
-            updated_at=self.updated_at,
-        )

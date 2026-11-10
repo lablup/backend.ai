@@ -1,249 +1,292 @@
 import uuid
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import (
     Any,
     override,
 )
 
-from ai.backend.common.data.permission.types import EntityType
-from ai.backend.manager.actions.action import BaseAction, BaseActionResult
+from ai.backend.common.data.entity.entity_share import EntityShareEntityType, EntityShareID
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
+from ai.backend.common.types import VFolderMountPolicy
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.models.vfolder import VFolderPermission as VFolderMountPermission
+from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
+from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
+from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
+from ai.backend.manager.services.vfolder.actions.base import (
+    VFolderAction,
+    VFolderScopeActionResult,
+)
 from ai.backend.manager.services.vfolder.types import VFolderInvitationInfo
 
 
 @dataclass
-class VFolderInvitationAction(BaseAction):
+class VFolderInvitationAnswerAction(BaseScopeAction):
+    """Base for an answer to one invitation, which is a share offered to the requester.
+
+    Scoped to the requester rather than to the offer: they hold no permission on the
+    share before answering, so what is checked is that they may answer offers at all.
+    """
+
+    invitation_id: EntityShareID
+    requester_user_uuid: uuid.UUID
+
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return EntityType.VFOLDER_INVITATION
+        return EntityShareEntityType()
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
+
+    @override
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return (UserID(self.requester_user_uuid),)
 
 
 @dataclass
-class InviteVFolderAction(VFolderInvitationAction):
+class VFolderInvitationAnswerActionResult(BaseScopeActionResult):
+    invitation_id: EntityShareID
+
+    @override
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
+        return (self.invitation_id,)
+
+
+@dataclass
+class VFolderInvitationScopeAction(BaseScopeAction):
+    """Base for reading the invitations a user sent or received.
+
+    The rows read are ``entity_share``, so permission is asked on that type.
+    """
+
+    user_uuid: uuid.UUID
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return EntityShareEntityType()
+
+    @override
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return (UserID(self.user_uuid),)
+
+
+@dataclass
+class InviteVFolderAction(BaseScopeAction):
+    """Offer a folder to other users, writing one ``entity_share`` row per invitee.
+
+    Asked as CREATE on ``entity_share`` in the scope owning the folder, which a project
+    member or a recipient of the folder does not hold.
+    """
+
+    vfolder_uuid: VFolderUUID
+    owner_scope: EntityIdentifier
     keypair_resource_policy: Mapping[str, Any]
     user_uuid: uuid.UUID
 
-    vfolder_uuid: uuid.UUID
-    mount_permission: VFolderMountPermission
+    mount_permission: VFolderMountPolicy
     invitee_emails: list[str]
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.vfolder_uuid)
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return EntityShareEntityType()
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.CREATE
 
+    @override
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return (self.owner_scope,)
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "invite_vfolder"
+
 
 @dataclass
-class InviteVFolderActionResult(BaseActionResult):
+class InviteVFolderActionResult(BaseScopeActionResult):
     vfolder_uuid: uuid.UUID
     invitation_ids: list[str]
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.vfolder_uuid)
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
+        """Names no entity: ``invitation_ids`` carries the invitee emails, not share ids."""
+        return ()
 
 
 @dataclass
-class AcceptInvitationAction(VFolderInvitationAction):
-    invitation_id: uuid.UUID
+class AcceptInvitationAction(VFolderInvitationAnswerAction):
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "accept_invitation"
+
+
+@dataclass
+class AcceptInvitationActionResult(VFolderInvitationAnswerActionResult):
+    pass
+
+
+@dataclass
+class RejectInvitationAction(VFolderInvitationAnswerAction):
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "reject_invitation"
+
+
+@dataclass
+class RejectInvitationActionResult(VFolderInvitationAnswerActionResult):
+    pass
+
+
+@dataclass
+class UpdateInvitationAction(BaseSingleEntityAction):
+    """Restate what an invitation of one's own lends."""
+
+    invitation_id: EntityShareID
+    requester_user_uuid: uuid.UUID
+    mount_permission: VFolderMountPolicy
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.invitation_id)
+    def entity_id(self) -> EntityIdentifier:
+        return self.invitation_id
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.UPDATE
 
-
-@dataclass
-class AcceptInvitationActionResult(BaseActionResult):
-    invitation_id: uuid.UUID
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.invitation_id)
-
-
-@dataclass
-class RejectInvitationAction(VFolderInvitationAction):
-    invitation_id: uuid.UUID
-    requester_user_uuid: uuid.UUID
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.invitation_id)
-
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.UPDATE
+    def action_name(cls) -> str:
+        return "update_invitation"
 
 
 @dataclass
-class RejectInvitationActionResult(BaseActionResult):
+class UpdateInvitationActionResult:
     invitation_id: uuid.UUID
 
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.invitation_id)
-
 
 @dataclass
-class UpdateInvitationAction(VFolderInvitationAction):
-    invitation_id: uuid.UUID
-
-    requester_user_uuid: uuid.UUID
-    mount_permission: VFolderMountPermission
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.invitation_id)
-
-    @override
-    @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.UPDATE
-
-
-@dataclass
-class UpdateInvitationActionResult(BaseActionResult):
-    invitation_id: uuid.UUID
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.invitation_id)
-
-
-@dataclass
-class ListInvitationAction(VFolderInvitationAction):
-    requester_user_uuid: uuid.UUID
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.requester_user_uuid)
-
+class ListInvitationAction(VFolderInvitationScopeAction):
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.SEARCH
 
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "list_invitation"
+
 
 @dataclass
-class ListInvitationActionResult(BaseActionResult):
+class ListInvitationActionResult(VFolderScopeActionResult):
     requester_user_uuid: uuid.UUID
     info: list[VFolderInvitationInfo]
 
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.requester_user_uuid)
-
 
 @dataclass
-class LeaveInvitedVFolderAction(VFolderInvitationAction):
-    vfolder_uuid: uuid.UUID
+class LeaveInvitedVFolderAction(VFolderAction):
+    """Give up one's own access to a shared folder.
+
+    ``PURGE``: what goes away is the permission row, and that table carries no
+    lifecycle flag to set instead.
+    """
+
     requester_user_uuid: uuid.UUID
     shared_user_uuid: uuid.UUID | None = None
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.vfolder_uuid)
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.PURGE
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.DELETE
+    def action_name(cls) -> str:
+        return "leave_invited_vfolder"
 
 
 @dataclass
-class LeaveInvitedVFolderActionResult(BaseActionResult):
+class LeaveInvitedVFolderActionResult:
     vfolder_uuid: uuid.UUID
 
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.vfolder_uuid)
-
 
 @dataclass
-class RevokeInvitedVFolderAction(VFolderInvitationAction):
-    vfolder_id: uuid.UUID
-    shared_user_id: uuid.UUID
+class RevokeInvitedVFolderAction(VFolderAction):
+    """Take a shared folder's access away from someone else.
 
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.vfolder_id)
+    ``PURGE`` for the same reason as leaving one: the permission row is removed.
+    """
+
+    shared_user_id: uuid.UUID
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.DELETE
+        return ActionOperationType.PURGE
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "revoke_invited_vfolder"
 
 
 @dataclass
-class RevokeInvitedVFolderActionResult(BaseActionResult):
+class RevokeInvitedVFolderActionResult:
     vfolder_id: uuid.UUID
     shared_user_id: uuid.UUID
 
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.vfolder_id)
-
 
 @dataclass
-class UpdateInvitedVFolderMountPermissionAction(VFolderInvitationAction):
-    vfolder_id: uuid.UUID
+class UpdateInvitedVFolderMountPermissionAction(VFolderAction):
     user_id: uuid.UUID
-    permission: VFolderMountPermission
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.vfolder_id)
+    permission: VFolderMountPolicy
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.UPDATE
 
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "update_invited_vfolder_mount_permission"
+
 
 @dataclass
-class UpdateInvitedVFolderMountPermissionActionResult(BaseActionResult):
+class UpdateInvitedVFolderMountPermissionActionResult:
     vfolder_id: uuid.UUID
     user_id: uuid.UUID
-    permission: VFolderMountPermission
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.vfolder_id)
+    permission: VFolderMountPolicy
 
 
 @dataclass
-class ListSentInvitationsAction(VFolderInvitationAction):
+class ListSentInvitationsAction(VFolderInvitationScopeAction):
     """List invitations sent by the requester."""
-
-    requester_user_uuid: uuid.UUID
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.requester_user_uuid)
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.SEARCH
 
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "list_sent_invitations"
+
 
 @dataclass
-class ListSentInvitationsActionResult(BaseActionResult):
+class ListSentInvitationsActionResult(VFolderScopeActionResult):
     invitations: list[VFolderInvitationInfo]
-
-    @override
-    def entity_id(self) -> str | None:
-        return None

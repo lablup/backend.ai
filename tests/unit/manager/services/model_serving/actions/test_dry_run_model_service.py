@@ -9,13 +9,15 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_user_context
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.events.dispatcher import EventDispatcher
 from ai.backend.common.events.hub import EventHub
-from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
-from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
@@ -27,8 +29,6 @@ from ai.backend.common.types import (
     VFolderMount,
     VFolderUsageMode,
 )
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.types import (
@@ -46,12 +46,11 @@ from ai.backend.manager.services.model_serving.actions.dry_run_model_service imp
     DryRunModelServiceAction,
     DryRunModelServiceActionResult,
 )
-from ai.backend.manager.services.model_serving.processors.model_serving import (
-    ModelServingProcessors,
-)
 from ai.backend.manager.services.model_serving.services.model_serving import ModelServingService
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
-from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
+    SchedulingController,
+)
 from ai.backend.testutils.scenario import ScenarioBase
 
 _RUNTIME_VARIANT_REFACTOR_SKIP = (
@@ -75,20 +74,17 @@ class TestDryRunModelService:
             is_superadmin=False,
             role=UserRole.USER,
             domain_name="default",
+            domain_id=DomainID(uuid.uuid4()),
         )
 
     @pytest.fixture(autouse=True)
     def set_user_context(self, user_data: UserData) -> Iterator[None]:
-        with with_user(user_data):
+        with with_user_context(user_data):
             yield
 
     @pytest.fixture
     def mock_storage_manager(self) -> MagicMock:
         return MagicMock(spec=StorageSessionManager)
-
-    @pytest.fixture
-    def mock_action_monitor(self) -> MagicMock:
-        return MagicMock(spec=ActionMonitor)
 
     @pytest.fixture
     def mock_event_dispatcher(self) -> MagicMock:
@@ -156,7 +152,7 @@ class TestDryRunModelService:
     @pytest.fixture
     def mock_deployment_repository(self) -> MagicMock:
         mock = MagicMock()
-        mock.get_default_architecture_from_scaling_group = AsyncMock(return_value=None)
+        mock.get_default_architecture_from_resource_group = AsyncMock(return_value=None)
         return mock
 
     @pytest.fixture
@@ -218,19 +214,6 @@ class TestDryRunModelService:
         )
 
     @pytest.fixture
-    def model_serving_processors(
-        self,
-        mock_action_monitor: MagicMock,
-        model_serving_service: ModelServingService,
-        mock_action_validators: ActionValidators,
-    ) -> ModelServingProcessors:
-        return ModelServingProcessors(
-            service=model_serving_service,
-            action_monitors=[mock_action_monitor],
-            validators=mock_action_validators,
-        )
-
-    @pytest.fixture
     def mock_get_vfolder_ownership_type_dry_run(
         self, mocker: Any, mock_repositories: MagicMock
     ) -> AsyncMock:
@@ -257,21 +240,6 @@ class TestDryRunModelService:
         )
 
     @pytest.fixture
-    def mock_resolve_image_for_endpoint_creation_dry_run(
-        self, mocker: Any, mock_repositories: Any
-    ) -> AsyncMock:
-        mock = cast(
-            AsyncMock,
-            mocker.patch.object(
-                mock_repositories.repository,
-                "resolve_image_for_endpoint_creation",
-                new_callable=AsyncMock,
-            ),
-        )
-        mock.return_value = MagicMock(image_ref="test-image:latest")
-        return mock
-
-    @pytest.fixture
     def mock_background_task_manager_start(
         self, mocker: Any, mock_background_task_manager: Any
     ) -> AsyncMock:
@@ -290,6 +258,7 @@ class TestDryRunModelService:
             ScenarioBase.success(
                 "Configuration validation success",
                 DryRunModelServiceAction(
+                    project_id=ProjectID(uuid.uuid4()),
                     service_name="test-model-v1.0",
                     replicas=2,
                     image="ai.backend/python:3.9",
@@ -312,7 +281,7 @@ class TestDryRunModelService:
                         model_mount_destination="/models",
                         extra_mounts={},
                         environ={},
-                        scaling_group="default",
+                        resource_group="default",
                         resources={"cpu": "2", "memory": "4G"},
                         resource_opts={},
                     ),
@@ -327,7 +296,7 @@ class TestDryRunModelService:
                         owner_role=UserRole.USER,
                         group_id=uuid.UUID("00000000-0000-0000-0000-000000000002"),
                         resource_policy={},
-                        scaling_group="default",
+                        resource_group="default",
                         extra_mounts=[],
                     ),
                 ),
@@ -339,12 +308,11 @@ class TestDryRunModelService:
     )
     async def test_dry_run_model_service(
         self,
+        model_serving_service: ModelServingService,
         scenario: ScenarioBase[DryRunModelServiceAction, DryRunModelServiceActionResult],
         user_data: UserData,
-        model_serving_processors: ModelServingProcessors,
         mock_get_vfolder_ownership_type_dry_run: AsyncMock,
         mock_get_user_with_keypair: AsyncMock,
-        mock_resolve_image_for_endpoint_creation_dry_run: MagicMock,
         mock_background_task_manager_start: AsyncMock,
     ) -> None:
         mock_get_user_with_keypair.return_value = MagicMock(
@@ -358,7 +326,7 @@ class TestDryRunModelService:
         async def dry_run_model_service(
             action: DryRunModelServiceAction,
         ) -> DryRunModelServiceActionResult:
-            return await model_serving_processors.dry_run_model_service.wait_for_complete(action)
+            return await model_serving_service.dry_run(action)
 
         await scenario.test(dry_run_model_service)
 
@@ -376,7 +344,7 @@ class TestDryRunModelServiceActionWithRevision:
             model_mount_destination="/models",
             extra_mounts={},
             environ={"API_KEY": "original-value"},
-            scaling_group="default",
+            resource_group="default",
             resources={"cpu": "1", "memory": "2G"},
             resource_opts={},
         )
@@ -392,7 +360,7 @@ class TestDryRunModelServiceActionWithRevision:
             owner_role=UserRole.USER,
             group_id=uuid.UUID("00000000-0000-0000-0000-000000000002"),
             resource_policy={},
-            scaling_group="default",
+            resource_group="default",
             extra_mounts=[],
         )
 
@@ -403,6 +371,7 @@ class TestDryRunModelServiceActionWithRevision:
         base_model_service_prepare_ctx: ModelServicePrepareCtx,
     ) -> DryRunModelServiceAction:
         return DryRunModelServiceAction(
+            project_id=ProjectID(uuid.uuid4()),
             service_name="test-service",
             replicas=1,
             image="api-image:v1",
@@ -531,7 +500,7 @@ class TestDryRunModelServiceActionWithRevision:
         assert result.config.model_version == base_action.config.model_version
         assert result.config.model_mount_destination == base_action.config.model_mount_destination
         assert result.config.extra_mounts == base_action.config.extra_mounts
-        assert result.config.scaling_group == base_action.config.scaling_group
+        assert result.config.resource_group == base_action.config.resource_group
         assert result.config.resource_opts == base_action.config.resource_opts
 
     @pytest.fixture
@@ -581,20 +550,17 @@ class TestDryRunWithDeploymentConfigOverrides:
             is_superadmin=False,
             role=UserRole.USER,
             domain_name="default",
+            domain_id=DomainID(uuid.uuid4()),
         )
 
     @pytest.fixture(autouse=True)
     def set_user_context(self, user_data: UserData) -> Iterator[None]:
-        with with_user(user_data):
+        with with_user_context(user_data):
             yield
 
     @pytest.fixture
     def mock_storage_manager(self) -> MagicMock:
         return MagicMock(spec=StorageSessionManager)
-
-    @pytest.fixture
-    def mock_action_monitor(self) -> MagicMock:
-        return MagicMock(spec=ActionMonitor)
 
     @pytest.fixture
     def mock_event_dispatcher(self) -> MagicMock:
@@ -665,7 +631,7 @@ class TestDryRunWithDeploymentConfigOverrides:
     @pytest.fixture
     def mock_deployment_repository(self) -> MagicMock:
         mock = MagicMock()
-        mock.get_default_architecture_from_scaling_group = AsyncMock(return_value=None)
+        mock.get_default_architecture_from_resource_group = AsyncMock(return_value=None)
         return mock
 
     @pytest.fixture
@@ -727,19 +693,6 @@ class TestDryRunWithDeploymentConfigOverrides:
         )
 
     @pytest.fixture
-    def model_serving_processors(
-        self,
-        mock_action_monitor: MagicMock,
-        model_serving_service: ModelServingService,
-        mock_action_validators: ActionValidators,
-    ) -> ModelServingProcessors:
-        return ModelServingProcessors(
-            service=model_serving_service,
-            action_monitors=[mock_action_monitor],
-            validators=mock_action_validators,
-        )
-
-    @pytest.fixture
     def expected_task_id(self) -> uuid.UUID:
         return uuid.UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
 
@@ -771,13 +724,6 @@ class TestDryRunWithDeploymentConfigOverrides:
             ),
         )
 
-        mocks["resolve_image_for_endpoint_creation"] = mocker.patch.object(
-            mock_repositories.repository,
-            "resolve_image_for_endpoint_creation",
-            new_callable=AsyncMock,
-            return_value=MagicMock(image_ref="test-image:latest"),
-        )
-
         mocks["background_task_manager_start"] = mocker.patch.object(
             mock_background_task_manager,
             "start",
@@ -788,16 +734,10 @@ class TestDryRunWithDeploymentConfigOverrides:
         return mocks
 
     @pytest.fixture
-    def mock_resolve_image_for_endpoint_creation(
-        self, setup_repository_mocks: dict[str, AsyncMock]
-    ) -> AsyncMock:
-        """Expose resolve_image mock for image override verification."""
-        return setup_repository_mocks["resolve_image_for_endpoint_creation"]
-
-    @pytest.fixture
     def action_with_api_request_values(self) -> DryRunModelServiceAction:
         """Action with values DIFFERENT from deployment config."""
         return DryRunModelServiceAction(
+            project_id=ProjectID(uuid.uuid4()),
             service_name="test-model-v1.0",
             replicas=1,
             image="api-request-image:v1",  # Different from service def
@@ -820,7 +760,7 @@ class TestDryRunWithDeploymentConfigOverrides:
                 model_mount_destination="/models",
                 extra_mounts={},
                 environ={"API_VAR": "from-api-request"},  # Different from service def
-                scaling_group="default",
+                resource_group="default",
                 resources={"cpu": "1", "memory": "2G"},  # Different from service def
                 resource_opts={},
             ),
@@ -835,24 +775,21 @@ class TestDryRunWithDeploymentConfigOverrides:
                 owner_role=UserRole.USER,
                 group_id=uuid.UUID("00000000-0000-0000-0000-000000000002"),
                 resource_policy={},
-                scaling_group="default",
+                resource_group="default",
                 extra_mounts=[],
             ),
         )
 
     async def test_deployment_config_overrides_applied(
         self,
-        model_serving_processors: ModelServingProcessors,
+        model_serving_service: ModelServingService,
         action_with_api_request_values: DryRunModelServiceAction,
         revision_from_deployment_config: ModelRevisionSpec,
         expected_task_id: uuid.UUID,
         mock_scheduling_controller: MagicMock,
-        mock_resolve_image_for_endpoint_creation: AsyncMock,
     ) -> None:
         """Verify dry run applies deployment config overrides from RevisionGenerator."""
-        result = await model_serving_processors.dry_run_model_service.wait_for_complete(
-            action_with_api_request_values
-        )
+        result = await model_serving_service.dry_run(action_with_api_request_values)
 
         # Image canonical/architecture are now looked up by ``image_id`` via
         # ``get_image_by_id`` after revision merge; the legacy
@@ -890,20 +827,17 @@ class TestDryRunExtraMountsHandling:
             is_superadmin=False,
             role=UserRole.USER,
             domain_name="default",
+            domain_id=DomainID(uuid.uuid4()),
         )
 
     @pytest.fixture(autouse=True)
     def set_user_context(self, user_data: UserData) -> Iterator[None]:
-        with with_user(user_data):
+        with with_user_context(user_data):
             yield
 
     @pytest.fixture
     def mock_storage_manager(self) -> MagicMock:
         return MagicMock(spec=StorageSessionManager)
-
-    @pytest.fixture
-    def mock_action_monitor(self) -> MagicMock:
-        return MagicMock(spec=ActionMonitor)
 
     @pytest.fixture
     def mock_event_dispatcher(self) -> MagicMock:
@@ -971,7 +905,7 @@ class TestDryRunExtraMountsHandling:
     @pytest.fixture
     def mock_deployment_repository(self) -> MagicMock:
         mock = MagicMock()
-        mock.get_default_architecture_from_scaling_group = AsyncMock(return_value=None)
+        mock.get_default_architecture_from_resource_group = AsyncMock(return_value=None)
         return mock
 
     @pytest.fixture
@@ -1033,19 +967,6 @@ class TestDryRunExtraMountsHandling:
         )
 
     @pytest.fixture
-    def model_serving_processors(
-        self,
-        mock_action_monitor: MagicMock,
-        model_serving_service: ModelServingService,
-        mock_action_validators: ActionValidators,
-    ) -> ModelServingProcessors:
-        return ModelServingProcessors(
-            service=model_serving_service,
-            action_monitors=[mock_action_monitor],
-            validators=mock_action_validators,
-        )
-
-    @pytest.fixture
     def expected_task_id(self) -> uuid.UUID:
         return uuid.UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
 
@@ -1096,13 +1017,6 @@ class TestDryRunExtraMountsHandling:
             ),
         )
 
-        mocks["resolve_image_for_endpoint_creation"] = mocker.patch.object(
-            mock_repositories.repository,
-            "resolve_image_for_endpoint_creation",
-            new_callable=AsyncMock,
-            return_value=MagicMock(image_ref="test-image:latest"),
-        )
-
         mocks["background_task_manager_start"] = mocker.patch.object(
             mock_background_task_manager,
             "start",
@@ -1116,6 +1030,7 @@ class TestDryRunExtraMountsHandling:
     def action_with_extra_mounts(self, extra_mount: VFolderMount) -> DryRunModelServiceAction:
         """Action with extra_mounts containing VFolderMount objects."""
         return DryRunModelServiceAction(
+            project_id=ProjectID(uuid.uuid4()),
             service_name="test-model-v1.0",
             replicas=1,
             image="ai.backend/python:3.9",
@@ -1138,7 +1053,7 @@ class TestDryRunExtraMountsHandling:
                 model_mount_destination="/models",
                 extra_mounts={},
                 environ={},
-                scaling_group="default",
+                resource_group="default",
                 resources={"cpu": "2", "memory": "4G"},
                 resource_opts={},
             ),
@@ -1153,14 +1068,14 @@ class TestDryRunExtraMountsHandling:
                 owner_role=UserRole.USER,
                 group_id=uuid.UUID("00000000-0000-0000-0000-000000000002"),
                 resource_policy={},
-                scaling_group="default",
+                resource_group="default",
                 extra_mounts=[extra_mount],
             ),
         )
 
     async def test_extra_mounts_uses_folder_id_not_vfolder_id(
         self,
-        model_serving_processors: ModelServingProcessors,
+        model_serving_service: ModelServingService,
         action_with_extra_mounts: DryRunModelServiceAction,
         extra_mount_folder_id: uuid.UUID,
         expected_task_id: uuid.UUID,
@@ -1171,9 +1086,7 @@ class TestDryRunExtraMountsHandling:
         - mount_map keys must be uuid.UUID objects
         - mount_options keys must be uuid.UUID objects
         """
-        result = await model_serving_processors.dry_run_model_service.wait_for_complete(
-            action_with_extra_mounts
-        )
+        result = await model_serving_service.dry_run(action_with_extra_mounts)
 
         assert result.task_id == expected_task_id
 

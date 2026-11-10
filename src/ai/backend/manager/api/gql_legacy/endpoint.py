@@ -19,8 +19,8 @@ from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import joinedload, selectinload
 
 from ai.backend.common.data.endpoint.types import EndpointStatus
+from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.exception import DeprecatedAPI, InvalidAPIParameters
-from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
     AutoScalingMetricComparator,
@@ -41,33 +41,34 @@ from ai.backend.manager.data.model_serving.modifier import (
 from ai.backend.manager.data.model_serving.types import (
     EndpointAutoScalingRuleData,
     EndpointData,
+    EndpointLifecycle,
 )
-from ai.backend.manager.errors.common import (
-    GenericForbidden,
-    ObjectNotFound,
-)
+from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.errors.service import (
+    AutoScalingRuleNotFound,
     EndpointNotFound,
     EndpointTokenNotFound,
 )
-from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
-from ai.backend.manager.models.endpoint import (
+from ai.backend.manager.errors.storage import VFolderNotFound
+from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
+from ai.backend.manager.models.endpoint.row import (
     EndpointAutoScalingRuleRow,
-    EndpointLifecycle,
     EndpointRow,
     EndpointTokenRow,
 )
-from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.endpoint.updaters import (
+    AutoScalingRuleUpdater,
+    LegacyEndpointUpdater,
+)
+from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
-from ai.backend.manager.models.user import UserRole, UserRow
-from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.model_serving.updaters import (
-    EndpointAutoScalingRuleUpdaterSpec,
-    EndpointUpdaterSpec,
+from ai.backend.manager.models.user.row import UserRole, UserRow
+from ai.backend.manager.models.vfolder.row import VFolderRow
+from ai.backend.manager.services.deployment.actions.lookup_owner import (
+    LookupAutoScalingRuleDeploymentAction,
 )
 from ai.backend.manager.services.model_serving.actions.create_auto_scaling_rule import (
     CreateEndpointAutoScalingRuleAction,
@@ -75,10 +76,10 @@ from ai.backend.manager.services.model_serving.actions.create_auto_scaling_rule 
 from ai.backend.manager.services.model_serving.actions.delete_auto_scaling_rule import (
     DeleteEndpointAutoScalingRuleAction,
 )
-from ai.backend.manager.services.model_serving.actions.modify_auto_scaling_rule import (
-    ModifyEndpointAutoScalingRuleAction,
+from ai.backend.manager.services.model_serving.actions.update_auto_scaling_rule import (
+    UpdateEndpointAutoScalingRuleAction,
 )
-from ai.backend.manager.services.model_serving.actions.modify_endpoint import ModifyEndpointAction
+from ai.backend.manager.services.model_serving.actions.update_endpoint import UpdateEndpointAction
 from ai.backend.manager.types import OptionalState, TriState
 
 from .base import (
@@ -219,7 +220,7 @@ class EndpointAutoScalingRuleNode(graphene.ObjectType):  # type: ignore[misc]
         try:
             _rule_id = RuleId(UUID(raw_rule_id))
         except ValueError as e:
-            raise ObjectNotFound(object_name="Endpoint Autoscaling Rule") from e
+            raise AutoScalingRuleNotFound() from e
 
         async with graph_ctx.db.begin_readonly_session() as db_session:
             rule_row = await EndpointAutoScalingRuleRow.get(
@@ -289,11 +290,11 @@ class EndpointAutoScalingRuleNode(graphene.ObjectType):  # type: ignore[misc]
             try:
                 _endpoint_id = DeploymentID(UUID(raw_endpoint_id))
             except ValueError as e:
-                raise ObjectNotFound(object_name="Endpoint") from e
+                raise EndpointNotFound() from e
             try:
                 row = await EndpointRow.get(db_session, _endpoint_id)
             except NoResultFound as e:
-                raise ObjectNotFound(object_name="Endpoint") from e
+                raise EndpointNotFound() from e
 
             match graph_ctx.user["role"]:
                 case UserRole.SUPERADMIN:
@@ -373,7 +374,9 @@ class ModifyEndpointAutoScalingRuleInput(graphene.InputObjectType):  # type: ign
     min_replicas = graphene.Int()
     max_replicas = graphene.Int()
 
-    def to_action(self, id: RuleId) -> ModifyEndpointAutoScalingRuleAction:
+    def to_action(
+        self, deployment_id: DeploymentID, id: RuleId
+    ) -> UpdateEndpointAutoScalingRuleAction:
         def convert_to_decimal(
             value: str | None | UndefinedType,
         ) -> decimal.Decimal | UndefinedType:
@@ -387,7 +390,8 @@ class ModifyEndpointAutoScalingRuleInput(graphene.InputObjectType):  # type: ign
             except decimal.InvalidOperation as e:
                 raise InvalidAPIParameters(f"Cannot convert {value} to Decimal") from e
 
-        spec = EndpointAutoScalingRuleUpdaterSpec(
+        updater = AutoScalingRuleUpdater(
+            rule_id=id,
             metric_source=OptionalState.from_graphql(
                 AutoScalingMetricSource(self.metric_source)
                 if self.metric_source is not Undefined
@@ -417,10 +421,19 @@ class ModifyEndpointAutoScalingRuleInput(graphene.InputObjectType):  # type: ign
                 self.max_replicas,
             ),
         )
-        return ModifyEndpointAutoScalingRuleAction(
+        return UpdateEndpointAutoScalingRuleAction(
+            deployment_id=deployment_id,
             id=id,
-            updater=Updater(spec=spec, pk_value=id),
+            updater=updater,
         )
+
+
+async def _rule_deployment(graph_ctx: GraphQueryContext, rule_id: RuleId) -> DeploymentID:
+    """Resolve the deployment an auto-scaling rule belongs to."""
+    result = await graph_ctx.processors.deployment.lookup_auto_scaling_rule_deployment.run(
+        LookupAutoScalingRuleDeploymentAction(rule_id=rule_id)
+    )
+    return DeploymentID(result.entity_id())
 
 
 class CreateEndpointAutoScalingRuleNode(graphene.Mutation):  # type: ignore[misc]
@@ -452,13 +465,13 @@ class CreateEndpointAutoScalingRuleNode(graphene.Mutation):  # type: ignore[misc
         try:
             _endpoint_id = DeploymentID(UUID(raw_endpoint_id))
         except ValueError as e:
-            raise ObjectNotFound(object_name="Endpoint") from e
+            raise EndpointNotFound() from e
 
         action = props.to_action(
             endpoint_id=_endpoint_id,
         )
 
-        result = await graph_ctx.processors.model_serving_auto_scaling.create_endpoint_auto_scaling_rule.wait_for_complete(
+        result = await graph_ctx.processors.model_serving_auto_scaling.create_endpoint_auto_scaling_rule.run(
             action
         )
 
@@ -499,14 +512,15 @@ class ModifyEndpointAutoScalingRuleNode(graphene.Mutation):  # type: ignore[misc
         try:
             _rule_id = RuleId(UUID(rule_id))
         except ValueError as e:
-            raise ObjectNotFound(object_name="Endpoint Autoscaling Rule") from e
+            raise AutoScalingRuleNotFound() from e
         graph_ctx: GraphQueryContext = info.context
 
         action = props.to_action(
+            deployment_id=await _rule_deployment(graph_ctx, _rule_id),
             id=_rule_id,
         )
 
-        result = await graph_ctx.processors.model_serving_auto_scaling.modify_endpoint_auto_scaling_rule.wait_for_complete(
+        result = await graph_ctx.processors.model_serving_auto_scaling.update_endpoint_auto_scaling_rule.run(
             action
         )
 
@@ -542,15 +556,16 @@ class DeleteEndpointAutoScalingRuleNode(graphene.Mutation):  # type: ignore[misc
         try:
             _rule_id = RuleId(UUID(rule_id))
         except ValueError as e:
-            raise ObjectNotFound(object_name="Endpoint Autoscaling Rule") from e
+            raise AutoScalingRuleNotFound() from e
 
         graph_ctx: GraphQueryContext = info.context
 
         action = DeleteEndpointAutoScalingRuleAction(
+            deployment_id=await _rule_deployment(graph_ctx, _rule_id),
             id=_rule_id,
         )
 
-        result = await graph_ctx.processors.model_serving_auto_scaling.delete_endpoint_auto_scaling_rule.wait_for_complete(
+        result = await graph_ctx.processors.model_serving_auto_scaling.delete_endpoint_auto_scaling_rule.run(
             action
         )
 
@@ -913,7 +928,7 @@ class Endpoint(graphene.ObjectType):  # type: ignore[misc]
 
     async def resolve_model_vfolder(self, info: graphene.ResolveInfo) -> VirtualFolderNode:
         if not self.model:
-            raise ObjectNotFound(object_name="VFolder")
+            raise VFolderNotFound()
 
         ctx: GraphQueryContext = info.context
 
@@ -923,7 +938,7 @@ class Endpoint(graphene.ObjectType):  # type: ignore[misc]
 
     async def resolve_extra_mounts(self, info: graphene.ResolveInfo) -> Sequence[VirtualFolderNode]:
         if not self.endpoint_id:
-            raise ObjectNotFound(object_name="Endpoint")
+            raise EndpointNotFound()
 
         ctx: GraphQueryContext = info.context
 
@@ -994,8 +1009,12 @@ class ExtraMountInput(graphene.InputObjectType):  # type: ignore[misc]
         _, raw_vfolder_id = AsyncNode.resolve_global_id(info, self.vfolder_id)
         if not raw_vfolder_id:
             raw_vfolder_id = self.vfolder_id
+        try:
+            vfolder_id = UUID(raw_vfolder_id)
+        except ValueError as e:
+            raise InvalidAPIParameters(f"Invalid id: {self.vfolder_id}") from e
         return ExtraMount(
-            vfolder_id=OptionalState.from_graphql(UUID(raw_vfolder_id)),
+            vfolder_id=OptionalState.from_graphql(vfolder_id),
             mount_destination=OptionalState.from_graphql(self.mount_destination),
             type=OptionalState.from_graphql(self.type),
             permission=OptionalState.from_graphql(self.permission),
@@ -1025,7 +1044,7 @@ class ModifyEndpointInput(graphene.InputObjectType):  # type: ignore[misc]
     environ = graphene.JSONString(description="Added in 24.03.5.")
     runtime_variant = graphene.String(description="Added in 24.03.5.")
 
-    def to_action(self, endpoint_id: uuid.UUID, info: graphene.ResolveInfo) -> ModifyEndpointAction:
+    def to_action(self, endpoint_id: uuid.UUID, info: graphene.ResolveInfo) -> UpdateEndpointAction:
         def create_image_ref_from_input(graphene_image_input: ImageRefType) -> ImageRef:
             registry: OptionalState[str] = OptionalState.nop()
             if (
@@ -1058,7 +1077,8 @@ class ModifyEndpointInput(graphene.InputObjectType):  # type: ignore[misc]
 
             return [extra_mount.to_action_field(info) for extra_mount in extra_mounts_gql]
 
-        spec = EndpointUpdaterSpec(
+        updater = LegacyEndpointUpdater(
+            deployment_id=DeploymentID(endpoint_id),
             resource_slots=OptionalState.from_graphql(
                 self.resource_slots
                 if (self.resource_slots is Undefined or self.resource_slots is None)
@@ -1072,7 +1092,6 @@ class ModifyEndpointInput(graphene.InputObjectType):  # type: ignore[misc]
             ),
             cluster_size=OptionalState.from_graphql(self.cluster_size),
             replicas=OptionalState.from_graphql(self.replicas),
-            desired_session_count=OptionalState.from_graphql(self.desired_session_count),
             image=TriState.from_graphql(
                 create_image_ref_from_input(self.image) if self.image is not Undefined else None,
             ),
@@ -1098,9 +1117,9 @@ class ModifyEndpointInput(graphene.InputObjectType):  # type: ignore[misc]
             # add-revision path (which accepts ``runtime_variant_id``).
             runtime_variant_id=OptionalState.nop(),
         )
-        return ModifyEndpointAction(
+        return UpdateEndpointAction(
             deployment_id=DeploymentID(endpoint_id),
-            updater=Updater(spec=spec, pk_value=endpoint_id),
+            updater=updater,
         )
 
 
@@ -1130,7 +1149,7 @@ class ModifyEndpoint(graphene.Mutation):  # type: ignore[misc]
             info=info,
         )
 
-        result = await graph_ctx.processors.model_serving.modify_endpoint.wait_for_complete(action)
+        result = await graph_ctx.processors.model_serving.update_endpoint.run(action)
 
         return cls(
             ok=result.success,

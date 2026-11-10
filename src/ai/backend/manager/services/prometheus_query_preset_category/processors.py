@@ -1,46 +1,72 @@
-from typing import override
+from __future__ import annotations
 
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
-from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.services.prometheus_query_preset_category.actions import (
+from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.ops.result import (
+    CreatedEntityOpsResult,
+    EntityOpsResult,
+    ScopedBatchOpsResult,
+)
+from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
+from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
+from ai.backend.manager.data.prometheus_query_preset_category.types import (
+    PrometheusQueryPresetCategoryData,
+)
+from ai.backend.manager.services.prometheus_query_preset_category.actions.bulk_get import (
+    BulkGetCategoriesAction,
+)
+from ai.backend.manager.services.prometheus_query_preset_category.actions.create import (
     CreateCategoryAction,
-    CreateCategoryActionResult,
-    DeleteCategoryAction,
-    DeleteCategoryActionResult,
+)
+from ai.backend.manager.services.prometheus_query_preset_category.actions.get import (
     GetCategoryAction,
-    GetCategoryActionResult,
-    SearchCategoriesAction,
-    SearchCategoriesActionResult,
 )
-from ai.backend.manager.services.prometheus_query_preset_category.service import (
-    PrometheusQueryPresetCategoryService,
+from ai.backend.manager.services.prometheus_query_preset_category.actions.partial_bulk_purge import (
+    PartialBulkPurgeCategoriesAction,
+)
+from ai.backend.manager.services.prometheus_query_preset_category.actions.purge import (
+    PurgeCategoryAction,
+)
+from ai.backend.manager.services.prometheus_query_preset_category.actions.scoped_search import (
+    ScopedSearchCategoriesAction,
 )
 
 
-class PrometheusQueryPresetCategoryProcessors(AbstractProcessorPackage):
-    create_category: ActionProcessor[CreateCategoryAction, CreateCategoryActionResult]
-    get_category: ActionProcessor[GetCategoryAction, GetCategoryActionResult]
-    search_categories: ActionProcessor[SearchCategoriesAction, SearchCategoriesActionResult]
-    delete_category: ActionProcessor[DeleteCategoryAction, DeleteCategoryActionResult]
+class PrometheusQueryPresetCategoryProcessors:
+    """Every operation runs straight against ops, so this domain has no service."""
 
-    def __init__(
-        self,
-        service: PrometheusQueryPresetCategoryService,
-        action_monitors: list[ActionMonitor],
-        validators: ActionValidators,
-    ) -> None:
-        self.create_category = ActionProcessor(service.create_category, action_monitors)
-        self.get_category = ActionProcessor(service.get_category, action_monitors)
-        self.search_categories = ActionProcessor(service.search_categories, action_monitors)
-        self.delete_category = ActionProcessor(service.delete_category, action_monitors)
+    global_create_category: GlobalActionProcessor[
+        CreateCategoryAction,
+        CreatedEntityOpsResult[PrometheusQueryPresetCategoryData],
+    ]
+    get_category: SingleEntityActionProcessor[
+        GetCategoryAction,
+        EntityOpsResult[PrometheusQueryPresetCategoryData],
+    ]
+    bulk_get_categories: PartialBulkActionProcessor[
+        BulkGetCategoriesAction,
+        PrometheusQueryPresetCategoryData,
+    ]
+    scoped_search_categories: ScopeActionProcessor[
+        ScopedSearchCategoriesAction,
+        ScopedBatchOpsResult[PrometheusQueryPresetCategoryData],
+    ]
+    purge_category: SingleEntityActionProcessor[
+        PurgeCategoryAction,
+        EntityOpsResult[PrometheusQueryPresetCategoryData],
+    ]
+    partial_bulk_purge_categories: PartialBulkActionProcessor[
+        PartialBulkPurgeCategoriesAction,
+        PrometheusQueryPresetCategoryData,
+    ]
 
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            CreateCategoryAction.spec(),
-            GetCategoryAction.spec(),
-            SearchCategoriesAction.spec(),
-            DeleteCategoryAction.spec(),
-        ]
+    def __init__(self, group: ProcessorGroup[PrometheusQueryPresetCategoryData]) -> None:
+        self.global_create_category = group.global_create_ops(CreateCategoryAction)
+        self.get_category = group.single_get_ops(GetCategoryAction)
+        self.bulk_get_categories = group.partial_bulk_get_ops(BulkGetCategoriesAction)
+        self.scoped_search_categories = group.scoped_search_ops(ScopedSearchCategoriesAction)
+        self.purge_category = group.entity_purge_ops(PurgeCategoryAction)
+        self.partial_bulk_purge_categories = group.entity_partial_bulk_purge_ops(
+            PartialBulkPurgeCategoriesAction
+        )

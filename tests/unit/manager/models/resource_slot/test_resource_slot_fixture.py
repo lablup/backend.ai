@@ -10,12 +10,10 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.manager.models.base import populate_fixture
-from ai.backend.manager.models.resource_slot import (
-    AgentResourceRow,
-    NumberFormat,
-    ResourceSlotTypeRow,
-)
+from ai.backend.manager.models.resource_slot.row import AgentResourceRow, ResourceSlotTypeRow
+from ai.backend.manager.models.resource_slot.types import NumberFormat
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 
@@ -75,6 +73,7 @@ class TestPopulateFixtureWithPydanticColumn:
         self,
         database_with_resource_slot_tables: ExtendedAsyncSAEngine,
         agent_id: str,
+        agent_uuid: AgentUUID,
     ) -> None:
         """FK on agent_resources(slot_name) is satisfied after loading resource_slot_types fixture.
 
@@ -97,6 +96,7 @@ class TestPopulateFixtureWithPydanticColumn:
             db_sess.add(
                 AgentResourceRow(
                     agent_id=agent_id,
+                    agent_uuid=agent_uuid,
                     slot_name="cpu",
                     capacity=Decimal("4"),
                 )

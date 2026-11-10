@@ -37,6 +37,7 @@ class TestSessionHistoryNodeCreation:
         now = datetime.now(tz=UTC)
         node = SessionHistoryNode(
             id=uuid.uuid4(),
+            field_id=uuid.uuid4(),
             session_id=uuid.uuid4(),
             phase="scheduling",
             result="SUCCESS",
@@ -57,6 +58,7 @@ class TestSessionHistoryNodeCreation:
         sub_step = make_substep()
         node = SessionHistoryNode(
             id=record_id,
+            field_id=record_id,
             session_id=session_id,
             phase="scaling",
             from_status="PENDING",
@@ -81,6 +83,7 @@ class TestSessionHistoryNodeCreation:
         now = datetime.now(tz=UTC)
         node = SessionHistoryNode(
             id=uuid.uuid4(),
+            field_id=uuid.uuid4(),
             session_id=uuid.uuid4(),
             phase="scheduling",
             result="FAILURE",
@@ -99,6 +102,7 @@ class TestSessionHistoryNodeCreation:
         sub_steps = [make_substep("step1"), make_substep("step2")]
         node = SessionHistoryNode(
             id=uuid.uuid4(),
+            field_id=uuid.uuid4(),
             session_id=uuid.uuid4(),
             phase="scheduling",
             result="SUCCESS",
@@ -116,6 +120,7 @@ class TestSessionHistoryNodeCreation:
         sub_step = make_substep("my_step", "success")
         node = SessionHistoryNode(
             id=uuid.uuid4(),
+            field_id=uuid.uuid4(),
             session_id=uuid.uuid4(),
             phase="scheduling",
             result="SUCCESS",
@@ -135,6 +140,7 @@ class TestSessionHistoryNodeCreation:
         session_id = uuid.uuid4()
         node = SessionHistoryNode(
             id=record_id,
+            field_id=record_id,
             session_id=session_id,
             phase="scheduling",
             result="SUCCESS",
@@ -158,6 +164,7 @@ class TestDeploymentHistoryNodeCreation:
         now = datetime.now(tz=UTC)
         node = DeploymentHistoryNode(
             id=uuid.uuid4(),
+            field_id=uuid.uuid4(),
             deployment_id=uuid.uuid4(),
             category="scaling",
             phase="scaling",
@@ -173,6 +180,7 @@ class TestDeploymentHistoryNodeCreation:
         now = datetime.now(tz=UTC)
         node = DeploymentHistoryNode(
             id=uuid.uuid4(),
+            field_id=uuid.uuid4(),
             deployment_id=uuid.uuid4(),
             category="scaling",
             phase="scaling",
@@ -190,6 +198,7 @@ class TestDeploymentHistoryNodeCreation:
         dep_id = uuid.uuid4()
         node = DeploymentHistoryNode(
             id=record_id,
+            field_id=record_id,
             deployment_id=dep_id,
             category="scaling",
             phase="scaling",
@@ -212,6 +221,7 @@ class TestRouteHistoryNodeCreation:
         now = datetime.now(tz=UTC)
         node = RouteHistoryNode(
             id=uuid.uuid4(),
+            field_id=uuid.uuid4(),
             route_id=uuid.uuid4(),
             deployment_id=uuid.uuid4(),
             category="lifecycle",
@@ -232,6 +242,7 @@ class TestRouteHistoryNodeCreation:
         dep_id = uuid.uuid4()
         node = RouteHistoryNode(
             id=uuid.uuid4(),
+            field_id=uuid.uuid4(),
             route_id=route_id,
             deployment_id=dep_id,
             category="lifecycle",
@@ -251,6 +262,7 @@ class TestRouteHistoryNodeCreation:
         dep_id = uuid.uuid4()
         node = RouteHistoryNode(
             id=record_id,
+            field_id=record_id,
             route_id=route_id,
             deployment_id=dep_id,
             category="health",
@@ -277,6 +289,7 @@ class TestListSessionHistoryPayload:
         now = datetime.now(tz=UTC)
         node = SessionHistoryNode(
             id=uuid.uuid4(),
+            field_id=uuid.uuid4(),
             session_id=uuid.uuid4(),
             phase="scheduling",
             result="SUCCESS",
@@ -299,6 +312,7 @@ class TestListSessionHistoryPayload:
         record_id = uuid.uuid4()
         node = SessionHistoryNode(
             id=record_id,
+            field_id=record_id,
             session_id=uuid.uuid4(),
             phase="scheduling",
             result="SUCCESS",
@@ -322,6 +336,7 @@ class TestListDeploymentHistoryPayload:
         now = datetime.now(tz=UTC)
         node = DeploymentHistoryNode(
             id=uuid.uuid4(),
+            field_id=uuid.uuid4(),
             deployment_id=uuid.uuid4(),
             category="scaling",
             phase="scaling",
@@ -339,6 +354,7 @@ class TestListDeploymentHistoryPayload:
         record_id = uuid.uuid4()
         node = DeploymentHistoryNode(
             id=record_id,
+            field_id=record_id,
             deployment_id=uuid.uuid4(),
             category="scaling",
             phase="scaling",
@@ -361,6 +377,7 @@ class TestListRouteHistoryPayload:
         now = datetime.now(tz=UTC)
         node = RouteHistoryNode(
             id=uuid.uuid4(),
+            field_id=uuid.uuid4(),
             route_id=uuid.uuid4(),
             deployment_id=uuid.uuid4(),
             category="lifecycle",
@@ -381,6 +398,7 @@ class TestListRouteHistoryPayload:
         dep_id = uuid.uuid4()
         node = RouteHistoryNode(
             id=record_id,
+            field_id=record_id,
             route_id=route_id,
             deployment_id=dep_id,
             category="lifecycle",

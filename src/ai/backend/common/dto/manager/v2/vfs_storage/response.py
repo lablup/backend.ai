@@ -12,6 +12,7 @@ __all__ = (
     "AdminSearchVFSStoragesPayload",
     "CreateVFSStoragePayload",
     "DeleteVFSStoragePayload",
+    "PurgeVFSStoragePayload",
     "UpdateVFSStoragePayload",
     "VFSStorageNode",
 )
@@ -21,6 +22,9 @@ class VFSStorageNode(BaseResponseModel):
     """Node model representing a VFS storage."""
 
     id: UUID = Field(description="Storage ID")
+    entity_id: UUID = Field(
+        description="UUID of the VFS storage. Added in 26.9.0.",
+    )
     name: str = Field(description="Storage name")
     host: str = Field(description="Storage host address")
     base_path: str = Field(description="Base path on the storage host")
@@ -42,6 +46,14 @@ class DeleteVFSStoragePayload(BaseResponseModel):
     """Payload for VFS storage deletion mutation result."""
 
     id: UUID = Field(description="ID of the deleted VFS storage")
+    entity_id: UUID = Field(description="UUID of the deleted VFS storage. Added in 26.10.0.")
+
+
+class PurgeVFSStoragePayload(BaseResponseModel):
+    """Payload for VFS storage permanent purge."""
+
+    id: UUID = Field(description="ID of the purged VFS storage")
+    entity_id: UUID = Field(description="UUID of the purged VFS storage. Added in 26.10.0.")
 
 
 class AdminSearchVFSStoragesPayload(BaseResponseModel):

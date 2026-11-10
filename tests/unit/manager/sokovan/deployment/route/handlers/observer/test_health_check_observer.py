@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import AsyncIterator, Mapping
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import cast
 from unittest.mock import AsyncMock
 from uuid import uuid4
 
+import pytest
+from aiohttp import web
+from aiohttp.test_utils import TestServer
 from dateutil.tz import tzutc
 
 from ai.backend.common.clients.valkey_client.valkey_schedule.types import (
@@ -16,16 +20,16 @@ from ai.backend.common.clients.valkey_client.valkey_schedule.types import (
     ReplicaProbeTarget,
 )
 from ai.backend.common.config import ModelHealthCheck
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
-from ai.backend.common.identifier.replica import ReplicaID
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
+from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.deployment.types import (
+    RouteData,
     RouteHealthStatus,
     RouteStatus,
     RouteTrafficStatus,
 )
-from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.route.handlers.observer.health_check import (
     RouteHealthObserver,
 )
@@ -223,4 +227,69 @@ class TestRouteHealthObserverProbePolicy:
         await observer.observe([route])
 
         call = observer._http_health_check.call_args
-        assert call.args == ("10.0.0.1", 8000, "/livez", 42.0, 204)
+        assert call.args == (route.route_id, "10.0.0.1", 8000, "/livez", 42.0, 204)
+
+
+@dataclass
+class _Replica:
+    host: str
+    port: int
+    received_paths: list[str] = field(default_factory=list)
+
+
+@pytest.fixture
+async def replica() -> AsyncIterator[_Replica]:
+    """A local HTTP server standing in for the replica; ``/redirect`` answers 302 to ``/health``."""
+    replica = _Replica(host="127.0.0.1", port=0)
+
+    async def handle(request: web.Request) -> web.Response:
+        replica.received_paths.append(request.raw_path)
+        if request.path == "/redirect":
+            return web.Response(status=302, headers={"Location": "/health"})
+        return web.Response()
+
+    app = web.Application()
+    app.router.add_route("GET", "/{tail:.*}", handle)
+    server = TestServer(app, host=replica.host)
+    await server.start_server()
+    replica.port = server.port or 0
+    try:
+        yield replica
+    finally:
+        await server.close()
+
+
+class TestRouteHealthObserverHttpProbe:
+    @pytest.mark.parametrize("path", ["/health?x=1", "/a@other.host/x"])
+    async def test_probe_stays_on_replica_host(self, replica: _Replica, path: str) -> None:
+        observer = _observer(_make_valkey(probe_targets={}, statuses={}))
+
+        healthy = await observer._http_health_check(
+            ReplicaID(uuid4()), replica.host, replica.port, path, 5.0, 200
+        )
+
+        assert healthy is True
+        assert replica.received_paths == [path]
+
+    async def test_probe_does_not_follow_redirect(self, replica: _Replica) -> None:
+        observer = _observer(_make_valkey(probe_targets={}, statuses={}))
+
+        healthy = await observer._http_health_check(
+            ReplicaID(uuid4()), replica.host, replica.port, "/redirect", 5.0, 200
+        )
+
+        assert healthy is False
+        assert replica.received_paths == ["/redirect"]
+
+    async def test_path_that_replaces_host_fails_without_request(self, replica: _Replica) -> None:
+        # Joined as a string, this path would move the probe to the host after ``@``.
+        # The local server stands in for that host, so a regression shows up as a request it receives.
+        observer = _observer(_make_valkey(probe_targets={}, statuses={}))
+        path = f"@{replica.host}:{replica.port}/x"
+
+        healthy = await observer._http_health_check(
+            ReplicaID(uuid4()), "192.0.2.1", 9, path, 5.0, 200
+        )
+
+        assert healthy is False
+        assert replica.received_paths == []

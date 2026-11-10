@@ -9,6 +9,7 @@ Verifies the one-shot RG-default merge that replaces the prior split
     resource_opts / environ / mounts / startup_command /
     bootstrap_script / starts_at / batch_timeout_sec)
   * caller-supplied values always override the RG baseline
+  * the owner's default bootstrap script comes before the RG baseline
   * empty collections on the draft are treated as "not set"
 """
 
@@ -18,15 +19,20 @@ import uuid
 
 import pytest
 
-from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.data.entity.bootstrap_script import BootstrapScript
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.types import BinarySize, ClusterMode, ResourceSlotEntry
+from ai.backend.manager.data.dotfile.types import DotfileBundle
+from ai.backend.manager.data.resource.types import SlotTypeInfo
+from ai.backend.manager.data.session.creation import ContainerUserInfo
 from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
     KernelGroupDraft,
     KernelResourceInput,
+    ResourceSpecDraft,
     SchedulingTargetDraft,
     SessionOptionsDraft,
-    SessionResourceSpecDraft,
 )
 from ai.backend.manager.data.session.options import (
     AgentSelectionPolicy,
@@ -38,11 +44,14 @@ from ai.backend.manager.data.session.options import (
     ResourceOpts,
     SessionHandlerOptions,
 )
-from ai.backend.manager.sokovan.scheduling_controller.preparers.draft_rule import (
-    SessionSpecPreparationContext,
-)
-from ai.backend.manager.sokovan.scheduling_controller.preparers.merge_resource_group_defaults_rule import (
+from ai.backend.manager.sokovan.scheduling_controller.preparers.resources.merge_resource_group_defaults_rule import (
     MergeResourceGroupDefaultsRule,
+)
+from ai.backend.manager.views.sokovan.session_creation import (
+    GlobalEnqueueInfo,
+    ResourceGroupEnqueueInfo,
+    SessionSpecContext,
+    UserEnqueueInfo,
 )
 
 
@@ -71,7 +80,7 @@ def rg_defaults(rg_image_id: ImageID) -> DefaultSessionOptions:
         default_kernel_execution_spec=KernelExecutionSpec(
             resource_input=KernelResourceConfig(
                 image_id=rg_image_id,
-                resources=[ResourceSlotEntry(resource_type="cpu", quantity="2")],
+                resources=[ResourceSlotEntry(resource_type=ResourceSlotName("cpu"), quantity="2")],
                 resource_opts=ResourceOpts(shmem=BinarySize(128 * 1024 * 1024)),
             ),
             environ={"RG_BASE": "1"},
@@ -81,8 +90,30 @@ def rg_defaults(rg_image_id: ImageID) -> DefaultSessionOptions:
     )
 
 
-def _context(rg: DefaultSessionOptions) -> SessionSpecPreparationContext:
-    return SessionSpecPreparationContext(resource_group_defaults=rg)
+def _context(
+    rg: DefaultSessionOptions, user_bootstrap_script: BootstrapScript | None = None
+) -> SessionSpecContext:
+    return SessionSpecContext(
+        resource_group=ResourceGroupEnqueueInfo(
+            defaults=rg,
+            network=None,
+            allow_fractional=False,
+            served_slot_names=frozenset(),
+        ),
+        user=UserEnqueueInfo(
+            policy=None,
+            container_user=ContainerUserInfo(),
+            dotfiles=DotfileBundle(),
+            default_bootstrap_script=user_bootstrap_script,
+            pending_session_count=0,
+            pending_session_resource_slots={},
+            vfolder_mounts_by_role={},
+        ),
+        global_info=GlobalEnqueueInfo(
+            image_infos={},
+            slot_type_info=SlotTypeInfo(types={}, required=frozenset()),
+        ),
+    )
 
 
 class TestMergeResourceGroupDefaultsRule:
@@ -92,9 +123,10 @@ class TestMergeResourceGroupDefaultsRule:
         rg_defaults: DefaultSessionOptions,
     ) -> None:
         """Unset option-level fields absorb every RG default."""
-        result = await rule.prepare(SessionResourceSpecDraft(), _context(rg_defaults))
+        result = await rule.prepare(ResourceSpecDraft(), _context(rg_defaults))
         opts = result.options
         assert opts.priority == 42
+        assert opts.job_priority == 0
         assert opts.is_preemptible is False
         assert opts.cluster_mode == ClusterMode.MULTI_NODE
         assert opts.handler_options == SessionHandlerOptions(
@@ -109,7 +141,7 @@ class TestMergeResourceGroupDefaultsRule:
         rg_defaults: DefaultSessionOptions,
     ) -> None:
         """Caller-set option-level fields survive the overlay."""
-        draft = SessionResourceSpecDraft(
+        draft = ResourceSpecDraft(
             options=SessionOptionsDraft(
                 priority=99,
                 cluster_mode=ClusterMode.SINGLE_NODE,
@@ -133,7 +165,7 @@ class TestMergeResourceGroupDefaultsRule:
         rg_image_id: ImageID,
     ) -> None:
         """A group without an execution_spec inherits every RG baseline field."""
-        draft = SessionResourceSpecDraft(
+        draft = ResourceSpecDraft(
             options=SessionOptionsDraft(
                 kernel_groups=(KernelGroupDraft(role="main", replica_count=1),),
             ),
@@ -143,7 +175,7 @@ class TestMergeResourceGroupDefaultsRule:
         merged = result.options.kernel_groups[0].execution_spec
         assert merged.resource_input.image_id == rg_image_id
         assert merged.resource_input.resources == (
-            ResourceSlotEntry(resource_type="cpu", quantity="2"),
+            ResourceSlotEntry(resource_type=ResourceSlotName("cpu"), quantity="2"),
         )
         assert merged.environ == {"RG_BASE": "1"}
         assert merged.startup_command == "rg-start"
@@ -159,7 +191,7 @@ class TestMergeResourceGroupDefaultsRule:
     ) -> None:
         """Caller-set execution_spec fields win over the RG baseline."""
         caller_image = ImageID(uuid.uuid4())
-        draft = SessionResourceSpecDraft(
+        draft = ResourceSpecDraft(
             options=SessionOptionsDraft(
                 kernel_groups=(
                     KernelGroupDraft(
@@ -182,7 +214,7 @@ class TestMergeResourceGroupDefaultsRule:
         assert merged.environ == {"CALLER": "yes"}
         # Unset fields still picked up from RG.
         assert merged.resource_input.resources == (
-            ResourceSlotEntry(resource_type="cpu", quantity="2"),
+            ResourceSlotEntry(resource_type=ResourceSlotName("cpu"), quantity="2"),
         )
         assert merged.startup_command == "rg-start"
 
@@ -192,7 +224,7 @@ class TestMergeResourceGroupDefaultsRule:
     ) -> None:
         """With no RG default_kernel_execution_spec, only option-level fill happens."""
         rg = DefaultSessionOptions(priority=7)
-        draft = SessionResourceSpecDraft(
+        draft = ResourceSpecDraft(
             options=SessionOptionsDraft(
                 kernel_groups=(KernelGroupDraft(role="main", replica_count=1),),
             ),
@@ -201,3 +233,51 @@ class TestMergeResourceGroupDefaultsRule:
         assert result.options.priority == 7
         assert result.options.kernel_groups is not None
         assert result.options.kernel_groups[0].execution_spec.resource_input.image_id is None
+
+    @pytest.mark.parametrize(
+        ("requested", "user_script", "rg", "expected"),
+        [
+            pytest.param("caller", "user", "rg", "caller", id="request-wins"),
+            pytest.param(None, "user", "rg", "user", id="user-default-over-rg"),
+            pytest.param(None, None, "rg", "rg", id="rg-when-no-user-default"),
+            pytest.param(None, "user", None, "user", id="user-default-without-rg-baseline"),
+            pytest.param(None, None, None, None, id="nothing-set"),
+        ],
+    )
+    async def test_bootstrap_script_precedence(
+        self,
+        rule: MergeResourceGroupDefaultsRule,
+        requested: str | None,
+        user_script: str | None,
+        rg: str | None,
+        expected: str | None,
+    ) -> None:
+        defaults = DefaultSessionOptions(
+            default_kernel_execution_spec=(
+                KernelExecutionSpec(
+                    resource_input=KernelResourceConfig(image_id=ImageID(uuid.uuid4())),
+                    bootstrap_script=rg,
+                )
+                if rg is not None
+                else None
+            ),
+        )
+        draft = ResourceSpecDraft(
+            options=SessionOptionsDraft(
+                kernel_groups=(
+                    KernelGroupDraft(
+                        role="main",
+                        replica_count=1,
+                        execution_spec=KernelExecutionSpecDraft(bootstrap_script=requested),
+                    ),
+                ),
+            ),
+        )
+        context = _context(
+            defaults, BootstrapScript(user_script) if user_script is not None else None
+        )
+
+        result = await rule.prepare(draft, context)
+
+        assert result.options.kernel_groups is not None
+        assert result.options.kernel_groups[0].execution_spec.bootstrap_script == expected

@@ -18,12 +18,12 @@ from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.plugin import BasePluginContext
 from ai.backend.common.types import KernelId, aobject
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .plugin import MetadataPlugin
 from .root import ContainerMetadataPlugin
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class MetadataPluginContext(BasePluginContext[MetadataPlugin]):
@@ -118,7 +118,7 @@ class MetadataServer(aobject):
         local_config = cast(AgentUnifiedConfig, self.app["_root.context"].local_config)
         await prepare_kernel_metadata_uri_handling(local_config)
         self.app["docker-mode"] = local_config.agent.docker_mode
-        log.info("Loading metadata plugin: meta-data")
+        log.info("metadata plugin loading", plugin_name="meta-data")
         metadata_plugin = ContainerMetadataPlugin({}, local_config.model_dump())
         await metadata_plugin.init(None)
         metadata_app, global_middlewares, route_structures = await metadata_plugin.create_app()
@@ -195,9 +195,9 @@ class MetadataServer(aobject):
         plugin_ctx = MetadataPluginContext(root_ctx.etcd, root_ctx.local_config)
         await plugin_ctx.init()
         root_ctx.metadata_plugin_ctx = plugin_ctx
-        log.debug("Available metadata plugins: {}", plugin_ctx.plugins)
+        log.debug("metadata plugins available", plugin_names=str(list(plugin_ctx.plugins)))
         for plugin_name, plugin_instance in plugin_ctx.plugins.items():
-            log.info("Loading metadata plugin: {0}", plugin_name)
+            log.info("metadata plugin loading", plugin_name=plugin_name)
             subapp, global_middlewares, route_structure = await plugin_instance.create_app()
             self._init_subapp(plugin_name, self.app, subapp, global_middlewares, route_structure)
 
