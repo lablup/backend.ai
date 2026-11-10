@@ -176,10 +176,10 @@ class AuthHandler:
     # logout (POST /auth/logout)
     # ------------------------------------------------------------------
 
-    async def logout(self, body: BodyParam[LogoutRequest], ctx: RequestCtx) -> APIResponse:
+    async def logout(self, body: BodyParam[LogoutRequest], ctx: UserContext) -> APIResponse:
         params = body.parsed
         log.info("AUTH.LOGOUT(session_token:{}...)", params.session_token[:8])
-        action = LogoutAction(session_token=params.session_token)
+        action = LogoutAction(user_id=ctx.user_uuid, session_token=params.session_token)
         await self._auth.logout.wait_for_complete(action)
         return APIResponse.build(HTTPStatus.OK, LogoutResponse())
 

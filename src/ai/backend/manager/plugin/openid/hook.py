@@ -4,6 +4,7 @@ import logging
 from collections.abc import Mapping, Sequence
 from typing import (
     Any,
+    cast,
 )
 
 import jwt
@@ -11,6 +12,7 @@ import jwt.exceptions
 import sqlalchemy as sa
 from aiohttp import web
 
+from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
 from ai.backend.common.plugin.hook import HookHandler, HookPlugin, Reject
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.login_session.enums import LoginSessionStatus
@@ -87,7 +89,7 @@ class OIDCHookPlugin(HookPlugin):
 
         if payload.get("force", False):
             async with db.begin() as conn:
-                await conn.execute(
+                invalidated = await conn.execute(
                     sa.update(LoginSessionRow.__table__)
                     .where(
                         (LoginSessionRow.__table__.c.user_id == user_uuid)
@@ -97,7 +99,11 @@ class OIDCHookPlugin(HookPlugin):
                         status=LoginSessionStatus.INVALIDATED,
                         invalidated_at=sa.func.now(),
                     )
+                    .returning(LoginSessionRow.__table__.c.session_token)
                 )
+                invalidated_tokens = [row.session_token for row in invalidated]
+            valkey_session = cast(ValkeySessionClient, root_app["_valkey_session"])
+            await valkey_session.delete_login_sessions(invalidated_tokens)
             log.info(
                 "AUTHORIZE_HOOK(openid): force-invalidated existing login sessions for {}",
                 email,
