@@ -17,7 +17,6 @@ import pytest
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.user.types import UserData
 from ai.backend.common.identifier.project import ProjectID
-from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.errors.resource import DBOperationFailed, TaskTemplateNotFound
 from ai.backend.manager.exceptions import InvalidArgument
@@ -56,17 +55,16 @@ from ai.backend.manager.services.template.actions.update_task_template import (
     UpdateTaskTemplateAction,
 )
 from ai.backend.manager.services.template.service import TemplateService
-from ai.backend.manager.views.session_template import ClusterTemplateWithOwnerAndDomain
 
 _CLUSTER_TEMPLATE_OWNER_UUID = uuid.UUID(int=1)
 _OTHER_USER_UUID = uuid.UUID(int=2)
 _CLUSTER_TEMPLATE_DOMAIN = "template-domain"
 _OTHER_DOMAIN = "other-domain"
-_CLUSTER_TEMPLATE = ClusterTemplateWithOwnerAndDomain(
-    template={"metadata": {"name": "test"}},
-    owner_id=UserID(_CLUSTER_TEMPLATE_OWNER_UUID),
-    domain_name=_CLUSTER_TEMPLATE_DOMAIN,
-)
+_CLUSTER_TEMPLATE = {
+    "template": {"metadata": {"name": "test"}},
+    "user_uuid": _CLUSTER_TEMPLATE_OWNER_UUID,
+    "domain_name": _CLUSTER_TEMPLATE_DOMAIN,
+}
 
 
 @dataclass(frozen=True)
@@ -908,11 +906,11 @@ class TestGetClusterTemplateAction:
     ) -> None:
         template_data = {"spec": {"nodes": []}, "metadata": {"name": "test"}}
         mock_repo.get_cluster_template = AsyncMock(
-            return_value=ClusterTemplateWithOwnerAndDomain(
-                template=template_data,
-                owner_id=UserID(_CLUSTER_TEMPLATE_OWNER_UUID),
-                domain_name=_CLUSTER_TEMPLATE_DOMAIN,
-            )
+            return_value={
+                "template": template_data,
+                "user_uuid": _CLUSTER_TEMPLATE_OWNER_UUID,
+                "domain_name": _CLUSTER_TEMPLATE_DOMAIN,
+            }
         )
 
         action = GetClusterTemplateAction(template_id="cluster-1")

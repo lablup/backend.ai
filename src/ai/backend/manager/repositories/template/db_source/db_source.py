@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, Any
 import sqlalchemy as sa
 
 from ai.backend.common.identifier.project import ProjectID
-from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.errors.resource import DBOperationFailed
@@ -19,7 +18,6 @@ from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.session_template import TemplateType, session_templates
 from ai.backend.manager.models.user import UserRole, users
 from ai.backend.manager.utils import check_if_requester_is_eligible_to_act_as_target_user
-from ai.backend.manager.views.session_template import ClusterTemplateWithOwnerAndDomain
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -433,9 +431,7 @@ class TemplateDBSource:
                     })
         return entries
 
-    async def get_cluster_template(
-        self, template_id: str
-    ) -> ClusterTemplateWithOwnerAndDomain | None:
+    async def get_cluster_template(self, template_id: str) -> dict[str, Any] | None:
         """Get a single active cluster template by ID with its owner and domain, or None."""
         async with self._db.begin_readonly() as conn:
             q = (
@@ -454,10 +450,11 @@ class TemplateDBSource:
             row = (await conn.execute(q)).first()
             if row is None:
                 return None
-            template = row.template if isinstance(row.template, dict) else dict(row.template)
-            return ClusterTemplateWithOwnerAndDomain(
-                template=template, owner_id=UserID(row.user_uuid), domain_name=row.domain_name
-            )
+            return {
+                "template": row.template if isinstance(row.template, dict) else dict(row.template),
+                "user_uuid": row.user_uuid,
+                "domain_name": row.domain_name,
+            }
 
     async def cluster_template_exists(self, template_id: str) -> bool:
         """Check if an active cluster template exists."""
