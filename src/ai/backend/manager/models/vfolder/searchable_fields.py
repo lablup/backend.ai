@@ -202,7 +202,7 @@ class VFolderMountPolicySearchableFields:
 
 class _VFolderNestedFields:
     """Rows of other tables the vfolder owns: its labels, per-user mount policies and
-    the auto-mounts not marked deleted."""
+    auto-mounts, the last both without and with the ones marked deleted."""
 
     labels = NestedSearchableField(
         EntityLabelSearchableFields.own,
@@ -225,6 +225,14 @@ class _VFolderNestedFields:
                 VFolderAutoMountRow.vfolder_id == VFolderRow.id,
                 VFolderAutoMountRow.deleted_at.is_(None),
             ),
+        ),
+    )
+    auto_mounts_including_deleted = NestedSearchableField(
+        VFolderAutoMountSearchableFields.own,
+        ToManyCorrelation(
+            VFolderAutoMountRow,
+            VFolderRow,
+            VFolderAutoMountRow.vfolder_id == VFolderRow.id,
         ),
     )
 

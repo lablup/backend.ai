@@ -106,8 +106,8 @@ class VFolderFilterGQL(PydanticInputMixin[VFolderFilter]):
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description=(
-                "Select vfolders by the auto-mounts set on them. "
-                "Auto-mounts marked deleted are not counted."
+                "Select vfolders by the auto-mounts set on them. Auto-mounts marked deleted "
+                "are left out unless the relation's filter gives `deletedAt` at the top level."
             ),
         ),
         default=None,

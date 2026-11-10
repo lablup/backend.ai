@@ -438,7 +438,8 @@ class VFolderFilter(BaseRequestModel):
         default=None,
         description=(
             f"Added in {NEXT_RELEASE_VERSION}. Filter by the auto-mounts set on the vfolder. "
-            "Auto-mounts marked deleted are not counted."
+            "Auto-mounts marked deleted are left out unless the relation's filter gives "
+            "`deleted_at` at the top level."
         ),
     )
     entity_id: UUIDFilter | None = Field(

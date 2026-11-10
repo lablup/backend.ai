@@ -100,8 +100,9 @@ VFolderAutoMountFilter.model_rebuild()
 class VFolderAutoMountNestedFilter(ToManyFilter[VFolderAutoMountFilter]):
     """The `auto_mounts` field of a vfolder filter.
 
-    It reaches only the auto-mounts not marked deleted, so a `deleted_at` condition in it
-    matches none. Each relation matches one auto-mount at a time.
+    Auto-mounts marked deleted are left out of a relation unless its filter gives
+    `deleted_at` at the top level; `exists` always leaves them out. Each relation matches
+    one auto-mount at a time.
     """
 
 

@@ -87,7 +87,10 @@ from ai.backend.common.dto.manager.v2.vfolder.types import (
 from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderUsageInfo as VFolderUsageInfoDTO,
 )
-from ai.backend.common.dto.manager.v2.vfolder_auto_mount.request import VFolderAutoMountFilter
+from ai.backend.common.dto.manager.v2.vfolder_auto_mount.request import (
+    VFolderAutoMountFilter,
+    VFolderAutoMountNestedFilter,
+)
 from ai.backend.common.exception import BackendAIError, UnreachableError
 from ai.backend.common.schema.deployment import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.common.types import (
@@ -124,6 +127,7 @@ from ai.backend.manager.models.condition_utils import (
     negate_conditions,
 )
 from ai.backend.manager.models.scopes import ScopeTarget
+from ai.backend.manager.models.specs.search.correlation import ToManyCorrelation
 from ai.backend.manager.models.specs.search.usage import UsedBy
 from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
 from ai.backend.manager.models.vfolder.creators import (
@@ -989,11 +993,7 @@ class VFolderAdapter(BaseAdapter):
                 VFolderSearchableFields.nested.labels.correlation,
                 self._convert_entity_label_filter,
             ),
-            *self.apply_to_many_filter(
-                f.auto_mounts,
-                VFolderSearchableFields.nested.auto_mounts.correlation,
-                self._convert_vfolder_auto_mount_filter,
-            ),
+            *self._convert_vfolder_auto_mounts_nested_filter(f.auto_mounts),
         ]
         if f.AND:
             for sub in f.AND:
@@ -1012,6 +1012,44 @@ class VFolderAdapter(BaseAdapter):
                 if sub_conditions:
                     conditions.append(negate_conditions(sub_conditions))
         return conditions
+
+    def _convert_vfolder_auto_mounts_nested_filter(
+        self, f: VFolderAutoMountNestedFilter | None
+    ) -> list[QueryCondition]:
+        """Each mode reaches the auto-mounts marked deleted only when its row filter names
+        ``deleted_at`` at the top level, as an auto-mount search does."""
+        if f is None:
+            return []
+        return [
+            *self.apply_to_many_filter(
+                VFolderAutoMountNestedFilter(exists=f.exists),
+                VFolderSearchableFields.nested.auto_mounts.correlation,
+                self._convert_vfolder_auto_mount_filter,
+            ),
+            *self.apply_to_many_filter(
+                VFolderAutoMountNestedFilter(some=f.some),
+                self._auto_mounts_correlation_for_row_filter(f.some),
+                self._convert_vfolder_auto_mount_filter,
+            ),
+            *self.apply_to_many_filter(
+                VFolderAutoMountNestedFilter(every=f.every),
+                self._auto_mounts_correlation_for_row_filter(f.every),
+                self._convert_vfolder_auto_mount_filter,
+            ),
+            *self.apply_to_many_filter(
+                VFolderAutoMountNestedFilter(none=f.none),
+                self._auto_mounts_correlation_for_row_filter(f.none),
+                self._convert_vfolder_auto_mount_filter,
+            ),
+        ]
+
+    def _auto_mounts_correlation_for_row_filter(
+        self, row_filter: VFolderAutoMountFilter | None
+    ) -> ToManyCorrelation:
+        nested = VFolderSearchableFields.nested
+        if row_filter is not None and row_filter.deleted_at is not None:
+            return nested.auto_mounts_including_deleted.correlation
+        return nested.auto_mounts.correlation
 
     def _convert_vfolder_auto_mount_filter(self, f: VFolderAutoMountFilter) -> list[QueryCondition]:
         fields = VFolderAutoMountSearchableFields.own

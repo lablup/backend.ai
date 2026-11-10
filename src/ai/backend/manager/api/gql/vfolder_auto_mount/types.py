@@ -325,9 +325,10 @@ class VFolderAutoMountFilterGQL(PydanticInputMixin[VFolderAutoMountFilterDTO]):
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description=(
-            "Filter selecting vfolders by the auto-mounts set on them. It reaches only the "
-            "auto-mounts not marked deleted, so a `deletedAt` condition in it matches none. "
-            "Each relation matches one auto-mount at a time."
+            "Filter selecting vfolders by the auto-mounts set on them. Auto-mounts marked "
+            "deleted are left out of a relation unless its filter gives `deletedAt` at the "
+            "top level; `exists` always leaves them out. Each relation matches one auto-mount "
+            "at a time."
         ),
     ),
     name="VFolderAutoMountNestedFilter",
@@ -335,7 +336,8 @@ class VFolderAutoMountFilterGQL(PydanticInputMixin[VFolderAutoMountFilterDTO]):
 class VFolderAutoMountNestedFilterGQL(PydanticInputMixin[VFolderAutoMountNestedFilterDTO]):
     exists: bool | None = gql_field(
         description=(
-            "True for a vfolder that has at least one auto-mount, false for one that has none."
+            "True for a vfolder that has at least one auto-mount not marked deleted, "
+            "false for one that has none."
         ),
         default=None,
     )
