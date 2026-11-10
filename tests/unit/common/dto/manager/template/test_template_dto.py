@@ -2,12 +2,10 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import Any
-from uuid import UUID
 
 import pytest
 from pydantic import ValidationError
 
-from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.dto.manager.template.request import (
     CreateClusterTemplateRequest,
     CreateSessionTemplateRequest,
@@ -39,10 +37,6 @@ from ai.backend.common.dto.manager.template.response import (
 from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 _NOW = datetime.now(UTC)
-
-
-_PROJECT_ID = ProjectID(UUID(int=1))
-_PROJECT_ID_TEXT = str(_PROJECT_ID)
 
 
 class TestTemplatePathParam:
@@ -94,17 +88,14 @@ class TestListSessionTemplatesRequest:
         assert req.group_id is None
 
     def test_with_values(self) -> None:
-        req = ListSessionTemplatesRequest.model_validate({
-            "all": True,
-            "group_id": _PROJECT_ID_TEXT,
-        })
+        req = ListSessionTemplatesRequest(all=True, group_id="some-group-id")
         assert req.all is True
-        assert req.group_id == _PROJECT_ID
+        assert req.group_id == "some-group-id"
 
     @pytest.mark.parametrize("alias", ["group_id", "groupId"])
     def test_group_id_alias(self, alias: str) -> None:
-        req = ListSessionTemplatesRequest.model_validate({alias: _PROJECT_ID_TEXT})
-        assert req.group_id == _PROJECT_ID
+        req = ListSessionTemplatesRequest.model_validate({alias: "gid-123"})
+        assert req.group_id == "gid-123"
 
 
 class TestGetSessionTemplateRequest:
@@ -181,8 +172,8 @@ class TestListClusterTemplatesRequest:
 
     @pytest.mark.parametrize("alias", ["group_id", "groupId"])
     def test_group_id_alias(self, alias: str) -> None:
-        req = ListClusterTemplatesRequest.model_validate({alias: _PROJECT_ID_TEXT})
-        assert req.group_id == _PROJECT_ID
+        req = ListClusterTemplatesRequest.model_validate({alias: "gid-456"})
+        assert req.group_id == "gid-456"
 
 
 class TestGetClusterTemplateRequest:

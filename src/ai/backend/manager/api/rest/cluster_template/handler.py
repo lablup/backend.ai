@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
+import uuid
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
 from uuid import UUID
@@ -46,7 +47,6 @@ from ai.backend.common.json import load_json
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.services.project.actions.lookup import LookupProjectAction
 from ai.backend.manager.services.template.actions.create_cluster_template import (
     CreateClusterTemplateAction,
@@ -131,15 +131,17 @@ class ClusterTemplateHandler:
         req: RequestCtx,
     ) -> APIResponse:
         params = query.parsed
-        if params.all and not ctx.is_superadmin:
-            raise InsufficientPrivilege("Only a superadmin may list every template")
+        user_role = req.request["user"]["role"]
+
+        raw_group_id = params.group_id if hasattr(params, "group_id") else None
+        group_id_filter = uuid.UUID(raw_group_id) if raw_group_id is not None else None
         action = ListClusterTemplatesAction(
             user_uuid=UserID(ctx.user_uuid),
-            user_role=req.request["user"]["role"],
+            user_role=user_role,
             domain_name=ctx.user_domain,
             is_superadmin=ctx.is_superadmin,
-            list_all=params.all,
-            group_id_filter=params.group_id,
+            list_all=params.all if hasattr(params, "all") else False,
+            group_id_filter=group_id_filter,
         )
         result = await self._template.list_cluster.run(action)
 

@@ -10,7 +10,6 @@ from typing import Literal
 from pydantic import AliasChoices, Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
-from ai.backend.common.data.entity.project import ProjectID
 
 __all__ = (
     # Path params
@@ -66,7 +65,7 @@ class ListSessionTemplatesRequest(BaseRequestModel):
         default=False,
         description="List all templates (superadmin only)",
     )
-    group_id: ProjectID | None = Field(
+    group_id: str | None = Field(
         default=None,
         validation_alias=AliasChoices("group_id", "groupId"),
         description="Filter by group ID",
@@ -145,7 +144,7 @@ class ListClusterTemplatesRequest(BaseRequestModel):
         default=False,
         description="List all templates (superadmin only)",
     )
-    group_id: ProjectID | None = Field(
+    group_id: str | None = Field(
         default=None,
         validation_alias=AliasChoices("group_id", "groupId"),
         description="Filter by group ID",
