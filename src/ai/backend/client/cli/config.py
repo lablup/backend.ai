@@ -8,7 +8,6 @@ import click
 from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
 from ai.backend.client import __version__
-from ai.backend.client.cli.types import CLI_CREDENTIAL_FILE_MODE
 from ai.backend.client.config import get_config, local_state_path
 from ai.backend.client.exceptions import BackendClientError
 from ai.backend.client.session import Session
@@ -146,7 +145,6 @@ def login() -> None:
             local_state_path.mkdir(parents=True, exist_ok=True)
             session.aiohttp_session.cookie_jar.update_cookies(result["cookies"])
             session.aiohttp_session.cookie_jar.save(local_state_path / "cookie.dat")
-            (local_state_path / "cookie.dat").chmod(CLI_CREDENTIAL_FILE_MODE)
             (local_state_path / "config.json").write_text(json.dumps(result.get("config", {})))
         except Exception as e:
             print_error(e)

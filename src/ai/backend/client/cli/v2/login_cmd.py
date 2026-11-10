@@ -10,7 +10,6 @@ from typing import Any
 
 import click
 
-from ai.backend.client.cli.types import CLI_CREDENTIAL_FILE_MODE
 from ai.backend.client.cli.v2.insecure_http_guard import InsecureEndpointError
 
 from .helpers import ProfileStore, create_v2_registry, load_v2_config
@@ -85,7 +84,6 @@ def login(force: bool) -> None:
             cookie_jar = client.session.cookie_jar
             if hasattr(cookie_jar, "save"):
                 cookie_jar.save(paths.cookie_file)
-                paths.cookie_file.chmod(CLI_CREDENTIAL_FILE_MODE)
 
             login_config = data.get("config", {})
             if login_config:
