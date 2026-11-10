@@ -60,7 +60,6 @@ class BaseConfigSchema(BackendAISchema):
         alias_generator=snake_to_kebab_case,
         validate_default=True,
         extra="allow",
-        hide_input_in_errors=True,
     )
 
     @model_validator(mode="after")

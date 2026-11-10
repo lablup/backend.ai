@@ -407,7 +407,7 @@ def load(config_path: Path | None = None, log_level: LogLevel = LogLevel.NOTSET)
             "ConfigurationError: Could not read or validate the account manager local config:",
             file=sys.stderr,
         )
-        print(pformat(e.errors(include_input=False, include_url=False)), file=sys.stderr)
+        print(pformat(e), file=sys.stderr)
         raise click.Abort() from e
     else:
         return server_config

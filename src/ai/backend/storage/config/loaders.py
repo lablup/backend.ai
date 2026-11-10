@@ -39,7 +39,7 @@ def load_local_config(
             f"ConfigurationError: Validation of storage-proxy local config has failed, {e}",
             file=sys.stderr,
         )
-        raise BaseConfigError({"error": str(e)}) from e
+        raise BaseConfigError(raw_cfg) from e
 
 
 def make_etcd(local_config: StorageProxyUnifiedConfig) -> AsyncEtcd:
