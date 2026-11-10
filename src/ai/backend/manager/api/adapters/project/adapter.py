@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from typing import assert_never
 from uuid import UUID
 
+from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.role import RoleID
@@ -118,13 +119,12 @@ from ai.backend.manager.services.project.actions.search_projects import (
 )
 from ai.backend.manager.services.project.actions.update_project import UpdateProjectAction
 from ai.backend.manager.services.project.processors import ProjectProcessors
-from ai.backend.manager.services.rbac.actions.roster.join_project import (
-    JoinProjectAction,
-)
+from ai.backend.manager.services.rbac.actions.role.bulk_assign import BulkAssignRoleAction
 from ai.backend.manager.services.rbac.actions.roster.leave_project import (
     LeaveProjectAction,
 )
 from ai.backend.manager.services.rbac.processors import RbacProcessors
+from ai.backend.manager.services.user.actions.bulk_get import BulkGetUsersAction
 from ai.backend.manager.services.user.actions.keypair_ops import GetDefaultKeypairsAction
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.types import OptionalState, TriState
@@ -522,16 +522,27 @@ class ProjectAdapter(BaseAdapter):
         project_id: UUID,
         input: AssignUsersToProjectInput,
     ) -> AssignUsersToProjectPayload:
-        """Assign users to a project."""
-        result = await self._rbac.join_project.run(
-            JoinProjectAction(
-                project_id=ProjectID(project_id),
-                user_ids=[UserID(uid) for uid in input.user_ids],
+        """Assign users to a project with a role. The role assignment puts them on the
+        project's roster and asks CREATE on the role and on each user."""
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
+        assigned = await self._rbac.bulk_assign_role.run(
+            BulkAssignRoleAction(
                 role_id=RoleID(input.role_id),
+                user_ids=[UserID(uid) for uid in input.user_ids],
+                granted_by=UserID(me.user_id),
+                project_id=ProjectID(project_id),
             )
         )
+        user_ids = [success.user_id for success in assigned.data.successes]
+        if not user_ids:
+            return AssignUsersToProjectPayload(items=[])
+        users = await self._user.bulk_get.run(BulkGetUsersAction(ids=user_ids))
         return AssignUsersToProjectPayload(
-            items=await self._user_nodes(result.members),
+            items=await self._user_nodes([
+                item.value for item in users.items if item.value is not None
+            ]),
         )
 
     async def _user_nodes(self, users: Sequence[UserData]) -> list[UserNode]:
