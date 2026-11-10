@@ -36,9 +36,50 @@ Note: maintainers may modify the news fragment without notice before merge.
 
 ### Filename convention
 
-News fragments live in `changes/` and must be named `<PR-number>.<type>.md`, where `<type>` matches one of the `directory` values defined by the `[[tool.towncrier.type]]` entries in `pyproject.toml` (e.g., `fix`, `feature`, `breaking`, `misc`).
+News fragments live in `changes/`. `<type>` is one of the `directory` values of the `[[tool.towncrier.type]]` entries in `pyproject.toml` (`fix`, `feature`, `breaking`, `misc` and so on). Two names are allowed:
 
-The number in the filename must be the **pull request number** — not an issue number, Linear/Jira ticket, or any other identifier. When you don't yet know the PR number, leave it empty and commit a placeholder such as `.fix.md` or `fix.md`; the `assign-pr-number` CI workflow will fill in the PR number on push. For PRs targeting `main`, the same workflow rewrites the prefix of any fragment *added by the PR* whose number does not match the current PR, so mistakenly using an issue number is recoverable. Backport PRs (targeting release branches) preserve the original fragment numbering so release notes keep linking back to the original change.
+| Name | Status | Made by |
+|---|---|---|
+| `<YYYYMMDD>-<HHMMSS>-<6 lowercase letters or digits>.<type>.md` | Recommended. Goes into the same push as the code, before the pull request exists | `python3 scripts/new-changelog.py <type> "<sentence>" [--issue <key>] [--epic <key>]`, which prints the path |
+| `<PR-number>.<type>.md` | Previous convention, still accepted. Only possible after the pull request exists | By hand |
+
+A fragment with the new name starts with front matter when it has an issue key:
+
+```markdown
+---
+issue: BA-1234
+epic: BA-1200
+---
+Fix the session cleanup race when an agent disconnects
+```
+
+- `issue` and `epic` are each optional. A value is a Jira key (`BA-N`) or a hejo key (`BAI-N`). Without either, the file holds only the sentence
+- With `epic`, `changes/epics/<epic>.md` must exist
+- The number in `<PR-number>.<type>.md` is the **pull request number**, not an issue number, a Jira key or any other identifier
+- Backport PRs keep the original fragment name, so release notes link back to the original change
+
+#### Epic files
+
+Each epic has a pair: `changes/epics/<epic key>.md` (English) and `<epic key>.ko.md` (Korean).
+
+```markdown
+---
+title: Session groups for spread and concentrate placement
+---
+Sessions can now be grouped so the scheduler places them together or apart.
+```
+
+- `title` is the epic's heading in the release notes, the body a 1-2 sentence summary for users
+- The first PR of the epic's issues that finds no epic file creates it. The PR that closes the epic deletes it
+- A release does not consume epic files
+
+#### Checks and release
+
+- CI checks the names, types, front matter and epic file pairs with `scripts/validate-changelog-fragments.py`
+- Before running towncrier, `scripts/release.sh` renames each new-style fragment to `<PR-number>.<type>.md` with `git mv` and drops its front matter (`scripts/rename-changelog-fragments.py`)
+  - The PR number is the first `(#N)` in the subject of the first-parent commit that added the file. A backport commit `... (#N) (#M)` gives the original PR number `N`
+  - When `<PR-number>.<type>.md` already exists, the name takes towncrier's counter: `<PR-number>.<type>.1.md`, `.2.md`
+  - A file that breaks these rules, or a fragment without `(#N)`, stops the release before anything is renamed
 
 ## In the middle: Pull request titles
 

@@ -59,7 +59,9 @@ class HuggingFaceRegistry(PydanticNodeMixin[HuggingFaceRegistryNode]):
     id: NodeID[str]
     url: str
     name: str
-    token: str | None
+    token: str | None = gql_field(
+        description="Access token for the registry. Masked unless the caller is a superadmin."
+    )
 
     @classmethod
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def

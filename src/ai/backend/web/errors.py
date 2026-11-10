@@ -81,6 +81,18 @@ class StaticFileNotFoundError(BackendAIError, web.HTTPNotFound):
         )
 
 
+class UnauthenticatedError(BackendAIError, web.HTTPUnauthorized):
+    error_type = "https://api.backend.ai/probs/auth-failed"
+    error_title = "Unauthorized access"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AUTH,
+            operation=ErrorOperation.AUTH,
+            error_detail=ErrorDetail.UNAUTHORIZED,
+        )
+
+
 class UnexpectedAuthResponseError(BackendAIError, web.HTTPInternalServerError):
     """Raised when the Manager returns an unrecognized authorization response type."""
 

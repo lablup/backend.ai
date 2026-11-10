@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ipaddress
+from typing import Final
 from uuid import UUID
 
 from strawberry import Info
@@ -43,6 +44,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
 from ai.backend.manager.config.unified import AuthConfig
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.user import UserModificationBadRequest
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.user import UserRole
@@ -61,6 +63,8 @@ from ai.backend.manager.services.user.actions.modify_user import (
 )
 from ai.backend.manager.services.user.actions.purge_user import BulkPurgeUserAction
 from ai.backend.manager.types import OptionalState, TriState
+
+SELF_EDITABLE_USER_FIELDS: Final = frozenset({"full_name", "password", "allowed_client_ip"})
 
 # Create Mutations
 
@@ -357,7 +361,7 @@ async def admin_bulk_update_users_v2(
 @gql_mutation(
     BackendAIGQLMeta(
         added_version="26.2.0",
-        description="Update the current user's information. Users can only update their own profile. Some fields may be restricted based on user role",
+        description="Update the current user's information. Users can only update their own profile. Non-superadmins can set only fullName, password and allowedClientIp",
     )
 )
 async def update_user_v2(
@@ -380,6 +384,12 @@ async def update_user_v2(
     if me is None:
         raise UnreachableError("User context is not available")
     dto = input.to_pydantic()
+    if not me.is_superadmin:
+        restricted = dto.model_fields_set - SELF_EDITABLE_USER_FIELDS
+        if restricted:
+            raise InsufficientPrivilege(
+                f"Cannot update these fields on your own account: {', '.join(sorted(restricted))}"
+            )
     if dto.password is not None:
         if dto.need_password_change is True:
             raise UserModificationBadRequest(
