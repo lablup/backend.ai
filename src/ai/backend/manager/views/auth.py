@@ -14,4 +14,5 @@ class UserCredential:
     """The user whose credential matched, with the password hash stored for them."""
 
     user_id: UserID
+    username: str
     hashed_password: str

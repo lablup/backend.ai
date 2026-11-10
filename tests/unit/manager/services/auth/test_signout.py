@@ -62,6 +62,7 @@ async def test_signout_successful_with_valid_credentials(
     mock_auth_repository.check_credential_without_migration.return_value = UserCredential(
         user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         hashed_password="hashed_password",
+        username="test-user",
     )
     mock_auth_repository.deactivate_user_and_keypairs.return_value = None
 

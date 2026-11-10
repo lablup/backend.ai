@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 from uuid import UUID
 
 import pytest
@@ -8,6 +8,7 @@ from ai.backend.common.plugin.hook import HookResult, HookResults
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.errors.common import RejectedByHook
+from ai.backend.manager.plugin.hook_args import VerifyPasswordFormatHookArgs
 from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.repositories.user_resource_policy.repository import (
     UserResourcePolicyRepository,
@@ -57,7 +58,6 @@ async def test_update_password_successful(
 ) -> None:
     """Test successful password update"""
     action = UpdatePasswordAction(
-        request=MagicMock(),
         user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         domain_name="default",
         email="user@example.com",
@@ -77,6 +77,7 @@ async def test_update_password_successful(
     mock_auth_repository.check_credential_without_migration.return_value = UserCredential(
         user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         hashed_password="hashed_password",
+        username="test-user",
     )
 
     # Password update succeeds
@@ -104,7 +105,6 @@ async def test_update_password_fails_when_new_passwords_dont_match(
 ) -> None:
     """Test password update fails when new passwords don't match"""
     action = UpdatePasswordAction(
-        request=MagicMock(),
         user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         domain_name="default",
         email="user@example.com",
@@ -124,6 +124,7 @@ async def test_update_password_fails_when_new_passwords_dont_match(
     mock_auth_repository.check_credential_without_migration.return_value = UserCredential(
         user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         hashed_password="hashed_password",
+        username="test-user",
     )
 
     result = await auth_service.update_password(action)
@@ -143,7 +144,6 @@ async def test_update_password_fails_with_incorrect_old_password(
 ) -> None:
     """Test password update fails with incorrect old password"""
     action = UpdatePasswordAction(
-        request=MagicMock(),
         user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         domain_name="default",
         email="user@example.com",
@@ -179,7 +179,6 @@ async def test_update_password_with_hook_rejection(
 ) -> None:
     """Test password update fails when hook rejects password format"""
     action = UpdatePasswordAction(
-        request=MagicMock(),
         user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         domain_name="default",
         email="user@example.com",
@@ -192,6 +191,7 @@ async def test_update_password_with_hook_rejection(
     mock_auth_repository.check_credential_without_migration.return_value = UserCredential(
         user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         hashed_password="hashed_password",
+        username="test-user",
     )
 
     # Hook rejects the new password format
@@ -214,7 +214,6 @@ async def test_update_password_repository_call(
 ) -> None:
     """Test that password update calls repository with correct parameters"""
     action = UpdatePasswordAction(
-        request=MagicMock(),
         user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         domain_name="test-domain",
         email="update@example.com",
@@ -227,6 +226,7 @@ async def test_update_password_repository_call(
     mock_auth_repository.check_credential_without_migration.return_value = UserCredential(
         user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         hashed_password="hashed_password",
+        username="test-user",
     )
     mock_hook_plugin_ctx.dispatch.return_value = HookResult(
         status=HookResults.PASSED,
@@ -252,8 +252,14 @@ async def test_update_password_repository_call(
 
     # Verify hook was called
     mock_hook_plugin_ctx.dispatch.assert_called_once()
-    hook_call = mock_hook_plugin_ctx.dispatch.call_args
-    assert hook_call[0][0] == "VERIFY_PASSWORD_FORMAT"
+    assert mock_hook_plugin_ctx.dispatch.call_args.args == (
+        "VERIFY_PASSWORD_FORMAT",
+        (
+            VerifyPasswordFormatHookArgs(
+                email="update@example.com", username="test-user", password="new_pass123"
+            ),
+        ),
+    )
 
     assert result.success is True
     assert result.message == "Password updated successfully"

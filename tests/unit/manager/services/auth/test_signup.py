@@ -6,12 +6,19 @@ from uuid import UUID
 
 import pytest
 
+from ai.backend.common.data.entity.domain import DomainName
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.plugin.hook import HookResult, HookResults
 from ai.backend.manager.data.auth.types import UserCreationData
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.errors.auth import EmailAlreadyExistsError
 from ai.backend.manager.errors.user import UserCreationBadRequest
 from ai.backend.manager.models.user.row import UserRole, UserStatus
+from ai.backend.manager.plugin.hook_args import (
+    PostSignupHookArgs,
+    PreSignupHookArgs,
+    VerifyPasswordFormatHookArgs,
+)
 from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.repositories.user_resource_policy.repository import (
     UserResourcePolicyRepository,
@@ -72,7 +79,7 @@ async def test_signup_successful_with_minimal_data(
         username=None,
         full_name=None,
         description=None,
-        request=MagicMock(),
+        lang="en-us",
     )
 
     # Setup hook behavior - both PRE_SIGNUP and VERIFY_PASSWORD_FORMAT pass
@@ -112,7 +119,7 @@ async def test_signup_successful_with_full_data(
         username="fulluser",
         full_name="Full User Name",
         description="A test user account",
-        request=MagicMock(),
+        lang="en-us",
     )
 
     # Setup hook behavior - both PRE_SIGNUP and VERIFY_PASSWORD_FORMAT pass
@@ -137,6 +144,31 @@ async def test_signup_successful_with_full_data(
     assert result.user_id == UUID("87654321-4321-8765-4321-876543218765")
     assert result.access_key == mock_keypair.access_key
     assert result.secret_key == mock_keypair.secret_key.content
+    assert [c.args for c in mock_hook_plugin_ctx.dispatch.call_args_list] == [
+        (
+            "PRE_SIGNUP",
+            (
+                PreSignupHookArgs(
+                    domain_name=DomainName("custom"),
+                    email="fulluser@example.com",
+                    password="another_secure_pass",
+                    username="fulluser",
+                    full_name="Full User Name",
+                    description="A test user account",
+                ),
+            ),
+        ),
+        (
+            "VERIFY_PASSWORD_FORMAT",
+            (
+                VerifyPasswordFormatHookArgs(
+                    email="fulluser@example.com",
+                    username="fulluser",
+                    password="another_secure_pass",
+                ),
+            ),
+        ),
+    ]
 
 
 async def test_signup_fails_when_email_already_exists(
@@ -152,7 +184,7 @@ async def test_signup_fails_when_email_already_exists(
         username=None,
         full_name=None,
         description=None,
-        request=MagicMock(),
+        lang="en-us",
     )
 
     # Setup hook behavior - both PRE_SIGNUP and VERIFY_PASSWORD_FORMAT pass
@@ -185,7 +217,7 @@ async def test_signup_with_hook_override(
         username="hookuser",
         full_name="Hook User",
         description="Original description",
-        request=MagicMock(),
+        lang="en-us",
     )
 
     # PRE_SIGNUP hook overrides some user data
@@ -252,7 +284,7 @@ async def test_signup_creation_error(
         username=None,
         full_name=None,
         description=None,
-        request=MagicMock(),
+        lang="en-us",
     )
 
     # Setup hooks to pass
@@ -277,9 +309,6 @@ async def test_signup_post_hook_notification(
     auth_service: AuthService,
 ) -> None:
     """Test that POST_SIGNUP hook is notified after successful signup"""
-    request_mock = MagicMock()
-    request_mock.headers = {"Accept-Language": "ko-kr,ko;q=0.9,en;q=0.8"}
-
     action = SignupAction(
         domain_name="default",
         email="notify@example.com",
@@ -287,7 +316,7 @@ async def test_signup_post_hook_notification(
         username=None,
         full_name=None,
         description=None,
-        request=request_mock,
+        lang="ko-kr",
     )
 
     # Setup successful signup
@@ -310,7 +339,11 @@ async def test_signup_post_hook_notification(
     # Verify POST_SIGNUP notification was called
     mock_hook_plugin_ctx.notify.assert_called_once_with(
         "POST_SIGNUP",
-        ("notify@example.com", mock_user.uuid, {"lang": "ko-kr"}),
+        (
+            PostSignupHookArgs(
+                email="notify@example.com", user_id=UserID(mock_user.uuid), lang="ko-kr"
+            ),
+        ),
     )
 
     assert result.user_id == mock_user.uuid

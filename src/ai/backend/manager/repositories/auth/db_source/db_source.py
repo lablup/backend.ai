@@ -609,7 +609,7 @@ class AuthDBSource:
         """Verify credentials without password migration (for signout, etc.)"""
         async with self._db.begin_readonly_read_committed() as conn:
             result = await conn.execute(
-                sa.select(users.c.uuid, users.c.password).where(
+                sa.select(users.c.uuid, users.c.username, users.c.password).where(
                     (users.c.email == email) & (users.c.domain_name == domain_name)
                 ),
             )
@@ -617,7 +617,9 @@ class AuthDBSource:
             if row is None:
                 raise AuthorizationFailed("User credential mismatch.")
             await self._check_password(row, target_password_info)
-        return UserCredential(user_id=UserID(row.uuid), hashed_password=row.password)
+        return UserCredential(
+            user_id=UserID(row.uuid), username=row.username, hashed_password=row.password
+        )
 
     @auth_db_source_resilience.apply()
     async def fetch_default_keypair(self, user_uuid: UUID) -> KeyPairData:
