@@ -67,11 +67,7 @@ from ai.backend.manager.data.session.options import (
     ResourceOpts,
 )
 from ai.backend.manager.defs import DEFAULT_ROLE
-<<<<<<< HEAD
-=======
-from ai.backend.manager.errors.agent import AgentNotAllocated
 from ai.backend.manager.errors.auth import InsufficientPrivilege
->>>>>>> 05f50c0f3 (fix(BA-8897): check the caller may act for owner_id in v2 enqueue_session (#16436))
 from ai.backend.manager.errors.common import (
     InternalServerError,
     ServiceUnavailable,
@@ -1538,24 +1534,7 @@ class SessionService:
         domain_name = action.domain_name
         if action.owner_id is not None:
             owner = await self._user_repository.get_user_by_uuid(action.owner_id)
-<<<<<<< HEAD
             if owner.main_access_key is None:
-=======
-            if action.owner_id != action.user_id:
-                try:
-                    check_if_requester_is_eligible_to_act_as_target_user(
-                        action.user_role,
-                        action.domain_name,
-                        owner.role,
-                        owner.domain_name,
-                    )
-                except RuntimeError as e:
-                    raise InsufficientPrivilege(str(e)) from e
-            owner_access_key = await self._user_repository.default_access_key(
-                UserID(action.owner_id)
-            )
-            if owner_access_key is None:
->>>>>>> 05f50c0f3 (fix(BA-8897): check the caller may act for owner_id in v2 enqueue_session (#16436))
                 raise InternalServerError(
                     f"Delegated owner {action.owner_id} has no main access key configured"
                 )
@@ -1567,6 +1546,16 @@ class SessionService:
                 raise InternalServerError(
                     f"Delegated owner {action.owner_id} has no domain configured"
                 )
+            if action.owner_id != action.user_id:
+                try:
+                    check_if_requester_is_eligible_to_act_as_target_user(
+                        action.user_role,
+                        action.domain_name,
+                        owner.role,
+                        owner.domain_name,
+                    )
+                except RuntimeError as e:
+                    raise InsufficientPrivilege(str(e)) from e
             user_id = owner.id
             access_key = AccessKey(owner.main_access_key)
             domain_name = owner.domain_name
