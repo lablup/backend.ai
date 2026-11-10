@@ -82,7 +82,7 @@ class KeypairAccessKeyLookup(FieldKeyLookup[KeyPairID, UserID]):
 
 @dataclass
 class KeypairAccessKeyUserLookup(DataLookup[KeyPairRow, UserID]):
-    """Resolves an access key into the user it authenticates as."""
+    """Resolves an active keypair's access key into the user it authenticates as."""
 
     access_key: AccessKey
 
@@ -96,7 +96,10 @@ class KeypairAccessKeyUserLookup(DataLookup[KeyPairRow, UserID]):
 
     @override
     def conditions(self) -> Sequence[QueryCondition]:
-        return [lambda: KeyPairRow.access_key == self.access_key]
+        return [
+            lambda: KeyPairRow.access_key == self.access_key,
+            lambda: KeyPairRow.is_active.is_(True),
+        ]
 
     @override
     def to_entity_id(self, row: KeyPairRow) -> UserID:

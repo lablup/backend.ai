@@ -286,17 +286,18 @@ class AuthDBSource:
 
     @auth_db_source_resilience.apply()
     async def fetch_keypair_signing_material(self, access_key: str) -> KeyPairSigningMaterial:
-        """Read the owner and the decrypted secret key of a keypair."""
+        """Read the owner and the decrypted secret key of an active keypair."""
         async with self._db.begin_readonly() as conn:
             row = (
                 await conn.execute(
                     sa.select(keypairs.c.user, keypairs.c.secret_key).where(
-                        keypairs.c.access_key == access_key
+                        keypairs.c.access_key == access_key,
+                        keypairs.c.is_active.is_(True),
                     )
                 )
             ).first()
         if row is None or row.secret_key is None:
-            raise KeyPairNotFound(f"No keypair holds the access key {access_key}")
+            raise KeyPairNotFound(f"No active keypair holds the access key {access_key}")
         return KeyPairSigningMaterial(
             user_id=row.user,
             secret_key=await self._key_provider_pool.decrypt(
