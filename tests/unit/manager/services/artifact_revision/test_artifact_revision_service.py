@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from ai.backend.common.contexts.user import with_user_context
+from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.artifact.types import (
     ArtifactRegistryType,
     ArtifactRevisionDownloadProgress,
@@ -911,7 +911,7 @@ class TestImportArtifactRevisionAction:
             domain_name="default",
             domain_id=DomainID(uuid.uuid4()),
         )
-        with with_user_context(user):
+        with with_user(user):
             yield user
 
     async def test_vfolder_without_update_is_rejected_before_any_change(
