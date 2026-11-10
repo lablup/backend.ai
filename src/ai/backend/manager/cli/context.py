@@ -106,14 +106,12 @@ async def config_provider_ctx(cli_ctx: CLIContext) -> AsyncIterator[ManagerConfi
     the provider. The etcd watcher is terminated on exit.
     """
     from ai.backend.common.configs.loader import (
-        AbstractConfigLoader,
         ConfigOverrider,
         EtcdConfigLoader,
         EtcdConfigWatcher,
         LoaderChain,
         TomlConfigLoader,
     )
-    from ai.backend.common.configs.loader.local_only_filter import LocalOnlyFieldFilter
     from ai.backend.common.etcd import AsyncEtcd
     from ai.backend.logging.types import LogLevel
     from ai.backend.manager.config.loader.legacy_etcd_loader import (
@@ -121,7 +119,6 @@ async def config_provider_ctx(cli_ctx: CLIContext) -> AsyncIterator[ManagerConfi
         LegacyEtcdVolumesLoader,
     )
     from ai.backend.manager.config.provider import ManagerConfigProvider
-    from ai.backend.manager.config.unified import ManagerUnifiedConfig
 
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     etcd_config_data = bootstrap_config.etcd.to_dataclass()
@@ -130,15 +127,10 @@ async def config_provider_ctx(cli_ctx: CLIContext) -> AsyncIterator[ManagerConfi
         if cli_ctx.config_path is not None:
             loaders.append(TomlConfigLoader(cli_ctx.config_path, "manager"))
         legacy_etcd_loader = LegacyEtcdLoader(etcd)
-        etcd_loaders: list[AbstractConfigLoader] = [
-            legacy_etcd_loader,
-            LegacyEtcdVolumesLoader(etcd),
-            EtcdConfigLoader(etcd, prefix="ai/backend/config/common"),
-            EtcdConfigLoader(etcd, prefix="ai/backend/config/manager"),
-        ]
-        loaders.extend(
-            LocalOnlyFieldFilter(loader, ManagerUnifiedConfig) for loader in etcd_loaders
-        )
+        loaders.append(legacy_etcd_loader)
+        loaders.append(LegacyEtcdVolumesLoader(etcd))
+        loaders.append(EtcdConfigLoader(etcd, prefix="ai/backend/config/common"))
+        loaders.append(EtcdConfigLoader(etcd, prefix="ai/backend/config/manager"))
         overrides: list[tuple[tuple[str, ...], Any]] = [
             (("debug", "enabled"), cli_ctx.log_level == LogLevel.DEBUG),
         ]
@@ -182,8 +174,7 @@ async def redis_ctx(cli_ctx: CLIContext) -> AsyncIterator[RedisConnectionSet]:
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
     from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
     from ai.backend.common.config import find_config_file
-    from ai.backend.common.configs.loader import LoaderChain, TomlConfigLoader
-    from ai.backend.common.configs.loader.local_only_filter import LocalOnlyFieldFilter
+    from ai.backend.common.configs.loader import TomlConfigLoader
     from ai.backend.common.configs.redis import RedisConfig
     from ai.backend.common.defs import (
         REDIS_IMAGE_DB,
@@ -192,24 +183,14 @@ async def redis_ctx(cli_ctx: CLIContext) -> AsyncIterator[RedisConnectionSet]:
         REDIS_STREAM_DB,
         RedisRole,
     )
-    from ai.backend.common.etcd import AsyncEtcd
-    from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
-    from ai.backend.manager.config.unified import ManagerUnifiedConfig
 
     from .types import RedisConnectionSet
 
-    bootstrap_config = await cli_ctx.get_bootstrap_config()
-    etcd_config_data = bootstrap_config.etcd.to_dataclass()
+    # The Redis config is read only from the local config file.
     config_path = cli_ctx.config_path or find_config_file("manager")
-    async with AsyncEtcd.create_from_config(etcd_config_data) as etcd:
-        # Redis passwords are read only from the local config file.
-        loader = LoaderChain([
-            TomlConfigLoader(config_path, "manager"),
-            LocalOnlyFieldFilter(LegacyEtcdLoader(etcd), ManagerUnifiedConfig),
-        ])
-        raw_config = await loader.load()
-        redis_config = RedisConfig.model_validate(raw_config.get("redis", {}))
-        redis_profile_target = redis_config.to_redis_profile_target()
+    raw_config = await TomlConfigLoader(config_path, "manager").load()
+    redis_config = RedisConfig.model_validate(raw_config.get("redis", {}))
+    redis_profile_target = redis_config.to_redis_profile_target()
 
     live_target = redis_profile_target.profile_target(RedisRole.LIVE).to_valkey_target()
     stat_target = redis_profile_target.profile_target(RedisRole.STATISTICS).to_valkey_target()

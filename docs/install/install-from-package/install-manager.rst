@@ -139,20 +139,15 @@ To list a specific key from Etcd, for example, ``config`` key:
 
    $ backend.ai mgr etcd get --prefix config
 
-Now, configure Valkey access information. This should be accessible from all
-nodes.
-
-.. code-block:: console
-
-   $ backend.ai mgr etcd put config/redis/addr "bai-m1:8110"
-
-Set the Valkey password in the local config file of each component
-(``manager.toml``, ``agent.toml`` and ``storage-proxy.toml``), not in Etcd.
-The components ignore Valkey passwords stored in Etcd:
+Now, configure Valkey access information in the local config file of each
+component (``manager.toml``, ``agent.toml`` and ``storage-proxy.toml``), not in
+Etcd. The address should be accessible from all nodes. The components ignore
+the Valkey settings stored in Etcd:
 
 .. code-block:: toml
 
    [redis]
+   addr = "bai-m1:8110"
    password = "develove"
 
 Also, populate the Storage Proxy configuration to the Etcd:
@@ -171,6 +166,8 @@ Also, populate the Storage Proxy configuration to the Etcd:
    $ backend.ai mgr etcd put volumes/proxies/bai-m1/client_api "http://127.0.0.1:6021"
    $ # Manager facing internal API endpoint of Storage Proxy.
    $ backend.ai mgr etcd put volumes/proxies/bai-m1/manager_api "http://bai-m1:6022"
+   $ # Random secret string which is used by Manager to communicate with Storage Proxy.
+   $ backend.ai mgr etcd put volumes/proxies/bai-m1/secret "secure-token-to-authenticate-manager-request"
    $ # Option to disable SSL verification for the Storage Proxy.
    $ backend.ai mgr etcd put volumes/proxies/bai-m1/ssl_verify "false"
 
@@ -180,16 +177,9 @@ Check if the configuration is properly populated:
 
    $ backend.ai mgr etcd get --prefix volumes
 
-Set the secret used by the manager to communicate with Storage Proxy in
-``manager.toml``, not in Etcd. The manager ignores secrets stored in Etcd.
-Use a unique random string that matches the Storage Proxy configuration:
-
-.. code-block:: toml
-
-   [volumes.proxies.bai-m1]
-   secret = "secure-token-to-authenticate-manager-request"
-
-The most recent set of parameters can be found from
+Note that you have to change the secret to a unique random string for secure
+communication between the manager and Storage Proxy. The most recent set of
+parameters can be found from
 `sample.etcd.volumes.json <https://github.com/lablup/backend.ai/blob/main/configs/manager/sample.etcd.volumes.json>`_.
 
 To enable access to the volumes defined by the Storage Proxy from every user,

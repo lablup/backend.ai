@@ -18,11 +18,12 @@ Prerequisites
 
       docker compose -f docker-compose.halfstack-ha.yml up -d
 
-3. Configure etcd for Valkey connection:
+3. Configure the Valkey connection in the ``[redis]`` table of ``manager.toml``, ``agent.toml`` and ``storage-proxy.toml``:
 
-   .. code-block:: bash
+   .. code-block:: toml
 
-      docker exec backendai-backendai-half-etcd-1 etcdctl put /sorna/local/config/redis/addr "host.docker.internal:8111"
+      [redis]
+      addr = "host.docker.internal:8111"
 
 Building Docker Images
 ----------------------

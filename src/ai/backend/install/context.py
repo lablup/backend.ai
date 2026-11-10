@@ -352,6 +352,27 @@ class Context(metaclass=ABCMeta):
         with path.open("w") as fp:
             tomlkit.dump(data, fp)
 
+    def set_redis_config(self, toml_path: Path) -> None:
+        """Write the Redis config of the halfstack to the `[redis]` table of the TOML file."""
+        halfstack = self.install_info.halfstack_config
+        values: dict[str, Any]
+        if halfstack.ha_setup:
+            if not halfstack.redis_sentinel_addrs:
+                raise RuntimeError("redis_sentinel_addrs must be configured for HA setup")
+            values = {
+                "sentinel": ",".join(
+                    f"{binding.host}:{binding.port}" for binding in halfstack.redis_sentinel_addrs
+                ),
+                "service_name": "mymaster",
+            }
+        else:
+            if not halfstack.redis_addr:
+                raise RuntimeError("redis_addr must be configured")
+            values = {"addr": f"{halfstack.redis_addr.face.host}:{halfstack.redis_addr.face.port}"}
+        if halfstack.redis_password:
+            values["password"] = halfstack.redis_password
+        self.set_toml_values(toml_path, ["redis"], values)
+
     @staticmethod
     def sed_in_place_multi(path: Path, subs: Sequence[tuple[str | re.Pattern[str], str]]) -> None:
         content = path.read_text()
@@ -882,6 +903,7 @@ class Context(metaclass=ABCMeta):
                     "local": {
                         "client_api": f"http://{storage_client_facing_addr.face.host}:{storage_client_facing_addr.face.port}",
                         "manager_api": f"https://{storage_manager_facing_addr.face.host}:{storage_manager_facing_addr.face.port}",
+                        "secret": self.install_info.service_config.storage_proxy_manager_auth_key,
                         "ssl_verify": "false",
                     }
                 },
@@ -897,44 +919,12 @@ class Context(metaclass=ABCMeta):
                 service.sftp_agent.scaling_group
             )
         await self.etcd_put_json("", data)
-        # The manager reads secrets only from manager.toml.
-        self.set_toml_values(
-            toml_path,
-            ["volumes", "proxies", "local"],
-            {"secret": service.storage_proxy_manager_auth_key},
-        )
-        if halfstack.redis_password:
-            self.set_toml_values(toml_path, ["redis"], {"password": halfstack.redis_password})
+        self.set_redis_config(toml_path)
         data = {}
         # TODO: in dev-mode, enable these.
         data["api"] = {}
         data["api"]["allow-openapi-schema-introspection"] = "no"
         data["api"]["allow-graphql-schema-introspection"] = "no"
-        if halfstack.ha_setup:
-            if not halfstack.redis_sentinel_addrs:
-                raise RuntimeError("redis_sentinel_addrs must be configured for HA setup")
-            data["redis"] = {
-                "sentinel": ",".join(
-                    f"{binding.host}:{binding.port}" for binding in halfstack.redis_sentinel_addrs
-                ),
-                "service_name": "mymaster",
-                "helper": {
-                    "socket_timeout": 5.0,
-                    "socket_connect_timeout": 2.0,
-                    "reconnect_poll_timeout": 0.3,
-                },
-            }
-        else:
-            if not halfstack.redis_addr:
-                raise RuntimeError("redis_addr must be configured")
-            data["redis"] = {
-                "addr": f"{halfstack.redis_addr.face.host}:{halfstack.redis_addr.face.port}",
-                "helper": {
-                    "socket_timeout": 5.0,
-                    "socket_connect_timeout": 2.0,
-                    "reconnect_poll_timeout": 0.3,
-                },
-            }
         (base_path / "etcd.config.json").write_text(json.dumps(data))
         await self.etcd_put_json("config", data)
         public_addr = self.install_variable.public_facing_address
@@ -992,8 +982,7 @@ class Context(metaclass=ABCMeta):
             ],
         )
         self._ensure_agent_var_base_path()
-        if halfstack.redis_password:
-            self.set_toml_values(toml_path, ["redis"], {"password": halfstack.redis_password})
+        self.set_redis_config(toml_path)
         if accelerator is not None:
             if accelerator == Accelerator.CUDA:
                 plugin_list = ['"ai.backend.accelerator.cuda_open"']
@@ -1211,8 +1200,7 @@ class Context(metaclass=ABCMeta):
             data["volume"]["volume1"]["path"] = service.vfolder_relpath  # type: ignore
         with toml_path.open("w") as fp:
             tomlkit.dump(data, fp)
-        if halfstack.redis_password:
-            self.set_toml_values(toml_path, ["redis"], {"password": halfstack.redis_password})
+        self.set_redis_config(toml_path)
         if self.install_variable.otel_endpoint:
             self.sed_in_place(
                 toml_path,
@@ -2441,8 +2429,8 @@ class DockerContext(Context):
         )
         service = info.service_config
         # The redis address is consumed from BOTH network profiles — the
-        # host-network manager/agent read it from etcd (config/redis/addr)
-        # and the bridge services from their generated configs — so its face
+        # host-network manager/agent and the bridge services read it from
+        # their generated configs — so its face
         # must be reachable from both: the host's public IP with the
         # host-published port.
         halfstack = info.halfstack_config
