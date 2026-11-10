@@ -7,12 +7,7 @@ import tempfile
 import uuid
 from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
-<<<<<<< HEAD
-from pathlib import Path
-=======
-from http import HTTPStatus
 from pathlib import Path, PurePosixPath
->>>>>>> d5a52bbe0 (fix(BA-8923): check Reservoir file paths and the target vfolder permission in artifact import (#16487))
 from typing import Any, Final, cast, override
 
 import aiofiles
@@ -777,56 +772,21 @@ class ReservoirDownloadStep(ImportStep[None]):
 
             log.info("Found {} files to download for model: {}", len(files), model_prefix)
 
-<<<<<<< HEAD
+            # Directories are created when the files under them are written.
+            file_entries = [file_info for file_info in files if file_info.type != "directory"]
+            # Check every path before anything is written.
+            relative_paths = [
+                self._model_relative_path(file_info.path, model_prefix)
+                for file_info in file_entries
+            ]
+
             # Initialize artifact download tracking in Redis with all file information
             revision = context.model.resolve_revision(ArtifactRegistryType.RESERVOIR)
-            file_info_list = [
-                (file_info.path, file_info.size or 0)
-                for file_info in files
-                if file_info.type != "directory"
-            ]
+            file_info_list = [(file_info.path, file_info.size or 0) for file_info in file_entries]
             await self._redis_client.init_artifact_download(
                 model_id=context.model.model_id,
                 revision=revision,
                 file_info_list=file_info_list,
-=======
-        log.debug("Found {} files to download for model: {}", len(files), model_prefix)
-
-        # Directories are created when the files under them are written.
-        file_entries = [file_info for file_info in files if file_info.type != "directory"]
-        # Check every path before anything is written.
-        relative_paths = [
-            self._model_relative_path(file_info.path, model_prefix) for file_info in file_entries
-        ]
-
-        # Initialize artifact download tracking in Redis with all file information
-        revision = context.model.resolve_revision(ArtifactRegistryType.RESERVOIR)
-        file_info_list = [(file_info.path, file_info.size or 0) for file_info in file_entries]
-        await self._redis_client.init_artifact_download(
-            model_id=context.model.model_id,
-            revision=revision,
-            file_info_list=file_info_list,
-        )
-
-        # Create file downloader
-        downloader = ReservoirVFSFileDownloader(
-            client=manager_client,
-            storage_name=registry_config.storage_name,
-            redis_client=self._redis_client,
-            model_id=context.model.model_id,
-            revision=revision,
-        )
-
-        # Download each file individually
-        total_bytes = 0
-        for file_info, relative_path in zip(file_entries, relative_paths, strict=True):
-            remote_file_path = file_info.path
-            local_file_path = await run_in_executor_with_context(
-                None, self._prepare_local_path, dest_path, relative_path
-            )
-            bytes_downloaded = await downloader.download_file(
-                remote_file_path, local_file_path, file_info.size or 0
->>>>>>> d5a52bbe0 (fix(BA-8923): check Reservoir file paths and the target vfolder permission in artifact import (#16487))
             )
 
             # Create file downloader
@@ -840,20 +800,12 @@ class ReservoirDownloadStep(ImportStep[None]):
 
             # Download each file individually
             total_bytes = 0
-            for file_info in files:
-                # Skip directories (they will be created automatically when files are downloaded)
-                if file_info.type == "directory":
-                    continue
-
+            loop = asyncio.get_running_loop()
+            for file_info, relative_path in zip(file_entries, relative_paths, strict=True):
                 remote_file_path = file_info.path
-                # Convert remote path to local path relative to dest_path
-                # Remove model_prefix from the beginning to get relative path within model
-                if remote_file_path.startswith(model_prefix):
-                    relative_path = remote_file_path[len(model_prefix) :].lstrip("/")
-                else:
-                    relative_path = remote_file_path
-
-                local_file_path = dest_path / relative_path
+                local_file_path = await loop.run_in_executor(
+                    None, self._prepare_local_path, dest_path, relative_path
+                )
                 bytes_downloaded = await downloader.download_file(
                     remote_file_path, local_file_path, file_info.size or 0
                 )
