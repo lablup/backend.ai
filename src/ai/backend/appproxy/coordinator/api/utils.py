@@ -1,4 +1,5 @@
 import functools
+import secrets
 from collections.abc import Callable
 from typing import Any, Literal
 
@@ -23,7 +24,10 @@ def auth_required(scope: Literal["manager"] | Literal["worker"]) -> Callable[[Ha
                 f"BackendAI {permitted_token}",
             )
             if _token := request.headers.get("X-BackendAI-Token"):
-                if _token not in permitted_header_values:
+                if not any(
+                    secrets.compare_digest(_token.encode(), permitted.encode())
+                    for permitted in permitted_header_values
+                ):
                     raise AuthorizationFailed("Unauthorized access")
             elif _auth_header := request.headers.get("Authorization"):
                 method, _, token = _auth_header.partition(" ")
