@@ -1,17 +1,26 @@
+import json
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import aiohttp_cors
 import pytest
 from aiohttp import web
+from aiohttp.test_utils import make_mocked_request
 
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.common.dto.manager.auth.response import UpdatePasswordNoAuthResponse
 from ai.backend.common.exception import BackendAISchemaValidationFailed
+from ai.backend.common.web.session import SESSION_KEY, Session
 from ai.backend.web.config.unified import SecurityConfig
-from ai.backend.web.server import build_cors_options, update_password_no_auth
+from ai.backend.web.errors import UnauthenticatedError
+from ai.backend.web.server import (
+    build_cors_options,
+    extend_login_session,
+    update_password_no_auth,
+)
 
 MANAGER_ENDPOINT = "http://manager:8081"
 PASSWORD_UPDATE_BODY = {
@@ -87,6 +96,65 @@ async def test_update_password_no_auth_returns_200_on_success(aiohttp_client: An
         "data": None,
         "password_changed_at": "2026-09-29T00:00:00+00:00",
     }
+
+
+class TestExtendLoginSession:
+    @pytest.fixture
+    def current_time(self, monkeypatch: pytest.MonkeyPatch) -> int:
+        current = 2_000_000_000
+        monkeypatch.setattr("ai.backend.web.server.get_time", lambda: current)
+        return current
+
+    @pytest.fixture
+    def session(self, current_time: int) -> Session:
+        session = Session(None, data=None, new=True)
+        session.expiration_dt = current_time + 60
+        return session
+
+    @pytest.fixture
+    def authenticated_session(self, session: Session) -> Session:
+        session["authenticated"] = True
+        return session
+
+    @pytest.fixture
+    def extension_request(self, session: Session) -> web.Request:
+        app = web.Application()
+        app["config"] = MagicMock(session=MagicMock(login_session_extension_sec=3600))
+        request = make_mocked_request("POST", "/server/extend-login-session", app=app)
+        request[SESSION_KEY] = session
+        return request
+
+    async def test_rejects_unauthenticated_session(
+        self, extension_request: web.Request, session: Session
+    ) -> None:
+        original_expiration = session.expiration_dt
+
+        with pytest.raises(UnauthenticatedError) as exc_info:
+            await extend_login_session(extension_request)
+
+        error = exc_info.value
+        assert error.status == 401
+        assert error.content_type == "application/problem+json"
+        assert error.text is not None
+        assert json.loads(error.text) == {
+            "type": "https://api.backend.ai/probs/auth-failed",
+            "title": "Unauthorized access",
+            "error_code": "auth_auth_unauthorized",
+        }
+        assert session.expiration_dt == original_expiration
+
+    async def test_extends_authenticated_session(
+        self, extension_request: web.Request, authenticated_session: Session, current_time: int
+    ) -> None:
+        resp = await extend_login_session(extension_request)
+
+        assert resp.status == 200
+        assert authenticated_session.expiration_dt == current_time + 3600
+        assert resp.text is not None
+        assert json.loads(resp.text) == {
+            "status": 201,
+            "expires": datetime.fromtimestamp(current_time + 3600, tz=UTC).isoformat(),
+        }
 
 
 ALLOWED_ORIGIN = "https://console.example.com"

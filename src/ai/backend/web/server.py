@@ -96,7 +96,11 @@ from ai.backend.web.security import SecurityPolicy, csp_nonce_var, security_poli
 
 from . import __version__, user_agent
 from .auth import build_forwarding_headers, fill_forwarding_hdrs_to_api_session, get_client_ip
-from .errors import InvalidAPIConfigurationError, UnexpectedAuthResponseError
+from .errors import (
+    InvalidAPIConfigurationError,
+    UnauthenticatedError,
+    UnexpectedAuthResponseError,
+)
 from .proxy import (
     decrypt_payload,
     web_handler,
@@ -620,6 +624,8 @@ async def extend_login_session(request: web.Request) -> web.Response:
 
     current = get_time()
     session = await get_session(request)
+    if not session.get("authenticated", False):
+        raise UnauthenticatedError()
 
     session.expiration_dt = current + login_session_extension_sec
     expires = datetime.fromtimestamp(session.expiration_dt, tz=UTC).isoformat()
