@@ -22,7 +22,15 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.group.types import ProjectType
-from ai.backend.manager.data.permission.types import RoleSource
+from ai.backend.manager.data.permission.types import (
+    EntityType as PermissionEntityType,
+)
+from ai.backend.manager.data.permission.types import (
+    RoleSource,
+)
+from ai.backend.manager.data.permission.types import (
+    ScopeType as PermissionScopeType,
+)
 from ai.backend.manager.data.vfolder.types import (
     VFolderCreateParams,
     VFolderMountPermission,
@@ -96,7 +104,7 @@ _REUSED_VFOLDER_NAME = "reused-name"
 
 
 @dataclass(frozen=True)
-class _ModelStoreHoldingDeletedAndLiveVFolderOfSameName:
+class _ProjectHoldingDeletedAndLiveVFolderOfSameName:
     live_vfolder_id: uuid.UUID
 
 
@@ -361,16 +369,39 @@ class TestVfolderRepository:
         assert vfolder_data.group == test_model_store_group
 
     @pytest.fixture
-    async def model_store_holding_deleted_and_live_vfolder_of_same_name(
+    async def project_holding_deleted_and_live_vfolder_of_same_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
         test_user: uuid.UUID,
-        test_model_store_group: uuid.UUID,
-    ) -> _ModelStoreHoldingDeletedAndLiveVFolderOfSameName:
+        test_project_resource_policy_name: str,
+    ) -> _ProjectHoldingDeletedAndLiveVFolderOfSameName:
+        project_id = uuid.uuid4()
         deleted_vfolder_id = uuid.uuid4()
         live_vfolder_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                GroupRow(
+                    id=project_id,
+                    name=f"test-project-{project_id.hex[:8]}",
+                    domain_name=test_domain_name,
+                    description="",
+                    is_active=True,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts={},
+                    resource_policy=test_project_resource_policy_name,
+                    type=ProjectType.GENERAL,
+                )
+            )
+            await db_sess.flush()
+            db_sess.add(
+                AssociationScopesEntitiesRow(
+                    scope_type=PermissionScopeType.PROJECT,
+                    scope_id=str(project_id),
+                    entity_type=PermissionEntityType.USER,
+                    entity_id=str(test_user),
+                )
+            )
             for vfolder_id, status in (
                 (deleted_vfolder_id, VFolderOperationStatus.DELETE_COMPLETE),
                 (live_vfolder_id, VFolderOperationStatus.READY),
@@ -381,12 +412,11 @@ class TestVfolderRepository:
                         name=_REUSED_VFOLDER_NAME,
                         host="local",
                         domain_name=test_domain_name,
-                        quota_scope_id=f"project:{test_model_store_group}",
-                        usage_mode=VFolderUsageMode.MODEL,
-                        permission=VFolderPermission.READ_ONLY,
+                        quota_scope_id=f"project:{project_id}",
+                        permission=VFolderPermission.READ_WRITE,
                         ownership_type=VFolderOwnershipType.GROUP,
                         user=None,
-                        group=test_model_store_group,
+                        group=project_id,
                         creator=f"test-{test_user.hex[:8]}@example.com",
                         creator_id=test_user,
                         unmanaged_path=None,
@@ -395,14 +425,14 @@ class TestVfolderRepository:
                     )
                 )
             await db_sess.flush()
-        return _ModelStoreHoldingDeletedAndLiveVFolderOfSameName(live_vfolder_id=live_vfolder_id)
+        return _ProjectHoldingDeletedAndLiveVFolderOfSameName(live_vfolder_id=live_vfolder_id)
 
-    async def test_name_resolves_to_live_model_store_vfolder_only(
+    async def test_name_resolves_to_live_project_vfolder_only(
         self,
         vfolder_repository: VfolderRepository,
         test_domain_name: str,
         test_user: uuid.UUID,
-        model_store_holding_deleted_and_live_vfolder_of_same_name: _ModelStoreHoldingDeletedAndLiveVFolderOfSameName,
+        project_holding_deleted_and_live_vfolder_of_same_name: _ProjectHoldingDeletedAndLiveVFolderOfSameName,
     ) -> None:
         rows = await vfolder_repository.get_accessible_rows(
             user_uuid=test_user,
@@ -415,7 +445,7 @@ class TestVfolderRepository:
         )
 
         assert [row["id"] for row in rows] == [
-            model_store_holding_deleted_and_live_vfolder_of_same_name.live_vfolder_id
+            project_holding_deleted_and_live_vfolder_of_same_name.live_vfolder_id
         ]
 
 
