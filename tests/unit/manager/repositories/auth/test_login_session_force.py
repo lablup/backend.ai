@@ -9,15 +9,9 @@ from dataclasses import dataclass
 import pytest
 import sqlalchemy as sa
 
-<<<<<<< HEAD
-=======
-from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
-from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.user import UserID
->>>>>>> 03ecfc03f (fix(BA-8947): scope logout to the owner and end login sessions on password change (#16555))
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-from ai.backend.manager.errors.auth import AuthorizationFailed
+from ai.backend.manager.errors.auth import AuthorizationFailed, LoginSessionNotFoundError
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow
@@ -26,20 +20,6 @@ from ai.backend.manager.models.login_session.enums import (
     LoginAttemptResult,
     LoginSessionStatus,
 )
-<<<<<<< HEAD
-=======
-from ai.backend.manager.data.secret.types import KeyProviderType
-from ai.backend.manager.errors.auth import AuthorizationFailed, LoginSessionNotFoundError
-from ai.backend.manager.models.agent.row import AgentRow
-
-# ORM cluster registration: configure_mappers() (triggered when this isolated
-# test registers a domain-cluster row) resolves string relationships against the
-# registry. These rows are reachable via relationships but are not otherwise
-# imported/registered by this test; _ORM_CLUSTER keeps them live.
-from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.keypair.row import KeyPairRow
-from ai.backend.manager.models.login_client_type.row import LoginClientTypeRow
->>>>>>> 03ecfc03f (fix(BA-8947): scope logout to the owner and end login sessions on password change (#16555))
 from ai.backend.manager.models.login_session.row import LoginHistoryRow, LoginSessionRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
@@ -388,7 +368,7 @@ class TestLoginSessionForce:
 
         # Logout (invalidate session by token)
         await auth_db_source.delete_owned_session_by_token(
-            result1.session_token, UserID(sample_user.user_id), LoginAttemptResult.LOGOUT
+            result1.session_token, sample_user.user_id, LoginAttemptResult.LOGOUT
         )
         assert await self._count_active_sessions(db_with_cleanup, sample_user.user_id) == 0
 
@@ -423,7 +403,7 @@ class TestLoginSessionForce:
 
         with pytest.raises(LoginSessionNotFoundError):
             await auth_db_source.delete_owned_session_by_token(
-                created.session_token, UserID(uuid.uuid4()), LoginAttemptResult.LOGOUT
+                created.session_token, uuid.uuid4(), LoginAttemptResult.LOGOUT
             )
 
         assert await self._count_active_sessions(db_with_cleanup, sample_user.user_id) == 1
@@ -439,85 +419,5 @@ class TestLoginSessionForce:
     ) -> None:
         with pytest.raises(LoginSessionNotFoundError):
             await auth_db_source.delete_owned_session_by_token(
-                "missing-token", UserID(sample_user.user_id), LoginAttemptResult.LOGOUT
+                "missing-token", sample_user.user_id, LoginAttemptResult.LOGOUT
             )
-
-    @pytest.fixture
-    async def mixed_session_tokens(
-        self, db_with_cleanup: ExtendedAsyncSAEngine, sample_user: SampleUserData
-    ) -> dict[str, str]:
-        other_user_id = uuid.uuid4()
-        other_email = f"other-{other_user_id}@example.com"
-        tokens = {name: uuid.uuid4().hex for name in ("active", "invalidated", "other")}
-        async with db_with_cleanup.begin_session() as db_session:
-            domain_id = await db_session.scalar(
-                sa.select(DomainRow.id).where(DomainRow.name == sample_user.domain_name)
-            )
-            db_session.add(
-                UserRow(
-                    uuid=other_user_id,
-                    username=other_email,
-                    email=other_email,
-                    password=self._make_password_info(),
-                    domain_name=sample_user.domain_name,
-                    domain_id=domain_id,
-                    role=UserRole.USER,
-                    resource_policy="test-user-policy",
-                    need_password_change=False,
-                )
-            )
-            await db_session.flush()
-            db_session.add_all([
-                LoginSessionRow(
-                    user_id=UserID(sample_user.user_id),
-                    access_key=sample_user.access_key,
-                    session_token=tokens["active"],
-                    status=LoginSessionStatus.ACTIVE,
-                ),
-                LoginSessionRow(
-                    user_id=UserID(sample_user.user_id),
-                    access_key=sample_user.access_key,
-                    session_token=tokens["invalidated"],
-                    status=LoginSessionStatus.INVALIDATED,
-                    invalidated_at=sa.func.now(),
-                ),
-                LoginSessionRow(
-                    user_id=UserID(other_user_id),
-                    access_key=f"AKIA{uuid.uuid4().hex[:16]}",
-                    session_token=tokens["other"],
-                    status=LoginSessionStatus.ACTIVE,
-                ),
-            ])
-            await db_session.commit()
-        return tokens
-
-    async def test_invalidate_returns_only_newly_invalidated_tokens(
-        self,
-        auth_db_source: AuthDBSource,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        sample_user: SampleUserData,
-        mixed_session_tokens: dict[str, str],
-    ) -> None:
-        tokens = await auth_db_source.invalidate_active_login_sessions(UserID(sample_user.user_id))
-
-        assert tokens == [mixed_session_tokens["active"]]
-        assert await self._count_active_sessions(db_with_cleanup, sample_user.user_id) == 0
-        async with db_with_cleanup.begin_readonly() as conn:
-            other_status = await conn.scalar(
-                sa.select(LoginSessionRow.status).where(
-                    LoginSessionRow.session_token == mixed_session_tokens["other"]
-                )
-            )
-        assert other_status == LoginSessionStatus.ACTIVE
-
-    async def test_repeated_invalidation_returns_no_tokens(
-        self,
-        auth_db_source: AuthDBSource,
-        sample_user: SampleUserData,
-        mixed_session_tokens: dict[str, str],
-    ) -> None:
-        await auth_db_source.invalidate_active_login_sessions(UserID(sample_user.user_id))
-
-        tokens = await auth_db_source.invalidate_active_login_sessions(UserID(sample_user.user_id))
-
-        assert tokens == []

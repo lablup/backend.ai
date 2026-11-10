@@ -6,11 +6,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
-<<<<<<< HEAD
-=======
-from ai.backend.common.auth.password import PasswordHashAlgorithm
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
->>>>>>> 03ecfc03f (fix(BA-8947): scope logout to the owner and end login sessions on password change (#16555))
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import AuthConfig, ManagerConfig

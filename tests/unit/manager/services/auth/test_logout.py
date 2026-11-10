@@ -3,15 +3,12 @@ from uuid import uuid4
 
 import pytest
 
-from ai.backend.common.data.entity.user import UserID
-from ai.backend.manager.data.auth.login_session_types import LoginAttemptResult
-from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.errors.auth import LoginSessionNotFoundError
+from ai.backend.manager.models.login_session.enums import LoginAttemptResult
 from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.repositories.user_resource_policy.repository import (
     UserResourcePolicyRepository,
 )
-from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.auth.actions.logout import LogoutAction
 from ai.backend.manager.services.auth.service import AuthService
 
@@ -25,7 +22,7 @@ class TestLogout:
 
     @pytest.fixture
     def action(self) -> LogoutAction:
-        return LogoutAction(user_id=UserID(uuid4()), session_token="session-token")
+        return LogoutAction(user_id=uuid4(), session_token="session-token")
 
     @pytest.fixture
     def service(
@@ -35,7 +32,6 @@ class TestLogout:
         mock_config_provider: MagicMock,
         mock_user_repository: AsyncMock,
         mock_group_repository: AsyncMock,
-        mock_client_ip_masking_repository: AsyncMock,
         mock_valkey_session_client: AsyncMock,
     ) -> AuthService:
         return AuthService(
@@ -47,10 +43,6 @@ class TestLogout:
             user_repository=mock_user_repository,
             group_repository=mock_group_repository,
             ssh_key_validator=AsyncMock(),
-            client_ip_masking_repository=mock_client_ip_masking_repository,
-            key_provider_pool=KeyProviderPool(
-                providers=[], write_provider_type=KeyProviderType.PLAIN
-            ),
         )
 
     @pytest.fixture
@@ -67,11 +59,8 @@ class TestLogout:
         result = await service.logout(action)
 
         assert result.success is True
-        assert repository.delete_owned_login_session_by_token.await_args is not None
-        assert repository.delete_owned_login_session_by_token.await_args.args[:3] == (
-            action.session_token,
-            action.user_id,
-            LoginAttemptResult.LOGOUT,
+        repository.delete_owned_login_session_by_token.assert_awaited_once_with(
+            action.session_token, action.user_id, LoginAttemptResult.LOGOUT
         )
         mock_valkey_session_client.delete_login_session.assert_awaited_once_with(
             action.session_token

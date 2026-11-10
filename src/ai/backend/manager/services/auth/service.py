@@ -548,16 +548,8 @@ class AuthService:
         )
 
     async def logout(self, action: LogoutAction) -> LogoutActionResult:
-<<<<<<< HEAD
-        await self._auth_repository.delete_login_session_by_token(
-            action.session_token, LoginAttemptResult.LOGOUT
-=======
         await self._auth_repository.delete_owned_login_session_by_token(
-            action.session_token,
-            action.user_id,
-            LoginAttemptResult.LOGOUT,
-            await self._recorded_client_ip(),
->>>>>>> 03ecfc03f (fix(BA-8947): scope logout to the owner and end login sessions on password change (#16555))
+            action.session_token, action.user_id, LoginAttemptResult.LOGOUT
         )
         await self._valkey_session_client.delete_login_session(action.session_token)
         return LogoutActionResult(success=True)
@@ -607,12 +599,9 @@ class AuthService:
 
         return SignoutActionResult(success=True)
 
-    async def _revoke_user_login_sessions(self, user_id: UserID, domain_name: str) -> None:
+    async def _revoke_user_login_sessions(self, user_id: uuid.UUID, domain_name: str) -> None:
         deleted_tokens = await self._auth_repository.delete_user_login_sessions(
-            user_id,
-            domain_name,
-            LoginAttemptResult.REVOKED_BY_USER,
-            await self._recorded_client_ip(),
+            user_id, domain_name, LoginAttemptResult.REVOKED_BY_USER
         )
         await self._valkey_session_client.delete_login_sessions(deleted_tokens)
 
@@ -709,7 +698,7 @@ class AuthService:
         changed_at = await self._auth_repository.update_user_password_by_uuid(
             checked_user["uuid"], password_info
         )
-        await self._revoke_user_login_sessions(checked_user.user_id, action.domain_name)
+        await self._revoke_user_login_sessions(checked_user["uuid"], action.domain_name)
 
         return UpdatePasswordNoAuthActionResult(
             user_id=checked_user["uuid"],

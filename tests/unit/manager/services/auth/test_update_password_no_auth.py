@@ -48,11 +48,7 @@ def auth_service(
     mock_config_provider: MagicMock,
     mock_user_repository: AsyncMock,
     mock_group_repository: AsyncMock,
-<<<<<<< HEAD
-=======
-    mock_client_ip_masking_repository: AsyncMock,
     mock_valkey_session_client: AsyncMock,
->>>>>>> 03ecfc03f (fix(BA-8947): scope logout to the owner and end login sessions on password change (#16555))
 ) -> AuthService:
     return AuthService(
         hook_plugin_ctx=mock_hook_plugin_ctx,

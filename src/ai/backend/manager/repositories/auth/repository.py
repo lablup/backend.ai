@@ -165,23 +165,10 @@ class AuthRepository:
         )
 
     @auth_repository_resilience.apply()
-<<<<<<< HEAD
-    async def delete_login_session_by_token(
-        self, session_token: str, result: LoginAttemptResult
-    ) -> None:
-        await self._db_source.delete_session_by_token(session_token, result)
-=======
     async def delete_owned_login_session_by_token(
-        self,
-        session_token: str,
-        user_id: UserID,
-        result: LoginAttemptResult,
-        client_ip: str | None = None,
+        self, session_token: str, user_id: UUID, result: LoginAttemptResult
     ) -> None:
-        await self._db_source.delete_owned_session_by_token(
-            session_token, user_id, result, client_ip
-        )
->>>>>>> 03ecfc03f (fix(BA-8947): scope logout to the owner and end login sessions on password change (#16555))
+        await self._db_source.delete_owned_session_by_token(session_token, user_id, result)
 
     @auth_repository_resilience.apply()
     async def delete_user_login_sessions(
@@ -226,7 +213,6 @@ class AuthRepository:
     # --- Login History ---
 
     @auth_repository_resilience.apply()
-<<<<<<< HEAD
     async def admin_search_login_history(
         self,
         querier: BatchQuerier,
@@ -240,8 +226,3 @@ class AuthRepository:
         querier: BatchQuerier,
     ) -> SearchResult[LoginHistoryData]:
         return await self._db_source.search_login_history(scope, querier)
-=======
-    async def invalidate_active_login_sessions(self, user_id: UserID) -> list[str]:
-        """Return only tokens of this user's sessions invalidated by this call."""
-        return await self._db_source.invalidate_active_login_sessions(user_id)
->>>>>>> 03ecfc03f (fix(BA-8947): scope logout to the owner and end login sessions on password change (#16555))
