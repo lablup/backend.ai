@@ -5308,6 +5308,11 @@ input CreateResourceSlotTypeInput
 
   """Display ordering rank. Lower values appear first."""
   rank: Int! = 0
+
+  """
+  Added in 26.10.0. Whether a kernel holding this slot must be launched sealed or fail.
+  """
+  sealedLaunch: Boolean! = false
 }
 
 """Added in 26.9.0. Payload for resource slot type registration."""
@@ -23767,6 +23772,11 @@ type ResourceSlotType implements Node
 
   """Display ordering rank. Lower values appear first."""
   rank: Int!
+
+  """
+  Added in 26.10.0. Whether a kernel holding this slot must be launched sealed or fail.
+  """
+  sealedLaunch: Boolean!
 }
 
 """
@@ -29692,6 +29702,11 @@ input UpdateResourceSlotTypeInput
 
   """Display ordering rank."""
   rank: Int = null
+
+  """
+  Added in 26.10.0. Whether a kernel holding this slot must be launched sealed or fail. Omit to leave unchanged.
+  """
+  sealedLaunch: Boolean
 }
 
 """Added in 26.9.0. Payload for resource slot type update."""
