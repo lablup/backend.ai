@@ -7,11 +7,13 @@ Includes tests for ArtifactService methods that deal with revisions.
 from __future__ import annotations
 
 import uuid
+from collections.abc import Iterator
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.artifact.types import (
     ArtifactRegistryType,
     ArtifactRevisionDownloadProgress,
@@ -19,7 +21,12 @@ from ai.backend.common.data.artifact.types import (
 from ai.backend.common.data.entity.artifact import ArtifactID
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
 from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.data.storage.types import ArtifactStorageType
+from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
     ArtifactData,
@@ -39,6 +46,7 @@ from ai.backend.manager.errors.artifact import (
 )
 from ai.backend.manager.errors.artifact_registry import InvalidArtifactRegistryTypeError
 from ai.backend.manager.errors.common import ServerMisconfiguredError
+from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.artifact_revision.searchers import ArtifactRevisionSearcher
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
@@ -46,6 +54,9 @@ from ai.backend.manager.repositories.artifact_registry.repository import Artifac
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
 from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository
 from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.rbac.permission_check_repository import (
+    RbacPermissionCheckRepository,
+)
 from ai.backend.manager.repositories.reservoir_registry.repository import (
     ReservoirRegistryRepository,
 )
@@ -188,6 +199,7 @@ class TestArtifactRevisionService:
             huggingface_registry_repository=mock_huggingface_repository,
             reservoir_registry_repository=mock_reservoir_repository,
             vfolder_repository=mock_vfolder_repository,
+            permission_check=MagicMock(spec=RbacPermissionCheckRepository),
             storage_manager=mock_storage_manager,
             config_provider=mock_config_provider,
             valkey_artifact_client=mock_valkey_artifact_client,
@@ -587,6 +599,10 @@ class TestImportArtifactRevisionAction:
         return MagicMock(spec=VfolderRepository)
 
     @pytest.fixture
+    def mock_permission_check(self) -> MagicMock:
+        return MagicMock(spec=RbacPermissionCheckRepository)
+
+    @pytest.fixture
     def mock_storage_manager(self) -> MagicMock:
         return MagicMock()
 
@@ -614,6 +630,7 @@ class TestImportArtifactRevisionAction:
         mock_huggingface_repository: MagicMock,
         mock_reservoir_repository: MagicMock,
         mock_vfolder_repository: MagicMock,
+        mock_permission_check: MagicMock,
         mock_storage_manager: MagicMock,
         mock_config_provider: MagicMock,
         mock_valkey_artifact_client: MagicMock,
@@ -629,6 +646,7 @@ class TestImportArtifactRevisionAction:
             huggingface_registry_repository=mock_huggingface_repository,
             reservoir_registry_repository=mock_reservoir_repository,
             vfolder_repository=mock_vfolder_repository,
+            permission_check=mock_permission_check,
             storage_manager=mock_storage_manager,
             config_provider=mock_config_provider,
             valkey_artifact_client=mock_valkey_artifact_client,
@@ -882,6 +900,89 @@ class TestImportArtifactRevisionAction:
         with pytest.raises(InvalidArtifactRegistryTypeError):
             await service.import_revision(action)
 
+    @pytest.fixture
+    def caller(self) -> Iterator[UserData]:
+        user = UserData(
+            user_id=uuid.uuid4(),
+            is_authorized=True,
+            is_admin=False,
+            is_superadmin=False,
+            role=UserRole.USER,
+            domain_name="default",
+            domain_id=DomainID(uuid.uuid4()),
+        )
+        with with_user(user):
+            yield user
+
+    async def test_vfolder_without_update_is_rejected_before_any_change(
+        self,
+        service: ArtifactRevisionService,
+        mock_artifact_repository: MagicMock,
+        mock_revision_ops: MagicMock,
+        mock_vfolder_repository: MagicMock,
+        mock_permission_check: MagicMock,
+        caller: UserData,
+        sample_revision: ArtifactRevisionData,
+    ) -> None:
+        vfolder_uuid = VFolderUUID(uuid.uuid4())
+        mock_permission_check.held_permissions = AsyncMock(
+            return_value={vfolder_uuid: Permission.READ}
+        )
+        mock_vfolder_repository.get_by_id = AsyncMock()
+        mock_revision_ops.get_field = AsyncMock(return_value=sample_revision)
+        mock_artifact_repository.update_artifact_revision_status = AsyncMock()
+
+        action = ImportArtifactRevisionAction(
+            artifact_revision_id=sample_revision.id, vfolder_id=vfolder_uuid
+        )
+        with pytest.raises(NotEnoughPermission):
+            await service.import_revision(action)
+
+        mock_permission_check.held_permissions.assert_awaited_once_with(
+            UserID(caller.user_id), [vfolder_uuid]
+        )
+        mock_vfolder_repository.get_by_id.assert_not_called()
+        mock_revision_ops.get_field.assert_not_called()
+        mock_artifact_repository.update_artifact_revision_status.assert_not_called()
+
+    async def test_vfolder_with_update_is_looked_up(
+        self,
+        service: ArtifactRevisionService,
+        mock_artifact_repository: MagicMock,
+        mock_revision_ops: MagicMock,
+        mock_vfolder_repository: MagicMock,
+        mock_permission_check: MagicMock,
+        mock_storage_manager: MagicMock,
+        mock_config_provider: MagicMock,
+        caller: UserData,
+        sample_revision: ArtifactRevisionData,
+        sample_artifact: ArtifactData,
+    ) -> None:
+        vfolder_uuid = VFolderUUID(uuid.uuid4())
+        mock_permission_check.held_permissions = AsyncMock(
+            return_value={vfolder_uuid: Permission.READ | Permission.UPDATE}
+        )
+        vfolder_data = MagicMock()
+        vfolder_data.id = vfolder_uuid
+        vfolder_data.quota_scope_id = "user:" + str(caller.user_id)
+        vfolder_data.host = "local:volume1"
+        mock_vfolder_repository.get_by_id = AsyncMock(return_value=vfolder_data)
+        mock_storage_manager.get_proxy_and_volume.return_value = ("local", "volume1")
+        mock_revision_ops.get_field = AsyncMock(return_value=sample_revision)
+        mock_artifact_repository.get_artifact_by_id = AsyncMock(return_value=sample_artifact)
+        mock_artifact_repository.update_artifact_revision_status = AsyncMock()
+        # The import stops at the next step, after the vfolder is resolved.
+        mock_config_provider.config.reservoir = None
+
+        action = ImportArtifactRevisionAction(
+            artifact_revision_id=sample_revision.id, vfolder_id=vfolder_uuid
+        )
+        with pytest.raises(ServerMisconfiguredError):
+            await service.import_revision(action)
+
+        mock_vfolder_repository.get_by_id.assert_awaited_once_with(vfolder_uuid)
+        mock_storage_manager.get_proxy_and_volume.assert_called_once_with("local:volume1")
+
 
 class TestDelegateImportArtifactRevisionBatchAction:
     """Test cases for DelegateImportArtifactRevisionBatchAction"""
@@ -966,6 +1067,7 @@ class TestDelegateImportArtifactRevisionBatchAction:
             huggingface_registry_repository=mock_huggingface_repository,
             reservoir_registry_repository=mock_reservoir_repository,
             vfolder_repository=mock_vfolder_repository,
+            permission_check=MagicMock(spec=RbacPermissionCheckRepository),
             storage_manager=mock_storage_manager,
             config_provider=mock_config_provider,
             valkey_artifact_client=mock_valkey_artifact_client,
@@ -1211,6 +1313,7 @@ class TestCancelImportAction:
             huggingface_registry_repository=MagicMock(spec=HuggingFaceRepository),
             reservoir_registry_repository=MagicMock(spec=ReservoirRegistryRepository),
             vfolder_repository=MagicMock(spec=VfolderRepository),
+            permission_check=MagicMock(spec=RbacPermissionCheckRepository),
             storage_manager=MagicMock(),
             config_provider=MagicMock(),
             valkey_artifact_client=MagicMock(),
@@ -1308,6 +1411,7 @@ class TestAssociateWithStorageAction:
             huggingface_registry_repository=MagicMock(spec=HuggingFaceRepository),
             reservoir_registry_repository=MagicMock(spec=ReservoirRegistryRepository),
             vfolder_repository=MagicMock(spec=VfolderRepository),
+            permission_check=MagicMock(spec=RbacPermissionCheckRepository),
             storage_manager=MagicMock(),
             config_provider=MagicMock(),
             valkey_artifact_client=MagicMock(),
@@ -1401,6 +1505,7 @@ class TestDisassociateWithStorageAction:
             huggingface_registry_repository=MagicMock(spec=HuggingFaceRepository),
             reservoir_registry_repository=MagicMock(spec=ReservoirRegistryRepository),
             vfolder_repository=MagicMock(spec=VfolderRepository),
+            permission_check=MagicMock(spec=RbacPermissionCheckRepository),
             storage_manager=MagicMock(),
             config_provider=MagicMock(),
             valkey_artifact_client=MagicMock(),
@@ -1490,6 +1595,7 @@ class TestCleanupArtifactRevisionAction:
             huggingface_registry_repository=MagicMock(spec=HuggingFaceRepository),
             reservoir_registry_repository=MagicMock(spec=ReservoirRegistryRepository),
             vfolder_repository=MagicMock(spec=VfolderRepository),
+            permission_check=MagicMock(spec=RbacPermissionCheckRepository),
             storage_manager=mock_storage_manager,
             config_provider=mock_config_provider,
             valkey_artifact_client=MagicMock(),
@@ -1770,6 +1876,7 @@ class TestGetDownloadProgressAction:
             huggingface_registry_repository=MagicMock(spec=HuggingFaceRepository),
             reservoir_registry_repository=mock_reservoir_repository,
             vfolder_repository=MagicMock(spec=VfolderRepository),
+            permission_check=MagicMock(spec=RbacPermissionCheckRepository),
             storage_manager=MagicMock(),
             config_provider=mock_config_provider,
             valkey_artifact_client=mock_valkey_artifact_client,

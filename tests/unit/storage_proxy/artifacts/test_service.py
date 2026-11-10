@@ -3,6 +3,7 @@
 import uuid
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
+from pathlib import Path, PurePosixPath
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
@@ -38,6 +39,7 @@ from ai.backend.storage.errors import (
     ReservoirStorageConfigInvalidError,
     StorageNotFoundError,
 )
+from ai.backend.storage.errors.object import ReservoirFilePathInvalidError
 from ai.backend.storage.services.artifacts.huggingface import (
     HuggingFaceDownloadStep,
     HuggingFaceFileDownloadStreamReader,
@@ -1076,3 +1078,70 @@ class TestReservoirDownloadStep:
 
             with pytest.raises(ArtifactStorageEmptyError):
                 await reservoir_download_step.execute(mock_import_step_context, None)
+
+
+class TestReservoirDownloadPathCheck:
+    """Reservoir file paths that would be written outside the download path."""
+
+    @pytest.mark.parametrize(
+        "remote_path",
+        ["m/r/../x.bin", "m/r/./x.bin", "../x.bin", "/etc/passwd", "m/r"],
+    )
+    def test_model_relative_path_rejects(
+        self, reservoir_download_step: ReservoirDownloadStep, remote_path: str
+    ) -> None:
+        with pytest.raises(ReservoirFilePathInvalidError):
+            reservoir_download_step._model_relative_path(remote_path, "m/r")
+
+    @pytest.mark.parametrize(
+        ("remote_path", "model_prefix", "expected"),
+        [
+            ("m/r/a/b.bin", "m/r", "a/b.bin"),
+            ("/a/b.bin", "/", "a/b.bin"),
+            ("m/r2/x.bin", "m/r", "m/r2/x.bin"),
+        ],
+    )
+    def test_model_relative_path_strips_prefix(
+        self,
+        reservoir_download_step: ReservoirDownloadStep,
+        remote_path: str,
+        model_prefix: str,
+        expected: str,
+    ) -> None:
+        relative = reservoir_download_step._model_relative_path(remote_path, model_prefix)
+        assert relative == PurePosixPath(expected)
+
+    def test_prepare_local_path_creates_parent(
+        self, reservoir_download_step: ReservoirDownloadStep, tmp_path: Path
+    ) -> None:
+        dest_path = tmp_path / "dest"
+        local_path = reservoir_download_step._prepare_local_path(
+            dest_path, PurePosixPath("a/b.bin")
+        )
+        assert local_path == dest_path / "a" / "b.bin"
+        assert local_path.parent.is_dir()
+
+    def test_prepare_local_path_rejects_symlinked_parent(
+        self, reservoir_download_step: ReservoirDownloadStep, tmp_path: Path
+    ) -> None:
+        dest_path = tmp_path / "dest"
+        dest_path.mkdir()
+        outside = tmp_path / "outside"
+        (dest_path / "link").symlink_to(outside, target_is_directory=True)
+
+        with pytest.raises(ReservoirFilePathInvalidError):
+            reservoir_download_step._prepare_local_path(dest_path, PurePosixPath("link/sub/x.bin"))
+        assert not outside.exists()
+
+    def test_prepare_local_path_rejects_symlinked_file(
+        self, reservoir_download_step: ReservoirDownloadStep, tmp_path: Path
+    ) -> None:
+        dest_path = tmp_path / "dest"
+        dest_path.mkdir()
+        target = tmp_path / "target.bin"
+        target.write_text("keep")
+        (dest_path / "x.bin").symlink_to(target)
+
+        with pytest.raises(ReservoirFilePathInvalidError):
+            reservoir_download_step._prepare_local_path(dest_path, PurePosixPath("x.bin"))
+        assert target.read_text() == "keep"
