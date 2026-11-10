@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator, Sequence
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any, override
 
@@ -86,6 +87,8 @@ from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingR
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.read import V2ReadOps
+from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
 from ai.backend.manager.services.ops.service import SearchService
 from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
@@ -922,3 +925,90 @@ class TestFullStack:
         # What the run reached reaches the audit trail; how much of it is recorded is
         # the audit policy's call.
         assert result.entity_ids() == (preset.id,)
+
+
+# =============================================================================
+# Retry when a session cannot be opened.
+# =============================================================================
+
+
+class _ProviderTimingOutFirstOpen(V2DBOpsProvider):
+    sessions_opened: int
+
+    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+        super().__init__(db)
+        self.sessions_opened = 0
+
+    @override
+    @asynccontextmanager
+    async def read_ops(self) -> AsyncGenerator[V2ReadOps]:
+        self._count_and_time_out_first_open()
+        async with super().read_ops() as r:
+            yield r
+
+    @override
+    @asynccontextmanager
+    async def write_ops(self) -> AsyncGenerator[V2WriteOps]:
+        self._count_and_time_out_first_open()
+        async with super().write_ops() as w:
+            yield w
+
+    def _count_and_time_out_first_open(self) -> None:
+        self.sessions_opened += 1
+        if self.sessions_opened == 1:
+            raise TimeoutError
+
+
+@pytest.fixture
+def provider_timing_out_first_open(database: ExtendedAsyncSAEngine) -> _ProviderTimingOutFirstOpen:
+    return _ProviderTimingOutFirstOpen(database)
+
+
+@pytest.fixture
+def repository_timing_out_first_open(
+    provider_timing_out_first_open: _ProviderTimingOutFirstOpen,
+) -> OpsRepository[RolePresetData]:
+    return OpsRepository[RolePresetData](provider_timing_out_first_open)
+
+
+@pytest.fixture
+async def stored_preset_id(database: ExtendedAsyncSAEngine) -> RolePresetID:
+    async with database.begin_session() as sess:
+        row = RolePresetRow(name="stored", scope_type=DomainEntityType())
+        sess.add(row)
+        await sess.flush()
+        return row.id
+
+
+class TestRetryOnSessionOpenFailure:
+    async def test_read_is_retried(
+        self,
+        provider_timing_out_first_open: _ProviderTimingOutFirstOpen,
+        repository_timing_out_first_open: OpsRepository[RolePresetData],
+        stored_preset_id: RolePresetID,
+    ) -> None:
+        read_back = await repository_timing_out_first_open.get(
+            _PresetQuerier(target=stored_preset_id)
+        )
+
+        assert read_back.id == stored_preset_id
+        assert provider_timing_out_first_open.sessions_opened == 2
+
+    async def test_write_is_retried_and_written_once(
+        self,
+        database: ExtendedAsyncSAEngine,
+        provider_timing_out_first_open: _ProviderTimingOutFirstOpen,
+        repository_timing_out_first_open: OpsRepository[RolePresetData],
+    ) -> None:
+        created = await repository_timing_out_first_open.create_global_entity(
+            _PresetCreator(name="retried", scope_type=DomainEntityType())
+        )
+
+        async with database.begin_readonly_session() as sess:
+            ids = (
+                await sess.scalars(
+                    sa.select(RolePresetRow.id).where(RolePresetRow.name == "retried")
+                )
+            ).all()
+        assert ids == [created.id]
+        assert provider_timing_out_first_open.sessions_opened == 2

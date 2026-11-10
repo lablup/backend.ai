@@ -48,9 +48,17 @@ pass-through would remain.
   scoped spec cannot flow through a registration-free path.
 - There is no `delete`: which column marks a row deleted is domain knowledge, so a
   delete action carries a `DataUpdater` and runs the update path.
+<<<<<<< HEAD
 - `OpsRepository` turns a missing row into `EntityNotFoundError` / `FieldNotFoundError`
   rather than `None` — that seam is the only thing it adds over ops. The error's domain
   is read off the identifier the spec carries, or off the lookup for a row named by key.
+=======
+- `OpsRepository` adds two things over ops. It turns a missing row into
+  `EntityNotFoundError` / `FieldNotFoundError` rather than `None`; the error's domain is
+  read off the identifier the spec carries, or off the lookup for a row named by key.
+  It retries a call that fails with an error other than `BackendAIError`, such as a
+  connection that could not be opened.
+>>>>>>> 86b98a1d (fix(BA-8993): retry OpsRepository operations when the DB connection fails (#16779))
 
 ## Gradual migration to the ops provider
 
