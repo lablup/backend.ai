@@ -8,7 +8,7 @@ import click
 from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
 from ai.backend.client import __version__
-from ai.backend.client.cli.credential_files import CLI_CREDENTIAL_FILE_MODE
+from ai.backend.client.cli.types import CLI_CREDENTIAL_FILE_MODE
 from ai.backend.client.config import get_config, local_state_path
 from ai.backend.client.exceptions import BackendClientError
 from ai.backend.client.session import Session

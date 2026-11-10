@@ -10,7 +10,7 @@ from typing import Any
 
 import click
 
-from ai.backend.client.cli.credential_files import CLI_CREDENTIAL_FILE_MODE
+from ai.backend.client.cli.types import CLI_CREDENTIAL_FILE_MODE
 from ai.backend.client.cli.v2.insecure_http_guard import InsecureEndpointError
 
 from .helpers import ProfileStore, create_v2_registry, load_v2_config

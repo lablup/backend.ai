@@ -6,7 +6,7 @@ from typing import Any
 
 import click
 
-from ai.backend.client.cli.credential_files import CLI_CREDENTIAL_FILE_MODE
+from ai.backend.client.cli.types import CLI_CREDENTIAL_FILE_MODE
 
 from .helpers import ProfileStore
 
