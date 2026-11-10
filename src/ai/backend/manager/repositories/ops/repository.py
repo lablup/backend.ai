@@ -216,17 +216,6 @@ class OpsRepository[TData]:
         async with self._ops.read_ops() as r:
             return await r.lookup_runtime_field_owners(lookup, field_ids)
 
-<<<<<<< HEAD
-=======
-    @_ops_repository_resilience.apply()
-    async def field_owner_candidates(
-        self, candidates: FieldOwnerCandidates[Any], field_ids: Sequence[FieldIdentifier]
-    ) -> Mapping[FieldIdentifier, Sequence[RuntimeEntityID]]:
-        """Read the owner candidates of each named field row."""
-        async with self._ops.read_ops() as r:
-            return await r.read_field_owner_candidates(candidates, field_ids)
-
->>>>>>> 86b98a1d (fix(BA-8993): retry OpsRepository operations when the DB connection fails (#16779))
     async def runtime_field_owner(
         self, lookup: RuntimeFieldOwnerLookup[Any], field_id: FieldIdentifier
     ) -> RuntimeEntityID:
@@ -279,19 +268,7 @@ class OpsRepository[TData]:
             )
         return resolved
 
-<<<<<<< HEAD
-=======
     @_ops_repository_resilience.apply()
-    async def fields_by_keys[TKey, TFieldID: FieldIdentifier, TOwnerID: EntityIdentifier](
-        self, lookup: BulkFieldKeyLookup[TKey, TFieldID, TOwnerID], keys: Sequence[TKey]
-    ) -> Mapping[TKey, tuple[TFieldID, TOwnerID]]:
-        """Resolve several keys into the field rows they name and their owners; a key
-        naming nothing is absent."""
-        async with self._ops.read_ops() as r:
-            return await r.lookup_fields_by_keys(lookup, keys)
-
-    @_ops_repository_resilience.apply()
->>>>>>> 86b98a1d (fix(BA-8993): retry OpsRepository operations when the DB connection fails (#16779))
     async def search_in_scopes(
         self,
         scopes: Sequence[OperationScope],
@@ -580,18 +557,7 @@ class OpsRepository[TData]:
         async with self._ops.write_ops() as w:
             return await w.upsert_field_entity(owner_id, upserter)
 
-<<<<<<< HEAD
-=======
     @_ops_repository_resilience.apply()
-    async def partial_bulk_upsert_field_entities[TFieldData: FieldData](
-        self, upserters: Mapping[Any, Sequence[FieldUpserter[Any, Any, TFieldData]]]
-    ) -> BulkResultWithFailures[list[TFieldData]]:
-        """Insert or update each owner's field rows independently, answering per owner."""
-        async with self._ops.write_ops() as w:
-            return await w.partial_bulk_upsert_field_entities(upserters)
-
-    @_ops_repository_resilience.apply()
->>>>>>> 86b98a1d (fix(BA-8993): retry OpsRepository operations when the DB connection fails (#16779))
     async def update(self, updater: GuardedDataUpdater[Any, TData]) -> TData:
         """Apply the update, telling a missing row from a refused one.
 
