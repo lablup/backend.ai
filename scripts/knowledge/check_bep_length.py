@@ -4,8 +4,8 @@
 Usage:
     python3 scripts/knowledge/check_bep_length.py [--root DIR] [PATH ...]
 
-Checks `proposals/BEP-<number>-*.md` and `.ko.md` from BEP-1080 on, or the given
-paths. The limits follow `proposals/BEP-0000-template.md`. Prints one
+Checks `proposals/BEP-<number>-*.md`, `.ko.md` and the sub-documents in
+`proposals/BEP-<number>/` from BEP-1080 on, or the given paths. The limits follow `proposals/BEP-0000-template.md`. Prints one
 "path:line: problem" line per violation and exits 1 when any exist. CI runs this
 via knowledge-check.yml.
 """
@@ -20,6 +20,7 @@ from pathlib import Path
 
 FIRST_CHECKED_NUMBER = 1080
 BEP_FILE = re.compile(r"^BEP-(\d{4})-.+\.md$")
+BEP_DIR = re.compile(r"^BEP-(\d{4})$")
 KO_SUFFIX = ".ko.md"
 
 MAX_LINES = 300
@@ -48,6 +49,7 @@ TABLE_ROW = re.compile(r"^\s*\|")
 TABLE_DIVIDER = re.compile(r"^\s*\|[\s:|-]+\|\s*$")
 IMAGE = re.compile(r"^\s*!\[")
 SENTENCE_END = re.compile(r"[^\d\s.]\.(?:\s|$)")
+ABBREVIATION = re.compile(r"\b(?:e\.g|i\.e|etc|vs|cf)\.", re.IGNORECASE)
 
 
 @dataclass
@@ -149,38 +151,48 @@ def _check_design(section: Section, display: str) -> list[str]:
             f"{display}:{section.line}: {len(subsections)} design subsections, "
             f"limit {MAX_DESIGN_SUBSECTIONS}"
         )
-    for sub in subsections:
-        tables = _tables(sub.body)
-        if len(tables) > MAX_DESIGN_TABLES:
-            problems.append(
-                f"{display}:{sub.line}: {len(tables)} tables, limit {MAX_DESIGN_TABLES}"
-            )
-        for first, rows in tables:
-            if rows > MAX_TABLE_ROWS:
-                problems.append(f"{display}:{first}: {rows} table rows, limit {MAX_TABLE_ROWS}")
-        prose = [
-            line
-            for _, line in sub.body
-            if line.strip()
-            and not TABLE_ROW.match(line)
-            and not IMAGE.match(line)
-            and not LIST_ITEM.match(line)
-            and not line.strip().startswith(REJECTED_PREFIXES)
-        ]
-        sentences = sum(len(SENTENCE_END.findall(line)) for line in prose)
-        if sentences > MAX_DESIGN_SENTENCES:
-            problems.append(
-                f"{display}:{sub.line}: {sentences} sentences in '{sub.title}', "
-                f"limit {MAX_DESIGN_SENTENCES}"
-            )
+    first_sub = subsections[0].line if subsections else None
+    lead = [(n, line) for n, line in section.body if first_sub is None or n < first_sub]
+    for unit in [Section(section.title, section.line, lead), *subsections]:
+        problems += _check_design_unit(unit, display)
+    return problems
+
+
+def _check_design_unit(unit: Section, display: str) -> list[str]:
+    """Table and sentence limits of a design subsection, or of the text before the first one."""
+    problems = []
+    tables = _tables(unit.body)
+    if len(tables) > MAX_DESIGN_TABLES:
+        problems.append(f"{display}:{unit.line}: {len(tables)} tables, limit {MAX_DESIGN_TABLES}")
+    for first, rows in tables:
+        if rows > MAX_TABLE_ROWS:
+            problems.append(f"{display}:{first}: {rows} table rows, limit {MAX_TABLE_ROWS}")
+    sentences = 0
+    for _, line in unit.body:
+        text = line.strip()
+        if not text or TABLE_ROW.match(line) or IMAGE.match(line):
+            continue
+        if text.startswith(REJECTED_PREFIXES):
+            continue
+        count = len(SENTENCE_END.findall(ABBREVIATION.sub("", line)))
+        sentences += max(count, 1) if LIST_ITEM.match(line) else count
+    if sentences > MAX_DESIGN_SENTENCES:
+        problems.append(
+            f"{display}:{unit.line}: {sentences} sentences in '{unit.title}', "
+            f"limit {MAX_DESIGN_SENTENCES}"
+        )
     return problems
 
 
 def _default_paths(root: Path) -> list[Path]:
     paths = []
-    for path in sorted((root / "proposals").glob("BEP-*.md")):
-        if (m := BEP_FILE.match(path.name)) and int(m[1]) >= FIRST_CHECKED_NUMBER:
-            paths.append(path)
+    for path in sorted((root / "proposals").glob("BEP-*")):
+        if path.is_file() and (m := BEP_FILE.match(path.name)):
+            if int(m[1]) >= FIRST_CHECKED_NUMBER:
+                paths.append(path)
+        elif path.is_dir() and (m := BEP_DIR.match(path.name)):
+            if int(m[1]) >= FIRST_CHECKED_NUMBER:
+                paths += sorted(path.glob("*.md"))
     return paths
 
 
