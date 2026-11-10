@@ -7,9 +7,9 @@ from typing import Any
 
 import click
 
-from .helpers import ProfileStore
+from ai.backend.client.config import OWNER_ONLY_FILE_MODE
 
-_OWNER_ONLY_FILE_MODE = 0o600
+from .helpers import ProfileStore
 
 CONFIGURABLE_KEYS = {
     "endpoint": ("config", "endpoint"),
@@ -45,9 +45,9 @@ def _save_toml(path: click.Path, data: dict[str, Any]) -> None:
     with open(
         p,
         "wb",
-        opener=lambda opened_path, flags: os.open(opened_path, flags, _OWNER_ONLY_FILE_MODE),
+        opener=lambda opened_path, flags: os.open(opened_path, flags, OWNER_ONLY_FILE_MODE),
     ) as f:
-        os.fchmod(f.fileno(), _OWNER_ONLY_FILE_MODE)
+        os.fchmod(f.fileno(), OWNER_ONLY_FILE_MODE)
         tomli_w.dump(data, f)
 
 

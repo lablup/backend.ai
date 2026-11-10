@@ -17,11 +17,10 @@ from ai.backend.client.cli.v2.deployment.chat.utils import (
     read_json_file,
     write_json_file,
 )
+from ai.backend.client.config import OWNER_ONLY_FILE_MODE
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.types import BackendAISchema
-
-_OWNER_ONLY_FILE_MODE = 0o600
 
 CACHE_ENTRY_TTL = timedelta(hours=24)
 """Endpoint cache entries older than this are treated as a cache miss."""
@@ -183,9 +182,9 @@ class DeploymentChatConfig(BackendAISchema):
             CHAT_CONFIG_FILE,
             "w",
             encoding="utf-8",
-            opener=lambda opened_path, flags: os.open(opened_path, flags, _OWNER_ONLY_FILE_MODE),
+            opener=lambda opened_path, flags: os.open(opened_path, flags, OWNER_ONLY_FILE_MODE),
         ) as config_file:
-            os.fchmod(config_file.fileno(), _OWNER_ONLY_FILE_MODE)
+            os.fchmod(config_file.fileno(), OWNER_ONLY_FILE_MODE)
             config_file.write(self.model_dump_json(indent=2))
 
 

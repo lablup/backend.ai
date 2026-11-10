@@ -35,6 +35,7 @@ DEFAULT_CHUNK_SIZE = 16 * (2**20)  # 16 MiB
 MAX_INFLIGHT_CHUNKS = 4
 
 local_state_path = Path(appdirs.user_state_dir("backend.ai", "Lablup"))
+OWNER_ONLY_FILE_MODE = 0o600
 local_cache_path = Path(appdirs.user_cache_dir("backend.ai", "Lablup"))
 
 
