@@ -8,7 +8,6 @@ from aiohttp import web
 
 from ai.backend.common.clients.http_client.client_pool import ClientPool, tcp_client_session_factory
 from ai.backend.web.proxy import _direct_acquire, web_handler, web_plugin_handler
-from ai.backend.web.stats import WebStats
 
 
 @pytest.fixture
@@ -48,7 +47,6 @@ async def _signup_gated_client(
         service=MagicMock(enable_signup=enable_signup),
     )
     app["client_pool"] = client_pool
-    app["stats"] = WebStats()
     app.router.add_route(
         "POST",
         "/func/{path:auth/signup}",

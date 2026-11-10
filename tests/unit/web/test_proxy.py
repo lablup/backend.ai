@@ -19,7 +19,6 @@ from ai.backend.web.clients.endpoint_pool import (
 )
 from ai.backend.web.proxy import web_handler, web_plugin_handler
 from ai.backend.web.server import client_ctx
-from ai.backend.web.stats import WebStats
 
 
 @asynccontextmanager
@@ -85,7 +84,6 @@ async def _cookie_proxy_client(
         service=MagicMock(enable_signup=True),
     )
     app["client_pool"] = client_pool
-    app["stats"] = WebStats()
     app.router.add_route(
         "*",
         "/func/{path:.*$}",
