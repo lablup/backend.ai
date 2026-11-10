@@ -294,7 +294,7 @@ async def update_password_no_auth(request: web.Request) -> web.Response:
         )
     except BackendClientError as e:
         # This is error, not failed login, so we should not update login history.
-        raise ProxyTargetUnreachableError(str(e)) from e
+        raise ProxyTargetUnreachableError() from e
     except BackendAPIError as e:
         log.info(
             "LOGIN_HANDLER: Authorization failed (email:{}, ip:{}) - {}",
@@ -551,7 +551,7 @@ async def login_handler(request: web.Request) -> web.Response:
                 )
     except BackendClientError as e:
         # This is error, not failed login, so we should not update login history.
-        raise ProxyTargetUnreachableError(str(e)) from e
+        raise ProxyTargetUnreachableError() from e
     except BackendAPIError as e:
         log.info(
             "LOGIN_HANDLER: Authorization failed (email:{}, ip:{}) - {}",
@@ -756,7 +756,7 @@ async def token_login_handler(request: web.Request) -> web.Response:
         result["authenticated"] = True
         result["data"] = public_return  # store public info from token
     except BackendClientError as e:
-        raise ProxyTargetUnreachableError(str(e)) from e
+        raise ProxyTargetUnreachableError() from e
     except BackendAPIError as e:
         log.info("Authorization failed for token {}: {}", auth_token, e)
         result["authenticated"] = False

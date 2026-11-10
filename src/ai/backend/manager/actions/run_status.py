@@ -48,6 +48,7 @@ class ActionRunStatus:
         log.exception("Unexpected error during action processing: {}", exc)
         return cls(
             status=OperationStatus.ERROR,
-            description=str(exc),
+            # An unclassified exception's text can carry SQL and internal addresses.
+            description=type(exc).__name__,
             error_code=ErrorCode.default(),
         )
