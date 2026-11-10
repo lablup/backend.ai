@@ -12,6 +12,8 @@ from pydantic import Field
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.types import TagsModel
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.common.types import EndpointProtocol
 
 
 class CreateEndpointRequestBody(BaseRequestModel):
@@ -52,5 +54,15 @@ class CreateEndpointRequestBody(BaseRequestModel):
             "Optional health check configuration. When present, the "
             "coordinator configures the load balancer to probe model "
             "service replicas using this path / interval / timeout."
+        ),
+    )
+    protocol: EndpointProtocol = Field(
+        default=EndpointProtocol.HTTP,
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. "
+            "Proxy protocol of the endpoint's circuit. ``http`` (default) is the "
+            "regular HTTP inference path. ``tcp`` makes the app-proxy worker pass "
+            "bytes through (TLS terminates inside the replica); it needs a "
+            "``(tcp, port)`` worker with ``inference`` in its accepted_traffics."
         ),
     )
