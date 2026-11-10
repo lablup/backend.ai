@@ -33,6 +33,11 @@ DEFAULT_CHUNK_SIZE: Final = 16 * (2**20)  # 16 MiB
 DEFAULT_ROLE: Final = "main"
 
 PASSWORD_PLACEHOLDER: Final = "*****"
+<<<<<<< HEAD
+=======
+SECRET_KEY_PLACEHOLDER: Final = "*****"
+TOKEN_PLACEHOLDER: Final = "*****"
+>>>>>>> ca95a63b0 (fix(BA-8972): mask artifact registry credentials for callers who are not superadmins (#16643))
 
 RESERVED_DOTFILES = [".terminfo", ".jupyter", ".ssh", ".ssh/authorized_keys", ".local", ".config"]
 
