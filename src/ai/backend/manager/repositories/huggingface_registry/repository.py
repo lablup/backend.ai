@@ -1,7 +1,9 @@
 import uuid
+from collections.abc import Mapping, Sequence
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -12,6 +14,7 @@ from ai.backend.manager.data.artifact_registries.types import (
     ArtifactRegistryModifierMeta,
 )
 from ai.backend.manager.data.huggingface_registry.types import (
+    HuggingFaceRegistryConnectionData,
     HuggingFaceRegistryData,
     HuggingFaceRegistryListResult,
 )
@@ -20,6 +23,9 @@ from ai.backend.manager.models.artifact_registries.creators import ArtifactRegis
 from ai.backend.manager.models.artifact_registries.updaters import ArtifactRegistryMetaUpdater
 from ai.backend.manager.models.huggingface_registry.creators import HuggingFaceRegistryCreator
 from ai.backend.manager.models.huggingface_registry.purgers import HuggingFaceRegistryPurger
+from ai.backend.manager.models.huggingface_registry.queriers import (
+    BulkHuggingFaceRegistryQuerier,
+)
 from ai.backend.manager.models.huggingface_registry.searchers import HuggingFaceRegistrySearcher
 from ai.backend.manager.models.huggingface_registry.updaters import HuggingFaceRegistryUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -126,6 +132,13 @@ class HuggingFaceRepository:
         self, registry_ids: list[uuid.UUID]
     ) -> list[HuggingFaceRegistryData]:
         return await self._db_source.get_registries_by_ids(registry_ids)
+
+    @huggingface_registry_repository_resilience.apply()
+    async def registry_connections(
+        self, registry_ids: Sequence[ArtifactRegistryID]
+    ) -> Mapping[EntityIdentifier, HuggingFaceRegistryConnectionData]:
+        async with self._registry_ops.read_ops() as r:
+            return await r.query_bulk_data(BulkHuggingFaceRegistryQuerier(), registry_ids)
 
     @huggingface_registry_repository_resilience.apply()
     async def list_registries(self) -> list[HuggingFaceRegistryData]:
