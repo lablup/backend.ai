@@ -13,6 +13,7 @@ from ai.backend.manager.config.unified import AuthConfig, ManagerConfig
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.errors.common import GenericBadRequest, RejectedByHook
+from ai.backend.manager.plugin.hook_args import VerifyPasswordFormatHookArgs
 from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.repositories.user_resource_policy.repository import (
     UserResourcePolicyRepository,
@@ -81,7 +82,6 @@ async def test_update_password_no_auth_successful(
         email="user@example.com",
         current_password="current_pass",
         new_password="new_secure_password",
-        request=MagicMock(),
     )
 
     # Setup hook to pass
@@ -95,6 +95,7 @@ async def test_update_password_no_auth_successful(
     mock_auth_repository.check_credential_without_migration.return_value = UserCredential(
         user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         hashed_password="hashed_current_pass",
+        username="test-user",
     )
 
     new_timestamp = datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC)  # Fixed timestamp for comparison
@@ -114,6 +115,14 @@ async def test_update_password_no_auth_successful(
         "default",
     )
     mock_valkey_session_client.delete_login_sessions.assert_awaited_once_with(deleted_tokens)
+    assert mock_hook_plugin_ctx.dispatch.call_args.args == (
+        "VERIFY_PASSWORD_FORMAT",
+        (
+            VerifyPasswordFormatHookArgs(
+                email="user@example.com", username="test-user", password="new_secure_password"
+            ),
+        ),
+    )
 
 
 async def test_update_password_no_auth_fails_when_max_password_age_is_none(
@@ -130,7 +139,6 @@ async def test_update_password_no_auth_fails_when_max_password_age_is_none(
         email="user@example.com",
         current_password="pass",
         new_password="newpass",
-        request=MagicMock(),
     )
 
     # Setup hook to pass
@@ -155,7 +163,6 @@ async def test_update_password_no_auth_fails_with_incorrect_current_password(
         email="user@example.com",
         current_password="wrong_password",
         new_password="new_password",
-        request=MagicMock(),
     )
 
     # Setup hook to pass
@@ -186,7 +193,6 @@ async def test_update_password_no_auth_fails_when_new_password_same_as_current(
         email="user@example.com",
         current_password="same_password",
         new_password="same_password",
-        request=MagicMock(),
     )
 
     # Setup hook to pass
@@ -200,6 +206,7 @@ async def test_update_password_no_auth_fails_when_new_password_same_as_current(
     mock_auth_repository.check_credential_without_migration.return_value = UserCredential(
         user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         hashed_password="hashed_same_password",
+        username="test-user",
     )
 
     mocker.patch(
@@ -221,12 +228,12 @@ async def test_update_password_no_auth_with_retry(
         email="retry@example.com",
         current_password="current",
         new_password="new_password",
-        request=MagicMock(),
     )
 
     mock_auth_repository.check_credential_without_migration.return_value = UserCredential(
         user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         hashed_password="hashed_current",
+        username="test-user",
     )
 
     changed_at = datetime.now(tz=UTC)
@@ -260,12 +267,12 @@ async def test_update_password_no_auth_hook_rejection(
         email="user@example.com",
         current_password="current",
         new_password="weak",
-        request=MagicMock(),
     )
 
     mock_auth_repository.check_credential_without_migration.return_value = UserCredential(
         user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         hashed_password="hashed_current",
+        username="test-user",
     )
 
     # Hook rejects the password

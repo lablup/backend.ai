@@ -251,11 +251,11 @@ class ArtifactRegistryProcessors:
             GetArtifactRegistryMetaAction, service.get_registry_meta
         )
         self.get_registry_metas = group.partial_bulk_get_ops(GetArtifactRegistryMetasAction)
-        self.bulk_get_huggingface_registries = huggingface_group.partial_bulk_get_ops(
-            BulkGetHuggingFaceRegistriesAction
+        self.bulk_get_huggingface_registries = huggingface_group.partial_bulk(
+            BulkGetHuggingFaceRegistriesAction, service.bulk_get_huggingface_registries
         )
-        self.bulk_get_reservoir_registries = reservoir_group.partial_bulk_get_ops(
-            BulkGetReservoirRegistriesAction
+        self.bulk_get_reservoir_registries = reservoir_group.partial_bulk(
+            BulkGetReservoirRegistriesAction, service.bulk_get_reservoir_registries
         )
 
         # Internal/batch actions without RBAC

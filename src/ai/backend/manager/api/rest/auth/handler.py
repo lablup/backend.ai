@@ -14,7 +14,7 @@ from typing import Final
 
 from aiohttp import web
 
-from ai.backend.common.api_handlers import APIResponse, BodyParam, QueryParam
+from ai.backend.common.api_handlers import APIResponse, BodyParam, HeaderParam, QueryParam
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.auth.request import (
@@ -51,6 +51,7 @@ from ai.backend.common.dto.manager.auth.types import (
 from ai.backend.common.exception import UnreachableError
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.middleware.auth import extract_client_ip
+from ai.backend.manager.dto.auth import SignupHeader
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.services.auth.actions.authorize import AuthorizeAction
@@ -176,16 +177,19 @@ class AuthHandler:
     # signup (POST /auth/signup)
     # ------------------------------------------------------------------
 
-    async def signup(self, body: BodyParam[SignupRequest], ctx: RequestCtx) -> APIResponse:
+    async def signup(
+        self, body: BodyParam[SignupRequest], header: HeaderParam[SignupHeader]
+    ) -> APIResponse:
         params = body.parsed
         action = SignupAction(
-            request=ctx.request,
             domain_name=params.domain,
             email=params.email,
             password=params.password,
             username=params.username,
             full_name=params.full_name,
             description=params.description,
+            lang=header.parsed.accept_language.split(",")[0].lower(),
+            token=params.token,
         )
         result = await self._auth.signup.run(action)
         resp = SignupResponse(
@@ -237,11 +241,9 @@ class AuthHandler:
         self,
         body: BodyParam[UpdatePasswordRequest],
         ctx: UserContext,
-        req: RequestCtx,
     ) -> APIResponse:
         params = body.parsed
         action = UpdatePasswordAction(
-            request=req.request,
             user_id=UserID(ctx.user_uuid),
             domain_name=ctx.user_domain,
             email=ctx.user_email,
@@ -260,11 +262,10 @@ class AuthHandler:
     # ------------------------------------------------------------------
 
     async def update_password_no_auth(
-        self, body: BodyParam[UpdatePasswordNoAuthRequest], ctx: RequestCtx
+        self, body: BodyParam[UpdatePasswordNoAuthRequest]
     ) -> APIResponse:
         params = body.parsed
         action = UpdatePasswordNoAuthAction(
-            request=ctx.request,
             domain_name=params.domain,
             email=params.username,
             current_password=params.current_password,

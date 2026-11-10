@@ -11,6 +11,7 @@ from ai.backend.common.data.entity.object_storage import ObjectStorageID
 from ai.backend.common.dto.manager.v2.object_storage.response import ObjectStorageNode
 from ai.backend.manager.api.adapters.object_storage.adapter import ObjectStorageAdapter
 from ai.backend.manager.data.permission.types import Permission
+from ai.backend.manager.defs import SECRET_KEY_PLACEHOLDER
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
@@ -93,8 +94,12 @@ class TheOrderIsKept(Then[ManyStoragesAndACaller, Loaded]):
     @override
     def says(self) -> str:
         return Says(
-            "미리 저장한 object storage 는 요청한 순서대로 반환됩니다",
-            english="the object storages seeded in advance come back in the requested order",
+            "미리 저장한 object storage 는 요청한 순서대로 반환되고, secret key 는 "
+            f"{SECRET_KEY_PLACEHOLDER!r} 로 반환됩니다",
+            english=(
+                "the object storages seeded in advance come back in the requested order with "
+                f"{SECRET_KEY_PLACEHOLDER!r} as their secret keys"
+            ),
         )
 
     @override
@@ -109,7 +114,7 @@ class TheOrderIsKept(Then[ManyStoragesAndACaller, Loaded]):
             if not isinstance(one, ObjectStorageNode):
                 verdicts.append(Same(f"[{i}]", type(one).__name__, ObjectStorageNode.__name__))
                 continue
-            verdicts += storage_verdicts(f"[{i}].", one, storage, KEPT)
+            verdicts += storage_verdicts(f"[{i}].", one, storage, KEPT, SECRET_KEY_PLACEHOLDER)
         return verdicts
 
 
@@ -148,10 +153,10 @@ class AUserGrantedReadGetsAStorage(
     def describe(self) -> str:
         return Says(
             "object storage 조회 권한을 받은 사용자가 하나를 조회하면 미리 저장한 object storage "
-            "전체가 반환됩니다",
+            "가 반환되고, 저장된 secret key 는 반환되지 않습니다",
             english=(
-                "when a user granted permission to read object storages reads one, the whole "
-                "seeded object storage comes back"
+                "when a user granted permission to read object storages reads one, the seeded "
+                "object storage comes back without its stored secret key"
             ),
         )
 
@@ -165,7 +170,7 @@ class AUserGrantedReadGetsAStorage(
 
     @override
     def then(self) -> Then[AStorageAndACaller, ObjectStorageNode]:
-        return TheStorageNode()
+        return TheStorageNode(secret_key=SECRET_KEY_PLACEHOLDER)
 
 
 @dataclass(frozen=True)
@@ -212,10 +217,11 @@ class AUserGrantedReadReadsManyInOrder(
     def describe(self) -> str:
         return Says(
             "object storage 조회 권한을 받은 사용자가 미리 저장한 object storage 둘을 한 번에 "
-            "조회하면, 둘은 요청한 순서대로 반환됩니다",
+            "조회하면, 둘은 요청한 순서대로 반환되고 저장된 secret key 는 반환되지 않습니다",
             english=(
                 "when a user granted permission to read object storages loads two object storages "
-                "seeded in advance at once, the two come back in the requested order"
+                "seeded in advance at once, the two come back in the requested order without "
+                "their stored secret keys"
             ),
         )
 

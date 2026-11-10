@@ -45,6 +45,7 @@ DEFAULT_ROLE: Final = "main"
 
 PASSWORD_PLACEHOLDER: Final = "*****"
 SECRET_KEY_PLACEHOLDER: Final = "*****"
+TOKEN_PLACEHOLDER: Final = "*****"
 
 
 # Mapping between vfolder names and their in-container paths.

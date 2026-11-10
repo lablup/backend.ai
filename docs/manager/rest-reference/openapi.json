@@ -42714,6 +42714,19 @@
             "default": null,
             "description": "Free-text account description; defaults to empty string",
             "title": "Description"
+          },
+          "token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Signup token passed to the PRE_SIGNUP hook",
+            "title": "Token"
           }
         },
         "required": [
@@ -71304,7 +71317,7 @@
           }
         },
         "parameters": [],
-        "description": "Simple liveness probe — returns 200 OK with version."
+        "description": "Simple liveness probe — returns 200 OK."
       }
     },
     "/health/livez": {

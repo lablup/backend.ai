@@ -28,7 +28,7 @@ Scenario: complete
 
 | scenario | verdict |
 |---|---|
-| [when a user granted permission to read object storages loads two object storages seeded in advance at once, the two come back in the requested order](#reading-a-user-granted-read-reads-several-object-storages-in-the-requested-order) | answered |
+| [when a user granted permission to read object storages loads two object storages seeded in advance at once, the two come back in the requested order without their stored secret keys](#reading-a-user-granted-read-reads-several-object-storages-in-the-requested-order) | answered |
 | [when a user granted nothing loads several object storage ids at once, instead of rejecting the whole request, every entry comes back holding a rejection for lack of permission](#reading-a-user-granted-nothing-reading-many-object-storage-ids-is-refused-on-every-id) | rejected |
 
 **create**
@@ -42,7 +42,7 @@ Scenario: complete
 
 | scenario | verdict |
 |---|---|
-| [when a user granted permission to read object storages reads one, the whole seeded object storage comes back](#reading-a-user-granted-read-gets-an-object-storage) | answered |
+| [when a user granted permission to read object storages reads one, the seeded object storage comes back without its stored secret key](#reading-a-user-granted-read-gets-an-object-storage) | answered |
 | [when a user granted nothing reads one object storage, it is rejected for lack of permission](#reading-a-user-granted-nothing-may-not-get-an-object-storage) | rejected |
 
 **partial_bulk_purge**
@@ -156,7 +156,7 @@ Then
 
 #### [a-user-granted-read-reads-several-object-storages-in-the-requested-order](/tests/scenario/bai_scenario/manager/object_storage/test_reading.py): pass
 
-when a user granted permission to read object storages loads two object storages seeded in advance at once, the two come back in the requested order
+when a user granted permission to read object storages loads two object storages seeded in advance at once, the two come back in the requested order without their stored secret keys
 
 Given
 
@@ -180,14 +180,14 @@ When
 
 Then
 
-- the object storages seeded in advance come back in the requested order
+- the object storages seeded in advance come back in the requested order with '*****' as their secret keys
   - length = 2
   - [0].id: same as the object storage created in advance
   - [0].entity_id: same as the object storage created in advance
   - [0].name = 'object-storage-1'
   - [0].host = 'seeded.object-storage.test'
   - [0].access_key = 'seeded-access-key'
-  - [0].secret_key = 'seeded-secret-key'
+  - [0].secret_key = '*****'
   - [0].endpoint = 'http://seeded.object-storage.test'
   - [0].region = 'seeded-region'
   - [1].id: same as the object storage created in advance
@@ -195,7 +195,7 @@ Then
   - [1].name = 'object-storage-2'
   - [1].host = 'seeded.object-storage.test'
   - [1].access_key = 'seeded-access-key'
-  - [1].secret_key = 'seeded-secret-key'
+  - [1].secret_key = '*****'
   - [1].endpoint = 'http://seeded.object-storage.test'
   - [1].region = 'seeded-region'
 
@@ -293,7 +293,7 @@ Then
 
 #### [a-user-granted-read-gets-an-object-storage](/tests/scenario/bai_scenario/manager/object_storage/test_reading.py): pass
 
-when a user granted permission to read object storages reads one, the whole seeded object storage comes back
+when a user granted permission to read object storages reads one, the seeded object storage comes back without its stored secret key
 
 Given
 
@@ -316,13 +316,13 @@ When
 
 Then
 
-- the whole object storage created in advance comes back
+- the object storage created in advance comes back with '*****' as its secret key
   - id: same as the object storage created in advance
   - entity_id: same as the object storage created in advance
   - name = 'object-storage-1'
   - host = 'seeded.object-storage.test'
   - access_key = 'seeded-access-key'
-  - secret_key = 'seeded-secret-key'
+  - secret_key = '*****'
   - endpoint = 'http://seeded.object-storage.test'
   - region = 'seeded-region'
 
