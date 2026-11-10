@@ -120,7 +120,7 @@ jobs:
       # See: github.com/pantsbuild/actions/tree/main/init-pants/
       # ref) https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml#L30-L49
       with:
-        gha-cache-key: v1
+        gha-cache-key: v2
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
     - name: Calculate base ref
@@ -225,7 +225,7 @@ jobs:
     - name: Bootstrap Pants
       uses: pantsbuild/actions/init-pants@0aaef864bd133c4055feb6adad0bfdce0de1c2e4  # v11
       with:
-        gha-cache-key: v1
+        gha-cache-key: v2
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
     - name: Calculate base ref
@@ -331,7 +331,7 @@ jobs:
       if: env.RUN_ALEMBIC_CHECK == 'true'
       uses: pantsbuild/actions/init-pants@0aaef864bd133c4055feb6adad0bfdce0de1c2e4  # v11
       with:
-        gha-cache-key: v1
+        gha-cache-key: v2
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         # ``pants export`` builds a venv into the named caches; caching the
         # lmdb_store (process cache) here desyncs from the named-caches cache
@@ -414,7 +414,7 @@ jobs:
     - name: Bootstrap Pants
       uses: pantsbuild/actions/init-pants@0aaef864bd133c4055feb6adad0bfdce0de1c2e4  # v11
       with:
-        gha-cache-key: v1
+        gha-cache-key: v2
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
     - name: Test
@@ -494,7 +494,7 @@ jobs:
     - name: Bootstrap Pants
       uses: pantsbuild/actions/init-pants@0aaef864bd133c4055feb6adad0bfdce0de1c2e4  # v11
       with:
-        gha-cache-key: v1
+        gha-cache-key: v2
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
     - name: Pick which components to run
@@ -634,7 +634,7 @@ jobs:
     - name: Bootstrap Pants
       uses: pantsbuild/actions/init-pants@0aaef864bd133c4055feb6adad0bfdce0de1c2e4  # v11
       with:
-        gha-cache-key: v1
+        gha-cache-key: v2
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
     - name: Test
@@ -720,7 +720,7 @@ jobs:
     - name: Bootstrap Pants
       uses: pantsbuild/actions/init-pants@0aaef864bd133c4055feb6adad0bfdce0de1c2e4  # v11
       with:
-        gha-cache-key: v1
+        gha-cache-key: v2
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
     - name: Test
@@ -914,7 +914,7 @@ jobs:
     - name: Bootstrap Pants
       uses: pantsbuild/actions/init-pants@0aaef864bd133c4055feb6adad0bfdce0de1c2e4  # v11
       with:
-        gha-cache-key: v1
+        gha-cache-key: v2
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'false'
     - name: Build wheel packages
@@ -962,7 +962,7 @@ jobs:
     - name: Bootstrap Pants
       uses: pantsbuild/actions/init-pants@0aaef864bd133c4055feb6adad0bfdce0de1c2e4  # v11
       with:
-        gha-cache-key: v1
+        gha-cache-key: v2
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'false'
     - name: Pants export
