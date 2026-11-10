@@ -15,8 +15,6 @@ class ListTaskTemplatesAction(TemplateUserScopeAction):
 
     user_role: UserRole
     domain_name: str
-    is_superadmin: bool
-    list_all: bool
 
     @override
     @classmethod

@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import json
 import uuid
-from dataclasses import dataclass
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
@@ -40,6 +39,9 @@ from ai.backend.manager.services.template.actions.get_cluster_template import (
 from ai.backend.manager.services.template.actions.get_task_template import (
     GetTaskTemplateAction,
 )
+from ai.backend.manager.services.template.actions.global_list_task_templates import (
+    GlobalListTaskTemplatesAction,
+)
 from ai.backend.manager.services.template.actions.list_cluster_templates import (
     ListClusterTemplatesAction,
 )
@@ -53,14 +55,6 @@ from ai.backend.manager.services.template.actions.update_task_template import (
     UpdateTaskTemplateAction,
 )
 from ai.backend.manager.services.template.service import TemplateService
-
-
-@dataclass(frozen=True)
-class _TaskTemplateListCase:
-    label: str
-    user_role: UserRole
-    is_superadmin: bool
-    list_all: bool
 
 
 def _template_id(name: str) -> SessionTemplateID:
@@ -356,80 +350,56 @@ class TestListTaskTemplatesAction:
     def service(self, mock_repo: MagicMock) -> TemplateService:
         return TemplateService(repository=mock_repo)
 
-    async def test_superadmin_with_list_all_returns_every_template(
+    async def test_returns_only_the_accessible_templates(
         self,
         service: TemplateService,
         mock_repo: MagicMock,
-    ) -> None:
-        user_uuid = uuid.uuid4()
-        entries = [{"name": "t1"}, {"name": "t2"}]
-        mock_repo.list_task_templates = AsyncMock(return_value=entries)
-
-        action = ListTaskTemplatesAction(
-            user_uuid=UserID(user_uuid),
-            user_role=UserRole.SUPERADMIN,
-            domain_name="default",
-            is_superadmin=True,
-            list_all=True,
-        )
-        result = await service.list_task_templates(action)
-
-        assert result.entries == entries
-        mock_repo.list_task_templates.assert_called_once_with(user_uuid)
-
-    @pytest.mark.parametrize(
-        "case",
-        [
-            _TaskTemplateListCase(
-                label="user",
-                user_role=UserRole.USER,
-                is_superadmin=False,
-                list_all=False,
-            ),
-            _TaskTemplateListCase(
-                label="user-asking-for-all",
-                user_role=UserRole.USER,
-                is_superadmin=False,
-                list_all=True,
-            ),
-            _TaskTemplateListCase(
-                label="superadmin-not-asking-for-all",
-                user_role=UserRole.SUPERADMIN,
-                is_superadmin=True,
-                list_all=False,
-            ),
-        ],
-        ids=lambda case: case.label,
-    )
-    async def test_other_requests_return_only_the_accessible_templates(
-        self,
-        service: TemplateService,
-        mock_repo: MagicMock,
-        case: _TaskTemplateListCase,
     ) -> None:
         user_uuid = uuid.uuid4()
         entries = [{"name": "my-task"}]
         mock_repo.list_accessible_templates = AsyncMock(return_value=entries)
-        mock_repo.list_task_templates = AsyncMock()
 
         action = ListTaskTemplatesAction(
             user_uuid=UserID(user_uuid),
-            user_role=case.user_role,
+            user_role=UserRole.USER,
             domain_name="default",
-            is_superadmin=case.is_superadmin,
-            list_all=case.list_all,
         )
         result = await service.list_task_templates(action)
 
         assert result.entries == entries
-        mock_repo.list_task_templates.assert_not_called()
         mock_repo.list_accessible_templates.assert_called_once_with(
             TemplateType.TASK,
             user_uuid,
-            case.user_role,
+            UserRole.USER,
             "default",
             allowed_types=["user", "group"],
         )
+
+
+class TestGlobalListTaskTemplatesAction:
+    @pytest.fixture
+    def mock_repo(self) -> MagicMock:
+        return MagicMock(spec=TemplateRepository)
+
+    @pytest.fixture
+    def service(self, mock_repo: MagicMock) -> TemplateService:
+        return TemplateService(repository=mock_repo)
+
+    async def test_returns_every_template(
+        self,
+        service: TemplateService,
+        mock_repo: MagicMock,
+    ) -> None:
+        requester_id = UserID(uuid.uuid4())
+        entries = [{"name": "t1"}, {"name": "t2"}]
+        mock_repo.list_task_templates = AsyncMock(return_value=entries)
+
+        result = await service.global_list_task_templates(
+            GlobalListTaskTemplatesAction(requester_id=requester_id)
+        )
+
+        assert result.entries == entries
+        mock_repo.list_task_templates.assert_called_once_with(requester_id)
 
 
 class TestUpdateTaskTemplateAction:

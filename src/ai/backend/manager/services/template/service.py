@@ -39,6 +39,10 @@ from .actions.get_task_template import (
     GetTaskTemplateAction,
     GetTaskTemplateActionResult,
 )
+from .actions.global_list_task_templates import (
+    GlobalListTaskTemplatesAction,
+    GlobalListTaskTemplatesActionResult,
+)
 from .actions.list_cluster_templates import (
     ListClusterTemplatesAction,
     ListClusterTemplatesActionResult,
@@ -112,17 +116,20 @@ class TemplateService:
         self, action: ListTaskTemplatesAction
     ) -> ListTaskTemplatesActionResult:
         """List the task templates the requester may see."""
-        if action.is_superadmin and action.list_all:
-            entries = await self._repository.list_task_templates(action.user_uuid)
-        else:
-            entries = await self._repository.list_accessible_templates(
-                TemplateType.TASK,
-                action.user_uuid,
-                action.user_role,
-                action.domain_name,
-                allowed_types=["user", "group"],
-            )
+        entries = await self._repository.list_accessible_templates(
+            TemplateType.TASK,
+            action.user_uuid,
+            action.user_role,
+            action.domain_name,
+            allowed_types=["user", "group"],
+        )
         return ListTaskTemplatesActionResult(entries=entries)
+
+    async def global_list_task_templates(
+        self, action: GlobalListTaskTemplatesAction
+    ) -> GlobalListTaskTemplatesActionResult:
+        entries = await self._repository.list_task_templates(action.requester_id)
+        return GlobalListTaskTemplatesActionResult(entries=entries)
 
     async def get_task_template(self, action: GetTaskTemplateAction) -> GetTaskTemplateActionResult:
         """Get a single task template by ID."""
