@@ -521,6 +521,7 @@ class AuthService:
                     username=action.username,
                     full_name=action.full_name,
                     description=action.description,
+                    token=action.token,
                 ),
             ),
             return_when=ALL_COMPLETED,

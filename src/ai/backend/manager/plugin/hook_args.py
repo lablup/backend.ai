@@ -19,6 +19,7 @@ class PreSignupHookArgs:
     username: str | None
     full_name: str | None
     description: str | None
+    token: str | None
 
 
 @dataclass(frozen=True)

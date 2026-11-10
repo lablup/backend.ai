@@ -189,6 +189,7 @@ class AuthHandler:
             full_name=params.full_name,
             description=params.description,
             lang=header.parsed.accept_language.split(",")[0].lower(),
+            token=params.token,
         )
         result = await self._auth.signup.run(action)
         resp = SignupResponse(

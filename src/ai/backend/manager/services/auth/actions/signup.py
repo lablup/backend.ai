@@ -15,6 +15,7 @@ class SignupAction(UserGlobalAction):
     full_name: str | None
     description: str | None
     lang: str
+    token: str | None = None
 
     @override
     @classmethod
