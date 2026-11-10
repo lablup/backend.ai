@@ -133,52 +133,52 @@ class HookPluginContext(BasePluginContext[HookPlugin]):
         Invokes the handlers of ``event_name`` in order, as ``return_when`` describes.
         A handler raising :class:`Reject` or any other exception ends the dispatch.
         """
-        executed_plugin_names = []
-        handler_results: list[Any] = []
-        for plugin_name, hook_handler in self._get_handlers(event_name, order=order):
+        handlers = self._get_handlers(event_name, order=order)
+        if not handlers and not success_if_no_hook:
+            return HookResult(status=REJECTED, src_plugin=[], result=[])
+        match return_when:
+            case HookReturnTiming.FIRST_COMPLETED:
+                return await self._dispatch_until_handled(handlers, args)
+            case HookReturnTiming.ALL_COMPLETED:
+                return await self._dispatch_to_all_handlers(handlers, args)
+
+    async def _dispatch_until_handled(
+        self,
+        handlers: Sequence[tuple[str, HookHandler]],
+        args: tuple[Any, ...],
+    ) -> HookResult:
+        executed_plugin_names: list[str] = []
+        for plugin_name, hook_handler in handlers:
+            executed_plugin_names.append(plugin_name)
             try:
-                executed_plugin_names.append(plugin_name)
                 handler_result = await hook_handler(*args)
-            except Reject as e:
-                return HookResult(
-                    status=REJECTED,
-                    src_plugin=plugin_name,
-                    reason=e.reason,
-                )
             except Exception as e:
-                return HookResult(
-                    status=ERROR,
-                    src_plugin=plugin_name,
-                    reason=repr(e),
-                )
-            else:
-                first_completed_result_found = (
-                    return_when == FIRST_COMPLETED and handler_result is not None
-                )
-                if first_completed_result_found:
-                    return HookResult(
-                        status=PASSED,
-                        src_plugin=plugin_name,
-                        result=handler_result,
-                    )
-                handler_results.append(handler_result)
-        if not success_if_no_hook and not executed_plugin_names:
-            return HookResult(
-                status=REJECTED,
-                src_plugin=executed_plugin_names,  # empty
-                result=handler_results,  # empty
-            )
-        if return_when == FIRST_COMPLETED:
-            return HookResult(
-                status=PASSED,
-                src_plugin=executed_plugin_names,
-                result=None,
-            )
-        return HookResult(
-            status=PASSED,
-            src_plugin=executed_plugin_names,
-            result=handler_results,
-        )
+                return self._build_failed_hook_result(plugin_name, e)
+            if handler_result is not None:
+                return HookResult(status=PASSED, src_plugin=plugin_name, result=handler_result)
+        return HookResult(status=PASSED, src_plugin=executed_plugin_names, result=None)
+
+    async def _dispatch_to_all_handlers(
+        self,
+        handlers: Sequence[tuple[str, HookHandler]],
+        args: tuple[Any, ...],
+    ) -> HookResult:
+        executed_plugin_names: list[str] = []
+        handler_results: list[Any] = []
+        for plugin_name, hook_handler in handlers:
+            executed_plugin_names.append(plugin_name)
+            try:
+                handler_results.append(await hook_handler(*args))
+            except Exception as e:
+                return self._build_failed_hook_result(plugin_name, e)
+        return HookResult(status=PASSED, src_plugin=executed_plugin_names, result=handler_results)
+
+    def _build_failed_hook_result(self, plugin_name: str, error: Exception) -> HookResult:
+        match error:
+            case Reject():
+                return HookResult(status=REJECTED, src_plugin=plugin_name, reason=error.reason)
+            case _:
+                return HookResult(status=ERROR, src_plugin=plugin_name, reason=repr(error))
 
     async def notify(
         self,
