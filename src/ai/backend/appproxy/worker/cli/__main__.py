@@ -61,7 +61,7 @@ def main(
     "--output",
     "-o",
     default=None,
-    type=click.Path(dir_okay=False, writable=True, path_type=Path),
+    type=click.Path(dir_okay=False, writable=True),
     help="Output file path (default: stdout)",
 )
 def generate_example_configuration(output: Path | None) -> None:
@@ -110,7 +110,7 @@ async def _generate() -> dict[str, Any]:
     "--output",
     "-o",
     default=None,
-    type=click.Path(dir_okay=False, writable=True, path_type=Path),
+    type=click.Path(dir_okay=False, writable=True),
     help="Output file path (default: stdout)",
 )
 def generate_openapi_spec(output: Path | None) -> None:

@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 
 import click
@@ -87,10 +86,6 @@ class _SpecCommandCase:
 
 
 class TestGenerateOpenAPISpecCommand:
-    @pytest.fixture
-    def spec_output_file(self, tmp_path: Path) -> Path:
-        return tmp_path / "openapi.json"
-
     @pytest.mark.parametrize(
         "case",
         [
@@ -99,25 +94,7 @@ class TestGenerateOpenAPISpecCommand:
         ],
         ids=lambda case: case.description,
     )
-    def test_output_option_writes_the_spec_to_the_file(
-        self, case: _SpecCommandCase, spec_output_file: Path
-    ) -> None:
-        result = CliRunner().invoke(
-            case.cli, ["generate-openapi-spec", "--output", str(spec_output_file)]
-        )
-
-        assert result.exit_code == 0, result.output
-        assert json.loads(spec_output_file.read_text())["paths"]
-
-    @pytest.mark.parametrize(
-        "case",
-        [
-            _SpecCommandCase(description="coordinator", cli=coordinator_cli),
-            _SpecCommandCase(description="worker", cli=worker_cli),
-        ],
-        ids=lambda case: case.description,
-    )
-    def test_without_output_option_writes_the_spec_to_stdout(self, case: _SpecCommandCase) -> None:
+    def test_writes_the_spec_to_stdout(self, case: _SpecCommandCase) -> None:
         result = CliRunner().invoke(case.cli, ["generate-openapi-spec"])
 
         assert result.exit_code == 0, result.output
@@ -125,13 +102,11 @@ class TestGenerateOpenAPISpecCommand:
 
     @pytest.mark.parametrize("list_handler_path", ["/v1/api/slots", "/v1/api/worker"])
     def test_coordinator_spec_describes_list_handlers_as_arrays(
-        self, list_handler_path: str, spec_output_file: Path
+        self, list_handler_path: str
     ) -> None:
-        result = CliRunner().invoke(
-            coordinator_cli, ["generate-openapi-spec", "--output", str(spec_output_file)]
-        )
+        result = CliRunner().invoke(coordinator_cli, ["generate-openapi-spec"])
 
         assert result.exit_code == 0, result.output
-        spec = json.loads(spec_output_file.read_text())
+        spec = json.loads(result.stdout)
         response = spec["paths"][list_handler_path]["get"]["responses"]["200"]
         assert response["content"]["application/json"]["schema"]["type"] == "array"
