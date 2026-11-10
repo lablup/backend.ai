@@ -5,6 +5,7 @@ Unit tests for VFolderService CRUD operations.
 from __future__ import annotations
 
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
@@ -40,7 +41,7 @@ from ai.backend.manager.errors.storage import (
 )
 from ai.backend.manager.models.group import ProjectType
 from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.models.vfolder import VFolderPermission
+from ai.backend.manager.models.vfolder import VFolderPermission, VFolderStatusSet
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.repositories.vfolder.types import BulkVFolderPurgeResult
 from ai.backend.manager.repositories.vfolder.updaters import VFolderAttributeUpdaterSpec
@@ -1379,6 +1380,12 @@ class TestCloneVFolderV2Action:
         mock_vfolder_repository.get_max_vfolder_count.assert_called_once_with(user_uuid, None)
 
 
+@dataclass(frozen=True)
+class _NameMatchedStatusesCase:
+    matched_statuses: tuple[VFolderOperationStatus, ...]
+    expected_status: VFolderOperationStatus
+
+
 class TestGetAccessibleVFolderAction:
     async def test_lookup_by_uuid_succeeds(
         self,
@@ -1473,3 +1480,55 @@ class TestGetAccessibleVFolderAction:
 
         with pytest.raises(TooManyVFoldersFound):
             await vfolder_service.get_accessible_vfolder(action)
+
+    @pytest.fixture
+    def repository_matching_name_with_statuses(
+        self,
+        mock_vfolder_repository: MagicMock,
+        case: _NameMatchedStatusesCase,
+    ) -> MagicMock:
+        mock_vfolder_repository.get_accessible_rows = AsyncMock(
+            return_value=[
+                {"id": uuid.uuid4(), "name": "reused-name", "status": status}
+                for status in case.matched_statuses
+            ]
+        )
+        return mock_vfolder_repository
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _NameMatchedStatusesCase(
+                matched_statuses=(
+                    VFolderOperationStatus.DELETE_COMPLETE,
+                    VFolderOperationStatus.READY,
+                ),
+                expected_status=VFolderOperationStatus.READY,
+            ),
+            _NameMatchedStatusesCase(
+                matched_statuses=(VFolderOperationStatus.DELETE_COMPLETE,),
+                expected_status=VFolderOperationStatus.DELETE_COMPLETE,
+            ),
+        ],
+        ids=lambda case: case.expected_status.value,
+    )
+    async def test_name_resolves_to_folder_with_storage_before_delete_complete_one(
+        self,
+        vfolder_service: VFolderService,
+        repository_matching_name_with_statuses: MagicMock,
+        user_uuid: uuid.UUID,
+        case: _NameMatchedStatusesCase,
+    ) -> None:
+        action = GetAccessibleVFolderAction(
+            user_uuid=user_uuid,
+            user_role=UserRole.USER,
+            domain_name="default",
+            is_admin=False,
+            perm=VFolderPermission.READ_ONLY,
+            folder_id_or_name="reused-name",
+            allowed_status_set=VFolderStatusSet.ALL,
+        )
+
+        result = await vfolder_service.get_accessible_vfolder(action)
+
+        assert result.row["status"] == case.expected_status
