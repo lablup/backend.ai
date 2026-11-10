@@ -135,7 +135,6 @@ class ReservoirFilePathInvalidError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/storage/reservoir/file-path/invalid"
     error_title = "Reservoir File Path Invalid"
 
-    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ARTIFACT,
