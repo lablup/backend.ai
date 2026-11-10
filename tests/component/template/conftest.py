@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import secrets
 import uuid
-from typing import Any
+from collections.abc import AsyncIterator
+from typing import TYPE_CHECKING, Any
 
 import pytest
 import sqlalchemy as sa
@@ -22,6 +24,7 @@ from ai.backend.manager.clients.storage_proxy.session_manager import StorageSess
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.project import ProjectRow
+from ai.backend.manager.models.session_template.row import SessionTemplateRow, TemplateType
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
@@ -35,6 +38,10 @@ from ai.backend.manager.services.project.processors import ProjectProcessors
 from ai.backend.manager.services.project.service import ProjectService
 from ai.backend.manager.services.template.processors import TemplateProcessors
 from ai.backend.manager.services.template.service import TemplateService
+from ai.backend.testutils.fixtures import DomainFixtureData
+
+if TYPE_CHECKING:
+    from tests.component.conftest import UserFixtureData
 
 
 @pytest.fixture()
@@ -104,3 +111,46 @@ async def group_name_fixture(
         row = result.first()
         assert row is not None
         return str(row[0])
+
+
+@pytest.fixture()
+async def task_template_id_in_a_project_nobody_joined(
+    db_engine: SAEngine,
+    domain_fixture: DomainFixtureData,
+    resource_policy_fixture: str,
+    admin_user_fixture: UserFixtureData,
+) -> AsyncIterator[str]:
+    project_id = uuid.uuid4()
+    template_id = uuid.uuid4()
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sa.insert(ProjectRow.__table__).values(
+                id=project_id,
+                name=f"group-{secrets.token_hex(6)}",
+                is_active=True,
+                domain_name=domain_fixture.domain_name,
+                resource_policy=resource_policy_fixture,
+            )
+        )
+        await conn.execute(
+            sa.insert(SessionTemplateRow.__table__).values(
+                id=template_id,
+                is_active=True,
+                domain_name=domain_fixture.domain_name,
+                group_id=project_id,
+                user_uuid=admin_user_fixture.user_uuid,
+                type=TemplateType.TASK,
+                name="in-a-project-nobody-joined",
+                template={"apiVersion": "v1", "kind": "taskTemplate"},
+            )
+        )
+    yield template_id.hex
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            SessionTemplateRow.__table__.delete().where(
+                SessionTemplateRow.__table__.c.id == template_id
+            )
+        )
+        await conn.execute(
+            ProjectRow.__table__.delete().where(ProjectRow.__table__.c.id == project_id)
+        )
