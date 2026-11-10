@@ -262,54 +262,6 @@ class AuthDBSource:
             query = keypairs.update().values(data).where(keypairs.c.access_key == access_key)
             await conn.execute(query)
 
-<<<<<<< HEAD
-=======
-    @auth_db_source_resilience.apply()
-    async def verify_keypair_secret(self, access_key: str, secret_key: str) -> bool:
-        """Whether an active keypair holds the given secret key."""
-        async with self._db.begin_readonly() as conn:
-            row = (
-                await conn.execute(
-                    sa.select(keypairs.c.secret_key, keypairs.c.is_active).where(
-                        keypairs.c.access_key == access_key
-                    )
-                )
-            ).first()
-        if row is None or row.secret_key is None or not row.is_active:
-            return False
-        stored = await self._key_provider_pool.decrypt(row.secret_key, KEYPAIR_SECRET_KEY_CONTEXT)
-        return secrets.compare_digest(stored.encode("utf-8"), secret_key.encode("utf-8"))
-
-    @auth_db_source_resilience.apply()
-    async def fetch_keypair_signing_material(self, access_key: str) -> KeyPairSigningMaterial:
-        """Read the owner and the decrypted secret key of an active keypair."""
-        async with self._db.begin_readonly() as conn:
-            row = (
-                await conn.execute(
-                    sa.select(keypairs.c.user, keypairs.c.secret_key).where(
-                        keypairs.c.access_key == access_key,
-                        keypairs.c.is_active.is_(True),
-                    )
-                )
-            ).first()
-        if row is None or row.secret_key is None:
-            raise KeyPairNotFound(f"No active keypair holds the access key {access_key}")
-        return KeyPairSigningMaterial(
-            user_id=row.user,
-            secret_key=await self._key_provider_pool.decrypt(
-                row.secret_key, KEYPAIR_SECRET_KEY_CONTEXT
-            ),
-        )
-
-    @auth_db_source_resilience.apply()
-    async def lookup[TEntityID: EntityIdentifier](
-        self, lookup: DataLookup[Any, TEntityID]
-    ) -> TEntityID | None:
-        """The id a key names, or None when it names nothing."""
-        async with self._v2_ops.read_ops() as r:
-            return await r.lookup_entity_id(lookup)
-
->>>>>>> df9590e42 (fix(BA-8948): reject inactive keypairs and compare signatures in constant time (#16556))
     def _user_row_to_data(self, row: UserRow | sa.Row[Any]) -> UserData:
         """Convert UserRow to UserData."""
         return UserData(

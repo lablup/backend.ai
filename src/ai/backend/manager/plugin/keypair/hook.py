@@ -131,7 +131,10 @@ class KeypairAuthHookPlugin(HookPlugin):
             secret = plugin_config["secret"]
             try:
                 payload = deserialize_stoken(stoken, secret)
-                query = sa.select(KeyPairRow).where(KeyPairRow.access_key == payload.access_key)
+                query = sa.select(KeyPairRow).where(
+                    KeyPairRow.access_key == payload.access_key,
+                    KeyPairRow.is_active.is_(True),
+                )
                 async with db.begin_readonly_session() as db_session:
                     keypair_row = await db_session.scalar(query)
                     user_id = keypair_row.user
@@ -147,7 +150,10 @@ class KeypairAuthHookPlugin(HookPlugin):
                         query = (
                             sa.select(keypairs.c.user, keypairs.c.secret_key)
                             .select_from(keypairs)
-                            .where(keypairs.c.access_key == access_key)
+                            .where(
+                                keypairs.c.access_key == access_key,
+                                keypairs.c.is_active.is_(True),
+                            )
                         )
                         result = await conn.execute(query)
                         keypair = result.fetchone()
