@@ -314,7 +314,6 @@ def no_auth_action() -> UpdatePasswordNoAuthAction:
         email="user@example.com",
         current_password="current_pass",
         new_password="new_secure_password",
-        request=MagicMock(),
     )
 
 
@@ -334,6 +333,7 @@ class TestUpdatePasswordNoAuthEligibility:
         mock_auth_repository.check_credential_without_migration.return_value = UserCredential(
             user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
             hashed_password="hashed_current_pass",
+            username="test-user",
             status=status,
             password_changed_at=_EXPIRED_CHANGED_AT,
         )
@@ -352,6 +352,7 @@ class TestUpdatePasswordNoAuthEligibility:
         mock_auth_repository.check_credential_without_migration.return_value = UserCredential(
             user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
             hashed_password="hashed_current_pass",
+            username="test-user",
             status=UserStatus.ACTIVE,
             password_changed_at=_NOW - timedelta(days=1),
         )
