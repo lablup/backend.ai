@@ -26,7 +26,6 @@ from ai.backend.common.configs import (
 from ai.backend.common.configs.jwt import SharedJWTConfig
 from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.meta import (
-    NEXT_RELEASE_VERSION,
     BackendAIConfigMeta,
     CompositeType,
     ConfigExample,
@@ -926,7 +925,7 @@ class SecurityConfig(BaseConfigSchema):
                 "SameSite attribute of session cookies: Strict, Lax, or None. "
                 "None requires cookie-secure to be true."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.19",
             example=ConfigExample(local="Lax", prod="Lax"),
         ),
     ]
@@ -976,7 +975,7 @@ class SecurityConfig(BaseConfigSchema):
                 'without a default port or a trailing slash. Wildcards and "null" are rejected. '
                 "When empty, no origin receives CORS response headers."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.19",
             example=ConfigExample(
                 local='["http://localhost:9081"]', prod='["https://console.example.com"]'
             ),
@@ -996,7 +995,7 @@ class SecurityConfig(BaseConfigSchema):
                 "run. Do not enable it in production: any site can then send credentialed "
                 "requests to the web server."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.19",
             example=ConfigExample(local="true", prod="false"),
         ),
     ]
