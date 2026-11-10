@@ -16,6 +16,102 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 26.4.19 (2026-11-10)
+
+### Breaking Changes
+* Stop loading plugin wheels from `./wheelhouse` during discovery; the manager, agent and storage-proxy now load wheels at start only with `allow = true` under `[wheelhouse]` in their config file, from `wheelhouse.path` (default: `./wheelhouse`), and wheels no longer provide CLI commands. ([#16407](https://github.com/lablup/backend.ai/issues/16407))
+* Require the etcd key `config/watcher/token` for the agent watcher instead of falling back to the fixed token `insecure` ([#16488](https://github.com/lablup/backend.ai/issues/16488))
+* Remove the webserver's `/config.ini` and `/stats` endpoints and stop serving JavaScript and CSS source maps; the WebUI reads `/config.toml` instead ([#16612](https://github.com/lablup/backend.ai/issues/16612))
+* Stop returning the manager and webserver release versions to unauthenticated clients by requiring authentication on the manager `GET /` and dropping the `version` field from the health responses of every component and from the webserver ping response ([#16736](https://github.com/lablup/backend.ai/issues/16736))
+
+### Features
+* Expire the App Proxy setup token five minutes after it is issued, and answer 401 instead of 500 when the worker receives an invalid one. ([#16411](https://github.com/lablup/backend.ai/issues/16411))
+* Add TLS verification options to the NetApp, PureStorage and DellEMC storage clients, and host IPC and seccomp options to accelerator plugins ([#16423](https://github.com/lablup/backend.ai/issues/16423))
+* Refuse to send requests from `./bai` to an endpoint that is neither https nor loopback unless `BACKEND_ALLOW_INSECURE_HTTP` or the `allow-insecure-http` config allows it ([#16482](https://github.com/lablup/backend.ai/issues/16482))
+* Support TLS connections to etcd through a new `[etcd.tls]` config section ([#16649](https://github.com/lablup/backend.ai/issues/16649))
+
+### Fixes
+* Fix the kernel runner failing to start in images that set `VIRTUAL_ENV` by always setting `PYTHONHOME` for the re-executed interpreter ([#15799](https://github.com/lablup/backend.ai/issues/15799))
+* Fix the App Proxy coordinator in Traefik mode failing to start when the Traefik etcd password is set, by passing the etcd user along with the password ([#16217](https://github.com/lablup/backend.ai/issues/16217))
+* Read the agent watcher fstab path from the new `fstab-path` key of the `[watcher]` config (default `/etc/fstab`) instead of request values, and log only whether the watcher token is configured ([#16218](https://github.com/lablup/backend.ai/issues/16218))
+* Mask internal error details in GraphQL gateway responses and publish the gateway port on localhost only in the halfstack compose files ([#16219](https://github.com/lablup/backend.ai/issues/16219))
+* Return an invalid request error with the parse error message, instead of an internal error, when a GraphQL query has an invalid `filter` or `order` expression ([#16221](https://github.com/lablup/backend.ai/issues/16221))
+* Skip symlinks inside a directory in archive downloads and copy symlinks as symlinks on vfolder clone ([#16222](https://github.com/lablup/backend.ai/issues/16222))
+* Fix the agent watcher failing to start with `ssl-enabled` by reading the `ssl-key` config key, and align the manager's default watcher port to 6009 ([#16224](https://github.com/lablup/backend.ai/issues/16224))
+* Require storage-proxy upload destinations to resolve inside the vfolder and open upload staging paths without following symlinks ([#16225](https://github.com/lablup/backend.ai/issues/16225))
+* Reject msgpack extension types in kernel runner status replies in the agent ([#16226](https://github.com/lablup/backend.ai/issues/16226))
+* Add the `security.cors-allowed-origins` webserver config to set the origins that receive CORS response headers. When it is not set, the webserver does not send CORS allow headers to other origins. ([#16227](https://github.com/lablup/backend.ai/issues/16227))
+* Write kernel SSH files under the work directory as regular files, replacing symlinks at those names instead of following them ([#16228](https://github.com/lablup/backend.ai/issues/16228))
+* Mask sensitive config values in the watcher debug output and always use `/etc/fstab` in agent volume mount and umount handling ([#16229](https://github.com/lablup/backend.ai/issues/16229))
+* Accept dotfile paths only under `/home/work` and without names reserved for agent files, and skip stored dotfiles outside these rules when creating a kernel ([#16231](https://github.com/lablup/backend.ai/issues/16231))
+* Open the App Proxy worker aiomonitor ports on `127.0.0.1`, matching the other components ([#16233](https://github.com/lablup/backend.ai/issues/16233))
+* Set the SameSite attribute on the webserver session cookie, configurable through `cookie-samesite` in `[security]` (default `Lax`) ([#16234](https://github.com/lablup/backend.ai/issues/16234))
+* Stop the `import-bssh` and `import-all-smi` workflows from running a crafted release tag as shell, and pin `peter-evans/create-pull-request` to a commit SHA in the `import-bssh`, `import-all-smi` and `update-seccomp-profile` workflows. ([#16305](https://github.com/lablup/backend.ai/issues/16305))
+* Pin every third-party action used by the GitHub workflows to a commit SHA, so a moved tag upstream cannot change the code that CI runs. ([#16314](https://github.com/lablup/backend.ai/issues/16314))
+* Stop the release workflows from running a crafted release tag name as shell, and build the installer short-URL requests so a tag name cannot change their JSON body. ([#16317](https://github.com/lablup/backend.ai/issues/16317))
+* Skip volumes without performance metrics in the storage proxy volume stats observer instead of logging a failure every cycle ([#16339](https://github.com/lablup/backend.ai/issues/16339))
+* Add a development-only option to accept CORS requests from all origins ([#16348](https://github.com/lablup/backend.ai/issues/16348))
+* Fix fair share observation failing with serialization errors when several resource groups are observed at the same time ([#16369](https://github.com/lablup/backend.ai/issues/16369))
+* Fix the AppProxy coordinator single endpoint API (`POST /v2/endpoints/{endpoint_id}`) failing with 500 on every request because the endpoint tags kept UUID values that the tag models read as strings ([#16382](https://github.com/lablup/backend.ai/issues/16382))
+* Update the bundled WebUI to v26.9.6 without source maps, which stops the interactive-login page from navigating to a `callback` value that is not an http(s) URL and removes the `.js.map` and `.css.map` files the webserver served ([#16391](https://github.com/lablup/backend.ai/issues/16391))
+* Stop exposing the App Proxy API token through `ScalingGroupNode` and stop returning domains outside the caller's permission from `domain_node` in the legacy GraphQL API ([#16393](https://github.com/lablup/backend.ai/issues/16393))
+* Stop the Kubernetes agent from creating privileged session pods, which gave code in a session root on the node; session containers now add only the `IPC_LOCK` and `SYS_NICE` capabilities ([#16394](https://github.com/lablup/backend.ai/issues/16394))
+* Load the mock accelerator plugin only when `allow-compute-plugins` lists `ai.backend.accelerator.mock`, so that an agent no longer reports fake devices just because it finds `mock-accelerator.toml`. ([#16405](https://github.com/lablup/backend.ai/issues/16405))
+* Make the manager send the resource group's `wsproxy_api_token` to the App Proxy coordinator's `/v2/conf`, so that `allow_unauthorized_configure_request` can be turned off ([#16408](https://github.com/lablup/backend.ai/issues/16408))
+* Ignore client-sent `X-Forwarded-Host` and `X-Forwarded-Proto` in the App Proxy worker unless `trusted_proxies` is set. A worker behind a reverse proxy that relies on these headers must list the proxy in `trusted_proxies`. ([#16409](https://github.com/lablup/backend.ai/issues/16409))
+* The shared vfolder listing (`GET /folders/_/shared`) now returns only the sharing relations the requester is party to, instead of every relation in the system. ([#16410](https://github.com/lablup/backend.ai/issues/16410))
+* Stop storing the login session token in the App Proxy coordinator. ([#16416](https://github.com/lablup/backend.ai/issues/16416))
+* Refuse App Proxy circuits on an `h2` worker unless they are open to public without `allowed_client_ips`, because such a worker cannot check credentials or client addresses. ([#16418](https://github.com/lablup/backend.ai/issues/16418))
+* Allow only superadmins to create a vfolder with an unmanaged path, so domain admins can no longer mount arbitrary host paths ([#16425](https://github.com/lablup/backend.ai/issues/16425))
+* Reject webserver proxy paths that contain `.` or `..` segments, including percent-encoded ones, so a request matched to a logged-out route can no longer reach a different manager path ([#16430](https://github.com/lablup/backend.ai/issues/16430))
+* Prevent the deployment health check path from changing the probed host, and stop the health check from following redirects ([#16433](https://github.com/lablup/backend.ai/issues/16433))
+* Fix v2 session enqueue creating a session for another user named in `owner_id` without checking the caller may act on that user's behalf ([#16436](https://github.com/lablup/backend.ai/issues/16436))
+* Re-check the vfolder mount subpath right before kernel creation and fail the kernel when the subpath resolves outside the vfolder. ([#16437](https://github.com/lablup/backend.ai/issues/16437))
+* Hide Python and aiohttp versions from the `Server` header of storage-proxy API responses ([#16438](https://github.com/lablup/backend.ai/issues/16438))
+* Check permissions in the legacy GraphQL single-node lookups, so a regular user can no longer read other users, agents, projects, networks and sessions by their node id ([#16445](https://github.com/lablup/backend.ai/issues/16445))
+* Fix legacy GraphQL returning a keypair's plaintext `secret_key` to domain admins and other users who are neither its owner nor a superadmin ([#16449](https://github.com/lablup/backend.ai/issues/16449))
+* Reject the runner-reserved variables `LOCAL_USER_ID`, `LOCAL_GROUP_ID` and `ADDITIONAL_GIDS` in user-supplied session environ so that users cannot gain root privileges inside containers ([#16464](https://github.com/lablup/backend.ai/issues/16464))
+* Reject a container metric name in the legacy GQL metric queries, the Prometheus query preset execution and the idle checker utilization labels unless it consists only of letters, digits, `_`, `:` and `-` ([#16465](https://github.com/lablup/backend.ai/issues/16465))
+* Prevent agent file uploads into a session from following a symlink swapped in after the path check ([#16470](https://github.com/lablup/backend.ai/issues/16470))
+* Mask the object storage `secret_key` in GraphQL and REST v2 responses for callers who are not superadmins ([#16471](https://github.com/lablup/backend.ai/issues/16471))
+* Reject vfolder mount destinations under reserved container paths such as `/opt/container`, which could be used to run user files as root in the container ([#16473](https://github.com/lablup/backend.ai/issues/16473))
+* Make the `no-tls` port frontend of an App Proxy `h2` worker listen on `bind_host` instead of all interfaces. ([#16485](https://github.com/lablup/backend.ai/issues/16485))
+* Serve only the login-screen fields of `config.toml` before login; the rest is rendered once the session is authenticated ([#16486](https://github.com/lablup/backend.ai/issues/16486))
+* Reject Reservoir artifact files whose path leaves the download directory. ([#16487](https://github.com/lablup/backend.ai/issues/16487))
+* Tighten two manager checks: only a super admin can deactivate another user's TOTP, and notification rule templates are rendered in a Jinja sandbox ([#16554](https://github.com/lablup/backend.ai/issues/16554))
+* Restrict logout to the requester's own login session, and end a user's login sessions on password change and OIDC force login ([#16555](https://github.com/lablup/backend.ai/issues/16555))
+* Reject inactive keypairs in keypair auth hook logins and compare signatures in constant time ([#16556](https://github.com/lablup/backend.ai/issues/16556))
+* Refuse reading, updating and deleting another user's session template, and list only the session templates the requester may see ([#16578](https://github.com/lablup/backend.ai/issues/16578))
+* Reject extending a webserver login session that is not authenticated ([#16613](https://github.com/lablup/backend.ai/issues/16613))
+* Restrict the object storage and VFS storage REST routes, the manager status and metrics routes and agent registry sync to superadmins ([#16622](https://github.com/lablup/backend.ai/issues/16622))
+* Allow only the owner, an admin of the template's domain and a superadmin to read, change or delete a cluster template ([#16628](https://github.com/lablup/backend.ai/issues/16628))
+* Accept only `fullName`, `password` and `allowedClientIp` in `updateUserV2` for non-superadmin users ([#16629](https://github.com/lablup/backend.ai/issues/16629))
+* Fix the App Proxy coordinator failing to start in Traefik mode when a Traefik etcd password is set ([#16631](https://github.com/lablup/backend.ai/issues/16631))
+* Mask the Reservoir registry `secret_key` and the HuggingFace registry `token` in GraphQL and REST v2 responses for callers who are not superadmins ([#16643](https://github.com/lablup/backend.ai/issues/16643))
+* Fix the `-g` option help of `vfolder create` and `model create` to state that it takes a project ID (UUID), not a name ([#16645](https://github.com/lablup/backend.ai/issues/16645))
+* Count concurrent failed logins atomically and stop extending a login block while the account is blocked ([#16731](https://github.com/lablup/backend.ai/issues/16731))
+* Fix the batch execution task of a batch session ending with an unretrieved error when the session's container disappears while its command is running ([#16733](https://github.com/lablup/backend.ai/issues/16733))
+* Serve the WebUI `version.json` from the webserver only to clients with a login session ([#16735](https://github.com/lablup/backend.ai/issues/16735))
+* Keep unclassified exception text, the internal manager address and secrets out of audit log descriptions, webserver error responses, debug config output and debug logs ([#16737](https://github.com/lablup/backend.ai/issues/16737))
+* Fix `mgr fixture populate` aborting on the example resource presets by declaring `shared_memory` as an integer ([#16752](https://github.com/lablup/backend.ai/issues/16752))
+* Verify TLS certificates on SDK vfolder downloads from the storage proxy, as uploads already do ([#16803](https://github.com/lablup/backend.ai/issues/16803))
+* Pass the signup token from the REST signup request to the PRE_SIGNUP hook again ([#16819](https://github.com/lablup/backend.ai/issues/16819))
+* Restrict the legacy GraphQL agent image force purge, container registry quota mutations and moving a project to another domain to a superadmin ([#16824](https://github.com/lablup/backend.ai/issues/16824))
+* Fix `--output` of `generate-openapi-spec`, `generate-example-configuration` and `python -m ai.backend.manager.openapi` failing with `AttributeError` ([#16842](https://github.com/lablup/backend.ai/issues/16842))
+
+### External Dependency Updates
+* Bump pyasn1 to 0.6.5 and the kernel runner's tornado to 6.6 to clear reported CVEs ([#16266](https://github.com/lablup/backend.ai/issues/16266))
+* Bump oauthlib to 4.0.1 to clear CVE-2026-49272 ([#16580](https://github.com/lablup/backend.ai/issues/16580))
+
+### Miscellaneous
+* Remove conflict markers from `requirements.txt` on the 26.4 branch ([#16590](https://github.com/lablup/backend.ai/issues/16590))
+* Remove conflict markers from `configs/graphql/gateway.config.ts` on the 26.4 branch ([#16600](https://github.com/lablup/backend.ai/issues/16600))
+* Support changelog fragments named without a PR number, which the release renames with the PR number from git history ([#16702](https://github.com/lablup/backend.ai/issues/16702))
+
+### Test Updates
+* Fix the coordinator endpoint request-model test importing `DeploymentID` from a module that does not exist on this branch, which made the test module fail to collect. ([#16422](https://github.com/lablup/backend.ai/issues/16422))
+
+
 ## 26.4.18 (2026-10-30)
 
 ### Fixes
