@@ -16,6 +16,7 @@ from ai.backend.common.dto.manager.query import (
     EnumFilter,
     NullableDateTimeFilter,
     StringFilter,
+    ToManyFilter,
     UUIDFilter,
 )
 from ai.backend.common.dto.manager.v2.common import OrderDirection
@@ -34,6 +35,7 @@ __all__ = (
     "ScopedSearchVFolderAutoMountsInput",
     "UpdateVFolderAutoMountInput",
     "VFolderAutoMountFilter",
+    "VFolderAutoMountNestedFilter",
     "VFolderAutoMountOrder",
     "VFolderAutoMountPermissionFilter",
     "VFolderAutoMountScopeTypeFilter",
@@ -93,6 +95,14 @@ class VFolderAutoMountFilter(BaseRequestModel):
 
 
 VFolderAutoMountFilter.model_rebuild()
+
+
+class VFolderAutoMountNestedFilter(ToManyFilter[VFolderAutoMountFilter]):
+    """The `auto_mounts` field of a vfolder filter.
+
+    It reaches only the auto-mounts not marked deleted, so a `deleted_at` condition in it
+    matches none. Each relation matches one auto-mount at a time.
+    """
 
 
 class VFolderAutoMountOrder(BaseRequestModel):

@@ -16,6 +16,9 @@ from ai.backend.common.dto.manager.v2.common import NonEmptyList
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
 from ai.backend.common.dto.manager.v2.entity_label.request import EntityLabelNestedFilter
 from ai.backend.common.dto.manager.v2.vfolder.types import VFolderScope, VFolderUsage
+from ai.backend.common.dto.manager.v2.vfolder_auto_mount.request import (
+    VFolderAutoMountNestedFilter,
+)
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.tristate.unset import UNSET, Unset
 from ai.backend.common.typed_validators import VFolderName, VFolderRelativePath
@@ -430,6 +433,13 @@ class VFolderFilter(BaseRequestModel):
     created_at: DateTimeFilter | None = Field(default=None, description="Filter by creation time.")
     labels: EntityLabelNestedFilter | None = Field(
         default=None, description="Filter by the labels on the entity"
+    )
+    auto_mounts: VFolderAutoMountNestedFilter | None = Field(
+        default=None,
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. Filter by the auto-mounts set on the vfolder. "
+            "Auto-mounts marked deleted are not counted."
+        ),
     )
     entity_id: UUIDFilter | None = Field(
         default=None,

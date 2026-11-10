@@ -28,6 +28,9 @@ from ai.backend.common.dto.manager.v2.vfolder_auto_mount.request import (
     VFolderAutoMountFilter as VFolderAutoMountFilterDTO,
 )
 from ai.backend.common.dto.manager.v2.vfolder_auto_mount.request import (
+    VFolderAutoMountNestedFilter as VFolderAutoMountNestedFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.vfolder_auto_mount.request import (
     VFolderAutoMountOrder as VFolderAutoMountOrderDTO,
 )
 from ai.backend.common.dto.manager.v2.vfolder_auto_mount.request import (
@@ -316,6 +319,35 @@ class VFolderAutoMountFilterGQL(PydanticInputMixin[VFolderAutoMountFilterDTO]):
     AND: list[Self] | None = gql_field(description="Match all nested filters.", default=None)
     OR: list[Self] | None = gql_field(description="Match any nested filter.", default=None)
     NOT: list[Self] | None = gql_field(description="Negate nested filters.", default=None)
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Filter selecting vfolders by the auto-mounts set on them. It reaches only the "
+            "auto-mounts not marked deleted, so a `deletedAt` condition in it matches none. "
+            "Each relation matches one auto-mount at a time."
+        ),
+    ),
+    name="VFolderAutoMountNestedFilter",
+)
+class VFolderAutoMountNestedFilterGQL(PydanticInputMixin[VFolderAutoMountNestedFilterDTO]):
+    exists: bool | None = gql_field(
+        description=(
+            "True for a vfolder that has at least one auto-mount, false for one that has none."
+        ),
+        default=None,
+    )
+    some: VFolderAutoMountFilterGQL | None = gql_field(
+        description="At least one auto-mount matches.", default=None
+    )
+    every: VFolderAutoMountFilterGQL | None = gql_field(
+        description="Every auto-mount matches; true when there is none.", default=None
+    )
+    none: VFolderAutoMountFilterGQL | None = gql_field(
+        description="No auto-mount matches.", default=None
+    )
 
 
 @gql_pydantic_input(

@@ -26,6 +26,7 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.entity_label.types.filters import EntityLabelNestedFilterGQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
+from ai.backend.manager.api.gql.vfolder_auto_mount.types import VFolderAutoMountNestedFilterGQL
 
 from .enum import VFolderOperationStatusGQL, VFolderUsageModeGQL
 
@@ -99,6 +100,16 @@ class VFolderFilterGQL(PydanticInputMixin[VFolderFilter]):
     )
     entity_id: UUIDFilter | None = gql_added_field(
         BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter by vfolder ID."),
+        default=None,
+    )
+    auto_mounts: VFolderAutoMountNestedFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Select vfolders by the auto-mounts set on them. "
+                "Auto-mounts marked deleted are not counted."
+            ),
+        ),
         default=None,
     )
 
