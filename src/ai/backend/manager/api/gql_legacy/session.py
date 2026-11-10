@@ -305,10 +305,22 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
     ) -> Self | None:
         graphene_ctx: GraphQueryContext = info.context
         _, raw_session_id = AsyncNode.resolve_global_id(info, id)
-        async with graphene_ctx.db.begin_readonly_session() as db_session:
+        session_id = parse_uuid(raw_session_id)
+        user = graphene_ctx.user
+        visible: sa.ColumnElement[bool]
+        match user["role"]:
+            case UserRole.SUPERADMIN:
+                visible = sa.true()
+            case UserRole.ADMIN:
+                visible = SessionRow.domain_name == user["domain_name"]
+            case UserRole.USER:
+                visible = SessionRow.user_uuid == user["uuid"]
+            case _:
+                visible = sa.false()
+        async with graphene_ctx.db.begin_readonly_session_read_committed() as db_session:
             stmt = (
                 sa.select(SessionRow)
-                .where(SessionRow.id == parse_uuid(raw_session_id))
+                .where(visible & (SessionRow.id == session_id))
                 .options(selectinload(SessionRow.kernels), joinedload(SessionRow.user))
             )
             query_result = await db_session.scalar(stmt)

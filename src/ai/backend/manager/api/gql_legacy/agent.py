@@ -168,6 +168,8 @@ class AgentNode(graphene.ObjectType):  # type: ignore[misc]
     @classmethod
     async def get_node(cls, info: graphene.ResolveInfo, id: str) -> Self | None:
         graphene_ctx: GraphQueryContext = info.context
+        if graphene_ctx.user["role"] != UserRole.SUPERADMIN:
+            return None
         _, raw_agent_id = AsyncNode.resolve_global_id(info, id)
         condition = [QueryConditions.by_ids([AgentId(raw_agent_id)])]
         agent_list = await graphene_ctx.agent_repository.list_data(condition)
