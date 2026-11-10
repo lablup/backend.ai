@@ -31,6 +31,7 @@ current, see `AGENTS.md` in this directory.
 | `refresh-graphql-gateway.sh` | Regenerates the schema, copies it to the root, restarts the Apollo Router (`--recreate` to recreate the container so config updates apply) | person |
 | `alembic-rebase.py` | Rebases a migration branch when alembic heads have diverged | person (`src/ai/backend/README.md`) |
 | `download-webui-release.sh` | Downloads and unpacks a WebUI bundle into `src/ai/backend/web` | person; `release.sh` |
+| `new-changelog.py` | Writes a changelog fragment named `changes/<YYYYMMDD>-<HHMMSS>-<6 chars>.<type>.md`, with front matter for `--issue` and `--epic`, and prints its path | person; Claude Code (`/submit`) |
 | `knowledge/search.py` | Lists or searches `KNOWLEDGE.md` frontmatter across the repository | person; Claude Code (`/knowledge`) |
 
 ## Commit and push
@@ -58,6 +59,7 @@ current, see `AGENTS.md` in this directory.
 | `.github/scripts/check-migration-edits.sh` | Reports the already-merged alembic migrations a pull request rewrites, deletes or renames; `allow:migration-edit` records an intended one | auto — `migration-edit-check.yml` |
 | `update-default-seccomp.sh` | Refreshes `default-seccomp.json` from the upstream moby profile | auto — `update-seccomp-profile.yml` (monthly); person |
 | `check-docs-label.sh` | Skips a Read the Docs PR preview build unless the PR carries `area:docs`. **Currently unreferenced** — `.readthedocs.yaml` does the same check inline | — |
+| `validate-changelog-fragments.py` | Checks the names, types, front matter and epic file pairs in `changes/` | auto — `ci.yml` (`check-build-and-lint`) |
 
 ## Release
 
@@ -79,6 +81,8 @@ current, see `AGENTS.md` in this directory.
 | `determine-release-type.py` | Prints `RELEASE_AUDIENCE` and `IS_PRERELEASE` for the `VERSION` file; rejects a version that is neither an alpha, a release candidate nor a final release | auto — `ci.yml` (`determine-release-grade`) |
 | `test_determine_release_type.py` | Checks `determine-release-type.py` against every classified and rejected version | auto — `ci.yml` (`check-build-and-lint`) |
 | `build-wheels.sh` | Builds the platform-specific and generic wheels | auto — `ci.yml` (release job) |
+| `rename-changelog-fragments.py` | Renames each new-style changelog fragment to `<PR-number>.<type>.md` with `git mv` and drops its front matter, taking the PR number from the commit that added the file; stops the release on a file that breaks the rules or has no PR number | auto — `release.sh` |
+| `changelog_fragments.py` | Module, not a command: the rules for the files in `changes/` (names, types, front matter, epic files) | auto — imported by `new-changelog.py`, `rename-changelog-fragments.py`, `validate-changelog-fragments.py`, `run-towncrier.py` |
 | `build-scies.sh` | Builds the scie executables locally (CI runs the equivalent pants commands inline) | person |
 | `diff-release.py` | Lists the commits between two refs with their original / backport PR numbers | person |
 

@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 import tomlkit
+from changelog_fragments import UNNUMBERED_RE, FragmentDirectory
 
 exempted_files = ["README.md", "template.md", "KNOWLEDGE.md"]
 
@@ -70,8 +71,16 @@ def main(pr_number: str, base_ref: str, dry_run: bool) -> None:
     # mismatched-prefix rewrites to PRs targeting ``main``.
     rewrite_mismatched = base_ref == "main"
 
+    # Fragments named without a PR number get it at release time
+    # (rename-changelog-fragments.py); towncrier-ignored files are not fragments
+    fragment_dir = FragmentDirectory(Path("."))
     all_fragments = [
-        f.name for f in base_path.iterdir() if f.is_file() and f.name not in exempted_files
+        f.name
+        for f in base_path.iterdir()
+        if f.is_file()
+        and f.name not in exempted_files
+        and not fragment_dir.is_ignored(f.name)
+        and not UNNUMBERED_RE.match(f.name)
     ]
     if pr_added_fragments is not None:
         files = [f for f in all_fragments if f in pr_added_fragments]

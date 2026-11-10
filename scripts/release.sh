@@ -73,8 +73,11 @@ else
     pants fmt ::
 fi
 
+# Give the news fragments named without a PR number their PR number
+python3 scripts/rename-changelog-fragments.py || exit 1
+
 # Update the version-branch changelog (consumes news fragments without an interactive prompt)
-python3 scripts/run-towncrier.py "${TARGET_VERSION}"
+python3 scripts/run-towncrier.py "${TARGET_VERSION}" || exit 1
 
 # Update sample config files (unmask secrets to show actual default values)
 ./backend.ai mgr config generate-sample --overwrite --unmask-secrets

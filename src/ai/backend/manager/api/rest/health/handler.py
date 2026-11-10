@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING
 
 from aiohttp import web
 
-from ai.backend.manager import __version__
 from ai.backend.manager.dto.context import RequestCtx
 
 if TYPE_CHECKING:
@@ -17,8 +16,8 @@ if TYPE_CHECKING:
 class HealthHandler:
     """Public-facing health endpoints.
 
-    ``/health`` returns a minimal liveness payload (version only — never the
-    internal connectivity matrix, which would leak deployment topology).
+    ``/health`` returns a minimal liveness payload (status only — never the
+    release version or the internal connectivity matrix).
     ``/livez`` and ``/readyz`` are status-only K8s-style probes that mirror
     the internal liveness / readiness checks but omit the response body.
     """
@@ -29,9 +28,9 @@ class HealthHandler:
         self._health_probe = health_probe
 
     async def hello(self, request_ctx: RequestCtx) -> web.Response:
-        """Simple liveness probe — returns 200 OK with version."""
+        """Simple liveness probe — returns 200 OK."""
         request_ctx.request["do_not_print_access_log"] = True
-        return web.json_response({"status": "ok", "version": __version__})
+        return web.json_response({"status": "ok"})
 
     async def livez(self, request_ctx: RequestCtx) -> web.Response:
         """Liveness probe — 200 / 503 based on liveness-tier health, empty body."""
