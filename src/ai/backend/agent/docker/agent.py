@@ -108,6 +108,7 @@ from ai.backend.agent.types import (
     VolumeInfo,
 )
 from ai.backend.agent.utils import (
+    SECRET_MASK,
     ContainerSSHFileWriter,
     closing_async,
     container_pid_to_host_pid,
@@ -1452,7 +1453,15 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
         # The final container config is settled down here.
         if self.local_config.debug.log_kernel_config:
-            log.debug("full container config: {!r}", pretty(container_config))
+            # Env carries the session's environ, so only the variable names are logged.
+            dumped = {
+                **container_config,
+                "Env": [
+                    f"{env.split('=', 1)[0]}={SECRET_MASK}"
+                    for env in container_config.get("Env", [])
+                ],
+            }
+            log.debug("full container config: {!r}", pretty(dumped))
 
         async def _rollback_container_creation() -> None:
             """Free the devices of a container that was never created.

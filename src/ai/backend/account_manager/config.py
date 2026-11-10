@@ -402,9 +402,6 @@ def load(config_path: Path | None = None, log_level: LogLevel = LogLevel.NOTSET)
     try:
         raw_cfg = config_key_to_snake_case(raw_cfg)
         server_config = ServerConfig(**raw_cfg)
-        if server_config.debug.enabled:
-            print("== Account Manager configuration ==", file=sys.stderr)
-            print(pformat(server_config.model_dump()), file=sys.stderr)
     except ValidationError as e:
         print(
             "ConfigurationError: Could not read or validate the account manager local config:",

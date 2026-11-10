@@ -290,7 +290,7 @@ from .types import (
     LifecycleEvent,
     MountInfo,
 )
-from .utils import generate_local_instance_id, get_arch_name
+from .utils import SECRET_MASK, generate_local_instance_id, get_arch_name
 
 if TYPE_CHECKING:
     from ai.backend.common.auth import PublicKey
@@ -2698,6 +2698,25 @@ class AbstractAgent[
             container_id=registered.container_id,
         )
 
+    @staticmethod
+    def _mask_kernel_config(config: KernelCreationConfig) -> dict[str, Any]:
+        image = config["image"]
+        registry = image["registry"]
+        return {
+            **config,
+            "image": {
+                **image,
+                "registry": {
+                    **registry,
+                    "password": SECRET_MASK if registry["password"] else None,
+                },
+            },
+            "environ": dict.fromkeys(config["environ"], SECRET_MASK),
+            "bootstrap_script": SECRET_MASK if config["bootstrap_script"] else None,
+            # internal_data carries the SSH keypair and dotfile contents.
+            "internal_data": SECRET_MASK if config["internal_data"] else None,
+        }
+
     async def create_kernel(
         self,
         ownership_data: KernelOwnershipData,
@@ -2734,7 +2753,8 @@ class AbstractAgent[
                 # Initialize the creation context
                 if self.local_config.debug.log_kernel_config:
                     log.debug(
-                        "kernel creation config dumped", kernel_config=str(pretty(kernel_config))
+                        "kernel creation config dumped",
+                        kernel_config=str(pretty(self._mask_kernel_config(kernel_config))),
                     )
                 ctx = await self.init_kernel_context(
                     ownership_data,
