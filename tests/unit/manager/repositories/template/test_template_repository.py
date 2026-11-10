@@ -587,8 +587,11 @@ class TestTemplateRepository:
 
         result = await template_repository.get_cluster_template(template_id)
 
-        assert result is not None
-        assert result == template_data
+        assert result == {
+            "template": template_data,
+            "user_uuid": test_user,
+            "domain_name": test_domain,
+        }
 
     async def test_get_cluster_template_not_found(
         self,
@@ -665,7 +668,8 @@ class TestTemplateRepository:
 
         assert rowcount == 1
         result = await template_repository.get_cluster_template(template_id)
-        assert result == new_data
+        assert result is not None
+        assert result["template"] == new_data
 
     async def test_update_cluster_template_nonexistent(
         self,

@@ -545,3 +545,98 @@ class TestDeleteClusterTemplate:
         result = await admin_registry.template.delete_cluster_template(cluster_tpl_id)
         assert isinstance(result, DeleteClusterTemplateResponse)
         assert result.success is True
+
+
+class TestClusterTemplateOwnerCheck:
+    @pytest.fixture
+    async def cluster_template_id_owned_by_admin(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        domain_fixture: DomainFixtureData,
+        group_name_fixture: str,
+    ) -> str:
+        session_template_result = await admin_registry.template.create_session_template(
+            CreateSessionTemplateRequest(
+                domain=domain_fixture.domain_name,
+                group=group_name_fixture,
+                payload=_session_template_payload("ct-owned-by-admin-dep"),
+            ),
+        )
+        cluster_template_result = await admin_registry.template.create_cluster_template(
+            CreateClusterTemplateRequest(
+                domain=domain_fixture.domain_name,
+                group=group_name_fixture,
+                payload=_cluster_template_payload(
+                    "ct-owned-by-admin", session_template_result.root[0].id
+                ),
+            ),
+        )
+        return cluster_template_result.id
+
+    @pytest.fixture
+    async def cluster_template_id_owned_by_user(
+        self,
+        user_registry: BackendAIClientRegistry,
+        domain_fixture: DomainFixtureData,
+        group_name_fixture: str,
+    ) -> str:
+        session_template_result = await user_registry.template.create_session_template(
+            CreateSessionTemplateRequest(
+                domain=domain_fixture.domain_name,
+                group=group_name_fixture,
+                payload=_session_template_payload("ct-owned-by-user-dep"),
+            ),
+        )
+        cluster_template_result = await user_registry.template.create_cluster_template(
+            CreateClusterTemplateRequest(
+                domain=domain_fixture.domain_name,
+                group=group_name_fixture,
+                payload=_cluster_template_payload(
+                    "ct-owned-by-user", session_template_result.root[0].id
+                ),
+            ),
+        )
+        return cluster_template_result.id
+
+    async def test_owner_gets_their_cluster_template(
+        self,
+        user_registry: BackendAIClientRegistry,
+        cluster_template_id_owned_by_user: str,
+    ) -> None:
+        result = await user_registry.template.get_cluster_template(
+            cluster_template_id_owned_by_user,
+            GetClusterTemplateRequest(format="json"),
+        )
+        assert isinstance(result, GetClusterTemplateResponse)
+
+    async def test_user_cannot_get_another_users_cluster_template(
+        self,
+        user_registry: BackendAIClientRegistry,
+        cluster_template_id_owned_by_admin: str,
+    ) -> None:
+        with pytest.raises(PermissionDeniedError):
+            await user_registry.template.get_cluster_template(
+                cluster_template_id_owned_by_admin,
+                GetClusterTemplateRequest(format="json"),
+            )
+
+    async def test_user_cannot_update_another_users_cluster_template(
+        self,
+        user_registry: BackendAIClientRegistry,
+        cluster_template_id_owned_by_admin: str,
+    ) -> None:
+        with pytest.raises(PermissionDeniedError):
+            await user_registry.template.update_cluster_template(
+                cluster_template_id_owned_by_admin,
+                UpdateClusterTemplateRequest(
+                    payload=_cluster_template_payload("ct-renamed", "session-template-id"),
+                ),
+            )
+
+    async def test_user_cannot_delete_another_users_cluster_template(
+        self,
+        user_registry: BackendAIClientRegistry,
+        cluster_template_id_owned_by_admin: str,
+    ) -> None:
+        with pytest.raises(PermissionDeniedError):
+            await user_registry.template.delete_cluster_template(cluster_template_id_owned_by_admin)

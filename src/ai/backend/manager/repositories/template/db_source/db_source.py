@@ -432,10 +432,14 @@ class TemplateDBSource:
         return entries
 
     async def get_cluster_template(self, template_id: str) -> dict[str, Any] | None:
-        """Get a single active cluster template by ID. Returns template dict or None."""
+        """Get a single active cluster template by ID with its owner and domain, or None."""
         async with self._db.begin_readonly() as conn:
             q = (
-                sa.select(session_templates.c.template)
+                sa.select(
+                    session_templates.c.template,
+                    session_templates.c.user_uuid,
+                    session_templates.c.domain_name,
+                )
                 .select_from(session_templates)
                 .where(
                     (session_templates.c.id == template_id)
@@ -443,12 +447,14 @@ class TemplateDBSource:
                     & (session_templates.c.type == TemplateType.CLUSTER),
                 )
             )
-            template = await conn.scalar(q)
-            if template is None:
+            row = (await conn.execute(q)).first()
+            if row is None:
                 return None
-            if isinstance(template, dict):
-                return template
-            return dict(template)
+            return {
+                "template": row.template if isinstance(row.template, dict) else dict(row.template),
+                "user_uuid": row.user_uuid,
+                "domain_name": row.domain_name,
+            }
 
     async def cluster_template_exists(self, template_id: str) -> bool:
         """Check if an active cluster template exists."""
