@@ -15,17 +15,13 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.exception import UserNotFound
-<<<<<<< HEAD
-from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-=======
 from ai.backend.common.types import AccessKey, ResourceSlot, VFolderHostPermissionMap
->>>>>>> df9590e4 (fix(BA-8948): reject inactive keypairs and compare signatures in constant time (#16556))
+from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.auth.types import UserData
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.errors.auth import GroupMembershipNotFoundError
-<<<<<<< HEAD
+from ai.backend.manager.errors.user import KeyPairNotFound
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
@@ -39,30 +35,10 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.keypair.lookups import KeypairAccessKeyUserLookup
 from ai.backend.manager.models.project import AssocGroupUserRow, ProjectRow
 from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
 from ai.backend.manager.models.rbac_models import PermissionRow, RoleRow, UserRoleRow
-=======
-from ai.backend.manager.errors.user import KeyPairNotFound
-from ai.backend.manager.models.agent.row import AgentRow
-from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
-from ai.backend.manager.models.deployment_auto_scaling_policy.row import (
-    DeploymentAutoScalingPolicyRow,
-)
-from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
-from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
-from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
-from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.endpoint.row import EndpointRow
-from ai.backend.manager.models.entity_label.row import EntityLabelRow
-from ai.backend.manager.models.image.row import ImageRow
-from ai.backend.manager.models.kernel.row import KernelRow
-from ai.backend.manager.models.keypair.lookups import KeypairAccessKeyUserLookup
-from ai.backend.manager.models.keypair.row import KeyPairRow
-from ai.backend.manager.models.project.row import AssocGroupUserRow, ProjectRow
-from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.rbac_models.role.row import RoleRow
->>>>>>> df9590e4 (fix(BA-8948): reject inactive keypairs and compare signatures in constant time (#16556))
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )
