@@ -3213,7 +3213,6 @@ class VolumeProxyConfig(BaseConfigSchema):
             ),
             added_version="25.8.0",
             secret=True,
-            local_only=True,
             example=ConfigExample(local="changeme", prod="<generate-secure-random-string>"),
         ),
     ]

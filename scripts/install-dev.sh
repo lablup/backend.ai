@@ -1142,29 +1142,19 @@ configure_backendai() {
   cp configs/manager/halfstack.alembic.ini ./alembic.ini
   sed_inplace "s/localhost:8100/localhost:${POSTGRES_PORT}/" ./alembic.ini
 
+  # Each component reads the Redis config only from its local config file.
   if [ $CONFIGURE_HA -eq 1 ]; then
-    ./backend.ai mgr etcd put config/redis/sentinel "127.0.0.1:${REDIS_SENTINEL1_PORT},127.0.0.1:${REDIS_SENTINEL2_PORT},127.0.0.1:${REDIS_SENTINEL3_PORT}"
-    ./backend.ai mgr etcd put config/redis/service_name "mymaster"
-    # The Redis password is read only from each component's local config file.
-    cat >> ./manager.toml <<EOF
-
-[redis]
-password = "develove"
-EOF
+    REDIS_TOML_CONFIG="sentinel = \"127.0.0.1:${REDIS_SENTINEL1_PORT},127.0.0.1:${REDIS_SENTINEL2_PORT},127.0.0.1:${REDIS_SENTINEL3_PORT}\"
+service_name = \"mymaster\"
+password = \"develove\""
   else
-    ./backend.ai mgr etcd put config/redis/addr "127.0.0.1:${REDIS_PORT}"
+    REDIS_TOML_CONFIG="addr = \"127.0.0.1:${REDIS_PORT}\""
   fi
-
-  ./backend.ai mgr etcd put-json config/redis/redis_helper_config ./configs/manager/sample.etcd.redis-helper.json
+  printf '\n[redis]\n%s\n' "$REDIS_TOML_CONFIG" >> ./manager.toml
 
   cp configs/manager/sample.etcd.volumes.json ./dev.etcd.volumes.json
   MANAGER_AUTH_KEY=$(python -c 'import secrets; print(secrets.token_hex(32), end="")')
-  # The manager reads the storage-proxy secret only from manager.toml.
-  cat >> ./manager.toml <<EOF
-
-[volumes.proxies.local]
-secret = "${MANAGER_AUTH_KEY}"
-EOF
+  sed_inplace "s/\"secret\": \"some-secret-shared-with-storage-proxy\"/\"secret\": \"${MANAGER_AUTH_KEY}\"/" ./dev.etcd.volumes.json
   sed_inplace "s/\"default_host\": .*$/\"default_host\": \"${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}\",/" ./dev.etcd.volumes.json
 
   # configure account-manager
@@ -1275,11 +1265,9 @@ EOF
     configure_storage_proxy_minio "./storage-proxy.toml"
   fi
 
-  if [ $CONFIGURE_HA -eq 1 ]; then
-    for f in ./agent.toml ./storage-proxy.toml; do
-      printf '\n[redis]\npassword = "develove"\n' >> "$f"
-    done
-  fi
+  for f in ./agent.toml ./storage-proxy.toml; do
+    printf '\n[redis]\n%s\n' "$REDIS_TOML_CONFIG" >> "$f"
+  done
 
   # configure webserver
   cp configs/webserver/halfstack.conf ./webserver.conf

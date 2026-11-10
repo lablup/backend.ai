@@ -120,10 +120,6 @@ class BackendAIConfigMeta(BackendAIFieldMeta):
     """Whether this field contains sensitive information.
     When True, the value should be masked in logs, CLI output, and error messages."""
 
-    local_only: bool = False
-    """Whether this field is read only from the local config file.
-    When True, `LocalOnlyFieldFilter` drops the value from remote sources such as etcd."""
-
     composite: CompositeType | None = None
     """Type of composite field structure, or None for simple fields.
 

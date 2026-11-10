@@ -1779,10 +1779,7 @@ class StorageProxyUnifiedConfig(BaseConfigSchema):
         RedisConfig | None,
         Field(default=None),
         BackendAIConfigMeta(
-            description=(
-                "Redis settings read only from this file, such as the password. "
-                "The other Redis settings come from etcd."
-            ),
+            description="Redis configuration. The storage proxy reads it only from this file.",
             added_version=NEXT_RELEASE_VERSION,
             composite=CompositeType.FIELD,
         ),

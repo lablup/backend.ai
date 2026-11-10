@@ -81,7 +81,6 @@ from ai.backend.common.asyncio import current_loop
 from ai.backend.common.auth import AgentAuthHandler, PublicKey, SecretKey
 from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
-from ai.backend.common.configs.loader.redis_loader import load_redis_config
 from ai.backend.common.defs import RedisRole
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import (
@@ -149,7 +148,6 @@ from ai.backend.common.types import (
     ServiceDiscoveryType,
     SessionId,
     aobject,
-    safe_print_redis_config,
 )
 from ai.backend.logging import Logger, LogLevel
 from ai.backend.logging.otel import (
@@ -572,11 +570,6 @@ class AgentRPCServer(aobject):
         log.info("manager detected")
 
     async def read_agent_config(self) -> None:
-        # Redis passwords come only from the local config file.
-        redis_config = await load_redis_config(self.etcd, self.local_config.redis)
-        log.info("redis configured", redis_config=safe_print_redis_config(redis_config))
-        self.local_config.overwrite(redis=redis_config)
-
         # Fill up vfolder configs from etcd and store as separate attributes
         # TODO: Integrate vfolder_config into local_config
         self._vfolder_config = config.vfolder_config_iv.check(
