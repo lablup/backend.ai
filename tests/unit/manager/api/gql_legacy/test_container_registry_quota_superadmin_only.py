@@ -3,6 +3,7 @@ as the REST endpoints do."""
 
 from __future__ import annotations
 
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -19,22 +20,22 @@ QUOTA_MUTATIONS = [
 
 
 class TestContainerRegistryQuotaSuperadminOnly:
-    def _resolve_as(self, field_name: str, role: UserRole) -> MagicMock:
-        """Run the privilege check for the mutation; the returned mock is the resolver."""
+    def _resolve_as(self, field_name: str, role: UserRole) -> tuple[MagicMock, Any]:
+        """Run the privilege check for the mutation; answers the resolver mock and the result."""
         info = MagicMock()
         info.operation.operation = OperationType.MUTATION
         info.field_name = field_name
+        info.path.key = field_name
         info.context.user = {"role": role}
         resolver = MagicMock()
-        try:
-            GQLMutationPrivilegeCheckMiddleware().resolve(resolver, None, info)
-        except Exception:
-            pass
-        return resolver
+        result = GQLMutationPrivilegeCheckMiddleware().resolve(resolver, None, info)
+        return resolver, result
 
     @pytest.mark.parametrize("field_name", QUOTA_MUTATIONS)
     def test_a_superadmin_reaches_the_resolver(self, field_name: str) -> None:
-        self._resolve_as(field_name, UserRole.SUPERADMIN).assert_called_once()
+        resolver, result = self._resolve_as(field_name, UserRole.SUPERADMIN)
+        resolver.assert_called_once()
+        assert result is resolver.return_value
 
     @pytest.mark.parametrize("field_name", QUOTA_MUTATIONS)
     @pytest.mark.parametrize(
@@ -42,7 +43,10 @@ class TestContainerRegistryQuotaSuperadminOnly:
         [UserRole.ADMIN, UserRole.USER, UserRole.MONITOR],
         ids=["admin", "user", "monitor"],
     )
-    def test_any_other_role_does_not_reach_the_resolver(
+    def test_any_other_role_is_refused_before_the_resolver(
         self, field_name: str, role: UserRole
     ) -> None:
-        self._resolve_as(field_name, role).assert_not_called()
+        resolver, result = self._resolve_as(field_name, role)
+        resolver.assert_not_called()
+        assert result.ok is False
+        assert result.msg == f"no permission to execute {field_name}"
