@@ -19,6 +19,7 @@ import sqlalchemy as sa
 import tomli_w
 import yarl
 from aiohttp import web
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from sqlalchemy.ext.asyncio.engine import create_async_engine
 
@@ -55,6 +56,7 @@ from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.dependencies.composer import DependencyInput, ManagerDependencyComposer
 from ai.backend.manager.models.base import pgsql_connect_opts
 from ai.backend.manager.models.domain.row import DomainRow, domains
+from ai.backend.manager.models.error_log.row import ErrorLogRow
 from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
 from ai.backend.manager.models.kernel.row import kernels
 from ai.backend.manager.models.keypair.row import keypairs
@@ -83,6 +85,7 @@ from ai.backend.testutils.bootstrap import (
     POSTGRES_USER,
 )
 from ai.backend.testutils.pants import get_parallel_slot
+from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
 # Import testcontainer fixtures (etcd_container, redis_container, postgres_container)
 # via pytest_plugins so they are registered as fixtures without triggering
@@ -205,6 +208,7 @@ def ipc_base_path(test_id: str) -> Path:
 @pytest.fixture(scope="session")
 def bootstrap_config(
     test_id: str,
+    test_ns: str,
     ipc_base_path: Path,
     logging_config: LoggingConfig,
     etcd_container: tuple[str, HostPortPairModel],
@@ -224,7 +228,7 @@ def bootstrap_config(
     # not populate default values for missing fields, making it unsuitable.
     config = BootstrapConfig(
         etcd=EtcdConfig.model_validate({
-            "namespace": test_id,
+            "namespace": test_ns,
             "addr": HostPortPairModel(host=etcd_addr.host, port=etcd_addr.port),
             "user": ETCD_USER,
             "password": ETCD_PASSWORD,
@@ -280,7 +284,7 @@ def bootstrap_config_path(
     tmp_path_factory: pytest.TempPathFactory,
 ) -> Path:
     """Write the bootstrap config to a temp TOML file for ManagerDependencyComposer."""
-    data = json.loads(bootstrap_config.model_dump_json(by_alias=True))
+    data = json.loads(bootstrap_config.model_dump_json(by_alias=True, exclude_none=True))
     config_dir = tmp_path_factory.mktemp("config")
     config_path = config_dir / "manager.toml"
     with open(config_path, "wb") as f:
@@ -625,6 +629,7 @@ async def group_fixture(
 
 @pytest.fixture()
 async def admin_user_fixture(
+    virtual_entity_seeder: VirtualEntitySeeder,
     db_engine: SAEngine,
     group_fixture: uuid.UUID,
     domain_fixture: str,
@@ -674,6 +679,7 @@ async def admin_user_fixture(
                 rate_limit=30000,
                 num_queries=0,
                 is_admin=True,
+                is_default=True,
                 user=str(data.user_uuid),
             )
         )
@@ -683,6 +689,9 @@ async def admin_user_fixture(
                 user_id=str(data.user_uuid),
             )
         )
+        async with AsyncSession(bind=conn) as sess:
+            await virtual_entity_seeder.seed_user_scope(sess, data.user_uuid)
+            await virtual_entity_seeder.enroll_user_in_project(sess, group_fixture, data.user_uuid)
     yield data
     async with db_engine.begin() as conn:
         # Clean side-effect tables that tests may populate via the running server
@@ -701,11 +710,13 @@ async def admin_user_fixture(
         await conn.execute(
             keypairs.delete().where(keypairs.c.access_key == data.keypair.access_key)
         )
+        await conn.execute(sa.delete(ErrorLogRow).where(ErrorLogRow.user == data.user_uuid))
         await conn.execute(users.delete().where(users.c.uuid == str(data.user_uuid)))
 
 
 @pytest.fixture()
 async def regular_user_fixture(
+    virtual_entity_seeder: VirtualEntitySeeder,
     db_engine: SAEngine,
     group_fixture: uuid.UUID,
     domain_fixture: str,
@@ -755,6 +766,7 @@ async def regular_user_fixture(
                 rate_limit=30000,
                 num_queries=0,
                 is_admin=False,
+                is_default=True,
                 user=str(data.user_uuid),
             )
         )
@@ -764,6 +776,9 @@ async def regular_user_fixture(
                 user_id=str(data.user_uuid),
             )
         )
+        async with AsyncSession(bind=conn) as sess:
+            await virtual_entity_seeder.seed_user_scope(sess, data.user_uuid)
+            await virtual_entity_seeder.enroll_user_in_project(sess, group_fixture, data.user_uuid)
     yield data
     async with db_engine.begin() as conn:
         await conn.execute(
@@ -774,6 +789,7 @@ async def regular_user_fixture(
         await conn.execute(
             keypairs.delete().where(keypairs.c.access_key == data.keypair.access_key)
         )
+        await conn.execute(sa.delete(ErrorLogRow).where(ErrorLogRow.user == data.user_uuid))
         await conn.execute(users.delete().where(users.c.uuid == str(data.user_uuid)))
 
 
@@ -785,6 +801,11 @@ async def database_fixture(
 ) -> AsyncIterator[None]:
     """Backward-compatible aggregate: requests all seed data fixtures."""
     yield
+
+
+@pytest.fixture(scope="session")
+def virtual_entity_seeder() -> VirtualEntitySeeder:
+    return VirtualEntitySeeder()
 
 
 @pytest.fixture()
@@ -805,6 +826,7 @@ async def server_factory(
     6. Start the server with AppRunner + TCPSite
     """
     init_stack = AsyncExitStack()
+    runner: web.AppRunner | None = None
 
     root_app = build_root_app(0, bootstrap_config)
 
@@ -863,7 +885,8 @@ async def server_factory(
 
         yield ServerInfo(host=str(service_addr.host), port=service_addr.port)
     finally:
-        await runner.cleanup()
+        if runner is not None:
+            await runner.cleanup()
         await init_stack.__aexit__(None, None, None)
 
 

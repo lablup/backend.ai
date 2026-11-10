@@ -4,6 +4,7 @@ import json
 
 import pytest
 
+from ai.backend.client.v2.exceptions import NotFoundError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.dto.manager.template import (
     CreateClusterTemplateRequest,
@@ -49,7 +50,7 @@ def _cluster_template_payload(
         "spec": {
             "nodes": [
                 {
-                    "role": "default",
+                    "role": "main",
                     "session_template": session_template_id,
                     "replicas": 1,
                 },
@@ -107,8 +108,8 @@ class TestSessionTemplateLifecycle:
         assert delete_result.success is True
 
         # Verify soft-deleted template is not retrievable
-        get_result3 = await admin_registry.template.get_session_template(template_id)
-        assert get_result3.template == {}
+        with pytest.raises(NotFoundError):
+            await admin_registry.template.get_session_template(template_id)
 
 
 @pytest.mark.integration
