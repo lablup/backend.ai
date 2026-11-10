@@ -1,7 +1,7 @@
 import logging
 from typing import Self
 
-from glide import ExpirySet, ExpiryType
+from glide import ExpirySet, ExpiryType, Script
 
 from ai.backend.common.clients.valkey_client.client import (
     AbstractValkeyClient,
@@ -40,6 +40,22 @@ valkey_session_resilience = Resilience(
 
 SESSION_KEY_PREFIX = "AIOHTTP_SESSION_"
 LOGIN_HISTORY_KEY_PREFIX = "login_history_"
+
+RECORD_LOGIN_FAILURE_SCRIPT = Script("""
+local block_duration_seconds = tonumber(ARGV[1])
+local allowed_fail_count = tonumber(ARGV[2])
+local history = cjson.decode(redis.call('GET', KEYS[1]) or '{}')
+history.login_fail_count = (history.login_fail_count or 0) + 1
+if history.login_fail_count > allowed_fail_count then
+    redis.call('SET', KEYS[1], cjson.encode(history), 'KEEPTTL')
+else
+    -- Older webservers index this field directly and
+    -- fail the login with KeyError without it, so keep writing it.
+    local clock = redis.call('TIME')
+    history.last_login_attempt = tonumber(clock[1]) + tonumber(clock[2]) / 1000000
+    redis.call('SET', KEYS[1], cjson.encode(history), 'EX', block_duration_seconds)
+end
+""")
 
 
 class ValkeySessionClient:
@@ -227,6 +243,18 @@ class ValkeySessionClient:
                 key,
                 block_data,
                 expiry=ExpirySet(ExpiryType.SEC, block_duration_seconds),
+            )
+
+    @valkey_session_resilience.apply()
+    async def record_login_failure(
+        self, username: str, block_duration_seconds: int, allowed_fail_count: int
+    ) -> None:
+        """Increment failures atomically, preserving an existing block's expiry."""
+        async with self._client.client() as conn:
+            await conn.invoke_script(
+                RECORD_LOGIN_FAILURE_SCRIPT,
+                keys=[f"{LOGIN_HISTORY_KEY_PREFIX}{username}"],
+                args=[str(block_duration_seconds), str(allowed_fail_count)],
             )
 
     @valkey_session_resilience.apply()
