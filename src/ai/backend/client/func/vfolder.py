@@ -28,6 +28,7 @@ from ai.backend.client.output.fields import vfolder_fields
 from ai.backend.client.output.types import FieldSpec, PaginatedResult
 from ai.backend.client.pagination import fetch_paginated_result
 from ai.backend.client.request import Request
+from ai.backend.common.dto.manager.field import VFolderStatusSetField
 from ai.backend.common.types import ResultSet
 
 from .base import BaseFunction, api_function
@@ -215,10 +216,13 @@ class VFolderByName(BaseFunction):
             page_size=page_size,
         )
 
-    async def _get_id_by_name(self) -> UUID:
+    async def _get_id_by_name(
+        self, allowed_status_set: VFolderStatusSetField | None = None
+    ) -> UUID:
         rqst = Request("GET", "/folders/_/id")
         rqst.set_json({
             "name": self.name,
+            "allowed_status_set": allowed_status_set,
         })
         async with rqst.fetch() as resp:
             data = await resp.json()
@@ -272,7 +276,8 @@ class VFolderByName(BaseFunction):
 
     @api_function
     async def purge(self) -> Mapping[str, Any]:
-        await self.update_id_by_name()
+        if self.id is None:
+            self.id = await self._get_id_by_name(allowed_status_set=VFolderStatusSetField.PURGABLE)
         rqst = Request("POST", "/folders/purge")
         rqst.set_json({
             "id": self.request_key,

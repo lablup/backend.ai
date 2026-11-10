@@ -10,7 +10,7 @@ from typing import Any
 from pydantic import AliasChoices, Field, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
-from ai.backend.common.dto.manager.field import VFolderPermissionField
+from ai.backend.common.dto.manager.field import VFolderPermissionField, VFolderStatusSetField
 from ai.backend.common.typed_validators import VFolderName, VFolderRelativePath
 from ai.backend.common.types import QuotaScopeID, VFolderUsageMode
 
@@ -172,6 +172,13 @@ class GetVFolderIDReq(BaseRequestModel):
     name: str = Field(
         validation_alias=AliasChoices("vfolder_name", "vfolderName"),
         description="VFolder name to look up",
+    )
+    allowed_status_set: VFolderStatusSetField | None = Field(
+        default=None,
+        description=(
+            "Added in 26.4.19. Match only folders in this status set. "
+            "Without it, every folder except `delete-complete` ones is matched."
+        ),
     )
 
 
