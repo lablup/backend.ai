@@ -98,11 +98,7 @@ async def webapp_plugin_ctx(
     root_app["_config_provider"] = r.bootstrap.config_provider
     root_app["_etcd"] = r.bootstrap.etcd
     root_app["_valkey_stat"] = r.infrastructure.valkey.stat
-<<<<<<< HEAD
-=======
     root_app["_valkey_session"] = r.infrastructure.valkey.session
-    root_app["_sentinel_monitors"] = r.infrastructure.sentinel_monitors
->>>>>>> 03ecfc03 (fix(BA-8947): scope logout to the owner and end login sessions on password change (#16555))
     root_app["_key_provider_pool"] = r.bootstrap.key_provider_pool
     root_app["_auth_repository"] = r.domain.repositories.auth.repository
     for plugin_name, plugin_instance in plugin_ctx.plugins.items():

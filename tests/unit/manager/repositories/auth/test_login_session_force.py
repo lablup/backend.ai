@@ -18,13 +18,8 @@ from ai.backend.manager.data.auth.login_session_types import (
     LoginSessionStatus,
 )
 from ai.backend.manager.data.secret.types import KeyProviderType
-<<<<<<< HEAD
-from ai.backend.manager.errors.auth import AuthorizationFailed
-from ai.backend.manager.models.agent import AgentRow
-=======
 from ai.backend.manager.errors.auth import AuthorizationFailed, LoginSessionNotFoundError
-from ai.backend.manager.models.agent.row import AgentRow
->>>>>>> 03ecfc03 (fix(BA-8947): scope logout to the owner and end login sessions on password change (#16555))
+from ai.backend.manager.models.agent import AgentRow
 
 # ORM cluster registration: configure_mappers() (triggered when this isolated
 # test registers a domain-cluster row) resolves string relationships against the

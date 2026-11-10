@@ -90,18 +90,13 @@ class OIDCHookPlugin(HookPlugin):
             raise Reject("user is inactivated")
 
         if payload.get("force", False):
-<<<<<<< HEAD
-            await auth_repository.invalidate_active_login_sessions(user_id)
+            invalidated_tokens = await auth_repository.invalidate_active_login_sessions(user_id)
+            valkey_session = cast(ValkeySessionClient, root_app["_valkey_session"])
+            await valkey_session.delete_login_sessions(invalidated_tokens)
             log.info(
                 "AUTHORIZE_HOOK(openid): force-invalidated existing login sessions for {}",
                 email,
             )
-=======
-            invalidated_tokens = await auth_repository.invalidate_active_login_sessions(user_id)
-            valkey_session = cast(ValkeySessionClient, root_app["_valkey_session"])
-            await valkey_session.delete_login_sessions(invalidated_tokens)
-            log.trace("openid login sessions force-invalidated", user_email=email)
->>>>>>> 03ecfc03 (fix(BA-8947): scope logout to the owner and end login sessions on password change (#16555))
 
         log.info("AUTHORIZE_HOOK(openid): {} authenticated by auth token", email)
         return user

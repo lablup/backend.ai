@@ -752,7 +752,7 @@ class AuthService:
         changed_at = await self._auth_repository.update_user_password_by_uuid(
             checked_user["uuid"], password_info
         )
-        await self._revoke_user_login_sessions(checked_user.user_id, action.domain_name)
+        await self._revoke_user_login_sessions(checked_user["uuid"], action.domain_name)
 
         return UpdatePasswordNoAuthActionResult(
             user_id=checked_user["uuid"],
