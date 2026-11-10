@@ -19,7 +19,6 @@ from ai.backend.web.proxy import (
     web_plugin_handler,
 )
 from ai.backend.web.server import client_ctx
-from ai.backend.web.stats import WebStats
 
 
 @pytest.fixture
@@ -60,7 +59,6 @@ async def test_proxy_forwards_act_as_header_upstream(
     frontend_app = web.Application()
     frontend_app["config"] = MagicMock(api=MagicMock(domain="default", ssl_verify=False))
     frontend_app["client_pool"] = client_pool
-    frontend_app["stats"] = WebStats()
     frontend_app.router.add_route("*", "/func/{path:.*}", frontend_handler)
     client = await aiohttp_client(frontend_app)
 
@@ -96,7 +94,6 @@ async def _signup_gated_client(
         service=MagicMock(enable_signup=enable_signup),
     )
     app["client_pool"] = client_pool
-    app["stats"] = WebStats()
     app.router.add_route(
         "POST",
         "/func/{path:auth/signup}",
@@ -201,7 +198,6 @@ async def _cookie_proxy_client(
         service=MagicMock(enable_signup=True),
     )
     app["client_pool"] = client_pool
-    app["stats"] = WebStats()
     app.router.add_route(
         "*",
         "/func/{path:.*$}",
