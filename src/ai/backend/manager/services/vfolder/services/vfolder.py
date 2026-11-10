@@ -1484,20 +1484,13 @@ class VFolderService:
             allowed_vfolder_types=allowed_vfolder_types,
             perm=action.perm,
             folder_id_or_name=action.folder_id_or_name,
-            allowed_status_set=action.allowed_status_set,
             allow_privileged_access=action.allow_privileged_access,
         )
         if len(entries) == 0:
             raise VFolderNotFound(extra_data=action.folder_id_or_name)
-        entries_except_inaccessible = [
-            entry
-            for entry in entries
-            if entry["status"] not in vfolder_status_map[VFolderStatusSet.INACCESSIBLE]
-        ]
-        candidates = entries_except_inaccessible or entries
-        if len(candidates) > 1:
-            raise TooManyVFoldersFound(candidates)
-        row = candidates[0]
+        if len(entries) > 1:
+            raise TooManyVFoldersFound(entries)
+        row = entries[0]
         if action.required_status is not None:
             await _check_vfolder_status(row["status"], action.required_status)
         return GetAccessibleVFolderActionResult(row=row)
