@@ -1417,6 +1417,7 @@ class VFolderHandler:
                 is_admin=req.request["is_admin"],
                 perm=VFolderPermissionSetAlias.READABLE,
                 folder_id_or_name=folder_name,
+                allowed_status_set=VFolderStatusSet.ALL,
                 allow_privileged_access=True,
             )
         )
