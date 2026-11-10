@@ -135,6 +135,16 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
         )
     )
 
+    async def resolve_secret_key(self, info: graphene.ResolveInfo) -> str | None:
+        """The stored secret key, only to its owner and superadmins."""
+        secret_key: str | None = self.secret_key
+        if secret_key is None:
+            return None
+        ctx: GraphQueryContext = info.context
+        if ctx.user["role"] != UserRole.SUPERADMIN and self.user != ctx.user["uuid"]:
+            return None
+        return secret_key
+
     async def resolve_user_info(
         self,
         info: graphene.ResolveInfo,
