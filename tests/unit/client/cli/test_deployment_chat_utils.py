@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import stat
 from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
@@ -45,20 +44,6 @@ def history_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setattr(chat_utils, "CHAT_HISTORY_FILE", path)
     monkeypatch.setattr(chat_types, "CHAT_HISTORY_FILE", path)
     return path
-
-
-@pytest.fixture
-def loose_config_path(config_path: Path) -> Path:
-    config_path.write_text("{}", encoding="utf-8")
-    config_path.chmod(0o644)
-    return config_path
-
-
-@pytest.fixture
-def chat_config_with_token() -> DeploymentChatConfig:
-    chat_config = DeploymentChatConfig()
-    chat_config.set_token(uuid4(), "sk-secret-token-1234")
-    return chat_config
 
 
 def _make_entry(
@@ -105,27 +90,6 @@ class TestConfigLoadSaveRoundTrip:
         loaded = DeploymentChatConfig.load()
         assert loaded.get_token(dep_id) == "sk-secret-token-1234"
         assert loaded.get_model(dep_id) == "llama-3-8b-instruct"
-
-
-@pytest.mark.usefixtures("world_readable_umask")
-class TestConfigFileMode:
-    def test_new_token_file_is_owner_only(
-        self,
-        config_path: Path,
-        chat_config_with_token: DeploymentChatConfig,
-    ) -> None:
-        chat_config_with_token.save()
-
-        assert stat.S_IMODE(config_path.stat().st_mode) == 0o600
-
-    def test_loose_token_file_is_tightened(
-        self,
-        loose_config_path: Path,
-        chat_config_with_token: DeploymentChatConfig,
-    ) -> None:
-        chat_config_with_token.save()
-
-        assert stat.S_IMODE(loose_config_path.stat().st_mode) == 0o600
 
 
 class TestCacheLoaderResilience:

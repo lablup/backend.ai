@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from typing import Any
 
 import click
@@ -42,12 +41,7 @@ def _save_toml(path: click.Path, data: dict[str, Any]) -> None:
 
     p = P(str(path))
     p.parent.mkdir(parents=True, exist_ok=True)
-    with open(
-        p,
-        "wb",
-        opener=lambda opened_path, flags: os.open(opened_path, flags, OWNER_ONLY_FILE_MODE),
-    ) as f:
-        os.fchmod(f.fileno(), OWNER_ONLY_FILE_MODE)
+    with p.open("wb") as f:
         tomli_w.dump(data, f)
 
 
@@ -107,6 +101,8 @@ def set_value(key: str, value: str) -> None:
         section[toml_key] = value
 
     _save_toml(path, data)
+    if file_type == "credentials":
+        path.chmod(OWNER_ONLY_FILE_MODE)
     click.echo(f"Set {key} = {value}")
 
 

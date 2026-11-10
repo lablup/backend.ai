@@ -1,37 +1,53 @@
 from __future__ import annotations
 
 import stat
-import tomllib
 from pathlib import Path
 
 import pytest
+from click.testing import CliRunner
 
-from ai.backend.client.cli.v2.config_cmd import _save_toml
-
-_CREDENTIALS = {"backend-ai": {"access_key": "access", "secret_key": "secret"}}
-
-
-@pytest.fixture
-def credentials_path_before_first_save(tmp_path: Path, world_readable_umask: None) -> Path:
-    return tmp_path / ".backend.ai" / "credentials.toml"
+from ai.backend.client.cli.v2 import v2
 
 
 @pytest.fixture
-def loose_credentials_path(credentials_path_before_first_save: Path) -> Path:
-    credentials_path_before_first_save.parent.mkdir()
-    credentials_path_before_first_save.write_text('[backend-ai]\naccess_key = "old"\n')
-    credentials_path_before_first_save.chmod(0o644)
-    return credentials_path_before_first_save
+def home_before_first_config_set(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    world_readable_umask: None,
+) -> Path:
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.delenv("BACKEND_PROFILE", raising=False)
+    return tmp_path
 
 
-class TestSaveToml:
-    def test_new_file_is_owner_only(self, credentials_path_before_first_save: Path) -> None:
-        _save_toml(credentials_path_before_first_save, _CREDENTIALS)
+@pytest.fixture
+def home_holding_loose_credentials(home_before_first_config_set: Path) -> Path:
+    credentials_path = home_before_first_config_set / ".backend.ai" / "credentials.toml"
+    credentials_path.parent.mkdir()
+    credentials_path.write_text('[backend-ai]\naccess_key = "old"\n')
+    credentials_path.chmod(0o644)
+    return home_before_first_config_set
 
-        assert stat.S_IMODE(credentials_path_before_first_save.stat().st_mode) == 0o600
 
-    def test_loose_file_is_tightened_and_rewritten(self, loose_credentials_path: Path) -> None:
-        _save_toml(loose_credentials_path, _CREDENTIALS)
+class TestConfigSetCredentialsFileMode:
+    def test_new_credentials_file_is_owner_only(
+        self,
+        runner: CliRunner,
+        home_before_first_config_set: Path,
+    ) -> None:
+        result = runner.invoke(v2, ["config", "set", "secret-key", "secret"])
 
-        assert stat.S_IMODE(loose_credentials_path.stat().st_mode) == 0o600
-        assert tomllib.loads(loose_credentials_path.read_text()) == _CREDENTIALS
+        assert result.exit_code == 0, result.output
+        credentials_path = home_before_first_config_set / ".backend.ai" / "credentials.toml"
+        assert stat.S_IMODE(credentials_path.stat().st_mode) == 0o600
+
+    def test_loose_credentials_file_is_tightened(
+        self,
+        runner: CliRunner,
+        home_holding_loose_credentials: Path,
+    ) -> None:
+        result = runner.invoke(v2, ["config", "set", "secret-key", "secret"])
+
+        assert result.exit_code == 0, result.output
+        credentials_path = home_holding_loose_credentials / ".backend.ai" / "credentials.toml"
+        assert stat.S_IMODE(credentials_path.stat().st_mode) == 0o600

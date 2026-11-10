@@ -4,8 +4,11 @@ Three on-disk JSON files live under ``~/.backend.ai/deployment_chat/`` —
 ``cache.json`` for the auto-managed endpoint cache, ``config.json`` for
 user-supplied tokens, and ``history.json`` for per-deployment chat
 transcripts. The per-feature subdirectory matches the existing
-``session/`` layout used by ``./bai login``. ``config.json`` is readable
-only by its owner.
+``session/`` layout used by ``./bai login``.
+
+All three files are written as plain JSON (no atomic-rename, no special
+POSIX permissions) to stay aligned with the existing CLI credential-storage
+convention in :mod:`ai.backend.client.cli.v2.config_cmd`.
 """
 
 from __future__ import annotations

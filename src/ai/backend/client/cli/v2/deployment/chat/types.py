@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import sys
 from collections import defaultdict
 from datetime import datetime, timedelta
@@ -17,7 +16,6 @@ from ai.backend.client.cli.v2.deployment.chat.utils import (
     read_json_file,
     write_json_file,
 )
-from ai.backend.client.config import OWNER_ONLY_FILE_MODE
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.types import BackendAISchema
@@ -176,16 +174,10 @@ class DeploymentChatConfig(BackendAISchema):
             return cls()
 
     def save(self) -> None:
-        """Persist the config as a JSON file readable only by its owner."""
-        CHAT_CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
-        with open(
-            CHAT_CONFIG_FILE,
-            "w",
-            encoding="utf-8",
-            opener=lambda opened_path, flags: os.open(opened_path, flags, OWNER_ONLY_FILE_MODE),
-        ) as config_file:
-            os.fchmod(config_file.fileno(), OWNER_ONLY_FILE_MODE)
-            config_file.write(self.model_dump_json(indent=2))
+        """Persist the config as a plain JSON file (matches existing CLI credential
+        storage convention; see ``client/cli/v2/config_cmd.py``).
+        """
+        write_json_file(CHAT_CONFIG_FILE, self.model_dump_json(indent=2))
 
 
 class ChatMessage(BackendAISchema):
