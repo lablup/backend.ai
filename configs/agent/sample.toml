@@ -769,8 +769,9 @@
   # Added in 25.12.0
   log-stats = false
   # Logs the kernel configuration sent to containers at startup. Shows
-  # environment variables, mount points, and execution settings. Helpful for
-  # debugging container initialization or configuration issues.
+  # environment variable names (values masked), mount points, and execution
+  # settings. Helpful for debugging container initialization or configuration
+  # issues.
   # Added in 25.12.0
   log-kernel-config = false
   # Logs the resource allocation map showing which resources (CPU cores, GPUs)
@@ -861,21 +862,17 @@
     # Connect to etcd over TLS.
     # Added in 26.10.0
     enabled = false
-
     # PEM file of the CA certificate that signed the etcd server certificate.
     # Required if TLS is enabled.
     # Added in 26.10.0
     ## ca-cert = "/etc/backend.ai/etcd/ca.pem"
-
     # PEM file of the client certificate, for an etcd started with --client-
     # cert-auth. Set together with client-key.
     # Added in 26.10.0
     ## client-cert = "/etc/backend.ai/etcd/client.pem"
-
     # PEM file of the client private key. Set together with client-cert.
     # Added in 26.10.0
     ## client-key = "/etc/backend.ai/etcd/client-key.pem"
-
     # Seconds to wait for the TLS handshake with an etcd member. When not set,
     # the handshake has no limit: request timeouts do not end it.
     # Added in 26.10.0
