@@ -1,11 +1,9 @@
 import uuid
-<<<<<<< HEAD
-=======
 from collections.abc import Mapping, Sequence
->>>>>>> ca95a63b (fix(BA-8972): mask artifact registry credentials for callers who are not superadmins (#16643))
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
