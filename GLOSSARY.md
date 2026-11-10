@@ -72,6 +72,8 @@ The term files set the terms. This list covers verbs and predicates. Korean word
 |---|---|
 | bring up, brought up, Brings up | start |
 | refuse | reject |
+| discard (an alternative) | reject |
+| pair up | combine |
 | tell apart, keep apart, split apart | distinguish |
 | is answered for by | active voice: the owning entity answers for it |
 | outgoing pattern, parent-fixed variants are the outgoing pattern | legacy pattern, marked as deprecated |
