@@ -175,6 +175,18 @@ async def static_handler(request: web.Request) -> web.StreamResponse:
         file_path.relative_to(static_path)
     except (ValueError, FileNotFoundError) as e:
         raise StaticFileNotFoundError() from e
+<<<<<<< HEAD
+=======
+    if relative_path.as_posix() in {
+        "stats",
+        "config.ini",
+        "version.json",
+    } or file_path.name.endswith((
+        ".js.map",
+        ".css.map",
+    )):
+        raise StaticFileNotFoundError()
+>>>>>>> 581042d2 (fix(BA-8973): serve `version.json` only to clients with a login session (#16735))
     if file_path.is_file():
         return apply_cache_headers(web.FileResponse(file_path), request_path)
     raise StaticFileNotFoundError()
@@ -216,6 +228,16 @@ async def config_toml_handler(request: web.Request) -> web.Response:
     return web.Response(text=config_content, content_type="text/plain")
 
 
+async def version_json_handler(request: web.Request) -> web.StreamResponse:
+    session = await get_session(request)
+    if not session.get("authenticated", False):
+        raise UnauthenticatedError()
+    config = cast(WebServerUnifiedConfig, request.app["config"])
+    return apply_cache_headers(
+        web.FileResponse(config.service.static_path / "version.json"), "version.json"
+    )
+
+
 async def console_handler(request: web.Request) -> web.StreamResponse:
     stats: WebStats = request.app["stats"]
     stats.active_webui_handlers.add(asyncio.current_task())
@@ -234,6 +256,18 @@ async def console_handler(request: web.Request) -> web.StreamResponse:
             }),
             content_type="application/problem+json",
         ) from e
+<<<<<<< HEAD
+=======
+    if relative_path.as_posix() in {
+        "stats",
+        "config.ini",
+        "version.json",
+    } or file_path.name.endswith((
+        ".js.map",
+        ".css.map",
+    )):
+        raise StaticFileNotFoundError()
+>>>>>>> 581042d2 (fix(BA-8973): serve `version.json` only to clients with a login session (#16735))
     index_path = (static_path / "index.html").resolve()
     if file_path.is_file() and file_path != index_path:
         return apply_cache_headers(web.FileResponse(file_path), request_path)
@@ -1131,6 +1165,7 @@ async def webapp_ctx(
     cors.add(app.router.add_route("POST", "/pipeline/{path:.*$}", pipeline_handler))
     cors.add(app.router.add_route("PATCH", "/pipeline/{path:.*$}", pipeline_handler))
     cors.add(app.router.add_route("DELETE", "/pipeline/{path:.*$}", pipeline_handler))
+    cors.add(app.router.add_route("GET", "/version.json", version_json_handler))
     if config.service.mode == ServiceMode.WEBUI:
         cors.add(app.router.add_route("GET", "/config.ini", config_ini_handler))
         cors.add(app.router.add_route("GET", "/config.toml", config_toml_handler))
