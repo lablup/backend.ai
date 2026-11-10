@@ -220,6 +220,9 @@ providers:
     rootKey: "traefik/worker_worker-1"
     endpoints:
       - "backendai-half-etcd:2379"
+    # The halfstack etcd root credentials.
+    username: "root"
+    password: "develove"
 
 log:
   level: INFO
