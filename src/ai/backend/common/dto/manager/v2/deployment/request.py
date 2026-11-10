@@ -48,6 +48,7 @@ from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.common.typed_validators import HealthCheckPath
 from ai.backend.common.types import (
     AutoScalingMetricSource,
     ClusterMode,
@@ -125,7 +126,7 @@ __all__ = (
 class ModelHealthCheckInput(BaseRequestModel):
     enable: bool = False
     interval: float | None = None
-    path: str | None = None
+    path: HealthCheckPath | None = None
     max_retries: int | None = None
     max_wait_time: float | None = None
     expected_status_code: int | None = None
