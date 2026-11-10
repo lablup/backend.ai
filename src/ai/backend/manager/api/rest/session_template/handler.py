@@ -58,6 +58,9 @@ from ai.backend.manager.services.template.actions.delete_task_template import (
 from ai.backend.manager.services.template.actions.get_task_template import (
     GetTaskTemplateAction,
 )
+from ai.backend.manager.services.template.actions.global_list_task_templates import (
+    GlobalListTaskTemplatesAction,
+)
 from ai.backend.manager.services.template.actions.list_task_templates import (
     ListTaskTemplatesAction,
 )
@@ -142,8 +145,21 @@ class SessionTemplateHandler:
         ctx: UserContext,
         req: RequestCtx,
     ) -> APIResponse:
-        action = ListTaskTemplatesAction(user_uuid=UserID(ctx.user_uuid))
-        result = await self._template.list_task.run(action)
+        params = query.parsed
+        if params.all and ctx.is_superadmin:
+            global_result = await self._template.global_list_task.run(
+                GlobalListTaskTemplatesAction(requester_id=UserID(ctx.user_uuid))
+            )
+            entries = global_result.entries
+        else:
+            scoped_result = await self._template.list_task.run(
+                ListTaskTemplatesAction(
+                    user_uuid=UserID(ctx.user_uuid),
+                    user_role=req.request["user"]["role"],
+                    domain_name=ctx.user_domain,
+                )
+            )
+            entries = scoped_result.entries
 
         items = [
             SessionTemplateListItemDTO(
@@ -159,7 +175,7 @@ class SessionTemplateHandler:
                 type=str(entry["type"]),
                 template=entry["template"],
             )
-            for entry in result.entries
+            for entry in entries
         ]
         return APIResponse.build(
             HTTPStatus.OK,
