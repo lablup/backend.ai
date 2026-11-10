@@ -92,16 +92,15 @@ from ai.backend.web.clients.manager_pool import (
     ManagerPoolGateHealthChecker,
 )
 from ai.backend.web.config.unified import EventLoopType, ServiceMode, WebServerUnifiedConfig
-<<<<<<< HEAD
-=======
-from ai.backend.web.errors import ManagerConnectionUnavailable, UnauthenticatedError
-from ai.backend.web.ratelimit import manager_proxy_rate_limited
->>>>>>> 6e4504f45 (fix(BA-8944): reject extending a login session that is not authenticated (#16613))
 from ai.backend.web.security import SecurityPolicy, csp_nonce_var, security_policy_middleware
 
 from . import __version__, user_agent
 from .auth import build_forwarding_headers, fill_forwarding_hdrs_to_api_session, get_client_ip
-from .errors import InvalidAPIConfigurationError, UnexpectedAuthResponseError
+from .errors import (
+    InvalidAPIConfigurationError,
+    UnauthenticatedError,
+    UnexpectedAuthResponseError,
+)
 from .proxy import (
     decrypt_payload,
     web_handler,
