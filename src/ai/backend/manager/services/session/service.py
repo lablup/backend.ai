@@ -67,6 +67,7 @@ from ai.backend.manager.data.session.options import (
     ResourceOpts,
 )
 from ai.backend.manager.defs import DEFAULT_ROLE
+from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.common import (
     InternalServerError,
     ServiceUnavailable,
@@ -239,6 +240,7 @@ from ai.backend.manager.services.session.types import (
 from ai.backend.manager.services.session.utils import drop_undefined
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.types import UserScope
+from ai.backend.manager.utils import check_if_requester_is_eligible_to_act_as_target_user
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -1544,6 +1546,16 @@ class SessionService:
                 raise InternalServerError(
                     f"Delegated owner {action.owner_id} has no domain configured"
                 )
+            if action.owner_id != action.user_id:
+                try:
+                    check_if_requester_is_eligible_to_act_as_target_user(
+                        action.user_role,
+                        action.domain_name,
+                        owner.role,
+                        owner.domain_name,
+                    )
+                except RuntimeError as e:
+                    raise InsufficientPrivilege(str(e)) from e
             user_id = owner.id
             access_key = AccessKey(owner.main_access_key)
             domain_name = owner.domain_name
