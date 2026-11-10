@@ -547,29 +547,6 @@ class TestDeleteClusterTemplate:
         assert result.success is True
 
 
-async def _create_cluster_template_with_its_session_template(
-    registry: BackendAIClientRegistry,
-    domain_name: str,
-    group_name: str,
-    name: str,
-) -> str:
-    session_template_result = await registry.template.create_session_template(
-        CreateSessionTemplateRequest(
-            domain=domain_name,
-            group=group_name,
-            payload=_session_template_payload(f"{name}-dep"),
-        ),
-    )
-    cluster_template_result = await registry.template.create_cluster_template(
-        CreateClusterTemplateRequest(
-            domain=domain_name,
-            group=group_name,
-            payload=_cluster_template_payload(name, session_template_result.root[0].id),
-        ),
-    )
-    return cluster_template_result.id
-
-
 class TestClusterTemplateOwnerCheck:
     @pytest.fixture
     async def cluster_template_id_owned_by_admin(
@@ -578,9 +555,23 @@ class TestClusterTemplateOwnerCheck:
         domain_fixture: DomainFixtureData,
         group_name_fixture: str,
     ) -> str:
-        return await _create_cluster_template_with_its_session_template(
-            admin_registry, domain_fixture.domain_name, group_name_fixture, "ct-owned-by-admin"
+        session_template_result = await admin_registry.template.create_session_template(
+            CreateSessionTemplateRequest(
+                domain=domain_fixture.domain_name,
+                group=group_name_fixture,
+                payload=_session_template_payload("ct-owned-by-admin-dep"),
+            ),
         )
+        cluster_template_result = await admin_registry.template.create_cluster_template(
+            CreateClusterTemplateRequest(
+                domain=domain_fixture.domain_name,
+                group=group_name_fixture,
+                payload=_cluster_template_payload(
+                    "ct-owned-by-admin", session_template_result.root[0].id
+                ),
+            ),
+        )
+        return cluster_template_result.id
 
     @pytest.fixture
     async def cluster_template_id_owned_by_user(
@@ -589,9 +580,23 @@ class TestClusterTemplateOwnerCheck:
         domain_fixture: DomainFixtureData,
         group_name_fixture: str,
     ) -> str:
-        return await _create_cluster_template_with_its_session_template(
-            user_registry, domain_fixture.domain_name, group_name_fixture, "ct-owned-by-user"
+        session_template_result = await user_registry.template.create_session_template(
+            CreateSessionTemplateRequest(
+                domain=domain_fixture.domain_name,
+                group=group_name_fixture,
+                payload=_session_template_payload("ct-owned-by-user-dep"),
+            ),
         )
+        cluster_template_result = await user_registry.template.create_cluster_template(
+            CreateClusterTemplateRequest(
+                domain=domain_fixture.domain_name,
+                group=group_name_fixture,
+                payload=_cluster_template_payload(
+                    "ct-owned-by-user", session_template_result.root[0].id
+                ),
+            ),
+        )
+        return cluster_template_result.id
 
     async def test_owner_gets_their_cluster_template(
         self,
