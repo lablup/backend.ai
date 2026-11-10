@@ -3,12 +3,10 @@ from __future__ import annotations
 import os
 import sys
 from pathlib import Path
-from pprint import pformat
 
 from ai.backend.common.config import ConfigurationError as BaseConfigError
 from ai.backend.common.config import override_key, override_with_env, read_from_file
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.exception import BackendAIError, BackendAISchemaValidationFailed
 from ai.backend.logging import LogLevel
 
 from .unified import StorageProxyUnifiedConfig
@@ -37,22 +35,11 @@ def load_local_config(
     try:
         return StorageProxyUnifiedConfig.model_validate(raw_cfg)
     except Exception as e:
-        if isinstance(e, BackendAISchemaValidationFailed):
-            # The wrapped ValidationError's message embeds input values; its errors() does not.
-            detail = pformat(e.errors())
-        elif isinstance(e, BackendAIError):
-            # Raised directly by the after-validators with a fixed message.
-            detail = str(e)
-        else:
-            detail = type(e).__name__
         print(
-            "ConfigurationError: Validation of storage-proxy local config has failed:",
-            detail,
-            sep="\n",
+            f"ConfigurationError: Validation of storage-proxy local config has failed, {e}",
             file=sys.stderr,
         )
-        # Neither the raw config nor the chained error may reach a traceback: both hold secrets.
-        raise BaseConfigError({}) from None
+        raise BaseConfigError({"error": str(e)}) from e
 
 
 def make_etcd(local_config: StorageProxyUnifiedConfig) -> AsyncEtcd:
