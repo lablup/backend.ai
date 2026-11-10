@@ -2567,8 +2567,7 @@ class AgentGlobalConfig(BaseConfigSchema):
         BackendAIConfigMeta(
             description=(
                 "Redis configuration. Redis is used for inter-agent communication, caching, and "
-                "pub/sub messaging. Set only the settings read only from this file, such as the "
-                "password; the other settings are injected from etcd at runtime."
+                "pub/sub messaging. The agent reads it only from this file."
             ),
             added_version="25.12.0",
             composite=CompositeType.FIELD,
