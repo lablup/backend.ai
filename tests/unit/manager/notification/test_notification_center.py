@@ -7,7 +7,6 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from ai.backend.common.data.entity.notification import NotificationChannelID
 from ai.backend.common.data.notification import SessionStartedMessage
 from ai.backend.common.data.notification.types import (
     NotificationChannelType,
@@ -33,7 +32,7 @@ def _params(message_template: str) -> ProcessRuleParams:
         message_template=message_template,
         rule_type=NotificationRuleType.SESSION_STARTED,
         channel=NotificationChannelData(
-            id=NotificationChannelID(uuid.uuid4()),
+            id=uuid.uuid4(),
             name="test-webhook",
             description=None,
             channel_type=NotificationChannelType.WEBHOOK,
