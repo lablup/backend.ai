@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
+from dataclasses import dataclass
 
 import pytest
 import sqlalchemy as sa
@@ -79,7 +80,9 @@ from ai.backend.manager.models.user import (
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import (
     VFolderInvitationRow,
+    VFolderPermission,
     VFolderPermissionRow,
+    VFolderPermissionSetAlias,
     VFolderRow,
 )
 from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurger
@@ -88,6 +91,13 @@ from ai.backend.manager.repositories.vfolder.purgers import VFolderPurgerSpec
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.repositories.vfolder.updaters import VFolderTrashUpdaterSpec
 from ai.backend.testutils.db import with_tables
+
+_REUSED_VFOLDER_NAME = "reused-name"
+
+
+@dataclass(frozen=True)
+class _ModelStoreHoldingDeletedAndLiveVFolderOfSameName:
+    live_vfolder_id: uuid.UUID
 
 
 class TestVfolderRepository:
@@ -349,6 +359,64 @@ class TestVfolderRepository:
         assert vfolder_data.usage_mode == VFolderUsageMode.MODEL
         assert vfolder_data.ownership_type == VFolderOwnershipType.GROUP
         assert vfolder_data.group == test_model_store_group
+
+    @pytest.fixture
+    async def model_store_holding_deleted_and_live_vfolder_of_same_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_user: uuid.UUID,
+        test_model_store_group: uuid.UUID,
+    ) -> _ModelStoreHoldingDeletedAndLiveVFolderOfSameName:
+        deleted_vfolder_id = uuid.uuid4()
+        live_vfolder_id = uuid.uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            for vfolder_id, status in (
+                (deleted_vfolder_id, VFolderOperationStatus.DELETE_COMPLETE),
+                (live_vfolder_id, VFolderOperationStatus.READY),
+            ):
+                db_sess.add(
+                    VFolderRow(
+                        id=vfolder_id,
+                        name=_REUSED_VFOLDER_NAME,
+                        host="local",
+                        domain_name=test_domain_name,
+                        quota_scope_id=f"project:{test_model_store_group}",
+                        usage_mode=VFolderUsageMode.MODEL,
+                        permission=VFolderPermission.READ_ONLY,
+                        ownership_type=VFolderOwnershipType.GROUP,
+                        user=None,
+                        group=test_model_store_group,
+                        creator=f"test-{test_user.hex[:8]}@example.com",
+                        creator_id=test_user,
+                        unmanaged_path=None,
+                        cloneable=False,
+                        status=status,
+                    )
+                )
+            await db_sess.flush()
+        return _ModelStoreHoldingDeletedAndLiveVFolderOfSameName(live_vfolder_id=live_vfolder_id)
+
+    async def test_name_resolves_to_live_model_store_vfolder_only(
+        self,
+        vfolder_repository: VfolderRepository,
+        test_domain_name: str,
+        test_user: uuid.UUID,
+        model_store_holding_deleted_and_live_vfolder_of_same_name: _ModelStoreHoldingDeletedAndLiveVFolderOfSameName,
+    ) -> None:
+        rows = await vfolder_repository.get_accessible_rows(
+            user_uuid=test_user,
+            user_role=UserRole.USER,
+            domain_name=test_domain_name,
+            is_admin=False,
+            allowed_vfolder_types=["user", "group"],
+            perm=VFolderPermissionSetAlias.READABLE,
+            folder_id_or_name=_REUSED_VFOLDER_NAME,
+        )
+
+        assert [row["id"] for row in rows] == [
+            model_store_holding_deleted_and_live_vfolder_of_same_name.live_vfolder_id
+        ]
 
 
 class TestVfolderRepositoryAllowedVfolderHosts:
