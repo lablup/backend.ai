@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import aiohttp_cors
 import pytest
+import tomli
 from aiohttp import web
 from aiohttp.test_utils import make_mocked_request
 
@@ -20,10 +21,12 @@ from ai.backend.web.config.unified import SecurityConfig, WebServerUnifiedConfig
 from ai.backend.web.errors import UnauthenticatedError
 from ai.backend.web.server import (
     build_cors_options,
+    config_toml_handler,
     extend_login_session,
     update_password_no_auth,
     version_json_handler,
 )
+from ai.backend.web.template import build_template_environment
 
 MANAGER_ENDPOINT = "http://manager:8081"
 PASSWORD_UPDATE_BODY = {
@@ -313,6 +316,21 @@ class TestCorsAllowedOriginsConfig:
             SecurityConfig.model_validate({"cors-allowed-origins": [origin]})
 
 
+LOGIN_SCREEN_FIELDS = {
+    "apiEndpoint",
+    "apiEndpointText",
+    "apiDomainName",
+    "connectionMode",
+    "signupSupport",
+    "allowChangeSigninMode",
+    "allowAnonymousChangePassword",
+    "allowSignupWithoutConfirmation",
+    "singleSignOnVendors",
+    "ssoRealmName",
+    "enableInteractiveLoginAccountSwitch",
+}
+
+
 async def _login(request: web.Request) -> web.Response:
     session = await get_session(request)
     session["authenticated"] = True
@@ -350,3 +368,48 @@ class TestVersionJsonHandler:
         resp = await client.get("/version.json")
         assert resp.status == 200
         assert await resp.text() == _VERSION_JSON
+
+
+class TestConfigTomlHandler:
+    @pytest.fixture
+    def app(self) -> web.Application:
+        app = web.Application()
+        setup_session(app, SimpleCookieStorage())
+        app["config"] = WebServerUnifiedConfig.model_validate({
+            "service": {
+                "sso-realm-name": "corp",
+                "single-sign-on-vendors": "saml",
+                "hide-agents": False,
+            },
+            "ui": {"menu-blocklist": "agent"},
+        })
+        app["j2env"] = build_template_environment()
+        app.router.add_route("GET", "/config.toml", config_toml_handler)
+        app.router.add_route("POST", "/login", _login)
+        return app
+
+    async def test_before_login_only_the_login_screen_fields_are_served(
+        self, aiohttp_client: Any, app: web.Application
+    ) -> None:
+        client = await aiohttp_client(app)
+        resp = await client.get("/config.toml")
+        assert resp.status == 200
+        assert resp.headers["Cache-Control"] == "no-store"
+        config = tomli.loads(await resp.text())
+        assert set(config) == {"general"}
+        assert set(config["general"]) == LOGIN_SCREEN_FIELDS
+        assert config["general"]["ssoRealmName"] == "corp"
+
+    async def test_after_login_the_whole_config_is_served(
+        self, aiohttp_client: Any, app: web.Application
+    ) -> None:
+        client = await aiohttp_client(app)
+        before_login = tomli.loads(await (await client.get("/config.toml")).text())
+        await client.post("/login")
+        resp = await client.get("/config.toml")
+        assert resp.status == 200
+        config = tomli.loads(await resp.text())
+        assert set(before_login["general"]) < set(config["general"])
+        assert config["general"]["hideAgents"] is False
+        assert {"resources", "environments", "menu", "plugin", "wsproxy", "pipeline"} <= set(config)
+        assert config["menu"]["blocklist"] == "agent"

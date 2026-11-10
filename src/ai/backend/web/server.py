@@ -129,7 +129,7 @@ from .proxy import (
 from .proxy import (
     pipeline_handler as pipeline_request_handler,
 )
-from .template import toml_scalar
+from .template import build_template_environment
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -189,6 +189,9 @@ async def static_handler(request: web.Request) -> web.StreamResponse:
 
 
 async def config_toml_handler(request: web.Request) -> web.Response:
+    """Serve the WebUI config. Before login only the fields the login screen reads are
+    rendered; the rest appears once the session is authenticated."""
+    session = await get_session(request)
     config = cast(WebServerUnifiedConfig, request.app["config"])
     force_protocol = config.service.force_endpoint_protocol
     if force_protocol is None:
@@ -200,8 +203,12 @@ async def config_toml_handler(request: web.Request) -> web.Response:
     config_content = tpl.render({
         "endpoint_url": f"{scheme}://{request.host}",  # must be absolute
         "config": config.model_dump(by_alias=True),
+        "authenticated": bool(session.get("authenticated", False)),
     })
-    return web.Response(text=config_content, content_type="text/plain")
+    response = web.Response(text=config_content, content_type="text/plain")
+    # The body depends on the session, so a shared cache must not keep it.
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 async def version_json_handler(request: web.Request) -> web.StreamResponse:
@@ -974,15 +981,7 @@ async def webapp_ctx(
     app["security_policy"] = SecurityPolicy.from_config(
         request_policy_config, response_policy_config, csp_policy_config
     )
-    j2env = jinja2.Environment(
-        extensions=[
-            "ai.backend.web.template.TOMLField",
-            "ai.backend.web.template.TOMLStringListField",
-        ],
-        loader=jinja2.PackageLoader("ai.backend.web", "templates"),
-    )
-    j2env.filters["toml_scalar"] = toml_scalar
-    app["j2env"] = j2env
+    app["j2env"] = build_template_environment()
 
     manager_pool = cast(HealthyEndpointPool, app["manager_pool"])
 
