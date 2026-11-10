@@ -31830,13 +31830,13 @@ input VFolderAutoMountFilter
 }
 
 """
-Added in 26.10.0. Filter selecting vfolders by the auto-mounts set on them. It reaches only the auto-mounts not marked deleted, so a `deletedAt` condition in it matches none. Each relation matches one auto-mount at a time.
+Added in 26.10.0. Filter selecting vfolders by the auto-mounts set on them. Auto-mounts marked deleted are left out of a relation unless its filter gives `deletedAt` at the top level; `exists` always leaves them out. Each relation matches one auto-mount at a time.
 """
 input VFolderAutoMountNestedFilter
   @join__type(graph: STRAWBERRY)
 {
   """
-  True for a vfolder that has at least one auto-mount, false for one that has none.
+  True for a vfolder that has at least one auto-mount not marked deleted, false for one that has none.
   """
   exists: Boolean = null
 
@@ -32022,7 +32022,7 @@ input VFolderFilter
   entityId: UUIDFilter = null
 
   """
-  Added in 26.10.0. Select vfolders by the auto-mounts set on them. Auto-mounts marked deleted are not counted.
+  Added in 26.10.0. Select vfolders by the auto-mounts set on them. Auto-mounts marked deleted are left out unless the relation's filter gives `deletedAt` at the top level.
   """
   autoMounts: VFolderAutoMountNestedFilter = null
   AND: [VFolderFilter!] = null
