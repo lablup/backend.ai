@@ -198,6 +198,7 @@ class AuthHandler:
             username=params.username,
             full_name=params.full_name,
             description=params.description,
+            token=params.token,
         )
         result = await self._auth.signup.wait_for_complete(action)
         resp = SignupResponse(

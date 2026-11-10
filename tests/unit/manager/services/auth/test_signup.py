@@ -110,6 +110,7 @@ async def test_signup_successful_with_full_data(
         full_name="Full User Name",
         description="A test user account",
         request=MagicMock(),
+        token="signup-token",
     )
 
     # Setup hook behavior - both PRE_SIGNUP and VERIFY_PASSWORD_FORMAT pass
@@ -138,6 +139,20 @@ async def test_signup_successful_with_full_data(
     assert result.user_id == UUID("87654321-4321-8765-4321-876543218765")
     assert result.access_key == ak
     assert result.secret_key == sk
+    assert mock_hook_plugin_ctx.dispatch.call_args_list[0].args == (
+        "PRE_SIGNUP",
+        (
+            {
+                "domain": "custom",
+                "email": "fulluser@example.com",
+                "password": "another_secure_pass",
+                "username": "fulluser",
+                "full_name": "Full User Name",
+                "description": "A test user account",
+                "token": "signup-token",
+            },
+        ),
+    )
 
 
 async def test_signup_fails_when_email_already_exists(
