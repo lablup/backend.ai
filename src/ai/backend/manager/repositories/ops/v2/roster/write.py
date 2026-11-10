@@ -19,10 +19,8 @@ from typing import ClassVar
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
-from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import Permission
-from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.project.types import UnassignUserFailure
 from ai.backend.manager.data.user.types import UserData
@@ -88,10 +86,9 @@ class V2RosterWriteOps(V2WriteOps, V2CapOps):
         self,
         project_id: ProjectID,
         user_ids: Sequence[UserID],
-        role_id: RoleID | None = None,
     ) -> list[UserData]:
-        """Put the named users on the project's roster and grant them ``role_id``, or
-        the project's auto_assign roles where none is named. Answers who was added.
+        """Put the named users on the project's roster and grant them the project's
+        auto_assign roles. Answers who was added.
 
         Narrowed to users of the project's domain that are not already on it: a user
         outside the domain is not a member the project can take, and one already on the
@@ -100,17 +97,11 @@ class V2RosterWriteOps(V2WriteOps, V2CapOps):
         if not user_ids:
             return []
         await self._refuse_personal_project(project_id)
-        if role_id is not None and not await self._role_exists(role_id):
-            raise InvalidAPIParameters(f"Role not found: {role_id}")
         rows = await self._domain_users(project_id, user_ids, include_joined=False)
         if not rows:
             return []
         for row in rows:
             await self._join(project_id, UserID(row.uuid))
-        if role_id is not None:
-            await self._bulk_insert_ignore_conflicts([
-                UserRoleRow(user_id=row.uuid, role_id=role_id) for row in rows
-            ])
         return [UserSearchableFields.own.to_data(row) for row in rows]
 
     async def leave_member(self, project_id: ProjectID, user_id: UserID) -> None:
@@ -155,10 +146,6 @@ class V2RosterWriteOps(V2WriteOps, V2CapOps):
             members=[UserSearchableFields.own.to_data(row) for row in joined_rows],
             failures=failures,
         )
-
-    async def _role_exists(self, role_id: RoleID) -> bool:
-        stmt = sa.select(sa.literal(1)).select_from(RoleRow).where(RoleRow.id == role_id)
-        return (await self._sess.execute(stmt)).first() is not None
 
     async def _domain_users(
         self, project_id: ProjectID, user_ids: Collection[UserID], *, include_joined: bool

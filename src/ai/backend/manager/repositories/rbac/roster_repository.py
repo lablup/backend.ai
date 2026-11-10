@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from ai.backend.common.data.entity.project import ProjectID
-from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import BackendAIError
 from ai.backend.manager.data.user.types import UserData
@@ -31,12 +30,11 @@ class RbacRosterRepository:
         self,
         project_id: ProjectID,
         user_ids: Sequence[UserID],
-        role_id: RoleID | None = None,
     ) -> list[UserData]:
-        """Put the named users on the roster, granting ``role_id`` or the project's
-        auto_assign roles. Answers who joined."""
+        """Put the named users on the roster, granting the project's auto_assign roles.
+        Answers who joined."""
         async with self._ops.write_ops() as w:
-            return await w.join_members(project_id, user_ids, role_id)
+            return await w.join_members(project_id, user_ids)
 
     async def leave_members(
         self, project_id: ProjectID, user_ids: Sequence[UserID]

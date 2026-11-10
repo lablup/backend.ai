@@ -139,9 +139,7 @@ class RbacRosterService:
         self._repository = repository
 
     async def join(self, action: JoinProjectAction) -> JoinProjectActionResult:
-        members = await self._repository.join_members(
-            action.project_id, action.user_ids, action.role_id
-        )
+        members = await self._repository.join_members(action.project_id, action.user_ids)
         return JoinProjectActionResult(members=members)
 
     async def leave(self, action: LeaveProjectAction) -> LeaveProjectActionResult:

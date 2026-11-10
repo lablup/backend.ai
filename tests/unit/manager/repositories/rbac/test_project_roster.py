@@ -12,7 +12,6 @@ import sqlalchemy as sa
 from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
-from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.permission.types import Permission
@@ -334,25 +333,6 @@ class TestEnrollUsersInProject:
         )
 
     @pytest.fixture
-    async def test_role(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        test_project: ProjectID,
-    ) -> RoleID:
-        role_id = RoleID(uuid.uuid4())
-        async with db_with_cleanup.begin_session() as session:
-            session.add(
-                RoleRow(
-                    id=role_id,
-                    name=f"test-role-{role_id.hex[:8]}",
-                    scope_type=ProjectEntityType(),
-                    scope_id=test_project,
-                )
-            )
-            await session.commit()
-        return role_id
-
-    @pytest.fixture
     def roster_repository(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -366,13 +346,12 @@ class TestEnrollUsersInProject:
         db_with_cleanup: ExtendedAsyncSAEngine,
         roster_repository: RbacRosterRepository,
         test_project: ProjectID,
-        test_role: RoleID,
         same_domain_user_1: UserID,
         same_domain_user_2: UserID,
     ) -> None:
         """Active users in same domain are assigned successfully."""
         result = await roster_repository.join_members(
-            test_project, [same_domain_user_1, same_domain_user_2], test_role
+            test_project, [same_domain_user_1, same_domain_user_2]
         )
 
         assert len(result) == 2
@@ -396,10 +375,9 @@ class TestEnrollUsersInProject:
         self,
         roster_repository: RbacRosterRepository,
         test_project: ProjectID,
-        test_role: RoleID,
     ) -> None:
         """Empty user_ids list returns empty result without DB access."""
-        result = await roster_repository.join_members(test_project, [], test_role)
+        result = await roster_repository.join_members(test_project, [])
         assert result == []
 
     async def test_enroll_filters_users_already_on_the_roster(
@@ -407,17 +385,16 @@ class TestEnrollUsersInProject:
         db_with_cleanup: ExtendedAsyncSAEngine,
         roster_repository: RbacRosterRepository,
         test_project: ProjectID,
-        test_role: RoleID,
         same_domain_user_1: UserID,
         same_domain_user_2: UserID,
     ) -> None:
         """Already-assigned users are excluded; only new users are returned."""
         # Pre-assign user_1
-        await roster_repository.join_members(test_project, [same_domain_user_1], test_role)
+        await roster_repository.join_members(test_project, [same_domain_user_1])
 
         # Assign both — only user_2 should be returned
         result = await roster_repository.join_members(
-            test_project, [same_domain_user_1, same_domain_user_2], test_role
+            test_project, [same_domain_user_1, same_domain_user_2]
         )
 
         assert len(result) == 1
@@ -440,13 +417,12 @@ class TestEnrollUsersInProject:
         self,
         roster_repository: RbacRosterRepository,
         test_project: ProjectID,
-        test_role: RoleID,
         same_domain_user_1: UserID,
         cross_domain_user: UserID,
     ) -> None:
         """Users from a different domain are silently excluded."""
         result = await roster_repository.join_members(
-            test_project, [same_domain_user_1, cross_domain_user], test_role
+            test_project, [same_domain_user_1, cross_domain_user]
         )
 
         assert len(result) == 1
@@ -456,62 +432,34 @@ class TestEnrollUsersInProject:
         self,
         roster_repository: RbacRosterRepository,
         test_project: ProjectID,
-        test_role: RoleID,
     ) -> None:
         """Non-existent user UUIDs are silently excluded."""
         fake_user = UserID(uuid.uuid4())
-        result = await roster_repository.join_members(test_project, [fake_user], test_role)
+        result = await roster_repository.join_members(test_project, [fake_user])
         assert result == []
 
     async def test_enroll_all_invalid_returns_empty(
         self,
         roster_repository: RbacRosterRepository,
         test_project: ProjectID,
-        test_role: RoleID,
         cross_domain_user: UserID,
     ) -> None:
         """When all users are invalid (wrong domain, nonexistent), return empty."""
         fake_user = UserID(uuid.uuid4())
 
-        result = await roster_repository.join_members(
-            test_project, [cross_domain_user, fake_user], test_role
-        )
+        result = await roster_repository.join_members(test_project, [cross_domain_user, fake_user])
         assert result == []
-
-    async def test_enroll_creates_user_role_rows(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        roster_repository: RbacRosterRepository,
-        test_project: ProjectID,
-        test_role: RoleID,
-        same_domain_user_1: UserID,
-        same_domain_user_2: UserID,
-    ) -> None:
-        """Assign creates UserRoleRow records for each user with the given role."""
-        await roster_repository.join_members(
-            test_project, [same_domain_user_1, same_domain_user_2], test_role
-        )
-
-        async with db_with_cleanup.begin_readonly_session() as session:
-            rows = (
-                await session.scalars(
-                    sa.select(UserRoleRow).where(UserRoleRow.role_id == test_role)
-                )
-            ).all()
-            assert len(rows) == 2
-            assert {r.user_id for r in rows} == {same_domain_user_1, same_domain_user_2}
 
     async def test_enroll_writes_a_read_capped_roster_edge(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         roster_repository: RbacRosterRepository,
         test_project: ProjectID,
-        test_role: RoleID,
         same_domain_user_1: UserID,
     ) -> None:
         """Enrolling puts the user on the project's list under a READ cap, and writes no
         legacy scope association."""
-        await roster_repository.join_members(test_project, [same_domain_user_1], test_role)
+        await roster_repository.join_members(test_project, [same_domain_user_1])
 
         async with db_with_cleanup.begin_readonly_session() as session:
             membership_id = await session.scalar(
@@ -538,13 +486,12 @@ class TestEnrollUsersInProject:
         db_with_cleanup: ExtendedAsyncSAEngine,
         roster_repository: RbacRosterRepository,
         test_project: ProjectID,
-        test_role: RoleID,
         same_domain_user_1: UserID,
     ) -> None:
         """Assigned users become members of the project's virtual entity, and the project
         is not bound into theirs — project-scoped permissions must not reach the entities
         a member owns."""
-        await roster_repository.join_members(test_project, [same_domain_user_1], test_role)
+        await roster_repository.join_members(test_project, [same_domain_user_1])
 
         async with db_with_cleanup.begin_readonly_session() as session:
             user_vs_id = await session.scalar(
@@ -583,12 +530,11 @@ class TestEnrollUsersInProject:
         self,
         roster_repository: RbacRosterRepository,
         personal_project: ProjectID,
-        test_role: RoleID,
         same_domain_user_1: UserID,
     ) -> None:
         """A personal project keeps its owner as its only member."""
         with pytest.raises(PersonalProjectMemberAdditionError):
-            await roster_repository.join_members(personal_project, [same_domain_user_1], test_role)
+            await roster_repository.join_members(personal_project, [same_domain_user_1])
 
     async def test_enroll_one_user_in_personal_project_refused(
         self,
@@ -638,11 +584,10 @@ class TestEnrollUsersInProject:
         db_with_cleanup: ExtendedAsyncSAEngine,
         roster_repository: RbacRosterRepository,
         test_project: ProjectID,
-        test_role: RoleID,
         same_domain_user_1: UserID,
     ) -> None:
         """Joining a user already on the roster keeps the membership row and its caps."""
-        await roster_repository.join_members(test_project, [same_domain_user_1], test_role)
+        await roster_repository.join_members(test_project, [same_domain_user_1])
         before = await self._roster_place(db_with_cleanup, test_project, same_domain_user_1)
 
         await roster_repository.join_member(test_project, same_domain_user_1)
@@ -904,25 +849,6 @@ class TestWithdrawUsersFromProject:
         )
 
     @pytest.fixture
-    async def test_role(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        test_project: ProjectID,
-    ) -> RoleID:
-        role_id = RoleID(uuid.uuid4())
-        async with db_with_cleanup.begin_session() as session:
-            session.add(
-                RoleRow(
-                    id=role_id,
-                    name=f"test-role-{role_id.hex[:8]}",
-                    scope_type=ProjectEntityType(),
-                    scope_id=test_project,
-                )
-            )
-            await session.commit()
-        return role_id
-
-    @pytest.fixture
     def roster_repository(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -936,12 +862,11 @@ class TestWithdrawUsersFromProject:
         db_with_cleanup: ExtendedAsyncSAEngine,
         roster_repository: RbacRosterRepository,
         test_project: ProjectID,
-        test_role: RoleID,
         same_domain_user_1: UserID,
     ) -> None:
         """Unassign reports the users it removed from the project scope."""
         project_id = test_project
-        await roster_repository.join_members(project_id, [same_domain_user_1], test_role)
+        await roster_repository.join_members(project_id, [same_domain_user_1])
 
         result = await roster_repository.leave_members(project_id, [same_domain_user_1])
         assert len(result.members) == 1
@@ -952,12 +877,11 @@ class TestWithdrawUsersFromProject:
         db_with_cleanup: ExtendedAsyncSAEngine,
         roster_repository: RbacRosterRepository,
         test_project: ProjectID,
-        test_role: RoleID,
         same_domain_user_1: UserID,
     ) -> None:
         """Withdrawing takes the user off the project's list."""
         project_id = test_project
-        await roster_repository.join_members(project_id, [same_domain_user_1], test_role)
+        await roster_repository.join_members(project_id, [same_domain_user_1])
 
         await roster_repository.leave_members(project_id, [same_domain_user_1])
 
