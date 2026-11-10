@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from ai.backend.client.v2.exceptions import NotFoundError
+from ai.backend.client.v2.exceptions import NotFoundError, PermissionDeniedError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.dto.manager.template import (
     CreateClusterTemplateRequest,
@@ -210,18 +210,25 @@ class TestListSessionTemplates:
 
         assert created.root[0].id in [item.id for item in result.root]
 
-    @pytest.mark.parametrize("list_all", [False, True], ids=["default", "asking-for-all"])
     async def test_user_does_not_see_a_project_they_are_not_in(
         self,
         user_registry: BackendAIClientRegistry,
         task_template_id_in_a_project_nobody_joined: str,
-        list_all: bool,
     ) -> None:
         result = await user_registry.template.list_session_templates(
-            ListSessionTemplatesRequest(all=list_all),
+            ListSessionTemplatesRequest(),
         )
 
         assert task_template_id_in_a_project_nobody_joined not in [item.id for item in result.root]
+
+    async def test_user_asking_for_all_is_rejected(
+        self,
+        user_registry: BackendAIClientRegistry,
+    ) -> None:
+        with pytest.raises(PermissionDeniedError):
+            await user_registry.template.list_session_templates(
+                ListSessionTemplatesRequest(all=True),
+            )
 
     async def test_superadmin_asking_for_all_sees_every_template(
         self,
