@@ -1,4 +1,4 @@
-"""modifyGroup keeps an admin inside their domain. (BA-8902)"""
+"""modifyGroup keeps an admin inside their domain."""
 
 from __future__ import annotations
 

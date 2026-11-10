@@ -1,5 +1,5 @@
 """The container registry quota mutations pass the privilege check for a superadmin only,
-as the REST endpoints do. (BA-8902)"""
+as the REST endpoints do."""
 
 from __future__ import annotations
 
