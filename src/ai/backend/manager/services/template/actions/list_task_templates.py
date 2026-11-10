@@ -1,24 +1,22 @@
 from __future__ import annotations
 
-import uuid
 from dataclasses import dataclass, field
-from typing import Any, override
+from typing import override
 
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.models.user.row import UserRole
+from ai.backend.manager.data.session_template.types import (
+    SessionTemplateWithOwnerEmailAndProjectName,
+)
 
 from .base import TemplateScopeActionResult, TemplateUserScopeAction
 
 
 @dataclass
 class ListTaskTemplatesAction(TemplateUserScopeAction):
-    """Action to list the task templates the requester may see."""
+    """List the task templates the requester or a project they joined holds."""
 
-    user_role: UserRole
-    domain_name: str
-    is_superadmin: bool
-    list_all: bool
-    group_id_filter: uuid.UUID | None = None
+    group_id_filter: ProjectID | None = None
 
     @override
     @classmethod
@@ -35,4 +33,4 @@ class ListTaskTemplatesAction(TemplateUserScopeAction):
 class ListTaskTemplatesActionResult(TemplateScopeActionResult):
     """Result of listing task templates."""
 
-    entries: list[dict[str, Any]] = field(default_factory=list)
+    entries: list[SessionTemplateWithOwnerEmailAndProjectName] = field(default_factory=list)

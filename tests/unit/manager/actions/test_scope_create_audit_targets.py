@@ -18,6 +18,7 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.session_template import SessionTemplateID
 from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.audit_policy import AuditLogPolicy
@@ -71,7 +72,8 @@ _PROJECT_ID = ProjectID(uuid.uuid4())
 _SESSION_UUID = uuid.uuid4()
 _DEPLOYMENT_ID = DeploymentID(uuid.uuid4())
 _VFOLDER_ID = VFolderUUID(uuid.uuid4())
-_TEMPLATE_UUIDS = (uuid.uuid4(), uuid.uuid4())
+_TEMPLATE_IDS = (SessionTemplateID(uuid.uuid4()), SessionTemplateID(uuid.uuid4()))
+_TEMPLATE_OWNER_ID = UserID(uuid.uuid4())
 
 
 @dataclass(frozen=True)
@@ -97,7 +99,7 @@ def _template_create_kwargs() -> dict[str, Any]:
     return {
         "requesting_project": _PROJECT_ID,
         "domain_name": "default",
-        "requester_uuid": uuid.uuid4(),
+        "requester_uuid": UserID(uuid.uuid4()),
         "requester_access_key": "AKTEST",
         "requester_role": UserRole.USER,
         "requester_domain": "default",
@@ -170,15 +172,18 @@ _CASES: dict[str, _Case] = {
     ),
     "create_cluster_template": _Case(
         action=CreateClusterTemplateAction(**_template_create_kwargs(), template_data={}),
-        result=CreateClusterTemplateActionResult(id=_TEMPLATE_UUIDS[0].hex, user="u"),
-        expected_entity_ids=(SessionTemplateID(_TEMPLATE_UUIDS[0]),),
+        result=CreateClusterTemplateActionResult(id=_TEMPLATE_IDS[0], user=_TEMPLATE_OWNER_ID),
+        expected_entity_ids=(_TEMPLATE_IDS[0],),
     ),
     "create_task_template": _Case(
         action=CreateTaskTemplateAction(**_template_create_kwargs()),
         result=CreateTaskTemplateActionResult(
-            created=[CreatedTaskTemplateItem(id=u.hex, user="u") for u in _TEMPLATE_UUIDS]
+            created=[
+                CreatedTaskTemplateItem(id=template_id, user=_TEMPLATE_OWNER_ID)
+                for template_id in _TEMPLATE_IDS
+            ]
         ),
-        expected_entity_ids=tuple(SessionTemplateID(u) for u in _TEMPLATE_UUIDS),
+        expected_entity_ids=_TEMPLATE_IDS,
     ),
     "create_vfolder": _Case(
         action=CreateVFolderAction(creator=_vfolder_creator()),

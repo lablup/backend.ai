@@ -1,16 +1,22 @@
 from __future__ import annotations
 
-import uuid
-from collections.abc import Iterable, Mapping
+from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, Any
 
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.session_template import SessionTemplateID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.manager.data.session_template.types import TemplateType
+from ai.backend.manager.data.session_template.types import (
+    SessionTemplateData,
+    SessionTemplateWithOwnerEmailAndProjectName,
+    TemplateType,
+)
+from ai.backend.manager.models.session_template.scopes import SessionTemplateTarget
 from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.template.db_source.db_source import TemplateDBSource
@@ -46,14 +52,14 @@ class TemplateRepository:
     @template_repository_resilience.apply()
     async def resolve_owner(
         self,
-        requester_uuid: uuid.UUID,
+        requester_uuid: UserID,
         requester_access_key: str,
         requester_role: UserRole,
         requester_domain: str,
         requesting_domain: str,
         requesting_project_id: ProjectID,
         owner_access_key: str | None = None,
-    ) -> tuple[uuid.UUID, ProjectID]:
+    ) -> tuple[UserID, ProjectID]:
         return await self._db_source.resolve_owner(
             requester_uuid,
             requester_access_key,
@@ -71,27 +77,23 @@ class TemplateRepository:
         self,
         domain_name: str,
         items: list[dict[str, Any]],
-    ) -> list[dict[str, str]]:
-        return await self._db_source.create_task_templates(domain_name, items)
+    ) -> None:
+        await self._db_source.create_task_templates(domain_name, items)
 
     @template_repository_resilience.apply()
-    async def list_task_templates_all(self, user_uuid: uuid.UUID) -> list[dict[str, Any]]:
-        return await self._db_source.list_task_templates_all(user_uuid)
-
-    @template_repository_resilience.apply()
-    async def get_task_template(self, template_id: str) -> dict[str, Any] | None:
+    async def get_task_template(self, template_id: SessionTemplateID) -> SessionTemplateData | None:
         return await self._db_source.get_task_template(template_id)
 
     @template_repository_resilience.apply()
-    async def task_template_exists(self, template_id: str) -> bool:
+    async def task_template_exists(self, template_id: SessionTemplateID) -> bool:
         return await self._db_source.task_template_exists(template_id)
 
     @template_repository_resilience.apply()
     async def update_task_template(
         self,
-        template_id: str,
-        group_id: uuid.UUID,
-        user_uuid: uuid.UUID,
+        template_id: SessionTemplateID,
+        group_id: ProjectID,
+        user_uuid: UserID,
         name: str,
         template_data: Mapping[str, Any],
     ) -> int:
@@ -105,45 +107,50 @@ class TemplateRepository:
     async def create_cluster_template(
         self,
         domain_name: str,
-        group_id: uuid.UUID,
-        user_uuid: uuid.UUID,
+        group_id: ProjectID,
+        user_uuid: UserID,
         name: str,
         template_data: Mapping[str, Any],
-    ) -> str:
+    ) -> SessionTemplateID:
         return await self._db_source.create_cluster_template(
             domain_name, group_id, user_uuid, name, template_data
         )
 
     @template_repository_resilience.apply()
-    async def list_cluster_templates_all(self, user_uuid: uuid.UUID) -> list[dict[str, Any]]:
-        return await self._db_source.list_cluster_templates_all(user_uuid)
+    async def joined_project_ids(self, user_id: UserID) -> list[ProjectID]:
+        return await self._db_source.joined_project_ids(user_id)
 
     @template_repository_resilience.apply()
-    async def list_accessible_templates(
+    async def list_templates_in_scopes(
         self,
         template_type: TemplateType,
-        user_uuid: uuid.UUID,
-        user_role: UserRole,
-        domain_name: str,
-        allowed_types: Iterable[str],
-        group_id_filter: uuid.UUID | None = None,
-    ) -> list[dict[str, Any]]:
-        return await self._db_source.list_accessible_templates(
-            template_type, user_uuid, user_role, domain_name, allowed_types, group_id_filter
+        scopes: Sequence[SessionTemplateTarget],
+        group_id_filter: ProjectID | None,
+    ) -> list[SessionTemplateWithOwnerEmailAndProjectName]:
+        return await self._db_source.list_templates_in_scopes(
+            template_type, scopes, group_id_filter
         )
 
     @template_repository_resilience.apply()
-    async def get_cluster_template(self, template_id: str) -> dict[str, Any] | None:
+    async def list_templates_in_global(
+        self, template_type: TemplateType
+    ) -> list[SessionTemplateWithOwnerEmailAndProjectName]:
+        return await self._db_source.list_templates_in_global(template_type)
+
+    @template_repository_resilience.apply()
+    async def get_cluster_template(
+        self, template_id: SessionTemplateID
+    ) -> SessionTemplateData | None:
         return await self._db_source.get_cluster_template(template_id)
 
     @template_repository_resilience.apply()
-    async def cluster_template_exists(self, template_id: str) -> bool:
+    async def cluster_template_exists(self, template_id: SessionTemplateID) -> bool:
         return await self._db_source.cluster_template_exists(template_id)
 
     @template_repository_resilience.apply()
     async def update_cluster_template(
         self,
-        template_id: str,
+        template_id: SessionTemplateID,
         template_data: Mapping[str, Any],
         name: str,
     ) -> int:
@@ -152,5 +159,7 @@ class TemplateRepository:
     # --- Shared ---
 
     @template_repository_resilience.apply()
-    async def soft_delete_template(self, template_id: str, template_type: TemplateType) -> int:
+    async def soft_delete_template(
+        self, template_id: SessionTemplateID, template_type: TemplateType
+    ) -> int:
         return await self._db_source.soft_delete_template(template_id, template_type)

@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
 
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.session_template import SessionTemplateID
 from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.models.user.row import UserRole
 
@@ -19,16 +20,16 @@ class TaskTemplateItemInput:
 
     template: Mapping[str, Any]
     name: str | None = None
-    group_id: uuid.UUID | None = None
-    user_uuid: uuid.UUID | None = None
+    group_id: ProjectID | None = None
+    user_uuid: UserID | None = None
 
 
 @dataclass
 class CreatedTaskTemplateItem:
     """A single created template ID and owner user."""
 
-    id: str
-    user: str
+    id: SessionTemplateID
+    user: UserID
 
 
 @dataclass
@@ -36,7 +37,7 @@ class CreateTaskTemplateAction(TemplateProjectScopeAction):
     """Action to create one or more task templates."""
 
     domain_name: str
-    requester_uuid: uuid.UUID
+    requester_uuid: UserID
     requester_access_key: str
     requester_role: UserRole
     requester_domain: str
@@ -62,4 +63,4 @@ class CreateTaskTemplateActionResult(TemplateScopeActionResult):
 
     @override
     def entity_ids(self) -> Sequence[EntityIdentifier]:
-        return tuple(SessionTemplateID(uuid.UUID(item.id)) for item in self.created)
+        return tuple(item.id for item in self.created)

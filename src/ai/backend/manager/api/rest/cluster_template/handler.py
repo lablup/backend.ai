@@ -12,7 +12,6 @@ import json
 import logging
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
-from uuid import UUID
 
 import yaml
 
@@ -24,7 +23,6 @@ from ai.backend.common.api_handlers import (
 )
 from ai.backend.common.data.entity.domain import DomainName
 from ai.backend.common.data.entity.project import ProjectID
-from ai.backend.common.data.entity.session_template import SessionTemplateID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.template.request import (
     CreateClusterTemplateRequest,
@@ -42,8 +40,10 @@ from ai.backend.common.dto.manager.template.response import (
     ListClusterTemplatesResponse,
     UpdateClusterTemplateResponse,
 )
+from ai.backend.common.exception import UnreachableError
 from ai.backend.common.json import load_json
 from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.data.session_template.types import SessionTemplateData
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.auth import InsufficientPrivilege
@@ -56,6 +56,9 @@ from ai.backend.manager.services.template.actions.delete_cluster_template import
 )
 from ai.backend.manager.services.template.actions.get_cluster_template import (
     GetClusterTemplateAction,
+)
+from ai.backend.manager.services.template.actions.global_list_cluster_templates import (
+    GlobalListClusterTemplatesAction,
 )
 from ai.backend.manager.services.template.actions.list_cluster_templates import (
     ListClusterTemplatesAction,
@@ -111,7 +114,7 @@ class ClusterTemplateHandler:
         action = CreateClusterTemplateAction(
             domain_name=domain,
             requesting_project=project_id,
-            requester_uuid=ctx.user_uuid,
+            requester_uuid=UserID(ctx.user_uuid),
             requester_access_key=ctx.access_key,
             requester_role=req.request["user"]["role"],
             requester_domain=ctx.user_domain,
@@ -121,7 +124,7 @@ class ClusterTemplateHandler:
         create_result = await self._template.create_cluster.run(action)
         return APIResponse.build(
             HTTPStatus.OK,
-            CreateClusterTemplateResponse(id=create_result.id, user=create_result.user),
+            CreateClusterTemplateResponse(id=create_result.id.hex, user=create_result.user.hex),
         )
 
     async def list_templates(
@@ -133,34 +136,42 @@ class ClusterTemplateHandler:
         params = query.parsed
         if params.all and not ctx.is_superadmin:
             raise InsufficientPrivilege("Only a superadmin may list every template")
-        action = ListClusterTemplatesAction(
-            user_uuid=UserID(ctx.user_uuid),
-            user_role=req.request["user"]["role"],
-            domain_name=ctx.user_domain,
-            is_superadmin=ctx.is_superadmin,
-            list_all=params.all,
-            group_id_filter=params.group_id,
-        )
-        result = await self._template.list_cluster.run(action)
+        if params.all:
+            global_result = await self._template.global_list_cluster.run(
+                GlobalListClusterTemplatesAction()
+            )
+            entries = global_result.entries
+        else:
+            scoped_result = await self._template.list_cluster.run(
+                ListClusterTemplatesAction(
+                    user_uuid=UserID(ctx.user_uuid), group_id_filter=params.group_id
+                )
+            )
+            entries = scoped_result.entries
 
         items = [
             ClusterTemplateListItemDTO(
-                name=entry["name"],
-                id=entry["id"].hex if hasattr(entry["id"], "hex") else str(entry["id"]),
-                created_at=entry["created_at"],
-                is_owner=entry["is_owner"],
-                user=str(entry["user"]) if entry["user"] is not None else None,
-                group=str(entry["group"]) if entry["group"] is not None else None,
-                user_email=entry["user_email"],
-                group_name=entry["group_name"],
-                type="user" if entry["user"] is not None else "group",
+                name=self._stored_template_name(entry.template),
+                id=entry.template.id.hex,
+                created_at=entry.template.created_at,
+                is_owner=entry.template.user_uuid == ctx.user_uuid,
+                user=str(entry.template.user_uuid),
+                group=str(entry.template.group_id) if entry.template.group_id is not None else None,
+                user_email=entry.owner_email,
+                group_name=entry.project_name,
+                type="user",
             )
-            for entry in result.entries
+            for entry in entries
         ]
         return APIResponse.build(
             HTTPStatus.OK,
             ListClusterTemplatesResponse(root=items),
         )
+
+    def _stored_template_name(self, template: SessionTemplateData) -> str:
+        if template.name is None:
+            raise UnreachableError(f"Session template {template.id} was stored without a name")
+        return template.name
 
     async def get(
         self,
@@ -174,11 +185,11 @@ class ClusterTemplateHandler:
             raise InvalidAPIParameters('format should be "yaml" or "json"')
 
         template_id = path.parsed.template_id
-        action = GetClusterTemplateAction(template_id=SessionTemplateID(UUID(template_id)))
+        action = GetClusterTemplateAction(template_id=template_id)
         result = await self._template.get_cluster.run(action)
         return APIResponse.build(
             HTTPStatus.OK,
-            GetClusterTemplateResponse(root=result.template),
+            GetClusterTemplateResponse(root=result.template.template),
         )
 
     async def update(
@@ -200,7 +211,7 @@ class ClusterTemplateHandler:
                 raise InvalidAPIParameters("Malformed payload") from e
 
         action = UpdateClusterTemplateAction(
-            template_id=SessionTemplateID(UUID(template_id)),
+            template_id=template_id,
             template_data=payload,
         )
         await self._template.update_cluster.run(action)
@@ -218,7 +229,7 @@ class ClusterTemplateHandler:
     ) -> APIResponse:
         template_id = path.parsed.template_id
 
-        action = DeleteClusterTemplateAction(template_id=SessionTemplateID(UUID(template_id)))
+        action = DeleteClusterTemplateAction(template_id=template_id)
         await self._template.delete_cluster.run(action)
         return APIResponse.build(
             HTTPStatus.OK,

@@ -8,6 +8,7 @@ import pytest
 from pydantic import ValidationError
 
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.session_template import SessionTemplateID
 from ai.backend.common.dto.manager.template.request import (
     CreateClusterTemplateRequest,
     CreateSessionTemplateRequest,
@@ -43,12 +44,13 @@ _NOW = datetime.now(UTC)
 
 _PROJECT_ID = ProjectID(UUID(int=1))
 _PROJECT_ID_TEXT = str(_PROJECT_ID)
+_TEMPLATE_ID = SessionTemplateID(UUID(int=2))
 
 
 class TestTemplatePathParam:
     def test_basic_instantiation(self) -> None:
-        param = TemplatePathParam(template_id="abc123")
-        assert param.template_id == "abc123"
+        param = TemplatePathParam.model_validate({"template_id": str(_TEMPLATE_ID)})
+        assert param.template_id == _TEMPLATE_ID
 
 
 class TestCreateSessionTemplateRequest:
