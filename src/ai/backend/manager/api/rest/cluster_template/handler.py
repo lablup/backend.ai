@@ -194,9 +194,6 @@ class ClusterTemplateHandler:
         template_id = path.parsed.template_id
         action = GetClusterTemplateAction(
             template_id=template_id,
-            requester_uuid=ctx.user_uuid,
-            requester_role=req.request["user"]["role"],
-            requester_domain=ctx.user_domain,
         )
         result = await self._template.get_cluster.wait_for_complete(action)
         return APIResponse.build(
@@ -232,9 +229,6 @@ class ClusterTemplateHandler:
         action = UpdateClusterTemplateAction(
             template_id=template_id,
             template_data=payload,
-            requester_uuid=ctx.user_uuid,
-            requester_role=req.request["user"]["role"],
-            requester_domain=ctx.user_domain,
         )
         await self._template.update_cluster.wait_for_complete(action)
         return APIResponse.build(
@@ -261,9 +255,6 @@ class ClusterTemplateHandler:
 
         action = DeleteClusterTemplateAction(
             template_id=template_id,
-            requester_uuid=ctx.user_uuid,
-            requester_role=req.request["user"]["role"],
-            requester_domain=ctx.user_domain,
         )
         await self._template.delete_cluster.wait_for_complete(action)
         return APIResponse.build(

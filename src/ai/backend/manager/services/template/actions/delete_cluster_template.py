@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-import uuid
 from dataclasses import dataclass
 from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.models.user import UserRole
 
 from .base import TemplateAction
 
@@ -16,9 +14,6 @@ class DeleteClusterTemplateAction(TemplateAction):
     """Action to soft-delete a cluster template."""
 
     template_id: str
-    requester_uuid: uuid.UUID
-    requester_role: UserRole
-    requester_domain: str
 
     @override
     @classmethod

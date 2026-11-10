@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import logging
 import uuid
-from collections.abc import Mapping
 from typing import Any, Final
 
+from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.exception import UnreachableError
 from ai.backend.common.json import load_json
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.errors.permission import NotEnoughPermission
@@ -14,7 +16,6 @@ from ai.backend.manager.models.session_template import (
     check_cluster_template,
     check_task_template,
 )
-from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.template.repository import TemplateRepository
 
 from .actions.create_cluster_template import (
@@ -128,31 +129,27 @@ class TemplateService:
             )
         return ListTaskTemplatesActionResult(entries=entries)
 
-    @staticmethod
-    def _check_task_template_access(
-        row: Mapping[str, Any],
-        requester_uuid: uuid.UUID,
-        requester_role: UserRole,
-        requester_domain: str,
+    def _ensure_requester_may_access_template(
+        self, owner_uuid: uuid.UUID, template_domain: str
     ) -> None:
         """Pass the owner, an admin of the template's domain and a superadmin."""
-        match requester_role:
-            case UserRole.SUPERADMIN:
-                return
-            case UserRole.ADMIN if row["domain_name"] == requester_domain:
-                return
-            case _ if row["user_uuid"] == requester_uuid:
-                return
-        raise NotEnoughPermission(f"User {requester_uuid} may not access this session template")
+        requester = current_user()
+        if requester is None:
+            raise UnreachableError("User context is not available")
+        requester_may_access = (
+            requester.is_superadmin
+            or (requester.role == UserRole.ADMIN and requester.domain_name == template_domain)
+            or requester.user_id == owner_uuid
+        )
+        if not requester_may_access:
+            raise NotEnoughPermission(f"User {requester.user_id} may not access this template")
 
     async def get_task_template(self, action: GetTaskTemplateAction) -> GetTaskTemplateActionResult:
         """Get a single task template by ID."""
         row = await self._repository.get_task_template(action.template_id)
         if row is None:
             raise TaskTemplateNotFound
-        self._check_task_template_access(
-            row, action.requester_uuid, action.requester_role, action.requester_domain
-        )
+        self._ensure_requester_may_access_template(row["user_uuid"], row["domain_name"])
         raw_template = row["template"]
         template: dict[str, Any] = (
             raw_template if isinstance(raw_template, dict) else dict(load_json(raw_template))
@@ -171,9 +168,7 @@ class TemplateService:
         row = await self._repository.get_task_template(action.template_id)
         if row is None:
             raise TaskTemplateNotFound
-        self._check_task_template_access(
-            row, action.requester_uuid, action.requester_role, action.requester_domain
-        )
+        self._ensure_requester_may_access_template(row["user_uuid"], row["domain_name"])
 
         # Authorize owner against the pre-resolved project
         default_user_uuid, default_group_id = await self._repository.resolve_owner(
@@ -211,9 +206,7 @@ class TemplateService:
         row = await self._repository.get_task_template(action.template_id)
         if row is None:
             raise TaskTemplateNotFound
-        self._check_task_template_access(
-            row, action.requester_uuid, action.requester_role, action.requester_domain
-        )
+        self._ensure_requester_may_access_template(row["user_uuid"], row["domain_name"])
         rowcount = await self._repository.soft_delete_template(
             action.template_id, TemplateType.TASK
         )
@@ -266,36 +259,17 @@ class TemplateService:
             )
         return ListClusterTemplatesActionResult(entries=entries)
 
-    async def _check_cluster_template_access(
-        self,
-        template_id: str,
-        requester_uuid: uuid.UUID,
-        requester_role: UserRole,
-        requester_domain: str,
-    ) -> None:
-        """Pass the owner, an admin of the template's domain and a superadmin."""
+    async def _ensure_requester_may_access_cluster_template(self, template_id: str) -> None:
         owner = await self._repository.get_cluster_template_owner(template_id)
         if owner is None:
             raise TaskTemplateNotFound
-        match requester_role:
-            case UserRole.SUPERADMIN:
-                return
-            case UserRole.ADMIN if owner["domain_name"] == requester_domain:
-                return
-            case _ if owner["user_uuid"] == requester_uuid:
-                return
-        raise NotEnoughPermission(f"User {requester_uuid} may not access this cluster template")
+        self._ensure_requester_may_access_template(owner["user_uuid"], owner["domain_name"])
 
     async def get_cluster_template(
         self, action: GetClusterTemplateAction
     ) -> GetClusterTemplateActionResult:
         """Get a single cluster template by ID."""
-        await self._check_cluster_template_access(
-            action.template_id,
-            action.requester_uuid,
-            action.requester_role,
-            action.requester_domain,
-        )
+        await self._ensure_requester_may_access_cluster_template(action.template_id)
         template = await self._repository.get_cluster_template(action.template_id)
         if template is None:
             raise TaskTemplateNotFound
@@ -305,12 +279,7 @@ class TemplateService:
         self, action: UpdateClusterTemplateAction
     ) -> UpdateClusterTemplateActionResult:
         """Validate and update an existing cluster template."""
-        await self._check_cluster_template_access(
-            action.template_id,
-            action.requester_uuid,
-            action.requester_role,
-            action.requester_domain,
-        )
+        await self._ensure_requester_may_access_cluster_template(action.template_id)
         template_data = check_cluster_template(action.template_data)
         name = template_data["metadata"]["name"]
         rowcount = await self._repository.update_cluster_template(
@@ -324,12 +293,7 @@ class TemplateService:
         self, action: DeleteClusterTemplateAction
     ) -> DeleteClusterTemplateActionResult:
         """Soft-delete a cluster template."""
-        await self._check_cluster_template_access(
-            action.template_id,
-            action.requester_uuid,
-            action.requester_role,
-            action.requester_domain,
-        )
+        await self._ensure_requester_may_access_cluster_template(action.template_id)
         rowcount = await self._repository.soft_delete_template(
             action.template_id, TemplateType.CLUSTER
         )

@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-import uuid
 from dataclasses import dataclass
 from typing import Any, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.models.user import UserRole
 
 from .base import TemplateAction
 
@@ -16,9 +14,6 @@ class GetClusterTemplateAction(TemplateAction):
     """Action to get a single cluster template by ID."""
 
     template_id: str
-    requester_uuid: uuid.UUID
-    requester_role: UserRole
-    requester_domain: str
 
     @override
     @classmethod

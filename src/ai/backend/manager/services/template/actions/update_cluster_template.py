@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.models.user import UserRole
 
 from .base import TemplateAction
 
@@ -18,9 +16,6 @@ class UpdateClusterTemplateAction(TemplateAction):
 
     template_id: str
     template_data: Mapping[str, Any]
-    requester_uuid: uuid.UUID
-    requester_role: UserRole
-    requester_domain: str
 
     @override
     @classmethod

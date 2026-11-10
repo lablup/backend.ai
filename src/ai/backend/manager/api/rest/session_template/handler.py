@@ -211,9 +211,6 @@ class SessionTemplateHandler:
         template_id = path.parsed.template_id
         action = GetTaskTemplateAction(
             template_id=template_id,
-            requester_uuid=ctx.user_uuid,
-            requester_role=req.request["user"]["role"],
-            requester_domain=ctx.user_domain,
         )
         result = await self._template.get_task.wait_for_complete(action)
         return APIResponse.build(
@@ -299,9 +296,6 @@ class SessionTemplateHandler:
 
         action = DeleteTaskTemplateAction(
             template_id=template_id,
-            requester_uuid=ctx.user_uuid,
-            requester_role=req.request["user"]["role"],
-            requester_domain=ctx.user_domain,
         )
         await self._template.delete_task.wait_for_complete(action)
         return APIResponse.build(
