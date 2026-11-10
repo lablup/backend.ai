@@ -42,19 +42,13 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
 )
 from ai.backend.common.dto.manager.v2.deployment_options import DeploymentOptionsInput
 from ai.backend.common.dto.manager.v2.resource_slot.types import ResourceOptsDTOInput
-<<<<<<< HEAD
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.identifier.vfolder import VFolderUUID
-=======
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.common.schema.deployment import IntOrPercent
-from ai.backend.common.tristate.unset import UNSET, Unset
 from ai.backend.common.typed_validators import HealthCheckPath
->>>>>>> 07891376f (fix(BA-8803): build health check URLs from parts and stop following redirects (#16433))
 from ai.backend.common.types import (
     AutoScalingMetricSource,
     ClusterMode,

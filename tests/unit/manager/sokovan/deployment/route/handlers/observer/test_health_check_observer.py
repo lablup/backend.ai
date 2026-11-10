@@ -227,10 +227,7 @@ class TestRouteHealthObserverProbePolicy:
         await observer.observe([route])
 
         call = observer._http_health_check.call_args
-<<<<<<< HEAD
         assert call.args == ("10.0.0.1", 8000, "/livez", 42.0, 204)
-=======
-        assert call.args == (route.route_id, "10.0.0.1", 8000, "/livez", 42.0, 204)
 
 
 @dataclass
@@ -267,9 +264,7 @@ class TestRouteHealthObserverHttpProbe:
     async def test_probe_stays_on_replica_host(self, replica: _Replica, path: str) -> None:
         observer = _observer(_make_valkey(probe_targets={}, statuses={}))
 
-        healthy = await observer._http_health_check(
-            ReplicaID(uuid4()), replica.host, replica.port, path, 5.0, 200
-        )
+        healthy = await observer._http_health_check(replica.host, replica.port, path, 5.0, 200)
 
         assert healthy is True
         assert replica.received_paths == [path]
@@ -278,7 +273,7 @@ class TestRouteHealthObserverHttpProbe:
         observer = _observer(_make_valkey(probe_targets={}, statuses={}))
 
         healthy = await observer._http_health_check(
-            ReplicaID(uuid4()), replica.host, replica.port, "/redirect", 5.0, 200
+            replica.host, replica.port, "/redirect", 5.0, 200
         )
 
         assert healthy is False
@@ -290,10 +285,7 @@ class TestRouteHealthObserverHttpProbe:
         observer = _observer(_make_valkey(probe_targets={}, statuses={}))
         path = f"@{replica.host}:{replica.port}/x"
 
-        healthy = await observer._http_health_check(
-            ReplicaID(uuid4()), "192.0.2.1", 9, path, 5.0, 200
-        )
+        healthy = await observer._http_health_check("192.0.2.1", 9, path, 5.0, 200)
 
         assert healthy is False
         assert replica.received_paths == []
->>>>>>> 07891376f (fix(BA-8803): build health check URLs from parts and stop following redirects (#16433))
