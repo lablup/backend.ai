@@ -309,12 +309,11 @@ async def update_user_v2(
             raise UserModificationBadRequest(
                 "old_password is required when changing your own password"
             )
-        if ctx.request is None:
-            raise UnreachableError("Request context is not available")
+        current = await ctx.adapters.user.get(me.user_id)
         await ctx.adapters.auth.update_password(
             user_id=UserID(me.user_id),
             domain_name=me.domain_name,
-            email=ctx.request["user"]["email"],
+            email=current.user.basic_info.email,
             input=UpdatePasswordInput(
                 old_password=dto.old_password,
                 new_password=dto.password,

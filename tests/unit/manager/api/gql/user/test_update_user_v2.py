@@ -95,8 +95,9 @@ class TestUpdateUserV2:
         info = MagicMock()
         info.context.adapters.user.update_user_by_id = AsyncMock()
         info.context.adapters.auth = AuthAdapter(mock_auth)
-        info.context.request = MagicMock()
-        info.context.request.__getitem__.return_value = {"email": "user@example.com"}
+        info.context.adapters.user.get = AsyncMock(
+            return_value=MagicMock(user=MagicMock(basic_info=MagicMock(email="user@example.com")))
+        )
         return info
 
     @pytest.fixture

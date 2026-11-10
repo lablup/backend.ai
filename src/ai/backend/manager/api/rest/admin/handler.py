@@ -192,11 +192,7 @@ class AdminHandler:
     # ------------------------------------------------------------------
 
     async def _execute_strawberry(
-        self,
-        params: GraphQLRequest,
-        *,
-        schema: StrawberrySchema,
-        request_ctx: RequestCtx | None = None,
+        self, params: GraphQLRequest, *, schema: StrawberrySchema
     ) -> APIResponse:
         gql_deps = self._gql_deps
         gql_ctx = StrawberryGQLContext(
@@ -207,7 +203,6 @@ class AdminHandler:
             data_loaders=DataLoaders(gql_deps.adapters),
             metric_observer=gql_deps.metric_observer,
             adapters=gql_deps.adapters,
-            request=request_ctx.request if request_ctx is not None else None,
         )
         result = await schema.execute(
             params.query,
@@ -227,9 +222,7 @@ class AdminHandler:
         ctx: UserContext,
         request_ctx: RequestCtx,
     ) -> APIResponse:
-        return await self._execute_strawberry(
-            body.parsed, schema=self._strawberry_schema, request_ctx=request_ctx
-        )
+        return await self._execute_strawberry(body.parsed, schema=self._strawberry_schema)
 
     # ------------------------------------------------------------------
     # handle_gql_strawberry_public (POST /admin/gql/strawberry/public)
