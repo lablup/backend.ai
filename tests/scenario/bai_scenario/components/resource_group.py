@@ -31,7 +31,12 @@ from ai.backend.common.dto.manager.v2.resource_group.types import (
     PreemptionModeDTO,
     SchedulerTypeDTO,
 )
-from ai.backend.common.types import PreemptionOrder, PreemptionVictimScope
+from ai.backend.common.types import (
+    AgentSelectionStrategy,
+    PreemptionOrder,
+    PreemptionVictimScope,
+    SessionTypes,
+)
 from ai.backend.manager.api.adapters.resource_group.adapter import ResourceGroupSearchPayload
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.project.types import ProjectData
@@ -39,6 +44,7 @@ from ai.backend.manager.data.resource_group.types import ResourceGroupData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
+from ai.backend.manager.models.resource_group.types import NUM_RETRIES_TO_SKIP_CONFIG_KEY
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
@@ -451,6 +457,13 @@ class GroupLook:
     preemption_mode: PreemptionModeDTO | Kept = KEPT
     preemption_min_runtime: float | Kept = KEPT
     victim_scope: PreemptionVictimScope | Kept = KEPT
+    allowed_session_types: list[SessionTypes] | Kept = KEPT
+    pending_timeout: float | Kept = KEPT
+    num_retries_to_skip: int | None | Kept = KEPT
+    agent_selection_strategy: AgentSelectionStrategy | Kept = KEPT
+    agent_selector_config: dict[str, Any] | Kept = KEPT
+    allow_fractional_resource_fragmentation: bool | Kept = KEPT
+    route_cleanup_target_statuses: list[str] | Kept = KEPT
 
     def verdicts(
         self, prefix: str, node: ResourceGroupDetailNode, seed: ResourceGroupData
@@ -532,6 +545,50 @@ class GroupLook:
                 node.scheduler.preemption.victim_scope,
                 _or(self.victim_scope, preemption.victim_scope),
             ),
+            Same(
+                f"{prefix}scheduler.options.allowed_session_types",
+                node.scheduler.options.allowed_session_types,
+                _or(self.allowed_session_types, seed.scheduler.options.allowed_session_types),
+            ),
+            Same(
+                f"{prefix}scheduler.options.pending_timeout",
+                node.scheduler.options.pending_timeout,
+                _or(self.pending_timeout, seed.scheduler.options.pending_timeout.total_seconds()),
+            ),
+            Same(
+                f"{prefix}scheduler.options.config.num_retries_to_skip",
+                node.scheduler.options.config.num_retries_to_skip,
+                _or(
+                    self.num_retries_to_skip,
+                    seed.scheduler.options.config.get(NUM_RETRIES_TO_SKIP_CONFIG_KEY),
+                ),
+            ),
+            Same(
+                f"{prefix}scheduler.options.agent_selection_strategy",
+                node.scheduler.options.agent_selection_strategy,
+                _or(self.agent_selection_strategy, seed.scheduler.options.agent_selection_strategy),
+            ),
+            Same(
+                f"{prefix}scheduler.options.agent_selector_config",
+                node.scheduler.options.agent_selector_config,
+                _or(self.agent_selector_config, dict(seed.scheduler.options.agent_selector_config)),
+            ),
+            Same(
+                f"{prefix}scheduler.options.allow_fractional_resource_fragmentation",
+                node.scheduler.options.allow_fractional_resource_fragmentation,
+                _or(
+                    self.allow_fractional_resource_fragmentation,
+                    seed.scheduler.options.allow_fractional_resource_fragmentation,
+                ),
+            ),
+            Same(
+                f"{prefix}scheduler.options.route_cleanup_target_statuses",
+                node.scheduler.options.route_cleanup_target_statuses,
+                _or(
+                    self.route_cleanup_target_statuses,
+                    seed.scheduler.options.route_cleanup_target_statuses,
+                ),
+            ),
             Skipped(
                 f"{prefix}default_deployment_options",
                 Says(
@@ -560,6 +617,16 @@ class TheNewGroupNode(Then[Any, ResourceGroupDetailNode]):
     started: datetime
     named: str
     is_default: bool = False
+    allowed_session_types: tuple[SessionTypes, ...] = (
+        SessionTypes.INTERACTIVE,
+        SessionTypes.BATCH,
+        SessionTypes.INFERENCE,
+    )
+    pending_timeout: float = 0.0
+    num_retries_to_skip: int | None = None
+    agent_selection_strategy: AgentSelectionStrategy = AgentSelectionStrategy.DISPERSED
+    allow_fractional_resource_fragmentation: bool = True
+    route_cleanup_target_statuses: tuple[str, ...] = ("unhealthy",)
 
     @override
     def says(self) -> str:
@@ -609,6 +676,41 @@ class TheNewGroupNode(Then[Any, ResourceGroupDetailNode]):
                 "scheduler.preemption.victim_scope",
                 node.scheduler.preemption.victim_scope,
                 PreemptionVictimScope.USER,
+            ),
+            Same(
+                "scheduler.options.allowed_session_types",
+                node.scheduler.options.allowed_session_types,
+                list(self.allowed_session_types),
+            ),
+            Same(
+                "scheduler.options.pending_timeout",
+                node.scheduler.options.pending_timeout,
+                self.pending_timeout,
+            ),
+            Same(
+                "scheduler.options.config.num_retries_to_skip",
+                node.scheduler.options.config.num_retries_to_skip,
+                self.num_retries_to_skip,
+            ),
+            Same(
+                "scheduler.options.agent_selection_strategy",
+                node.scheduler.options.agent_selection_strategy,
+                self.agent_selection_strategy,
+            ),
+            Same(
+                "scheduler.options.agent_selector_config",
+                node.scheduler.options.agent_selector_config,
+                {},
+            ),
+            Same(
+                "scheduler.options.allow_fractional_resource_fragmentation",
+                node.scheduler.options.allow_fractional_resource_fragmentation,
+                self.allow_fractional_resource_fragmentation,
+            ),
+            Same(
+                "scheduler.options.route_cleanup_target_statuses",
+                node.scheduler.options.route_cleanup_target_statuses,
+                list(self.route_cleanup_target_statuses),
             ),
             Skipped(
                 "default_deployment_options",

@@ -468,6 +468,14 @@ enum AgentResourceSlotOrderField {
   USED
 }
 
+"""Added in 26.10.0. How agents are chosen for a session's kernels."""
+enum AgentSelectionStrategy {
+  DISPERSED
+  CONCENTRATED
+  ROUNDROBIN
+  LEGACY
+}
+
 """Added in 25.15.0. Aggregated resource statistics for an agent."""
 type AgentStats {
   """Total resource capacity of the agent."""
@@ -17600,6 +17608,51 @@ type ResourceGroupSchedulerConfig {
 
   """Added in 26.3.0. Preemption configuration for this resource group."""
   preemption: PreemptionConfig!
+
+  """
+  Added in 26.10.0. Scheduler options other than the preemption configuration.
+  """
+  options: ResourceGroupSchedulerOptions!
+}
+
+"""
+Added in 26.10.0. Scheduler options of a resource group, other than the preemption configuration.
+"""
+type ResourceGroupSchedulerOptions {
+  """Session types that may be created in the resource group."""
+  allowedSessionTypes: [SessionTypes!]!
+
+  """
+  Seconds a session may stay pending before it is cancelled (0 = no timeout).
+  """
+  pendingTimeout: Float!
+
+  """The config section of the scheduler options."""
+  config: ResourceGroupSchedulerOptionsConfig!
+
+  """How agents are chosen for a session's kernels."""
+  agentSelectionStrategy: AgentSelectionStrategy!
+
+  """Options of the agent selector."""
+  agentSelectorConfig: JSON!
+
+  """
+  Whether an agent may start a kernel that fragments a fractional resource request.
+  """
+  allowFractionalResourceFragmentation: Boolean!
+
+  """
+  Route health statuses (healthy/unhealthy/degraded) whose routes are cleaned up automatically.
+  """
+  routeCleanupTargetStatuses: [String!]!
+}
+
+"""
+Added in 26.10.0. The config section of a resource group's scheduler options.
+"""
+type ResourceGroupSchedulerOptionsConfig {
+  """Number of scheduling retries before a pending session is skipped."""
+  numRetriesToSkip: Int
 }
 
 """
