@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from ai.backend.common.identifier.user import UserID
 
 
 @dataclass
-class SessionTemplateOwnerAndDomain:
+class ClusterTemplateWithOwnerAndDomain:
+    template: dict[str, Any]
     owner_id: UserID
     domain_name: str

@@ -56,14 +56,16 @@ from ai.backend.manager.services.template.actions.update_task_template import (
     UpdateTaskTemplateAction,
 )
 from ai.backend.manager.services.template.service import TemplateService
-from ai.backend.manager.views.session_template import SessionTemplateOwnerAndDomain
+from ai.backend.manager.views.session_template import ClusterTemplateWithOwnerAndDomain
 
 _CLUSTER_TEMPLATE_OWNER_UUID = uuid.UUID(int=1)
 _OTHER_USER_UUID = uuid.UUID(int=2)
 _CLUSTER_TEMPLATE_DOMAIN = "template-domain"
 _OTHER_DOMAIN = "other-domain"
-_CLUSTER_TEMPLATE_OWNER = SessionTemplateOwnerAndDomain(
-    owner_id=UserID(_CLUSTER_TEMPLATE_OWNER_UUID), domain_name=_CLUSTER_TEMPLATE_DOMAIN
+_CLUSTER_TEMPLATE = ClusterTemplateWithOwnerAndDomain(
+    template={"metadata": {"name": "test"}},
+    owner_id=UserID(_CLUSTER_TEMPLATE_OWNER_UUID),
+    domain_name=_CLUSTER_TEMPLATE_DOMAIN,
 )
 
 
@@ -905,8 +907,13 @@ class TestGetClusterTemplateAction:
         mock_repo: MagicMock,
     ) -> None:
         template_data = {"spec": {"nodes": []}, "metadata": {"name": "test"}}
-        mock_repo.get_cluster_template_owner = AsyncMock(return_value=_CLUSTER_TEMPLATE_OWNER)
-        mock_repo.get_cluster_template = AsyncMock(return_value=template_data)
+        mock_repo.get_cluster_template = AsyncMock(
+            return_value=ClusterTemplateWithOwnerAndDomain(
+                template=template_data,
+                owner_id=UserID(_CLUSTER_TEMPLATE_OWNER_UUID),
+                domain_name=_CLUSTER_TEMPLATE_DOMAIN,
+            )
+        )
 
         action = GetClusterTemplateAction(template_id="cluster-1")
         with _acting_as(_CLUSTER_TEMPLATE_OWNER_UUID, UserRole.USER, _CLUSTER_TEMPLATE_DOMAIN):
@@ -919,7 +926,7 @@ class TestGetClusterTemplateAction:
         service: TemplateService,
         mock_repo: MagicMock,
     ) -> None:
-        mock_repo.get_cluster_template_owner = AsyncMock(return_value=None)
+        mock_repo.get_cluster_template = AsyncMock(return_value=None)
 
         action = GetClusterTemplateAction(template_id="nonexistent")
         with (
@@ -1032,7 +1039,7 @@ class TestUpdateClusterTemplateAction:
         service: TemplateService,
         mock_repo: MagicMock,
     ) -> None:
-        mock_repo.get_cluster_template_owner = AsyncMock(return_value=_CLUSTER_TEMPLATE_OWNER)
+        mock_repo.get_cluster_template = AsyncMock(return_value=_CLUSTER_TEMPLATE)
         mock_repo.update_cluster_template = AsyncMock(return_value=1)
 
         action = UpdateClusterTemplateAction(
@@ -1050,7 +1057,7 @@ class TestUpdateClusterTemplateAction:
         service: TemplateService,
         mock_repo: MagicMock,
     ) -> None:
-        mock_repo.get_cluster_template_owner = AsyncMock(return_value=None)
+        mock_repo.get_cluster_template = AsyncMock(return_value=None)
 
         action = UpdateClusterTemplateAction(
             template_id="nonexistent",
@@ -1067,7 +1074,7 @@ class TestUpdateClusterTemplateAction:
         service: TemplateService,
         mock_repo: MagicMock,
     ) -> None:
-        mock_repo.get_cluster_template_owner = AsyncMock(return_value=_CLUSTER_TEMPLATE_OWNER)
+        mock_repo.get_cluster_template = AsyncMock(return_value=_CLUSTER_TEMPLATE)
 
         template = _make_valid_cluster_template()
         template["spec"]["nodes"] = [
@@ -1089,7 +1096,7 @@ class TestUpdateClusterTemplateAction:
         service: TemplateService,
         mock_repo: MagicMock,
     ) -> None:
-        mock_repo.get_cluster_template_owner = AsyncMock(return_value=_CLUSTER_TEMPLATE_OWNER)
+        mock_repo.get_cluster_template = AsyncMock(return_value=_CLUSTER_TEMPLATE)
         mock_repo.update_cluster_template = AsyncMock(return_value=0)
 
         action = UpdateClusterTemplateAction(
@@ -1117,7 +1124,7 @@ class TestDeleteClusterTemplateAction:
         service: TemplateService,
         mock_repo: MagicMock,
     ) -> None:
-        mock_repo.get_cluster_template_owner = AsyncMock(return_value=_CLUSTER_TEMPLATE_OWNER)
+        mock_repo.get_cluster_template = AsyncMock(return_value=_CLUSTER_TEMPLATE)
         mock_repo.soft_delete_template = AsyncMock(return_value=1)
 
         action = DeleteClusterTemplateAction(template_id="cluster-to-delete")
@@ -1134,7 +1141,7 @@ class TestDeleteClusterTemplateAction:
         service: TemplateService,
         mock_repo: MagicMock,
     ) -> None:
-        mock_repo.get_cluster_template_owner = AsyncMock(return_value=None)
+        mock_repo.get_cluster_template = AsyncMock(return_value=None)
 
         action = DeleteClusterTemplateAction(template_id="nonexistent")
         with (
@@ -1148,7 +1155,7 @@ class TestDeleteClusterTemplateAction:
         service: TemplateService,
         mock_repo: MagicMock,
     ) -> None:
-        mock_repo.get_cluster_template_owner = AsyncMock(return_value=_CLUSTER_TEMPLATE_OWNER)
+        mock_repo.get_cluster_template = AsyncMock(return_value=_CLUSTER_TEMPLATE)
         mock_repo.soft_delete_template = AsyncMock(return_value=0)
 
         action = DeleteClusterTemplateAction(template_id="cluster-x")
@@ -1163,8 +1170,7 @@ class TestClusterTemplateAccess:
     @pytest.fixture
     def mock_repo_holding_a_cluster_template(self) -> MagicMock:
         mock_repo = MagicMock(spec=TemplateRepository)
-        mock_repo.get_cluster_template_owner = AsyncMock(return_value=_CLUSTER_TEMPLATE_OWNER)
-        mock_repo.get_cluster_template = AsyncMock(return_value={"metadata": {"name": "test"}})
+        mock_repo.get_cluster_template = AsyncMock(return_value=_CLUSTER_TEMPLATE)
         mock_repo.update_cluster_template = AsyncMock(return_value=1)
         mock_repo.soft_delete_template = AsyncMock(return_value=1)
         return mock_repo

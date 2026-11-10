@@ -12,7 +12,7 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryAr
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.models.session_template import TemplateType
 from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.views.session_template import SessionTemplateOwnerAndDomain
+from ai.backend.manager.views.session_template import ClusterTemplateWithOwnerAndDomain
 
 from .db_source import TemplateDBSource
 
@@ -134,14 +134,10 @@ class TemplateRepository:
         )
 
     @template_repository_resilience.apply()
-    async def get_cluster_template(self, template_id: str) -> dict[str, Any] | None:
-        return await self._db_source.get_cluster_template(template_id)
-
-    @template_repository_resilience.apply()
-    async def get_cluster_template_owner(
+    async def get_cluster_template(
         self, template_id: str
-    ) -> SessionTemplateOwnerAndDomain | None:
-        return await self._db_source.get_cluster_template_owner(template_id)
+    ) -> ClusterTemplateWithOwnerAndDomain | None:
+        return await self._db_source.get_cluster_template(template_id)
 
     @template_repository_resilience.apply()
     async def cluster_template_exists(self, template_id: str) -> bool:

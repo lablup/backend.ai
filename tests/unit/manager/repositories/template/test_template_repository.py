@@ -34,7 +34,7 @@ from ai.backend.manager.models.session_template import TemplateType, session_tem
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.template.repository import TemplateRepository
-from ai.backend.manager.views.session_template import SessionTemplateOwnerAndDomain
+from ai.backend.manager.views.session_template import ClusterTemplateWithOwnerAndDomain
 from ai.backend.testutils.db import with_tables
 
 
@@ -589,39 +589,15 @@ class TestTemplateRepository:
 
         result = await template_repository.get_cluster_template(template_id)
 
-        assert result is not None
-        assert result == template_data
+        assert result == ClusterTemplateWithOwnerAndDomain(
+            template=template_data, owner_id=UserID(test_user), domain_name=test_domain
+        )
 
     async def test_get_cluster_template_not_found(
         self,
         template_repository: TemplateRepository,
     ) -> None:
         result = await template_repository.get_cluster_template(uuid.uuid4().hex)
-        assert result is None
-
-    async def test_get_cluster_template_owner_exists(
-        self,
-        template_repository: TemplateRepository,
-        test_domain: str,
-        test_user: uuid.UUID,
-        test_group: tuple[uuid.UUID, str],
-    ) -> None:
-        group_id, _ = test_group
-        template_id = await template_repository.create_cluster_template(
-            test_domain, group_id, test_user, "cluster-owner", {"data": True}
-        )
-
-        result = await template_repository.get_cluster_template_owner(template_id)
-
-        assert result == SessionTemplateOwnerAndDomain(
-            owner_id=UserID(test_user), domain_name=test_domain
-        )
-
-    async def test_get_cluster_template_owner_not_found(
-        self,
-        template_repository: TemplateRepository,
-    ) -> None:
-        result = await template_repository.get_cluster_template_owner(uuid.uuid4().hex)
         assert result is None
 
     async def test_cluster_template_exists_true(
@@ -692,7 +668,8 @@ class TestTemplateRepository:
 
         assert rowcount == 1
         result = await template_repository.get_cluster_template(template_id)
-        assert result == new_data
+        assert result is not None
+        assert result.template == new_data
 
     async def test_update_cluster_template_nonexistent(
         self,

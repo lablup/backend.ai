@@ -19,7 +19,7 @@ from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.session_template import TemplateType, session_templates
 from ai.backend.manager.models.user import UserRole, users
 from ai.backend.manager.utils import check_if_requester_is_eligible_to_act_as_target_user
-from ai.backend.manager.views.session_template import SessionTemplateOwnerAndDomain
+from ai.backend.manager.views.session_template import ClusterTemplateWithOwnerAndDomain
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -433,32 +433,17 @@ class TemplateDBSource:
                     })
         return entries
 
-    async def get_cluster_template(self, template_id: str) -> dict[str, Any] | None:
-        """Get a single active cluster template by ID. Returns template dict or None."""
-        async with self._db.begin_readonly() as conn:
-            q = (
-                sa.select(session_templates.c.template)
-                .select_from(session_templates)
-                .where(
-                    (session_templates.c.id == template_id)
-                    & (session_templates.c.is_active)
-                    & (session_templates.c.type == TemplateType.CLUSTER),
-                )
-            )
-            template = await conn.scalar(q)
-            if template is None:
-                return None
-            if isinstance(template, dict):
-                return template
-            return dict(template)
-
-    async def get_cluster_template_owner(
+    async def get_cluster_template(
         self, template_id: str
-    ) -> SessionTemplateOwnerAndDomain | None:
-        """Get the `user_uuid` and `domain_name` of an active cluster template."""
+    ) -> ClusterTemplateWithOwnerAndDomain | None:
+        """Get a single active cluster template by ID with its owner and domain, or None."""
         async with self._db.begin_readonly() as conn:
             q = (
-                sa.select(session_templates.c.user_uuid, session_templates.c.domain_name)
+                sa.select(
+                    session_templates.c.template,
+                    session_templates.c.user_uuid,
+                    session_templates.c.domain_name,
+                )
                 .select_from(session_templates)
                 .where(
                     (session_templates.c.id == template_id)
@@ -466,12 +451,12 @@ class TemplateDBSource:
                     & (session_templates.c.type == TemplateType.CLUSTER),
                 )
             )
-            result = await conn.execute(q)
-            row = result.first()
+            row = (await conn.execute(q)).first()
             if row is None:
                 return None
-            return SessionTemplateOwnerAndDomain(
-                owner_id=UserID(row.user_uuid), domain_name=row.domain_name
+            template = row.template if isinstance(row.template, dict) else dict(row.template)
+            return ClusterTemplateWithOwnerAndDomain(
+                template=template, owner_id=UserID(row.user_uuid), domain_name=row.domain_name
             )
 
     async def cluster_template_exists(self, template_id: str) -> bool:
