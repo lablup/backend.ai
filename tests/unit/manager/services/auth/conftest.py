@@ -6,12 +6,18 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import AuthConfig, ManagerConfig
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.repositories.group.repository import GroupRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
+
+
+@pytest.fixture
+def mock_valkey_session_client() -> AsyncMock:
+    return AsyncMock(spec=ValkeySessionClient)
 
 
 @pytest.fixture

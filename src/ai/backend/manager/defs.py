@@ -33,6 +33,8 @@ DEFAULT_CHUNK_SIZE: Final = 16 * (2**20)  # 16 MiB
 DEFAULT_ROLE: Final = "main"
 
 PASSWORD_PLACEHOLDER: Final = "*****"
+SECRET_KEY_PLACEHOLDER: Final = "*****"
+TOKEN_PLACEHOLDER: Final = "*****"
 
 RESERVED_DOTFILES = [".terminfo", ".jupyter", ".ssh", ".ssh/authorized_keys", ".local", ".config"]
 

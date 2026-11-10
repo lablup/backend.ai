@@ -29,12 +29,13 @@ def auth_service(
     mock_config_provider: AsyncMock,
     mock_user_repository: AsyncMock,
     mock_group_repository: AsyncMock,
+    mock_valkey_session_client: AsyncMock,
 ) -> AuthService:
     return AuthService(
         hook_plugin_ctx=mock_hook_plugin_ctx,
         auth_repository=mock_auth_repository,
         config_provider=mock_config_provider,
-        valkey_session_client=AsyncMock(),
+        valkey_session_client=mock_valkey_session_client,
         user_resource_policy_repository=AsyncMock(spec=UserResourcePolicyRepository),
         user_repository=mock_user_repository,
         group_repository=mock_group_repository,
@@ -46,6 +47,7 @@ async def test_update_password_successful(
     auth_service: AuthService,
     mock_auth_repository: AsyncMock,
     mock_hook_plugin_ctx: AsyncMock,
+    mock_valkey_session_client: AsyncMock,
 ) -> None:
     """Test successful password update"""
     action = UpdatePasswordAction(
@@ -75,6 +77,8 @@ async def test_update_password_successful(
 
     # Password update succeeds
     mock_auth_repository.update_user_password.return_value = None
+    deleted_tokens = ["first-session-token", "second-session-token"]
+    mock_auth_repository.delete_user_login_sessions.return_value = deleted_tokens
 
     result = await auth_service.update_password(action)
 
@@ -82,6 +86,11 @@ async def test_update_password_successful(
     assert result.message == "Password updated successfully"
     mock_auth_repository.check_credential_without_migration.assert_called_once()
     mock_auth_repository.update_user_password.assert_called_once()
+    assert mock_auth_repository.delete_user_login_sessions.call_args.args[:2] == (
+        action.user_id,
+        "default",
+    )
+    mock_valkey_session_client.delete_login_sessions.assert_awaited_once_with(deleted_tokens)
 
 
 async def test_update_password_fails_when_new_passwords_dont_match(

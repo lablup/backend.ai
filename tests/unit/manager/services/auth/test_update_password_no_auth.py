@@ -48,12 +48,13 @@ def auth_service(
     mock_config_provider: MagicMock,
     mock_user_repository: AsyncMock,
     mock_group_repository: AsyncMock,
+    mock_valkey_session_client: AsyncMock,
 ) -> AuthService:
     return AuthService(
         hook_plugin_ctx=mock_hook_plugin_ctx,
         auth_repository=mock_auth_repository,
         config_provider=mock_config_provider,
-        valkey_session_client=AsyncMock(),
+        valkey_session_client=mock_valkey_session_client,
         user_resource_policy_repository=AsyncMock(spec=UserResourcePolicyRepository),
         user_repository=mock_user_repository,
         group_repository=mock_group_repository,
@@ -65,6 +66,7 @@ async def test_update_password_no_auth_successful(
     auth_service: AuthService,
     mock_auth_repository: AsyncMock,
     mock_hook_plugin_ctx: AsyncMock,
+    mock_valkey_session_client: AsyncMock,
     mocker: Any,
 ) -> None:
     """Test successfully updating password without auth"""
@@ -94,6 +96,8 @@ async def test_update_password_no_auth_successful(
 
     new_timestamp = datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC)  # Fixed timestamp for comparison
     mock_auth_repository.update_user_password_by_uuid.return_value = new_timestamp
+    deleted_tokens = ["first-session-token", "second-session-token"]
+    mock_auth_repository.delete_user_login_sessions.return_value = deleted_tokens
 
     mocker.patch(
         "ai.backend.manager.services.auth.service.compare_to_hashed_password", return_value=False
@@ -102,6 +106,11 @@ async def test_update_password_no_auth_successful(
 
     assert result.user_id == UUID("12345678-1234-5678-1234-567812345678")
     assert result.password_changed_at == datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC)
+    assert mock_auth_repository.delete_user_login_sessions.call_args.args[:2] == (
+        result.user_id,
+        "default",
+    )
+    mock_valkey_session_client.delete_login_sessions.assert_awaited_once_with(deleted_tokens)
 
 
 async def test_update_password_no_auth_fails_when_max_password_age_is_none(

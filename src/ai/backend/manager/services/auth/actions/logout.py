@@ -1,3 +1,4 @@
+import uuid
 from dataclasses import dataclass
 from typing import override
 
@@ -8,6 +9,7 @@ from ai.backend.manager.services.auth.actions.base import AuthAction
 
 @dataclass
 class LogoutAction(AuthAction):
+    user_id: uuid.UUID
     session_token: str
 
     @override

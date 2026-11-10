@@ -76,12 +76,12 @@ class KeypairAuthHookPlugin(HookPlugin):
             if hash_type not in hashlib.algorithms_guaranteed:
                 raise InvalidAuthParameters("Unsupported signing method (hash type)")
 
+            if params["date"] is None:
+                raise InvalidAuthParameters("Request date is missing")
             date_obj = dateutil_parse(params["date"])
             date = date_obj.isoformat()
             endpoint = params["endpoint"]
             api_version = params["api_version"]
-            if date is None:
-                raise InvalidAuthParameters("Request date is missing")
             if endpoint is None:
                 raise InvalidAuthParameters("Request endpoint is missing")
             if api_version is None:
@@ -131,7 +131,10 @@ class KeypairAuthHookPlugin(HookPlugin):
             secret = plugin_config["secret"]
             try:
                 payload = deserialize_stoken(stoken, secret)
-                query = sa.select(KeyPairRow).where(KeyPairRow.access_key == payload.access_key)
+                query = sa.select(KeyPairRow).where(
+                    KeyPairRow.access_key == payload.access_key,
+                    KeyPairRow.is_active.is_(True),
+                )
                 async with db.begin_readonly_session() as db_session:
                     keypair_row = await db_session.scalar(query)
                     user_id = keypair_row.user
@@ -147,7 +150,10 @@ class KeypairAuthHookPlugin(HookPlugin):
                         query = (
                             sa.select(keypairs.c.user, keypairs.c.secret_key)
                             .select_from(keypairs)
-                            .where(keypairs.c.access_key == access_key)
+                            .where(
+                                keypairs.c.access_key == access_key,
+                                keypairs.c.is_active.is_(True),
+                            )
                         )
                         result = await conn.execute(query)
                         keypair = result.fetchone()
@@ -160,7 +166,7 @@ class KeypairAuthHookPlugin(HookPlugin):
                     generated_token = await self.sign_token(
                         sign_method, keypair.secret_key, sign_params
                     )
-                    if generated_token != signature:
+                    if not hmac.compare_digest(generated_token, signature):
                         raise Reject("Invalid auth token")
                     user_id = keypair.user
 

@@ -612,24 +612,27 @@ class AuthDBSource:
             ]
 
     @auth_db_source_resilience.apply()
-    async def delete_session_by_token(
+    async def delete_owned_session_by_token(
         self,
         session_token: str,
+        user_id: UUID,
         result: LoginAttemptResult,
     ) -> None:
-        """Delete a single login session by its token and record history.
-
-        Uses a CTE to atomically DELETE + INSERT into login_history with a
-        JOIN on users to obtain domain_name. No-op if the session is not found.
+        """Validate ownership, delete the session, and record history in one transaction.
+        Raise LoginSessionNotFoundError if the token is missing or belongs to another user.
         """
         ls = LoginSessionRow.__table__
         lh = LoginHistoryRow.__table__
-        async with self._db.connect() as conn:
+        async with self._db.begin() as conn:
+            session_id = await conn.scalar(
+                sa.select(ls.c.id)
+                .where((ls.c.session_token == session_token) & (ls.c.user_id == user_id))
+                .with_for_update()
+            )
+            if session_id is None:
+                raise LoginSessionNotFoundError()
             deleted = (
-                sa.delete(ls)
-                .where(ls.c.session_token == session_token)
-                .returning(ls.c.user_id)
-                .cte("deleted")
+                sa.delete(ls).where(ls.c.id == session_id).returning(ls.c.user_id).cte("deleted")
             )
             insert_query = lh.insert().from_select(
                 ["user_id", "domain_name", "result"],
@@ -640,7 +643,6 @@ class AuthDBSource:
                 ).select_from(deleted.join(users, deleted.c.user_id == users.c.uuid)),
             )
             await conn.execute(insert_query)
-            await conn.commit()
 
     @auth_db_source_resilience.apply()
     async def delete_sessions_by_user(

@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-from ai.backend.manager.errors.auth import AuthorizationFailed
+from ai.backend.manager.errors.auth import AuthorizationFailed, LoginSessionNotFoundError
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow
@@ -367,8 +367,8 @@ class TestLoginSessionForce:
         assert await self._count_active_sessions(db_with_cleanup, sample_user.user_id) == 1
 
         # Logout (invalidate session by token)
-        await auth_db_source.delete_session_by_token(
-            result1.session_token, LoginAttemptResult.LOGOUT
+        await auth_db_source.delete_owned_session_by_token(
+            result1.session_token, sample_user.user_id, LoginAttemptResult.LOGOUT
         )
         assert await self._count_active_sessions(db_with_cleanup, sample_user.user_id) == 0
 
@@ -388,3 +388,36 @@ class TestLoginSessionForce:
         )
         assert result2.session_token != result1.session_token
         assert await self._count_active_sessions(db_with_cleanup, sample_user.user_id) == 1
+
+    async def test_logout_with_another_users_token_keeps_session(
+        self,
+        auth_db_source: AuthDBSource,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        sample_user: SampleUserData,
+    ) -> None:
+        created = await auth_db_source.create_login_session(
+            user_id=sample_user.user_id,
+            access_key=sample_user.access_key,
+            domain_name=sample_user.domain_name,
+        )
+
+        with pytest.raises(LoginSessionNotFoundError):
+            await auth_db_source.delete_owned_session_by_token(
+                created.session_token, uuid.uuid4(), LoginAttemptResult.LOGOUT
+            )
+
+        assert await self._count_active_sessions(db_with_cleanup, sample_user.user_id) == 1
+        assert (
+            await self._count_login_history(
+                db_with_cleanup, sample_user.user_id, LoginAttemptResult.LOGOUT
+            )
+            == 0
+        )
+
+    async def test_logout_with_missing_token_raises_not_found(
+        self, auth_db_source: AuthDBSource, sample_user: SampleUserData
+    ) -> None:
+        with pytest.raises(LoginSessionNotFoundError):
+            await auth_db_source.delete_owned_session_by_token(
+                "missing-token", sample_user.user_id, LoginAttemptResult.LOGOUT
+            )

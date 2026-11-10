@@ -362,7 +362,7 @@ class VFolderByName(BaseFunction):
                             file_req_hdrs[hdrs.IF_RANGE] = if_range
                             file_req_hdrs[hdrs.RANGE] = f"{file_unit}={range_start}-"
                         async with aiohttp.ClientSession(headers=file_req_hdrs) as client:
-                            async with client.get(download_url, ssl=False) as raw_resp:
+                            async with client.get(download_url) as raw_resp:
                                 match raw_resp.status:
                                     case 200:
                                         # First attempt to download file or file has changed.
