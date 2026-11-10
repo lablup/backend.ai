@@ -63,7 +63,6 @@ async def test_update_password_successful(
         email="user@example.com",
         old_password="old_password",
         new_password="new_secure_password",
-        new_password_confirm="new_secure_password",
     )
 
     # Setup hook to pass password format verification
@@ -110,7 +109,6 @@ async def test_update_password_fails_when_new_passwords_dont_match(
         email="user@example.com",
         old_password="old_password",
         new_password="new_password1",
-        new_password_confirm="new_password2",
     )
 
     # Setup hook to pass password format verification
@@ -149,7 +147,6 @@ async def test_update_password_fails_with_incorrect_old_password(
         email="user@example.com",
         old_password="wrong_old_password",
         new_password="new_password",
-        new_password_confirm="new_password",
     )
 
     # Setup hook to pass password format verification
@@ -184,7 +181,6 @@ async def test_update_password_with_hook_rejection(
         email="user@example.com",
         old_password="correct_old_password",
         new_password="weak",
-        new_password_confirm="weak",
     )
 
     # Valid old password
@@ -219,7 +215,6 @@ async def test_update_password_repository_call(
         email="update@example.com",
         old_password="old_pass",
         new_password="new_pass123",
-        new_password_confirm="new_pass123",
     )
 
     # Setup successful scenario

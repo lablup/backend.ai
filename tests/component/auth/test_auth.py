@@ -754,12 +754,11 @@ class TestPasswordChange:
         auth_user_registry: BackendAIClientRegistry,
         auth_user_fixture: AuthUserFixtureData,
     ) -> None:
-        """When new_password and new_password2 (confirmation) do not match,
-        InvalidRequestError (400) must be raised.
-        This prevents accidental password changes caused by typos."""
+        """Reject mismatched password confirmation at the HTTP API boundary."""
         with pytest.raises(InvalidRequestError):
             await auth_user_registry.auth.update_password(
-                UpdatePasswordRequest(
+                # Send invalid input to verify server-side validation.
+                UpdatePasswordRequest.model_construct(
                     old_password=auth_user_fixture.password,
                     new_password="NewP@ssw0rd!",
                     new_password2="MismatchP@ss!",

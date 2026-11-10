@@ -696,16 +696,6 @@ class AuthService:
     async def update_password(self, action: UpdatePasswordAction) -> UpdatePasswordActionResult:
         domain_name = action.domain_name
         email = action.email
-        if action.new_password != action.new_password_confirm:
-            log.trace(
-                "password update rejected, new password mismatch",
-                domain_name=domain_name,
-                user_email=email,
-            )
-            return UpdatePasswordActionResult(
-                success=False,
-                message="new password mismatch",
-            )
         auth_config = self._config_provider.config.auth
         try:
             credential = await self._auth_repository.check_credential_without_migration(

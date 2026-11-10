@@ -10863,7 +10863,7 @@ type Mutation {
   adminUpdateUserV2(userId: UUID!, input: UpdateUserV2Input!): UpdateUserV2Payload
 
   """
-  Added in 26.2.0. Update the current user's information. Users can only update their own profile. Non-superadmins can set only fullName, password and allowedClientIp
+  Added in 26.2.0. Update the current user's information. Users can only update their own profile. Non-superadmins can set only fullName, password and allowedClientIp. Password changes require oldPassword
   """
   updateUserV2(input: UpdateUserV2Input!): UpdateUserV2Payload
 
@@ -23049,6 +23049,11 @@ input UpdateUserV2Input {
 
   """New password."""
   password: String
+
+  """
+  Added in 26.10.0. Current password, required when changing your own password.
+  """
+  oldPassword: String
 
   """New full display name."""
   fullName: String

@@ -17,8 +17,10 @@ from ai.backend.common.dto.manager.v2.user.request import (
     DeleteUserInput,
     PurgeUserInput,
     RestoreUserInput,
+    UpdatePasswordInput,
 )
 from ai.backend.common.exception import InvalidIpAddressValue, UnreachableError
+from ai.backend.common.tristate.unset import UNSET
 from ai.backend.common.types import ReadableCIDR
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
 from ai.backend.manager.api.gql.decorators import (
@@ -69,7 +71,12 @@ from ai.backend.manager.services.user.actions.update_user import (
 )
 from ai.backend.manager.types import OptionalState, TriState
 
-SELF_EDITABLE_USER_FIELDS: Final = frozenset({"full_name", "password", "allowed_client_ip"})
+SELF_EDITABLE_USER_FIELDS: Final = frozenset({
+    "full_name",
+    "password",
+    "old_password",
+    "allowed_client_ip",
+})
 
 # Create Mutations
 
@@ -274,24 +281,14 @@ async def admin_bulk_update_users_v2(
 @gql_mutation(
     BackendAIGQLMeta(
         added_version="26.2.0",
-        description="Update the current user's information. Users can only update their own profile. Non-superadmins can set only fullName, password and allowedClientIp",
+        description="Update the current user's information. Users can only update their own profile. Non-superadmins can set only fullName, password and allowedClientIp. Password changes require oldPassword",
     )
 )
 async def update_user_v2(
     info: Info[StrawberryGQLContext],
     input: UpdateUserV2InputGQL,
 ) -> UpdateUserPayloadGQL | None:
-    """Update the current user's own information.
-
-    Args:
-        info: Strawberry GraphQL context.
-        input: User update input with fields to modify.
-
-    Returns:
-        UpdateUserPayloadGQL with the updated user.
-
-
-    """
+    """Update the current user's profile, verifying credentials for password changes."""
     ctx = info.context
     me = current_user()
     if me is None:
@@ -308,7 +305,22 @@ async def update_user_v2(
             raise UserModificationBadRequest(
                 "need_password_change cannot be true when changing your own password"
             )
-        dto = dto.model_copy(update={"need_password_change": False})
+        if not isinstance(dto.old_password, str):
+            raise UserModificationBadRequest(
+                "old_password is required when changing your own password"
+            )
+        if ctx.request is None:
+            raise UnreachableError("Request context is not available")
+        await ctx.adapters.auth.update_password(
+            user_id=UserID(me.user_id),
+            domain_name=me.domain_name,
+            email=ctx.request["user"]["email"],
+            input=UpdatePasswordInput(
+                old_password=dto.old_password,
+                new_password=dto.password,
+            ),
+        )
+        dto = dto.model_copy(update={"password": UNSET, "need_password_change": False})
     payload = await ctx.adapters.user.update_user_by_id(me.user_id, dto)
     return UpdateUserPayloadGQL.from_pydantic(payload)
 
