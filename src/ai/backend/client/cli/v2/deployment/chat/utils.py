@@ -10,14 +10,11 @@ only by its owner.
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import Any
 
 from ai.backend.client.cli.v2.helpers import CONFIG_DIR
 from ai.backend.common.json import load_json
-
-_OWNER_ONLY_FILE_MODE = 0o600
 
 CHAT_DIR = CONFIG_DIR / "deployment_chat"
 CHAT_CACHE_FILE = CHAT_DIR / "cache.json"
@@ -41,16 +38,3 @@ def write_json_file(path: Path, text: str) -> None:
     """Write ``text`` to ``path`` after ensuring the parent directory exists."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
-
-
-def write_owner_only_json_file(path: Path, text: str) -> None:
-    """Write ``text`` to ``path`` readable only by its owner, creating the parent directory."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with open(
-        path,
-        "w",
-        encoding="utf-8",
-        opener=lambda opened_path, flags: os.open(opened_path, flags, _OWNER_ONLY_FILE_MODE),
-    ) as owner_only_file:
-        os.fchmod(owner_only_file.fileno(), _OWNER_ONLY_FILE_MODE)
-        owner_only_file.write(text)
