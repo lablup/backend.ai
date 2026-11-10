@@ -22,14 +22,9 @@ from ai.backend.manager.api.rest.template.registry import register_template_rout
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.session_template.types import TemplateType
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
-<<<<<<< HEAD
 from ai.backend.manager.models.project import ProjectRow
-=======
-from ai.backend.manager.models.project.row import ProjectRow
-from ai.backend.manager.models.session_template.row import SessionTemplateRow
->>>>>>> 3adc78e5 (fix(BA-8969): return only the task templates a requester may read (#16634))
+from ai.backend.manager.models.session_template.row import SessionTemplateRow, TemplateType
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
