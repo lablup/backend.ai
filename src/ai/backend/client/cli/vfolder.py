@@ -2,6 +2,7 @@ import json
 import sys
 from datetime import datetime
 from pathlib import Path
+from uuid import UUID
 
 import click
 import humanize
@@ -181,15 +182,22 @@ def delete(name: str) -> None:
 
 
 @vfolder.command()
-@click.argument("name", type=str)
-def purge(name: str) -> None:
+@click.argument("name_or_id", type=str)
+def purge(name_or_id: str) -> None:
     """Purge the given virtual folder. This operation is irreversible!
 
-    NAME: Name of a virtual folder.
+    NAME_OR_ID: Name or ID of a virtual folder. A folder in `delete-complete` status can be
+    purged only by its ID.
     """
     with Session() as session:
         try:
-            _ = session.VFolder(name).purge()
+            try:
+                vfolder_id = UUID(name_or_id)
+            except ValueError:
+                target_vfolder = session.VFolder(name_or_id)
+            else:
+                target_vfolder = session.VFolder(name_or_id, id=vfolder_id)
+            _ = target_vfolder.purge()
             print_done("Purged.")
         except Exception as e:
             print_error(e)
