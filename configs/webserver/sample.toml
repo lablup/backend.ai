@@ -544,9 +544,9 @@
   # attacks.
   # Added in 25.12.0
   login-block-time = 1200
-  # Maximum number of failed login attempts before blocking. After this many
-  # failures, the IP or account is blocked for login_block_time seconds. Lower
-  # values are more secure but may frustrate legitimate users.
+  # Maximum number of failed login attempts per username before blocking. After
+  # this many failures, login for that username is blocked for login_block_time
+  # seconds. Lower values are more secure but may frustrate legitimate users.
   # Added in 25.12.0
   login-allowed-fail-count = 5
   # Automatically log out users after a period of inactivity. When enabled,
