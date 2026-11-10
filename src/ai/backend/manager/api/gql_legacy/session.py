@@ -621,21 +621,30 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
                 .filter(SessionRow.id == self.row_id)
                 .cte(name="dependency_cte", recursive=True)
             )
-            dependee = sa.select(SessionDependencyRow.depends_on).join(
-                dependency_cte, SessionDependencyRow.session_id == dependency_cte.c.id
+            # PostgreSQL takes one reference to the CTE in the recursive term, so one join
+            # reads both directions. UNION drops the sessions already in the graph.
+            is_dependent = SessionDependencyRow.session_id == dependency_cte.c.id
+            is_dependee = SessionDependencyRow.depends_on == dependency_cte.c.id
+            linked = (
+                sa.select(
+                    sa.case(
+                        (is_dependent, SessionDependencyRow.depends_on),
+                        else_=SessionDependencyRow.session_id,
+                    )
+                )
+                .select_from(SessionDependencyRow)
+                .join(dependency_cte, is_dependent | is_dependee)
             )
-            dependent = sa.select(SessionDependencyRow.session_id).join(
-                dependency_cte, SessionDependencyRow.depends_on == dependency_cte.c.id
-            )
-            dependency_cte = dependency_cte.union_all(dependee).union_all(dependent)
+            dependency_cte = dependency_cte.union(linked)
             # Get the session IDs in the graph
             query = sa.select(dependency_cte.c.id)
             session_ids = (await db_sess.execute(query)).scalars().all()
             # Get the session rows in the graph
             query = (
                 sa.select(SessionRow)
-                .where(SessionRow.id.in_(session_ids))
+                .where(type(self)._visible_to(ctx.user) & SessionRow.id.in_(session_ids))
                 .options(
+                    selectinload(SessionRow.kernels.and_(KernelRow.cluster_role == DEFAULT_ROLE)),
                     selectinload(SessionRow.user),
                 )
             )
