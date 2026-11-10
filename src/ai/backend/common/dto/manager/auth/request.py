@@ -96,6 +96,10 @@ class SignupRequest(BaseRequestModel):
         default=None,
         description="Free-text account description; defaults to empty string",
     )
+    token: str | None = Field(
+        default=None,
+        description="Signup token passed to the PRE_SIGNUP hook",
+    )
 
 
 class LogoutRequest(BaseRequestModel):

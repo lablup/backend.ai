@@ -186,6 +186,7 @@ class AuthHandler:
             username=params.username,
             full_name=params.full_name,
             description=params.description,
+            token=params.token,
         )
         result = await self._auth.signup.run(action)
         resp = SignupResponse(

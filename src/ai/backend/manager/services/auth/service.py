@@ -495,9 +495,10 @@ class AuthService:
 
     async def signup(self, action: SignupAction) -> SignupActionResult:
         params = action.hook_params
+        pre_signup_params = params if action.token is None else {**params, "token": action.token}
         hook_result = await self._hook_plugin_ctx.dispatch(
             "PRE_SIGNUP",
-            (params,),
+            (pre_signup_params,),
             return_when=ALL_COMPLETED,
         )
         if hook_result.status != PASSED:
