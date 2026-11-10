@@ -6,6 +6,7 @@ from typing import Any, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.models.user import UserRole
 
 from .base import TemplateAction
 
@@ -15,6 +16,9 @@ class GetTaskTemplateAction(TemplateAction):
     """Action to get a single task template by ID."""
 
     template_id: str
+    requester_uuid: uuid.UUID
+    requester_role: UserRole
+    requester_domain: str
 
     @override
     @classmethod

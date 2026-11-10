@@ -791,6 +791,32 @@
   # Added in 26.4.16
   keep-alive-timeout = 3.0
 
+  # TLS settings for the connection to etcd.
+  # Added in 26.4.19
+  [etcd.tls]
+    # Connect to etcd over TLS.
+    # Added in 26.4.19
+    enabled = false
+
+    # PEM file of the CA certificate that signed the etcd server certificate.
+    # Required if TLS is enabled.
+    # Added in 26.4.19
+    ## ca-cert = "/etc/backend.ai/etcd/ca.pem"
+
+    # PEM file of the client certificate, for an etcd started with --client-
+    # cert-auth. Set together with client-key.
+    # Added in 26.4.19
+    ## client-cert = "/etc/backend.ai/etcd/client.pem"
+
+    # PEM file of the client private key. Set together with client-cert.
+    # Added in 26.4.19
+    ## client-key = "/etc/backend.ai/etcd/client-key.pem"
+
+    # Seconds to wait for the TLS handshake with an etcd member. When not set,
+    # the handshake has no limit: request timeouts do not end it.
+    # Added in 26.4.19
+    ## handshake-timeout = 10.0
+
 # Container log collection and retention configuration. Controls how container
 # stdout/stderr logs are collected, stored, and made available to users.
 # Important for debugging container applications.

@@ -1,7 +1,12 @@
 import logging
+from dataclasses import replace
 
+from ai.backend.common.contexts.user import current_user
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
+from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
+from ai.backend.manager.defs import SECRET_KEY_PLACEHOLDER, TOKEN_PLACEHOLDER
 from ai.backend.manager.repositories.artifact_registry.repository import ArtifactRegistryRepository
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
 from ai.backend.manager.repositories.reservoir_registry.repository import (
@@ -104,7 +109,9 @@ class ArtifactRegistryService:
         registry_data = await self._huggingface_registry_repository.create(
             action.creator, action.meta
         )
-        return CreateHuggingFaceRegistryActionResult(result=registry_data)
+        return CreateHuggingFaceRegistryActionResult(
+            result=self._with_token_masked_unless_superadmin(registry_data)
+        )
 
     async def update_huggingface_registry(
         self, action: UpdateHuggingFaceRegistryAction
@@ -116,7 +123,9 @@ class ArtifactRegistryService:
         registry_data = await self._huggingface_registry_repository.update(
             action.updater, action.meta
         )
-        return UpdateHuggingFaceRegistryActionResult(result=registry_data)
+        return UpdateHuggingFaceRegistryActionResult(
+            result=self._with_token_masked_unless_superadmin(registry_data)
+        )
 
     async def delete_huggingface_registry(
         self, action: DeleteHuggingFaceRegistryAction
@@ -138,7 +147,9 @@ class ArtifactRegistryService:
         registry_data = await self._huggingface_registry_repository.get_registry_data_by_id(
             action.registry_id
         )
-        return GetHuggingFaceRegistryActionResult(result=registry_data)
+        return GetHuggingFaceRegistryActionResult(
+            result=self._with_token_masked_unless_superadmin(registry_data)
+        )
 
     async def get_huggingface_registries(
         self, action: GetHuggingFaceRegistriesAction
@@ -150,7 +161,12 @@ class ArtifactRegistryService:
         registry_data_list = await self._huggingface_registry_repository.get_registries_by_ids(
             action.registry_ids
         )
-        return GetHuggingFaceRegistriesActionResult(result=registry_data_list)
+        return GetHuggingFaceRegistriesActionResult(
+            result=[
+                self._with_token_masked_unless_superadmin(registry_data)
+                for registry_data in registry_data_list
+            ]
+        )
 
     async def list_huggingface_registry(
         self, _action: ListHuggingFaceRegistryAction
@@ -160,7 +176,12 @@ class ArtifactRegistryService:
         """
         log.info("Listing huggingface registries")
         registry_data_list = await self._huggingface_registry_repository.list_registries()
-        return ListHuggingFaceRegistryActionResult(data=registry_data_list)
+        return ListHuggingFaceRegistryActionResult(
+            data=[
+                self._with_token_masked_unless_superadmin(registry_data)
+                for registry_data in registry_data_list
+            ]
+        )
 
     async def search_huggingface_registries(
         self, action: SearchHuggingFaceRegistriesAction
@@ -171,7 +192,10 @@ class ArtifactRegistryService:
         )
 
         return SearchHuggingFaceRegistriesActionResult(
-            registries=result.items,
+            registries=[
+                self._with_token_masked_unless_superadmin(registry_data)
+                for registry_data in result.items
+            ],
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
@@ -185,7 +209,9 @@ class ArtifactRegistryService:
         """
         log.info("Creating reservoir with data: {}", action.creator)
         reservoir_data = await self._reservoir_repository.create(action.creator, action.meta)
-        return CreateReservoirActionResult(result=reservoir_data)
+        return CreateReservoirActionResult(
+            result=self._with_secret_key_masked_unless_superadmin(reservoir_data)
+        )
 
     async def update_reservoir_registry(
         self, action: UpdateReservoirRegistryAction
@@ -195,7 +221,9 @@ class ArtifactRegistryService:
         """
         log.info("Updating reservoir with id: {}", action.updater.pk_value)
         reservoir_data = await self._reservoir_repository.update(action.updater, action.meta)
-        return UpdateReservoirRegistryActionResult(result=reservoir_data)
+        return UpdateReservoirRegistryActionResult(
+            result=self._with_secret_key_masked_unless_superadmin(reservoir_data)
+        )
 
     async def delete_reservoir_registry(
         self, action: DeleteReservoirRegistryAction
@@ -217,7 +245,9 @@ class ArtifactRegistryService:
         reservoir_data = await self._reservoir_repository.get_reservoir_registry_data_by_id(
             action.reservoir_id
         )
-        return GetReservoirRegistryActionResult(result=reservoir_data)
+        return GetReservoirRegistryActionResult(
+            result=self._with_secret_key_masked_unless_superadmin(reservoir_data)
+        )
 
     async def get_reservoir_registries(
         self, action: GetReservoirRegistriesAction
@@ -229,7 +259,12 @@ class ArtifactRegistryService:
         reservoir_data_list = await self._reservoir_repository.get_registries_by_ids(
             action.registry_ids
         )
-        return GetReservoirRegistriesActionResult(result=reservoir_data_list)
+        return GetReservoirRegistriesActionResult(
+            result=[
+                self._with_secret_key_masked_unless_superadmin(reservoir_data)
+                for reservoir_data in reservoir_data_list
+            ]
+        )
 
     async def list_reservoir_registries(
         self, _action: ListReservoirRegistriesAction
@@ -239,7 +274,12 @@ class ArtifactRegistryService:
         """
         log.info("Listing reservoirs")
         reservoir_data_list = await self._reservoir_repository.list_reservoir_registries()
-        return ListReservoirRegistriesActionResult(data=reservoir_data_list)
+        return ListReservoirRegistriesActionResult(
+            data=[
+                self._with_secret_key_masked_unless_superadmin(reservoir_data)
+                for reservoir_data in reservoir_data_list
+            ]
+        )
 
     async def search_reservoir_registries(
         self, action: SearchReservoirRegistriesAction
@@ -249,7 +289,10 @@ class ArtifactRegistryService:
             querier=action.querier,
         )
         return SearchReservoirRegistriesActionResult(
-            registries=result.items,
+            registries=[
+                self._with_secret_key_masked_unless_superadmin(reservoir_data)
+                for reservoir_data in result.items
+            ],
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
@@ -295,4 +338,28 @@ class ArtifactRegistryService:
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
+        )
+
+    @staticmethod
+    def _with_secret_key_masked_unless_superadmin(
+        reservoir_data: ReservoirRegistryData,
+    ) -> ReservoirRegistryData:
+        user = current_user()
+        return (
+            reservoir_data
+            if user is not None and user.is_superadmin
+            else replace(reservoir_data, secret_key=SECRET_KEY_PLACEHOLDER)
+        )
+
+    @staticmethod
+    def _with_token_masked_unless_superadmin(
+        registry_data: HuggingFaceRegistryData,
+    ) -> HuggingFaceRegistryData:
+        if registry_data.token is None:
+            return registry_data
+        user = current_user()
+        return (
+            registry_data
+            if user is not None and user.is_superadmin
+            else replace(registry_data, token=TOKEN_PLACEHOLDER)
         )

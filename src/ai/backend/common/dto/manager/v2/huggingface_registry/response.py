@@ -23,7 +23,10 @@ class HuggingFaceRegistryNode(BaseResponseModel):
     id: UUID = Field(description="Registry ID")
     name: str = Field(description="Registry name")
     url: str = Field(description="HuggingFace Hub URL")
-    token: str | None = Field(default=None, description="Access token for the registry")
+    token: str | None = Field(
+        default=None,
+        description="Access token for the registry. Masked unless the caller is a superadmin.",
+    )
 
 
 class CreateHuggingFaceRegistryPayload(BaseResponseModel):
