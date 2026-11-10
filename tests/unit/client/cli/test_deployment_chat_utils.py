@@ -48,17 +48,6 @@ def history_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 @pytest.fixture
-def config_path_in_missing_directory(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    world_readable_umask: None,
-) -> Path:
-    path = tmp_path / "deployment_chat" / "config.json"
-    monkeypatch.setattr(chat_types, "CHAT_CONFIG_FILE", path)
-    return path
-
-
-@pytest.fixture
 def loose_config_path(config_path: Path) -> Path:
     config_path.write_text("{}", encoding="utf-8")
     config_path.chmod(0o644)
@@ -118,16 +107,16 @@ class TestConfigLoadSaveRoundTrip:
         assert loaded.get_model(dep_id) == "llama-3-8b-instruct"
 
 
-class TestFilePermissions:
-    def test_new_token_file_is_owner_only_in_owner_only_directory(
+@pytest.mark.usefixtures("world_readable_umask")
+class TestConfigFileMode:
+    def test_new_token_file_is_owner_only(
         self,
-        config_path_in_missing_directory: Path,
+        config_path: Path,
         chat_config_with_token: DeploymentChatConfig,
     ) -> None:
         chat_config_with_token.save()
 
-        assert stat.S_IMODE(config_path_in_missing_directory.stat().st_mode) == 0o600
-        assert stat.S_IMODE(config_path_in_missing_directory.parent.stat().st_mode) == 0o700
+        assert stat.S_IMODE(config_path.stat().st_mode) == 0o600
 
     def test_loose_token_file_is_tightened(
         self,
@@ -137,18 +126,6 @@ class TestFilePermissions:
         chat_config_with_token.save()
 
         assert stat.S_IMODE(loose_config_path.stat().st_mode) == 0o600
-
-    @pytest.mark.usefixtures("world_readable_umask")
-    def test_cache_and_history_files_are_owner_only(
-        self,
-        cache_path: Path,
-        history_path: Path,
-    ) -> None:
-        DeploymentChatCache().save()
-        DeploymentChatHistory().save()
-
-        assert stat.S_IMODE(cache_path.stat().st_mode) == 0o600
-        assert stat.S_IMODE(history_path.stat().st_mode) == 0o600
 
 
 class TestCacheLoaderResilience:

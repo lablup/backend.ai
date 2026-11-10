@@ -11,7 +11,6 @@ from typing import Any
 import click
 
 from ai.backend.client.cli.v2.insecure_http_guard import InsecureEndpointError
-from ai.backend.client.owner_only_files import ensure_owner_only_file
 
 from .helpers import ProfileStore, create_v2_registry, load_v2_config
 
@@ -27,7 +26,7 @@ def login(force: bool) -> None:
     Requires ``endpoint-type`` to be ``session``.
     """
 
-    async def _log_in_and_save_session() -> None:
+    async def _run() -> None:
         config = load_v2_config()
 
         if config.endpoint_type != "session":
@@ -51,7 +50,7 @@ def login(force: bool) -> None:
             if force:
                 payload["force"] = True
             async with client.session.post(login_url, json=payload) as resp:
-                login_response = await resp.json()
+                data = await resp.json()
 
             def _get_details(resp_data: dict[str, Any]) -> str:
                 raw = resp_data.get("data")
@@ -66,37 +65,37 @@ def login(force: bool) -> None:
                     return str(resp_data["title"])
                 return "Unknown error"
 
-            if not login_response.get("authenticated"):
-                details = _get_details(login_response)
+            if not data.get("authenticated"):
+                details = _get_details(data)
 
                 if details == "OTP not provided":
                     otp = input("One-time Password: ")
                     payload["otp"] = otp.strip()
                     async with client.session.post(login_url, json=payload) as resp:
-                        login_response = await resp.json()
+                        data = await resp.json()
 
-            if not login_response.get("authenticated"):
-                details = _get_details(login_response)
+            if not data.get("authenticated"):
+                details = _get_details(data)
                 click.echo(click.style(f"Login failed: {details}", fg="red"))
                 raise SystemExit(1)
 
             paths = ProfileStore().selected()
+            paths.session_dir.mkdir(parents=True, exist_ok=True)
             cookie_jar = client.session.cookie_jar
             if hasattr(cookie_jar, "save"):
-                ensure_owner_only_file(paths.cookie_file)
                 cookie_jar.save(paths.cookie_file)
+                paths.cookie_file.chmod(0o600)
 
-            login_config = login_response.get("config", {})
+            login_config = data.get("config", {})
             if login_config:
-                session_config_path = paths.session_dir / "config.json"
-                ensure_owner_only_file(session_config_path)
-                session_config_path.write_text(json.dumps(login_config))
+                config_path = paths.session_dir / "config.json"
+                config_path.write_text(json.dumps(login_config))
 
             click.echo(click.style("Login succeeded.", fg="green"))
         finally:
             await registry.close()
 
-    asyncio.run(_log_in_and_save_session())
+    asyncio.run(_run())
 
 
 def _remove_stored_session() -> None:

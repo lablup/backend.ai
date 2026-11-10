@@ -15,6 +15,7 @@ from ai.backend.client.cli.v2.deployment.chat.utils import (
     CHAT_HISTORY_FILE,
     read_json_file,
     write_json_file,
+    write_owner_only_json_file,
 )
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.exception import BackendAISchemaValidationFailed
@@ -174,10 +175,8 @@ class DeploymentChatConfig(BackendAISchema):
             return cls()
 
     def save(self) -> None:
-        """Persist the config as a plain JSON file (matches existing CLI credential
-        storage convention; see ``client/cli/v2/config_cmd.py``).
-        """
-        write_json_file(CHAT_CONFIG_FILE, self.model_dump_json(indent=2))
+        """Persist the config as a JSON file readable only by its owner."""
+        write_owner_only_json_file(CHAT_CONFIG_FILE, self.model_dump_json(indent=2))
 
 
 class ChatMessage(BackendAISchema):

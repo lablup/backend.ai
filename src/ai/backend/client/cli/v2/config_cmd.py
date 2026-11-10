@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
 import click
 
-from ai.backend.client.owner_only_files import ensure_owner_only_file
-
 from .helpers import ProfileStore
+
+_OWNER_ONLY_FILE_MODE = 0o600
 
 CONFIGURABLE_KEYS = {
     "endpoint": ("config", "endpoint"),
@@ -34,13 +35,30 @@ def _load_toml(path: click.Path) -> dict[str, Any]:
         return tomllib.load(f)
 
 
-def _save_toml(toml_path: Path, data: dict[str, Any]) -> None:
-    """Write a dict to an owner-only TOML file under the ``[backend-ai]`` section."""
+def _save_toml(path: click.Path, data: dict[str, Any]) -> None:
+    """Write a dict to a TOML file under the ``[backend-ai]`` section."""
+    from pathlib import Path as P
+
     import tomli_w
 
-    ensure_owner_only_file(toml_path)
-    with toml_path.open("wb") as toml_file:
-        tomli_w.dump(data, toml_file)
+    p = P(str(path))
+    p.parent.mkdir(parents=True, exist_ok=True)
+    with p.open("wb") as f:
+        tomli_w.dump(data, f)
+
+
+def _save_credentials_toml(credentials_path: Path, data: dict[str, Any]) -> None:
+    """Write a dict to a TOML file readable only by its owner."""
+    import tomli_w
+
+    credentials_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(
+        credentials_path,
+        "wb",
+        opener=lambda opened_path, flags: os.open(opened_path, flags, _OWNER_ONLY_FILE_MODE),
+    ) as credentials_file:
+        os.fchmod(credentials_file.fileno(), _OWNER_ONLY_FILE_MODE)
+        tomli_w.dump(data, credentials_file)
 
 
 @click.group()
@@ -98,7 +116,10 @@ def set_value(key: str, value: str) -> None:
     else:
         section[toml_key] = value
 
-    _save_toml(path, data)
+    if file_type == "config":
+        _save_toml(path, data)
+    else:
+        _save_credentials_toml(path, data)
     click.echo(f"Set {key} = {value}")
 
 
