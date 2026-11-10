@@ -147,8 +147,7 @@ async def static_handler(request: web.Request) -> web.StreamResponse:
     static_path = config.service.static_path
     file_path = (static_path / request_path).resolve()
     try:
-<<<<<<< HEAD
-        file_path.relative_to(static_path)
+        relative_path = file_path.relative_to(static_path)
     except (ValueError, FileNotFoundError):
         return web.HTTPNotFound(
             text=json.dumps({
@@ -157,17 +156,11 @@ async def static_handler(request: web.Request) -> web.StreamResponse:
             }),
             content_type="application/problem+json",
         )
-=======
-        relative_path = file_path.relative_to(static_path)
-    except (ValueError, FileNotFoundError) as e:
-        raise StaticFileNotFoundError() from e
-    if relative_path.as_posix() in {"stats", "config.ini"} or file_path.name.endswith((
+    blocked = relative_path.as_posix() in {"stats", "config.ini"} or file_path.name.endswith((
         ".js.map",
         ".css.map",
-    )):
-        raise StaticFileNotFoundError()
->>>>>>> 8e34a5ea5 (fix(BA-8883): stop serving config.ini, /stats, and source maps from the webserver (#16612))
-    if file_path.is_file():
+    ))
+    if file_path.is_file() and not blocked:
         return apply_cache_headers(web.FileResponse(file_path), request_path)
     return web.HTTPNotFound(
         text=json.dumps({
@@ -214,7 +207,13 @@ async def console_handler(request: web.Request) -> web.StreamResponse:
         ".js.map",
         ".css.map",
     )):
-        raise StaticFileNotFoundError()
+        raise web.HTTPNotFound(
+            text=json.dumps({
+                "type": "https://api.backend.ai/probs/generic-not-found",
+                "title": "Not Found",
+            }),
+            content_type="application/problem+json",
+        )
     index_path = (static_path / "index.html").resolve()
     if file_path.is_file() and file_path != index_path:
         return apply_cache_headers(web.FileResponse(file_path), request_path)

@@ -437,8 +437,6 @@ async def web_handler_with_jwt(
             jwt_token=jwt_token,
         )
 
-    stats: WebStats = frontend_rqst.app["stats"]
-    stats.active_proxy_api_handlers.add(asyncio.current_task())  # type: ignore
     path = _strip_route_prefix(frontend_rqst, prefix="/func")
     http_headers_to_forward_extra = http_headers_to_forward_extra or []
 
