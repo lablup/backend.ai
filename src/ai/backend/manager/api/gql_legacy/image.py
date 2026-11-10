@@ -1329,7 +1329,8 @@ class PurgeImagesPayload(graphene.ObjectType):  # type: ignore[misc]
     """
 
     task_id = graphene.String()
-    allowed_roles = (UserRole.SUPERADMIN, UserRole.ADMIN)
+    # ``GQLMutationPrivilegeCheckMiddleware`` reads the roles off the Output type.
+    allowed_roles = (UserRole.SUPERADMIN,)
 
 
 class PurgeImages(graphene.Mutation):  # type: ignore[misc]
