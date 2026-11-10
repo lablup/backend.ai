@@ -115,6 +115,7 @@ from .errors import (
     MissingRequestParameterError,
     ProxyTargetUnreachableError,
     StaticFileNotFoundError,
+    UnauthenticatedError,
     UnexpectedAuthResponseError,
 )
 from .proxy import (
@@ -607,6 +608,8 @@ async def extend_login_session(request: web.Request) -> web.Response:
 
     current = get_time()
     session = await get_session(request)
+    if not session.get("authenticated", False):
+        raise UnauthenticatedError()
 
     session.expiration_dt = current + login_session_extension_sec
     expires = datetime.fromtimestamp(session.expiration_dt, tz=UTC).isoformat()
