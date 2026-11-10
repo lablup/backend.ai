@@ -397,12 +397,12 @@ class TestVersionJsonHandler:
         app.router.add_route("GET", "/version.json", version_json_handler)
         return app
 
-    async def test_before_login_is_not_found(
+    async def test_before_login_is_unauthorized(
         self, aiohttp_client: Any, app_serving_version_json: web.Application
     ) -> None:
         client = await aiohttp_client(app_serving_version_json)
         resp = await client.get("/version.json")
-        assert resp.status == 404
+        assert resp.status == 401
 
     async def test_after_login_is_served(
         self, aiohttp_client: Any, app_serving_version_json: web.Application

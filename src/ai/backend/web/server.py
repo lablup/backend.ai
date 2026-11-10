@@ -219,7 +219,7 @@ async def config_toml_handler(request: web.Request) -> web.Response:
 async def version_json_handler(request: web.Request) -> web.StreamResponse:
     session = await get_session(request)
     if not session.get("authenticated", False):
-        raise StaticFileNotFoundError()
+        raise UnauthenticatedError()
     config = cast(WebServerUnifiedConfig, request.app["config"])
     return apply_cache_headers(
         web.FileResponse(config.service.static_path / "version.json"), "version.json"
