@@ -1,14 +1,23 @@
 import uuid
 
+import sqlalchemy as sa
+
 from ai.backend.common.data.entity.permission import PermissionFieldType, PermissionID
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.session import SessionEntityType
-from ai.backend.manager.data.permission.types import Permission
+from ai.backend.manager.data.permission.types import Permission, RoleSource
+from ai.backend.manager.errors.role_preset import SystemRoleNotEditable
 from ai.backend.manager.models.rbac_models.permission.creators import RolePermissionCreator
 from ai.backend.manager.models.rbac_models.permission.lookups import RolePermissionOwnerLookup
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.permission.purgers import RolePermissionPurger
 from ai.backend.manager.models.rbac_models.permission.scopes import RolePermissionTarget
+from ai.backend.manager.models.rbac_models.permission.updaters import RolePermissionUpdater
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+
+_NOT_OWNED_BY_A_SYSTEM_ROLE = PermissionRow.role_id.not_in(
+    sa.select(RoleRow.id).where(RoleRow.source == RoleSource.SYSTEM)
+)
 
 
 class TestRolePermissionCreator:
@@ -80,3 +89,19 @@ class TestRolePermissionPurger:
         assert purger.target_id_column() is PermissionRow.id
         assert purger.target_id_value() == permission_id
         assert purger.conflict_checks() == ()
+
+    def test_the_purger_declines_an_entry_of_a_system_role(self) -> None:
+        purger = RolePermissionPurger(permission_id=PermissionID(uuid.uuid4()))
+
+        (guard,) = purger.guard_checks()
+        assert str(guard.condition()) == str(_NOT_OWNED_BY_A_SYSTEM_ROLE)
+        assert isinstance(guard.error, SystemRoleNotEditable)
+
+
+class TestRolePermissionUpdater:
+    def test_the_updater_declines_an_entry_of_a_system_role(self) -> None:
+        updater = RolePermissionUpdater(permission_id=PermissionID(uuid.uuid4()))
+
+        (guard,) = updater.guard_checks()
+        assert str(guard.condition()) == str(_NOT_OWNED_BY_A_SYSTEM_ROLE)
+        assert isinstance(guard.error, SystemRoleNotEditable)
