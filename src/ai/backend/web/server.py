@@ -96,7 +96,11 @@ from ai.backend.web.security import SecurityPolicy, csp_nonce_var, security_poli
 
 from . import __version__, user_agent
 from .auth import build_forwarding_headers, fill_forwarding_hdrs_to_api_session, get_client_ip
-from .errors import InvalidAPIConfigurationError, UnexpectedAuthResponseError
+from .errors import (
+    InvalidAPIConfigurationError,
+    StaticFileNotFoundError,
+    UnexpectedAuthResponseError,
+)
 from .proxy import (
     decrypt_payload,
     web_handler,
@@ -148,27 +152,16 @@ async def static_handler(request: web.Request) -> web.StreamResponse:
     file_path = (static_path / request_path).resolve()
     try:
         relative_path = file_path.relative_to(static_path)
-    except (ValueError, FileNotFoundError):
-        return web.HTTPNotFound(
-            text=json.dumps({
-                "type": "https://api.backend.ai/probs/generic-not-found",
-                "title": "Not Found",
-            }),
-            content_type="application/problem+json",
-        )
-    blocked = relative_path.as_posix() in {"stats", "config.ini"} or file_path.name.endswith((
+    except (ValueError, FileNotFoundError) as e:
+        raise StaticFileNotFoundError() from e
+    if relative_path.as_posix() in {"stats", "config.ini"} or file_path.name.endswith((
         ".js.map",
         ".css.map",
-    ))
-    if file_path.is_file() and not blocked:
+    )):
+        raise StaticFileNotFoundError()
+    if file_path.is_file():
         return apply_cache_headers(web.FileResponse(file_path), request_path)
-    return web.HTTPNotFound(
-        text=json.dumps({
-            "type": "https://api.backend.ai/probs/generic-not-found",
-            "title": "Not Found",
-        }),
-        content_type="application/problem+json",
-    )
+    raise StaticFileNotFoundError()
 
 
 async def config_toml_handler(request: web.Request) -> web.Response:
@@ -196,24 +189,12 @@ async def console_handler(request: web.Request) -> web.StreamResponse:
     try:
         relative_path = file_path.relative_to(static_path)
     except (ValueError, FileNotFoundError) as e:
-        raise web.HTTPNotFound(
-            text=json.dumps({
-                "type": "https://api.backend.ai/probs/generic-not-found",
-                "title": "Not Found",
-            }),
-            content_type="application/problem+json",
-        ) from e
+        raise StaticFileNotFoundError() from e
     if relative_path.as_posix() in {"stats", "config.ini"} or file_path.name.endswith((
         ".js.map",
         ".css.map",
     )):
-        raise web.HTTPNotFound(
-            text=json.dumps({
-                "type": "https://api.backend.ai/probs/generic-not-found",
-                "title": "Not Found",
-            }),
-            content_type="application/problem+json",
-        )
+        raise StaticFileNotFoundError()
     index_path = (static_path / "index.html").resolve()
     if file_path.is_file() and file_path != index_path:
         return apply_cache_headers(web.FileResponse(file_path), request_path)
