@@ -153,8 +153,8 @@ class TemplateDBSource:
             scopes.append(ProjectID(group_id))
         return scopes
 
-    async def list_task_templates_all(self, user_uuid: uuid.UUID) -> list[dict[str, Any]]:
-        """List every active task template with user/group info (superadmin only)."""
+    async def list_task_templates(self, user_uuid: uuid.UUID) -> list[dict[str, Any]]:
+        """List all active task templates with user/group info."""
         async with self._db.begin_readonly() as conn:
             j = sa.join(
                 SessionTemplateRow,

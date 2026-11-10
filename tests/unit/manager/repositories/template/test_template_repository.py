@@ -546,7 +546,7 @@ class TestTemplateRepository:
         ]
         await template_repository.create_task_templates(test_domain.domain_name, items)
 
-        entries = await template_repository.list_task_templates_all(test_user)
+        entries = await template_repository.list_task_templates(test_user)
 
         assert len(entries) == 2
         for entry in entries:
@@ -559,7 +559,7 @@ class TestTemplateRepository:
         self,
         template_repository: TemplateRepository,
     ) -> None:
-        entries = await template_repository.list_task_templates_all(uuid.uuid4())
+        entries = await template_repository.list_task_templates(uuid.uuid4())
         assert entries == []
 
     async def test_list_task_templates_only_active(
@@ -591,7 +591,7 @@ class TestTemplateRepository:
         await template_repository.create_task_templates(test_domain.domain_name, items)
         await template_repository.soft_delete_template(deleted_id, TemplateType.TASK)
 
-        entries = await template_repository.list_task_templates_all(test_user)
+        entries = await template_repository.list_task_templates(test_user)
 
         assert len(entries) == 1
         assert entries[0]["id"].hex == active_id

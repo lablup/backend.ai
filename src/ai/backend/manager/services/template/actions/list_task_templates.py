@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import uuid
 from dataclasses import dataclass, field
 from typing import Any, override
 
@@ -18,7 +17,6 @@ class ListTaskTemplatesAction(TemplateUserScopeAction):
     domain_name: str
     is_superadmin: bool
     list_all: bool
-    group_id_filter: uuid.UUID | None = None
 
     @override
     @classmethod

@@ -75,8 +75,8 @@ class TemplateRepository:
         return await self._db_source.create_task_templates(domain_name, items)
 
     @template_repository_resilience.apply()
-    async def list_task_templates_all(self, user_uuid: uuid.UUID) -> list[dict[str, Any]]:
-        return await self._db_source.list_task_templates_all(user_uuid)
+    async def list_task_templates(self, user_uuid: uuid.UUID) -> list[dict[str, Any]]:
+        return await self._db_source.list_task_templates(user_uuid)
 
     @template_repository_resilience.apply()
     async def get_task_template(self, template_id: str) -> dict[str, Any] | None:

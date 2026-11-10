@@ -143,19 +143,12 @@ class SessionTemplateHandler:
         req: RequestCtx,
     ) -> APIResponse:
         params = query.parsed
-        group_id_filter: UUID | None = None
-        if params.group_id is not None:
-            try:
-                group_id_filter = UUID(params.group_id)
-            except ValueError as e:
-                raise InvalidAPIParameters("group_id must be a UUID") from e
         action = ListTaskTemplatesAction(
             user_uuid=UserID(ctx.user_uuid),
             user_role=req.request["user"]["role"],
             domain_name=ctx.user_domain,
             is_superadmin=ctx.is_superadmin,
             list_all=params.all,
-            group_id_filter=group_id_filter,
         )
         result = await self._template.list_task.run(action)
 

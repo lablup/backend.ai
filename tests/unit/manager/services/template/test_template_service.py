@@ -61,7 +61,6 @@ class _TaskTemplateListCase:
     user_role: UserRole
     is_superadmin: bool
     list_all: bool
-    group_id_filter: uuid.UUID | None
 
 
 def _template_id(name: str) -> SessionTemplateID:
@@ -364,7 +363,7 @@ class TestListTaskTemplatesAction:
     ) -> None:
         user_uuid = uuid.uuid4()
         entries = [{"name": "t1"}, {"name": "t2"}]
-        mock_repo.list_task_templates_all = AsyncMock(return_value=entries)
+        mock_repo.list_task_templates = AsyncMock(return_value=entries)
 
         action = ListTaskTemplatesAction(
             user_uuid=UserID(user_uuid),
@@ -376,7 +375,7 @@ class TestListTaskTemplatesAction:
         result = await service.list_task_templates(action)
 
         assert result.entries == entries
-        mock_repo.list_task_templates_all.assert_called_once_with(user_uuid)
+        mock_repo.list_task_templates.assert_called_once_with(user_uuid)
 
     @pytest.mark.parametrize(
         "case",
@@ -386,28 +385,18 @@ class TestListTaskTemplatesAction:
                 user_role=UserRole.USER,
                 is_superadmin=False,
                 list_all=False,
-                group_id_filter=None,
             ),
             _TaskTemplateListCase(
                 label="user-asking-for-all",
                 user_role=UserRole.USER,
                 is_superadmin=False,
                 list_all=True,
-                group_id_filter=None,
             ),
             _TaskTemplateListCase(
                 label="superadmin-not-asking-for-all",
                 user_role=UserRole.SUPERADMIN,
                 is_superadmin=True,
                 list_all=False,
-                group_id_filter=None,
-            ),
-            _TaskTemplateListCase(
-                label="user-filtering-by-project",
-                user_role=UserRole.USER,
-                is_superadmin=False,
-                list_all=False,
-                group_id_filter=uuid.UUID(int=1),
             ),
         ],
         ids=lambda case: case.label,
@@ -421,7 +410,7 @@ class TestListTaskTemplatesAction:
         user_uuid = uuid.uuid4()
         entries = [{"name": "my-task"}]
         mock_repo.list_accessible_templates = AsyncMock(return_value=entries)
-        mock_repo.list_task_templates_all = AsyncMock()
+        mock_repo.list_task_templates = AsyncMock()
 
         action = ListTaskTemplatesAction(
             user_uuid=UserID(user_uuid),
@@ -429,19 +418,17 @@ class TestListTaskTemplatesAction:
             domain_name="default",
             is_superadmin=case.is_superadmin,
             list_all=case.list_all,
-            group_id_filter=case.group_id_filter,
         )
         result = await service.list_task_templates(action)
 
         assert result.entries == entries
-        mock_repo.list_task_templates_all.assert_not_called()
+        mock_repo.list_task_templates.assert_not_called()
         mock_repo.list_accessible_templates.assert_called_once_with(
             TemplateType.TASK,
             user_uuid,
             case.user_role,
             "default",
             allowed_types=["user", "group"],
-            group_id_filter=case.group_id_filter,
         )
 
 
