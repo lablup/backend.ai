@@ -2,6 +2,7 @@ import json
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
@@ -13,13 +14,15 @@ from aiohttp.test_utils import make_mocked_request
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.common.dto.manager.auth.response import UpdatePasswordNoAuthResponse
 from ai.backend.common.exception import BackendAISchemaValidationFailed
-from ai.backend.common.web.session import SESSION_KEY, Session
-from ai.backend.web.config.unified import SecurityConfig
+from ai.backend.common.web.session import SESSION_KEY, Session, SimpleCookieStorage, get_session
+from ai.backend.common.web.session import setup as setup_session
+from ai.backend.web.config.unified import SecurityConfig, WebServerUnifiedConfig
 from ai.backend.web.errors import UnauthenticatedError
 from ai.backend.web.server import (
     build_cors_options,
     extend_login_session,
     update_password_no_auth,
+    version_json_handler,
 )
 
 MANAGER_ENDPOINT = "http://manager:8081"
@@ -308,3 +311,42 @@ class TestCorsAllowedOriginsConfig:
     async def test_rejects_invalid_origin(self, origin: str) -> None:
         with pytest.raises(BackendAISchemaValidationFailed):
             SecurityConfig.model_validate({"cors-allowed-origins": [origin]})
+
+
+async def _login(request: web.Request) -> web.Response:
+    session = await get_session(request)
+    session["authenticated"] = True
+    return web.Response()
+
+
+_VERSION_JSON = '{ "package": "26.10.0", "buildNumber": "100" }'
+
+
+class TestVersionJsonHandler:
+    @pytest.fixture
+    def app_serving_version_json(self, tmp_path: Path) -> web.Application:
+        (tmp_path / "version.json").write_text(_VERSION_JSON)
+        app = web.Application()
+        setup_session(app, SimpleCookieStorage())
+        app["config"] = WebServerUnifiedConfig.model_validate({
+            "service": {"static-path": str(tmp_path)},
+        })
+        app.router.add_route("POST", "/login", _login)
+        app.router.add_route("GET", "/version.json", version_json_handler)
+        return app
+
+    async def test_before_login_is_unauthorized(
+        self, aiohttp_client: Any, app_serving_version_json: web.Application
+    ) -> None:
+        client = await aiohttp_client(app_serving_version_json)
+        resp = await client.get("/version.json")
+        assert resp.status == 401
+
+    async def test_after_login_is_served(
+        self, aiohttp_client: Any, app_serving_version_json: web.Application
+    ) -> None:
+        client = await aiohttp_client(app_serving_version_json)
+        await client.post("/login")
+        resp = await client.get("/version.json")
+        assert resp.status == 200
+        assert await resp.text() == _VERSION_JSON

@@ -161,7 +161,11 @@ async def static_handler(request: web.Request) -> web.StreamResponse:
         relative_path = file_path.relative_to(static_path)
     except (ValueError, FileNotFoundError) as e:
         raise StaticFileNotFoundError() from e
-    if relative_path.as_posix() in {"stats", "config.ini"} or file_path.name.endswith((
+    if relative_path.as_posix() in {
+        "stats",
+        "config.ini",
+        "version.json",
+    } or file_path.name.endswith((
         ".js.map",
         ".css.map",
     )):
@@ -187,6 +191,16 @@ async def config_toml_handler(request: web.Request) -> web.Response:
     return web.Response(text=config_content, content_type="text/plain")
 
 
+async def version_json_handler(request: web.Request) -> web.StreamResponse:
+    session = await get_session(request)
+    if not session.get("authenticated", False):
+        raise UnauthenticatedError()
+    config = cast(WebServerUnifiedConfig, request.app["config"])
+    return apply_cache_headers(
+        web.FileResponse(config.service.static_path / "version.json"), "version.json"
+    )
+
+
 async def console_handler(request: web.Request) -> web.StreamResponse:
     request_path = request.match_info["path"]
     config = cast(WebServerUnifiedConfig, request.app["config"])
@@ -197,7 +211,11 @@ async def console_handler(request: web.Request) -> web.StreamResponse:
         relative_path = file_path.relative_to(static_path)
     except (ValueError, FileNotFoundError) as e:
         raise StaticFileNotFoundError() from e
-    if relative_path.as_posix() in {"stats", "config.ini"} or file_path.name.endswith((
+    if relative_path.as_posix() in {
+        "stats",
+        "config.ini",
+        "version.json",
+    } or file_path.name.endswith((
         ".js.map",
         ".css.map",
     )):
@@ -1117,6 +1135,7 @@ async def webapp_ctx(
     cors.add(app.router.add_route("POST", "/pipeline/{path:.*$}", pipeline_handler))
     cors.add(app.router.add_route("PATCH", "/pipeline/{path:.*$}", pipeline_handler))
     cors.add(app.router.add_route("DELETE", "/pipeline/{path:.*$}", pipeline_handler))
+    cors.add(app.router.add_route("GET", "/version.json", version_json_handler))
     if config.service.mode == ServiceMode.WEBUI:
         cors.add(app.router.add_route("GET", "/config.toml", config_toml_handler))
         app["webui_index_template"] = (config.service.static_path / "index.html").read_text()
