@@ -76,7 +76,9 @@ class ObjectStorage(PydanticNodeMixin[ObjectStorageNode]):
     name: str
     host: str
     access_key: str
-    secret_key: str
+    secret_key: str = gql_field(
+        description="Secret key for authentication. Masked unless the caller is a superadmin."
+    )
     endpoint: str
     region: str
 

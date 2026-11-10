@@ -7,6 +7,7 @@ from collections.abc import Sequence
 from uuid import UUID
 
 from ai.backend.common.api_handlers import Sentinel
+from ai.backend.common.contexts.user import current_user
 from ai.backend.common.dto.manager.v2.object_storage.request import (
     AdminSearchObjectStoragesInput,
     CreateObjectStorageInput,
@@ -27,6 +28,7 @@ from ai.backend.common.dto.manager.v2.object_storage.response import (
 from ai.backend.common.dto.manager.v2.object_storage.types import OrderDirection
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
+from ai.backend.manager.defs import SECRET_KEY_PLACEHOLDER
 from ai.backend.manager.models.object_storage.conditions import ObjectStorageConditions
 from ai.backend.manager.models.object_storage.orders import ObjectStorageOrders
 from ai.backend.manager.repositories.base import (
@@ -263,13 +265,18 @@ class ObjectStorageAdapter(BaseAdapter):
 
     @staticmethod
     def _data_to_dto(data: ObjectStorageData) -> ObjectStorageNode:
-        """Convert data layer type to Pydantic DTO."""
+        """Convert data layer type to Pydantic DTO; only a superadmin gets the secret key."""
+        user = current_user()
         return ObjectStorageNode(
             id=data.id,
             name=data.name,
             host=data.host,
             access_key=data.access_key,
-            secret_key=data.secret_key,
+            secret_key=(
+                data.secret_key
+                if user is not None and user.is_superadmin
+                else SECRET_KEY_PLACEHOLDER
+            ),
             endpoint=data.endpoint,
             region=data.region,
         )
