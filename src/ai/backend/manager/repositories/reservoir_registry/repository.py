@@ -1,4 +1,8 @@
 import uuid
+<<<<<<< HEAD
+=======
+from collections.abc import Mapping, Sequence
+>>>>>>> ca95a63b (fix(BA-8972): mask artifact registry credentials for callers who are not superadmins (#16643))
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
@@ -12,6 +16,7 @@ from ai.backend.manager.data.artifact_registries.types import (
     ArtifactRegistryModifierMeta,
 )
 from ai.backend.manager.data.reservoir_registry.types import (
+    ReservoirRegistryConnectionData,
     ReservoirRegistryData,
     ReservoirRegistryListResult,
 )
@@ -20,6 +25,7 @@ from ai.backend.manager.models.artifact_registries.creators import ArtifactRegis
 from ai.backend.manager.models.artifact_registries.updaters import ArtifactRegistryMetaUpdater
 from ai.backend.manager.models.reservoir_registry.creators import ReservoirRegistryCreator
 from ai.backend.manager.models.reservoir_registry.purgers import ReservoirRegistryPurger
+from ai.backend.manager.models.reservoir_registry.queriers import BulkReservoirRegistryQuerier
 from ai.backend.manager.models.reservoir_registry.searchers import ReservoirRegistrySearcher
 from ai.backend.manager.models.reservoir_registry.updaters import ReservoirRegistryUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -68,6 +74,13 @@ class ReservoirRegistryRepository:
         self, reservoir_ids: list[uuid.UUID]
     ) -> list[ReservoirRegistryData]:
         return await self._db_source.get_registries_by_ids(reservoir_ids)
+
+    @reservoir_registry_repository_resilience.apply()
+    async def registry_connections(
+        self, registry_ids: Sequence[ArtifactRegistryID]
+    ) -> Mapping[EntityIdentifier, ReservoirRegistryConnectionData]:
+        async with self._registry_ops.read_ops() as r:
+            return await r.query_bulk_data(BulkReservoirRegistryQuerier(), registry_ids)
 
     @reservoir_registry_repository_resilience.apply()
     async def get_registry_data_by_name(self, name: str) -> ReservoirRegistryData:
