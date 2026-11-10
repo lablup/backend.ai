@@ -285,13 +285,12 @@ async def update_password_no_auth(request: web.Request) -> web.Response:
             creds["username"],
             client_ip,
         )
-    except BackendClientError as e:
+    except BackendClientError:
         # This is error, not failed login, so we should not update login history.
         return web.HTTPBadGateway(
             text=json.dumps({
                 "type": "https://api.backend.ai/probs/bad-gateway",
                 "title": "The proxy target server is inaccessible.",
-                "details": str(e),
             }),
             content_type="application/problem+json",
         )
@@ -548,13 +547,12 @@ async def login_handler(request: web.Request) -> web.Response:
                 raise UnexpectedAuthResponseError(
                     f"Unexpected auth result type: {type(auth_result)}"
                 )
-    except BackendClientError as e:
+    except BackendClientError:
         # This is error, not failed login, so we should not update login history.
         return web.HTTPBadGateway(
             text=json.dumps({
                 "type": "https://api.backend.ai/probs/bad-gateway",
                 "title": "The proxy target server is inaccessible.",
-                "details": str(e),
             }),
             content_type="application/problem+json",
         )
@@ -772,12 +770,11 @@ async def token_login_handler(request: web.Request) -> web.Response:
         session["token"] = stored_token  # store full token
         result["authenticated"] = True
         result["data"] = public_return  # store public info from token
-    except BackendClientError as e:
+    except BackendClientError:
         return web.HTTPBadGateway(
             text=json.dumps({
                 "type": "https://api.backend.ai/probs/bad-gateway",
                 "title": "The proxy target server is inaccessible.",
-                "details": str(e),
             }),
             content_type="application/problem+json",
         )
