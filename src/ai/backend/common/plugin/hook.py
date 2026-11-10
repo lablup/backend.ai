@@ -32,8 +32,8 @@ __all__ = (
 
 class HookHandler(Protocol):
     """
-    Returns the result of the handler, or None when it has no result for this event.
-    Raises :class:`Reject` to cancel the ongoing event.
+    Returns None when the handler does not handle the event, and a non-None result when it does.
+    Raises :class:`Reject` to reject the event.
     """
 
     async def __call__(self, *args: Any) -> Any:
@@ -70,6 +70,11 @@ class HookResults(enum.Enum):
 
 
 class HookReturnTiming(enum.Enum):
+    """
+    ``ALL_COMPLETED`` runs every handler and returns the list of their results.
+    ``FIRST_COMPLETED`` returns the result of the first handler that handles the event, or None.
+    """
+
     ALL_COMPLETED = 0
     FIRST_COMPLETED = 1
 
@@ -125,9 +130,8 @@ class HookPluginContext(BasePluginContext[HookPlugin]):
         order: Sequence[str] | None = None,
     ) -> HookResult:
         """
-        Invoke the handlers that matches with the given ``event_name``.
+        Invokes the handlers of ``event_name`` in order, as ``return_when`` describes.
         A handler raising :class:`Reject` or any other exception ends the dispatch.
-        ``FIRST_COMPLETED`` also ends it at the first non-None result, continuing past None.
         """
         executed_plugin_names = []
         handler_results: list[Any] = []
