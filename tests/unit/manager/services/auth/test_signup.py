@@ -120,6 +120,7 @@ async def test_signup_successful_with_full_data(
         full_name="Full User Name",
         description="A test user account",
         lang="en-us",
+        token="signup-token",
     )
 
     # Setup hook behavior - both PRE_SIGNUP and VERIFY_PASSWORD_FORMAT pass
@@ -155,6 +156,7 @@ async def test_signup_successful_with_full_data(
                     username="fulluser",
                     full_name="Full User Name",
                     description="A test user account",
+                    token="signup-token",
                 ),
             ),
         ),
