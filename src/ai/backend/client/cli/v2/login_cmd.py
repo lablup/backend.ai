@@ -10,7 +10,6 @@ from typing import Any
 
 import click
 
-from ai.backend.client.auth import encrypt_payload
 from ai.backend.client.cli.v2.insecure_http_guard import InsecureEndpointError
 from ai.backend.client.owner_only_files import ensure_owner_only_file
 
@@ -51,24 +50,8 @@ def login(force: bool) -> None:
             payload: dict[str, str | bool] = {"username": user_id, "password": password}
             if force:
                 payload["force"] = True
-
-            async def _post_login_payload() -> dict[str, Any]:
-                if config.endpoint.scheme == "https":
-                    login_request = client.session.post(login_url, json=payload)
-                else:
-                    # The webserver derives the key from the request's scheme and Host header,
-                    # so a path or trailing slash in the configured endpoint must not reach it.
-                    encoded_body = encrypt_payload(
-                        str(config.endpoint.origin()), json.dumps(payload).encode()
-                    )
-                    login_request = client.session.post(
-                        login_url, data=encoded_body, headers={"X-BackendAI-Encoded": "true"}
-                    )
-                async with login_request as resp:
-                    response_body: dict[str, Any] = await resp.json()
-                    return response_body
-
-            login_response = await _post_login_payload()
+            async with client.session.post(login_url, json=payload) as resp:
+                login_response = await resp.json()
 
             def _get_details(resp_data: dict[str, Any]) -> str:
                 raw = resp_data.get("data")
@@ -89,7 +72,8 @@ def login(force: bool) -> None:
                 if details == "OTP not provided":
                     otp = input("One-time Password: ")
                     payload["otp"] = otp.strip()
-                    login_response = await _post_login_payload()
+                    async with client.session.post(login_url, json=payload) as resp:
+                        login_response = await resp.json()
 
             if not login_response.get("authenticated"):
                 details = _get_details(login_response)

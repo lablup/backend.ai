@@ -43,7 +43,7 @@ def v2(ctx: click.Context, profile_name: str | None) -> None:
     # `load_dotenv` is idempotent — running on both paths is harmless.
     from dotenv import find_dotenv, load_dotenv
 
-    load_dotenv(dotenv_path=find_dotenv(usecwd=True))
+    load_dotenv(dotenv_path=find_dotenv(usecwd=True), override=True)
 
 
 # Infrastructure commands

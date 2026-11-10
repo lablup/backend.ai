@@ -72,7 +72,7 @@ def get_env[T](
 
     :returns: The value processed by the *clean* function.
     """
-    load_dotenv(dotenv_path=find_dotenv(usecwd=True))
+    load_dotenv(dotenv_path=find_dotenv(usecwd=True), override=True)
     key = key.upper()
     raw = os.environ.get("BACKEND_" + key)
     if raw is None:

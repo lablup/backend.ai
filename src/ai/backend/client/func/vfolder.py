@@ -28,7 +28,6 @@ from ai.backend.client.output.fields import vfolder_fields
 from ai.backend.client.output.types import FieldSpec, PaginatedResult
 from ai.backend.client.pagination import fetch_paginated_result
 from ai.backend.client.request import Request
-from ai.backend.client.session import api_session
 from ai.backend.common.types import ResultSet
 
 from .base import BaseFunction, api_function
@@ -351,7 +350,6 @@ class VFolderByName(BaseFunction):
         file_unit = "bytes"
         file_mode = "wb"
         file_req_hdrs: dict[str, str] = {}
-        verify_tls_certificate = not api_session.get().config.skip_sslcert_validation
         try:
             async for session_attempt in AsyncRetrying(
                 wait=wait_exponential(multiplier=0.02, min=0.02, max=5.0),
@@ -364,9 +362,7 @@ class VFolderByName(BaseFunction):
                             file_req_hdrs[hdrs.IF_RANGE] = if_range
                             file_req_hdrs[hdrs.RANGE] = f"{file_unit}={range_start}-"
                         async with aiohttp.ClientSession(headers=file_req_hdrs) as client:
-                            async with client.get(
-                                download_url, ssl=verify_tls_certificate
-                            ) as raw_resp:
+                            async with client.get(download_url, ssl=False) as raw_resp:
                                 match raw_resp.status:
                                     case 200:
                                         # First attempt to download file or file has changed.

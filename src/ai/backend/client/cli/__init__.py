@@ -69,7 +69,7 @@ def v2() -> None:
     # so this wrapper is the actual entry point for `./bai v2 ...`.
     from dotenv import find_dotenv, load_dotenv
 
-    load_dotenv(dotenv_path=find_dotenv(usecwd=True))
+    load_dotenv(dotenv_path=find_dotenv(usecwd=True), override=True)
 
 
 # Groups with aliases in subcommands - still eager load
