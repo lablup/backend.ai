@@ -4,7 +4,7 @@ import enum
 import logging
 from abc import ABCMeta, abstractmethod
 from collections.abc import Sequence
-from typing import Any, Final, Protocol
+from typing import Any, Final, Protocol, override
 
 import attrs
 
@@ -69,21 +69,9 @@ class HookResults(enum.Enum):
     ERROR = 2
 
 
-class HookReturnTiming(enum.Enum):
-    """
-    ``ALL_COMPLETED`` runs every handler and returns the list of their results.
-    ``FIRST_COMPLETED`` returns the result of the first handler that handles the event, or None.
-    """
-
-    ALL_COMPLETED = 0
-    FIRST_COMPLETED = 1
-
-
 PASSED: Final = HookResults.PASSED
 REJECTED: Final = HookResults.REJECTED
 ERROR: Final = HookResults.ERROR
-ALL_COMPLETED: Final = HookReturnTiming.ALL_COMPLETED
-FIRST_COMPLETED: Final = HookReturnTiming.FIRST_COMPLETED
 
 
 @attrs.define(auto_attribs=True, slots=True)
@@ -92,6 +80,76 @@ class HookResult:
     src_plugin: str | Sequence[str] | None = None
     reason: str | None = None
     result: Any | None = None
+
+
+class HookReturnTiming(metaclass=ABCMeta):
+    """
+    Decides how many handlers of an event run and what :class:`HookResult` they make.
+    """
+
+    @abstractmethod
+    async def run_handlers(
+        self,
+        handlers: Sequence[tuple[str, HookHandler]],
+        args: tuple[Any, ...],
+    ) -> HookResult:
+        raise NotImplementedError
+
+    def _build_failed_hook_result(self, plugin_name: str, error: Exception) -> HookResult:
+        match error:
+            case Reject():
+                return HookResult(status=REJECTED, src_plugin=plugin_name, reason=error.reason)
+            case _:
+                return HookResult(status=ERROR, src_plugin=plugin_name, reason=repr(error))
+
+
+class FirstCompletedReturnTiming(HookReturnTiming):
+    """
+    Returns the result of the first handler that handles the event, or None when none does.
+    """
+
+    @override
+    async def run_handlers(
+        self,
+        handlers: Sequence[tuple[str, HookHandler]],
+        args: tuple[Any, ...],
+    ) -> HookResult:
+        executed_plugin_names: list[str] = []
+        for plugin_name, hook_handler in handlers:
+            executed_plugin_names.append(plugin_name)
+            try:
+                handler_result = await hook_handler(*args)
+            except Exception as e:
+                return self._build_failed_hook_result(plugin_name, e)
+            if handler_result is not None:
+                return HookResult(status=PASSED, src_plugin=plugin_name, result=handler_result)
+        return HookResult(status=PASSED, src_plugin=executed_plugin_names, result=None)
+
+
+class AllCompletedReturnTiming(HookReturnTiming):
+    """
+    Runs every handler and returns the list of their results.
+    """
+
+    @override
+    async def run_handlers(
+        self,
+        handlers: Sequence[tuple[str, HookHandler]],
+        args: tuple[Any, ...],
+    ) -> HookResult:
+        executed_plugin_names: list[str] = []
+        handler_results: list[Any] = []
+        for plugin_name, hook_handler in handlers:
+            executed_plugin_names.append(plugin_name)
+            try:
+                handler_results.append(await hook_handler(*args))
+            except Exception as e:
+                return self._build_failed_hook_result(plugin_name, e)
+        return HookResult(status=PASSED, src_plugin=executed_plugin_names, result=handler_results)
+
+
+ALL_COMPLETED: Final = AllCompletedReturnTiming()
+FIRST_COMPLETED: Final = FirstCompletedReturnTiming()
 
 
 class HookPluginContext(BasePluginContext[HookPlugin]):
@@ -136,49 +194,7 @@ class HookPluginContext(BasePluginContext[HookPlugin]):
         handlers = self._get_handlers(event_name, order=order)
         if not handlers and not success_if_no_hook:
             return HookResult(status=REJECTED, src_plugin=[], result=[])
-        match return_when:
-            case HookReturnTiming.FIRST_COMPLETED:
-                return await self._dispatch_until_handled(handlers, args)
-            case HookReturnTiming.ALL_COMPLETED:
-                return await self._dispatch_to_all_handlers(handlers, args)
-
-    async def _dispatch_until_handled(
-        self,
-        handlers: Sequence[tuple[str, HookHandler]],
-        args: tuple[Any, ...],
-    ) -> HookResult:
-        executed_plugin_names: list[str] = []
-        for plugin_name, hook_handler in handlers:
-            executed_plugin_names.append(plugin_name)
-            try:
-                handler_result = await hook_handler(*args)
-            except Exception as e:
-                return self._build_failed_hook_result(plugin_name, e)
-            if handler_result is not None:
-                return HookResult(status=PASSED, src_plugin=plugin_name, result=handler_result)
-        return HookResult(status=PASSED, src_plugin=executed_plugin_names, result=None)
-
-    async def _dispatch_to_all_handlers(
-        self,
-        handlers: Sequence[tuple[str, HookHandler]],
-        args: tuple[Any, ...],
-    ) -> HookResult:
-        executed_plugin_names: list[str] = []
-        handler_results: list[Any] = []
-        for plugin_name, hook_handler in handlers:
-            executed_plugin_names.append(plugin_name)
-            try:
-                handler_results.append(await hook_handler(*args))
-            except Exception as e:
-                return self._build_failed_hook_result(plugin_name, e)
-        return HookResult(status=PASSED, src_plugin=executed_plugin_names, result=handler_results)
-
-    def _build_failed_hook_result(self, plugin_name: str, error: Exception) -> HookResult:
-        match error:
-            case Reject():
-                return HookResult(status=REJECTED, src_plugin=plugin_name, reason=error.reason)
-            case _:
-                return HookResult(status=ERROR, src_plugin=plugin_name, reason=repr(error))
+        return await return_when.run_handlers(handlers, args)
 
     async def notify(
         self,
