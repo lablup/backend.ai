@@ -6,7 +6,7 @@ from typing import Any
 
 import click
 
-from ai.backend.client.config import OWNER_ONLY_FILE_MODE
+from ai.backend.client.cli.credential_files import CLI_CREDENTIAL_FILE_MODE
 
 from .helpers import ProfileStore
 
@@ -102,7 +102,7 @@ def set_value(key: str, value: str) -> None:
 
     _save_toml(path, data)
     if file_type == "credentials":
-        path.chmod(OWNER_ONLY_FILE_MODE)
+        path.chmod(CLI_CREDENTIAL_FILE_MODE)
     click.echo(f"Set {key} = {value}")
 
 

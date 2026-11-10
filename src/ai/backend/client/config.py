@@ -37,8 +37,6 @@ MAX_INFLIGHT_CHUNKS = 4
 local_state_path = Path(appdirs.user_state_dir("backend.ai", "Lablup"))
 local_cache_path = Path(appdirs.user_cache_dir("backend.ai", "Lablup"))
 
-OWNER_ONLY_FILE_MODE = 0o600
-
 
 def parse_api_version(value: str) -> tuple[int, str]:
     match = re.search(r"^v(?P<major>\d+)\.(?P<date>\d{8})$", value)
