@@ -461,7 +461,6 @@ class SessionService:
         tag = action.tag
 
         template = await self._session_repository.get_template_by_id(template_id)
-        log.debug("task template: {}", template)
         if not template:
             raise SessionTemplateNotFound
 
@@ -626,8 +625,6 @@ class SessionService:
         if isinstance(template, str):
             template = load_json(template)
 
-        log.debug("Template: {0}", template)
-
         param_from_template = {
             "image": template["spec"]["kernel"]["image"],
             "architecture": template["spec"]["kernel"]["architecture"],
@@ -670,12 +667,6 @@ class SessionService:
         override_config = drop_undefined(dict(action.params.config))
         override_params = drop_undefined(dict(asdict(action.params)))
 
-        log.debug("Default config: {0}", config_from_template)
-        log.debug("Default params: {0}", param_from_template)
-
-        log.debug("Override config: {0}", override_config)
-        log.debug("Override params: {0}", override_params)
-
         if override_config:
             config_from_template.update(override_config)
         if override_params:
@@ -690,8 +681,6 @@ class SessionService:
             log.debug("Error: {0}", str(e2))
             raise InvalidAPIParameters("Error while validating template") from e2
         params["config"] = config_from_template
-
-        log.debug("Updated param: {0}", params)
 
         if git := template["spec"]["kernel"]["git"]:
             if _dest := git.get("dest_dir"):

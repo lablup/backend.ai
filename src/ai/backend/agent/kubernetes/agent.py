@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import functools
 import hashlib
 import logging
@@ -52,6 +53,7 @@ from ai.backend.agent.resources import (
     known_slot_types,
 )
 from ai.backend.agent.types import Container, KernelOwnershipData, MountInfo, Port
+from ai.backend.agent.utils import SECRET_MASK
 from ai.backend.common.asyncio import current_loop
 from ai.backend.common.cgroup import CgroupController
 from ai.backend.common.docker import ImageRef, KernelFeatures
@@ -727,7 +729,12 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         )
 
         if self.local_config.debug.log_kernel_config:
-            log.debug("Initial container config: {0}", deployment)
+            # env carries the session's environ, so only the variable names are logged.
+            dumped = copy.deepcopy(deployment)
+            for container in dumped["spec"]["template"]["spec"]["containers"]:
+                for env in container.get("env", []):
+                    env["value"] = SECRET_MASK
+            log.debug("Initial container config: {0}", dumped)
 
         expose_service = Service(
             str(self.kernel_id),
