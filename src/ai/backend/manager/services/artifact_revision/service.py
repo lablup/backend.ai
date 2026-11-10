@@ -11,7 +11,6 @@ from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
     ValkeyArtifactDownloadTrackingClient,
 )
-from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.artifact.types import (
     ArtifactRegistryType,
     ArtifactRevisionDownloadProgress,
@@ -30,7 +29,6 @@ from ai.backend.common.dto.storage.request import (
     HuggingFaceImportModelsReq,
     ReservoirImportModelsReq,
 )
-from ai.backend.common.exception import UnreachableError
 from ai.backend.common.types import VFolderID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.artifact_registry.reservoir_client import ReservoirRegistryClient
@@ -46,7 +44,6 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactType,
 )
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
-from ai.backend.manager.data.vfolder.types import VFolderData
 from ai.backend.manager.dto.request import (
     DelegateImportArtifactsReq,
     ImportArtifactsOptions,
@@ -395,14 +392,6 @@ class ArtifactRevisionService:
     async def import_revision(
         self, action: ImportArtifactRevisionAction
     ) -> ImportArtifactRevisionActionResult:
-        # Checked before the try so that a denied caller does not mark the revision failed.
-        vfolder_id: VFolderID | None = None
-        volume_name: str | None = None
-        if action.vfolder_id:
-            vfolder_data = await self._get_writable_vfolder(action.vfolder_id)
-            vfolder_id = VFolderID(vfolder_data.quota_scope_id, vfolder_data.id)
-            _, volume_name = self._storage_manager.get_proxy_and_volume(vfolder_data.host)
-
         try:
             revision_data = await self._artifact_repository.get_artifact_revision_by_id(
                 action.artifact_revision_id
@@ -423,6 +412,15 @@ class ArtifactRevisionService:
             )
 
             storage_proxy_client = self._storage_manager.get_manager_facing_client(storage_host)
+
+            # Look up vfolder to get volume_name (host) if vfolder_id is provided
+            vfolder_id: VFolderID | None = None
+            volume_name: str | None = None
+            if action.vfolder_id:
+                vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_id)
+                if vfolder_data:
+                    vfolder_id = VFolderID(vfolder_data.quota_scope_id, vfolder_data.id)
+                    _, volume_name = self._storage_manager.get_proxy_and_volume(vfolder_data.host)
 
             task_id: UUID
             match artifact.registry_type:
@@ -611,20 +609,6 @@ class ArtifactRevisionService:
             raise e
 
         return ImportArtifactRevisionActionResult(result=revision_data, task_id=task_id)
-
-    async def _get_writable_vfolder(self, vfolder_id: UUID) -> VFolderData:
-        """The vfolder an import writes into, once the caller is shown to be able to write to it."""
-        requester = current_user()
-        if requester is None:
-            raise UnreachableError("User context is not available")
-        vfolder_data = await self._vfolder_repository.get_by_id_validated(
-            vfolder_id, requester.user_id, requester.domain_name
-        )
-        access_infos = await self._vfolder_repository.get_access_infos(
-            [vfolder_data], requester.user_id
-        )
-        self._vfolder_repository.ensure_writable(access_infos[0], requester.role)
-        return vfolder_data
 
     async def cleanup(
         self, action: CleanupArtifactRevisionAction

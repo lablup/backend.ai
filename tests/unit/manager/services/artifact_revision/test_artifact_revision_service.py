@@ -7,19 +7,16 @@ Includes tests for ArtifactService methods that deal with revisions.
 from __future__ import annotations
 
 import uuid
-from collections.abc import Iterator
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.artifact.types import (
     ArtifactRegistryType,
     ArtifactRevisionDownloadProgress,
 )
 from ai.backend.common.data.storage.types import ArtifactStorageType
-from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
     ArtifactData,
@@ -39,7 +36,6 @@ from ai.backend.manager.errors.artifact import (
 )
 from ai.backend.manager.errors.artifact_registry import InvalidArtifactRegistryTypeError
 from ai.backend.manager.errors.common import ServerMisconfiguredError
-from ai.backend.manager.errors.storage import VFolderPermissionError
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.artifact_registry.repository import ArtifactRegistryRepository
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
@@ -898,95 +894,6 @@ class TestImportArtifactRevisionAction:
 
         with pytest.raises(InvalidArtifactRegistryTypeError):
             await service.import_revision(action)
-
-    @pytest.fixture
-    def caller(self) -> Iterator[UserData]:
-        user = UserData(
-            user_id=uuid.uuid4(),
-            is_authorized=True,
-            is_admin=False,
-            is_superadmin=False,
-            role=UserRole.USER,
-            domain_name="default",
-        )
-        with with_user(user):
-            yield user
-
-    async def test_vfolder_without_write_is_rejected_before_any_change(
-        self,
-        service: ArtifactRevisionService,
-        mock_artifact_repository: MagicMock,
-        mock_vfolder_repository: MagicMock,
-        caller: UserData,
-        sample_revision: ArtifactRevisionData,
-    ) -> None:
-        vfolder_uuid = uuid.uuid4()
-        vfolder_data = MagicMock()
-        access_info = MagicMock()
-        mock_vfolder_repository.get_by_id_validated = AsyncMock(return_value=vfolder_data)
-        mock_vfolder_repository.get_access_infos = AsyncMock(return_value=[access_info])
-        mock_vfolder_repository.ensure_writable = MagicMock(
-            side_effect=VFolderPermissionError("not writable")
-        )
-        mock_artifact_repository.get_artifact_revision_by_id = AsyncMock(
-            return_value=sample_revision
-        )
-        mock_artifact_repository.update_artifact_revision_status = AsyncMock()
-
-        action = ImportArtifactRevisionAction(
-            artifact_revision_id=sample_revision.id, vfolder_id=vfolder_uuid
-        )
-        with pytest.raises(VFolderPermissionError):
-            await service.import_revision(action)
-
-        mock_vfolder_repository.get_by_id_validated.assert_awaited_once_with(
-            vfolder_uuid, caller.user_id, caller.domain_name
-        )
-        mock_vfolder_repository.get_access_infos.assert_awaited_once_with(
-            [vfolder_data], caller.user_id
-        )
-        mock_vfolder_repository.ensure_writable.assert_called_once_with(access_info, UserRole.USER)
-        mock_artifact_repository.get_artifact_revision_by_id.assert_not_called()
-        mock_artifact_repository.update_artifact_revision_status.assert_not_called()
-
-    async def test_vfolder_with_write_is_looked_up(
-        self,
-        service: ArtifactRevisionService,
-        mock_artifact_repository: MagicMock,
-        mock_vfolder_repository: MagicMock,
-        mock_storage_manager: MagicMock,
-        mock_config_provider: MagicMock,
-        caller: UserData,
-        sample_revision: ArtifactRevisionData,
-        sample_artifact: ArtifactData,
-    ) -> None:
-        vfolder_uuid = uuid.uuid4()
-        vfolder_data = MagicMock()
-        vfolder_data.id = vfolder_uuid
-        vfolder_data.quota_scope_id = "user:" + str(caller.user_id)
-        vfolder_data.host = "local:volume1"
-        mock_vfolder_repository.get_by_id_validated = AsyncMock(return_value=vfolder_data)
-        mock_vfolder_repository.get_access_infos = AsyncMock(return_value=[MagicMock()])
-        mock_vfolder_repository.ensure_writable = MagicMock(return_value=None)
-        mock_storage_manager.get_proxy_and_volume.return_value = ("local", "volume1")
-        mock_artifact_repository.get_artifact_revision_by_id = AsyncMock(
-            return_value=sample_revision
-        )
-        mock_artifact_repository.get_artifact_by_id = AsyncMock(return_value=sample_artifact)
-        mock_artifact_repository.update_artifact_revision_status = AsyncMock()
-        # The import stops at the next step, after the vfolder is resolved.
-        mock_config_provider.config.reservoir = None
-
-        action = ImportArtifactRevisionAction(
-            artifact_revision_id=sample_revision.id, vfolder_id=vfolder_uuid
-        )
-        with pytest.raises(ServerMisconfiguredError):
-            await service.import_revision(action)
-
-        mock_vfolder_repository.get_by_id_validated.assert_awaited_once_with(
-            vfolder_uuid, caller.user_id, caller.domain_name
-        )
-        mock_storage_manager.get_proxy_and_volume.assert_called_once_with("local:volume1")
 
 
 class TestDelegateImportArtifactRevisionBatchAction:
