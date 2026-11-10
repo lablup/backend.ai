@@ -9,7 +9,6 @@ import signal
 import socket
 import ssl
 import sys
-import time
 import traceback
 import uuid
 from collections.abc import (
@@ -66,6 +65,7 @@ from ai.backend.common.dto.manager.auth.types import (
 from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
 from ai.backend.common.health_checker.probe import HealthProbe, HealthProbeOptions
 from ai.backend.common.health_checker.types import ComponentId
+from ai.backend.common.json import load_json
 from ai.backend.common.middlewares.exception import general_exception_middleware
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.networking import force_threaded_dns_resolver
@@ -111,6 +111,7 @@ from .auth import (
 from .errors import (
     AlreadyLoggedInError,
     InvalidAPIConfigurationError,
+    LoginBlockedError,
     MissingAuthTokenError,
     MissingRequestParameterError,
     ProxyTargetUnreachableError,
@@ -416,41 +417,14 @@ async def login_handler(request: web.Request) -> web.Response:
     valkey_client: ValkeySessionClient = request.app["redis"]
     BLOCK_TIME = config.session.login_block_time
 
-    async def _get_login_history() -> dict[str, float | int]:
-        login_history_bytes = await valkey_client.get_login_history(creds["username"])
-        if not login_history_bytes:
-            login_history: dict[str, float | int] = {
-                "last_login_attempt": 0,
-                "login_fail_count": 0,
-            }
-        else:
-            login_history = json.loads(login_history_bytes)
-        if login_history["last_login_attempt"] < 0:
-            login_history["last_login_attempt"] = 0
-        if login_history["login_fail_count"] < 0:
-            login_history["login_fail_count"] = 0
-        return login_history
-
-    async def _set_login_history(last_login_attempt: float, login_fail_count: float | int) -> None:
-        """
-        Set login history per email (not in browser session).
-        """
-        value = json.dumps({
-            "last_login_attempt": last_login_attempt,
-            "login_fail_count": login_fail_count,
-        })
-        await valkey_client.set_login_block(creds["username"], value, BLOCK_TIME)
-
-    # Block login if there are too many consecutive failed login attempts.
+    # Block login after too many failures. The history key expires BLOCK_TIME
+    # after the last counted failure, so an existing key is never stale.
     ALLOWED_FAIL_COUNT = config.session.login_allowed_fail_count
-    login_time = time.time()
-    login_history = await _get_login_history()
-    last_login_attempt = login_history.get("last_login_attempt", 0)
-    login_fail_count = login_history.get("login_fail_count", 0)
-    if login_time - last_login_attempt > BLOCK_TIME:
-        # If last attempt is far past, allow login again.
-        login_fail_count = 0
-    last_login_attempt = login_time
+    login_history_bytes = await valkey_client.get_login_history(creds["username"])
+    login_fail_count = 0
+    if login_history_bytes:
+        login_history = load_json(login_history_bytes)
+        login_fail_count = login_history.get("login_fail_count", 0)
     if login_fail_count >= ALLOWED_FAIL_COUNT:
         log.info(
             "LOGIN_HANDLER: Too many consecutive login fails (email:{}, count:{}, ip:{})",
@@ -458,14 +432,7 @@ async def login_handler(request: web.Request) -> web.Response:
             login_fail_count,
             client_ip,
         )
-        await _set_login_history(last_login_attempt, login_fail_count)
-        raise web.HTTPTooManyRequests(
-            text=json.dumps({
-                "type": "https://api.backend.ai/probs/too-many-requests",
-                "title": "Too many failed login attempts",
-            }),
-            content_type="application/problem+json",
-        )
+        raise LoginBlockedError()
 
     manager_pool = cast(HealthyEndpointPool, request.app["manager_pool"])
     try:
@@ -503,8 +470,7 @@ async def login_handler(request: web.Request) -> web.Response:
                 session["token"] = stored_token  # store full token
                 result["authenticated"] = True
                 result["data"] = public_return  # store public info from token
-                login_fail_count = 0
-                await _set_login_history(last_login_attempt, login_fail_count)
+                await valkey_client.clear_login_block(creds["username"])
                 log.info(
                     "LOGIN_HANDLER: Authorization succeeded for (email:{}, ip:{})",
                     creds["username"],
@@ -549,8 +515,9 @@ async def login_handler(request: web.Request) -> web.Response:
         }
         session["authenticated"] = False
         if e.status == 401:
-            login_fail_count += 1
-            await _set_login_history(last_login_attempt, login_fail_count)
+            await valkey_client.record_login_failure(
+                creds["username"], BLOCK_TIME, ALLOWED_FAIL_COUNT
+            )
         return web.json_response(result, status=e.status)
     return web.json_response(result)
 
