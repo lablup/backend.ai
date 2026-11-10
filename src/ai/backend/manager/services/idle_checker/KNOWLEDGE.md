@@ -49,7 +49,8 @@ the entity type, shape, operation, gate and backing.
 
 - Both read another entity before writing: they fetch the prometheus query preset the
   utilization spec names and reject filter and group labels that preset does not
-  declare as allowed.
+  declare as allowed. A `container_metric_name` filter label whose value holds a
+  character outside letters, digits, `_`, `:` and `-` is rejected before that read.
 - A check that reads another repository is past what an action validator absorbs, and
   a spec cannot issue SQL — that is the criterion for keeping a service method.
 - Past the check the service hands the action's spec to ops unchanged. It does nothing

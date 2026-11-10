@@ -32,6 +32,7 @@ from ai.backend.manager.data.prometheus_query_preset import (
     ExecutePresetOptions,
     PrometheusQueryPresetData,
 )
+from ai.backend.manager.errors.metric import InvalidContainerMetricName
 from ai.backend.manager.models.prometheus_query_preset.creators import (
     PrometheusQueryPresetCreator,
 )
@@ -256,6 +257,61 @@ class TestPrometheusQueryPresetService:
 
         with pytest.raises(PrometheusQueryPresetInvalidLabel):
             await service.execute_preset(action)
+
+    async def test_execute_preset_accepts_a_valid_container_metric_name(
+        self,
+        service: PrometheusQueryPresetService,
+        mock_repository: MagicMock,
+        mock_prometheus_client: MagicMock,
+        preset_data: PrometheusQueryPresetData,
+    ) -> None:
+        mock_repository.get_by_id = AsyncMock(
+            return_value=replace(preset_data, filter_labels=["container_metric_name"])
+        )
+        mock_prometheus_client.execute_preset = AsyncMock(
+            return_value=PrometheusResponse(
+                status="success",
+                data=PrometheusQueryData(result_type="matrix", result=[]),
+            )
+        )
+        action = ExecutePresetAction(
+            preset_id=preset_data.id,
+            options=ExecutePresetOptions(
+                filter_labels={"container_metric_name": "cuda_mem"},
+                group_labels=[],
+            ),
+            time_window="5m",
+            time_range=QueryTimeRange(start="1704067200", end="1704153600", step="60s"),
+        )
+
+        await service.execute_preset(action)
+
+        mock_prometheus_client.execute_preset.assert_awaited_once()
+
+    async def test_execute_preset_rejects_an_invalid_container_metric_name(
+        self,
+        service: PrometheusQueryPresetService,
+        mock_repository: MagicMock,
+        mock_prometheus_client: MagicMock,
+        preset_data: PrometheusQueryPresetData,
+    ) -> None:
+        mock_repository.get_by_id = AsyncMock(
+            return_value=replace(preset_data, filter_labels=["container_metric_name"])
+        )
+        mock_prometheus_client.execute_preset = AsyncMock()
+        action = ExecutePresetAction(
+            preset_id=preset_data.id,
+            options=ExecutePresetOptions(
+                filter_labels={"container_metric_name": 'cpu_util"} or vector(1) #'},
+                group_labels=[],
+            ),
+            time_window="5m",
+            time_range=QueryTimeRange(start="1704067200", end="1704153600", step="60s"),
+        )
+
+        with pytest.raises(InvalidContainerMetricName):
+            await service.execute_preset(action)
+        mock_prometheus_client.execute_preset.assert_not_awaited()
 
     async def test_execute_preset_invalid_group_label(
         self,
