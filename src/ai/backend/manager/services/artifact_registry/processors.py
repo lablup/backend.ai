@@ -192,39 +192,10 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
             validators=[validators.rbac.single_entity],
         )
 
-<<<<<<< HEAD
         self.get_registry_meta = SingleEntityActionProcessor(
             service.get_registry_meta,
             action_monitors,
             validators=[validators.rbac.single_entity],
-=======
-        self.partial_bulk_update_huggingface_registries = group.partial_bulk(
-            PartialBulkUpdateHuggingFaceRegistriesAction,
-            service.partial_bulk_update_huggingface_registries,
-        )
-        self.partial_bulk_purge_huggingface_registries = group.partial_bulk(
-            PartialBulkPurgeHuggingFaceRegistriesAction,
-            service.partial_bulk_purge_huggingface_registries,
-        )
-        self.partial_bulk_update_reservoir_registries = group.partial_bulk(
-            PartialBulkUpdateReservoirRegistriesAction,
-            service.partial_bulk_update_reservoir_registries,
-        )
-        self.partial_bulk_purge_reservoir_registries = group.partial_bulk(
-            PartialBulkPurgeReservoirRegistriesAction,
-            service.partial_bulk_purge_reservoir_registries,
-        )
-
-        self.get_registry_meta = group.single_entity(
-            GetArtifactRegistryMetaAction, service.get_registry_meta
-        )
-        self.get_registry_metas = group.partial_bulk_get_ops(GetArtifactRegistryMetasAction)
-        self.bulk_get_huggingface_registries = huggingface_group.partial_bulk(
-            BulkGetHuggingFaceRegistriesAction, service.bulk_get_huggingface_registries
-        )
-        self.bulk_get_reservoir_registries = reservoir_group.partial_bulk(
-            BulkGetReservoirRegistriesAction, service.bulk_get_reservoir_registries
->>>>>>> ca95a63b0 (fix(BA-8972): mask artifact registry credentials for callers who are not superadmins (#16643))
         )
 
         # Internal/batch actions without RBAC

@@ -5,8 +5,7 @@ from uuid import uuid4
 
 import pytest
 
-from ai.backend.common.contexts.user import with_user_context
-from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.user.types import UserData, UserRole
 
 
@@ -24,7 +23,6 @@ def caller_user_context(caller_role: UserRole) -> Iterator[UserData]:
         is_superadmin=caller_role == UserRole.SUPERADMIN,
         role=caller_role,
         domain_name="default",
-        domain_id=DomainID(uuid4()),
     )
-    with with_user_context(caller):
+    with with_user(caller):
         yield caller
