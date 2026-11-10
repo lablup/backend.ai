@@ -17,6 +17,7 @@ import pytest
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.user.types import UserData
 from ai.backend.common.identifier.project import ProjectID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.errors.resource import DBOperationFailed, TaskTemplateNotFound
 from ai.backend.manager.exceptions import InvalidArgument
@@ -55,15 +56,15 @@ from ai.backend.manager.services.template.actions.update_task_template import (
     UpdateTaskTemplateAction,
 )
 from ai.backend.manager.services.template.service import TemplateService
+from ai.backend.manager.views.session_template import SessionTemplateOwnerAndDomain
 
 _CLUSTER_TEMPLATE_OWNER_UUID = uuid.UUID(int=1)
 _OTHER_USER_UUID = uuid.UUID(int=2)
 _CLUSTER_TEMPLATE_DOMAIN = "template-domain"
 _OTHER_DOMAIN = "other-domain"
-_CLUSTER_TEMPLATE_OWNER = {
-    "user_uuid": _CLUSTER_TEMPLATE_OWNER_UUID,
-    "domain_name": _CLUSTER_TEMPLATE_DOMAIN,
-}
+_CLUSTER_TEMPLATE_OWNER = SessionTemplateOwnerAndDomain(
+    owner_id=UserID(_CLUSTER_TEMPLATE_OWNER_UUID), domain_name=_CLUSTER_TEMPLATE_DOMAIN
+)
 
 
 @dataclass(frozen=True)
@@ -334,9 +335,11 @@ class TestGetTaskTemplateAction:
     ) -> None:
         action = GetTaskTemplateAction(
             template_id="tmpl-123",
+            requester_uuid=owner_uuid,
+            requester_role=UserRole.USER,
+            requester_domain="default",
         )
-        with _acting_as(owner_uuid, UserRole.USER, "default"):
-            result = await service.get_task_template(action)
+        result = await service.get_task_template(action)
 
         assert result.template == stored_template["template"]
         assert result.name == "test-template"
@@ -353,9 +356,11 @@ class TestGetTaskTemplateAction:
 
         action = GetTaskTemplateAction(
             template_id="tmpl-123",
+            requester_uuid=owner_uuid,
+            requester_role=UserRole.USER,
+            requester_domain="default",
         )
-        with _acting_as(owner_uuid, UserRole.USER, "default"):
-            result = await service.get_task_template(action)
+        result = await service.get_task_template(action)
 
         assert isinstance(result.template, dict)
         assert result.template["kind"] == "taskTemplate"
@@ -374,9 +379,11 @@ class TestGetTaskTemplateAction:
     ) -> None:
         action = GetTaskTemplateAction(
             template_id="tmpl-123",
+            requester_uuid=uuid.uuid4(),
+            requester_role=role,
+            requester_domain=domain,
         )
-        with _acting_as(uuid.uuid4(), role, domain):
-            result = await service.get_task_template(action)
+        result = await service.get_task_template(action)
 
         assert result.name == "test-template"
 
@@ -394,8 +401,11 @@ class TestGetTaskTemplateAction:
     ) -> None:
         action = GetTaskTemplateAction(
             template_id="tmpl-123",
+            requester_uuid=uuid.uuid4(),
+            requester_role=role,
+            requester_domain=domain,
         )
-        with pytest.raises(NotEnoughPermission), _acting_as(uuid.uuid4(), role, domain):
+        with pytest.raises(NotEnoughPermission):
             await service.get_task_template(action)
 
     async def test_nonexistent_id_raises_not_found(
@@ -407,11 +417,11 @@ class TestGetTaskTemplateAction:
 
         action = GetTaskTemplateAction(
             template_id="nonexistent",
+            requester_uuid=uuid.uuid4(),
+            requester_role=UserRole.USER,
+            requester_domain="default",
         )
-        with (
-            pytest.raises(TaskTemplateNotFound),
-            _acting_as(uuid.uuid4(), UserRole.USER, "default"),
-        ):
+        with pytest.raises(TaskTemplateNotFound):
             await service.get_task_template(action)
 
 
@@ -542,8 +552,7 @@ class TestUpdateTaskTemplateAction:
             **base_action_kwargs,
             items=[TaskTemplateItemInput(template=_make_valid_task_template("updated"))],
         )
-        with _acting_as(action.requester_uuid, action.requester_role, action.requester_domain):
-            result = await service.update_task_template(action)
+        result = await service.update_task_template(action)
 
         assert result is not None
         mock_repo.update_task_template.assert_called_once()
@@ -560,10 +569,7 @@ class TestUpdateTaskTemplateAction:
             **base_action_kwargs,
             items=[TaskTemplateItemInput(template=_make_valid_task_template())],
         )
-        with (
-            pytest.raises(TaskTemplateNotFound),
-            _acting_as(action.requester_uuid, action.requester_role, action.requester_domain),
-        ):
+        with pytest.raises(TaskTemplateNotFound):
             await service.update_task_template(action)
 
     async def test_invalid_template_raises_error(
@@ -582,10 +588,7 @@ class TestUpdateTaskTemplateAction:
             **base_action_kwargs,
             items=[TaskTemplateItemInput(template=bad_template)],
         )
-        with (
-            pytest.raises(Exception),
-            _acting_as(action.requester_uuid, action.requester_role, action.requester_domain),
-        ):
+        with pytest.raises(Exception):
             await service.update_task_template(action)
 
     async def test_rowcount_not_one_raises_db_operation_failed(
@@ -602,10 +605,7 @@ class TestUpdateTaskTemplateAction:
             **base_action_kwargs,
             items=[TaskTemplateItemInput(template=_make_valid_task_template())],
         )
-        with (
-            pytest.raises(DBOperationFailed),
-            _acting_as(action.requester_uuid, action.requester_role, action.requester_domain),
-        ):
+        with pytest.raises(DBOperationFailed):
             await service.update_task_template(action)
 
     @pytest.mark.parametrize(
@@ -634,10 +634,7 @@ class TestUpdateTaskTemplateAction:
             **kwargs,
             items=[TaskTemplateItemInput(template=_make_valid_task_template())],
         )
-        with (
-            pytest.raises(NotEnoughPermission),
-            _acting_as(action.requester_uuid, action.requester_role, action.requester_domain),
-        ):
+        with pytest.raises(NotEnoughPermission):
             await service.update_task_template(action)
         mock_repo.update_task_template.assert_not_called()
 
@@ -660,8 +657,7 @@ class TestUpdateTaskTemplateAction:
             **kwargs,
             items=[TaskTemplateItemInput(template=_make_valid_task_template())],
         )
-        with _acting_as(action.requester_uuid, action.requester_role, action.requester_domain):
-            await service.update_task_template(action)
+        await service.update_task_template(action)
 
         mock_repo.update_task_template.assert_called_once()
 
@@ -702,9 +698,11 @@ class TestDeleteTaskTemplateAction:
 
         action = DeleteTaskTemplateAction(
             template_id="tmpl-to-delete",
+            requester_uuid=owner_uuid,
+            requester_role=UserRole.USER,
+            requester_domain="default",
         )
-        with _acting_as(owner_uuid, UserRole.USER, "default"):
-            result = await service.delete_task_template(action)
+        result = await service.delete_task_template(action)
 
         assert result is not None
         mock_repo.soft_delete_template.assert_called_once_with("tmpl-to-delete", TemplateType.TASK)
@@ -718,11 +716,11 @@ class TestDeleteTaskTemplateAction:
 
         action = DeleteTaskTemplateAction(
             template_id="nonexistent",
+            requester_uuid=uuid.uuid4(),
+            requester_role=UserRole.USER,
+            requester_domain="default",
         )
-        with (
-            pytest.raises(TaskTemplateNotFound),
-            _acting_as(uuid.uuid4(), UserRole.USER, "default"),
-        ):
+        with pytest.raises(TaskTemplateNotFound):
             await service.delete_task_template(action)
 
     async def test_rowcount_not_one_raises_db_operation_failed(
@@ -736,8 +734,11 @@ class TestDeleteTaskTemplateAction:
 
         action = DeleteTaskTemplateAction(
             template_id="tmpl-x",
+            requester_uuid=owner_uuid,
+            requester_role=UserRole.USER,
+            requester_domain="default",
         )
-        with pytest.raises(DBOperationFailed), _acting_as(owner_uuid, UserRole.USER, "default"):
+        with pytest.raises(DBOperationFailed):
             await service.delete_task_template(action)
 
     @pytest.mark.parametrize(
@@ -757,8 +758,11 @@ class TestDeleteTaskTemplateAction:
 
         action = DeleteTaskTemplateAction(
             template_id="tmpl-x",
+            requester_uuid=uuid.uuid4(),
+            requester_role=role,
+            requester_domain=domain,
         )
-        with pytest.raises(NotEnoughPermission), _acting_as(uuid.uuid4(), role, domain):
+        with pytest.raises(NotEnoughPermission):
             await service.delete_task_template(action)
         mock_repo.soft_delete_template.assert_not_called()
 
@@ -779,9 +783,11 @@ class TestDeleteTaskTemplateAction:
 
         action = DeleteTaskTemplateAction(
             template_id="tmpl-x",
+            requester_uuid=uuid.uuid4(),
+            requester_role=role,
+            requester_domain=domain,
         )
-        with _acting_as(uuid.uuid4(), role, domain):
-            await service.delete_task_template(action)
+        await service.delete_task_template(action)
 
         mock_repo.soft_delete_template.assert_called_once_with("tmpl-x", TemplateType.TASK)
 
@@ -902,9 +908,7 @@ class TestGetClusterTemplateAction:
         mock_repo.get_cluster_template_owner = AsyncMock(return_value=_CLUSTER_TEMPLATE_OWNER)
         mock_repo.get_cluster_template = AsyncMock(return_value=template_data)
 
-        action = GetClusterTemplateAction(
-            template_id="cluster-1",
-        )
+        action = GetClusterTemplateAction(template_id="cluster-1")
         with _acting_as(_CLUSTER_TEMPLATE_OWNER_UUID, UserRole.USER, _CLUSTER_TEMPLATE_DOMAIN):
             result = await service.get_cluster_template(action)
 
@@ -917,9 +921,7 @@ class TestGetClusterTemplateAction:
     ) -> None:
         mock_repo.get_cluster_template_owner = AsyncMock(return_value=None)
 
-        action = GetClusterTemplateAction(
-            template_id="nonexistent",
-        )
+        action = GetClusterTemplateAction(template_id="nonexistent")
         with (
             pytest.raises(TaskTemplateNotFound),
             _acting_as(_CLUSTER_TEMPLATE_OWNER_UUID, UserRole.USER, _CLUSTER_TEMPLATE_DOMAIN),
@@ -1118,9 +1120,7 @@ class TestDeleteClusterTemplateAction:
         mock_repo.get_cluster_template_owner = AsyncMock(return_value=_CLUSTER_TEMPLATE_OWNER)
         mock_repo.soft_delete_template = AsyncMock(return_value=1)
 
-        action = DeleteClusterTemplateAction(
-            template_id="cluster-to-delete",
-        )
+        action = DeleteClusterTemplateAction(template_id="cluster-to-delete")
         with _acting_as(_CLUSTER_TEMPLATE_OWNER_UUID, UserRole.USER, _CLUSTER_TEMPLATE_DOMAIN):
             result = await service.delete_cluster_template(action)
 
@@ -1136,9 +1136,7 @@ class TestDeleteClusterTemplateAction:
     ) -> None:
         mock_repo.get_cluster_template_owner = AsyncMock(return_value=None)
 
-        action = DeleteClusterTemplateAction(
-            template_id="nonexistent",
-        )
+        action = DeleteClusterTemplateAction(template_id="nonexistent")
         with (
             pytest.raises(TaskTemplateNotFound),
             _acting_as(_CLUSTER_TEMPLATE_OWNER_UUID, UserRole.USER, _CLUSTER_TEMPLATE_DOMAIN),
@@ -1153,9 +1151,7 @@ class TestDeleteClusterTemplateAction:
         mock_repo.get_cluster_template_owner = AsyncMock(return_value=_CLUSTER_TEMPLATE_OWNER)
         mock_repo.soft_delete_template = AsyncMock(return_value=0)
 
-        action = DeleteClusterTemplateAction(
-            template_id="cluster-x",
-        )
+        action = DeleteClusterTemplateAction(template_id="cluster-x")
         with (
             pytest.raises(DBOperationFailed),
             _acting_as(_CLUSTER_TEMPLATE_OWNER_UUID, UserRole.USER, _CLUSTER_TEMPLATE_DOMAIN),
@@ -1206,9 +1202,7 @@ class TestClusterTemplateAccess:
         service: TemplateService,
         case: _ClusterTemplateRequesterCase,
     ) -> None:
-        action = GetClusterTemplateAction(
-            template_id="cluster-1",
-        )
+        action = GetClusterTemplateAction(template_id="cluster-1")
 
         with _acting_as(case.requester_uuid, case.requester_role, case.requester_domain):
             result = await service.get_cluster_template(action)
@@ -1244,9 +1238,7 @@ class TestClusterTemplateAccess:
         service: TemplateService,
         case: _ClusterTemplateRequesterCase,
     ) -> None:
-        action = GetClusterTemplateAction(
-            template_id="cluster-1",
-        )
+        action = GetClusterTemplateAction(template_id="cluster-1")
 
         with (
             pytest.raises(NotEnoughPermission),
@@ -1277,9 +1269,7 @@ class TestClusterTemplateAccess:
         service: TemplateService,
         mock_repo_holding_a_cluster_template: MagicMock,
     ) -> None:
-        action = DeleteClusterTemplateAction(
-            template_id="cluster-1",
-        )
+        action = DeleteClusterTemplateAction(template_id="cluster-1")
 
         with (
             pytest.raises(NotEnoughPermission),

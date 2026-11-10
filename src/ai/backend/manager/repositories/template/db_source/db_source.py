@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 import sqlalchemy as sa
 
 from ai.backend.common.identifier.project import ProjectID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.errors.resource import DBOperationFailed
@@ -18,6 +19,7 @@ from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.session_template import TemplateType, session_templates
 from ai.backend.manager.models.user import UserRole, users
 from ai.backend.manager.utils import check_if_requester_is_eligible_to_act_as_target_user
+from ai.backend.manager.views.session_template import SessionTemplateOwnerAndDomain
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -450,7 +452,9 @@ class TemplateDBSource:
                 return template
             return dict(template)
 
-    async def get_cluster_template_owner(self, template_id: str) -> dict[str, Any] | None:
+    async def get_cluster_template_owner(
+        self, template_id: str
+    ) -> SessionTemplateOwnerAndDomain | None:
         """Get the `user_uuid` and `domain_name` of an active cluster template."""
         async with self._db.begin_readonly() as conn:
             q = (
@@ -466,7 +470,9 @@ class TemplateDBSource:
             row = result.first()
             if row is None:
                 return None
-            return {"user_uuid": row.user_uuid, "domain_name": row.domain_name}
+            return SessionTemplateOwnerAndDomain(
+                owner_id=UserID(row.user_uuid), domain_name=row.domain_name
+            )
 
     async def cluster_template_exists(self, template_id: str) -> bool:
         """Check if an active cluster template exists."""

@@ -11,6 +11,7 @@ from collections.abc import AsyncGenerator
 import pytest
 
 from ai.backend.common.identifier.project import ProjectID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.errors.api import InvalidAPIParameters
@@ -33,6 +34,7 @@ from ai.backend.manager.models.session_template import TemplateType, session_tem
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.template.repository import TemplateRepository
+from ai.backend.manager.views.session_template import SessionTemplateOwnerAndDomain
 from ai.backend.testutils.db import with_tables
 
 
@@ -611,7 +613,9 @@ class TestTemplateRepository:
 
         result = await template_repository.get_cluster_template_owner(template_id)
 
-        assert result == {"user_uuid": test_user, "domain_name": test_domain}
+        assert result == SessionTemplateOwnerAndDomain(
+            owner_id=UserID(test_user), domain_name=test_domain
+        )
 
     async def test_get_cluster_template_owner_not_found(
         self,

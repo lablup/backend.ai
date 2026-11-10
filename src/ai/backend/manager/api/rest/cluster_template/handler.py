@@ -192,9 +192,7 @@ class ClusterTemplateHandler:
         )
 
         template_id = path.parsed.template_id
-        action = GetClusterTemplateAction(
-            template_id=template_id,
-        )
+        action = GetClusterTemplateAction(template_id=template_id)
         result = await self._template.get_cluster.wait_for_complete(action)
         return APIResponse.build(
             HTTPStatus.OK,
@@ -253,9 +251,7 @@ class ClusterTemplateHandler:
             else "*",
         )
 
-        action = DeleteClusterTemplateAction(
-            template_id=template_id,
-        )
+        action = DeleteClusterTemplateAction(template_id=template_id)
         await self._template.delete_cluster.wait_for_complete(action)
         return APIResponse.build(
             HTTPStatus.OK,
