@@ -743,6 +743,12 @@ class ModifyGroup(graphene.Mutation):  # type: ignore[misc]
         props: ModifyGroupInput,
     ) -> ModifyGroup:
         graph_ctx: GraphQueryContext = info.context
+        if (
+            graph_ctx.user["role"] != UserRole.SUPERADMIN
+            and isinstance(props.domain_name, str)
+            and props.domain_name != graph_ctx.user["domain_name"]
+        ):
+            return cls(False, "only a superadmin can move a project to another domain", None)
 
         action = props.to_action(gid)
         res = await graph_ctx.processors.group.modify_group.wait_for_complete(action)

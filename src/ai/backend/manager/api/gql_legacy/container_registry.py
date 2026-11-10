@@ -535,10 +535,7 @@ class DeleteContainerRegistryNode(graphene.Mutation):  # type: ignore[misc]
 class CreateContainerRegistryQuota(graphene.Mutation):  # type: ignore[misc]
     """Added in 25.3.0."""
 
-    allowed_roles = (
-        UserRole.SUPERADMIN,
-        UserRole.ADMIN,
-    )
+    allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
         scope_id = ScopeField(required=True)
@@ -575,10 +572,7 @@ class CreateContainerRegistryQuota(graphene.Mutation):  # type: ignore[misc]
 class UpdateContainerRegistryQuota(graphene.Mutation):  # type: ignore[misc]
     """Added in 25.3.0."""
 
-    allowed_roles = (
-        UserRole.SUPERADMIN,
-        UserRole.ADMIN,
-    )
+    allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
         scope_id = ScopeField(required=True)
@@ -615,10 +609,7 @@ class UpdateContainerRegistryQuota(graphene.Mutation):  # type: ignore[misc]
 class DeleteContainerRegistryQuota(graphene.Mutation):  # type: ignore[misc]
     """Added in 25.3.0."""
 
-    allowed_roles = (
-        UserRole.SUPERADMIN,
-        UserRole.ADMIN,
-    )
+    allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
         scope_id = ScopeField(required=True)
