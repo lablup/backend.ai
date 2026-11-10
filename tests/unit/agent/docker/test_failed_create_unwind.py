@@ -772,6 +772,7 @@ class TestCreateKernelWhoseContainerStartFails:
             "process_mounts",
         ):
             setattr(ctx, name, AsyncMock())
+        ctx.kernel_config_for_restart.return_value = {}
         ctx.kernel_config = {
             "cluster_role": "main",
             "preopen_ports": None,
@@ -848,7 +849,7 @@ class TestCreateKernelWhoseContainerStartFails:
                 cast(Any, SimpleNamespace(kernel_id=kernel_id, session_id=session_id)),
                 MagicMock(),
                 cast(Any, kernel_config),
-                cast(Any, {}),
+                cast(Any, {"replicas": {}}),
             )
 
         queued: list[ContainerLifecycleEvent] = []
@@ -895,7 +896,7 @@ class TestCreateKernelWhoseContainerStartFails:
                 cast(Any, SimpleNamespace(kernel_id=kernel_id, session_id=session_id)),
                 MagicMock(),
                 cast(Any, kernel_config),
-                cast(Any, {}),
+                cast(Any, {"replicas": {}}),
             )
 
         queued: list[ContainerLifecycleEvent] = []
