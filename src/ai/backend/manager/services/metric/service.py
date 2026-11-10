@@ -1,6 +1,7 @@
 import logging
 
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.clients.prometheus.metric_types import ensure_container_metric_name
 from ai.backend.manager.repositories.metric.repository import MetricRepository
 
 from .actions.container import (
@@ -34,6 +35,7 @@ class MetricService:
         self,
         action: ContainerMetricAction,
     ) -> ContainerMetricActionResult:
+        ensure_container_metric_name(action.metric_name)
         result = await self._metric_repository.query_container_metric(
             action.metric_name,
             action.labels,

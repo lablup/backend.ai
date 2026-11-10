@@ -9,7 +9,10 @@ from uuid import UUID
 import graphene
 
 from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
-from ai.backend.manager.clients.prometheus.metric_types import ContainerMetricOptionalLabel
+from ai.backend.manager.clients.prometheus.metric_types import (
+    ContainerMetricOptionalLabel,
+    ensure_container_metric_name,
+)
 from ai.backend.manager.services.metric.actions.container import (
     ContainerMetricAction,
 )
@@ -46,6 +49,7 @@ class UserUtilizationMetricQueryInput(graphene.InputObjectType):  # type: ignore
     )
 
     def metric_query_param(self) -> MetricQueryParameter:
+        ensure_container_metric_name(self.metric_name)
         return MetricQueryParameter(
             metric_name=self.metric_name,
             value_type=self.value_type,
