@@ -2,7 +2,7 @@
 
 [background](/src/ai/backend/manager/api/adapters/project/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/project/adapter.py)
 
-Scenario: incomplete 15 / 17
+Scenario: incomplete 14 / 17
 
 - built from ops (10)
   - admin_search: representative success ✗ · representative rejection ✗: SCENARIO-GAP
@@ -16,7 +16,7 @@ Scenario: incomplete 15 / 17
   - search_by_domain_name: representative success ✗ · representative rejection ✗: SCENARIO-GAP
   - search_by_user: representative success ✗ · representative rejection ✗: SCENARIO-GAP
 - ops + direct implementation (4)
-  - assign_users: success present 1 · rejection absent (atomic_bulk_get_ops, scope): SCENARIO-GAP
+  - assign_users: success present 1 · rejection present 1 (atomic_bulk_get_ops, partial_bulk_get_ops, relation)
   - partial_bulk_update: success present 3 · rejection absent (partial_bulk, partial_bulk_delete_ops, partial_bulk_restore_ops): SCENARIO-GAP
   - unassign_users: success absent · rejection absent (atomic_bulk_get_ops, scope): SCENARIO-GAP
   - update: success present 2 · rejection absent (single_delete_ops, single_entity, single_restore_ops): SCENARIO-GAP
@@ -42,7 +42,8 @@ Scenario: incomplete 15 / 17
 
 | scenario | verdict |
 |---|---|
-| [when a project and a role in its scope are in place and a user is assigned, the user is put on the roster](#project-assigning-a-user-to-a-project-puts-them-on-its-roster) | answered |
+| [when a caller permitted both to create users and to grant the named role assigns a user with that role, the user is put on the roster](#project-assigning-a-user-to-a-project-puts-them-on-its-roster) | answered |
+| [an assignment also asks for the permission to grant the named role, so a caller permitted only to create users is rejected for lack of permission](#project-a-caller-who-may-not-grant-the-role-may-not-assign-a-user-with-it) | rejected |
 
 **partial_bulk_update**
 
@@ -226,11 +227,11 @@ Then
 
 #### [assigning-a-user-to-a-project-puts-them-on-its-roster](/tests/scenario/bai_scenario/manager/project/test_project.py): pass
 
-when a project and a role in its scope are in place and a user is assigned, the user is put on the roster
+when a caller permitted both to create users and to grant the named role assigns a user with that role, the user is put on the roster
 
 Given
 
-- one project, the role in its scope, the user to assign, and the superadmin
+- one project, the role in its scope, the user to assign, and a caller holding the user READ and CREATE permissions in the domain scope. The caller holds the role CREATE permission
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project research-1
@@ -240,8 +241,16 @@ Given
     - regular user user-1: has their own keypair and personal project
     - User resource policy user-policy-2: up to 10 folders per user
     - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-    - superadmin user-2: has their own keypair and personal project
+    - regular user user-2: has their own keypair and personal project
   - Role project-member-1: applies only within the scope it is granted in
+  - a role assignment granting the user the READ, CREATE permissions
+    - Role user-role-1: applies only within the scope it is granted in
+    - Role user-role-1: READ allowed on every user
+    - Role user-role-1: CREATE allowed on every user
+    - regular user user-2: holds Role user-role-1
+  - Role role-granter-1: applies only within the scope it is granted in
+  - Role role-granter-1: CREATE allowed on every role
+  - regular user user-2: holds Role role-granter-1
 
 When
 
@@ -251,6 +260,41 @@ Then
 
 - the roster holds the user assigned, and no one else
   - items: same as the one user assigned
+
+<a id="project-a-caller-who-may-not-grant-the-role-may-not-assign-a-user-with-it"></a>
+
+#### [a-caller-who-may-not-grant-the-role-may-not-assign-a-user-with-it](/tests/scenario/bai_scenario/manager/project/test_project.py): pass
+
+an assignment also asks for the permission to grant the named role, so a caller permitted only to create users is rejected for lack of permission
+
+Given
+
+- one project, the role in its scope, the user to assign, and a caller holding the user READ and CREATE permissions in the domain scope. The caller does not hold the role CREATE permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project research-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Role project-member-1: applies only within the scope it is granted in
+  - a role assignment granting the user the READ, CREATE permissions
+    - Role user-role-1: applies only within the scope it is granted in
+    - Role user-role-1: READ allowed on every user
+    - Role user-role-1: CREATE allowed on every user
+    - regular user user-2: holds Role user-role-1
+
+When
+
+- ProjectAdapter.assign_users: user-2 assigns user-1 to research-1
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 ### partial_bulk_update
 
