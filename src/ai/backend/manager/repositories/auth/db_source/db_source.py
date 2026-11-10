@@ -14,7 +14,7 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
 
-from ai.backend.common.auth.password import HashInfo, PasswordInfo
+from ai.backend.common.auth.password import HashInfo, PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
@@ -413,7 +413,13 @@ class AuthDBSource:
             await asyncio.to_thread(configured_hasher.generate_new_hash, target_password_info)
             raise AuthorizationFailed("User credential mismatch.") from None
         if not matched:
-            if target_password_info.need_migration(stored):
+            # A stored hash cheaper than the configured one is topped up to that cost. Rounds
+            # compare only within one algorithm; SHA256 is cheaper than any other.
+            if stored.algorithm == target_password_info.algorithm:
+                cheaper = stored.rounds < target_password_info.rounds
+            else:
+                cheaper = stored.algorithm == PasswordHashAlgorithm.SHA256
+            if cheaper:
                 await asyncio.to_thread(configured_hasher.generate_new_hash, target_password_info)
             raise PasswordMismatch(UserID(row.uuid))
         return row

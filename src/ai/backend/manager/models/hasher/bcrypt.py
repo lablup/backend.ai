@@ -20,7 +20,8 @@ class BcryptHasher(PasswordHasher):
     def generate_new_hash(self, password_info: PasswordInfo) -> HashInfo:
         # Note: bcrypt generates its own salt, so salt_size is ignored
         hash_value = bcrypt.hashpw(
-            password_info.password.encode("utf8"), bcrypt.gensalt(rounds=password_info.rounds)
+            password_info.password.encode("utf8")[:BCRYPT_MAX_PASSWORD_BYTES],
+            bcrypt.gensalt(rounds=password_info.rounds),
         ).decode("utf8")
 
         return HashInfo(
