@@ -107,7 +107,6 @@ async def config_provider_ctx(cli_ctx: CLIContext) -> AsyncIterator[ManagerConfi
     """
     from ai.backend.common.configs.loader import (
         ConfigOverrider,
-        EtcdConfigLoader,
         EtcdConfigWatcher,
         LoaderChain,
         TomlConfigLoader,
@@ -129,8 +128,6 @@ async def config_provider_ctx(cli_ctx: CLIContext) -> AsyncIterator[ManagerConfi
         legacy_etcd_loader = LegacyEtcdLoader(etcd)
         loaders.append(legacy_etcd_loader)
         loaders.append(LegacyEtcdVolumesLoader(etcd))
-        loaders.append(EtcdConfigLoader(etcd, prefix="ai/backend/config/common"))
-        loaders.append(EtcdConfigLoader(etcd, prefix="ai/backend/config/manager"))
         overrides: list[tuple[tuple[str, ...], Any]] = [
             (("debug", "enabled"), cli_ctx.log_level == LogLevel.DEBUG),
         ]

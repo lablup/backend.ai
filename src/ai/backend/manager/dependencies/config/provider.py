@@ -8,7 +8,6 @@ from typing import Any, override
 
 from ai.backend.common.configs.loader import (
     ConfigOverrider,
-    EtcdConfigLoader,
     EtcdConfigWatcher,
     LoaderChain,
     TomlConfigLoader,
@@ -74,10 +73,6 @@ class ConfigProviderDependency(
 
         # Add legacy etcd volumes loader (volumes/ prefix)
         loaders.append(LegacyEtcdVolumesLoader(setup_input.etcd))
-
-        # Add etcd config loaders
-        loaders.append(EtcdConfigLoader(setup_input.etcd, prefix="ai/backend/config/common"))
-        loaders.append(EtcdConfigLoader(setup_input.etcd, prefix="ai/backend/config/manager"))
 
         # Add overrides
         overrides: list[tuple[tuple[str, ...], Any]] = [
