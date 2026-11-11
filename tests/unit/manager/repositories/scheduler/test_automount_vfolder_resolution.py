@@ -41,6 +41,7 @@ from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.types import BinarySize, QuotaScopeID, ResourceSlot
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.project.types import ProjectType
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.data.session.draft import (
     KernelGroupDraft,
     ResourceSpecDraft,
@@ -92,6 +93,7 @@ from ai.backend.manager.repositories.rbac.permission_check_repository import (
     RbacPermissionCheckRepository,
 )
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
 from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
@@ -380,6 +382,9 @@ class TestAutoMountVFolderResolution:
             mock_storage_manager,
             RbacPermissionCheckRepository(
                 PermissionOpsProvider(db_with_cleanup), mock_config_provider
+            ),
+            key_provider_pool=KeyProviderPool(
+                providers=[], write_provider_type=KeyProviderType.PLAIN
             ),
         )
 

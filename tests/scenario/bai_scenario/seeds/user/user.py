@@ -22,6 +22,7 @@ from ai.backend.manager.data.resource.types import (
     UserResourcePolicyData,
 )
 from ai.backend.manager.data.user.types import UserStatus
+from ai.backend.manager.models.ssh_keypair.creators import SSHKeypairCreator
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.repositories.ops.v2.user.write import FullUserCreator
 from ai.backend.manager.secret.types import SecretValue
@@ -118,8 +119,7 @@ class TestSeedUserOf(TestSeedUser[DomainData, UserResourcePolicyData, KeyPairRes
             keypair_secrets=KeyPairSecrets(
                 access_key=AccessKey(f"AK{token}"),
                 secret_key=self.secret_key or SecretValue(f"sk-{token}"),
-                ssh_public_key="",
-                ssh_private_key="",
             ),
+            ssh_keypair=SSHKeypairCreator(public_key="", private_key=None, is_default=True),
             keypair_resource_policy=keypair_policy.name,
         )

@@ -20,7 +20,7 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.common.types import AccessKey, SlotName, SSHPublicKey
+from ai.backend.common.types import AccessKey, SlotName
 from ai.backend.common.utils import nmget
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
@@ -32,6 +32,7 @@ from ai.backend.manager.data.bootstrap_script.types import (
 from ai.backend.manager.data.dotfile.types import DotfileEntries, DotfileEntry
 from ai.backend.manager.data.keypair.types import GeneratedKeyPairData, KeyPairCreator, KeyPairData
 from ai.backend.manager.data.session.types import SessionEntityData
+from ai.backend.manager.data.ssh_keypair.types import SSHKeypairData
 from ai.backend.manager.data.user.types import (
     BulkUserCreateResultData,
     BulkUserUpdateResultData,
@@ -70,6 +71,10 @@ from ai.backend.manager.models.keypair.queriers import DefaultKeypairQuerier
 from ai.backend.manager.models.keypair.updaters import KeypairUpdater
 from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.models.specs.updater import GuardedDataUpdater
+from ai.backend.manager.models.ssh_keypair.creators import SSHKeypairCreator
+from ai.backend.manager.models.ssh_keypair.purgers import DefaultSSHKeypairPurger
+from ai.backend.manager.models.ssh_keypair.queriers import DefaultSSHKeypairQuerier
+from ai.backend.manager.models.ssh_keypair.row import SSH_KEYPAIR_PRIVATE_KEY_CONTEXT
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.searchers import UserSearcher
 from ai.backend.manager.models.user.updaters import UserUpdater
@@ -479,26 +484,42 @@ class UserRepository:
         return await self._db_source.admin_get_keypair(access_key)
 
     @user_repository_resilience.apply()
-    async def admin_update_ssh_public_key(
-        self,
-        access_key: AccessKey,
-        ssh_public_key: SSHPublicKey,
+    async def default_ssh_keypair(self, user_id: UserID) -> SSHKeypairData | None:
+        async with self._v2_ops.read_ops() as r:
+            designated = await r.query_owned_fields(
+                DefaultSSHKeypairQuerier(),
+                [user_id],
+            )
+        return designated.get(user_id)
+
+    @user_repository_resilience.apply()
+    async def replace_default_ssh_keypair(
+        self, user_id: UserID, public_key: str, private_key: str | None
     ) -> None:
-        """Admin registers (overwrites) a user's SSH public key."""
-        await self._db_source.admin_update_ssh_public_key(
-            access_key=access_key,
-            ssh_public_key=ssh_public_key,
+        """Purge the user's default SSH keypair and create the given one as the default,
+        in one transaction."""
+        encrypted = (
+            await self._key_provider_pool.encrypt(private_key, SSH_KEYPAIR_PRIVATE_KEY_CONTEXT)
+            if private_key is not None
+            else None
         )
+        async with self._v2_ops.write_ops() as w:
+            await w.batch_purge_field_entities(
+                user_id,
+                DefaultSSHKeypairPurger(),
+            )
+            await w.create_field(
+                user_id,
+                SSHKeypairCreator(public_key=public_key, private_key=encrypted, is_default=True),
+            )
 
     @user_repository_resilience.apply()
-    async def admin_clear_ssh_keypair(self, access_key: str) -> None:
-        """Admin clears a user's SSH keypair."""
-        await self._db_source.admin_clear_ssh_keypair(access_key=access_key)
-
-    @user_repository_resilience.apply()
-    async def admin_get_ssh_public_key(self, access_key: str) -> str | None:
-        """Admin retrieves a user's SSH public key (never the private key)."""
-        return await self._db_source.admin_get_ssh_public_key(access_key=access_key)
+    async def purge_default_ssh_keypair(self, user_id: UserID) -> None:
+        async with self._v2_ops.write_ops() as w:
+            await w.batch_purge_field_entities(
+                user_id,
+                DefaultSSHKeypairPurger(),
+            )
 
     async def _get_time_binned_monthly_stats(
         self,

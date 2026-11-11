@@ -8434,8 +8434,10 @@ type KeyPairV2 implements Node {
   """Name of the resource policy assigned to this keypair."""
   resourcePolicy: String!
 
-  """The SSH public key associated with this keypair."""
-  sshPublicKey: String
+  """
+  The public key of the owner's default SSH keypair, the same for every keypair of one user.
+  """
+  sshPublicKey: String @deprecated(reason: "Deprecated since 26.10.0. An SSH keypair belongs to the user, not to a keypair.")
 
   """UUID of the user who owns this keypair."""
   userId: UUID!

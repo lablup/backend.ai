@@ -181,6 +181,7 @@ from ai.backend.manager.models.resource_slot.row import ResourceSlotTypeRow
 from ai.backend.manager.models.resource_slot.types import NumberFormat
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.session_template.row import SessionTemplateRow
+from ai.backend.manager.models.ssh_keypair.creators import SSHKeypairCreator
 
 # Nothing under src imports the storage rows yet; name them so the sandbox holds their
 # tables when `schema oneshot` builds the full schema.
@@ -1200,8 +1201,9 @@ async def provision_user(
                     keypair_secrets=KeyPairSecrets(
                         access_key=AccessKey(keypair.access_key),
                         secret_key=SecretValue(keypair.secret_key),
-                        ssh_public_key="ssh-rsa test",
-                        ssh_private_key="test-private-key",
+                    ),
+                    ssh_keypair=SSHKeypairCreator(
+                        public_key="ssh-rsa test", private_key=None, is_default=True
                     ),
                     keypair_resource_policy=resource_policy_fixture,
                 )

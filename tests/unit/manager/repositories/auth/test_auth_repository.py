@@ -16,7 +16,7 @@ import sqlalchemy as sa
 from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.exception import UserNotFound
-from ai.backend.common.types import AccessKey, ResourceSlot, SSHPublicKey, VFolderHostPermissionMap
+from ai.backend.common.types import AccessKey, ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.types import UserData
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.secret.types import KeyProviderType
@@ -56,6 +56,7 @@ from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
 from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
 from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.ssh_keypair.row import SSHKeypairRow
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -82,8 +83,6 @@ class UserTestData(UserData):
     """Extended UserData with test-specific fields"""
 
     access_key: str
-    ssh_public_key: str
-    ssh_private_key: str
 
 
 @dataclass
@@ -124,6 +123,7 @@ class TestAuthRepository:
                 RolePermissionPresetRow,
                 UserRow,
                 KeyPairRow,
+                SSHKeypairRow,
                 ProjectRow,
                 AssocGroupUserRow,
                 ContainerRegistryRow,
@@ -263,8 +263,6 @@ class TestAuthRepository:
         user_uuid = uuid.uuid4()
         email = f"test-{uuid.uuid4()}@example.com"
         access_key = f"AKIATEST{uuid.uuid4().hex[:10]}"
-        ssh_public_key = f"ssh-rsa AAAAB3NzaC1yc2ETEST{uuid.uuid4().hex[:16]}..."
-        ssh_private_key = f"-----BEGIN RSA PRIVATE KEY-----\nTEST{uuid.uuid4().hex[:32]}\n-----END RSA PRIVATE KEY-----"
 
         async with db_with_cleanup.begin_session() as db_sess:
             # Create test user with hashed password
@@ -288,7 +286,6 @@ class TestAuthRepository:
             db_sess.add(user)
             await db_sess.flush()
 
-            # Create test keypair with SSH keys
             keypair = KeyPairRow(
                 access_key=access_key,
                 secret_key=SecretValue("test_secret_key"),
@@ -296,8 +293,6 @@ class TestAuthRepository:
                 is_active=True,
                 is_default=True,
                 resource_policy=keypair_resource_policy.name,
-                ssh_public_key=ssh_public_key,
-                ssh_private_key=ssh_private_key,
             )
             db_sess.add(keypair)
             await db_sess.flush()
@@ -326,8 +321,6 @@ class TestAuthRepository:
                 resource_policy=user.resource_policy,
                 sudo_session_enabled=user.sudo_session_enabled,
                 access_key=access_key,
-                ssh_public_key=ssh_public_key,
-                ssh_private_key=ssh_private_key,
             )
         yield user_data
 
@@ -535,64 +528,6 @@ class TestAuthRepository:
             )
             assert keypair is not None
             assert keypair.is_active is False
-
-    async def test_get_ssh_public_key(
-        self,
-        auth_repository: AuthRepository,
-        sample_user_data: UserTestData,
-    ) -> None:
-        """Test retrieving SSH public key"""
-        result = await auth_repository.get_ssh_public_key(sample_user_data.access_key)
-
-        assert result == sample_user_data.ssh_public_key
-
-    async def test_update_ssh_keypair(
-        self,
-        auth_repository: AuthRepository,
-        sample_user_data: UserTestData,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> None:
-        """Test updating SSH keypair"""
-        update_public_key = "ssh-rsa AAAAB3NzaC1yc2EUPDATED..."
-        update_private_key = (
-            "-----BEGIN RSA PRIVATE KEY-----\nUPDATED...\n-----END RSA PRIVATE KEY-----"
-        )
-
-        await auth_repository.update_ssh_keypair(
-            sample_user_data.access_key,
-            update_public_key,
-            update_private_key,
-        )
-
-        # Verify SSH keypair was updated
-        async with db_with_cleanup.begin_session() as db_sess:
-            keypair = await db_sess.scalar(
-                sa.select(KeyPairRow).where(KeyPairRow.access_key == sample_user_data.access_key)
-            )
-            assert keypair is not None
-            assert keypair.ssh_public_key == update_public_key
-            assert keypair.ssh_private_key == update_private_key
-
-    async def test_update_ssh_public_key_keeps_the_private_key(
-        self,
-        auth_repository: AuthRepository,
-        sample_user_data: UserTestData,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> None:
-        """Replacing the SSH public key leaves the stored private key as it was"""
-        update_public_key = SSHPublicKey("ssh-rsa AAAAB3NzaC1yc2EUPDATED...")
-
-        await auth_repository.update_ssh_public_key(
-            AccessKey(sample_user_data.access_key), update_public_key
-        )
-
-        async with db_with_cleanup.begin_session() as db_sess:
-            keypair = await db_sess.scalar(
-                sa.select(KeyPairRow).where(KeyPairRow.access_key == sample_user_data.access_key)
-            )
-            assert keypair is not None
-            assert keypair.ssh_public_key == update_public_key
-            assert keypair.ssh_private_key == sample_user_data.ssh_private_key
 
     async def test_default_keypair(
         self, auth_repository: AuthRepository, sample_user_data: UserTestData

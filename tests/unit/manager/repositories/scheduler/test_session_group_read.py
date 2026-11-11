@@ -21,6 +21,7 @@ from ai.backend.manager.data.deployment.types import (
     ReplicaGroupLifecycle,
     ReplicaGroupScalingStatus,
 )
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.data.session_group.types import (
     SessionGroupPlacementDirection,
     SessionGroupPlacementEnforcement,
@@ -32,6 +33,7 @@ from ai.backend.manager.models.session_group.searchers import SessionGroupSearch
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.session.actions.enqueue_session import (
     EnqueueSessionAction,
     ResourceSlotEntry,
@@ -183,7 +185,11 @@ class TestSearchSessionGroups:
         owner_user_id: UserID,
         session_group_id: SessionGroupID,
     ) -> None:
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
 
         groups = await db_source.search_session_groups(
             _owned_searcher(session_group_id, owner_user_id, project_id)
@@ -197,7 +203,11 @@ class TestSearchSessionGroups:
         project_id: ProjectID,
         owner_user_id: UserID,
     ) -> None:
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
 
         groups = await db_source.search_session_groups(
             _owned_searcher(SessionGroupID(uuid.uuid4()), owner_user_id, project_id)
@@ -211,7 +221,11 @@ class TestSearchSessionGroups:
         project_id: ProjectID,
         session_group_id: SessionGroupID,
     ) -> None:
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
 
         groups = await db_source.search_session_groups(
             _owned_searcher(session_group_id, UserID(uuid.uuid4()), project_id)
@@ -225,7 +239,11 @@ class TestSearchSessionGroups:
         owner_user_id: UserID,
         session_group_id: SessionGroupID,
     ) -> None:
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
 
         groups = await db_source.search_session_groups(
             _owned_searcher(session_group_id, owner_user_id, ProjectID(uuid.uuid4()))
@@ -241,7 +259,11 @@ class TestSearchSessionGroups:
         session_group_id: SessionGroupID,
         deleted: None,
     ) -> None:
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
 
         groups = await db_source.search_session_groups(
             _owned_searcher(session_group_id, owner_user_id, project_id)
@@ -257,7 +279,11 @@ class TestSearchSessionGroups:
         session_group_id: SessionGroupID,
         held_by_replica_group: None,
     ) -> None:
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
 
         groups = await db_source.search_session_groups(
             _owned_searcher(session_group_id, owner_user_id, project_id)
@@ -273,7 +299,11 @@ class TestSearchSessionGroups:
         session_group_id: SessionGroupID,
         held_by_replica_group: None,
     ) -> None:
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
 
         groups = await db_source.search_session_groups(
             _held_searcher(session_group_id, owner_user_id, project_id)
@@ -288,7 +318,11 @@ class TestSearchSessionGroups:
         owner_user_id: UserID,
         session_group_id: SessionGroupID,
     ) -> None:
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
 
         groups = await db_source.search_session_groups(
             _held_searcher(session_group_id, owner_user_id, project_id)

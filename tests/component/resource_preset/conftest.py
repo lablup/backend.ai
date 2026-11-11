@@ -154,6 +154,7 @@ def agent_processors(
         config_provider,
         MagicMock(),
         RbacPermissionCheckRepository(PermissionOpsProvider(database_engine), config_provider),
+        key_provider_pool=KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )
     service = AgentService(
         etcd=async_etcd,

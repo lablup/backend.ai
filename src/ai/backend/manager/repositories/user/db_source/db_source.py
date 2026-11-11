@@ -23,7 +23,7 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
 from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
-from ai.backend.common.types import AccessKey, SSHPublicKey, VFolderID
+from ai.backend.common.types import AccessKey, VFolderID
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.bootstrap_script.types import BootstrapScriptRevisionData
@@ -106,6 +106,7 @@ from ai.backend.manager.models.session.searchable_fields import SessionSearchabl
 from ai.backend.manager.models.session.searchers import SessionSearcher
 from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
+from ai.backend.manager.models.ssh_keypair.creators import SSHKeypairCreator
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.purgers import (
     UserErrorLogPurger,
@@ -124,7 +125,10 @@ from ai.backend.manager.models.vfolder.row import (
     VFolderRow,
     vfolders,
 )
-from ai.backend.manager.repositories.auth.keypair_secrets import generate_keypair_data
+from ai.backend.manager.repositories.auth.keypair_secrets import (
+    generate_keypair_data,
+    generate_ssh_keypair_data,
+)
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.read import V2ReadOps
 from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
@@ -268,10 +272,16 @@ class UserDBSource:
                 f"User with email {creator.email} or username {creator.username} already exists."
             )
 
+        ssh_secrets = await generate_ssh_keypair_data(self._key_provider_pool)
         result = await w.create_user(
             FullUserCreator(
                 user=creator,
                 keypair_secrets=await generate_keypair_data(self._key_provider_pool),
+                ssh_keypair=SSHKeypairCreator(
+                    public_key=ssh_secrets.public_key,
+                    private_key=ssh_secrets.private_key,
+                    is_default=True,
+                ),
                 keypair_resource_policy=keypair_resource_policy,
             )
         )
@@ -1139,59 +1149,3 @@ class UserDBSource:
             if not kp_row:
                 raise KeyPairNotFound(f"Keypair {access_key} not found")
             return KeyPairSearchableFields.own.to_data(kp_row)
-
-    async def admin_update_ssh_public_key(
-        self,
-        access_key: AccessKey,
-        ssh_public_key: SSHPublicKey,
-    ) -> None:
-        """Admin registers (overwrites) a user's SSH public key."""
-        async with self._db.begin_session() as session:
-            exists = (
-                await session.scalars(
-                    sa.select(KeyPairRow.access_key).where(KeyPairRow.access_key == access_key)
-                )
-            ).first()
-            if exists is None:
-                raise KeyPairNotFound(f"Keypair {access_key} not found")
-            await session.execute(
-                sa.update(keypairs)
-                .where(keypairs.c.access_key == access_key)
-                .values(ssh_public_key=ssh_public_key)
-            )
-
-    async def admin_clear_ssh_keypair(self, access_key: str) -> None:
-        """Admin clears a user's SSH keypair."""
-        async with self._db.begin_session() as session:
-            exists = (
-                await session.scalars(
-                    sa.select(KeyPairRow.access_key).where(KeyPairRow.access_key == access_key)
-                )
-            ).first()
-            if exists is None:
-                raise KeyPairNotFound(f"Keypair {access_key} not found")
-            await session.execute(
-                sa.update(keypairs)
-                .where(keypairs.c.access_key == access_key)
-                .values(
-                    ssh_public_key=None,
-                    ssh_private_key=None,
-                )
-            )
-
-    async def admin_get_ssh_public_key(self, access_key: str) -> str | None:
-        """Admin retrieves a user's SSH public key."""
-        async with self._db.begin_readonly_session() as db_session:
-            exists = (
-                await db_session.scalars(
-                    sa.select(KeyPairRow.access_key).where(KeyPairRow.access_key == access_key)
-                )
-            ).first()
-            if exists is None:
-                raise KeyPairNotFound(f"Keypair {access_key} not found")
-            ssh_public_key: str | None = (
-                await db_session.scalars(
-                    sa.select(KeyPairRow.ssh_public_key).where(KeyPairRow.access_key == access_key)
-                )
-            ).first()
-            return ssh_public_key

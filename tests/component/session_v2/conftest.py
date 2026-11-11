@@ -784,6 +784,7 @@ async def compute_session_processors(
         config_provider,
         storage_manager,
         RbacPermissionCheckRepository(PermissionOpsProvider(database_engine), config_provider),
+        key_provider_pool=KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )
     scheduling_controller = SchedulingController(
         SchedulingControllerArgs(

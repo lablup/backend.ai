@@ -1,27 +1,20 @@
-"""Admin SSH public key registration, run against a real database."""
+"""The default SSH keypair of a user, run against a real database."""
 
 from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
-from dataclasses import dataclass
 
 import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.types import AccessKey, ResourceSlot, SSHPublicKey
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.keypair.row import KeyPairRow
-from ai.backend.manager.models.resource_group.row import (
-    ResourceGroupForKeypairsRow,
-    ResourceGroupRow,
-)
-from ai.backend.manager.models.resource_policy.row import (
-    KeyPairResourcePolicyRow,
-    UserResourcePolicyRow,
-)
+from ai.backend.manager.models.resource_policy.row import UserResourcePolicyRow
+from ai.backend.manager.models.ssh_keypair.row import SSHKeypairRow
 from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
@@ -35,28 +28,13 @@ from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
 
 
-@dataclass(frozen=True)
-class _KeypairWithSSHKeys:
-    access_key: AccessKey
-    ssh_private_key: str
-
-
-class TestAdminUpdateSSHPublicKey:
+class TestDefaultSSHKeypair:
     @pytest.fixture
     async def db(
         self, database_connection: ExtendedAsyncSAEngine
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
         async with with_tables(
-            database_connection,
-            [
-                DomainRow,
-                ResourceGroupRow,
-                UserResourcePolicyRow,
-                KeyPairResourcePolicyRow,
-                UserRow,
-                KeyPairRow,
-                ResourceGroupForKeypairsRow,
-            ],
+            database_connection, [DomainRow, UserResourcePolicyRow, UserRow, SSHKeypairRow]
         ):
             yield database_connection
 
@@ -73,14 +51,11 @@ class TestAdminUpdateSSHPublicKey:
         )
 
     @pytest.fixture
-    async def keypair_with_ssh_keys(self, db: ExtendedAsyncSAEngine) -> _KeypairWithSSHKeys:
-        user_id = uuid.uuid4()
+    async def user_id(self, db: ExtendedAsyncSAEngine) -> UserID:
+        user_id = UserID(uuid.uuid4())
         domain_id = DomainID(uuid.uuid4())
         domain_name = f"domain-{domain_id.hex[:8]}"
-        user_policy_name = f"user-policy-{user_id.hex[:8]}"
-        keypair_policy_name = f"keypair-policy-{user_id.hex[:8]}"
-        access_key = AccessKey(f"AKIATEST{user_id.hex[:10]}")
-        ssh_private_key = "-----BEGIN RSA PRIVATE KEY-----\nSTORED\n-----END RSA PRIVATE KEY-----"
+        policy_name = f"policy-{user_id.hex[:8]}"
         async with db.begin_session() as session:
             session.add(
                 DomainRow(
@@ -96,20 +71,11 @@ class TestAdminUpdateSSHPublicKey:
             )
             session.add(
                 UserResourcePolicyRow(
-                    name=user_policy_name,
+                    name=policy_name,
                     max_vfolder_count=10,
                     max_quota_scope_size=-1,
                     max_session_count_per_model_session=10,
                     max_customized_image_count=10,
-                )
-            )
-            session.add(
-                KeyPairResourcePolicyRow(
-                    name=keypair_policy_name,
-                    max_concurrent_sessions=10,
-                    max_concurrent_sftp_sessions=2,
-                    max_containers_per_session=10,
-                    idle_timeout=3600,
                 )
             )
             await session.flush()
@@ -126,44 +92,48 @@ class TestAdminUpdateSSHPublicKey:
                     status_info="",
                     domain_name=domain_name,
                     role=UserRole.USER,
-                    resource_policy=user_policy_name,
+                    resource_policy=policy_name,
                     allowed_client_ip=None,
                     totp_key=None,
                     domain_id=domain_id,
                 )
             )
-            await session.flush()
-            session.add(
-                KeyPairRow(
-                    access_key=access_key,
-                    secret_key=SecretValue("test_secret_key"),
-                    user=user_id,
-                    is_active=True,
-                    is_default=True,
-                    resource_policy=keypair_policy_name,
-                    ssh_public_key="ssh-rsa STORED",
-                    ssh_private_key=ssh_private_key,
-                )
-            )
-        return _KeypairWithSSHKeys(access_key=access_key, ssh_private_key=ssh_private_key)
+        return user_id
 
-    async def test_replaces_the_public_key_and_keeps_the_private_key(
-        self,
-        repository: UserRepository,
-        db: ExtendedAsyncSAEngine,
-        keypair_with_ssh_keys: _KeypairWithSSHKeys,
-    ) -> None:
-        await repository.admin_update_ssh_public_key(
-            access_key=keypair_with_ssh_keys.access_key,
-            ssh_public_key=SSHPublicKey("ssh-rsa REGISTERED"),
-        )
-
+    async def _keys(self, db: ExtendedAsyncSAEngine, user_id: UserID) -> list[tuple[str, bool]]:
         async with db.begin_readonly_session() as session:
-            keypair = await session.scalar(
-                sa.select(KeyPairRow).where(
-                    KeyPairRow.access_key == keypair_with_ssh_keys.access_key
+            rows = await session.execute(
+                sa.select(SSHKeypairRow.public_key, SSHKeypairRow.is_default).where(
+                    SSHKeypairRow.user_id == user_id
                 )
             )
-        assert keypair is not None
-        assert keypair.ssh_public_key == "ssh-rsa REGISTERED"
-        assert keypair.ssh_private_key == keypair_with_ssh_keys.ssh_private_key
+            return [(row.public_key, row.is_default) for row in rows]
+
+    async def test_replace_without_one_creates_the_default(
+        self, repository: UserRepository, user_id: UserID
+    ) -> None:
+        await repository.replace_default_ssh_keypair(user_id, "pub-1", "priv-1")
+
+        data = await repository.default_ssh_keypair(user_id)
+
+        assert data is not None
+        assert data.public_key == "pub-1"
+        assert data.private_key == SecretValue("priv-1")
+
+    async def test_replace_leaves_one_default_holding_the_new_keys(
+        self, db: ExtendedAsyncSAEngine, repository: UserRepository, user_id: UserID
+    ) -> None:
+        await repository.replace_default_ssh_keypair(user_id, "pub-1", "priv-1")
+        await repository.replace_default_ssh_keypair(user_id, "pub-2", "priv-2")
+
+        assert await self._keys(db, user_id) == [("pub-2", True)]
+
+    async def test_purge_removes_the_default(
+        self, db: ExtendedAsyncSAEngine, repository: UserRepository, user_id: UserID
+    ) -> None:
+        await repository.replace_default_ssh_keypair(user_id, "pub-1", "priv-1")
+
+        await repository.purge_default_ssh_keypair(user_id)
+
+        assert await repository.default_ssh_keypair(user_id) is None
+        assert await self._keys(db, user_id) == []

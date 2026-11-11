@@ -13,6 +13,7 @@ from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.keypair.response import KeypairNode
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -71,7 +72,14 @@ class KeyPairGQL(PydanticNodeMixin[KeypairNode]):
         description="Name of the resource policy assigned to this keypair."
     )
     ssh_public_key: str | None = gql_field(
-        description="The SSH public key associated with this keypair."
+        description=(
+            "The public key of the owner's default SSH keypair, the same for every keypair "
+            "of one user."
+        ),
+        deprecation_reason=(
+            f"Deprecated since {NEXT_RELEASE_VERSION}. An SSH keypair belongs to the user, "
+            "not to a keypair."
+        ),
     )
     user_id: UUID = gql_field(description="UUID of the user who owns this keypair.")
 

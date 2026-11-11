@@ -39,6 +39,9 @@ from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.models.project.row import ProjectRow, groups
 from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
+from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.ssh_keypair.searchable_fields import SSHKeypairSearchableFields
+from ai.backend.manager.models.ssh_keypair.searchers import SSHKeypairSearcher
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.row import (
     ACTIVE_USER_STATUSES,
@@ -69,6 +72,7 @@ from ai.backend.manager.services.user.actions.purge_user import (
     PurgeUserAction,
 )
 from ai.backend.manager.services.user.actions.restore_user import RestoreUserAction
+from ai.backend.manager.services.user.actions.ssh_keypair_ops import SearchSSHKeypairsAction
 from ai.backend.manager.services.user.actions.update_user import (
     UpdateUserAction,
     UpdateUserActionResult,
@@ -1117,7 +1121,19 @@ class CreateUser(graphene.Mutation):  # type: ignore[misc]
         action: CreateUserAction = props.to_action(email, graph_ctx, domain_id)
 
         action_result = await graph_ctx.processors.user.create_user.run(action)
-        keypair = KeyPair.from_data(action_result.data.keypair)
+        ssh_keypairs = await graph_ctx.processors.user.search_ssh_keypairs.run(
+            SearchSSHKeypairsAction(
+                user_ids=[UserID(action_result.data.user.id)],
+                searcher=SSHKeypairSearcher(
+                    pagination=OffsetPagination(limit=1),
+                    conditions=[SSHKeypairSearchableFields.own.is_default.filter.equals(True)],
+                ),
+            )
+        )
+        keypair = KeyPair.from_data(
+            action_result.data.keypair,
+            ssh_keypairs.items[0].public_key if ssh_keypairs.items else None,
+        )
 
         return cls(
             ok=True,

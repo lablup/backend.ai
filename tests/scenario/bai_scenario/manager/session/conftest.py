@@ -47,6 +47,7 @@ from ai.backend.manager.data.kernel_group.types import (
     KernelGroupEnvironData,
     KernelGroupResourceSlotData,
 )
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
@@ -66,6 +67,7 @@ from ai.backend.manager.repositories.rbac.permission_check_repository import (
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.idle_checker.processors import IdleCheckerProcessors
 from ai.backend.manager.services.idle_checker.service import IdleCheckerService
 from ai.backend.manager.services.session.actions.lookup_bulk_kernel_group_environ_owner import (
@@ -158,6 +160,7 @@ async def adapter(
         config,
         FakeStorageSessionManager({"local": storage}),
         RbacPermissionCheckRepository(PermissionOpsProvider(engine), config),
+        key_provider_pool=KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )
     service = SessionService(
         SessionServiceArgs(

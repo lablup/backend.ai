@@ -62,8 +62,6 @@ class KeypairCreator(FieldCreator[UserID, KeyPairRow, KeyPairData]):
             is_admin=self.is_admin,
             resource_policy=self.resource_policy,
             rate_limit=self.rate_limit,
-            ssh_public_key=self.secrets.ssh_public_key,
-            ssh_private_key=self.secrets.ssh_private_key,
         )
 
     @override
