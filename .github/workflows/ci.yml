@@ -418,7 +418,14 @@ jobs:
       id-token: write
       attestations: write
     needs: [determine-release-grade, lint-and-typecheck, test-unit-gate, test-component-gate, test-integration-gate, check-alembic-migrations, seed]
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    # Without a status function, `success()` also fails on a skipped ancestor such as `typecheck`.
+    # Require the direct needs to succeed instead; the gates judge the jobs behind them.
+    if: >-
+      github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+      && !cancelled()
+      && !contains(needs.*.result, 'failure')
+      && !contains(needs.*.result, 'cancelled')
+      && !contains(needs.*.result, 'skipped')
     uses: ./.github/workflows/ci-release.yml
     with:
       tag: ${{ github.ref_name }}
@@ -434,7 +441,9 @@ jobs:
   # only public releases are published; internal alphas are not.
   build-docker-images:
     needs: [determine-release-grade, release]
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    if: >-
+      github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+      && !cancelled() && needs.release.result == 'success'
       && needs.determine-release-grade.outputs.RELEASE_AUDIENCE == 'public'
     permissions:
       contents: read
@@ -449,7 +458,9 @@ jobs:
       contents: write
       actions: read
     needs: [determine-release-grade, release]
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    if: >-
+      github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+      && !cancelled() && needs.release.result == 'success'
     uses: ./.github/workflows/ci-post-release.yml
     with:
       tag: ${{ github.ref_name }}
@@ -458,7 +469,9 @@ jobs:
 
   publish-to-pypi:
     needs: [determine-release-grade, release]
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    if: >-
+      github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+      && !cancelled() && needs.release.result == 'success'
       && needs.determine-release-grade.outputs.RELEASE_AUDIENCE == 'public'
     runs-on: ubuntu-latest
     permissions:
