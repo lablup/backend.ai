@@ -70,6 +70,10 @@ jobs:
         else
           echo "(skipping matchers for fork pull request)"
         fi
+        if [ ! -s dist/ci-targets/typecheck.txt ]; then
+          echo "No targets to typecheck"
+          exit 0
+        fi
         pants --spec-files=dist/ci-targets/typecheck.txt check
     - name: Decide whether this run saves the caches
       id: cache-save
