@@ -92,6 +92,6 @@ class GetSSHKeypairPayload(BaseResponseModel):
 
 
 class SSHKeypairPayload(BaseResponseModel):
-    """Payload for generate/upload SSH keypair (public key only)."""
+    """Payload for generate/upload SSH keypair (both keys returned)."""
 
     keypair: SSHKeypairInfo = Field(description="Generated or uploaded SSH keypair data")

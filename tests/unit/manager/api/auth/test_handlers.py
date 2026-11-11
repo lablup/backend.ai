@@ -679,19 +679,20 @@ class TestGetSSHKeypair:
 class TestGenerateSSHKeypair:
     """Tests for generate_ssh_keypair handler."""
 
-    async def test_calls_processor_and_returns_public_key(
+    async def test_calls_processor_and_returns_keypair(
         self,
         handler: AuthHandler,
         user_context: UserContext,
         mock_processors: MagicMock,
     ) -> None:
-        """Verify processor is called and only the public key is returned."""
+        """Verify processor is called and keypair is returned."""
         ssh_public_key = "ssh-rsa NEWPUB...\n"
+        ssh_private_key = "-----BEGIN RSA PRIVATE KEY-----\n...\n"
         mock_processors.auth.generate_ssh_keypair.run = AsyncMock(
             return_value=GenerateSSHKeypairActionResult(
                 ssh_keypair=SSHKeypair(
                     ssh_public_key=ssh_public_key,
-                    ssh_private_key="-----BEGIN RSA PRIVATE KEY-----\n...\n",
+                    ssh_private_key=ssh_private_key,
                 ),
             )
         )
@@ -700,7 +701,11 @@ class TestGenerateSSHKeypair:
 
         mock_processors.auth.generate_ssh_keypair.run.assert_called_once()
         assert response.status_code == HTTPStatus.OK
-        assert response.to_json == {"ssh_public_key": ssh_public_key}
+        data = response.to_json
+        assert data is not None
+        assert isinstance(data, dict)
+        assert data["ssh_public_key"] == ssh_public_key
+        assert data["ssh_private_key"] == ssh_private_key
 
 
 class TestUploadSSHKeypair:

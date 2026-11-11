@@ -41,6 +41,7 @@ from ai.backend.common.dto.manager.auth.response import (
     UpdateFullNameResponse,
     UpdatePasswordNoAuthResponse,
     UpdatePasswordResponse,
+    UploadSSHKeypairResponse,
     VerifyAuthResponse,
 )
 from ai.backend.common.dto.manager.auth.types import (
@@ -304,7 +305,10 @@ class AuthHandler:
                 access_key=ctx.access_key,
             )
         )
-        resp = SSHKeypairResponse(ssh_public_key=result.ssh_keypair.ssh_public_key)
+        resp = SSHKeypairResponse(
+            ssh_public_key=result.ssh_keypair.ssh_public_key,
+            ssh_private_key=result.ssh_keypair.ssh_private_key,
+        )
         return APIResponse.build(HTTPStatus.OK, resp)
 
     # ------------------------------------------------------------------
@@ -323,5 +327,5 @@ class AuthHandler:
                 access_key=ctx.access_key,
             )
         )
-        resp = SSHKeypairResponse(ssh_public_key=result.public_key)
+        resp = UploadSSHKeypairResponse(ssh_public_key=result.public_key)
         return APIResponse.build(HTTPStatus.OK, resp)

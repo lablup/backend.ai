@@ -15,6 +15,7 @@ from ai.backend.common.dto.manager.auth.response import (
     UpdateFullNameResponse,
     UpdatePasswordNoAuthResponse,
     UpdatePasswordResponse,
+    UploadSSHKeypairResponse,
     VerifyAuthResponse,
 )
 from ai.backend.common.dto.manager.auth.types import (
@@ -105,8 +106,12 @@ def test_get_ssh_keypair_response() -> None:
 
 
 def test_ssh_keypair_response() -> None:
-    resp = SSHKeypairResponse(ssh_public_key="ssh-rsa AAAA...")
+    resp = SSHKeypairResponse(
+        ssh_public_key="ssh-rsa AAAA...",
+        ssh_private_key="-----BEGIN RSA PRIVATE KEY-----...",
+    )
     assert resp.ssh_public_key == "ssh-rsa AAAA..."
+    assert resp.ssh_private_key == "-----BEGIN RSA PRIVATE KEY-----..."
 
 
 def test_verify_auth_response() -> None:
@@ -127,6 +132,7 @@ def test_response_models_have_field_descriptions() -> None:
         UpdatePasswordNoAuthResponse,
         GetSSHKeypairResponse,
         SSHKeypairResponse,
+        UploadSSHKeypairResponse,
         VerifyAuthResponse,
     ]
     for model in models_with_fields:

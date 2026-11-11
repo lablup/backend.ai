@@ -337,11 +337,18 @@ class TestSSHKeypairInfoCreation:
     """Tests for SSHKeypairInfo Pydantic model creation."""
 
     def test_basic_creation(self) -> None:
-        keypair = SSHKeypairInfo(ssh_public_key="ssh-rsa AAAAB3NzaC1yc2E...")
+        keypair = SSHKeypairInfo(
+            ssh_public_key="ssh-rsa AAAAB3NzaC1yc2E...",
+            ssh_private_key="-----BEGIN RSA PRIVATE KEY-----\n...",
+        )
         assert keypair.ssh_public_key == "ssh-rsa AAAAB3NzaC1yc2E..."
+        assert keypair.ssh_private_key == "-----BEGIN RSA PRIVATE KEY-----\n..."
 
     def test_creation_from_dict(self) -> None:
-        keypair = SSHKeypairInfo.model_validate({"ssh_public_key": "ssh-rsa AAAA..."})
+        keypair = SSHKeypairInfo.model_validate({
+            "ssh_public_key": "ssh-rsa AAAA...",
+            "ssh_private_key": "-----BEGIN RSA PRIVATE KEY-----",
+        })
         assert keypair.ssh_public_key == "ssh-rsa AAAA..."
 
 
@@ -349,14 +356,32 @@ class TestSSHKeypairInfoSerialization:
     """Tests for SSHKeypairInfo serialization."""
 
     def test_model_dump(self) -> None:
-        keypair = SSHKeypairInfo(ssh_public_key="ssh-rsa AAAA...")
-        assert keypair.model_dump() == {"ssh_public_key": "ssh-rsa AAAA..."}
+        keypair = SSHKeypairInfo(
+            ssh_public_key="ssh-rsa AAAA...",
+            ssh_private_key="-----BEGIN RSA PRIVATE KEY-----",
+        )
+        data = keypair.model_dump()
+        assert data["ssh_public_key"] == "ssh-rsa AAAA..."
+        assert data["ssh_private_key"] == "-----BEGIN RSA PRIVATE KEY-----"
+
+    def test_model_dump_json(self) -> None:
+        keypair = SSHKeypairInfo(
+            ssh_public_key="ssh-rsa AAAA...",
+            ssh_private_key="-----BEGIN RSA PRIVATE KEY-----",
+        )
+        json_str = keypair.model_dump_json()
+        parsed = json.loads(json_str)
+        assert parsed["ssh_public_key"] == "ssh-rsa AAAA..."
 
     def test_serialization_round_trip(self) -> None:
-        keypair = SSHKeypairInfo(ssh_public_key="ssh-rsa AAAAB3...")
+        keypair = SSHKeypairInfo(
+            ssh_public_key="ssh-rsa AAAAB3...",
+            ssh_private_key="-----BEGIN RSA PRIVATE KEY-----\nMIIEow...",
+        )
         json_str = keypair.model_dump_json()
         restored = SSHKeypairInfo.model_validate_json(json_str)
         assert restored.ssh_public_key == keypair.ssh_public_key
+        assert restored.ssh_private_key == keypair.ssh_private_key
 
 
 class TestPasswordChangeInfoCreation:

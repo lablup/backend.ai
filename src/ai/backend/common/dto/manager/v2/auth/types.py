@@ -53,9 +53,10 @@ class RoleInfo(BaseResponseModel):
 
 
 class SSHKeypairInfo(BaseResponseModel):
-    """SSH keypair data (public key only)."""
+    """SSH keypair data."""
 
     ssh_public_key: str = Field(description="SSH public key in standard format")
+    ssh_private_key: str = Field(description="SSH private key in PEM format")
 
 
 class PasswordChangeInfo(BaseResponseModel):

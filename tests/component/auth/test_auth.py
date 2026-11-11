@@ -40,6 +40,7 @@ from ai.backend.common.dto.manager.auth.response import (
     UpdateFullNameResponse,
     UpdatePasswordNoAuthResponse,
     UpdatePasswordResponse,
+    UploadSSHKeypairResponse,
     VerifyAuthResponse,
 )
 from ai.backend.common.dto.manager.auth.types import AuthTokenType
@@ -942,10 +943,11 @@ class TestSSHKeypair:
         user_registry: BackendAIClientRegistry,
     ) -> None:
         """Calling generate_ssh_keypair should make the server create an RSA keypair
-        and return only its public key as a non-empty string."""
+        and return both public and private keys as non-empty strings."""
         result = await user_registry.auth.generate_ssh_keypair()
         assert isinstance(result, SSHKeypairResponse)
         assert result.ssh_public_key != ""
+        assert result.ssh_private_key != ""
 
     async def test_get_ssh_keypair_after_generate(
         self,
@@ -969,7 +971,7 @@ class TestSSHKeypair:
         result = await user_registry.auth.upload_ssh_keypair(
             UploadSSHKeypairRequest(pubkey=rsa_public_key),
         )
-        assert isinstance(result, SSHKeypairResponse)
+        assert isinstance(result, UploadSSHKeypairResponse)
         assert result.ssh_public_key.strip() == rsa_public_key
 
     async def test_upload_overwrites_existing_public_key(
