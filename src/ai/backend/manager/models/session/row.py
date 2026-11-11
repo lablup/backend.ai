@@ -211,7 +211,6 @@ def _build_session_fetch_query(
     *,
     allow_stale: bool = True,
     for_update: bool = False,
-    do_ordering: bool = False,
     max_matches: int | None = None,
     eager_loading_op: Sequence[_AbstractLoad] | None = None,
 ) -> sa.sql.Select[Any]:
@@ -230,8 +229,6 @@ def _build_session_fetch_query(
         query = query.limit(max_matches).offset(0)
     if for_update:
         query = query.with_for_update()
-    if do_ordering:
-        query = query.order_by(SessionRow.created_at)
     if eager_loading_op is not None:
         query = query.options(*eager_loading_op)
 
@@ -240,25 +237,16 @@ def _build_session_fetch_query(
 
 async def _match_sessions_by_id(
     db_session: SASession,
-    session_id_or_list: SessionId | list[SessionId],
+    session_id: SessionId,
     access_key: AccessKey | None = None,
     *,
-    allow_prefix: bool = False,
     allow_stale: bool = True,
     for_update: bool = False,
     max_matches: int | None = None,
     eager_loading_op: Sequence[_AbstractLoad] | None = None,
 ) -> Sequence[SessionRow]:
-    cond: sa.sql.elements.ColumnElement[bool]
-    if isinstance(session_id_or_list, list):
-        cond = SessionRow.id.in_(session_id_or_list)
-    else:
-        if allow_prefix:
-            cond = sa.sql.expression.cast(SessionRow.id, sa.String).like(f"{session_id_or_list}%")
-        else:
-            cond = SessionRow.id == session_id_or_list
     query = _build_session_fetch_query(
-        cond,
+        SessionRow.id == session_id,
         access_key,
         max_matches=max_matches,
         allow_stale=allow_stale,
@@ -870,7 +858,6 @@ class SessionRow(CreatedAtMixin, Base):
             allow_stale=allow_stale,
             for_update=for_update,
             eager_loading_op=eager_loading_op,
-            allow_prefix=False,
         )
         try:
             return sessions[0]
