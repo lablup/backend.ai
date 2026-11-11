@@ -1,20 +1,30 @@
 from __future__ import annotations
 
+import asyncio
+import uuid
+from collections.abc import Iterator
 from decimal import Decimal
-from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from pathlib import Path
+from types import SimpleNamespace
+from typing import Any, cast
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from ai.backend.agent import resources as resources_mod
-from ai.backend.agent.docker.agent import DockerAgent
+from ai.backend.agent.docker.agent import DockerAgent, DockerKernelCreationContext
+from ai.backend.agent.errors.agent import ContainerCreationError
+from ai.backend.agent.port_pool import PortPool
 from ai.backend.agent.resources import AbstractComputePlugin, KernelResourceSpec
 from ai.backend.common.types import (
+    AgentId,
     BinarySize,
     ContainerId,
     DeviceId,
     DeviceName,
+    KernelId,
     ResourceSlot,
+    SessionId,
     SlotName,
     SlotTypes,
 )
@@ -40,6 +50,106 @@ class TestDefaultHooks:
         await AbstractComputePlugin.on_container_created(plugin, CID, alloc)
         await AbstractComputePlugin.on_container_destroyed(plugin, CID, alloc)
         assert not plugin.mock_calls
+
+
+class _StopAfterStart(Exception):
+    """Ends `start_container` right after `docker start`, past the code under test."""
+
+
+class TestOnContainerCreated:
+    @pytest.fixture
+    def container(self) -> MagicMock:
+        container = MagicMock(_id=str(CID), id=str(CID))
+        container.start = AsyncMock(side_effect=_StopAfterStart())
+        return container
+
+    @pytest.fixture
+    def docker(self, container: MagicMock) -> Iterator[MagicMock]:
+        docker = MagicMock()
+        docker.close = AsyncMock()
+        docker.containers.create = AsyncMock(return_value=container)
+        with (
+            patch("ai.backend.agent.docker.agent.Docker", return_value=docker),
+            patch("ai.backend.agent.docker.agent._build_log_config"),
+        ):
+            yield docker
+
+    def _context(self, tmp_path: Path, hooks: dict[str, AsyncMock]) -> Any:
+        ctx: Any = object.__new__(DockerKernelCreationContext)
+        ctx.kernel_config = cast(Any, {"image": {"labels": {}}, "cluster_hostname": "main1"})
+        ctx.local_config = MagicMock()
+        ctx.local_config.debug.log_kernel_config = False
+        ctx.port_pool = PortPool((30000, 30009), cooldown_sec=0)
+        ctx.cluster_ssh_port_mapping = None
+        ctx.network_plugin_ctx = MagicMock()
+        ctx.image_ref = MagicMock()
+        ctx.ownership_data = MagicMock()
+        ctx.internal_data = {}
+        ctx.container_configs = []
+        ctx.computer_docker_args = {"HostConfig": {}}
+        ctx.computers = {
+            DeviceName(name): SimpleNamespace(instance=SimpleNamespace(on_container_created=hook))
+            for name, hook in hooks.items()
+        }
+        ctx.resource_lock = asyncio.Lock()
+        ctx.domain_socket_proxies = []
+        ctx.config_dir = tmp_path
+        ctx.agent_id = AgentId("a1")
+        ctx.kernel_id = KernelId(uuid.uuid4())
+        ctx.session_id = SessionId(uuid.uuid4())
+        ctx._apply_seccomp_profile = AsyncMock()
+        return ctx
+
+    def _kernel(self, allocations: dict[DeviceName, Any]) -> Any:
+        kernel = MagicMock()
+        kernel.resource_spec = SimpleNamespace(allocations=allocations)
+        kernel.service_ports = []
+        kernel.environ = {}
+        return kernel
+
+    async def _start(self, ctx: Any, kernel: Any) -> None:
+        await DockerKernelCreationContext.start_container(
+            ctx, kernel, [], None, [], cast(Any, {"network_config": {"mode": "bridge"}})
+        )
+
+    @pytest.mark.usefixtures("docker")
+    async def test_passes_each_plugin_its_own_allocation_before_the_start(
+        self, tmp_path: Path, container: MagicMock
+    ) -> None:
+        order: list[str] = []
+        cuda_hook = AsyncMock(side_effect=lambda *_: order.append("cuda"))
+        cpu_hook = AsyncMock(side_effect=lambda *_: order.append("cpu"))
+
+        def start() -> None:
+            order.append("start")
+            raise _StopAfterStart()
+
+        container.start.side_effect = start
+        cuda_alloc = {CUDA_MEM: {DeviceId("0"): Decimal(1 << 30)}}
+        cpu_alloc = {SlotName("cpu"): {DeviceId("root"): Decimal(2)}}
+        ctx = self._context(tmp_path, {"cuda": cuda_hook, "cpu": cpu_hook})
+
+        with pytest.raises(ContainerCreationError):
+            await self._start(ctx, self._kernel({CUDA: cuda_alloc, DeviceName("cpu"): cpu_alloc}))
+
+        cuda_hook.assert_awaited_once_with(CID, cuda_alloc)
+        cpu_hook.assert_awaited_once_with(CID, cpu_alloc)
+        assert order == ["cuda", "cpu", "start"]
+
+    @pytest.mark.usefixtures("docker")
+    async def test_a_failing_hook_aborts_the_start(
+        self, tmp_path: Path, container: MagicMock
+    ) -> None:
+        hook = AsyncMock(side_effect=RuntimeError("no dmem"))
+        ctx = self._context(tmp_path, {"cuda": hook})
+        kernel = self._kernel({CUDA: {CUDA_MEM: {DeviceId("0"): Decimal(1)}}})
+
+        with pytest.raises(ContainerCreationError) as caught:
+            await self._start(ctx, kernel)
+
+        assert caught.value.container_id == CID
+        kernel.set_container_id.assert_called_once_with(CID)
+        container.start.assert_not_awaited()
 
 
 class TestNotifyContainerDestroyed:
