@@ -15701,10 +15701,10 @@
         "type": "object"
       },
       "AdminRegisterSSHKeypairInput": {
-        "description": "Admin request to register (overwrite) a user's SSH keypair.",
+        "description": "Admin request to register (overwrite) a user's SSH public key.",
         "properties": {
           "access_key": {
-            "description": "Access key whose SSH keypair will be replaced.",
+            "description": "Access key whose SSH public key will be replaced.",
             "title": "Access Key",
             "type": "string"
           },
@@ -15712,17 +15712,11 @@
             "description": "PEM-encoded SSH public key.",
             "title": "Ssh Public Key",
             "type": "string"
-          },
-          "ssh_private_key": {
-            "description": "PEM-encoded SSH private key.",
-            "title": "Ssh Private Key",
-            "type": "string"
           }
         },
         "required": [
           "access_key",
-          "ssh_public_key",
-          "ssh_private_key"
+          "ssh_public_key"
         ],
         "title": "AdminRegisterSSHKeypairInput",
         "type": "object"
@@ -42867,22 +42861,16 @@
         "type": "object"
       },
       "UploadSSHKeypairRequest": {
-        "description": "Request to upload an SSH keypair. The pair is validated for consistency.",
+        "description": "Request to upload an SSH public key.",
         "properties": {
           "pubkey": {
             "description": "SSH public key in standard format (e.g., 'ssh-rsa AAAA...')",
             "title": "Pubkey",
             "type": "string"
-          },
-          "privkey": {
-            "description": "SSH private key in PEM format",
-            "title": "Privkey",
-            "type": "string"
           }
         },
         "required": [
-          "pubkey",
-          "privkey"
+          "pubkey"
         ],
         "title": "UploadSSHKeypairRequest",
         "type": "object"
@@ -57525,7 +57513,7 @@
           }
         },
         "parameters": [],
-        "description": "Register (overwrite) a user's SSH keypair (admin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Register (overwrite) a user's SSH public key (admin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/keypairs/{access_key}/ssh": {
