@@ -30,6 +30,7 @@ from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.logging.structured import StructuredLogger
 
 from .config import HostPortPair, PermitHashConfig
+from .defs import PERMIT_COOKIE_NAME
 from .errors import InvalidAPIParameters
 
 # FIXME: merge majority of common definitions to ai.backend.common when ready
@@ -80,7 +81,17 @@ def calculate_permit_hash(config: PermitHashConfig, user_id: UUID) -> str:
 
 def is_permit_valid(config: PermitHashConfig, user_id: UUID, hash: str) -> bool:
     valid_hash = calculate_permit_hash(config, user_id)
-    return valid_hash == hash
+    return hmac.compare_digest(valid_hash.encode(), hash.encode())
+
+
+def strip_permit_cookie(cookie_header: str) -> str | None:
+    """Return the Cookie header value without the permit cookie, or None if nothing remains."""
+    kept = [
+        pair.strip()
+        for pair in cookie_header.split(";")
+        if pair.strip() and pair.partition("=")[0].strip() != PERMIT_COOKIE_NAME
+    ]
+    return "; ".join(kept) if kept else None
 
 
 _burst_last_call: float = 0.0
