@@ -61,6 +61,21 @@
       "rank": 400
     },
     {
+      "uuid": "ab149050-da4c-4e1c-b9d9-a3f7fe15b2e2",
+      "slot_name": "cuda.mem",
+      "slot_type": "bytes",
+      "required": false,
+      "display_name": "GPU Memory",
+      "description": "CUDA-capable GPU memory (fractional)",
+      "display_unit": "GiB",
+      "display_icon": "nvidia",
+      "number_format": {
+        "binary": true,
+        "round_length": 1
+      },
+      "rank": 450
+    },
+    {
       "uuid": "3759b036-ba21-4c54-90d3-0834aa7e5753",
       "slot_name": "rocm.device",
       "slot_type": "count",
