@@ -15,6 +15,7 @@ def home_without_backend_ai_dir(
     monkeypatch: pytest.MonkeyPatch,
     world_readable_umask: None,
 ) -> Path:
+    monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.delenv("BACKEND_PROFILE", raising=False)
     return tmp_path
