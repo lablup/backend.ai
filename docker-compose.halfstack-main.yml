@@ -121,7 +121,8 @@ services:
       --auto-compaction-retention 1
       --metrics=extensive
     healthcheck:
-      test: ["CMD", "etcdctl", "endpoint", "health"]
+      # `endpoint health` needs credentials once auth is enabled; `endpoint status` does not.
+      test: ["CMD", "etcdctl", "endpoint", "status"]
       interval: 5s
       timeout: 3s
       retries: 10

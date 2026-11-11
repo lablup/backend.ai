@@ -37,7 +37,7 @@ if needed.
          volumes:
             - "${HOME}/.data/backend.ai/etcd-data:/etcd-data:rw"
          healthcheck:
-            test: ["CMD", "etcdctl", "endpoint", "health"]
+            test: ["CMD", "etcdctl", "endpoint", "status"]
             interval: 10s
             timeout: 3s
             retries: 10
