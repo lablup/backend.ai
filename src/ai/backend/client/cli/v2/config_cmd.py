@@ -2,11 +2,19 @@
 
 from __future__ import annotations
 
+import os
+from pathlib import Path
 from typing import Any
 
 import click
 
+<<<<<<< HEAD
 from .helpers import CONFIG_DIR, CONFIG_FILE, CREDENTIALS_FILE
+=======
+from ai.backend.client.cli.types import CLI_CREDENTIAL_FILE_MODE
+
+from .helpers import ProfileStore
+>>>>>>> 1c8280234 (fix(BA-8998): create the v2 CLI credentials.toml readable only by its owner (#16406))
 
 CONFIGURABLE_KEYS = {
     "endpoint": ("config", "endpoint"),
@@ -41,6 +49,19 @@ def _save_toml(path: click.Path, data: dict[str, Any]) -> None:
     p.parent.mkdir(parents=True, exist_ok=True)
     with p.open("wb") as f:
         tomli_w.dump(data, f)
+
+
+def _save_credentials_toml(credentials_path: Path, data: dict[str, Any]) -> None:
+    """Write a dict to a TOML file created readable only by its owner."""
+    import tomli_w
+
+    credentials_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(
+        credentials_path,
+        "wb",
+        opener=lambda opened_path, flags: os.open(opened_path, flags, CLI_CREDENTIAL_FILE_MODE),
+    ) as credentials_file:
+        tomli_w.dump(data, credentials_file)
 
 
 @click.group()
@@ -83,9 +104,17 @@ def set_value(key: str, value: str) -> None:
     file_type, toml_key = CONFIGURABLE_KEYS[key]
 
     if file_type == "config":
+<<<<<<< HEAD
         path = CONFIG_FILE
     else:
         path = CREDENTIALS_FILE
+=======
+        path = paths.config_file
+        save_toml_file = _save_toml
+    else:
+        path = paths.credentials_file
+        save_toml_file = _save_credentials_toml
+>>>>>>> 1c8280234 (fix(BA-8998): create the v2 CLI credentials.toml readable only by its owner (#16406))
 
     data = _load_toml(path)
     section = data.setdefault("backend-ai", {})
@@ -95,7 +124,7 @@ def set_value(key: str, value: str) -> None:
     else:
         section[toml_key] = value
 
-    _save_toml(path, data)
+    save_toml_file(path, data)
     click.echo(f"Set {key} = {value}")
 
 
