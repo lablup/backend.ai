@@ -559,6 +559,7 @@ class TestAgentUnifiedConfigValidation:
                 "user": "test",
                 "password": "test",
             },
+            "redis": {"addr": "127.0.0.1:6379"},
         }
 
     def test_kubernetes_backend_requires_nfs_config_for_k8s_nfs(
@@ -745,6 +746,7 @@ class TestAgentUnifiedConfigSingleAgentMode:
                 "user": "test",
                 "password": "test",
             },
+            "redis": {"addr": "127.0.0.1:6379"},
         }
 
     def test_single_agent_mode_uses_global_config(
@@ -808,6 +810,7 @@ class TestMultipleAgentsConfigValidation:
                 "user": "test",
                 "password": "test",
             },
+            "redis": {"addr": "127.0.0.1:6379"},
         }
 
     def test_multiple_agents_inherit_global_config(
@@ -1247,6 +1250,7 @@ class TestResourceAllocationModes:
                 "user": "test",
                 "password": "test",
             },
+            "redis": {"addr": "127.0.0.1:6379"},
         }
 
     def test_allocation_mode_defaults_to_shared(
