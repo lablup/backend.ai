@@ -1,0 +1,1 @@
+import{t as e}from"./jsx-runtime-BapUIyWk.js";import{t}from"./Tooltip-QQJy2agO.js";var n=e();function r({content:e,children:r}){return(0,n.jsx)(t,{content:e,placement:`above`,focusTrigger:`always`,children:r})}export{r as default};
