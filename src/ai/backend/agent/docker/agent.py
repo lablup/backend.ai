@@ -984,8 +984,9 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         self.container_configs.append(container_config)
 
     def _create_mount_points_in_work_dir(self, mounts: Sequence[Mount]) -> None:
-        # runc would create a missing mount point as root, and one below /home/work lands in
-        # the scratch work directory, where an agent running as another user cannot remove it.
+        # With Docker running as root and the agent as a non-root user, runc creates a missing
+        # mount point below /home/work as root inside the scratch work directory, and the agent
+        # cannot remove a nested one (e.g. /home/work/a/b) when it cleans the scratch.
         for mount in mounts:
             if mount.type != MountTypes.BIND or _KERNEL_WORK_DIR not in mount.target.parents:
                 continue
