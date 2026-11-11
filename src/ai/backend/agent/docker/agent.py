@@ -987,12 +987,21 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         # With Docker running as root and the agent as a non-root user, runc creates a missing
         # mount point below /home/work as root inside the scratch work directory, and the agent
         # cannot remove a nested one (e.g. /home/work/a/b) when it cleans the scratch.
+        work_dir = self.work_dir.resolve()
         for mount in mounts:
-            if mount.type != MountTypes.BIND or _KERNEL_WORK_DIR not in mount.target.parents:
+            if mount.type != MountTypes.BIND:
+                continue
+            # Docker cleans `..` out of the target before mounting, so the path must be cleaned
+            # the same way before it is compared with or joined below /home/work.
+            target = Path(os.path.normpath(mount.target))
+            if _KERNEL_WORK_DIR not in target.parents:
                 continue
             if mount.source is None or not mount.source.is_dir():
                 continue
-            mount_point = self.work_dir / mount.target.relative_to(_KERNEL_WORK_DIR)
+            mount_point = work_dir / target.relative_to(_KERNEL_WORK_DIR)
+            # A symlink the kernel left in the work directory must not lead the mkdir out of it.
+            if not mount_point.resolve().is_relative_to(work_dir):
+                continue
             mount_point.mkdir(parents=True, exist_ok=True)
 
     @override
