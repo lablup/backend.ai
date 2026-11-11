@@ -1,12 +1,10 @@
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 from uuid import UUID
 
 import pytest
 
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.secret.types import KeyProviderType
-from ai.backend.manager.errors.keypair import InvalidSSHPrivateKey, SSHKeypairMismatch
-from ai.backend.manager.models.keypair.ssh_key_validator import SSHKeyValidator
 from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.repositories.user_resource_policy.repository import (
     UserResourcePolicyRepository,
@@ -30,18 +28,12 @@ def mock_auth_repository() -> AsyncMock:
 
 
 @pytest.fixture
-def mock_ssh_key_validator() -> MagicMock:
-    return MagicMock(spec=SSHKeyValidator)
-
-
-@pytest.fixture
 def auth_service(
     mock_hook_plugin_ctx: AsyncMock,
     mock_auth_repository: AsyncMock,
     mock_config_provider: AsyncMock,
     mock_user_repository: AsyncMock,
     mock_group_repository: AsyncMock,
-    mock_ssh_key_validator: MagicMock,
     mock_client_ip_masking_repository: AsyncMock,
 ) -> AuthService:
     return AuthService(
@@ -52,7 +44,6 @@ def auth_service(
         user_resource_policy_repository=AsyncMock(spec=UserResourcePolicyRepository),
         user_repository=mock_user_repository,
         group_repository=mock_group_repository,
-        ssh_key_validator=mock_ssh_key_validator,
         client_ip_masking_repository=mock_client_ip_masking_repository,
         key_provider_pool=KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )
@@ -130,79 +121,22 @@ async def test_generate_ssh_keypair(
 
 
 # Test Upload SSH Keypair
-async def test_upload_ssh_keypair_valid_keys(
+async def test_upload_ssh_keypair_replaces_only_the_public_key(
     auth_service: AuthService,
     mock_auth_repository: AsyncMock,
-    mock_ssh_key_validator: MagicMock,
 ) -> None:
-    """Test uploading valid SSH keypair"""
+    """Test uploading an SSH public key leaves the stored private key alone"""
     action = UploadSSHKeypairAction(
         user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         access_key="AKIA1234567890ABCDEF",
         public_key="ssh-rsa AAAAB3NzaC1yc2EUPLOADED...",
-        private_key="-----BEGIN RSA PRIVATE KEY-----\nUPLOADED...\n-----END RSA PRIVATE KEY-----",
     )
-
-    # The injected validator accepts the keypair (returns None).
-    mock_ssh_key_validator.validate.return_value = None
 
     result = await auth_service.upload_ssh_keypair(action)
 
-    mock_ssh_key_validator.validate.assert_called_once_with(
-        action.private_key,
-        action.public_key,
-    )
-    # Verify repository was called
-    mock_auth_repository.update_ssh_keypair.assert_called_once_with(
+    mock_auth_repository.update_ssh_public_key.assert_called_once_with(
         action.access_key,
         action.public_key,
-        action.private_key,
     )
-
-    assert result.ssh_keypair.ssh_public_key == action.public_key
-    assert result.ssh_keypair.ssh_private_key == action.private_key
-
-
-async def test_upload_ssh_keypair_invalid_keys(
-    auth_service: AuthService,
-    mock_auth_repository: AsyncMock,
-    mock_ssh_key_validator: MagicMock,
-) -> None:
-    """Test uploading invalid SSH keypair propagates the validator error"""
-    action = UploadSSHKeypairAction(
-        user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
-        access_key="AKIA1234567890ABCDEF",
-        public_key="invalid-public-key",
-        private_key="invalid-private-key",
-    )
-
-    mock_ssh_key_validator.validate.side_effect = InvalidSSHPrivateKey("Invalid private key format")
-
-    with pytest.raises(InvalidSSHPrivateKey):
-        await auth_service.upload_ssh_keypair(action)
-
-    # Verify repository was NOT called for invalid keys
     mock_auth_repository.update_ssh_keypair.assert_not_called()
-
-
-async def test_upload_ssh_keypair_mismatch(
-    auth_service: AuthService,
-    mock_auth_repository: AsyncMock,
-    mock_ssh_key_validator: MagicMock,
-) -> None:
-    """Test that a keypair mismatch from the validator propagates and skips the write"""
-    action = UploadSSHKeypairAction(
-        user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
-        access_key="AKIATEST",
-        public_key="bad-key",
-        private_key="bad-key",
-    )
-
-    mock_ssh_key_validator.validate.side_effect = SSHKeypairMismatch(
-        "Public key does not match the private key"
-    )
-
-    with pytest.raises(SSHKeypairMismatch):
-        await auth_service.upload_ssh_keypair(action)
-
-    mock_auth_repository.update_ssh_keypair.assert_not_called()
+    assert result.public_key == action.public_key

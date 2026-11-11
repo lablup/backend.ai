@@ -517,7 +517,6 @@ def create_services(args: ServiceArgs, action_registry: ProcessorRegistry[Any]) 
             user_resource_policy_repository=repositories.user_resource_policy.repository,
             user_repository=repositories.user.repository,
             group_repository=repositories.project.repository,
-            ssh_key_validator=args.ssh_key_validator,
             client_ip_masking_repository=repositories.client_ip_masking.repository,
             key_provider_pool=args.key_provider_pool,
         ),

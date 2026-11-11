@@ -271,6 +271,17 @@ class AuthDBSource:
             await conn.execute(query)
 
     @auth_db_source_resilience.apply()
+    async def modify_ssh_public_key(self, access_key: str, public_key: str) -> None:
+        """Modify the SSH public key for an access key in database."""
+        async with self._db.begin() as conn:
+            query = (
+                keypairs.update()
+                .values(ssh_public_key=public_key)
+                .where(keypairs.c.access_key == access_key)
+            )
+            await conn.execute(query)
+
+    @auth_db_source_resilience.apply()
     async def verify_keypair_secret(self, access_key: str, secret_key: str) -> bool:
         """Whether an active keypair holds the given secret key."""
         async with self._db.begin_readonly() as conn:

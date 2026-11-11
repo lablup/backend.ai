@@ -157,10 +157,9 @@ class UpdatePasswordNoAuthRequest(BaseRequestModel):
 
 
 class UploadSSHKeypairRequest(BaseRequestModel):
-    """Request to upload an SSH keypair. The pair is validated for consistency."""
+    """Request to upload an SSH public key."""
 
     pubkey: str = Field(description="SSH public key in standard format (e.g., 'ssh-rsa AAAA...')")
-    privkey: str = Field(description="SSH private key in PEM format")
 
 
 class VerifyAuthRequest(BaseRequestModel):

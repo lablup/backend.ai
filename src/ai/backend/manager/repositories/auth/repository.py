@@ -107,6 +107,10 @@ class AuthRepository:
         await self._db_source.modify_ssh_keypair(access_key, public_key, private_key)
 
     @auth_repository_resilience.apply()
+    async def update_ssh_public_key(self, access_key: str, public_key: str) -> None:
+        await self._db_source.modify_ssh_public_key(access_key, public_key)
+
+    @auth_repository_resilience.apply()
     async def verify_keypair_secret(self, access_key: str, secret_key: str) -> bool:
         """Whether an active keypair holds the given secret key."""
         return await self._db_source.verify_keypair_secret(access_key, secret_key)

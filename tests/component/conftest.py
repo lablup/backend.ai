@@ -156,7 +156,6 @@ from ai.backend.manager.models.kernel_group_resource_slot.row import (  # noqa: 
     KernelGroupResourceSlotRow,
 )
 from ai.backend.manager.models.keypair.row import keypairs
-from ai.backend.manager.models.keypair.ssh_key_validator import SSHKeyValidator
 from ai.backend.manager.models.project.row import (
     ProjectRow,
     ProjectType,
@@ -1812,7 +1811,6 @@ def auth_processors(
         user_resource_policy_repository=user_resource_policy_repository,
         user_repository=user_repository,
         group_repository=group_repository,
-        ssh_key_validator=SSHKeyValidator(),
         client_ip_masking_repository=ClientIPMaskingRepository(database_engine),
         key_provider_pool=KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )

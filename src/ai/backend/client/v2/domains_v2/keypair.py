@@ -144,7 +144,7 @@ class V2KeypairClient(BaseDomainClient):
         self,
         request: AdminRegisterSSHKeypairInput,
     ) -> AdminRegisterSSHKeypairPayload:
-        """Register (overwrite) a user's SSH keypair (admin only)."""
+        """Register (overwrite) a user's SSH public key (admin only)."""
         return await self._client.typed_request(
             "POST",
             f"{_ADMIN_PATH}/ssh",

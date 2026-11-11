@@ -711,32 +711,21 @@ class TestGenerateSSHKeypair:
 class TestUploadSSHKeypair:
     """Tests for upload_ssh_keypair handler."""
 
-    async def test_calls_processor_and_returns_keypair(
+    async def test_calls_processor_and_returns_public_key(
         self,
         handler: AuthHandler,
         user_context: UserContext,
         mock_processors: MagicMock,
     ) -> None:
-        """Verify processor is called and keypair is returned."""
+        """Verify processor is called and only the public key is returned."""
         body: BodyParam[UploadSSHKeypairRequest] = BodyParam(UploadSSHKeypairRequest)
-        body.from_body({
-            "pubkey": "ssh-rsa AAAAB3...",
-            "privkey": "-----BEGIN RSA PRIVATE KEY-----\n...",
-        })
+        body.from_body({"pubkey": "ssh-rsa AAAAB3..."})
         mock_processors.auth.upload_ssh_keypair.run = AsyncMock(
-            return_value=UploadSSHKeypairActionResult(
-                ssh_keypair=SSHKeypair(
-                    ssh_public_key="ssh-rsa AAAAB3...\n",
-                    ssh_private_key="-----BEGIN RSA PRIVATE KEY-----\n...\n",
-                ),
-            )
+            return_value=UploadSSHKeypairActionResult(public_key="ssh-rsa AAAAB3...\n")
         )
 
         response = await handler.upload_ssh_keypair(body, user_context)
 
         mock_processors.auth.upload_ssh_keypair.run.assert_called_once()
         assert response.status_code == HTTPStatus.OK
-        data = response.to_json
-        assert data is not None
-        assert "ssh_public_key" in data
-        assert "ssh_private_key" in data
+        assert response.to_json == {"ssh_public_key": "ssh-rsa AAAAB3...\n"}

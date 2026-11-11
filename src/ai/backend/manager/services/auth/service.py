@@ -31,7 +31,7 @@ from ai.backend.common.exception import (
     UnreachableError,
 )
 from ai.backend.common.plugin.hook import ALL_COMPLETED, FIRST_COMPLETED, PASSED, HookPluginContext
-from ai.backend.common.types import AccessKey, SecretKey, SSHPrivateKey, SSHPublicKey
+from ai.backend.common.types import AccessKey, SecretKey
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import AuthConfig
@@ -57,7 +57,6 @@ from ai.backend.manager.errors.common import (
 from ai.backend.manager.errors.user import KeyPairNotFound, UserResourcePolicyNotFound
 from ai.backend.manager.models.hasher.factory import compare_to_hashed_password
 from ai.backend.manager.models.keypair.row import KEYPAIR_SECRET_KEY_CONTEXT
-from ai.backend.manager.models.keypair.ssh_key_validator import SSHKeyValidator
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.row import (
     UserRole,
@@ -151,7 +150,6 @@ class AuthService:
     _user_resource_policy_repository: UserResourcePolicyRepository
     _user_repository: UserRepository
     _group_repository: ProjectRepository
-    _ssh_key_validator: SSHKeyValidator
     _client_ip_masking_repository: ClientIPMaskingRepository
 
     def __init__(
@@ -163,7 +161,6 @@ class AuthService:
         user_resource_policy_repository: UserResourcePolicyRepository,
         user_repository: UserRepository,
         group_repository: ProjectRepository,
-        ssh_key_validator: SSHKeyValidator,
         client_ip_masking_repository: ClientIPMaskingRepository,
         key_provider_pool: KeyProviderPool,
     ) -> None:
@@ -174,7 +171,6 @@ class AuthService:
         self._user_resource_policy_repository = user_resource_policy_repository
         self._user_repository = user_repository
         self._group_repository = group_repository
-        self._ssh_key_validator = ssh_key_validator
         self._client_ip_masking_repository = client_ip_masking_repository
         self._key_provider_pool = key_provider_pool
 
@@ -822,18 +818,8 @@ class AuthService:
     async def upload_ssh_keypair(
         self, action: UploadSSHKeypairAction
     ) -> UploadSSHKeypairActionResult:
-        privkey = action.private_key
-        pubkey = action.public_key
-        self._ssh_key_validator.validate(SSHPrivateKey(privkey), SSHPublicKey(pubkey))
-
-        await self._auth_repository.update_ssh_keypair(action.access_key, pubkey, privkey)
-
-        return UploadSSHKeypairActionResult(
-            ssh_keypair=SSHKeypair(
-                ssh_public_key=pubkey,
-                ssh_private_key=privkey,
-            ),
-        )
+        await self._auth_repository.update_ssh_public_key(action.access_key, action.public_key)
+        return UploadSSHKeypairActionResult(public_key=action.public_key)
 
     async def resolve_access_key_scope(
         self, action: PublicResolveAccessKeyScopeAction

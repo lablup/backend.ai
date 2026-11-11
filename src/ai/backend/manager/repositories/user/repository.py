@@ -479,17 +479,15 @@ class UserRepository:
         return await self._db_source.admin_get_keypair(access_key)
 
     @user_repository_resilience.apply()
-    async def admin_update_ssh_keypair(
+    async def admin_update_ssh_public_key(
         self,
         access_key: str,
         ssh_public_key: str,
-        ssh_private_key: str,
     ) -> None:
-        """Admin registers (overwrites) a user's SSH keypair."""
-        await self._db_source.admin_update_ssh_keypair(
+        """Admin registers (overwrites) a user's SSH public key."""
+        await self._db_source.admin_update_ssh_public_key(
             access_key=access_key,
             ssh_public_key=ssh_public_key,
-            ssh_private_key=ssh_private_key,
         )
 
     @user_repository_resilience.apply()

@@ -89,7 +89,6 @@ def auth_service(
         user_resource_policy_repository=mock_user_resource_policy_repository,
         user_repository=mock_user_repository,
         group_repository=mock_group_repository,
-        ssh_key_validator=AsyncMock(),
         client_ip_masking_repository=mock_client_ip_masking_repository,
         key_provider_pool=KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )
