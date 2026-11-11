@@ -178,6 +178,7 @@ from ai.backend.common.events.types import (
     AbstractEvent,
 )
 from ai.backend.common.exception import (
+    ConfigurationError,
     InvalidVFolderMountSourceError,
     VolumeMountFailed,
 )
@@ -1003,6 +1004,11 @@ class AbstractAgent[
             self.local_config.agent.kernel_creation_concurrency
         )
         self.container_lifecycle_queue = asyncio.Queue()
+
+        if self.local_config.redis is None:
+            raise ConfigurationError({
+                "AbstractAgent.__ainit__": "Redis runtime configuration is not set."
+            })
 
         redis_profile_target = self.local_config.redis.to_redis_profile_target()
         stream_redis_target = redis_profile_target.profile_target(RedisRole.STREAM)

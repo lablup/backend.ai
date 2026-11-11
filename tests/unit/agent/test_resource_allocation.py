@@ -79,7 +79,6 @@ def create_test_config(
             "user": "test",
             "password": "test",
         },
-        "redis": {"addr": "127.0.0.1:6379"},
     }
 
     # Add manual allocation fields if provided

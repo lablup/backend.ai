@@ -38,9 +38,6 @@ addr = {{ host = "127.0.0.1", port = 2379 }}
 user = "test"
 password = "test"
 
-[redis]
-addr = {{ host = "127.0.0.1", port = 6379 }}
-
 [container]
 scratch-root = "/tmp/test"
 
@@ -80,9 +77,6 @@ namespace = "original"
 addr = {{ host = "127.0.0.1", port = 2379 }}
 user = "test"
 password = "test"
-
-[redis]
-addr = {{ host = "127.0.0.1", port = 6379 }}
 
 [container]
 scratch-root = "/tmp/original"
@@ -146,9 +140,6 @@ namespace = "local"
 addr = {{ host = "127.0.0.1", port = 2379 }}
 user = "test"
 password = "test"
-
-[redis]
-addr = {{ host = "127.0.0.1", port = 6379 }}
 
 [container]
 scratch-root = "/tmp/test"
