@@ -53,8 +53,8 @@ class VFolderAutoMountScopeTypeFilter(EnumFilter[VFolderAutoMountScopeType]):
 class VFolderAutoMountFilter(BaseRequestModel):
     """Filter for vfolder auto-mounts.
 
-    An auto-mount search leaves out the auto-mounts marked deleted unless the top-level filter
-    gives ``deleted_at``. A ``deleted_at`` inside ``AND``/``OR``/``NOT`` does not lift that default.
+    Auto-mounts marked deleted are left out unless the top-level filter gives ``deleted_at``.
+    A ``deleted_at`` inside ``AND``/``OR``/``NOT`` does not lift that default.
     """
 
     entity_id: UUIDFilter | None = Field(default=None, description="Filter by auto-mount ID.")
@@ -78,8 +78,8 @@ class VFolderAutoMountFilter(BaseRequestModel):
     deleted_at: NullableDateTimeFilter | None = Field(
         default=None,
         description=(
-            "Filter by deletion time. In an auto-mount search, setting it on the top-level "
-            "filter includes the auto-mounts marked deleted; inside AND, OR or NOT it does not."
+            "Filter by deletion time. Setting it on the top-level filter includes the "
+            "auto-mounts marked deleted; inside AND, OR or NOT it does not."
         ),
     )
 

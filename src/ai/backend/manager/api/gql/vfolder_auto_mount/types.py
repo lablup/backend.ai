@@ -282,9 +282,8 @@ class VFolderAutoMountScopeTypeFilterGQL(PydanticInputMixin[VFolderAutoMountScop
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description=(
-            "Filter for vfolder auto-mounts. An auto-mount search leaves out the auto-mounts "
-            "marked deleted unless the top-level filter gives `deletedAt`; one inside AND, OR or "
-            "NOT does not lift that."
+            "Filter for vfolder auto-mounts. Auto-mounts marked deleted are left out unless "
+            "the top-level filter gives `deletedAt`; one inside AND, OR or NOT does not lift that."
         ),
     ),
     name="VFolderAutoMountFilter",
@@ -312,8 +311,8 @@ class VFolderAutoMountFilterGQL(PydanticInputMixin[VFolderAutoMountFilterDTO]):
     )
     deleted_at: NullableDateTimeFilter | None = gql_field(
         description=(
-            "Filter by deletion time. In an auto-mount search, setting it on the top-level "
-            "filter includes the auto-mounts marked deleted; inside AND, OR or NOT it does not."
+            "Filter by deletion time. Setting it on the top-level filter includes the "
+            "auto-mounts marked deleted; inside AND, OR or NOT it does not."
         ),
         default=None,
     )
