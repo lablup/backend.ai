@@ -482,17 +482,16 @@ class TestUpdateSessionRename:
         with pytest.raises(SessionAlreadyExists):
             await db_source.update_session(self._rename(target, "taken"), session_name="taken")
 
-    async def test_namesake_by_id_string_does_not_block(
+    async def test_name_equal_to_a_live_session_id_raises_already_exists(
         self, db_source: SessionDBSource, add_session: _SessionFactory
     ) -> None:
         target = await add_session(name="renamed-me", with_main_kernel=True)
         other = await add_session(name="other")
 
-        result = await db_source.update_session(
-            self._rename(target, str(other)), session_name=str(other)
-        )
-
-        assert result.name == str(other)
+        with pytest.raises(SessionAlreadyExists):
+            await db_source.update_session(
+                self._rename(target, str(other)), session_name=str(other)
+            )
 
     async def test_errored_namesake_does_not_block(
         self, db_source: SessionDBSource, add_session: _SessionFactory
@@ -601,6 +600,24 @@ class TestLiveSessionsNamedSearcher:
             result = await r.search_in_global(
                 LiveSessionsNamedSearcher(
                     pagination=NoPagination(), access_key=owner.access_key, name="taken"
+                )
+            )
+
+        assert [row.id for row in result.items] == [live]
+
+    async def test_lists_the_live_session_whose_id_is_the_name(
+        self,
+        db_with_tables: ExtendedAsyncSAEngine,
+        owner: _Owner,
+        add_session: _SessionFactory,
+    ) -> None:
+        live = await add_session(name="some-name")
+        await add_session(name="other-name")
+
+        async with V2DBOpsProvider(db_with_tables).read_ops() as r:
+            result = await r.search_in_global(
+                LiveSessionsNamedSearcher(
+                    pagination=NoPagination(), access_key=owner.access_key, name=str(live)
                 )
             )
 

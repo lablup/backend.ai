@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass, field
 from typing import Any, override
 
@@ -46,16 +47,21 @@ class SessionInfoSearcher(Searcher[SessionRow, SessionInfo]):
 
 @dataclass
 class LiveSessionsNamedSearcher(Searcher[SessionRow, SessionEntityData]):
-    """The live sessions of ``access_key`` whose name is ``name``."""
+    """The live sessions of ``access_key`` whose name, or whose id as a string, is ``name``."""
 
     access_key: AccessKey = field(kw_only=True)
     name: str = field(kw_only=True)
 
     @override
     def build_select(self) -> sa.sql.Select[Any]:
+        matched = SessionRow.name == self.name
+        try:
+            matched = matched | (SessionRow.id == SessionId(uuid.UUID(self.name)))
+        except ValueError:
+            pass
         return sa.select(SessionRow).where(
             (SessionRow.access_key == self.access_key)
-            & (SessionRow.name == self.name)
+            & matched
             & SessionRow.status.not_in(SessionStatus.terminal_statuses())
         )
 
