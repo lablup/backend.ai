@@ -177,6 +177,7 @@ from .errors.kernel import (
     MainKernelNotFound,
     SessionAlreadyExists,
     SessionNotFound,
+    TooManyKernelsFound,
     TooManySessionsMatched,
 )
 from .errors.resource import (
@@ -565,6 +566,10 @@ class AgentRegistry:
             async with self._ops_provider.read_ops() as r:
                 main_kernels = await r.search_in_global(
                     MainKernelSearcher(pagination=NoPagination(), session_id=existing.id)
+                )
+            if len(main_kernels.items) > 1:
+                raise TooManyKernelsFound(
+                    f"Session (id: {existing.id}) has more than 1 main kernel."
                 )
             if not main_kernels.items:
                 raise MainKernelNotFound(f"Session (id={existing.id}) has no main kernel.")
