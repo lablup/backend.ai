@@ -11,7 +11,7 @@ from aiohttp import web
 from ai.backend.common.data.entity.keypair import KeyPairFieldType
 from ai.backend.common.data.entity.login_client_type import LoginClientTypeEntityType
 from ai.backend.common.data.entity.login_session import LoginSessionFieldType
-from ai.backend.common.data.entity.user import UserEntityType
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -78,6 +78,48 @@ class AuthorizationFailed(BackendAIError, web.HTTPUnauthorized):
         )
 
 
+<<<<<<< HEAD
+=======
+class PasswordMismatch(AuthorizationFailed):
+    """Raised when the user exists and the password does not match its hash.
+
+    Answers the client as :class:`AuthorizationFailed` does; carries the user so the
+    failure can be recorded against them."""
+
+    user_id: UserID
+
+    def __init__(self, user_id: UserID) -> None:
+        super().__init__("User credential mismatch.")
+        self.user_id = user_id
+
+
+class SuperadminRequired(BackendAIError, web.HTTPForbidden):
+    error_type = "https://api.backend.ai/probs/superadmin-required"
+    error_title = "Superadmin privilege is required."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.USER,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.FORBIDDEN,
+        )
+
+
+class AuthenticationRequired(BackendAIError, web.HTTPUnauthorized):
+    error_type = "https://api.backend.ai/probs/authentication-required"
+    error_title = "Authentication is required."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.USER,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.UNAUTHORIZED,
+        )
+
+
+>>>>>>> 0fb099e1 (fix(BA-9007): cost one hash on every rejected login and record a wrong password (#16850))
 class PasswordExpired(BackendAIError, web.HTTPUnauthorized):
     error_type = "https://api.backend.ai/probs/password-expired"
     error_title = "Password has expired."
