@@ -40,6 +40,7 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderUsageData,
 )
 from ai.backend.manager.errors.common import GenericForbidden
+from ai.backend.manager.errors.repository import EmptyMatchConditionError
 from ai.backend.manager.services.vfolder.actions.get_usage import (
     GetVFolderUsageActionResult,
 )
@@ -282,11 +283,6 @@ class _AutoMountsFilterCase:
     reaches_deleted: bool
 
 
-_LIVE_AUTO_MOUNTS_PREDICATE = (
-    "vfolder_auto_mounts.vfolder_id = vfolders.id AND vfolder_auto_mounts.deleted_at IS NULL"
-)
-
-
 class TestVFolderAdapterConvertAutoMountsFilter:
     @pytest.fixture
     def adapter(self) -> VFolderAdapter:
@@ -311,7 +307,10 @@ class TestVFolderAdapterConvertAutoMountsFilter:
                 auto_mounts=VFolderAutoMountNestedFilter(
                     every=VFolderAutoMountFilter(scope_id=UUIDFilter(equals=_SCOPE_ID))
                 ),
-                expected_sql_fragments=["vfolder_auto_mounts.scope_id != :"],
+                expected_sql_fragments=[
+                    "NOT (EXISTS",
+                    "vfolder_auto_mounts.deleted_at IS NULL AND vfolder_auto_mounts.scope_id != :",
+                ],
                 reaches_deleted=False,
             ),
             _AutoMountsFilterCase(
@@ -319,6 +318,15 @@ class TestVFolderAdapterConvertAutoMountsFilter:
                     some=VFolderAutoMountFilter(deleted_at=NullableDateTimeFilter(is_null=False))
                 ),
                 expected_sql_fragments=["vfolder_auto_mounts.deleted_at IS NOT NULL"],
+                reaches_deleted=True,
+            ),
+            _AutoMountsFilterCase(
+                auto_mounts=VFolderAutoMountNestedFilter(
+                    every=VFolderAutoMountFilter(
+                        deleted_at=NullableDateTimeFilter(after=datetime(2026, 1, 1, tzinfo=UTC))
+                    )
+                ),
+                expected_sql_fragments=["vfolder_auto_mounts.deleted_at <= :"],
                 reaches_deleted=True,
             ),
             _AutoMountsFilterCase(
@@ -333,7 +341,14 @@ class TestVFolderAdapterConvertAutoMountsFilter:
                 reaches_deleted=False,
             ),
         ],
-        ids=["exists", "some", "every", "some_top_level_deleted_at", "some_nested_deleted_at"],
+        ids=[
+            "exists",
+            "some",
+            "every",
+            "some_top_level_deleted_at",
+            "every_top_level_deleted_at",
+            "some_nested_deleted_at",
+        ],
     )
     def test_reaches_deleted_auto_mounts_only_for_a_top_level_deleted_at(
         self, adapter: VFolderAdapter, case: _AutoMountsFilterCase
@@ -342,9 +357,20 @@ class TestVFolderAdapterConvertAutoMountsFilter:
         assert len(conditions) == 1
         sql = str(conditions[0]())
         assert "vfolder_auto_mounts.vfolder_id = vfolders.id" in sql
-        assert (_LIVE_AUTO_MOUNTS_PREDICATE not in sql) == case.reaches_deleted
+        assert ("vfolder_auto_mounts.deleted_at IS NULL" not in sql) == case.reaches_deleted
         for fragment in case.expected_sql_fragments:
             assert fragment in sql
+
+    @pytest.mark.parametrize("mode", ["some", "every", "none"])
+    def test_a_mode_given_no_condition_is_refused(self, adapter: VFolderAdapter, mode: str) -> None:
+        with pytest.raises(EmptyMatchConditionError):
+            adapter._convert_vfolder_filter(
+                VFolderFilter(
+                    auto_mounts=VFolderAutoMountNestedFilter.model_validate({
+                        mode: VFolderAutoMountFilter()
+                    })
+                )
+            )
 
 
 class TestVFolderAdapterGetFolderUsage:
