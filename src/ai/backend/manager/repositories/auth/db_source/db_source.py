@@ -11,6 +11,14 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.orm import joinedload, selectinload
 
+<<<<<<< HEAD
+=======
+from ai.backend.common.auth.password import HashInfo, PasswordHashAlgorithm, PasswordInfo
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.user import UserID
+>>>>>>> 0fb099e14 (fix(BA-9007): cost one hash on every rejected login and record a wrong password (#16850))
 from ai.backend.common.exception import BackendAIError, UserNotFound
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -27,12 +35,26 @@ from ai.backend.manager.errors.auth import (
     AuthorizationFailed,
     GroupMembershipNotFoundError,
     LoginSessionNotFoundError,
+<<<<<<< HEAD
     UserCreationError,
 )
 from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.models.hasher.types import HashInfo, PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs
 from ai.backend.manager.models.login_session.enums import LoginAttemptResult, LoginSessionStatus
+=======
+    PasswordMismatch,
+)
+from ai.backend.manager.errors.common import InternalServerError
+from ai.backend.manager.errors.user import KeyPairNotFound, UserCreationBadRequest
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.hasher.factory import PasswordHasherFactory
+from ai.backend.manager.models.keypair.queriers import DefaultKeypairQuerier
+from ai.backend.manager.models.keypair.row import (
+    KEYPAIR_SECRET_KEY_CONTEXT,
+    keypairs,
+)
+>>>>>>> 0fb099e14 (fix(BA-9007): cost one hash on every rejected login and record a wrong password (#16850))
 from ai.backend.manager.models.login_session.row import LoginHistoryRow, LoginSessionRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -340,20 +362,57 @@ class AuthDBSource:
                 .where((users.c.email == email) & (users.c.domain_name == domain_name))
             )
 
+<<<<<<< HEAD
     async def _check_password(
         self,
         conn: sa.ext.asyncio.AsyncConnection,
         row: sa.Row[Any],
+=======
+    @auth_db_source_resilience.apply()
+    async def query_user_data[TData](self, querier: DataQuerier[UserRow, TData]) -> TData | None:
+        """The user a querier names, or None when it names nothing."""
+        async with self._v2_ops.read_ops() as r:
+            return await r.query_data(querier)
+
+    async def _password_matched_row(
+        self,
+        row: sa.Row[Any] | None,
+>>>>>>> 0fb099e14 (fix(BA-9007): cost one hash on every rejected login and record a wrong password (#16850))
         target_password_info: PasswordInfo,
-    ) -> None:
-        """Verify password against stored hash. Raises AuthorizationFailed on mismatch."""
-        if row.password is None:
+    ) -> sa.Row[Any]:
+        """The user row whose stored hash the password matches. Every refusal costs at least
+        one hash at the configured cost, so the answer time does not tell whether the account
+        exists, even when its stored hash is older and cheaper."""
+        configured_hasher = PasswordHasherFactory.get_hasher(target_password_info.algorithm)
+        if row is None or row.password is None:
+            await asyncio.to_thread(configured_hasher.generate_new_hash, target_password_info)
             raise AuthorizationFailed("User credential mismatch.")
         try:
+<<<<<<< HEAD
             if not compare_to_hashed_password(target_password_info.password, row.password):
                 raise AuthorizationFailed("User credential mismatch.")
+=======
+            stored = HashInfo.from_hash_string(row.password)
+            matched = await asyncio.to_thread(
+                PasswordHasherFactory.get_hasher(stored.algorithm).verify,
+                target_password_info.password,
+                stored,
+            )
+>>>>>>> 0fb099e14 (fix(BA-9007): cost one hash on every rejected login and record a wrong password (#16850))
         except ValueError:
+            await asyncio.to_thread(configured_hasher.generate_new_hash, target_password_info)
             raise AuthorizationFailed("User credential mismatch.") from None
+        if not matched:
+            # A stored hash cheaper than the configured one is topped up to that cost. Rounds
+            # compare only within one algorithm; SHA256 is cheaper than any other.
+            if stored.algorithm == target_password_info.algorithm:
+                cheaper = stored.rounds < target_password_info.rounds
+            else:
+                cheaper = stored.algorithm == PasswordHashAlgorithm.SHA256
+            if cheaper:
+                await asyncio.to_thread(configured_hasher.generate_new_hash, target_password_info)
+            raise PasswordMismatch(UserID(row.uuid))
+        return row
 
     async def _migrate_password_hash(
         self,
@@ -433,12 +492,16 @@ class AuthDBSource:
                 .select_from(users)
                 .where((users.c.email == email) & (users.c.domain_name == domain_name)),
             )
+<<<<<<< HEAD
             row = result.first()
 
             if row is None:
                 raise AuthorizationFailed("User credential mismatch.")
 
             await self._check_password(conn, row, target_password_info)
+=======
+            row = await self._password_matched_row(result.first(), target_password_info)
+>>>>>>> 0fb099e14 (fix(BA-9007): cost one hash on every rejected login and record a wrong password (#16850))
             await self._migrate_password_hash(conn, row, domain_name, email, target_password_info)
 
             # Fetch active sessions for the user within the same connection
@@ -545,11 +608,23 @@ class AuthDBSource:
         password: str,
     ) -> sa.RowMapping:
         """Verify credentials without password migration (for signout, etc.)"""
+<<<<<<< HEAD
         return await check_credential(
             db=self._db,
             domain=domain_name,
             email=email,
             password=password,
+=======
+        async with self._db.begin_readonly_read_committed() as conn:
+            result = await conn.execute(
+                sa.select(users.c.uuid, users.c.username, users.c.password).where(
+                    (users.c.email == email) & (users.c.domain_name == domain_name)
+                ),
+            )
+            row = await self._password_matched_row(result.first(), target_password_info)
+        return UserCredential(
+            user_id=UserID(row.uuid), username=row.username, hashed_password=row.password
+>>>>>>> 0fb099e14 (fix(BA-9007): cost one hash on every rejected login and record a wrong password (#16850))
         )
 
     @auth_db_source_resilience.apply()
