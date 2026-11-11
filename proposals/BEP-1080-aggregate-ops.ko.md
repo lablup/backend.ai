@@ -89,7 +89,7 @@ groupBy 는 filter 처럼 field 마다 값 type 별 group input 을 받고, fiel
 |---|---|
 | group 칸 | 값 type 별 group. 민감한 값, Text, JSON, 배열 column 은 비움 |
 | 값 칸 | 값 type, 출처 테이블, 집계 값 정렬 |
-| 스코프 Target | `to_condition()` 외에 (scope_id, row_id) 쌍 select. 소유 column 이 아니라 RBAC 경로 |
+| 스코프 Target | `to_condition()` 외에 (scope_id, row_id) 쌍 select. Target 마다 선언한다. 엔티티는 소유 column 이 아니라 RBAC 경로, RBAC 그래프에 없는 행(감사 로그)은 그 행의 column |
 | `ToManyCorrelation` | EXISTS 외에 (row_id, 자식 값) 쌍 select. `ToManyGroup` 이 사용 |
 | 세션 nested | kernels 아래 `resource_allocations` 추가 (깊이 2) |
 

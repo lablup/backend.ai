@@ -93,3 +93,18 @@ class InvalidCursor(BackendAIError, web.HTTPBadRequest):
             operation=ErrorOperation.GENERIC,
             error_detail=ErrorDetail.INVALID_PARAMETERS,
         )
+
+
+class AggregateLimitExceeded(BackendAIError, web.HTTPBadRequest):
+    """An aggregate request asks for more scopes, groups or kept groups than configured."""
+
+    error_type = "https://api.backend.ai/probs/aggregate-limit-exceeded"
+    error_title = "Aggregate request exceeds the configured limit."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.API,
+            operation=ErrorOperation.SEARCH,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )

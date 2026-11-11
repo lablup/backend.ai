@@ -48,6 +48,9 @@ from ai.backend.manager.actions.v2.bulk.result import (
     BasePartialBulkActionResult,
     PartialBulkResult,
 )
+from ai.backend.manager.actions.v2.bulk.validator.aggregate_scopes import (
+    AggregateScopeCountValidator,
+)
 from ai.backend.manager.actions.v2.bulk.validator.base import (
     AtomicBulkActionValidator,
     PartialBulkActionValidator,
@@ -115,12 +118,14 @@ from ai.backend.manager.actions.v2.ops.base import (
     DeleteSingleEntityOpsAction,
     GetGlobalOpsAction,
     GetSingleEntityOpsAction,
+    GlobalAggregateOpsAction,
     GlobalSearcherOpsAction,
     LookupEntityOpsAction,
     OperationScopeOpsAction,
     PartialBulkGetEntityOpsAction,
     PartialBulkPurgeEntityOpsAction,
     PartialBulkPurgeGlobalEntityOpsAction,
+    PartialBulkScopedAggregateOpsAction,
     PurgeEntityOpsAction,
     RestorePartialBulkOpsAction,
     RestoreSingleEntityOpsAction,
@@ -157,6 +162,10 @@ from ai.backend.manager.actions.v2.single_entity.processor import (
 )
 from ai.backend.manager.actions.v2.single_entity.validator.base import SingleEntityActionValidator
 from ai.backend.manager.errors.common import ServerMisconfiguredError
+from ai.backend.manager.models.specs.aggregate.aggregator import (
+    AggregateResult,
+    ScopeAggregateResult,
+)
 from ai.backend.manager.services.ops.service import (
     BatchPurgeService,
     BatchUpdateService,
@@ -175,6 +184,7 @@ from ai.backend.manager.services.ops.service import (
     FieldOwnerKeyLookupService,
     FieldOwnerLookupService,
     GetService,
+    GlobalAggregateService,
     GlobalAtomicCreateService,
     GlobalAtomicUpsertService,
     GlobalBatchPurgeService,
@@ -190,6 +200,7 @@ from ai.backend.manager.services.ops.service import (
     PartialBulkDeleteService,
     PartialBulkGetService,
     PartialBulkRestoreService,
+    PartialBulkScopedAggregateService,
     PartialBulkUpdateService,
     RestoreService,
     RoleManagedEntityAtomicCreateService,
@@ -758,6 +769,41 @@ class ProcessorGroup[TData: EntityData]:
             GlobalSearcherService(self._deps.repository).execute,
             monitors=(*self._deps.monitors.global_scope, *monitors),
             validators=(*self._deps.validators.global_scope, *validators),
+        )
+
+    def global_aggregate_ops[TAction: GlobalAggregateOpsAction[Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        validators: Sequence[GlobalActionValidator] = (),
+        monitors: Sequence[GlobalActionMonitor] = (),
+    ) -> GlobalActionProcessor[TAction, AggregateResult]:
+        """A count across every row, in total and per group, behind the global gate."""
+        self._record(action_cls, ActionKind.GLOBAL, ActionGate.PERMISSION, ActionBacking.GENERIC)
+        return GlobalActionProcessor(
+            GlobalAggregateService(self._deps.repository, self._deps.aggregate_limits).execute,
+            monitors=(*self._deps.monitors.global_scope, *monitors),
+            validators=(*self._deps.validators.global_scope, *validators),
+        )
+
+    def partial_bulk_scoped_aggregate_ops[TAction: PartialBulkScopedAggregateOpsAction[Any, Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        partial_validators: Sequence[PartialBulkActionValidator] = (),
+        monitors: Sequence[BulkActionMonitor] = (),
+    ) -> PartialBulkActionProcessor[TAction, Sequence[ScopeAggregateResult[Any]]]:
+        """A count within each named scope, one permission check per scope.
+
+        The scope count is checked before any scope is authorized.
+        """
+        self._record(action_cls, ActionKind.BULK, ActionGate.PERMISSION, ActionBacking.GENERIC)
+        limits = self._deps.aggregate_limits
+        return PartialBulkActionProcessor(
+            PartialBulkScopedAggregateService(self._deps.repository, limits).execute,
+            monitors=(*self._deps.monitors.bulk, *monitors),
+            atomic_validators=(AggregateScopeCountValidator(limits),),
+            partial_validators=(*self._deps.validators.partial_bulk, *partial_validators),
         )
 
     def global_get_ops[TAction: GetGlobalOpsAction[Any, Any]](

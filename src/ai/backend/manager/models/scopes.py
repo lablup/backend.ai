@@ -80,3 +80,19 @@ class ScopeTarget(OperationScope):
     def scope_id(self) -> EntityIdentifier:
         """The scope the caller must hold the operation's permission in."""
         raise NotImplementedError
+
+
+class AggregateScopeTarget(ScopeTarget, ABC):
+    """A scope target an aggregate can count within, one scope at a time.
+
+    Where ``to_condition()`` filters the rows of every scope OR-ed together, an aggregate
+    answers each scope on its own, so it pairs each scope with the rows it reaches.
+    """
+
+    @abstractmethod
+    def scope_row_ids(self) -> sa.SelectBase:
+        """Select one column: the ids of the rows this scope reaches, by every path.
+
+        A row reached by more than one path may repeat; ops counts it once per scope.
+        """
+        raise NotImplementedError
