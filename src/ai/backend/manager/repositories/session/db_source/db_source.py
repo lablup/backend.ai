@@ -447,8 +447,6 @@ class SessionDBSource:
                         )
                     )
                 ).items
-                if len(matches) > 1:
-                    raise TooManySessionsMatched.from_sessions(matches)
                 if matches:
                     raise SessionAlreadyExists(
                         f"Duplicate session name. Session(id:{matches[0].id}) already has the name"

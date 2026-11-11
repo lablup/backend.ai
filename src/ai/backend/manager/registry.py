@@ -361,8 +361,6 @@ class AgentRegistry:
                     pagination=NoPagination(), access_key=access_key, name=session_name
                 )
             )
-        if len(result.items) > 1:
-            raise TooManySessionsMatched.from_sessions(result.items)
         return result.items[0] if result.items else None
 
     async def init(self) -> None:

@@ -38,10 +38,7 @@ from ai.backend.common.types import (
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.session.options import SessionStoredOptions
 from ai.backend.manager.data.session.types import SessionEntityData, SessionStatus
-from ai.backend.manager.errors.kernel import (
-    SessionNotFound,
-    TooManySessionsMatched,
-)
+from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.models.specs.searcher import SearcherResult
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
@@ -498,12 +495,3 @@ class TestLiveSessionNamed:
         _answer_global_searches(registry, [session])
 
         assert await registry._live_session_named("taken", access_key) is session
-
-    async def test_several_sessions_carrying_the_name_raise(
-        self, registry: AgentRegistry, access_key: AccessKey
-    ) -> None:
-        namesakes = [_session_entity_data("taken", access_key) for _ in range(2)]
-        _answer_global_searches(registry, namesakes)
-
-        with pytest.raises(TooManySessionsMatched):
-            await registry._live_session_named("taken", access_key)
