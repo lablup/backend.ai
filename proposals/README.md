@@ -151,6 +151,7 @@ BEP numbers start from 1000.
 | [1078](BEP-1078-storage-proxy-enhancement.md) | Storage Proxy Enhancement | Sanghun Lee | Draft |
 | [1079](BEP-1079-vxlan-overlay-cluster-network.md) | VXLAN Overlay Cluster Network | Daemyung Jang | Draft |
 | [1080](BEP-1080-aggregate-ops.md) | Aggregate Ops | HyeokJin Kim | Draft |
+| [1081](BEP-1081-accelerator-container-lifecycle-hooks.md) | Accelerator Plugin Container Lifecycle Hooks | Joongi Kim | Draft |
 | _next_ | _(reserve your number here)_ | | |
 
 ## File Structure
