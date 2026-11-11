@@ -7,6 +7,7 @@ from typing import override
 
 from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.dependencies import NonMonitorableDependencyProvider
+from ai.backend.common.exception import ConfigurationError
 from ai.backend.common.types import safe_print_redis_config
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage.config.unified import StorageProxyUnifiedConfig
@@ -25,5 +26,7 @@ class RedisConfigProvider(NonMonitorableDependencyProvider[StorageProxyUnifiedCo
     @asynccontextmanager
     @override
     async def provide(self, setup_input: StorageProxyUnifiedConfig) -> AsyncIterator[RedisConfig]:
+        if setup_input.redis is None:
+            raise ConfigurationError({"redis": "Redis configuration is missing."})
         log.info("redis config applied", redis_config=safe_print_redis_config(setup_input.redis))
         yield setup_input.redis

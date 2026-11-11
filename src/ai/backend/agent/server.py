@@ -102,7 +102,7 @@ from ai.backend.common.events.event_types.kernel.broadcast import (
     KernelTerminatedBroadcastEvent,
 )
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
-from ai.backend.common.exception import BackendAISchemaValidationFailed
+from ai.backend.common.exception import BackendAISchemaValidationFailed, ConfigurationError
 from ai.backend.common.health_checker.checkers.etcd import EtcdHealthChecker
 from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
 from ai.backend.common.health_checker.probe import HealthProbe, HealthProbeOptions
@@ -354,6 +354,8 @@ class AgentRPCServer(aobject):
 
         await self.read_agent_config()
         await self.read_agent_config_container()
+        if not self.local_config.redis:
+            raise ConfigurationError({"AgentRPCServer": "Redis runtime configuration is missing."})
         self.sentinel_monitors = SentinelMonitorSet(
             self.local_config.redis.to_redis_profile_target().valkey_targets()
         )
@@ -1565,6 +1567,8 @@ async def service_discovery_ctx(
             service_discovery = ETCDServiceDiscovery(ETCDServiceDiscoveryArgs(etcd))
         case ServiceDiscoveryType.REDIS:
             await agent_server.read_agent_config()
+            if not local_config.redis:
+                raise ConfigurationError({"server_main": "Redis runtime configuration is missing."})
             valkey_profile_target = local_config.redis.to_valkey_profile_target()
             live_valkey_target = valkey_profile_target.profile_target(RedisRole.LIVE)
             service_discovery = await RedisServiceDiscovery.create(
