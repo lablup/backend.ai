@@ -1,4 +1,4 @@
-"""도메인과 레지스트리 relation 맞추기 — 이름 목록에 맞춰 relation이 생기고 지워지는가."""
+"""도메인과 레지스트리 relation 맞추기 — 레지스트리 id 목록에 맞춰 relation이 생기고 지워지는가."""
 
 from __future__ import annotations
 
@@ -9,13 +9,14 @@ from typing import Any, override
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.api.adapters.domain.adapter import DomainAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.user.types import UserData
-from ai.backend.manager.errors.auth import InsufficientPrivilege
+from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.domain_container_registry_relation.row import (
     DomainContainerRegistryRelationRow,
 )
@@ -36,9 +37,6 @@ from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 from bai_scenario.seeds.domain.domain import TestSeedDomain
 from bai_scenario.seeds.image.registry import AllowDomain, TestSeedContainerRegistry
-
-UNKNOWN_REGISTRY_NAME = "no-such-registry.scenario.local"
-"""어떤 레지스트리의 `registry_name`과도 맞지 않는 이름."""
 
 
 @dataclass(frozen=True)
@@ -85,26 +83,23 @@ class ADomainARegistryAndSomeone(Given[TestSeedingSession, ADomainARegistryAndAC
         )
 
 
-class NamesGiven(enum.Enum):
-    """sync에 넘기는 레지스트리 이름 목록."""
+class RegistriesGiven(enum.Enum):
+    """sync에 넘기는 레지스트리 id 목록."""
 
-    THE_REGISTRY = Says("그 레지스트리의 이름", english="the name of that registry")
+    THE_REGISTRY = Says("그 레지스트리", english="that registry")
     NOTHING = Says("빈 목록", english="an empty list")
-    UNKNOWN = Says("어떤 레지스트리와도 맞지 않는 이름", english="a name no registry carries")
 
-    def of(self, laid: ADomainARegistryAndACaller) -> list[str]:
+    def of(self, laid: ADomainARegistryAndACaller) -> list[ContainerRegistryID]:
         match self:
-            case NamesGiven.THE_REGISTRY:
-                return [laid.registry.registry_name]
-            case NamesGiven.NOTHING:
+            case RegistriesGiven.THE_REGISTRY:
+                return [ContainerRegistryID(laid.registry.id)]
+            case RegistriesGiven.NOTHING:
                 return []
-            case NamesGiven.UNKNOWN:
-                return [UNKNOWN_REGISTRY_NAME]
 
 
 @dataclass(frozen=True)
 class Syncing(When[ADomainARegistryAndACaller, DomainAdapter, None]):
-    names: NamesGiven
+    registries: RegistriesGiven
 
     @override
     def operation(self) -> str:
@@ -114,17 +109,19 @@ class Syncing(When[ADomainARegistryAndACaller, DomainAdapter, None]):
     def describe(self, laid: ADomainARegistryAndACaller) -> str:
         return Says(
             f"{laid.caller.username}이 {laid.domain.name}의 relation을 "
-            f"{self.names.value}에 맞춥니다",
+            f"{self.registries.value}에 맞춥니다",
             english=(
                 f"{laid.caller.username} syncs the relations of {laid.domain.name} "
-                f"to {self.names.value.english}"
+                f"to {self.registries.value.english}"
             ),
         )
 
     @override
     async def call(self, adapter: DomainAdapter, laid: ADomainARegistryAndACaller) -> None:
         with ActingAs(laid.caller):
-            await adapter.sync_registry_relations(DomainID(laid.domain.id), self.names.of(laid))
+            await adapter.sync_registry_relations(
+                DomainID(laid.domain.id), self.registries.of(laid)
+            )
 
 
 @dataclass(frozen=True)
@@ -147,21 +144,20 @@ type SyncScenario = Scenario[TestSeedingSession, ADomainARegistryAndACaller, Dom
 
 
 @dataclass(frozen=True)
-class NamingARegistryLinksIt(
+class GivingARegistryLinksIt(
     Scenario[TestSeedingSession, ADomainARegistryAndACaller, DomainAdapter, None]
 ):
     @override
     def summary(self) -> str:
-        return "naming-a-registry-links-the-domain-to-it"
+        return "giving-a-registry-links-the-domain-to-it"
 
     @override
     def describe(self) -> str:
         return Says(
-            "슈퍼관리자가 레지스트리의 이름으로 맞추면 도메인과 그 레지스트리 사이에 relation이 생깁니다"
-            " (이름으로 레지스트리를 찾는 일은 전역 역할로 막혀 있어 슈퍼관리자가 호출합니다)",
+            "슈퍼관리자가 레지스트리를 넘겨 맞추면 도메인과 그 레지스트리 사이에 relation이 생깁니다",
             english=(
-                "when the superadmin syncs with the name of a registry, the domain and that "
-                "registry become related (finding registries by name is gated by the global role, so the superadmin calls it)"
+                "when the superadmin syncs with a registry, the domain and that registry "
+                "become related"
             ),
         )
 
@@ -171,7 +167,7 @@ class NamingARegistryLinksIt(
 
     @override
     def when(self) -> When[ADomainARegistryAndACaller, DomainAdapter, None]:
-        return Syncing(NamesGiven.THE_REGISTRY)
+        return Syncing(RegistriesGiven.THE_REGISTRY)
 
     @override
     def then(self) -> Then[ADomainARegistryAndACaller, None]:
@@ -189,12 +185,8 @@ class LeavingARegistryOutUnlinksIt(
     @override
     def describe(self) -> str:
         return Says(
-            "relation이 있는 레지스트리를 빼고 빈 목록으로 맞추면 그 relation이 지워집니다"
-            " (이름으로 레지스트리를 찾는 일은 전역 역할로 막혀 있어 슈퍼관리자가 호출합니다)",
-            english=(
-                "syncing with an empty list removes the relation to a registry left out"
-                " (finding registries by name is gated by the global role, so the superadmin calls it)"
-            ),
+            "relation이 있는 레지스트리를 빼고 빈 목록으로 맞추면 그 relation이 지워집니다",
+            english="syncing with an empty list removes the relation to a registry left out",
         )
 
     @override
@@ -203,39 +195,7 @@ class LeavingARegistryOutUnlinksIt(
 
     @override
     def when(self) -> When[ADomainARegistryAndACaller, DomainAdapter, None]:
-        return Syncing(NamesGiven.NOTHING)
-
-    @override
-    def then(self) -> Then[ADomainARegistryAndACaller, None]:
-        return TheCallReturnsNothing()
-
-
-@dataclass(frozen=True)
-class ANameNoRegistryCarriesLinksNothing(
-    Scenario[TestSeedingSession, ADomainARegistryAndACaller, DomainAdapter, None]
-):
-    @override
-    def summary(self) -> str:
-        return "a-name-no-registry-carries-links-nothing"
-
-    @override
-    def describe(self) -> str:
-        return Says(
-            "어떤 레지스트리와도 맞지 않는 이름으로 맞추면 오류 없이 relation이 생기지 않습니다"
-            " (이름으로 레지스트리를 찾는 일은 전역 역할로 막혀 있어 슈퍼관리자가 호출합니다)",
-            english=(
-                "syncing with a name no registry carries relates nothing and raises nothing"
-                " (finding registries by name is gated by the global role, so the superadmin calls it)"
-            ),
-        )
-
-    @override
-    def given(self) -> Given[TestSeedingSession, ADomainARegistryAndACaller]:
-        return ADomainARegistryAndSomeone()
-
-    @override
-    def when(self) -> When[ADomainARegistryAndACaller, DomainAdapter, None]:
-        return Syncing(NamesGiven.UNKNOWN)
+        return Syncing(RegistriesGiven.NOTHING)
 
     @override
     def then(self) -> Then[ADomainARegistryAndACaller, None]:
@@ -253,12 +213,8 @@ class AUserGrantedNothingMayNotSync(
     @override
     def describe(self) -> str:
         return Says(
-            "슈퍼관리자가 아닌 사용자가 relation을 맞추려 하면 거부됩니다. "
-            "이름으로 레지스트리를 찾는 일은 슈퍼관리자 역할이 있어야만 실행됩니다",
-            english=(
-                "a user who is not a superadmin is refused when syncing the relations; "
-                "finding registries by name runs only with the superadmin role"
-            ),
+            "도메인에 아무 권한이 없는 사용자가 relation을 맞추려 하면 거부됩니다",
+            english="a user granted nothing on the domain is refused when syncing the relations",
         )
 
     @override
@@ -267,24 +223,23 @@ class AUserGrantedNothingMayNotSync(
 
     @override
     def when(self) -> When[ADomainARegistryAndACaller, DomainAdapter, None]:
-        return Syncing(NamesGiven.THE_REGISTRY)
+        return Syncing(RegistriesGiven.THE_REGISTRY)
 
     @override
     def then(self) -> Then[ADomainARegistryAndACaller, Any]:
-        return TheCallIsRefused(InsufficientPrivilege)
+        return TheCallIsRefused(NotEnoughPermission)
 
 
 SCENARIOS: list[SyncScenario] = [
-    NamingARegistryLinksIt(),
+    GivingARegistryLinksIt(),
     LeavingARegistryOutUnlinksIt(),
-    ANameNoRegistryCarriesLinksNothing(),
     AUserGrantedNothingMayNotSync(),
 ]
 
 
 def expected_relation_count(scenario: SyncScenario) -> int:
     match scenario:
-        case NamingARegistryLinksIt():
+        case GivingARegistryLinksIt():
             return 1
         case _:
             return 0
