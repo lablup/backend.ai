@@ -87,10 +87,7 @@ from ai.backend.common.dto.manager.v2.vfolder.types import (
 from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderUsageInfo as VFolderUsageInfoDTO,
 )
-from ai.backend.common.dto.manager.v2.vfolder_auto_mount.request import (
-    VFolderAutoMountFilter,
-    VFolderAutoMountNestedFilter,
-)
+from ai.backend.common.dto.manager.v2.vfolder_auto_mount.request import VFolderAutoMountFilter
 from ai.backend.common.exception import BackendAIError, UnreachableError
 from ai.backend.common.schema.deployment import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.common.types import (
@@ -119,7 +116,6 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderData,
     VFolderMountPolicyData,
 )
-from ai.backend.manager.errors.repository import EmptyMatchConditionError
 from ai.backend.manager.errors.resource import NotAModelVFolder
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import (
@@ -993,7 +989,12 @@ class VFolderAdapter(BaseAdapter):
                 VFolderSearchableFields.nested.labels.correlation,
                 self._convert_entity_label_filter,
             ),
-            *self._convert_vfolder_auto_mounts_nested_filter(f.auto_mounts),
+            *self.apply_to_many_filter(
+                f.auto_mounts,
+                VFolderSearchableFields.nested.auto_mounts.correlation,
+                self._convert_vfolder_auto_mount_filter,
+                self._auto_mount_conditions_leaving_out_deleted,
+            ),
         ]
         if f.AND:
             for sub in f.AND:
@@ -1013,51 +1014,14 @@ class VFolderAdapter(BaseAdapter):
                     conditions.append(negate_conditions(sub_conditions))
         return conditions
 
-    def _convert_vfolder_auto_mounts_nested_filter(
-        self, f: VFolderAutoMountNestedFilter | None
+    def _auto_mount_conditions_leaving_out_deleted(
+        self, row_filter: VFolderAutoMountFilter | None
     ) -> list[QueryCondition]:
-        """Auto-mounts marked deleted are left out unless a mode's row filter gives
+        """Auto-mounts marked deleted are left out unless the row filter gives
         ``deleted_at`` at the top level, as an auto-mount search does."""
-        if f is None:
+        if row_filter is not None and row_filter.deleted_at is not None:
             return []
-        correlation = VFolderSearchableFields.nested.auto_mounts.correlation
-        live = VFolderAutoMountSearchableFields.own.deleted_at.filter.is_null()
-        conditions: list[QueryCondition] = []
-        if f.exists is True:
-            conditions.append(correlation.some([live]))
-        elif f.exists is False:
-            conditions.append(correlation.none([live]))
-        if f.some is not None:
-            row_conditions = self._auto_mount_row_conditions(f.some, "some")
-            if f.some.deleted_at is None:
-                conditions.append(correlation.some([*row_conditions, live]))
-            else:
-                conditions.append(correlation.some(row_conditions))
-        if f.none is not None:
-            row_conditions = self._auto_mount_row_conditions(f.none, "none")
-            if f.none.deleted_at is None:
-                conditions.append(correlation.none([*row_conditions, live]))
-            else:
-                conditions.append(correlation.none(row_conditions))
-        if f.every is not None:
-            row_conditions = self._auto_mount_row_conditions(f.every, "every")
-            if f.every.deleted_at is None:
-                # `every` negates all its conditions, so `live` would count a deleted row as
-                # failing; "no live row fails" keeps `live` outside the negation.
-                conditions.append(correlation.none([live, negate_conditions(row_conditions)]))
-            else:
-                conditions.append(correlation.every(row_conditions))
-        return conditions
-
-    def _auto_mount_row_conditions(
-        self, row_filter: VFolderAutoMountFilter, mode: str
-    ) -> list[QueryCondition]:
-        row_conditions = self._convert_vfolder_auto_mount_filter(row_filter)
-        if not row_conditions:
-            raise EmptyMatchConditionError(
-                extra_msg=f"`{mode}` was given no condition; `exists` asks for a related row"
-            )
-        return row_conditions
+        return [VFolderAutoMountSearchableFields.own.deleted_at.filter.is_null()]
 
     def _convert_vfolder_auto_mount_filter(self, f: VFolderAutoMountFilter) -> list[QueryCondition]:
         fields = VFolderAutoMountSearchableFields.own
