@@ -8,13 +8,9 @@ from typing import Any
 
 import click
 
-<<<<<<< HEAD
-from .helpers import CONFIG_DIR, CONFIG_FILE, CREDENTIALS_FILE
-=======
 from ai.backend.client.cli.types import CLI_CREDENTIAL_FILE_MODE
 
-from .helpers import ProfileStore
->>>>>>> 1c8280234 (fix(BA-8998): create the v2 CLI credentials.toml readable only by its owner (#16406))
+from .helpers import CONFIG_DIR, CONFIG_FILE, CREDENTIALS_FILE
 
 CONFIGURABLE_KEYS = {
     "endpoint": ("config", "endpoint"),
@@ -104,17 +100,11 @@ def set_value(key: str, value: str) -> None:
     file_type, toml_key = CONFIGURABLE_KEYS[key]
 
     if file_type == "config":
-<<<<<<< HEAD
         path = CONFIG_FILE
-    else:
-        path = CREDENTIALS_FILE
-=======
-        path = paths.config_file
         save_toml_file = _save_toml
     else:
-        path = paths.credentials_file
+        path = CREDENTIALS_FILE
         save_toml_file = _save_credentials_toml
->>>>>>> 1c8280234 (fix(BA-8998): create the v2 CLI credentials.toml readable only by its owner (#16406))
 
     data = _load_toml(path)
     section = data.setdefault("backend-ai", {})
