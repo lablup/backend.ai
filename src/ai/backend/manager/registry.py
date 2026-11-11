@@ -357,7 +357,7 @@ class AgentRegistry:
     async def _live_session_named(
         r: V2ReadOps, session_name: str, access_key: AccessKey
     ) -> SessionEntityData | None:
-        """The unended session of ``access_key`` named ``session_name``, if there is one."""
+        """The live session of ``access_key`` named ``session_name``, if there is one."""
         result = await r.search_in_global(
             LiveSessionsNamedSearcher(
                 pagination=NoPagination(), access_key=access_key, name=session_name

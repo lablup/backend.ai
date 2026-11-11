@@ -46,7 +46,7 @@ class SessionInfoSearcher(Searcher[SessionRow, SessionInfo]):
 
 @dataclass
 class LiveSessionsNamedSearcher(Searcher[SessionRow, SessionEntityData]):
-    """The unended sessions of ``access_key`` whose name is ``name``."""
+    """The live sessions of ``access_key`` whose name is ``name``."""
 
     access_key: AccessKey = field(kw_only=True)
     name: str = field(kw_only=True)

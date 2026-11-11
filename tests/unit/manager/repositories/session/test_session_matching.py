@@ -584,7 +584,7 @@ class TestLiveSessionsMountingVFolder:
 
 
 class TestLiveSessionsNamedSearcher:
-    async def test_lists_only_the_unended_sessions_of_the_key_with_the_name(
+    async def test_lists_only_the_live_sessions_of_the_key_with_the_name(
         self,
         db_with_tables: ExtendedAsyncSAEngine,
         owner: _Owner,

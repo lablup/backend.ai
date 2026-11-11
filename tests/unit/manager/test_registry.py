@@ -480,7 +480,7 @@ class TestLiveSessionNamed:
     ) -> AgentRegistry:
         return registry_ctx[0]
 
-    async def test_none_when_no_unended_session_carries_the_name(
+    async def test_none_when_no_live_session_carries_the_name(
         self, registry: AgentRegistry, access_key: AccessKey
     ) -> None:
         read_ops = _read_ops_answering([])
