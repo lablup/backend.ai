@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from uuid import UUID
 
+from cryptography.exceptions import UnsupportedAlgorithm
+from cryptography.hazmat.primitives.serialization import load_ssh_public_key
 from pydantic import AliasChoices, Field, ValidationInfo, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
@@ -160,6 +162,15 @@ class UploadSSHKeypairRequest(BaseRequestModel):
     """Request to upload an SSH public key."""
 
     pubkey: str = Field(description="SSH public key in standard format (e.g., 'ssh-rsa AAAA...')")
+
+    @field_validator("pubkey")
+    @classmethod
+    def pubkey_must_be_an_ssh_public_key(cls, value: str) -> str:
+        try:
+            load_ssh_public_key(value.encode())
+        except (ValueError, UnsupportedAlgorithm) as e:
+            raise ValueError("pubkey is not a valid SSH public key") from e
+        return value
 
 
 class VerifyAuthRequest(BaseRequestModel):

@@ -7,7 +7,9 @@ from __future__ import annotations
 from typing import Self
 from uuid import UUID
 
-from pydantic import Field
+from cryptography.exceptions import UnsupportedAlgorithm
+from cryptography.hazmat.primitives.serialization import load_ssh_public_key
+from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.defs import MAX_PAGE_LIMIT
@@ -167,6 +169,15 @@ class AdminRegisterSSHKeypairInput(BaseRequestModel):
 
     access_key: str = Field(description="Access key whose SSH public key will be replaced.")
     ssh_public_key: str = Field(description="PEM-encoded SSH public key.")
+
+    @field_validator("ssh_public_key")
+    @classmethod
+    def ssh_public_key_must_be_an_ssh_public_key(cls, value: str) -> str:
+        try:
+            load_ssh_public_key(value.encode())
+        except (ValueError, UnsupportedAlgorithm) as e:
+            raise ValueError("ssh_public_key is not a valid SSH public key") from e
+        return value
 
 
 class AdminDeleteSSHKeypairInput(BaseRequestModel):

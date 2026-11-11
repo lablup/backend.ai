@@ -76,7 +76,7 @@ SERVER_RATE_LIMIT = 10000
 CREATED_RATE_LIMIT = 30000
 """키를 만드는 요청이 요청 한도를 생략했을 때의 값."""
 
-SSH_PUBLIC_KEY = "ssh-rsa scenario-public-key"
+SSH_PUBLIC_KEY = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICq33r1BP5Jbc+JSvADo7sDmG1TUyNz/GmRQzraa1krs"
 
 
 # ------------------------------------------------------------------ situations
@@ -1298,11 +1298,10 @@ class AGrantedUserRegistersAnothersSSHKey(
     def describe(self) -> str:
         return Says(
             "대상 스코프에서 READ 와 UPDATE 를 받은 사용자가 공개키를 주면, "
-            "형식 검사 없이 공개키를 덮어쓰고 access key 가 응답으로 옵니다",
+            "공개키를 덮어쓰고 access key 가 응답으로 옵니다",
             english=(
                 "when a user granted READ and UPDATE in the target scope gives a public key, "
-                "it overwrites the stored public key without a format check and "
-                "the access key comes back"
+                "it overwrites the stored public key and the access key comes back"
             ),
         )
 

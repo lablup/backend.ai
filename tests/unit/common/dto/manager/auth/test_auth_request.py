@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from uuid import UUID, uuid4
 
+import pytest
+from pydantic import ValidationError
+
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.auth.request import (
     AuthorizeRequest,
@@ -15,6 +18,9 @@ from ai.backend.common.dto.manager.auth.request import (
     VerifyAuthRequest,
 )
 from ai.backend.common.dto.manager.auth.types import AuthTokenType
+from ai.backend.common.exception import BackendAISchemaValidationFailed
+
+_SSH_PUBLIC_KEY = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICq33r1BP5Jbc+JSvADo7sDmG1TUyNz/GmRQzraa1krs"
 
 
 def test_authorize_request_creation(sample_client_type_id: UUID) -> None:
@@ -168,8 +174,18 @@ def test_update_password_no_auth_request() -> None:
 
 
 def test_upload_ssh_keypair_request() -> None:
-    req = UploadSSHKeypairRequest(pubkey="ssh-rsa AAAA...")
-    assert req.pubkey == "ssh-rsa AAAA..."
+    req = UploadSSHKeypairRequest(pubkey=_SSH_PUBLIC_KEY)
+    assert req.pubkey == _SSH_PUBLIC_KEY
+
+
+@pytest.mark.parametrize(
+    "pubkey",
+    ["", "not-an-ssh-public-key"],
+    ids=["empty", "unknown-key-type"],
+)
+def test_upload_ssh_keypair_request_rejects_a_non_ssh_public_key(pubkey: str) -> None:
+    with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+        UploadSSHKeypairRequest(pubkey=pubkey)
 
 
 def test_verify_auth_request() -> None:
