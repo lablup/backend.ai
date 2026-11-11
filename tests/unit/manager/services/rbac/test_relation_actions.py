@@ -41,7 +41,6 @@ from ai.backend.manager.actions.v2.relation.result import (
     RelationActionResultMeta,
 )
 from ai.backend.manager.actions.v2.relation.trigger import RelationActionTriggerMeta
-from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.permission import RelationSpecMismatch
 from ai.backend.manager.models.audit_log.creators import RelationAuditLogCreator
 from ai.backend.manager.models.container_registry.creators import ContainerRegistryProjectCreator
@@ -234,17 +233,6 @@ class TestUpdateRelationAction:
 
         assert list(action.scope_targets()) == [_PROJECT_ID, _REGISTRY_ID, other_project]
         assert action.operation_type() is ActionOperationType.UPDATE
-
-    def test_a_pair_named_on_both_sides_is_refused(self) -> None:
-        pair = RelationPair(scope=_PROJECT_ID, target=_REGISTRY_ID)
-
-        with pytest.raises(InvalidAPIParameters):
-            UpdateRelationAction(
-                create_pairs=[pair],
-                creator=ContainerRegistryProjectCreator(),
-                purge_pairs=[pair],
-                purger=ContainerRegistryProjectPurger(),
-            )
 
     def test_a_purger_of_another_relation_is_refused(self) -> None:
         purger: Any = ResourceGroupForDomainRelationPurger()

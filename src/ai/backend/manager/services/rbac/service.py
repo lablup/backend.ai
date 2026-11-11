@@ -13,6 +13,7 @@ from ai.backend.manager.data.permission.role import (
     BulkRoleAssignmentFailure,
     BulkRoleAssignmentResultData,
 )
+from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
@@ -110,6 +111,10 @@ class RbacRelationService:
     async def update(
         self, action: UpdateRelationAction[Any, Any, Any]
     ) -> UpdateRelationActionResult[Any, Any]:
+        """Reject a pair named in both lists here, inside the run, so the audit row
+        records the rejection."""
+        if both := set(action.create_pairs) & set(action.purge_pairs):
+            raise InvalidAPIParameters(f"Pairs named to both create and purge: {both}")
         written, unlinked = await self._repository.update(
             [(pair.scope, pair.target) for pair in action.create_pairs],
             action.creator,

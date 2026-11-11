@@ -7,7 +7,6 @@ from typing import override
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.relation.base import BaseRelationAction
-from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.permission import RelationSpecMismatch
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.specs.relation import RelationCreator, RelationPurger
@@ -23,7 +22,8 @@ class UpdateRelationAction[
 ](BaseRelationAction):
     """Unlink ``purge_pairs`` and link ``create_pairs`` in one transaction.
 
-    A pair named on both sides is refused. Every entity named is asked for UPDATE.
+    A pair named on both sides is rejected by the service. Every entity named is asked
+    for UPDATE.
     """
 
     create_pairs: Sequence[RelationPair[TScope, TTarget]]
@@ -38,8 +38,6 @@ class UpdateRelationAction[
                 f"creator writes {self.creator.row_class().__name__} but purger removes "
                 f"{self.purger.row_class().__name__}"
             )
-        if both := set(self.create_pairs) & set(self.purge_pairs):
-            raise InvalidAPIParameters(f"Pairs named to both create and purge: {both}")
 
     @override
     @classmethod
