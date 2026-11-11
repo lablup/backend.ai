@@ -1,10 +1,18 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Iterator
 
 import pytest
 
 from ai.backend.client.config import APIConfig, set_config
+
+
+@pytest.fixture
+def world_readable_umask() -> Iterator[None]:
+    previous_umask = os.umask(0o022)
+    yield
+    os.umask(previous_umask)
 
 
 @pytest.fixture(autouse=True)
