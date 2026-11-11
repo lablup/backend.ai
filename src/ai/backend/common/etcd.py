@@ -307,8 +307,10 @@ class AsyncEtcd(AbstractKVStore):
         }).check(scope_prefix_map)
 
         if credentials is not None:
-            self._connect_options = ConnectOptions().with_user(
-                credentials["user"], credentials["password"]
+            self._connect_options = (
+                ConnectOptions()
+                .with_user(credentials["user"], credentials["password"])
+                .with_auto_token_refresh(True)
             )
         else:
             self._connect_options = None
