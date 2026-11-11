@@ -1409,11 +1409,6 @@ class VFolderHandler:
     ) -> APIResponse:
         params = body.parsed
         folder_name = params.name
-        allowed_status_set: VFolderStatusSet | None
-        if params.allowed_status_set is None:
-            allowed_status_set = None
-        else:
-            allowed_status_set = VFolderStatusSet(params.allowed_status_set.value)
         resolved = await self._vfolder.get_accessible_vfolder.wait_for_complete(
             GetAccessibleVFolderAction(
                 user_uuid=ctx.user_uuid,
@@ -1422,7 +1417,6 @@ class VFolderHandler:
                 is_admin=req.request["is_admin"],
                 perm=VFolderPermissionSetAlias.READABLE,
                 folder_id_or_name=folder_name,
-                allowed_status_set=allowed_status_set,
                 allow_privileged_access=True,
             )
         )

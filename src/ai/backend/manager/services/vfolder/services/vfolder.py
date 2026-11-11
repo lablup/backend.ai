@@ -1484,7 +1484,6 @@ class VFolderService:
             allowed_vfolder_types=allowed_vfolder_types,
             perm=action.perm,
             folder_id_or_name=action.folder_id_or_name,
-            allowed_status_set=action.allowed_status_set,
             allow_privileged_access=action.allow_privileged_access,
         )
         if len(entries) == 0:

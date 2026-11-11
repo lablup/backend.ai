@@ -24,17 +24,6 @@ class VFolderOperationStatusField(enum.StrEnum):
     DELETE_ERROR = "delete-error"
 
 
-class VFolderStatusSetField(enum.StrEnum):
-    ALL = "all"
-    READABLE = "readable"
-    MOUNTABLE = "mountable"
-    UPDATABLE = "updatable"
-    DELETABLE = "deletable"
-    PURGABLE = "purgable"
-    RECOVERABLE = "recoverable"
-    INACCESSIBLE = "inaccessible"
-
-
 class VFolderOwnershipTypeField(enum.StrEnum):
     USER = "user"
     GROUP = "group"

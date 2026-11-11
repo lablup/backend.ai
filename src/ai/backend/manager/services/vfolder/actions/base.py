@@ -618,7 +618,6 @@ class GetAccessibleVFolderAction(VFolderAction):
     perm: VFolderPermissionSetAlias | VFolderPermission
     folder_id_or_name: str | uuid.UUID
     required_status: VFolderStatusSet | None = None
-    allowed_status_set: VFolderStatusSet | None = None
     allow_privileged_access: bool = False
 
     @override
