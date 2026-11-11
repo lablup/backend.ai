@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import pytest
-from pydantic import ValidationError
 
+from ai.backend.common.auth.exception import InvalidSSHPublicKey
 from ai.backend.common.dto.manager.v2.keypair.request import AdminRegisterSSHKeypairInput
-from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 _SSH_PUBLIC_KEY = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICq33r1BP5Jbc+JSvADo7sDmG1TUyNz/GmRQzraa1krs"
 
@@ -22,5 +21,5 @@ class TestAdminRegisterSSHKeypairInput:
         ids=["empty", "unknown-key-type"],
     )
     def test_rejects_a_non_ssh_public_key(self, ssh_public_key: str) -> None:
-        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+        with pytest.raises(InvalidSSHPublicKey):
             AdminRegisterSSHKeypairInput(access_key="AKIATEST", ssh_public_key=ssh_public_key)

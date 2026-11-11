@@ -3,9 +3,9 @@ from __future__ import annotations
 from uuid import UUID, uuid4
 
 import pytest
-from pydantic import ValidationError
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.auth.exception import InvalidSSHPublicKey
 from ai.backend.common.dto.manager.auth.request import (
     AuthorizeRequest,
     GetRoleRequest,
@@ -18,7 +18,6 @@ from ai.backend.common.dto.manager.auth.request import (
     VerifyAuthRequest,
 )
 from ai.backend.common.dto.manager.auth.types import AuthTokenType
-from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 _SSH_PUBLIC_KEY = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICq33r1BP5Jbc+JSvADo7sDmG1TUyNz/GmRQzraa1krs"
 
@@ -184,7 +183,7 @@ def test_upload_ssh_keypair_request() -> None:
     ids=["empty", "unknown-key-type"],
 )
 def test_upload_ssh_keypair_request_rejects_a_non_ssh_public_key(pubkey: str) -> None:
-    with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+    with pytest.raises(InvalidSSHPublicKey):
         UploadSSHKeypairRequest(pubkey=pubkey)
 
 

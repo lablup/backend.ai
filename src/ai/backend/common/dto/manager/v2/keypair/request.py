@@ -12,6 +12,7 @@ from cryptography.hazmat.primitives.serialization import load_ssh_public_key
 from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.auth.exception import InvalidSSHPublicKey
 from ai.backend.common.dto.manager.defs import MAX_PAGE_LIMIT
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection
@@ -176,7 +177,7 @@ class AdminRegisterSSHKeypairInput(BaseRequestModel):
         try:
             load_ssh_public_key(value.encode())
         except (ValueError, UnsupportedAlgorithm) as e:
-            raise ValueError("ssh_public_key is not a valid SSH public key") from e
+            raise InvalidSSHPublicKey("ssh_public_key is not a valid SSH public key") from e
         return value
 
 

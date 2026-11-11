@@ -12,6 +12,7 @@ from cryptography.hazmat.primitives.serialization import load_ssh_public_key
 from pydantic import AliasChoices, Field, ValidationInfo, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.auth.exception import InvalidSSHPublicKey
 
 from .types import AuthTokenType
 
@@ -169,7 +170,7 @@ class UploadSSHKeypairRequest(BaseRequestModel):
         try:
             load_ssh_public_key(value.encode())
         except (ValueError, UnsupportedAlgorithm) as e:
-            raise ValueError("pubkey is not a valid SSH public key") from e
+            raise InvalidSSHPublicKey("pubkey is not a valid SSH public key") from e
         return value
 
 
