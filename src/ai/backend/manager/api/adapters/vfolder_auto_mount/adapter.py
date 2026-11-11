@@ -125,7 +125,7 @@ class VFolderAutoMountAdapter(BaseAdapter):
         )
         searcher = self._build_searcher(
             VFolderAutoMountSearcher,
-            conditions=self._convert_filter(input.filter) if input.filter else [],
+            conditions=self._search_conditions(input.filter),
             orders=self._convert_orders(input.order) if input.order else [],
             pagination_spec=_VFOLDER_AUTO_MOUNT_PAGINATION_SPEC,
             first=input.first,
@@ -187,6 +187,16 @@ class VFolderAutoMountAdapter(BaseAdapter):
             )
         )
         return DeleteVFolderAutoMountPayload(vfolder_auto_mount=self._data_to_node(result.data))
+
+    def _search_conditions(self, filter: VFolderAutoMountFilter | None) -> list[QueryCondition]:
+        """The filter's conditions; auto-mounts marked deleted are left out unless the
+        top-level filter names ``deleted_at``."""
+        if filter is None:
+            return [VFolderAutoMountSearchableFields.own.deleted_at.filter.is_null()]
+        conditions = self._convert_filter(filter)
+        if filter.deleted_at is None:
+            conditions.append(VFolderAutoMountSearchableFields.own.deleted_at.filter.is_null())
+        return conditions
 
     def _convert_filter(self, filter: VFolderAutoMountFilter) -> list[QueryCondition]:
         fields = VFolderAutoMountSearchableFields.own

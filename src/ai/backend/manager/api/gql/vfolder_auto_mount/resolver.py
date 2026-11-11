@@ -41,7 +41,8 @@ from ai.backend.manager.api.gql.vfolder_auto_mount.types import (
         description=(
             "Page through the vfolder auto-mounts of the named projects and users, combined "
             "with OR. "
-            "Every project is authorized before the read runs."
+            "Every project is authorized before the read runs. Auto-mounts marked deleted "
+            "are left out unless the filter names `deletedAt`."
         ),
     )
 )  # type: ignore[misc]
