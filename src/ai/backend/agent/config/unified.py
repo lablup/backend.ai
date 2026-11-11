@@ -2562,8 +2562,8 @@ class AgentGlobalConfig(BaseConfigSchema):
         ),
     ]
     redis: Annotated[
-        RedisConfig,
-        Field(),
+        RedisConfig | None,
+        Field(default=None),
         BackendAIConfigMeta(
             description=(
                 "Redis configuration. Redis is used for inter-agent communication, caching, and "
@@ -2772,6 +2772,7 @@ class AgentUnifiedConfig(AgentGlobalConfig, AgentSpecificConfig):
         container_logs: ContainerLogsConfig | None = None,
         api: APIConfig | None = None,
         kernel_lifecycles: KernelLifecyclesConfig | None = None,
+        redis: RedisConfig | None = None,
         plugins: Mapping[str, Any] | None = None,
     ) -> None:
         # TODO: Replace setting update values with something like LoaderChain used in Manager.
@@ -2781,6 +2782,8 @@ class AgentUnifiedConfig(AgentGlobalConfig, AgentSpecificConfig):
             self.api = api
         if kernel_lifecycles:
             self.kernel_lifecycles = kernel_lifecycles
+        if redis:
+            self.redis = redis
         if plugins:
             self.plugins = plugins
 

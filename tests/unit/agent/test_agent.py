@@ -25,7 +25,6 @@ from ai.backend.agent.config.unified import (
 from ai.backend.agent.server import AgentRPCServer
 from ai.backend.agent.types import AgentBackend, ContainerLifecycleEvent, LifecycleEvent
 from ai.backend.common.configs.etcd import EtcdConfig
-from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.events.event_types.kernel.anycast import KernelTerminatedAnycastEvent
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.typed_validators import HostPortPair
@@ -53,7 +52,6 @@ def base_agent_config(rpc_auth_key_config: dict[str, Path]) -> AgentUnifiedConfi
             "user": "test",
             "password": "test",
         }),
-        redis=RedisConfig.model_validate({"addr": "127.0.0.1:6379"}),
     )
 
 
