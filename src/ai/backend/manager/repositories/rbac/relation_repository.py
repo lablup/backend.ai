@@ -1,7 +1,7 @@
 """The links between two entities, written through the relation ops.
 
-One method per direction and none per kind: which relation a link is is the spec's, and
-the spec is chosen where the request is read.
+One method per direction, ``update`` for both in one transaction, and none per kind:
+which relation a link is is the spec's, and the spec is chosen where the request is read.
 """
 
 from __future__ import annotations
@@ -46,6 +46,24 @@ class RbacRelationRepository:
         """Take that reach back. Answers per pair whether it was linked."""
         async with self._ops.write_ops() as w:
             return await w.purge_relations(purger, pairs)
+
+    async def update[TScope: EntityIdentifier, TTarget: EntityIdentifier, TRow: Base](
+        self,
+        create_pairs: Sequence[tuple[TScope, TTarget]],
+        creator: RelationCreator[TScope, TTarget, TRow],
+        purge_pairs: Sequence[tuple[TScope, TTarget]],
+        purger: RelationPurger[TScope, TTarget, TRow],
+    ) -> tuple[list[bool], list[bool]]:
+        """Purge then create in one transaction, locked on every entity named, so a
+        failure leaves nothing and runs sharing an entity go one after another. Answers
+        as :meth:`create` and :meth:`purge` do, in that order."""
+        async with self._ops.write_ops() as w:
+            await w.lock_entities(
+                entity for pair in (*create_pairs, *purge_pairs) for entity in pair
+            )
+            unlinked = await w.purge_relations(purger, purge_pairs) if purge_pairs else []
+            linked = await w.create_relations(creator, create_pairs) if create_pairs else []
+            return linked, unlinked
 
     async def delete[TScope: EntityIdentifier, TTarget: EntityIdentifier, TRow: Base](
         self,
