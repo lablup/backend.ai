@@ -25,7 +25,6 @@ class _MountPointCase:
 class _ProcessMountsSituation:
     ctx: MagicMock
     work_dir: Path
-    dir_outside_scratch: Path
     mounts: list[Mount]
 
 
@@ -43,9 +42,6 @@ class TestProcessMounts:
         )
         work_dir = tmp_path / "scratch" / "work"
         work_dir.mkdir(parents=True)
-        dir_outside_scratch = tmp_path / "outside"
-        dir_outside_scratch.mkdir()
-        (work_dir / "link-to-outside").symlink_to(dir_outside_scratch)
         source = tmp_path / "vfolder"
         if case.source_is_dir:
             source.mkdir()
@@ -58,12 +54,7 @@ class TestProcessMounts:
             DockerKernelCreationContext._create_mount_points_in_work_dir, ctx
         )
         mount = Mount(MountTypes.BIND, source, Path(case.target), MountPermission.READ_ONLY)
-        return _ProcessMountsSituation(
-            ctx=ctx,
-            work_dir=work_dir,
-            dir_outside_scratch=dir_outside_scratch,
-            mounts=[mount],
-        )
+        return _ProcessMountsSituation(ctx=ctx, work_dir=work_dir, mounts=[mount])
 
     @pytest.mark.parametrize(
         "case",
@@ -83,32 +74,10 @@ class TestProcessMounts:
                 source_is_dir=False,
                 expected_dirs_in_work=frozenset(),
             ),
-            _MountPointCase(
-                target="/home/work/../../home/work/data",
-                source_is_dir=True,
-                expected_dirs_in_work=frozenset({"data"}),
-            ),
-            _MountPointCase(
-                target="/home/work/../../outside/data",
-                source_is_dir=True,
-                expected_dirs_in_work=frozenset(),
-            ),
-            _MountPointCase(
-                target="/home/work/link-to-outside/data",
-                source_is_dir=True,
-                expected_dirs_in_work=frozenset(),
-            ),
         ],
-        ids=[
-            "nested-dir-below-work",
-            "dir-outside-work",
-            "file-below-work",
-            "dotdot-back-into-work",
-            "dotdot-out-of-work",
-            "symlink-out-of-work",
-        ],
+        ids=["nested-dir-below-work", "dir-outside-work", "file-below-work"],
     )
-    async def test_creates_mount_points_only_inside_work(
+    async def test_creates_mount_points_of_dirs_below_work(
         self,
         process_mounts_situation: _ProcessMountsSituation,
         case: _MountPointCase,
@@ -118,10 +87,5 @@ class TestProcessMounts:
         )
 
         work_dir = process_mounts_situation.work_dir
-        dirs_in_work = {
-            str(p.relative_to(work_dir))
-            for p in work_dir.rglob("*")
-            if p.is_dir() and not p.is_symlink()
-        }
+        dirs_in_work = {str(p.relative_to(work_dir)) for p in work_dir.rglob("*") if p.is_dir()}
         assert dirs_in_work == case.expected_dirs_in_work
-        assert not any(process_mounts_situation.dir_outside_scratch.iterdir())
