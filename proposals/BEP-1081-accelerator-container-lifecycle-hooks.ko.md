@@ -3,8 +3,8 @@
 ## Related Issues
 
 - JIRA: 아직 생성하지 않음
-- 사용처: `backend.ai-accelerator-cuda-open` (독립 오픈소스 CUDA 가속기 플러그인)의 fractional 할당 모드
-- 상위 문서: [BEP-1016](BEP-1016-accelerator-interface-v2.md) (Accelerator Interface v2, `AbstractLifecycleHook`)
+- 사용처: 독립 CUDA 플러그인 `backend.ai-accelerator-cuda-open` 의 fractional 모드
+- 상위: [BEP-1016](BEP-1016-accelerator-interface-v2.md) (`AbstractLifecycleHook`)
 
 ## Goal
 
@@ -21,7 +21,7 @@
 
 ## Non-goals
 
-- BEP-1016 의 v2 플러그인 인터페이스 (`AbstractLifecycleHook`, `Workload`, `WorkloadConfig`). 여기의 두 호출은 나중에 그 인터페이스로 대체합니다 (결정 요약 참고).
+- BEP-1016 의 v2 플러그인 인터페이스 (`AbstractLifecycleHook`, `Workload`, `WorkloadConfig`)
 - Docker 외의 Agent 백엔드.
 - 훅이 반환하는 설정 변경. 컨테이너 설정은 계속 `generate_docker_args` 가 만듭니다.
 - 열린 질문의 후속 항목: MIG 자원 슬롯 유형 등록, GPU 개수 힌트, 트리 안의 `cuda_open` 사본.
@@ -108,7 +108,7 @@ generate_docker_args → docker create → resource.txt 에 CID → on_container
 | `number_format` | `{"binary": true, "round_length": 1}` |
 | `rank` | 450 |
 
-upgrade 는 `ON CONFLICT DO NOTHING` 으로 넣습니다. downgrade 는 `cuda.mem` 을 참조하는 테이블이 없을 때만 행을 삭제합니다.
+upgrade 는 고정 uuid 로 행을 `ON CONFLICT DO NOTHING` 으로 넣고, `ResourceSlotTypeUpserter` 가 쓰는 그래프 노드와 edge 를 씁니다: 노드는 자신을 소유하고 관할하며, `global` 과 `public` 스코프가 노드를 소유하고 관할합니다. 운영자가 이미 등록한 `cuda.mem` 은 행을 그대로 두고 노드만 받습니다. downgrade 는 고정 uuid 의 행만, `slot_name` 에 외래 키를 둔 테이블 여섯 개 중 어느 것도 참조하지 않을 때 삭제합니다. 새 설치 (`mgr schema oneshot`) 는 마이그레이션을 실행하지 않고 head 로 stamp 하므로 `fixtures/manager/example-resource-slot-types.json` 에도 같은 행을 둡니다.
 
 ### CUDA 플러그인의 사용
 
@@ -132,7 +132,7 @@ device 모드는 두 훅에서 아무것도 하지 않습니다.
 
 ## Implementation Plan
 
-1. 코어: 훅 두 개, `resource.txt` 의 정확한 바이트 수, `cuda.mem` 마이그레이션, 단위 테스트 (`topic/compute-plugin-container-hooks` 의 draft PR).
+1. 코어 (`topic/compute-plugin-container-hooks`): 훅 두 개, 바이트 수, `cuda.mem`, 테스트
 2. 열린 질문의 코어 후속 작업, 항목마다 PR 하나.
 3. BEP-1016: 두 메서드를 `AbstractLifecycleHook.post_create()`, `post_terminate()` 로 대체.
 
@@ -161,5 +161,5 @@ device 모드는 두 훅에서 아무것도 하지 않습니다.
 ## Related documents
 
 - [BEP-1016: Accelerator Interface v2](BEP-1016-accelerator-interface-v2.md)
-- [BEP-1000: Redefining Accelerator Metadata](BEP-1000-redefining-accelerator-metadata.md)
-- [BEP-1061: Agent Kernel Lifecycle Structuring](BEP-1061-agent-kernel-lifecycle.md)
+- [BEP-1000](BEP-1000-redefining-accelerator-metadata.md): 가속기 메타데이터 재정의
+- [BEP-1061](BEP-1061-agent-kernel-lifecycle.md): Agent 커널 라이프사이클 구조화

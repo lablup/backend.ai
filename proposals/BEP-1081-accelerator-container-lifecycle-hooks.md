@@ -12,7 +12,7 @@ Implemented-Version:
 ## Related Issues
 
 - JIRA: not created yet
-- Consumer: `backend.ai-accelerator-cuda-open` (the standalone open-source CUDA accelerator plugin), its fractional allocation mode
+- Consumer: the fractional allocation mode of `backend.ai-accelerator-cuda-open`, the standalone CUDA plugin
 - Upstream: [BEP-1016](BEP-1016-accelerator-interface-v2.md) (Accelerator Interface v2, `AbstractLifecycleHook`)
 
 ## Goal
@@ -30,7 +30,7 @@ The first consumer is the fractional mode of the standalone CUDA plugin. It prov
 
 ## Non-goals
 
-- The v2 plugin interface of BEP-1016 (`AbstractLifecycleHook`, `Workload`, `WorkloadConfig`). The two calls here map onto it later (see the decision summary).
+- The BEP-1016 v2 plugin interface (`AbstractLifecycleHook`, `Workload`, `WorkloadConfig`)
 - Agent backends other than Docker.
 - Config changes returned by a hook. Container config stays in `generate_docker_args`.
 - The follow-up items in the open questions: MIG slot type registration, the GPU count hint, the in-tree `cuda_open` copy.
@@ -117,7 +117,7 @@ Rules a plugin follows:
 | `number_format` | `{"binary": true, "round_length": 1}` |
 | `rank` | 450 |
 
-The upgrade inserts with `ON CONFLICT DO NOTHING`. The downgrade deletes the row only when no table references `cuda.mem`.
+The upgrade writes the row under a fixed uuid with `ON CONFLICT DO NOTHING`, then the graph node and its edges that `ResourceSlotTypeUpserter` writes: the node owns and governs itself, and the `global` and `public` scopes own and govern it. A `cuda.mem` an operator already registered keeps its row and gets the node. The downgrade deletes only the row under the fixed uuid, and only when none of the six tables with a foreign key to `slot_name` refers to it. `fixtures/manager/example-resource-slot-types.json` carries the same row, since a fresh install (`mgr schema oneshot`) stamps the head without running the migration.
 
 ### Use by the CUDA plugin
 
@@ -141,7 +141,7 @@ The device mode does nothing in either hook.
 
 ## Implementation Plan
 
-1. Core: the two hooks, exact bytes in `resource.txt`, the `cuda.mem` migration, unit tests (draft PR on `topic/compute-plugin-container-hooks`).
+1. Core, branch `topic/compute-plugin-container-hooks`: the two hooks, exact bytes, `cuda.mem`, unit tests
 2. Core follow-ups from the open questions, one PR each.
 3. BEP-1016: replace the two methods with `AbstractLifecycleHook.post_create()` and `post_terminate()`.
 
