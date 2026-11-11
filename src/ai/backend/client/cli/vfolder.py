@@ -180,12 +180,15 @@ def delete(name: str) -> None:
             sys.exit(ExitCode.FAILURE)
 
 
-@vfolder.command()
+@vfolder.command(
+    deprecated=(
+        "A name does not resolve to a `delete-complete` folder; "
+        "use `backend.ai v2 vfolder purge VFOLDER_ID`."
+    )
+)
 @click.argument("name", type=str)
 def purge(name: str) -> None:
     """Purge the given virtual folder. This operation is irreversible!
-    Deprecated: a name does not resolve to a `delete-complete` folder.
-    Use `backend.ai v2 vfolder purge VFOLDER_ID`.
 
     NAME: Name of a virtual folder.
     """
