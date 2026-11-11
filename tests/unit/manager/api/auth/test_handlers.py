@@ -39,7 +39,9 @@ from ai.backend.common.dto.manager.auth.request import (
     UploadSSHKeypairRequest,
     VerifyAuthRequest,
 )
+from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import AccessKey, SecretKey
+from ai.backend.manager.api.adapters.auth.adapter import AuthAdapter
 from ai.backend.manager.api.rest.auth.handler import AuthHandler
 from ai.backend.manager.api.rest.middleware.auth import (
     TRUSTED_PROXY_NETWORKS_KEY,
@@ -78,7 +80,7 @@ def mock_processors() -> MagicMock:
 @pytest.fixture
 def handler(mock_processors: MagicMock) -> AuthHandler:
     """AuthHandler instance with mock processors."""
-    return AuthHandler(auth=mock_processors.auth)
+    return AuthHandler(auth=mock_processors.auth, adapter=AuthAdapter(mock_processors.auth))
 
 
 @pytest.fixture
@@ -576,26 +578,15 @@ class TestUpdatePassword:
         mock_processors.auth.update_password.run.assert_called_once()
         assert response.status_code == HTTPStatus.OK
 
-    async def test_returns_bad_request_on_failure(
-        self,
-        handler: AuthHandler,
-        user_context: UserContext,
-        mock_processors: MagicMock,
-    ) -> None:
-        """Verify BAD_REQUEST is returned when password update fails."""
+    async def test_rejects_mismatched_confirmation(self) -> None:
+        """Verify a mismatched new_password2 is rejected while parsing the body."""
         body: BodyParam[UpdatePasswordRequest] = BodyParam(UpdatePasswordRequest)
-        body.from_body({
-            "old_password": "oldpass",
-            "new_password": "newpass",
-            "new_password2": "differentpass",
-        })
-        mock_processors.auth.update_password.run = AsyncMock(
-            return_value=UpdatePasswordActionResult(success=False, message="mismatch")
-        )
-
-        response = await handler.update_password(body, user_context)
-
-        assert response.status_code == HTTPStatus.BAD_REQUEST
+        with pytest.raises(InvalidAPIParameters, match="new password mismatch"):
+            body.from_body({
+                "old_password": "oldpass",
+                "new_password": "newpass",
+                "new_password2": "differentpass",
+            })
 
 
 class TestUpdatePasswordNoAuth:

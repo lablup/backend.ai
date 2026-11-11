@@ -130,6 +130,13 @@ class UpdateUserV2InputGQL(PydanticInputMixin[UpdateUserInputDTO]):
 
     username: str | None = gql_field(description="New username.", default=UNSET)
     password: str | None = gql_field(description="New password.", default=UNSET)
+    old_password: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Current password, required when changing your own password.",
+        ),
+        default=UNSET,
+    )
     full_name: str | None = gql_field(description="New full display name.", default=UNSET)
     description: str | None = gql_field(description="New description.", default=UNSET)
     status: UserStatusEnumGQL | None = gql_field(

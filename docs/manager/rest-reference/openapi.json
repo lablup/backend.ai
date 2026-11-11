@@ -39242,6 +39242,18 @@
             "description": "New password. Omit to leave unchanged.",
             "title": "Password"
           },
+          "old_password": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Current password, required for own password changes. Added in 26.10.0.",
+            "title": "Old Password"
+          },
           "full_name": {
             "anyOf": [
               {

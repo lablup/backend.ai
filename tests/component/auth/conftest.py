@@ -18,6 +18,7 @@ from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.manager.api.adapters.auth.adapter import AuthAdapter
 from ai.backend.manager.api.rest.auth.handler import AuthHandler
 from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 
@@ -58,7 +59,9 @@ def server_module_registries(
 ) -> list[RouteRegistry]:
     """Load only the auth module for auth-domain tests."""
     return [
-        register_auth_routes(AuthHandler(auth=auth_processors), route_deps),
+        register_auth_routes(
+            AuthHandler(auth=auth_processors, adapter=AuthAdapter(auth_processors)), route_deps
+        ),
     ]
 
 

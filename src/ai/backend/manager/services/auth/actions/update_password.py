@@ -11,7 +11,6 @@ class UpdatePasswordAction(UserEntityAction):
     email: str
     old_password: str
     new_password: str
-    new_password_confirm: str
 
     @override
     @classmethod
