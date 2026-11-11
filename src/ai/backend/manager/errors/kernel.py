@@ -4,8 +4,8 @@ Kernel and session-related exceptions.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
-from typing import TYPE_CHECKING, Any, Self, override
+from collections.abc import Mapping
+from typing import Any, override
 
 from aiohttp import web
 
@@ -25,9 +25,6 @@ from ai.backend.manager.errors.base.field import FieldError, FieldErrorCode
 from ai.backend.manager.exceptions import AgentError
 
 from .common import ObjectNotFound
-
-if TYPE_CHECKING:
-    from ai.backend.manager.data.session.types import SessionEntityData
 
 
 class KernelNotReady(FieldError, web.HTTPBadRequest):
@@ -102,23 +99,6 @@ class TooManySessionsMatched(EntityError, web.HTTPNotFound):
             ]
             extra_data["matches"] = serializable_matches
         super().__init__(extra_msg, extra_data, **kwargs)
-
-    @classmethod
-    def from_sessions(cls, sessions: Sequence[SessionEntityData]) -> Self:
-        """The error carrying every session that matched."""
-        return cls(
-            extra_data={
-                "matches": [
-                    {
-                        "session_id": session.id,
-                        "session_name": session.name,
-                        "status": session.status,
-                        "created_at": session.created_at,
-                    }
-                    for session in sessions
-                ]
-            }
-        )
 
 
 class TooManyKernelsFound(FieldError, web.HTTPNotFound):

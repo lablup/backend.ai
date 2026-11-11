@@ -123,7 +123,19 @@ class SessionDBSource:
         if len(sessions) > 1:
             # Defensive: the partial unique index should prevent this for non-terminal
             # sessions, but guard against any data that escaped the constraint.
-            raise TooManySessionsMatched.from_sessions(sessions)
+            raise TooManySessionsMatched(
+                extra_data={
+                    "matches": [
+                        {
+                            "session_id": session.id,
+                            "session_name": session.name,
+                            "status": session.status,
+                            "created_at": session.created_at,
+                        }
+                        for session in sessions
+                    ]
+                }
+            )
         return SessionId(sessions[0].id)
 
     async def get_session_name(self, session_id: SessionId) -> str:
