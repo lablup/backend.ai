@@ -993,7 +993,6 @@ class VFolderAdapter(BaseAdapter):
                 f.auto_mounts,
                 VFolderSearchableFields.nested.auto_mounts.correlation,
                 self._convert_vfolder_auto_mount_filter,
-                self._auto_mount_conditions_leaving_out_deleted,
             ),
         ]
         if f.AND:
@@ -1013,15 +1012,6 @@ class VFolderAdapter(BaseAdapter):
                 if sub_conditions:
                     conditions.append(negate_conditions(sub_conditions))
         return conditions
-
-    def _auto_mount_conditions_leaving_out_deleted(
-        self, row_filter: VFolderAutoMountFilter | None
-    ) -> list[QueryCondition]:
-        """Auto-mounts marked deleted are left out unless the row filter gives
-        ``deleted_at`` at the top level, as an auto-mount search does."""
-        if row_filter is not None and row_filter.deleted_at is not None:
-            return []
-        return [VFolderAutoMountSearchableFields.own.deleted_at.filter.is_null()]
 
     def _convert_vfolder_auto_mount_filter(self, f: VFolderAutoMountFilter) -> list[QueryCondition]:
         fields = VFolderAutoMountSearchableFields.own

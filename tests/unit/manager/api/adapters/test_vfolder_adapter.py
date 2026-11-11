@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass
 from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
@@ -14,7 +13,7 @@ import pytest
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
-from ai.backend.common.dto.manager.query import NullableDateTimeFilter, UUIDFilter
+from ai.backend.common.dto.manager.query import UUIDFilter
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.dto.manager.v2.vfolder.request import (
     ScopedSearchVFoldersInput,
@@ -40,7 +39,6 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderUsageData,
 )
 from ai.backend.manager.errors.common import GenericForbidden
-from ai.backend.manager.errors.repository import EmptyMatchConditionError
 from ai.backend.manager.services.vfolder.actions.get_usage import (
     GetVFolderUsageActionResult,
 )
@@ -276,101 +274,26 @@ class TestVFolderAdapterConvertFilter:
 _SCOPE_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
 
 
-@dataclass(frozen=True)
-class _AutoMountsFilterCase:
-    auto_mounts: VFolderAutoMountNestedFilter
-    expected_sql_fragments: list[str]
-    reaches_deleted: bool
-
-
 class TestVFolderAdapterConvertAutoMountsFilter:
     @pytest.fixture
     def adapter(self) -> VFolderAdapter:
         return VFolderAdapter(MagicMock(), MagicMock(), MagicMock(), MagicMock(), MagicMock())
 
-    @pytest.mark.parametrize(
-        "case",
-        [
-            _AutoMountsFilterCase(
-                auto_mounts=VFolderAutoMountNestedFilter(exists=True),
-                expected_sql_fragments=["EXISTS"],
-                reaches_deleted=False,
-            ),
-            _AutoMountsFilterCase(
+    def test_some_correlates_the_vfolder_auto_mounts_without_a_deleted_at_condition(
+        self, adapter: VFolderAdapter
+    ) -> None:
+        conditions = adapter._convert_vfolder_filter(
+            VFolderFilter(
                 auto_mounts=VFolderAutoMountNestedFilter(
                     some=VFolderAutoMountFilter(scope_id=UUIDFilter(equals=_SCOPE_ID))
-                ),
-                expected_sql_fragments=["vfolder_auto_mounts.scope_id = :"],
-                reaches_deleted=False,
-            ),
-            _AutoMountsFilterCase(
-                auto_mounts=VFolderAutoMountNestedFilter(
-                    every=VFolderAutoMountFilter(scope_id=UUIDFilter(equals=_SCOPE_ID))
-                ),
-                expected_sql_fragments=[
-                    "NOT (EXISTS",
-                    "vfolder_auto_mounts.deleted_at IS NULL AND vfolder_auto_mounts.scope_id != :",
-                ],
-                reaches_deleted=False,
-            ),
-            _AutoMountsFilterCase(
-                auto_mounts=VFolderAutoMountNestedFilter(
-                    some=VFolderAutoMountFilter(deleted_at=NullableDateTimeFilter(is_null=False))
-                ),
-                expected_sql_fragments=["vfolder_auto_mounts.deleted_at IS NOT NULL"],
-                reaches_deleted=True,
-            ),
-            _AutoMountsFilterCase(
-                auto_mounts=VFolderAutoMountNestedFilter(
-                    every=VFolderAutoMountFilter(
-                        deleted_at=NullableDateTimeFilter(after=datetime(2026, 1, 1, tzinfo=UTC))
-                    )
-                ),
-                expected_sql_fragments=["vfolder_auto_mounts.deleted_at <= :"],
-                reaches_deleted=True,
-            ),
-            _AutoMountsFilterCase(
-                auto_mounts=VFolderAutoMountNestedFilter(
-                    some=VFolderAutoMountFilter(
-                        AND=[
-                            VFolderAutoMountFilter(deleted_at=NullableDateTimeFilter(is_null=False))
-                        ]
-                    )
-                ),
-                expected_sql_fragments=["vfolder_auto_mounts.deleted_at IS NOT NULL"],
-                reaches_deleted=False,
-            ),
-        ],
-        ids=[
-            "exists",
-            "some",
-            "every",
-            "some_top_level_deleted_at",
-            "every_top_level_deleted_at",
-            "some_nested_deleted_at",
-        ],
-    )
-    def test_reaches_deleted_auto_mounts_only_for_a_top_level_deleted_at(
-        self, adapter: VFolderAdapter, case: _AutoMountsFilterCase
-    ) -> None:
-        conditions = adapter._convert_vfolder_filter(VFolderFilter(auto_mounts=case.auto_mounts))
+                )
+            )
+        )
         assert len(conditions) == 1
         sql = str(conditions[0]())
         assert "vfolder_auto_mounts.vfolder_id = vfolders.id" in sql
-        assert ("vfolder_auto_mounts.deleted_at IS NULL" not in sql) == case.reaches_deleted
-        for fragment in case.expected_sql_fragments:
-            assert fragment in sql
-
-    @pytest.mark.parametrize("mode", ["some", "every", "none"])
-    def test_a_mode_given_no_condition_is_refused(self, adapter: VFolderAdapter, mode: str) -> None:
-        with pytest.raises(EmptyMatchConditionError):
-            adapter._convert_vfolder_filter(
-                VFolderFilter(
-                    auto_mounts=VFolderAutoMountNestedFilter.model_validate({
-                        mode: VFolderAutoMountFilter()
-                    })
-                )
-            )
+        assert "vfolder_auto_mounts.scope_id = :" in sql
+        assert "vfolder_auto_mounts.deleted_at" not in sql
 
 
 class TestVFolderAdapterGetFolderUsage:

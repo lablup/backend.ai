@@ -105,10 +105,7 @@ class VFolderFilterGQL(PydanticInputMixin[VFolderFilter]):
     auto_mounts: VFolderAutoMountNestedFilterGQL | None = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
-            description=(
-                "Select vfolders by the auto-mounts set on them. Auto-mounts marked deleted "
-                "are left out unless the relation's filter gives `deletedAt` at the top level."
-            ),
+            description="Select vfolders by the auto-mounts set on them.",
         ),
         default=None,
     )

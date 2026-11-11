@@ -29,9 +29,7 @@ from ai.backend.common.dto.manager.query import (
     ToManyFilter,
     UUIDFilter,
 )
-from ai.backend.manager.errors.repository import EmptyMatchConditionError
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.condition_utils import negate_conditions
 from ai.backend.manager.models.specs.conditions.array import ArrayConditions
 from ai.backend.manager.models.specs.conditions.boolean import BoolConditions
 from ai.backend.manager.models.specs.conditions.date import DateConditions
@@ -472,64 +470,25 @@ class BaseFilterAdapter:
         to_many_filter: ToManyFilter[F] | None,
         correlation: ToManyCorrelation,
         row_conditions: Callable[[F], list[QueryCondition]],
-        counted_row_conditions: Callable[[F | None], list[QueryCondition]] | None = None,
     ) -> list[QueryCondition]:
         """Apply every matching mode ``to_many_filter`` sets, each as its own condition.
 
         ``row_conditions`` turns the row filter into the conditions one related row must
-        meet. A mode carrying no condition is refused with a 400 rather than silently
-        widening to "has a related row" — which is what ``exists`` says.
-
-        ``counted_row_conditions`` takes a mode's row filter (``None`` for ``exists``) and
-        returns the conditions a related row must meet to be counted at all; the related
-        rows they leave out take no part in that mode, ``every`` included.
+        meet. A mode carrying no condition is refused by the correlation, so a request
+        that names one without saying what to match answers with a 400 rather than
+        silently widening to "has a related row" — which is what ``exists`` says.
         """
         if to_many_filter is None:
             return []
-        counted_conditions_for = counted_row_conditions or (lambda _row_filter: [])
         applied: list[QueryCondition] = []
         if to_many_filter.exists is not None:
-            counted = counted_conditions_for(None)
-            if not counted:
-                applied.append(
-                    correlation.exists() if to_many_filter.exists else correlation.not_exists()
-                )
-            elif to_many_filter.exists:
-                applied.append(correlation.some(counted))
-            else:
-                applied.append(correlation.none(counted))
+            applied.append(
+                correlation.exists() if to_many_filter.exists else correlation.not_exists()
+            )
         if to_many_filter.some is not None:
-            conditions = self._required_row_conditions(row_conditions, to_many_filter.some, "some")
-            applied.append(
-                correlation.some([*conditions, *counted_conditions_for(to_many_filter.some)])
-            )
+            applied.append(correlation.some(row_conditions(to_many_filter.some)))
         if to_many_filter.every is not None:
-            conditions = self._required_row_conditions(
-                row_conditions, to_many_filter.every, "every"
-            )
-            counted = counted_conditions_for(to_many_filter.every)
-            if not counted:
-                applied.append(correlation.every(conditions))
-            else:
-                # `every` negates all its conditions, which would count a left-out row as
-                # failing; "no counted row fails" keeps `counted` outside the negation.
-                applied.append(correlation.none([*counted, negate_conditions(conditions)]))
+            applied.append(correlation.every(row_conditions(to_many_filter.every)))
         if to_many_filter.none is not None:
-            conditions = self._required_row_conditions(row_conditions, to_many_filter.none, "none")
-            applied.append(
-                correlation.none([*conditions, *counted_conditions_for(to_many_filter.none)])
-            )
+            applied.append(correlation.none(row_conditions(to_many_filter.none)))
         return applied
-
-    def _required_row_conditions[F](
-        self,
-        row_conditions: Callable[[F], list[QueryCondition]],
-        row_filter: F,
-        mode: str,
-    ) -> list[QueryCondition]:
-        conditions = row_conditions(row_filter)
-        if not conditions:
-            raise EmptyMatchConditionError(
-                extra_msg=f"`{mode}` was given no condition; `exists` asks for a related row"
-            )
-        return conditions

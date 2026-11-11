@@ -51,11 +51,7 @@ class VFolderAutoMountScopeTypeFilter(EnumFilter[VFolderAutoMountScopeType]):
 
 
 class VFolderAutoMountFilter(BaseRequestModel):
-    """Filter for vfolder auto-mounts.
-
-    Auto-mounts marked deleted are left out unless the top-level filter gives ``deleted_at``.
-    A ``deleted_at`` inside ``AND``/``OR``/``NOT`` does not lift that default.
-    """
+    """Filter for vfolder auto-mounts."""
 
     entity_id: UUIDFilter | None = Field(default=None, description="Filter by auto-mount ID.")
     scope_type: VFolderAutoMountScopeTypeFilter | None = Field(
@@ -76,11 +72,7 @@ class VFolderAutoMountFilter(BaseRequestModel):
         default=None, description="Filter by last update time."
     )
     deleted_at: NullableDateTimeFilter | None = Field(
-        default=None,
-        description=(
-            "Filter by deletion time. Setting it on the top-level filter includes the "
-            "auto-mounts marked deleted; inside AND, OR or NOT it does not."
-        ),
+        default=None, description="Filter by deletion time."
     )
 
     AND: list[VFolderAutoMountFilter] | None = Field(
@@ -100,9 +92,7 @@ VFolderAutoMountFilter.model_rebuild()
 class VFolderAutoMountNestedFilter(ToManyFilter[VFolderAutoMountFilter]):
     """The `auto_mounts` field of a vfolder filter.
 
-    Auto-mounts marked deleted are left out of a relation unless its filter gives
-    `deleted_at` at the top level; `exists` always leaves them out. Each relation matches
-    one auto-mount at a time.
+    Each relation matches one auto-mount at a time.
     """
 
 
