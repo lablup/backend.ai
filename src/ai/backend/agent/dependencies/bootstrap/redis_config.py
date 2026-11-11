@@ -7,7 +7,6 @@ from typing import override
 from ai.backend.agent.config.unified import AgentUnifiedConfig
 from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.dependencies import NonMonitorableDependencyProvider
-from ai.backend.common.exception import ConfigurationError
 
 
 class RedisConfigDependency(NonMonitorableDependencyProvider[AgentUnifiedConfig, RedisConfig]):
@@ -21,6 +20,4 @@ class RedisConfigDependency(NonMonitorableDependencyProvider[AgentUnifiedConfig,
     @asynccontextmanager
     @override
     async def provide(self, setup_input: AgentUnifiedConfig) -> AsyncIterator[RedisConfig]:
-        if setup_input.redis is None:
-            raise ConfigurationError({"redis": "Redis configuration is missing."})
         yield setup_input.redis

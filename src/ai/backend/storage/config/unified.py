@@ -1776,8 +1776,8 @@ class StorageProxyUnifiedConfig(BaseConfigSchema):
         ),
     ]
     redis: Annotated[
-        RedisConfig | None,
-        Field(default=None),
+        RedisConfig,
+        Field(),
         BackendAIConfigMeta(
             description="Redis configuration. The storage proxy reads it only from this file.",
             added_version=NEXT_RELEASE_VERSION,
