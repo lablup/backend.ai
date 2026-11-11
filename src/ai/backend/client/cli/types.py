@@ -10,6 +10,9 @@ if TYPE_CHECKING:
     from ai.backend.client.output.types import BaseOutputHandler
 
 
+CLI_CREDENTIAL_FILE_MODE = 0o600
+
+
 class OutputMode(enum.Enum):
     CONSOLE = "console"
     JSON = "json"
