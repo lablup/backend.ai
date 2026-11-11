@@ -102,7 +102,7 @@ from ai.backend.manager.clients.storage_proxy.session_manager import StorageSess
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.image.types import ImageData, ImageStatus
-from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
 from ai.backend.manager.data.model_serving.types import EndpointData
 from ai.backend.manager.data.resource_group.types import ResourceGroupData
 from ai.backend.manager.data.session.draft import (
@@ -159,6 +159,7 @@ from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagin
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.read import V2ReadOps
 from ai.backend.manager.repositories.resource_slot.repository import ResourceSlotRepository
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.sokovan.scheduling_controller.resource_parse import parse_quantity
@@ -352,16 +353,16 @@ class AgentRegistry:
             raise ImageNotFound()
         return result.items[0]
 
+    @staticmethod
     async def _live_session_named(
-        self, session_name: str, access_key: AccessKey
+        r: V2ReadOps, session_name: str, access_key: AccessKey
     ) -> SessionEntityData | None:
         """The unended session of ``access_key`` named ``session_name``, if there is one."""
-        async with self._ops_provider.read_ops() as r:
-            result = await r.search_in_global(
-                LiveSessionsNamedSearcher(
-                    pagination=NoPagination(), access_key=access_key, name=session_name
-                )
+        result = await r.search_in_global(
+            LiveSessionsNamedSearcher(
+                pagination=NoPagination(), access_key=access_key, name=session_name
             )
+        )
         return result.items[0] if result.items else None
 
     async def init(self) -> None:
@@ -561,19 +562,23 @@ class AgentRegistry:
         # Check existing (access_key, session_name) instance
         # NOTE: We can reuse the session IDs of TERMINATED sessions only.
         # NOTE: Reusing a session in the PENDING status returns an empty value in service_ports.
-        existing = await self._live_session_named(session_name, owner_access_key)
+        main_kernels: list[KernelInfo] = []
+        async with self._ops_provider.read_ops() as r:
+            existing = await self._live_session_named(r, session_name, owner_access_key)
+            if existing is not None:
+                main_kernels = (
+                    await r.search_in_global(
+                        MainKernelSearcher(pagination=NoPagination(), session_id=existing.id)
+                    )
+                ).items
         if existing is not None:
-            async with self._ops_provider.read_ops() as r:
-                main_kernels = await r.search_in_global(
-                    MainKernelSearcher(pagination=NoPagination(), session_id=existing.id)
-                )
-            if len(main_kernels.items) > 1:
+            if len(main_kernels) > 1:
                 raise TooManyKernelsFound(
                     f"Session (id: {existing.id}) has more than 1 main kernel."
                 )
-            if not main_kernels.items:
+            if not main_kernels:
                 raise MainKernelNotFound(f"Session (id={existing.id}) has no main kernel.")
-            main_kernel = main_kernels.items[0]
+            main_kernel = main_kernels[0]
             if main_kernel.image.identifier is None:
                 raise InvalidKernelConfig("Session main kernel has no image specified")
             if not main_kernel.image.identifier.architecture:
@@ -797,7 +802,9 @@ class AgentRegistry:
         # Check existing (access_key, session) kernel instance
         # NOTE: We can reuse the session IDs of TERMINATED sessions only.
         # NOTE: Reusing a session in the PENDING status returns an empty value in service_ports.
-        if await self._live_session_named(session_name, owner_access_key) is not None:
+        async with self._ops_provider.read_ops() as r:
+            existing = await self._live_session_named(r, session_name, owner_access_key)
+        if existing is not None:
             raise TooManySessionsMatched
 
         mounts = []

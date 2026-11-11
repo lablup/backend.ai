@@ -6,7 +6,7 @@ import uuid
 from collections.abc import AsyncGenerator, AsyncIterator, Mapping
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, cast
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -449,16 +449,15 @@ def _session_entity_data(name: str, access_key: AccessKey) -> SessionEntityData:
     )
 
 
-def _answer_global_searches(registry: AgentRegistry, items: list[SessionEntityData]) -> None:
-    """Make the registry's ops provider answer every global search with ``items``."""
+def _read_ops_answering(items: list[SessionEntityData]) -> MagicMock:
+    """Read ops that answer every global search with ``items``."""
     read_ops = MagicMock()
     read_ops.search_in_global = AsyncMock(
         return_value=SearcherResult(
             items=items, total_count=len(items), has_next_page=False, has_previous_page=False
         )
     )
-    provider = cast(MagicMock, registry._ops_provider)
-    provider.read_ops.return_value.__aenter__.return_value = read_ops
+    return read_ops
 
 
 class TestLiveSessionNamed:
@@ -484,14 +483,14 @@ class TestLiveSessionNamed:
     async def test_none_when_no_unended_session_carries_the_name(
         self, registry: AgentRegistry, access_key: AccessKey
     ) -> None:
-        _answer_global_searches(registry, [])
+        read_ops = _read_ops_answering([])
 
-        assert await registry._live_session_named("fresh", access_key) is None
+        assert await registry._live_session_named(read_ops, "fresh", access_key) is None
 
     async def test_returns_the_one_session_carrying_the_name(
         self, registry: AgentRegistry, access_key: AccessKey
     ) -> None:
         session = _session_entity_data("taken", access_key)
-        _answer_global_searches(registry, [session])
+        read_ops = _read_ops_answering([session])
 
-        assert await registry._live_session_named("taken", access_key) is session
+        assert await registry._live_session_named(read_ops, "taken", access_key) is session
