@@ -192,6 +192,7 @@ LIBC_BANNER_GLIBC_REGEX = re.compile(r"^GNU C Library .*release version (\d+\.\d
 # Upper bound for one libc probe container (start, run, exit). The probe executes paths
 # from an untrusted image, so a hang must not stall session creation.
 _LIBC_PROBE_TIMEOUT_SEC: Final[float] = 30.0
+_KERNEL_WORK_DIR: Final[Path] = Path("/home/work")
 # Docker reports these when the probe command does not exist or cannot be executed in the
 # image; anything else from the daemon is a real error and must surface as such.
 _LIBC_PROBE_EXEC_FAILURE_MARKERS: Final[tuple[str, ...]] = (
@@ -955,6 +956,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
     @override
     async def process_mounts(self, mounts: Sequence[Mount]) -> None:
+        await run_in_executor_with_context(None, self._create_mount_points_in_work_dir, mounts)
+
         def fix_unsupported_perm(folder_perm: MountPermission) -> MountPermission:
             if folder_perm == MountPermission.RW_DELETE:
                 # TODO: enforce readable/writable but not deletable
@@ -979,6 +982,17 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             },
         }
         self.container_configs.append(container_config)
+
+    def _create_mount_points_in_work_dir(self, mounts: Sequence[Mount]) -> None:
+        # runc would create a missing mount point as root, and one below /home/work lands in
+        # the scratch work directory, where an agent running as another user cannot remove it.
+        for mount in mounts:
+            if mount.type != MountTypes.BIND or _KERNEL_WORK_DIR not in mount.target.parents:
+                continue
+            if mount.source is None or not mount.source.is_dir():
+                continue
+            mount_point = self.work_dir / mount.target.relative_to(_KERNEL_WORK_DIR)
+            mount_point.mkdir(parents=True, exist_ok=True)
 
     @override
     async def apply_accelerator_allocation(
