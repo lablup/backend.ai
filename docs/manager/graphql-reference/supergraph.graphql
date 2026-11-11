@@ -21486,7 +21486,7 @@ type Query
   scopedSessionGroups(scope: SessionGroupScope!, filter: SessionGroupFilter = null, orderBy: [SessionGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionGroupConnection @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.10.0. Page through the vfolder auto-mounts of the named projects and users, combined with OR. Every project is authorized before the read runs. Auto-mounts marked deleted are left out unless the filter names `deletedAt`.
+  Added in 26.10.0. Page through the vfolder auto-mounts of the named projects and users, combined with OR. Every project is authorized before the read runs.
   """
   scopedVfolderAutoMounts(scope: VFolderAutoMountScope!, filter: VFolderAutoMountFilter = null, orderBy: [VFolderAutoMountOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderAutoMountConnection @join__field(graph: STRAWBERRY)
 
@@ -31784,9 +31784,7 @@ type VFolderAutoMountEdge
   node: VFolderAutoMount!
 }
 
-"""
-Added in 26.10.0. Filter for vfolder auto-mounts. Auto-mounts marked deleted are left out unless the top-level filter gives `deletedAt`; one inside AND, OR or NOT does not lift that.
-"""
+"""Added in 26.10.0. Filter for vfolder auto-mounts."""
 input VFolderAutoMountFilter
   @join__type(graph: STRAWBERRY)
 {
@@ -31814,9 +31812,7 @@ input VFolderAutoMountFilter
   """Filter by last update time."""
   updatedAt: DateTimeFilter = null
 
-  """
-  Filter by deletion time. Setting it on the top-level filter includes the auto-mounts marked deleted; inside AND, OR or NOT it does not.
-  """
+  """Filter by deletion time."""
   deletedAt: NullableDateTimeFilter = null
 
   """Match all nested filters."""
@@ -31830,13 +31826,13 @@ input VFolderAutoMountFilter
 }
 
 """
-Added in 26.10.0. Filter selecting vfolders by the auto-mounts set on them. Auto-mounts marked deleted are left out of a relation unless its filter gives `deletedAt` at the top level; `exists` always leaves them out. Each relation matches one auto-mount at a time.
+Added in 26.10.0. Filter selecting vfolders by the auto-mounts set on them. Each relation matches one auto-mount at a time.
 """
 input VFolderAutoMountNestedFilter
   @join__type(graph: STRAWBERRY)
 {
   """
-  True for a vfolder that has at least one auto-mount not marked deleted, false for one that has none.
+  True for a vfolder that has at least one auto-mount, false for one that has none.
   """
   exists: Boolean = null
 
@@ -32021,9 +32017,7 @@ input VFolderFilter
   """Added in 26.10.0. Filter by vfolder ID."""
   entityId: UUIDFilter = null
 
-  """
-  Added in 26.10.0. Select vfolders by the auto-mounts set on them. Auto-mounts marked deleted are left out unless the relation's filter gives `deletedAt` at the top level.
-  """
+  """Added in 26.10.0. Select vfolders by the auto-mounts set on them."""
   autoMounts: VFolderAutoMountNestedFilter = null
   AND: [VFolderFilter!] = null
   OR: [VFolderFilter!] = null
