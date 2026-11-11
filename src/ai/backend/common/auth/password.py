@@ -20,8 +20,6 @@ class PasswordHashAlgorithm(enum.StrEnum):
 
 
 HASH_DELIMITER: Final[str] = "$"
-# bcrypt reads only this many bytes of a password.
-BCRYPT_MAX_PASSWORD_BYTES: Final[int] = 72
 
 
 @dataclass(frozen=True)
