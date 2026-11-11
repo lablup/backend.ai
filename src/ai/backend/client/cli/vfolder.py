@@ -184,8 +184,6 @@ def delete(name: str) -> None:
 @click.argument("name", type=str)
 def purge(name: str) -> None:
     """Purge the given virtual folder. This operation is irreversible!
-    Deprecated since 26.4.20; use `backend.ai v2 vfolder purge VFOLDER_ID`,
-    since a name does not resolve to a `delete-complete` folder.
 
     NAME: Name of a virtual folder.
     """
