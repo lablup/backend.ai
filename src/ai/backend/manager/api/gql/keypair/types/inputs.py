@@ -22,6 +22,7 @@ from ai.backend.common.dto.manager.v2.keypair.request import (
 from ai.backend.common.dto.manager.v2.keypair.request import (
     UpdateMyKeypairInput as UpdateMyKeypairInputDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -104,7 +105,10 @@ class AdminUpdateKeypairInputGQL(PydanticInputMixin[AdminUpdateKeypairInputDTO])
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        description="Admin input for registering (overwriting) a user's SSH public key.",
+        description=(
+            "Admin input for registering (overwriting) a user's SSH public key. "
+            f"`sshPrivateKey` was removed in {NEXT_RELEASE_VERSION}."
+        ),
         added_version="26.4.2",
     ),
     name="AdminRegisterSSHKeypairInput",

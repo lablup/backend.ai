@@ -23,7 +23,6 @@ from ai.backend.common.dto.manager.auth.response import (
     UpdateFullNameResponse,
     UpdatePasswordNoAuthResponse,
     UpdatePasswordResponse,
-    UploadSSHKeypairResponse,
     VerifyAuthResponse,
 )
 
@@ -112,14 +111,12 @@ class AuthClient(BaseDomainClient):
             response_model=SSHKeypairResponse,
         )
 
-    async def upload_ssh_keypair(
-        self, request: UploadSSHKeypairRequest
-    ) -> UploadSSHKeypairResponse:
+    async def upload_ssh_keypair(self, request: UploadSSHKeypairRequest) -> SSHKeypairResponse:
         return await self._client.typed_request(
             "POST",
             "/auth/ssh-keypair",
             request=request,
-            response_model=UploadSSHKeypairResponse,
+            response_model=SSHKeypairResponse,
         )
 
     async def verify_auth(self, request: VerifyAuthRequest) -> VerifyAuthResponse:
