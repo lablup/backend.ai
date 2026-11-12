@@ -131,6 +131,7 @@ class FirstHandledRunner(HookHandlerRunner[Any]):
                 handler_result = await hook_handler(*args)
             except Exception as e:
                 return self._build_failed_hook_result(plugin_name, e)
+            # A handler returns None when the event is not its to handle, so the next handler gets it.
             if handler_result is not None:
                 return HookResult(status=PASSED, src_plugin=plugin_name, result=handler_result)
         return HookResult(status=PASSED, src_plugin=executed_plugin_names, result=None)
