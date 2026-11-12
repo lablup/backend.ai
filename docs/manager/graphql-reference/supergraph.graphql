@@ -11629,7 +11629,9 @@ type KeyPair implements Item
   rolling_count: Int
   user: UUID
   projects: [String]
-  ssh_public_key: String
+
+  """The public key of the owner's default SSH keypair."""
+  ssh_public_key: String @deprecated(reason: "Deprecated since 26.10.0. An SSH keypair belongs to the user, not to a keypair.")
   vfolders: [VirtualFolder]
   compute_sessions(status: String): [ComputeSession]
   concurrency_used: Int
@@ -11958,8 +11960,10 @@ type KeyPairV2 implements Node
   """Name of the resource policy assigned to this keypair."""
   resourcePolicy: String!
 
-  """The SSH public key associated with this keypair."""
-  sshPublicKey: String
+  """
+  The public key of the owner's default SSH keypair, the same for every keypair of one user.
+  """
+  sshPublicKey: String @deprecated(reason: "Deprecated since 26.10.0. An SSH keypair belongs to the user, not to a keypair.")
 
   """UUID of the user who owns this keypair."""
   userId: UUID!

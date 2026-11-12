@@ -13,6 +13,7 @@ from sqlalchemy.engine.row import Row
 
 from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
 from ai.backend.common.defs import REDIS_RATE_LIMIT_DB, RedisRole
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairData
@@ -20,6 +21,10 @@ from ai.backend.manager.models.keypair.row import (
     KEYPAIR_SECRET_KEY_CONTEXT,
     keypairs,
 )
+from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.ssh_keypair.searchable_fields import SSHKeypairSearchableFields
+from ai.backend.manager.models.ssh_keypair.searchers import SSHKeypairSearcher
+from ai.backend.manager.services.user.actions.ssh_keypair_ops import SearchSSHKeypairsAction
 
 from .session import ComputeSession
 
@@ -122,7 +127,13 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
     user = graphene.UUID()
     projects = graphene.List(lambda: graphene.String)
 
-    ssh_public_key = graphene.String()
+    ssh_public_key = graphene.String(
+        description="The public key of the owner's default SSH keypair.",
+        deprecation_reason=(
+            f"Deprecated since {NEXT_RELEASE_VERSION}. An SSH keypair belongs to the user, "
+            "not to a keypair."
+        ),
+    )
 
     vfolders = graphene.List("ai.backend.manager.api.gql_legacy.vfolder.VirtualFolder")
     compute_sessions = graphene.List(
@@ -159,8 +170,9 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
         return cast(UserInfo, await loader.load(self.user))
 
     @classmethod
-    def from_data(cls, data: KeyPairData) -> Self:
+    def from_data(cls, data: KeyPairData, ssh_public_key: str | None) -> Self:
         return cls(
+            ssh_public_key=ssh_public_key,
             access_key=data.access_key,
             secret_key=data.secret_key,
             is_active=data.is_active,
@@ -170,7 +182,6 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
             created_at=data.created_at,
             rate_limit=data.rate_limit,
             user=data.user_id,
-            ssh_public_key=data.ssh_public_key,
         )
 
     @classmethod
@@ -192,7 +203,6 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
             created_at=row.created_at,
             rate_limit=row.rate_limit,
             user=row.user,
-            ssh_public_key=row.ssh_public_key,
             concurrency_limit=0,  # deprecated
             projects=row._mapping.get("groups_name", []),
         )
@@ -286,7 +296,6 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
         "last_used": ("keypairs_last_used", dtparse),
         "rate_limit": ("keypairs_rate_limit", None),
         "num_queries": ("keypairs_num_queries", None),
-        "ssh_public_key": ("keypairs_ssh_public_key", None),
         "projects": ("groups_name", None),
     }
 
@@ -552,7 +561,19 @@ class CreateKeyPair(graphene.Mutation):  # type: ignore[misc]
         result = await graph_ctx.processors.user.admin_create_keypair.run(
             AdminCreateKeypairAction(user_id=UserID(owner.entity_id()), creator=props.to_creator())
         )
-        keypair = KeyPair.from_data(result.generated_data.keypair)
+        ssh_keypairs = await graph_ctx.processors.user.search_ssh_keypairs.run(
+            SearchSSHKeypairsAction(
+                user_ids=[UserID(owner.entity_id())],
+                searcher=SSHKeypairSearcher(
+                    pagination=OffsetPagination(limit=1),
+                    conditions=[SSHKeypairSearchableFields.own.is_default.filter.equals(True)],
+                ),
+            )
+        )
+        keypair = KeyPair.from_data(
+            result.generated_data.keypair,
+            ssh_keypairs.items[0].public_key if ssh_keypairs.items else None,
+        )
         keypair.user_id = user_id
         return cls(ok=True, msg="success", keypair=keypair)
 

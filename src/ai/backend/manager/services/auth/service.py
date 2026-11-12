@@ -238,8 +238,6 @@ class AuthService:
             "last_used": keypair.last_used,
             "rate_limit": keypair.rate_limit,
             "num_queries": keypair.num_queries,
-            "ssh_public_key": keypair.ssh_public_key,
-            "ssh_private_key": keypair.ssh_private_key,
             "user": keypair.user_id,
             "resource_policy": keypair.resource_policy_name,
             # Rows carry no aggregate size limit, so pack without DotfileEntries.pack()'s.
@@ -803,14 +801,17 @@ class AuthService:
         )
 
     async def get_ssh_keypair(self, action: GetSSHKeypairAction) -> GetSSHKeypairActionResult:
-        pubkey = await self._auth_repository.get_ssh_public_key(action.access_key)
-        return GetSSHKeypairActionResult(public_key=pubkey or "", access_key=action.access_key)
+        ssh_keypair = await self._user_repository.default_ssh_keypair(action.user_id)
+        return GetSSHKeypairActionResult(
+            public_key=ssh_keypair.public_key if ssh_keypair is not None else "",
+            access_key=action.access_key,
+        )
 
     async def generate_ssh_keypair(
         self, action: GenerateSSHKeypairAction
     ) -> GenerateSSHKeypairActionResult:
         pubkey, privkey = generate_ssh_keypair()
-        await self._auth_repository.update_ssh_keypair(action.access_key, pubkey, privkey)
+        await self._user_repository.replace_default_ssh_keypair(action.user_id, pubkey, privkey)
 
         return GenerateSSHKeypairActionResult(
             ssh_keypair=SSHKeypair(
@@ -824,7 +825,9 @@ class AuthService:
     ) -> UploadSSHKeypairActionResult:
         self._ssh_key_validator.validate(action.public_key)
 
-        await self._auth_repository.update_ssh_public_key(action.access_key, action.public_key)
+        await self._user_repository.replace_default_ssh_keypair(
+            action.user_id, action.public_key, None
+        )
         return UploadSSHKeypairActionResult(public_key=action.public_key)
 
     async def resolve_access_key_scope(

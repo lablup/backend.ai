@@ -52,6 +52,7 @@ from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.network.types import NetworkType
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.data.session.options import (
     KernelExecutionSpec,
     KernelGroup,
@@ -118,6 +119,7 @@ from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntit
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
@@ -578,7 +580,11 @@ class TestEnqueueSessionSchedulingHistory:
         enrolled_scopes: None,
         resource_slot_types: None,
     ) -> None:
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
         session_id = SessionID(uuid.uuid4())
         spec = self._spec(
             session_id=session_id,
@@ -627,7 +633,11 @@ class TestEnqueueSessionSchedulingHistory:
     ) -> None:
         """One enqueue writes the session, its kernels, their requested slots, and the
         PENDING history row, and enrolls the session under its user and project."""
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
         session_id = SessionID(uuid.uuid4())
         spec = self._spec(
             session_id=session_id,
@@ -731,7 +741,11 @@ class TestEnqueueSessionSchedulingHistory:
         resource_slot_types: None,
     ) -> None:
         """A dependency the caller declares becomes one row of the dependency graph."""
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
         resource_group_id = await self._resource_group_id(db_with_cleanup, test_scaling_group_name)
         first_id = SessionID(uuid.uuid4())
         await db_source.enqueue_session_from_spec(
@@ -788,7 +802,11 @@ class TestEnqueueSessionSchedulingHistory:
         enrolled_scopes: None,
     ) -> None:
         """A dependency naming no session leaves nothing behind."""
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
         session_id = SessionID(uuid.uuid4())
         spec = self._spec(
             session_id=session_id,
@@ -823,7 +841,11 @@ class TestEnqueueSessionSchedulingHistory:
         enrolled_scopes: None,
     ) -> None:
         """A kernel whose image is not registered fails before anything is written."""
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
         session_id = SessionID(uuid.uuid4())
         spec = self._spec(
             session_id=session_id,
@@ -889,7 +911,11 @@ class TestEnqueueSessionSchedulingHistory:
     ) -> None:
         """One main and three workers write two group rows; the worker row keeps the
         requested image and slots."""
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
         session_id = SessionID(uuid.uuid4())
         spec = self._spec(
             session_id=session_id,
@@ -928,7 +954,11 @@ class TestEnqueueSessionSchedulingHistory:
         enqueue_spec_args: dict[str, Any],
     ) -> None:
         """Every worker kernel references the worker group row."""
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
         session_id = SessionID(uuid.uuid4())
         spec = self._spec(
             session_id=session_id,
@@ -963,7 +993,11 @@ class TestEnqueueSessionSchedulingHistory:
         enqueue_spec_args: dict[str, Any],
     ) -> None:
         """Environ given to the worker group is stored only under that group."""
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
         session_id = SessionID(uuid.uuid4())
         spec = self._spec(
             session_id=session_id,
@@ -1005,7 +1039,11 @@ class TestEnqueueSessionSchedulingHistory:
         enqueue_spec_args: dict[str, Any],
     ) -> None:
         """A key that is not an environment variable name leaves nothing behind."""
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
         session_id = SessionID(uuid.uuid4())
         spec = self._spec(
             session_id=session_id,
@@ -1096,7 +1134,11 @@ class TestEnqueueSessionSchedulingHistory:
         worker_mount: VFolderMount,
     ) -> SessionID:
         """A session whose main and two workers mount different vfolders."""
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
         session_id = SessionID(uuid.uuid4())
         await db_source.enqueue_session_from_spec(
             self._spec(
@@ -1151,7 +1193,11 @@ class TestEnqueueSessionSchedulingHistory:
         worker_mount: VFolderMount,
     ) -> None:
         """The main kernel starts with the main mount and every worker with the worker mount."""
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
 
         result = await db_source.search_sessions_with_kernels(
             SessionSearcher(
@@ -1182,7 +1228,11 @@ class TestEnqueueSessionSchedulingHistory:
         main_mount: VFolderMount,
     ) -> None:
         """Two mounts of one group at the same destination leave nothing behind."""
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
         session_id = SessionID(uuid.uuid4())
         spec = self._spec(
             session_id=session_id,
@@ -1555,6 +1605,9 @@ class TestMarkTerminatingSchedulingHistory:
             MagicMock(),
             MagicMock(),
             MagicMock(),
+            key_provider_pool=KeyProviderPool(
+                providers=[], write_provider_type=KeyProviderType.PLAIN
+            ),
         )
 
     @pytest.fixture
@@ -1590,7 +1643,11 @@ class TestMarkTerminatingSchedulingHistory:
         running_session_id: SessionId,
     ) -> None:
         """Test that mark_sessions_terminating() creates history records for RUNNING sessions."""
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
 
         result = await db_source.mark_sessions_terminating([running_session_id])
         assert running_session_id in result.terminating_sessions
@@ -1643,7 +1700,11 @@ class TestMarkTerminatingSchedulingHistory:
         test_agent_id: str,
     ) -> None:
         """Test that mark_sessions_terminating() records history for cancelled PENDING sessions."""
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
 
         session_id = await self._create_session_with_kernel(
             db_with_cleanup,
@@ -1688,7 +1749,11 @@ class TestMarkTerminatingSchedulingHistory:
         test_agent_id: str,
     ) -> None:
         """Test that mark_sessions_terminating(forced=True) creates TERMINATED history records."""
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
 
         session_id = await self._create_session_with_kernel(
             db_with_cleanup,
@@ -1732,7 +1797,11 @@ class TestMarkTerminatingSchedulingHistory:
         test_agent_id: str,
     ) -> None:
         """Forced termination should record history for TERMINATING sessions too."""
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
 
         session_id = await self._create_session_with_kernel(
             db_with_cleanup,
@@ -1776,7 +1845,11 @@ class TestMarkTerminatingSchedulingHistory:
         test_agent_id: str,
     ) -> None:
         """Test that different from_statuses are correctly captured for each session."""
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
 
         # Create sessions in different terminatable statuses
         running_session_id = await self._create_session_with_kernel(

@@ -7,6 +7,15 @@ from ai.backend.manager.secret.types import SecretValue
 
 
 @dataclass(frozen=True)
+class SSHKeypairSecrets:
+    """A generated SSH keypair before DB insert. ``private_key`` is already in its
+    stored form, so it is bound as is."""
+
+    public_key: str
+    private_key: SecretValue
+
+
+@dataclass(frozen=True)
 class SSHKeypairData(FieldData):
     id: SSHKeypairID
     user_id: UserID

@@ -24,7 +24,6 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.common.types import AccessKey, SSHPublicKey
 from ai.backend.manager.data.auth.login_session_types import (
     LoginAttemptResult,
     LoginSessionStatus,
@@ -54,6 +53,7 @@ from ai.backend.manager.models.keypair.row import (
 from ai.backend.manager.models.login_session.row import LoginHistoryRow, LoginSessionRow
 from ai.backend.manager.models.specs.lookup import DataLookup
 from ai.backend.manager.models.specs.querier import DataQuerier
+from ai.backend.manager.models.ssh_keypair.creators import SSHKeypairCreator
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.row import (
     UserRole,
@@ -63,7 +63,10 @@ from ai.backend.manager.models.user.row import (
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
-from ai.backend.manager.repositories.auth.keypair_secrets import generate_keypair_data
+from ai.backend.manager.repositories.auth.keypair_secrets import (
+    generate_keypair_data,
+    generate_ssh_keypair_data,
+)
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.user.provider import UserOpsProvider
 from ai.backend.manager.repositories.ops.v2.user.write import FullUserCreator
@@ -167,11 +170,17 @@ class AuthDBSource:
     ) -> UserCreationData:
         """Provision a signup user in one transaction: the row, its default keypair,
         and its domain/project (model-store included) scope enrollments."""
+        ssh_secrets = await generate_ssh_keypair_data(self._key_provider_pool)
         async with self._user_ops_provider.write_ops() as w:
             result = await w.create_user(
                 FullUserCreator(
                     user=user_spec,
                     keypair_secrets=await generate_keypair_data(self._key_provider_pool),
+                    ssh_keypair=SSHKeypairCreator(
+                        public_key=ssh_secrets.public_key,
+                        private_key=ssh_secrets.private_key,
+                        is_default=True,
+                    ),
                     keypair_resource_policy=keypair_resource_policy,
                     keypair_rate_limit=keypair_rate_limit,
                 )
@@ -252,35 +261,6 @@ class AuthDBSource:
                 .where(keypairs.c.user.in_(sa.select(users.c.uuid).where(users.c.email == email)))
             )
             await conn.execute(keypair_query)
-
-    @auth_db_source_resilience.apply()
-    async def fetch_ssh_public_key(self, access_key: str) -> str | None:
-        """Fetch SSH public key for an access key from database."""
-        async with self._db.begin() as conn:
-            query = sa.select(keypairs.c.ssh_public_key).where(keypairs.c.access_key == access_key)
-            return await conn.scalar(query)
-
-    @auth_db_source_resilience.apply()
-    async def modify_ssh_keypair(self, access_key: str, public_key: str, private_key: str) -> None:
-        """Modify SSH keypair for an access key in database."""
-        async with self._db.begin() as conn:
-            data = {
-                "ssh_public_key": public_key,
-                "ssh_private_key": private_key,
-            }
-            query = keypairs.update().values(data).where(keypairs.c.access_key == access_key)
-            await conn.execute(query)
-
-    @auth_db_source_resilience.apply()
-    async def modify_ssh_public_key(self, access_key: AccessKey, public_key: SSHPublicKey) -> None:
-        """Modify the SSH public key for an access key in database."""
-        async with self._db.begin() as conn:
-            query = (
-                keypairs.update()
-                .values(ssh_public_key=public_key)
-                .where(keypairs.c.access_key == access_key)
-            )
-            await conn.execute(query)
 
     @auth_db_source_resilience.apply()
     async def verify_keypair_secret(self, access_key: str, secret_key: str) -> bool:

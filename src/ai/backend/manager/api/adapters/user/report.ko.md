@@ -2,7 +2,7 @@
 
 [배경](/src/ai/backend/manager/api/adapters/user/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/user/adapter.py)
 
-시나리오: 미완성 3 / 44
+시나리오: 미완성 4 / 44
 
 - ops 구성 (21)
   - UserAdapter.admin_search: 대표 성공 ✓ · 대표 거부 ✓
@@ -26,29 +26,29 @@
   - UserConfigAdapter.get_default_auto_generated_file: 대표 성공 ✗ · 대표 거부 ✓: SCENARIO-GAP
   - UserConfigAdapter.get_default_auto_generated_files: 대표 성공 ✓ · 대표 거부 ✓
   - UserConfigAdapter.update_default_auto_generated_file: 대표 성공 ✗ · 대표 거부 ✓: SCENARIO-GAP
-- ops + 직접 구현 (7)
+- ops + 직접 구현 (12)
+  - UserAdapter.admin_create_keypair: 성공 없음 · 거부 있음 3 (atomic_bulk_scoped_search_ops, single_entity): SCENARIO-GAP
+  - UserAdapter.admin_get_keypair: 성공 있음 1 · 거부 있음 1 (atomic_bulk_scoped_search_ops, single_field)
+  - UserAdapter.admin_update_keypair: 성공 있음 1 · 거부 있음 3 (atomic_bulk_scoped_search_ops, single_field)
   - UserAdapter.bulk_create_users: 성공 있음 1 · 거부 있음 1 (atomic_bulk_get_ops, global_scope)
-  - UserAdapter.bulk_create_users_with_keypair: 성공 있음 1 · 거부 있음 1 (atomic_bulk_get_ops, global_scope)
+  - UserAdapter.bulk_create_users_with_keypair: 성공 있음 1 · 거부 있음 1 (atomic_bulk_get_ops, atomic_bulk_scoped_search_ops, global_scope)
   - UserAdapter.bulk_update_users: 성공 있음 3 · 거부 있음 1 (atomic_bulk_get_ops, global_scope, partial_bulk_get_ops, single_entity)
-  - UserAdapter.create_user: 성공 있음 1 · 거부 있음 2 (atomic_bulk_get_ops, scope)
+  - UserAdapter.create_user: 성공 있음 1 · 거부 있음 2 (atomic_bulk_get_ops, atomic_bulk_scoped_search_ops, scope)
   - UserAdapter.delete_user_by_id: 성공 있음 1 · 거부 있음 1 (atomic_bulk_get_ops, single_entity)
   - UserAdapter.get: 성공 있음 1 · 거부 있음 1 (atomic_bulk_get_ops, single_entity)
+  - UserAdapter.issue_my_keypair: 성공 있음 1 · 거부 있음 2 (atomic_bulk_scoped_search_ops, single_entity)
+  - UserAdapter.update_my_keypair: 성공 있음 1 · 거부 있음 3 (atomic_bulk_scoped_search_ops, single_field)
   - UserAdapter.update_user_by_id: 성공 있음 7 · 거부 있음 6 (atomic_bulk_get_ops, single_entity)
-- 직접 구현 (16)
-  - UserAdapter.admin_create_keypair: 성공 있음 1 · 거부 있음 2 (single_entity)
+- 직접 구현 (11)
   - UserAdapter.admin_delete_keypair: 성공 있음 1 · 거부 있음 3 (single_field)
   - UserAdapter.admin_delete_ssh_keypair: 성공 있음 1 · 거부 있음 2 (single_entity)
-  - UserAdapter.admin_get_keypair: 성공 있음 1 · 거부 있음 1 (single_field)
   - UserAdapter.admin_get_ssh_keypair: 성공 있음 1 · 거부 있음 1 (single_entity)
   - UserAdapter.admin_register_ssh_keypair: 성공 있음 1 · 거부 있음 2 (single_entity)
-  - UserAdapter.admin_update_keypair: 성공 있음 1 · 거부 있음 3 (single_field)
   - UserAdapter.bulk_purge_users: 성공 있음 2 · 거부 있음 1 (global_scope)
-  - UserAdapter.issue_my_keypair: 성공 있음 2 · 거부 있음 1 (single_entity)
   - UserAdapter.purge_user_by_id: 성공 있음 1 · 거부 있음 2 (single_entity)
   - UserAdapter.restore_user_by_id: 성공 있음 1 · 거부 있음 2 (single_entity)
   - UserAdapter.revoke_my_keypair: 성공 있음 1 · 거부 있음 4 (single_field)
   - UserAdapter.switch_default_access_key: 성공 있음 1 · 거부 있음 2 (single_entity)
-  - UserAdapter.update_my_keypair: 성공 있음 1 · 거부 있음 3 (single_field)
   - UserAdapter.update_user: 성공 있음 1 · 거부 있음 1 (single_entity)
   - UserConfigAdapter.create_auto_generated_file: 성공 있음 1 · 거부 있음 2 (single_entity)
 
@@ -205,6 +205,30 @@
 | [권한을 받지 않은 사용자가 자기 설정 파일을 고치려 하면, 권한 부족으로 거부됩니다](#config_files-a-user-granted-nothing-may-not-update-a-config-file) | 거부 |
 | [READ 와 UPDATE 를 받은 사용자가 기본으로 표시되지 않은 설정 파일을 고치려 하면, 대상이 없다는 것으로 거부됩니다](#config_files-updating-a-config-file-that-is-not-marked-default-is-not-found) | 거부 |
 
+**UserAdapter.admin_create_keypair**
+
+| 시나리오 | 판정 |
+|---|---|
+| [권한 받은 사용자가 없는 정책 이름을 주면, 입력 검증이 막습니다](#managing_keypairs-a-key-may-not-be-made-under-a-policy-that-does-not-exist) | 거부 |
+| [역할 없이 키를 생성하려 하면, 엔티티 권한 문이 막습니다](#managing_keypairs-a-user-granted-nothing-may-not-make-a-key-for-another) | 거부 |
+| [superadmin 이 아니어도 대상 사용자 스코프에서 UPDATE 를 받은 사용자가 정책을 주고 키를 생성하면, 기본 아닌 새 키와 secret 이 응답으로 옵니다](#managing_keypairs-a-user-granted-update-on-another-makes-them-a-key-of-the-given-policy) | 거부 |
+
+**UserAdapter.admin_get_keypair**
+
+| 시나리오 | 판정 |
+|---|---|
+| [대상 스코프에서 READ 를 받은 사용자가 읽으면, 그 키 노드 전체가 응답으로 옵니다](#managing_keypairs-a-granted-user-reads-another-users-key-by-access-key) | 성공 |
+| [역할 없이 읽으려 하면, 소유자 조회 단계가 막습니다](#managing_keypairs-a-user-granted-nothing-may-not-read-another-users-key) | 거부 |
+
+**UserAdapter.admin_update_keypair**
+
+| 시나리오 | 판정 |
+|---|---|
+| [대상 스코프에서 READ 와 UPDATE 를 받은 사용자가 요청 한도만 주면, 나머지는 그대로이고 한도만 변경된 키 노드가 응답으로 옵니다](#managing_keypairs-a-granted-user-changing-another-users-rate-limit-changes-only-that) | 성공 |
+| [역할 없이 변경하려 하면, 소유자 조회 단계가 막습니다](#managing_keypairs-a-user-granted-nothing-may-not-change-another-users-key) | 거부 |
+| [READ 만 받고 변경하려 하면, 엔티티 권한 문이 막습니다](#managing_keypairs-a-user-granted-only-read-may-not-change-another-users-key) | 거부 |
+| [권한 받은 사용자가 없는 정책 이름을 주면, 입력 검증이 막습니다](#managing_keypairs-another-users-key-may-not-be-moved-to-a-policy-that-does-not-exist) | 거부 |
+
 **UserAdapter.bulk_create_users**
 
 | 시나리오 | 판정 |
@@ -250,6 +274,23 @@
 | [대상 사용자 스코프에서 사용자 읽기 권한을 받은 사용자가 읽으면, 기본 키까지 채운 노드 전체가 응답으로 옵니다](#reading-a-user-granted-read-on-another-user-reads-their-whole-node) | 성공 |
 | [아무 역할도 받지 않은 사용자가 다른 사용자를 읽으려 하면, 엔티티 권한 문이 막습니다](#reading-a-user-granted-nothing-may-not-read-another-user) | 거부 |
 
+**UserAdapter.issue_my_keypair**
+
+| 시나리오 | 판정 |
+|---|---|
+| [권한 받은 사용자가 키를 발급하고 그 키로 기본 키를 옮긴 다음 원래 기본 키를 회수하면, 세 호출이 차례로 통과하고 발급한 키 하나만 남습니다](#own_keypairs-an-issued-key-made-default-lets-the-original-default-key-be-revoked) | 성공 |
+| [역할을 받지 않은 사용자가 자기 키를 발급하려 하면, 본인이어도 엔티티 권한 문이 막습니다](#own_keypairs-a-user-granted-nothing-may-not-issue-their-own-key) | 거부 |
+| [자기 사용자 스코프에서 UPDATE 를 받은 사용자가 발급하면, 기본 키의 관리자 표시, 정책, 요청 한도를 따르고 기본 표시는 없는 키와 secret 이 응답으로 옵니다](#own_keypairs-a-user-granted-update-on-themself-issues-a-key-that-follows-their-default-key) | 거부 |
+
+**UserAdapter.update_my_keypair**
+
+| 시나리오 | 판정 |
+|---|---|
+| [자기 스코프에서 READ 와 UPDATE 를 받은 사용자가 기본 아닌 키를 비활성으로 변경하면, 활성만 변경된 키 노드가 응답으로 옵니다](#own_keypairs-a-user-granted-read-and-update-turns-off-a-non-default-key) | 성공 |
+| [역할 없이 키를 비활성으로 변경하려 하면, 소유자 조회 단계가 막습니다](#own_keypairs-a-user-granted-nothing-may-not-turn-off-their-own-key) | 거부 |
+| [READ 만 받고 키를 비활성으로 변경하려 하면, 엔티티 권한 문이 막습니다](#own_keypairs-a-user-granted-only-read-may-not-turn-off-their-own-key) | 거부 |
+| [권한 받은 사용자가 자기 기본 키를 비활성으로 변경하려 하면, 입력 검증이 막습니다](#own_keypairs-the-default-key-may-not-be-turned-off) | 거부 |
+
 **UserAdapter.update_user_by_id**
 
 | 시나리오 | 판정 |
@@ -268,14 +309,6 @@
 | [대상 사용자 스코프에서 UPDATE 와 READ 만 받은 사용자가 수정으로 DELETED 를 주면, 삭제의 엔티티 권한 문이 막습니다](#retiring-an-edit-to-deleted-is-refused-without-soft-delete) | 거부 |
 | [삭제 상태 사용자에 수정으로 DELETED 만 주면, 아무것도 변경되지 않고 그 사용자가 응답으로 옵니다](#retiring-an-edit-to-deleted-on-a-deleted-user-changes-nothing) | 거부 |
 
-**UserAdapter.admin_create_keypair**
-
-| 시나리오 | 판정 |
-|---|---|
-| [superadmin 이 아니어도 대상 사용자 스코프에서 UPDATE 를 받은 사용자가 정책을 주고 키를 생성하면, 기본 아닌 새 키와 secret 이 응답으로 옵니다](#managing_keypairs-a-user-granted-update-on-another-makes-them-a-key-of-the-given-policy) | 성공 |
-| [권한 받은 사용자가 없는 정책 이름을 주면, 입력 검증이 막습니다](#managing_keypairs-a-key-may-not-be-made-under-a-policy-that-does-not-exist) | 거부 |
-| [역할 없이 키를 생성하려 하면, 엔티티 권한 문이 막습니다](#managing_keypairs-a-user-granted-nothing-may-not-make-a-key-for-another) | 거부 |
-
 **UserAdapter.admin_delete_keypair**
 
 | 시나리오 | 판정 |
@@ -293,13 +326,6 @@
 | [역할 없이 삭제하려 하면, 소유자 조회 단계가 막습니다](#managing_keypairs-a-user-granted-nothing-may-not-clear-another-users-ssh-key) | 거부 |
 | [READ 만 받고 삭제하려 하면, 엔티티 권한 문이 막습니다](#managing_keypairs-a-user-granted-only-read-may-not-clear-another-users-ssh-key) | 거부 |
 
-**UserAdapter.admin_get_keypair**
-
-| 시나리오 | 판정 |
-|---|---|
-| [대상 스코프에서 READ 를 받은 사용자가 읽으면, 그 키 노드 전체가 응답으로 옵니다](#managing_keypairs-a-granted-user-reads-another-users-key-by-access-key) | 성공 |
-| [역할 없이 읽으려 하면, 소유자 조회 단계가 막습니다](#managing_keypairs-a-user-granted-nothing-may-not-read-another-users-key) | 거부 |
-
 **UserAdapter.admin_get_ssh_keypair**
 
 | 시나리오 | 판정 |
@@ -315,15 +341,6 @@
 | [역할 없이 등록하려 하면, 소유자 조회 단계가 막습니다](#managing_keypairs-a-user-granted-nothing-may-not-register-another-users-ssh-key) | 거부 |
 | [READ 만 받고 등록하려 하면, 엔티티 권한 문이 막습니다](#managing_keypairs-a-user-granted-only-read-may-not-register-another-users-ssh-key) | 거부 |
 
-**UserAdapter.admin_update_keypair**
-
-| 시나리오 | 판정 |
-|---|---|
-| [대상 스코프에서 READ 와 UPDATE 를 받은 사용자가 요청 한도만 주면, 나머지는 그대로이고 한도만 변경된 키 노드가 응답으로 옵니다](#managing_keypairs-a-granted-user-changing-another-users-rate-limit-changes-only-that) | 성공 |
-| [역할 없이 변경하려 하면, 소유자 조회 단계가 막습니다](#managing_keypairs-a-user-granted-nothing-may-not-change-another-users-key) | 거부 |
-| [READ 만 받고 변경하려 하면, 엔티티 권한 문이 막습니다](#managing_keypairs-a-user-granted-only-read-may-not-change-another-users-key) | 거부 |
-| [권한 받은 사용자가 없는 정책 이름을 주면, 입력 검증이 막습니다](#managing_keypairs-another-users-key-may-not-be-moved-to-a-policy-that-does-not-exist) | 거부 |
-
 **UserAdapter.bulk_purge_users**
 
 | 시나리오 | 판정 |
@@ -331,14 +348,6 @@
 | [superadmin 이 있는 사용자와 없는 id 를 함께 주면, 하나는 영구 삭제되고 없는 id 는 실패로 담깁니다](#retiring-a-bulk-purge-records-a-missing-id-as-a-failure) | 성공 |
 | [전역 역할이 문인 일괄 영구 삭제에서 superadmin 이 사용자 둘을 주면, 두 id 와 개수 둘이 응답으로 옵니다](#retiring-the-superadmin-bulk-purge-answers-the-purged-ids-and-count) | 성공 |
 | [도메인 스코프에서 HARD_DELETE 를 받은 사용자라도 일괄 영구 삭제를 하려 하면, 전역 역할 문이 막습니다](#retiring-a-user-who-is-not-the-superadmin-may-not-purge-in-bulk) | 거부 |
-
-**UserAdapter.issue_my_keypair**
-
-| 시나리오 | 판정 |
-|---|---|
-| [자기 사용자 스코프에서 UPDATE 를 받은 사용자가 발급하면, 기본 키의 관리자 표시, 정책, 요청 한도를 따르고 기본 표시는 없는 키와 secret 이 응답으로 옵니다](#own_keypairs-a-user-granted-update-on-themself-issues-a-key-that-follows-their-default-key) | 성공 |
-| [권한 받은 사용자가 키를 발급하고 그 키로 기본 키를 옮긴 다음 원래 기본 키를 회수하면, 세 호출이 차례로 통과하고 발급한 키 하나만 남습니다](#own_keypairs-an-issued-key-made-default-lets-the-original-default-key-be-revoked) | 성공 |
-| [역할을 받지 않은 사용자가 자기 키를 발급하려 하면, 본인이어도 엔티티 권한 문이 막습니다](#own_keypairs-a-user-granted-nothing-may-not-issue-their-own-key) | 거부 |
 
 **UserAdapter.purge_user_by_id**
 
@@ -373,15 +382,6 @@
 | [자기 스코프에서 UPDATE 를 받은 사용자가 기본 아닌 활성 키로 기본 키를 옮기면, 성공이 오고 사용자 노드의 기본 키가 그 키가 됩니다](#own_keypairs-a-user-granted-read-and-update-moves-their-default-key) | 성공 |
 | [역할 없이 기본 키를 옮기려 하면, 엔티티 권한 문이 막습니다](#own_keypairs-a-user-granted-nothing-may-not-move-their-default-key) | 거부 |
 | [권한 받은 사용자가 다른 사용자의 키를 주면, 입력 검증이 막습니다](#own_keypairs-someone-elses-key-may-not-become-the-default-key) | 거부 |
-
-**UserAdapter.update_my_keypair**
-
-| 시나리오 | 판정 |
-|---|---|
-| [자기 스코프에서 READ 와 UPDATE 를 받은 사용자가 기본 아닌 키를 비활성으로 변경하면, 활성만 변경된 키 노드가 응답으로 옵니다](#own_keypairs-a-user-granted-read-and-update-turns-off-a-non-default-key) | 성공 |
-| [역할 없이 키를 비활성으로 변경하려 하면, 소유자 조회 단계가 막습니다](#own_keypairs-a-user-granted-nothing-may-not-turn-off-their-own-key) | 거부 |
-| [READ 만 받고 키를 비활성으로 변경하려 하면, 엔티티 권한 문이 막습니다](#own_keypairs-a-user-granted-only-read-may-not-turn-off-their-own-key) | 거부 |
-| [권한 받은 사용자가 자기 기본 키를 비활성으로 변경하려 하면, 입력 검증이 막습니다](#own_keypairs-the-default-key-may-not-be-turned-off) | 거부 |
 
 **UserAdapter.update_user**
 
@@ -851,7 +851,6 @@ Then
   - is_default = False
   - rate_limit = 10000
   - resource_policy = 'keypair-policy-2'
-  - ssh_public_key = ''
   - num_queries = 0
   - last_used = None
   - user_id: 키페어 소유자와 같다
@@ -1821,7 +1820,6 @@ Then
   - items[the extra key].is_default = False
   - items[the extra key].rate_limit = 10000
   - items[the extra key].resource_policy = 'keypair-policy-1'
-  - items[the extra key].ssh_public_key = ''
   - items[the extra key].num_queries = 0
   - items[the extra key].last_used = None
   - items[the extra key].user_id: 키페어 소유자와 같다
@@ -1834,7 +1832,6 @@ Then
   - items[the default key].is_default = True
   - items[the default key].rate_limit = 10000
   - items[the default key].resource_policy = 'keypair-policy-1'
-  - items[the default key].ssh_public_key = ''
   - items[the default key].num_queries = 0
   - items[the default key].last_used = None
   - items[the default key].user_id: 키 소유자와 같다
@@ -2140,6 +2137,329 @@ Then
 
 - 거부됩니다
   - 거부: DotfileNotFound
+
+### UserAdapter.admin_create_keypair
+
+<a id="managing_keypairs-a-key-may-not-be-made-under-a-policy-that-does-not-exist"></a>
+
+#### [a-key-may-not-be-made-under-a-policy-that-does-not-exist](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
+
+권한 받은 사용자가 없는 정책 이름을 주면, 입력 검증이 막습니다
+
+Given
+
+- 도메인 하나와 대상 사용자, 호출자는 대상에 대한 사용자 UPDATE 권한을 받았습니다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 키페어 정책 granted-policy-1: 동시 세션 5개까지
+  - 사용자 UPDATE 권한을 부여한 역할 배정
+    - 역할 user-role-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 user-role-1: user 전체에 UPDATE 허용
+    - 일반 사용자 user-2: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.admin_create_keypair: user-2이 user-1에게 없는 정책으로 키를 생성합니다
+
+Then
+
+- 거부됩니다
+  - 거부: KeypairResourcePolicyNotFound
+
+<a id="managing_keypairs-a-user-granted-nothing-may-not-make-a-key-for-another"></a>
+
+#### [a-user-granted-nothing-may-not-make-a-key-for-another](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
+
+역할 없이 키를 생성하려 하면, 엔티티 권한 문이 막습니다
+
+Given
+
+- 도메인 하나와 대상 사용자, 호출자는 아무 권한도 받지 않았습니다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 키페어 정책 granted-policy-1: 동시 세션 5개까지
+
+When
+
+- UserAdapter.admin_create_keypair: user-2이 user-1에게 granted-policy-1으로 키를 생성합니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
+
+<a id="managing_keypairs-a-user-granted-update-on-another-makes-them-a-key-of-the-given-policy"></a>
+
+#### [a-user-granted-update-on-another-makes-them-a-key-of-the-given-policy](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
+
+superadmin 이 아니어도 대상 사용자 스코프에서 UPDATE 를 받은 사용자가 정책을 주고 키를 생성하면, 기본 아닌 새 키와 secret 이 응답으로 옵니다
+
+Given
+
+- 도메인 하나와 대상 사용자, 호출자는 대상에 대한 사용자 UPDATE 권한을 받았습니다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 키페어 정책 granted-policy-1: 동시 세션 5개까지
+  - 사용자 UPDATE 권한을 부여한 역할 배정
+    - 역할 user-role-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 user-role-1: user 전체에 UPDATE 허용
+    - 일반 사용자 user-2: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.admin_create_keypair: user-2이 user-1에게 granted-policy-1으로 키를 생성합니다
+
+Then
+
+- 생성한 키 전체와 secret 이 응답으로 옵니다
+  - 거부: NotEnoughPermission
+
+### UserAdapter.admin_get_keypair
+
+<a id="managing_keypairs-a-granted-user-reads-another-users-key-by-access-key"></a>
+
+#### [a-granted-user-reads-another-users-key-by-access-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
+
+대상 스코프에서 READ 를 받은 사용자가 읽으면, 그 키 노드 전체가 응답으로 옵니다
+
+Given
+
+- 도메인 하나와 대상 사용자, 대상에게 기본 아닌 키 하나, 호출자는 대상에 대한 사용자 READ 권한을 받았습니다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 키페어 정책 granted-policy-1: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
+  - 사용자 READ 권한을 부여한 역할 배정
+    - 역할 user-role-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.admin_get_keypair: user-2이 user-1의 키를 access key 로 읽습니다
+
+Then
+
+- 미리 저장한 키 전체가 응답으로 옵니다
+  - id: 미리 저장한 키와 같다
+  - access_key: 미리 저장한 키와 같다
+  - is_active = True
+  - is_admin = False
+  - is_default = False
+  - rate_limit = 10000
+  - resource_policy = 'granted-policy-1'
+  - ssh_public_key = ''
+  - num_queries = 0
+  - last_used = None
+  - user_id: 키 소유자와 같다
+  - created_at: 이 실행이 쓴 시각
+  - modified_at: 이 실행이 쓴 시각
+
+<a id="managing_keypairs-a-user-granted-nothing-may-not-read-another-users-key"></a>
+
+#### [a-user-granted-nothing-may-not-read-another-users-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
+
+역할 없이 읽으려 하면, 소유자 조회 단계가 막습니다
+
+Given
+
+- 도메인 하나와 대상 사용자, 대상에게 기본 아닌 키 하나, 호출자는 아무 권한도 받지 않았습니다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 키페어 정책 granted-policy-1: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
+
+When
+
+- UserAdapter.admin_get_keypair: user-2이 user-1의 키를 access key 로 읽습니다
+
+Then
+
+- 거부됩니다
+  - 거부: GenericBadRequest
+
+### UserAdapter.admin_update_keypair
+
+<a id="managing_keypairs-a-granted-user-changing-another-users-rate-limit-changes-only-that"></a>
+
+#### [a-granted-user-changing-another-users-rate-limit-changes-only-that](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
+
+대상 스코프에서 READ 와 UPDATE 를 받은 사용자가 요청 한도만 주면, 나머지는 그대로이고 한도만 변경된 키 노드가 응답으로 옵니다
+
+Given
+
+- 도메인 하나와 대상 사용자, 대상에게 기본 아닌 키 하나, 호출자는 대상에 대한 사용자 READ, UPDATE 권한을 받았습니다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 키페어 정책 granted-policy-1: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
+  - 사용자 READ, UPDATE 권한을 부여한 역할 배정
+    - 역할 user-role-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 역할 user-role-1: user 전체에 UPDATE 허용
+    - 일반 사용자 user-2: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.admin_update_keypair: user-2이 user-1의 키에 요청 한도를 지정합니다
+
+Then
+
+- 요청 한도만 변경된 키 전체가 응답으로 옵니다
+  - id: 미리 저장한 키와 같다
+  - access_key: 미리 저장한 키와 같다
+  - is_active = True
+  - is_admin = False
+  - is_default = False
+  - rate_limit = 45000
+  - resource_policy = 'granted-policy-1'
+  - ssh_public_key = ''
+  - num_queries = 0
+  - last_used = None
+  - user_id: 키 소유자와 같다
+  - created_at: 이 실행이 쓴 시각
+  - modified_at: 이 실행이 쓴 시각
+
+<a id="managing_keypairs-a-user-granted-nothing-may-not-change-another-users-key"></a>
+
+#### [a-user-granted-nothing-may-not-change-another-users-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
+
+역할 없이 변경하려 하면, 소유자 조회 단계가 막습니다
+
+Given
+
+- 도메인 하나와 대상 사용자, 대상에게 기본 아닌 키 하나, 호출자는 아무 권한도 받지 않았습니다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 키페어 정책 granted-policy-1: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
+
+When
+
+- UserAdapter.admin_update_keypair: user-2이 user-1의 키에 요청 한도를 지정합니다
+
+Then
+
+- 거부됩니다
+  - 거부: GenericBadRequest
+
+<a id="managing_keypairs-a-user-granted-only-read-may-not-change-another-users-key"></a>
+
+#### [a-user-granted-only-read-may-not-change-another-users-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
+
+READ 만 받고 변경하려 하면, 엔티티 권한 문이 막습니다
+
+Given
+
+- 도메인 하나와 대상 사용자, 대상에게 기본 아닌 키 하나, 호출자는 대상에 대한 사용자 READ 권한을 받았습니다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 키페어 정책 granted-policy-1: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
+  - 사용자 READ 권한을 부여한 역할 배정
+    - 역할 user-role-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.admin_update_keypair: user-2이 user-1의 키에 요청 한도를 지정합니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
+
+<a id="managing_keypairs-another-users-key-may-not-be-moved-to-a-policy-that-does-not-exist"></a>
+
+#### [another-users-key-may-not-be-moved-to-a-policy-that-does-not-exist](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
+
+권한 받은 사용자가 없는 정책 이름을 주면, 입력 검증이 막습니다
+
+Given
+
+- 도메인 하나와 대상 사용자, 대상에게 기본 아닌 키 하나, 호출자는 대상에 대한 사용자 READ, UPDATE 권한을 받았습니다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 키페어 정책 granted-policy-1: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
+  - 사용자 READ, UPDATE 권한을 부여한 역할 배정
+    - 역할 user-role-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 역할 user-role-1: user 전체에 UPDATE 허용
+    - 일반 사용자 user-2: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.admin_update_keypair: user-2이 user-1의 키에 요청 한도와 없는 정책을 지정합니다
+
+Then
+
+- 거부됩니다
+  - 거부: KeypairResourcePolicyNotFound
 
 ### UserAdapter.bulk_create_users
 
@@ -2841,6 +3161,252 @@ Then
 - 거부됩니다
   - 거부: NotEnoughPermission
 
+### UserAdapter.issue_my_keypair
+
+<a id="own_keypairs-an-issued-key-made-default-lets-the-original-default-key-be-revoked"></a>
+
+#### [an-issued-key-made-default-lets-the-original-default-key-be-revoked](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py): pass
+
+권한 받은 사용자가 키를 발급하고 그 키로 기본 키를 옮긴 다음 원래 기본 키를 회수하면, 세 호출이 차례로 통과하고 발급한 키 하나만 남습니다
+
+Given
+
+- 도메인 하나와 기본 아닌 키 0개를 가진 사용자 한 명, 그 사용자는 자기 사용자에 READ, UPDATE 권한을 받았습니다
+  - 도메인 home-1
+  - 키 정책을 아는 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 사용자 READ, UPDATE 권한을 부여한 역할 배정
+    - 역할 user-role-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 역할 user-role-1: user 전체에 UPDATE 허용
+    - 일반 사용자 user-1: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.issue_my_keypair: user-1이 자기 키 검색으로 기본 키를 찾고, 키를 발급해 그 키로 기본 키를 옮긴 다음 원래 기본 키를 회수하고 자기 키를 다시 조회합니다
+
+Then
+
+- 세 호출이 통과하고 발급한 키 하나만 남습니다
+  - issued.id: 건너뜀: 매니저가 생성한 access key 입니다
+  - issued.access_key: 건너뜀: 매니저가 생성합니다
+  - issued.is_active = True
+  - issued.is_admin = False
+  - issued.is_default = False
+  - issued.rate_limit = 10000
+  - issued.resource_policy = 'keypair-policy-1'
+  - issued.ssh_public_key: 건너뜀: 매니저가 생성한 RSA 키입니다
+  - issued.num_queries = 0
+  - issued.last_used = None
+  - issued.user_id: 키페어 소유자와 같다
+  - issued.created_at: 이 실행이 쓴 시각
+  - issued.modified_at: 이 실행이 쓴 시각
+  - issued.secret_key: 건너뜀: 매니저가 매번 새로 생성합니다
+  - switched = True
+  - revoked = True
+  - after.total_count = 1
+  - after.has_next_page = False
+  - after.has_previous_page = False
+  - after.items.access_key: 발급한 키와 같다
+  - after.items[0].is_active = True
+  - after.items[0].is_admin = False
+  - after.items[0].is_default = True
+  - after.items[0].rate_limit = 10000
+  - after.items[0].resource_policy = 'keypair-policy-1'
+  - after.items[0].ssh_public_key: 건너뜀: 매니저가 생성한 RSA 키입니다
+  - after.items[0].num_queries = 0
+  - after.items[0].last_used = None
+  - after.items[0].user_id: 키 소유자와 같다
+  - after.items[0].created_at: 이 실행이 쓴 시각
+  - after.items[0].modified_at: 이 실행이 쓴 시각
+
+<a id="own_keypairs-a-user-granted-nothing-may-not-issue-their-own-key"></a>
+
+#### [a-user-granted-nothing-may-not-issue-their-own-key](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py): pass
+
+역할을 받지 않은 사용자가 자기 키를 발급하려 하면, 본인이어도 엔티티 권한 문이 막습니다
+
+Given
+
+- 도메인 하나와 기본 아닌 키 0개를 가진 사용자 한 명, 그 사용자는 아무 권한도 받지 않았습니다
+  - 도메인 home-1
+  - 키 정책을 아는 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- UserAdapter.issue_my_keypair: user-1이 자기 키를 발급합니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
+
+<a id="own_keypairs-a-user-granted-update-on-themself-issues-a-key-that-follows-their-default-key"></a>
+
+#### [a-user-granted-update-on-themself-issues-a-key-that-follows-their-default-key](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py): pass
+
+자기 사용자 스코프에서 UPDATE 를 받은 사용자가 발급하면, 기본 키의 관리자 표시, 정책, 요청 한도를 따르고 기본 표시는 없는 키와 secret 이 응답으로 옵니다
+
+Given
+
+- 도메인 하나와 기본 아닌 키 0개를 가진 사용자 한 명, 그 사용자는 자기 사용자에 UPDATE 권한을 받았습니다
+  - 도메인 home-1
+  - 키 정책을 아는 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 사용자 UPDATE 권한을 부여한 역할 배정
+    - 역할 user-role-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 user-role-1: user 전체에 UPDATE 허용
+    - 일반 사용자 user-1: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.issue_my_keypair: user-1이 자기 키를 발급합니다
+
+Then
+
+- 기본 키를 따르는 기본 아닌 새 키와 secret 이 응답으로 옵니다
+  - 거부: NotEnoughPermission
+
+### UserAdapter.update_my_keypair
+
+<a id="own_keypairs-a-user-granted-read-and-update-turns-off-a-non-default-key"></a>
+
+#### [a-user-granted-read-and-update-turns-off-a-non-default-key](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py): pass
+
+자기 스코프에서 READ 와 UPDATE 를 받은 사용자가 기본 아닌 키를 비활성으로 변경하면, 활성만 변경된 키 노드가 응답으로 옵니다
+
+Given
+
+- 도메인 하나와 기본 아닌 키 1개를 가진 사용자 한 명, 그 사용자는 자기 사용자에 READ, UPDATE 권한을 받았습니다
+  - 도메인 home-1
+  - 키 정책을 아는 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 일반 사용자 user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
+  - 사용자 READ, UPDATE 권한을 부여한 역할 배정
+    - 역할 user-role-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 역할 user-role-1: user 전체에 UPDATE 허용
+    - 일반 사용자 user-1: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.update_my_keypair: user-1이 기본 아닌 자기 키를 비활성으로 변경합니다
+
+Then
+
+- 활성만 변경된 키 노드 전체가 응답으로 옵니다
+  - id: 미리 저장한 키페어와 같다
+  - access_key: 미리 저장한 키페어와 같다
+  - is_active = False
+  - is_admin = False
+  - is_default = False
+  - rate_limit = 10000
+  - resource_policy = 'keypair-policy-1'
+  - num_queries = 0
+  - last_used = None
+  - user_id: 키페어 소유자와 같다
+  - created_at: 이 실행이 쓴 시각
+  - modified_at: 이 실행이 쓴 시각
+
+<a id="own_keypairs-a-user-granted-nothing-may-not-turn-off-their-own-key"></a>
+
+#### [a-user-granted-nothing-may-not-turn-off-their-own-key](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py): pass
+
+역할 없이 키를 비활성으로 변경하려 하면, 소유자 조회 단계가 막습니다
+
+Given
+
+- 도메인 하나와 기본 아닌 키 1개를 가진 사용자 한 명, 그 사용자는 아무 권한도 받지 않았습니다
+  - 도메인 home-1
+  - 키 정책을 아는 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 일반 사용자 user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
+
+When
+
+- UserAdapter.update_my_keypair: user-1이 기본 아닌 자기 키를 비활성으로 변경합니다
+
+Then
+
+- 거부됩니다
+  - 거부: GenericBadRequest
+
+<a id="own_keypairs-a-user-granted-only-read-may-not-turn-off-their-own-key"></a>
+
+#### [a-user-granted-only-read-may-not-turn-off-their-own-key](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py): pass
+
+READ 만 받고 키를 비활성으로 변경하려 하면, 엔티티 권한 문이 막습니다
+
+Given
+
+- 도메인 하나와 기본 아닌 키 1개를 가진 사용자 한 명, 그 사용자는 자기 사용자에 READ 권한을 받았습니다
+  - 도메인 home-1
+  - 키 정책을 아는 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 일반 사용자 user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
+  - 사용자 READ 권한을 부여한 역할 배정
+    - 역할 user-role-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.update_my_keypair: user-1이 기본 아닌 자기 키를 비활성으로 변경합니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
+
+<a id="own_keypairs-the-default-key-may-not-be-turned-off"></a>
+
+#### [the-default-key-may-not-be-turned-off](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py): pass
+
+권한 받은 사용자가 자기 기본 키를 비활성으로 변경하려 하면, 입력 검증이 막습니다
+
+Given
+
+- 도메인 하나와 기본 아닌 키 0개를 가진 사용자 한 명, 그 사용자는 자기 사용자에 READ, UPDATE 권한을 받았습니다
+  - 도메인 home-1
+  - 키 정책을 아는 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 사용자 READ, UPDATE 권한을 부여한 역할 배정
+    - 역할 user-role-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 역할 user-role-1: user 전체에 UPDATE 허용
+    - 일반 사용자 user-1: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.update_my_keypair: user-1이 자기 키 검색으로 기본 키를 찾아 비활성으로 변경합니다
+
+Then
+
+- 거부됩니다
+  - 거부: KeyPairForbidden
+
 ### UserAdapter.update_user_by_id
 
 <a id="editing-a-user-granted-update-changing-only-the-full-name-leaves-the-rest"></a>
@@ -3445,116 +4011,6 @@ Then
 - 삭제 상태 그대로인 사용자 전체가 응답으로 옵니다
   - 거부: NotEnoughPermission
 
-### UserAdapter.admin_create_keypair
-
-<a id="managing_keypairs-a-user-granted-update-on-another-makes-them-a-key-of-the-given-policy"></a>
-
-#### [a-user-granted-update-on-another-makes-them-a-key-of-the-given-policy](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
-
-superadmin 이 아니어도 대상 사용자 스코프에서 UPDATE 를 받은 사용자가 정책을 주고 키를 생성하면, 기본 아닌 새 키와 secret 이 응답으로 옵니다
-
-Given
-
-- 도메인 하나와 대상 사용자, 호출자는 대상에 대한 사용자 UPDATE 권한을 받았습니다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
-  - 키페어 정책 granted-policy-1: 동시 세션 5개까지
-  - 사용자 UPDATE 권한을 부여한 역할 배정
-    - 역할 user-role-1: 부여된 스코프 안에서만 적용됩니다
-    - 역할 user-role-1: user 전체에 UPDATE 허용
-    - 일반 사용자 user-2: 역할 user-role-1 보유
-
-When
-
-- UserAdapter.admin_create_keypair: user-2이 user-1에게 granted-policy-1으로 키를 생성합니다
-
-Then
-
-- 생성한 키 전체와 secret 이 응답으로 옵니다
-  - id: 건너뜀: 매니저가 생성한 access key 입니다
-  - access_key: 건너뜀: 매니저가 생성합니다
-  - is_active = True
-  - is_admin = False
-  - is_default = False
-  - rate_limit = 30000
-  - resource_policy = 'granted-policy-1'
-  - ssh_public_key: 건너뜀: 매니저가 생성한 RSA 키입니다
-  - num_queries = 0
-  - last_used = None
-  - user_id: 키페어 소유자와 같다
-  - created_at: 이 실행이 쓴 시각
-  - modified_at: 이 실행이 쓴 시각
-  - secret_key: 건너뜀: 매니저가 생성합니다
-
-<a id="managing_keypairs-a-key-may-not-be-made-under-a-policy-that-does-not-exist"></a>
-
-#### [a-key-may-not-be-made-under-a-policy-that-does-not-exist](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
-
-권한 받은 사용자가 없는 정책 이름을 주면, 입력 검증이 막습니다
-
-Given
-
-- 도메인 하나와 대상 사용자, 호출자는 대상에 대한 사용자 UPDATE 권한을 받았습니다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
-  - 키페어 정책 granted-policy-1: 동시 세션 5개까지
-  - 사용자 UPDATE 권한을 부여한 역할 배정
-    - 역할 user-role-1: 부여된 스코프 안에서만 적용됩니다
-    - 역할 user-role-1: user 전체에 UPDATE 허용
-    - 일반 사용자 user-2: 역할 user-role-1 보유
-
-When
-
-- UserAdapter.admin_create_keypair: user-2이 user-1에게 없는 정책으로 키를 생성합니다
-
-Then
-
-- 거부됩니다
-  - 거부: KeypairResourcePolicyNotFound
-
-<a id="managing_keypairs-a-user-granted-nothing-may-not-make-a-key-for-another"></a>
-
-#### [a-user-granted-nothing-may-not-make-a-key-for-another](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
-
-역할 없이 키를 생성하려 하면, 엔티티 권한 문이 막습니다
-
-Given
-
-- 도메인 하나와 대상 사용자, 호출자는 아무 권한도 받지 않았습니다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
-  - 키페어 정책 granted-policy-1: 동시 세션 5개까지
-
-When
-
-- UserAdapter.admin_create_keypair: user-2이 user-1에게 granted-policy-1으로 키를 생성합니다
-
-Then
-
-- 거부됩니다
-  - 거부: NotEnoughPermission
-
 ### UserAdapter.admin_delete_keypair
 
 <a id="managing_keypairs-a-granted-user-deleting-another-users-extra-key-gets-its-access-key"></a>
@@ -3801,84 +4257,6 @@ Then
 - 거부됩니다
   - 거부: NotEnoughPermission
 
-### UserAdapter.admin_get_keypair
-
-<a id="managing_keypairs-a-granted-user-reads-another-users-key-by-access-key"></a>
-
-#### [a-granted-user-reads-another-users-key-by-access-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
-
-대상 스코프에서 READ 를 받은 사용자가 읽으면, 그 키 노드 전체가 응답으로 옵니다
-
-Given
-
-- 도메인 하나와 대상 사용자, 대상에게 기본 아닌 키 하나, 호출자는 대상에 대한 사용자 READ 권한을 받았습니다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
-  - 키페어 정책 granted-policy-1: 동시 세션 5개까지
-  - 일반 사용자 user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
-  - 사용자 READ 권한을 부여한 역할 배정
-    - 역할 user-role-1: 부여된 스코프 안에서만 적용됩니다
-    - 역할 user-role-1: user 전체에 READ 허용
-    - 일반 사용자 user-2: 역할 user-role-1 보유
-
-When
-
-- UserAdapter.admin_get_keypair: user-2이 user-1의 키를 access key 로 읽습니다
-
-Then
-
-- 미리 저장한 키 전체가 응답으로 옵니다
-  - id: 미리 저장한 키와 같다
-  - access_key: 미리 저장한 키와 같다
-  - is_active = True
-  - is_admin = False
-  - is_default = False
-  - rate_limit = 10000
-  - resource_policy = 'granted-policy-1'
-  - ssh_public_key = ''
-  - num_queries = 0
-  - last_used = None
-  - user_id: 키 소유자와 같다
-  - created_at: 이 실행이 쓴 시각
-  - modified_at: 이 실행이 쓴 시각
-
-<a id="managing_keypairs-a-user-granted-nothing-may-not-read-another-users-key"></a>
-
-#### [a-user-granted-nothing-may-not-read-another-users-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
-
-역할 없이 읽으려 하면, 소유자 조회 단계가 막습니다
-
-Given
-
-- 도메인 하나와 대상 사용자, 대상에게 기본 아닌 키 하나, 호출자는 아무 권한도 받지 않았습니다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
-  - 키페어 정책 granted-policy-1: 동시 세션 5개까지
-  - 일반 사용자 user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
-
-When
-
-- UserAdapter.admin_get_keypair: user-2이 user-1의 키를 access key 로 읽습니다
-
-Then
-
-- 거부됩니다
-  - 거부: GenericBadRequest
-
 ### UserAdapter.admin_get_ssh_keypair
 
 <a id="managing_keypairs-a-granted-user-reads-another-users-ssh-public-key-only"></a>
@@ -4058,154 +4436,6 @@ Then
 - 거부됩니다
   - 거부: NotEnoughPermission
 
-### UserAdapter.admin_update_keypair
-
-<a id="managing_keypairs-a-granted-user-changing-another-users-rate-limit-changes-only-that"></a>
-
-#### [a-granted-user-changing-another-users-rate-limit-changes-only-that](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
-
-대상 스코프에서 READ 와 UPDATE 를 받은 사용자가 요청 한도만 주면, 나머지는 그대로이고 한도만 변경된 키 노드가 응답으로 옵니다
-
-Given
-
-- 도메인 하나와 대상 사용자, 대상에게 기본 아닌 키 하나, 호출자는 대상에 대한 사용자 READ, UPDATE 권한을 받았습니다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
-  - 키페어 정책 granted-policy-1: 동시 세션 5개까지
-  - 일반 사용자 user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
-  - 사용자 READ, UPDATE 권한을 부여한 역할 배정
-    - 역할 user-role-1: 부여된 스코프 안에서만 적용됩니다
-    - 역할 user-role-1: user 전체에 READ 허용
-    - 역할 user-role-1: user 전체에 UPDATE 허용
-    - 일반 사용자 user-2: 역할 user-role-1 보유
-
-When
-
-- UserAdapter.admin_update_keypair: user-2이 user-1의 키에 요청 한도를 지정합니다
-
-Then
-
-- 요청 한도만 변경된 키 전체가 응답으로 옵니다
-  - id: 미리 저장한 키와 같다
-  - access_key: 미리 저장한 키와 같다
-  - is_active = True
-  - is_admin = False
-  - is_default = False
-  - rate_limit = 45000
-  - resource_policy = 'granted-policy-1'
-  - ssh_public_key = ''
-  - num_queries = 0
-  - last_used = None
-  - user_id: 키 소유자와 같다
-  - created_at: 이 실행이 쓴 시각
-  - modified_at: 이 실행이 쓴 시각
-
-<a id="managing_keypairs-a-user-granted-nothing-may-not-change-another-users-key"></a>
-
-#### [a-user-granted-nothing-may-not-change-another-users-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
-
-역할 없이 변경하려 하면, 소유자 조회 단계가 막습니다
-
-Given
-
-- 도메인 하나와 대상 사용자, 대상에게 기본 아닌 키 하나, 호출자는 아무 권한도 받지 않았습니다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
-  - 키페어 정책 granted-policy-1: 동시 세션 5개까지
-  - 일반 사용자 user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
-
-When
-
-- UserAdapter.admin_update_keypair: user-2이 user-1의 키에 요청 한도를 지정합니다
-
-Then
-
-- 거부됩니다
-  - 거부: GenericBadRequest
-
-<a id="managing_keypairs-a-user-granted-only-read-may-not-change-another-users-key"></a>
-
-#### [a-user-granted-only-read-may-not-change-another-users-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
-
-READ 만 받고 변경하려 하면, 엔티티 권한 문이 막습니다
-
-Given
-
-- 도메인 하나와 대상 사용자, 대상에게 기본 아닌 키 하나, 호출자는 대상에 대한 사용자 READ 권한을 받았습니다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
-  - 키페어 정책 granted-policy-1: 동시 세션 5개까지
-  - 일반 사용자 user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
-  - 사용자 READ 권한을 부여한 역할 배정
-    - 역할 user-role-1: 부여된 스코프 안에서만 적용됩니다
-    - 역할 user-role-1: user 전체에 READ 허용
-    - 일반 사용자 user-2: 역할 user-role-1 보유
-
-When
-
-- UserAdapter.admin_update_keypair: user-2이 user-1의 키에 요청 한도를 지정합니다
-
-Then
-
-- 거부됩니다
-  - 거부: NotEnoughPermission
-
-<a id="managing_keypairs-another-users-key-may-not-be-moved-to-a-policy-that-does-not-exist"></a>
-
-#### [another-users-key-may-not-be-moved-to-a-policy-that-does-not-exist](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
-
-권한 받은 사용자가 없는 정책 이름을 주면, 입력 검증이 막습니다
-
-Given
-
-- 도메인 하나와 대상 사용자, 대상에게 기본 아닌 키 하나, 호출자는 대상에 대한 사용자 READ, UPDATE 권한을 받았습니다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
-  - 키페어 정책 granted-policy-1: 동시 세션 5개까지
-  - 일반 사용자 user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
-  - 사용자 READ, UPDATE 권한을 부여한 역할 배정
-    - 역할 user-role-1: 부여된 스코프 안에서만 적용됩니다
-    - 역할 user-role-1: user 전체에 READ 허용
-    - 역할 user-role-1: user 전체에 UPDATE 허용
-    - 일반 사용자 user-2: 역할 user-role-1 보유
-
-When
-
-- UserAdapter.admin_update_keypair: user-2이 user-1의 키에 요청 한도와 없는 정책을 지정합니다
-
-Then
-
-- 거부됩니다
-  - 거부: KeypairResourcePolicyNotFound
-
 ### UserAdapter.bulk_purge_users
 
 <a id="retiring-a-bulk-purge-records-a-missing-id-as-a-failure"></a>
@@ -4303,135 +4533,6 @@ Then
 
 - 거부됩니다
   - 거부: InsufficientPrivilege
-
-### UserAdapter.issue_my_keypair
-
-<a id="own_keypairs-a-user-granted-update-on-themself-issues-a-key-that-follows-their-default-key"></a>
-
-#### [a-user-granted-update-on-themself-issues-a-key-that-follows-their-default-key](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py): pass
-
-자기 사용자 스코프에서 UPDATE 를 받은 사용자가 발급하면, 기본 키의 관리자 표시, 정책, 요청 한도를 따르고 기본 표시는 없는 키와 secret 이 응답으로 옵니다
-
-Given
-
-- 도메인 하나와 기본 아닌 키 0개를 가진 사용자 한 명, 그 사용자는 자기 사용자에 UPDATE 권한을 받았습니다
-  - 도메인 home-1
-  - 키 정책을 아는 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - 사용자 UPDATE 권한을 부여한 역할 배정
-    - 역할 user-role-1: 부여된 스코프 안에서만 적용됩니다
-    - 역할 user-role-1: user 전체에 UPDATE 허용
-    - 일반 사용자 user-1: 역할 user-role-1 보유
-
-When
-
-- UserAdapter.issue_my_keypair: user-1이 자기 키를 발급합니다
-
-Then
-
-- 기본 키를 따르는 기본 아닌 새 키와 secret 이 응답으로 옵니다
-  - id: 건너뜀: 매니저가 생성한 access key 입니다
-  - access_key: 건너뜀: 매니저가 생성합니다
-  - is_active = True
-  - is_admin = False
-  - is_default = False
-  - rate_limit = 10000
-  - resource_policy = 'keypair-policy-1'
-  - ssh_public_key: 건너뜀: 매니저가 생성한 RSA 키입니다
-  - num_queries = 0
-  - last_used = None
-  - user_id: 키페어 소유자와 같다
-  - created_at: 이 실행이 쓴 시각
-  - modified_at: 이 실행이 쓴 시각
-  - secret_key: 건너뜀: 매니저가 매번 새로 생성합니다
-
-<a id="own_keypairs-an-issued-key-made-default-lets-the-original-default-key-be-revoked"></a>
-
-#### [an-issued-key-made-default-lets-the-original-default-key-be-revoked](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py): pass
-
-권한 받은 사용자가 키를 발급하고 그 키로 기본 키를 옮긴 다음 원래 기본 키를 회수하면, 세 호출이 차례로 통과하고 발급한 키 하나만 남습니다
-
-Given
-
-- 도메인 하나와 기본 아닌 키 0개를 가진 사용자 한 명, 그 사용자는 자기 사용자에 READ, UPDATE 권한을 받았습니다
-  - 도메인 home-1
-  - 키 정책을 아는 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - 사용자 READ, UPDATE 권한을 부여한 역할 배정
-    - 역할 user-role-1: 부여된 스코프 안에서만 적용됩니다
-    - 역할 user-role-1: user 전체에 READ 허용
-    - 역할 user-role-1: user 전체에 UPDATE 허용
-    - 일반 사용자 user-1: 역할 user-role-1 보유
-
-When
-
-- UserAdapter.issue_my_keypair: user-1이 자기 키 검색으로 기본 키를 찾고, 키를 발급해 그 키로 기본 키를 옮긴 다음 원래 기본 키를 회수하고 자기 키를 다시 조회합니다
-
-Then
-
-- 세 호출이 통과하고 발급한 키 하나만 남습니다
-  - issued.id: 건너뜀: 매니저가 생성한 access key 입니다
-  - issued.access_key: 건너뜀: 매니저가 생성합니다
-  - issued.is_active = True
-  - issued.is_admin = False
-  - issued.is_default = False
-  - issued.rate_limit = 10000
-  - issued.resource_policy = 'keypair-policy-1'
-  - issued.ssh_public_key: 건너뜀: 매니저가 생성한 RSA 키입니다
-  - issued.num_queries = 0
-  - issued.last_used = None
-  - issued.user_id: 키페어 소유자와 같다
-  - issued.created_at: 이 실행이 쓴 시각
-  - issued.modified_at: 이 실행이 쓴 시각
-  - issued.secret_key: 건너뜀: 매니저가 매번 새로 생성합니다
-  - switched = True
-  - revoked = True
-  - after.total_count = 1
-  - after.has_next_page = False
-  - after.has_previous_page = False
-  - after.items.access_key: 발급한 키와 같다
-  - after.items[0].is_active = True
-  - after.items[0].is_admin = False
-  - after.items[0].is_default = True
-  - after.items[0].rate_limit = 10000
-  - after.items[0].resource_policy = 'keypair-policy-1'
-  - after.items[0].ssh_public_key: 건너뜀: 매니저가 생성한 RSA 키입니다
-  - after.items[0].num_queries = 0
-  - after.items[0].last_used = None
-  - after.items[0].user_id: 키 소유자와 같다
-  - after.items[0].created_at: 이 실행이 쓴 시각
-  - after.items[0].modified_at: 이 실행이 쓴 시각
-
-<a id="own_keypairs-a-user-granted-nothing-may-not-issue-their-own-key"></a>
-
-#### [a-user-granted-nothing-may-not-issue-their-own-key](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py): pass
-
-역할을 받지 않은 사용자가 자기 키를 발급하려 하면, 본인이어도 엔티티 권한 문이 막습니다
-
-Given
-
-- 도메인 하나와 기본 아닌 키 0개를 가진 사용자 한 명, 그 사용자는 아무 권한도 받지 않았습니다
-  - 도메인 home-1
-  - 키 정책을 아는 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-
-When
-
-- UserAdapter.issue_my_keypair: user-1이 자기 키를 발급합니다
-
-Then
-
-- 거부됩니다
-  - 거부: NotEnoughPermission
 
 ### UserAdapter.purge_user_by_id
 
@@ -4695,7 +4796,6 @@ Then
   - after.items[0].is_default = True
   - after.items[0].rate_limit = 10000
   - after.items[0].resource_policy = 'keypair-policy-1'
-  - after.items[0].ssh_public_key = ''
   - after.items[0].num_queries = 0
   - after.items[0].last_used = None
   - after.items[0].user_id: 키 소유자와 같다
@@ -4926,137 +5026,6 @@ Given
 When
 
 - UserAdapter.switch_default_access_key: user-1이 다른 사용자의 키로 기본 키를 옮깁니다
-
-Then
-
-- 거부됩니다
-  - 거부: KeyPairForbidden
-
-### UserAdapter.update_my_keypair
-
-<a id="own_keypairs-a-user-granted-read-and-update-turns-off-a-non-default-key"></a>
-
-#### [a-user-granted-read-and-update-turns-off-a-non-default-key](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py): pass
-
-자기 스코프에서 READ 와 UPDATE 를 받은 사용자가 기본 아닌 키를 비활성으로 변경하면, 활성만 변경된 키 노드가 응답으로 옵니다
-
-Given
-
-- 도메인 하나와 기본 아닌 키 1개를 가진 사용자 한 명, 그 사용자는 자기 사용자에 READ, UPDATE 권한을 받았습니다
-  - 도메인 home-1
-  - 키 정책을 아는 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - 일반 사용자 user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
-  - 사용자 READ, UPDATE 권한을 부여한 역할 배정
-    - 역할 user-role-1: 부여된 스코프 안에서만 적용됩니다
-    - 역할 user-role-1: user 전체에 READ 허용
-    - 역할 user-role-1: user 전체에 UPDATE 허용
-    - 일반 사용자 user-1: 역할 user-role-1 보유
-
-When
-
-- UserAdapter.update_my_keypair: user-1이 기본 아닌 자기 키를 비활성으로 변경합니다
-
-Then
-
-- 활성만 변경된 키 노드 전체가 응답으로 옵니다
-  - id: 미리 저장한 키페어와 같다
-  - access_key: 미리 저장한 키페어와 같다
-  - is_active = False
-  - is_admin = False
-  - is_default = False
-  - rate_limit = 10000
-  - resource_policy = 'keypair-policy-1'
-  - ssh_public_key = ''
-  - num_queries = 0
-  - last_used = None
-  - user_id: 키페어 소유자와 같다
-  - created_at: 이 실행이 쓴 시각
-  - modified_at: 이 실행이 쓴 시각
-
-<a id="own_keypairs-a-user-granted-nothing-may-not-turn-off-their-own-key"></a>
-
-#### [a-user-granted-nothing-may-not-turn-off-their-own-key](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py): pass
-
-역할 없이 키를 비활성으로 변경하려 하면, 소유자 조회 단계가 막습니다
-
-Given
-
-- 도메인 하나와 기본 아닌 키 1개를 가진 사용자 한 명, 그 사용자는 아무 권한도 받지 않았습니다
-  - 도메인 home-1
-  - 키 정책을 아는 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - 일반 사용자 user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
-
-When
-
-- UserAdapter.update_my_keypair: user-1이 기본 아닌 자기 키를 비활성으로 변경합니다
-
-Then
-
-- 거부됩니다
-  - 거부: GenericBadRequest
-
-<a id="own_keypairs-a-user-granted-only-read-may-not-turn-off-their-own-key"></a>
-
-#### [a-user-granted-only-read-may-not-turn-off-their-own-key](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py): pass
-
-READ 만 받고 키를 비활성으로 변경하려 하면, 엔티티 권한 문이 막습니다
-
-Given
-
-- 도메인 하나와 기본 아닌 키 1개를 가진 사용자 한 명, 그 사용자는 자기 사용자에 READ 권한을 받았습니다
-  - 도메인 home-1
-  - 키 정책을 아는 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - 일반 사용자 user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
-  - 사용자 READ 권한을 부여한 역할 배정
-    - 역할 user-role-1: 부여된 스코프 안에서만 적용됩니다
-    - 역할 user-role-1: user 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 user-role-1 보유
-
-When
-
-- UserAdapter.update_my_keypair: user-1이 기본 아닌 자기 키를 비활성으로 변경합니다
-
-Then
-
-- 거부됩니다
-  - 거부: NotEnoughPermission
-
-<a id="own_keypairs-the-default-key-may-not-be-turned-off"></a>
-
-#### [the-default-key-may-not-be-turned-off](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py): pass
-
-권한 받은 사용자가 자기 기본 키를 비활성으로 변경하려 하면, 입력 검증이 막습니다
-
-Given
-
-- 도메인 하나와 기본 아닌 키 0개를 가진 사용자 한 명, 그 사용자는 자기 사용자에 READ, UPDATE 권한을 받았습니다
-  - 도메인 home-1
-  - 키 정책을 아는 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - 사용자 READ, UPDATE 권한을 부여한 역할 배정
-    - 역할 user-role-1: 부여된 스코프 안에서만 적용됩니다
-    - 역할 user-role-1: user 전체에 READ 허용
-    - 역할 user-role-1: user 전체에 UPDATE 허용
-    - 일반 사용자 user-1: 역할 user-role-1 보유
-
-When
-
-- UserAdapter.update_my_keypair: user-1이 자기 키 검색으로 기본 키를 찾아 비활성으로 변경합니다
 
 Then
 

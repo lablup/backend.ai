@@ -31,6 +31,7 @@ from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.keypair.creators import DefaultKeypairCreator
 from ai.backend.manager.models.project.creators import ProjectCreator
 from ai.backend.manager.models.project.row import ProjectRow, ProjectType
+from ai.backend.manager.models.ssh_keypair.creators import SSHKeypairCreator
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_query
@@ -43,12 +44,14 @@ from ai.backend.manager.repositories.ops.v2.roster.write import V2RosterWriteOps
 
 @dataclass
 class FullUserCreator:
-    """The user to create and what its default keypair is made of. The domain it is
-    created in is the user spec's own, and the keypair's active and admin flags are
-    read off the user that was written rather than guessed from the spec."""
+    """The user to create and what its default keypair and default SSH keypair are
+    made of. The domain it is created in is the user spec's own, and the keypair's
+    active and admin flags are read off the user that was written rather than guessed
+    from the spec."""
 
     user: UserCreator
     keypair_secrets: KeyPairSecrets
+    ssh_keypair: SSHKeypairCreator
     keypair_resource_policy: str
     keypair_rate_limit: int | None = None
 
@@ -86,8 +89,8 @@ class V2UserWriteOps(V2RosterWriteOps, V2ResourcePolicyWriteOps):
     async def create_user(self, creation: FullUserCreator) -> FullUserCreatorResult:
         """Provision a user: the row, its virtual entity, the domain that owns and
         governs it, the roles its scope's, its domain's and the public scope's presets
-        call for, the keypair it authorizes with, and the personal project it alone
-        belongs to."""
+        call for, the keypair it authorizes with, its default SSH keypair, and the
+        personal project it alone belongs to."""
         domain_id = creation.user.domain_id
         # The user is created in its domain, so the domain has to be in the graph
         # first: one created before the graph, or by a data migration, has no node yet.
@@ -100,6 +103,7 @@ class V2UserWriteOps(V2RosterWriteOps, V2ResourcePolicyWriteOps):
             [user_id, domain_id, global_entity_id(GlobalEntityName.PUBLIC)], user_id
         )
         keypair = await self._create_default_keypair(user, creation)
+        await self.create_field(user_id, creation.ssh_keypair)
         personal_project = await self._create_personal_project(user_id, user.username, domain_id)
         await self.restate_user_resource_policy_share(user_id)
         await self.restate_keypair_resource_policy_share(user_id)

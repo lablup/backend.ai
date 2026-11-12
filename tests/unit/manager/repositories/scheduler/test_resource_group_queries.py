@@ -15,12 +15,14 @@ import pytest
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import AgentId
 from ai.backend.manager.data.agent.types import AgentStatus
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.testutils.db import with_tables
 
 
@@ -157,7 +159,11 @@ class TestScalingGroupQueries:
         even when they have no ALIVE, schedulable, or any agents, so that coordinator
         promotion and termination checks still visit sessions pinned there.
         """
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
         resource_group_ids = set(await db_source.get_all_resource_groups())
 
         assert mixed_agents_scenario.schedulable in resource_group_ids

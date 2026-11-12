@@ -158,6 +158,7 @@ from ai.backend.manager.models.session_designated_agent.row import SessionDesign
 from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.session_group.searchers import SessionGroupSearcher
 from ai.backend.manager.models.specs.creator import FieldToCreate, NestedFieldToCreate
+from ai.backend.manager.models.ssh_keypair.row import SSH_KEYPAIR_PRIVATE_KEY_CONTEXT, SSHKeypairRow
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
@@ -180,6 +181,7 @@ from ai.backend.manager.repositories.scheduler.types.session_creation import (
     SessionSpecFetch,
     UserEnqueueFetch,
 )
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.types import UserScope
 from ai.backend.manager.views.sokovan.agent import (
     AgentMeta,
@@ -305,14 +307,17 @@ class ScheduleDBSource:
 
     _db: ExtendedAsyncSAEngine
     _reconcile_ops: ReconcileOpsProvider
+    _key_provider_pool: KeyProviderPool
 
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
         reconcile_ops_provider: ReconcileOpsProvider,
+        key_provider_pool: KeyProviderPool,
     ) -> None:
         self._db = db
         self._reconcile_ops = reconcile_ops_provider
+        self._key_provider_pool = key_provider_pool
 
     async def fetch_scheduling_fetch(
         self, resource_group_id: ResourceGroupID
@@ -2494,15 +2499,12 @@ class ScheduleDBSource:
         user_scope: UserScope,
         access_key: AccessKey,
     ) -> DotfileBundle:
-        """Read the keypair owner's dotfiles and SSH keys, then merge project/domain dotfiles."""
+        """Read the keypair owner's dotfiles and default SSH keypair, then merge
+        project/domain dotfiles."""
         conn = cast(SAConnection, db_sess.bind)
         row = (
             await conn.execute(
-                sa.select(
-                    keypairs.c.ssh_public_key,
-                    keypairs.c.ssh_private_key,
-                    keypairs.c.user,
-                ).where(keypairs.c.access_key == access_key)
+                sa.select(keypairs.c.user).where(keypairs.c.access_key == access_key)
             )
         ).first()
         if row is None:
@@ -2523,13 +2525,22 @@ class ScheduleDBSource:
             DotfileEntry(entry.path, entry.perm, entry.data) for entry in user_auto_generated_files
         ]
         ssh_keypair: SSHKeypair | None = None
-        if row.ssh_public_key:
-            # TODO(BA-8467): Drop the private key once keypairs stop storing it. Until then a
-            # missing one goes as "", since agents write it out with `.encode()`.
-            ssh_keypair = SSHKeypair(
-                public_key=row.ssh_public_key,
-                private_key=row.ssh_private_key or "",
+        ssh_row = (
+            await conn.execute(
+                sa.select(SSHKeypairRow.public_key, SSHKeypairRow.private_key).where(
+                    SSHKeypairRow.user_id == row.user, SSHKeypairRow.is_default
+                )
             )
+        ).first()
+        if ssh_row is not None and ssh_row.public_key:
+            # TODO(BA-8467): Drop the private key once the default stops storing it. Until then
+            # a missing one goes as "", since agents write it out with `.encode()`.
+            private_key = ""
+            if ssh_row.private_key is not None:
+                private_key = await self._key_provider_pool.decrypt(
+                    ssh_row.private_key, SSH_KEYPAIR_PRIVATE_KEY_CONTEXT
+                )
+            ssh_keypair = SSHKeypair(public_key=ssh_row.public_key, private_key=private_key)
         seen_paths = {entry.path for entry in ordered_entries}
 
         packed = await conn.scalar(

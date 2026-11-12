@@ -84,8 +84,6 @@ async def runtime_user_id(db: ExtendedAsyncSAEngine, applied: None, admin: UserS
                 secrets=KeyPairSecrets(
                     access_key=AccessKey("AKRUNTIME"),
                     secret_key=SecretValue("SKRUNTIME"),
-                    ssh_public_key="ssh-rsa runtime",
-                    ssh_private_key="runtime-private-key",
                 ),
                 is_active=True,
                 is_admin=False,

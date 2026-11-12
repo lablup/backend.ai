@@ -26,6 +26,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.agent.row import AgentRow
@@ -55,6 +56,7 @@ from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
 
@@ -310,7 +312,11 @@ class TestPersistentNetworkNotRecreated:
             network_id=pre_created_network_id,
         )
 
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
         searcher = SessionSearcher(
             pagination=NoPagination(),
             conditions=[

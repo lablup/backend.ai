@@ -160,7 +160,8 @@ update_user_by_id 와 bulk_update_users 는 같은 기준으로 `status` 를 나
 | 사용자 자원 정책 | 요청의 기본값 `"default"` | `common/dto/manager/v2/user/request.py:89-92`, `models/user/creators.py:116` |
 | 개인 프로젝트의 자원 정책 | 코드가 고정한 이름 `"default"` | `models/project/creators.py:66-67` |
 | 개인 프로젝트 이름 | 사용자 이름. 겹치면 `-2` 부터 `-999`, 그래도 겹치면 사용자 id | `repositories/ops/v2/user/write.py:175-199` |
-| access key, secret key, SSH 키쌍 | 생성한다. secret 은 키 provider 풀로 암호화한다 | `common/auth/keypair.py`, `repositories/auth/keypair_secrets.py:10-18` |
+| access key, secret key | 생성한다. secret 은 키 provider 풀로 암호화한다 | `common/auth/keypair.py`, `repositories/auth/keypair_secrets.py` |
+| default SSH keypair | 사용자와 같은 트랜잭션에서 생성한다. 비밀키는 키 provider 풀로 암호화한다 | `repositories/auth/keypair_secrets.py`, `repositories/ops/v2/user/write.py` |
 | 기본 액세스 키의 활성, 관리자 표시 | 사용자 상태가 ACTIVE 인지, 역할이 SUPERADMIN 이나 ADMIN 인지 | `write.py:106-107` |
 | 비밀번호 해시 설정 | manager 설정 `auth.password_hash_*` | `adapter.py:491-496` |
 | 도메인 id | 이름으로 조회한다 | `adapter.py:217-220` |
@@ -189,7 +190,7 @@ adapter 경로는 앞뒤에 둘을 추가한다. 같은 쓰기 트랜잭션 안�
 |---|---|---|
 | 중복 검사 | 없음 | 있음 |
 | 키페어 정책 | 앞 단계가 생성한 정책 | 기본 표시 정책 조회(대체 예정) |
-| 키 값 | 평문, SSH 키는 빈 문자열 | 생성, 암호화 |
+| 키 값 | 평문 | 생성, 암호화 |
 | 프로젝트 등재 | 없음 | 있음 |
 
 ## adapter 가 요구하는 의존성
@@ -224,7 +225,7 @@ adapter 경로는 앞뒤에 둘을 추가한다. 같은 쓰기 트랜잭션 안�
 | `is_active`, `is_admin`, `is_default`, `rate_limit`, `resource_policy` | 값으로 본다 |
 | `num_queries` | 0 |
 | `last_used` | None |
-| `ssh_public_key` | 생성 경로면 무시(생성한 RSA 키), 미리 저장한 키면 빈 문자열 |
+| `ssh_public_key` | deprecated. 소유자의 default SSH keypair 공개키로, 한 사용자의 keypair 모두에 같다 |
 | `created_at`, `modified_at` | 이 실행이 기록한 시각 |
 | `user_id` | 소유 사용자와 같다 |
 | 발급 응답의 secret key | 무시. 매번 새로 생성한다 |
