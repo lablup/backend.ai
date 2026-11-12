@@ -17,11 +17,11 @@ from ai.backend.common.exception import (
     BackendAIError,
     BackendAISchemaValidationFailed,
 )
-from ai.backend.logging.structured import StructuredLogger
+from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.errors.repository import RepositoryIntegrityError
 
-log: Final = StructuredLogger(logging.getLogger(__spec__.name))
+log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 def _to_graphql_validation_error(e: ValidationError) -> GraphQLError:
