@@ -60,7 +60,9 @@ class OIDCHookPlugin(HookPlugin):
         db = root_app["_db"]
         secret = self._config.secret
 
-        stoken = params.get("stoken") or params.get("sToken") or request.cookies.get("sToken")
+        stoken_in_params = params.get("stoken") or params.get("sToken")
+        stoken_from_cookie = not stoken_in_params
+        stoken = request.cookies.get("sToken") if stoken_from_cookie else stoken_in_params
         if not stoken:
             log.debug(
                 "AUTHORIZE_HOOK(openid): no sToken found in params or cookies. proceeded with normal auth steps"
@@ -70,9 +72,21 @@ class OIDCHookPlugin(HookPlugin):
             payload = jwt.decode(stoken, secret, algorithms=["HS256"])
             user_uuid = payload["user"]
             email = payload["email"]
+<<<<<<< HEAD
         except jwt.ExpiredSignatureError:
             raise Reject("Expired authentication token") from None
         except (jwt.PyJWTError, KeyError):
+=======
+        except (jwt.PyJWTError, KeyError, ValueError) as e:
+            if stoken_from_cookie:
+                # Only a client calling the manager directly sends the cookie without the token in params, and it
+                # may be left from an earlier login and come with a password login that auth_keypair leaves
+                # unhandled, so an expired or invalid cookie leaves the login to password verification.
+                log.debug("openid auth cookie unusable, proceeding with password verification")
+                return None
+            if isinstance(e, jwt.ExpiredSignatureError):
+                raise Reject("Expired authentication token") from None
+>>>>>>> 262a0e2c7 (fix(BA-8918): skip None results of `FIRST_COMPLETED` hook handlers (#16982))
             raise Reject("Invalid authentication token") from None
 
         log.debug("AUTHORIZE_HOOK(openid): auth token {}", stoken)

@@ -429,3 +429,79 @@ async def test_hook_notify(etcd: AsyncEtcd, mocker: MockerFixture) -> None:
         await ctx.notify("HOOK3", ("e", "f"))
     finally:
         await ctx.cleanup()
+
+
+_HOOK_EVENT = "HOOK_EVENT"
+
+
+@dataclass(frozen=True)
+class _FirstCompletedCase:
+    handler_result_by_plugin: Mapping[str, Any]
+    expected_result: Any
+    expected_src_plugin: str | list[str]
+    expected_called_plugins: list[str]
+
+
+@dataclass(frozen=True)
+class _FirstCompletedDispatch:
+    ctx: HookPluginContext
+    handler_by_plugin: Mapping[str, AsyncMock]
+
+
+class TestFirstCompletedDispatch:
+    @pytest.fixture
+    def first_completed_dispatch(
+        self, case: _FirstCompletedCase, mocker: MockerFixture
+    ) -> _FirstCompletedDispatch:
+        handler_by_plugin = {
+            plugin_name: AsyncMock(return_value=handler_result)
+            for plugin_name, handler_result in case.handler_result_by_plugin.items()
+        }
+        ctx = HookPluginContext(mocker.MagicMock(spec=AsyncEtcd), {})
+        ctx.plugins = {
+            plugin_name: mocker.MagicMock(
+                get_handlers=mocker.MagicMock(return_value=[(_HOOK_EVENT, handler)])
+            )
+            for plugin_name, handler in handler_by_plugin.items()
+        }
+        return _FirstCompletedDispatch(ctx=ctx, handler_by_plugin=handler_by_plugin)
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            pytest.param(
+                _FirstCompletedCase(
+                    handler_result_by_plugin={"a": None, "b": "answer", "c": "unreached"},
+                    expected_result="answer",
+                    expected_src_plugin="b",
+                    expected_called_plugins=["a", "b"],
+                ),
+                id="none_then_value_stops_at_the_value",
+            ),
+            pytest.param(
+                _FirstCompletedCase(
+                    handler_result_by_plugin={"a": None, "b": None},
+                    expected_result=[],
+                    expected_src_plugin=["a", "b"],
+                    expected_called_plugins=["a", "b"],
+                ),
+                id="all_none_passes_with_no_result",
+            ),
+        ],
+    )
+    async def test_dispatch_result(
+        self, case: _FirstCompletedCase, first_completed_dispatch: _FirstCompletedDispatch
+    ) -> None:
+        hook_result = await first_completed_dispatch.ctx.dispatch(
+            _HOOK_EVENT, (), return_when=FIRST_COMPLETED
+        )
+
+        assert hook_result.status == PASSED
+        assert hook_result.result == case.expected_result
+        assert hook_result.src_plugin == case.expected_src_plugin
+        called_plugins = [
+            plugin_name
+            for plugin_name, handler in first_completed_dispatch.handler_by_plugin.items()
+            if handler.await_count > 0
+        ]
+        assert called_plugins == case.expected_called_plugins
