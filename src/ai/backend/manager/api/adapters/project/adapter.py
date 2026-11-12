@@ -6,7 +6,6 @@ from collections.abc import Sequence
 from typing import assert_never
 from uuid import UUID
 
-from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.role import RoleID
@@ -521,17 +520,16 @@ class ProjectAdapter(BaseAdapter):
         self,
         project_id: UUID,
         input: AssignUsersToProjectInput,
+        *,
+        granted_by: UUID,
     ) -> AssignUsersToProjectPayload:
         """Assign users to a project with a role. The role assignment puts them on the
         project's roster and asks CREATE on the role and on each user."""
-        me = current_user()
-        if me is None:
-            raise UnreachableError("User context is not available")
         assigned = await self._rbac.bulk_assign_role.run(
             BulkAssignRoleAction(
                 role_id=RoleID(input.role_id),
                 user_ids=[UserID(uid) for uid in input.user_ids],
-                granted_by=UserID(me.user_id),
+                granted_by=UserID(granted_by),
                 project_id=ProjectID(project_id),
             )
         )

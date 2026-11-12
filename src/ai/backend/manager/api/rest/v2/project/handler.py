@@ -168,11 +168,14 @@ class V2ProjectHandler:
 
     async def assign_users(
         self,
+        user_ctx: UserContext,
         path: PathParam[ProjectIdPathParam],
         body: BodyParam[AssignUsersToProjectInput],
     ) -> APIResponse:
         """Assign users to a project."""
-        result = await self._adapter.assign_users(path.parsed.project_id, body.parsed)
+        result = await self._adapter.assign_users(
+            path.parsed.project_id, body.parsed, granted_by=user_ctx.user_uuid
+        )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def unassign_users(

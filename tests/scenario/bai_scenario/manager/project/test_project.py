@@ -207,6 +207,7 @@ class AssigningTheMember(When[AProjectAMemberAndACaller, ProjectAdapter, Answer]
             return await adapter.assign_users(
                 laid.project.id,
                 AssignUsersToProjectInput(user_ids=[laid.member.id], role_id=laid.role.id),
+                granted_by=laid.caller.id,
             )
 
 
