@@ -66,6 +66,24 @@ class TestServiceParserInterpolation:
         [
             pytest.param({}, "{runtime_path}", "/usr/bin/python3", id="unset-uses-legacy"),
             pytest.param(
+                {"interpolation": {"delimiters": []}},
+                "{runtime_path}",
+                "/usr/bin/python3",
+                id="empty-delimiters-use-legacy",
+            ),
+            pytest.param(
+                {"interpolation": {"delimiters": [{"start": "", "end": "}}"}]}},
+                "{runtime_path}",
+                "/usr/bin/python3",
+                id="empty-start-uses-legacy",
+            ),
+            pytest.param(
+                {"interpolation": {"delimiters": [{"start": "{{", "end": ""}]}},
+                "{runtime_path}",
+                "/usr/bin/python3",
+                id="empty-end-uses-legacy",
+            ),
+            pytest.param(
                 _JINJA_OPTS, "{runtime_path}", "{runtime_path}", id="delimiter-skips-legacy"
             ),
             pytest.param(_JINJA_OPTS, "{{ runtime_path }}", "/usr/bin/python3", id="delimiter"),
@@ -105,6 +123,13 @@ class TestServiceParserInterpolation:
                 "c.settings = {{'python': '{runtime_path}'}}",
                 "c.settings = {'python': '/usr/bin/python3'}\n",
                 id="legacy",
+            ),
+            pytest.param(
+                {"interpolation": {}},
+                "{out_dir}/cfg",
+                "c.settings = {{'python': '{runtime_path}'}}",
+                "c.settings = {'python': '/usr/bin/python3'}\n",
+                id="empty-option-uses-legacy",
             ),
             pytest.param(
                 _JINJA_OPTS,

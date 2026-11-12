@@ -22,8 +22,6 @@ class ServiceInterpolator:
     def __init__(
         self, variables: Mapping[str, Any], delimiters: Sequence[InterpolationDelimiter]
     ) -> None:
-        if not delimiters:
-            raise InvalidServiceDefinition("Service interpolation requires at least one delimiter")
         self._variables = variables
         self._delimiters = tuple(delimiters)
 

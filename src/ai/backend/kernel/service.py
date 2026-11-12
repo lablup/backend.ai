@@ -26,7 +26,7 @@ import attrs
 from . import service_actions
 from .exception import DisallowedArgument, DisallowedEnvironment, InvalidServiceDefinition
 from .interpolation.interpolator import LEGACY_DELIMITERS, ServiceInterpolator
-from .interpolation.types import InterpolationOption
+from .interpolation.types import InterpolationDelimiter, InterpolationOption
 from .logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger())
@@ -108,11 +108,16 @@ class ServiceParser:
         service = self.services[service_name]
         if service.noop:
             return [], {}
-        interpolation_option = opts.get("interpolation")
-        delimiters = (
-            interpolation_option["delimiters"] if interpolation_option else LEGACY_DELIMITERS
+        delimiters = (opts.get("interpolation") or {}).get("delimiters")
+        if delimiters is not None and not self._is_valid_delimiters(delimiters):
+            log.warning(
+                "Invalid interpolation delimiters {!r}; using the legacy syntax", delimiters
+            )
+            delimiters = None
+        legacy = delimiters is None
+        interpolator = ServiceInterpolator(
+            self.variables, LEGACY_DELIMITERS if delimiters is None else delimiters
         )
-        interpolator = ServiceInterpolator(self.variables, delimiters)
 
         for action in service.prestart_actions:
             try:
@@ -123,9 +128,7 @@ class ServiceParser:
                 ) from e
             args = {}
             for name, value in action["args"].items():
-                args[name] = self._render_action_arg(
-                    value, interpolator, legacy=interpolation_option is None
-                )
+                args[name] = self._render_action_arg(value, interpolator, legacy=legacy)
             ret = await action_impl(**args)
             if (ref := action.get("ref")) is not None:
                 self.variables[ref] = ret
@@ -173,6 +176,10 @@ class ServiceParser:
             env[env_name] = env_value
 
         return cmdargs, env
+
+    @staticmethod
+    def _is_valid_delimiters(delimiters: Sequence[InterpolationDelimiter]) -> bool:
+        return bool(delimiters) and all(d["start"] and d["end"] for d in delimiters)
 
     def _render_action_arg(
         self, value: Any, interpolator: ServiceInterpolator, *, legacy: bool

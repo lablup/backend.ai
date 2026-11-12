@@ -7,7 +7,7 @@ class InterpolationDelimiter(TypedDict):
     end: str
 
 
-class InterpolationOption(TypedDict):
+class InterpolationOption(TypedDict, total=False):
     """The ``interpolation`` entry of a service start's options."""
 
     delimiters: Sequence[InterpolationDelimiter]

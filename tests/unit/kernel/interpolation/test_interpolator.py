@@ -88,7 +88,3 @@ class TestServiceInterpolator:
             ServiceInterpolator(_VARIABLES, delimiters).apply(["{{ ports[0 }}"])
 
         assert ("Literal braces" in str(exc_info.value)) is mentions_literal_braces
-
-    def test_requires_a_delimiter(self) -> None:
-        with pytest.raises(InvalidServiceDefinition):
-            ServiceInterpolator(_VARIABLES, [])
