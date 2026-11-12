@@ -22,6 +22,7 @@ __all__ = (
     "UpdatePasswordNoAuthResponse",
     "GetSSHKeypairResponse",
     "SSHKeypairResponse",
+    "UploadSSHKeypairResponse",
     "VerifyAuthResponse",
 )
 
@@ -94,10 +95,16 @@ class GetSSHKeypairResponse(BaseResponseModel):
 
 
 class SSHKeypairResponse(BaseResponseModel):
-    """Response for generate/upload SSH keypair (both keys returned)."""
+    """Response for generating an SSH keypair (both keys returned)."""
 
     ssh_public_key: str = Field(description="SSH public key in standard format")
     ssh_private_key: str = Field(description="SSH private key in PEM format")
+
+
+class UploadSSHKeypairResponse(BaseResponseModel):
+    """Response for uploading an SSH public key."""
+
+    ssh_public_key: str = Field(description="SSH public key in standard format")
 
 
 class VerifyAuthResponse(BaseResponseModel):

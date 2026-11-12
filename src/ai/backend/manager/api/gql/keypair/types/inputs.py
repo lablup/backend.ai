@@ -104,12 +104,14 @@ class AdminUpdateKeypairInputGQL(PydanticInputMixin[AdminUpdateKeypairInputDTO])
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        description="Admin input for registering (overwriting) a user's SSH keypair.",
+        description=(
+            "Admin input for registering (overwriting) a user's SSH public key. "
+            "`sshPrivateKey` was removed in 26.4.20."
+        ),
         added_version="26.4.2",
     ),
     name="AdminRegisterSSHKeypairInput",
 )
 class AdminRegisterSSHKeypairInputGQL(PydanticInputMixin[AdminRegisterSSHKeypairInputDTO]):
-    access_key: str = gql_field(description="Access key whose SSH keypair will be replaced.")
+    access_key: str = gql_field(description="Access key whose SSH public key will be replaced.")
     ssh_public_key: str = gql_field(description="PEM-encoded SSH public key.")
-    ssh_private_key: str = gql_field(description="PEM-encoded SSH private key.")
