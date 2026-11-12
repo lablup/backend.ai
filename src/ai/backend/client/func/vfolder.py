@@ -29,7 +29,6 @@ from ai.backend.client.output.fields import vfolder_fields
 from ai.backend.client.output.types import FieldSpec, PaginatedResult
 from ai.backend.client.pagination import fetch_paginated_result
 from ai.backend.client.request import Request
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import ResultSet
 
 from .base import BaseFunction, api_function
@@ -274,7 +273,7 @@ class VFolderByName(BaseFunction):
 
     @api_function
     @deprecated(
-        f"Deprecated since {NEXT_RELEASE_VERSION}. A name does not resolve to a "
+        "Deprecated since 26.4.20. A name does not resolve to a "
         "`delete-complete` folder; use `V2VFolderClient.purge()` with the vfolder ID."
     )
     async def purge(self) -> Mapping[str, Any]:
