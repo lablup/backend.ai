@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import logging
 import re
-import uuid
 from collections.abc import Mapping, MutableMapping, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Self, cast
+from typing import TYPE_CHECKING, Any, cast
 from urllib.parse import urlparse
 
 import sqlalchemy as sa
@@ -18,7 +17,6 @@ from sqlalchemy.sql.expression import SQLColumnExpression
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.logging.structured import StructuredLogger
-from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.errors.container_registry import (
     InvalidContainerRegistryProject,
     InvalidContainerRegistryURL,
@@ -173,19 +171,6 @@ class ContainerRegistryRow(Base):
         self.extra = extra
 
     @classmethod
-    async def get(
-        cls,
-        session: AsyncSession,
-        id: str | uuid.UUID,
-    ) -> ContainerRegistryRow:
-        query = sa.select(ContainerRegistryRow).where(ContainerRegistryRow.id == id)
-        result = await session.execute(query)
-        row = result.scalar()
-        if row is None:
-            raise NoResultFound
-        return row
-
-    @classmethod
     async def list_by_registry_name(
         cls,
         session: AsyncSession,
@@ -232,20 +217,3 @@ class ContainerRegistryRow(Base):
     @classmethod
     def scope_name_expr(cls) -> SQLColumnExpression[str]:
         return cls.registry_name
-
-    @classmethod
-    def from_dataclass(cls, data: ContainerRegistryData) -> Self:
-        instance = cls(
-            id=data.id,
-            url=data.url,
-            registry_name=data.registry_name,
-            type=data.type,
-            project=data.project,
-            username=data.username,
-            password=data.password,
-            ssl_verify=data.ssl_verify,
-            is_global=data.is_global,
-            extra=data.extra,
-        )
-        instance.id = data.id
-        return instance
