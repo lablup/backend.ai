@@ -9,7 +9,6 @@ from unittest.mock import patch
 
 import pytest
 
-from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.secret.types import KeyProviderType
@@ -19,7 +18,6 @@ from ai.backend.manager.models.association_container_registries_groups.row impor
 )
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.hasher.factory import compare_to_hashed_password
 from ai.backend.manager.models.hasher.pbkdf2 import PBKDF2_SHA256Hasher
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow
@@ -35,6 +33,11 @@ from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
+)
+from ai.backend.manager.models.user import (
+    PasswordHashAlgorithm,
+    PasswordInfo,
+    compare_to_hashed_password,
 )
 from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
