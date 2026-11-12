@@ -9,8 +9,6 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.manager.data.common.types import SearchResult
-from ai.backend.manager.data.container_registry.types import DomainContainerRegistryRelationData
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.errors.resource import DomainDeletionFailed
 from ai.backend.manager.models.domain.creators import DomainCreator
@@ -107,22 +105,6 @@ class DomainRepository:
                 [(domain_id, registry_id) for registry_id in to_link],
             )
         return DomainContainerRegistryRelationChange(linked=to_link, unlinked=to_unlink)
-
-    @domain_repository_resilience.apply()
-    async def search_container_registry_relations(
-        self,
-        scopes: Sequence[DomainContainerRegistryRelationTarget],
-        searcher: DomainContainerRegistryRelationSearcher,
-    ) -> SearchResult[DomainContainerRegistryRelationData]:
-        """Search the relations of any of the scopes' domains (OR), narrowed by ``searcher``."""
-        async with self._v2_ops.read_ops() as r:
-            result = await r.search_with_scopes(scopes, searcher)
-        return SearchResult(
-            items=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
 
     @domain_repository_resilience.apply()
     async def get_domain_id_by_name(self, name: DomainName) -> DomainID:

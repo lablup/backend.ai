@@ -23,10 +23,6 @@ from ai.backend.manager.services.domain.actions.purge_domain import (
     PurgeDomainAction,
     PurgeDomainActionResult,
 )
-from ai.backend.manager.services.domain.actions.search_container_registry_relations import (
-    SearchDomainContainerRegistryRelationsAction,
-    SearchDomainContainerRegistryRelationsActionResult,
-)
 from ai.backend.manager.services.domain.actions.update_container_registry_relations import (
     UpdateDomainContainerRegistryRelationsAction,
     UpdateDomainContainerRegistryRelationsActionResult,
@@ -60,19 +56,6 @@ class DomainService:
         )
         return UpdateDomainContainerRegistryRelationsActionResult(
             linked=change.linked, unlinked=change.unlinked
-        )
-
-    async def search_container_registry_relations(
-        self, action: SearchDomainContainerRegistryRelationsAction
-    ) -> SearchDomainContainerRegistryRelationsActionResult:
-        result = await self._repository.search_container_registry_relations(
-            action.operation_scopes(), action.searcher
-        )
-        return SearchDomainContainerRegistryRelationsActionResult(
-            items=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
         )
 
     async def purge(self, action: PurgeDomainAction) -> PurgeDomainActionResult:
