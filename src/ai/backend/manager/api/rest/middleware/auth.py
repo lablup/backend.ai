@@ -812,6 +812,9 @@ async def _authenticate_via_hook(
     if hook_result.status != PASSED:
         raise RejectedByHook.from_hook_result(hook_result)
 
+    if not hook_result.result:
+        return None
+
     access_key = hook_result.result
     if access_key is None:
         return None
