@@ -1,4 +1,7 @@
+from collections.abc import Mapping
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
@@ -12,13 +15,21 @@ from ai.backend.common.data.entity.resource_policy import (
 )
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.auth.types import AuthTokenType
+from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.exception import InvalidAPIParameters
-from ai.backend.common.plugin.hook import HookPluginContext, HookResult, HookResults
+from ai.backend.common.plugin.hook import (
+    HookPlugin,
+    HookPluginContext,
+    HookResult,
+    HookResults,
+    Reject,
+)
 from ai.backend.manager.config.unified import AuthConfig
 from ai.backend.manager.data.auth.login_session_types import LoginAttemptResult
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.errors.auth import AuthorizationFailed, PasswordExpired, PasswordMismatch
+from ai.backend.manager.errors.common import RejectedByHook
 from ai.backend.manager.models.user.row import UserRole, UserStatus
 from ai.backend.manager.repositories.auth.db_source.db_source import (
     ActiveSessionInfo,
@@ -144,9 +155,10 @@ def setup_successful_auth(
       3. _create_login_session: create_login_session in DB, set_login_session in Valkey
     """
     # Both AUTHORIZE and POST_AUTHORIZE hooks pass
-    mock_hook_plugin_ctx.dispatch.return_value = HookResult(
-        status=HookResults.PASSED, result=None, reason=None
-    )
+    mock_hook_plugin_ctx.dispatch.side_effect = [
+        HookResult(status=HookResults.PASSED, result=None, reason=None),
+        HookResult(status=HookResults.PASSED, result=[], reason=None),
+    ]
 
     mock_user = _make_mock_user()
 
@@ -335,7 +347,7 @@ async def test_authorize_with_hook_authorization(
     # Second call (POST_AUTHORIZE): passes normally
     mock_hook_plugin_ctx.dispatch.side_effect = [
         HookResult(status=HookResults.PASSED, result=hook_user, reason=None),
-        HookResult(status=HookResults.PASSED, result=None, reason=None),
+        HookResult(status=HookResults.PASSED, result=[], reason=None),
     ]
 
     # When hook provides user, _verify_user calls get_active_session_tokens
@@ -435,7 +447,7 @@ async def test_authorize_with_post_hook_response(
     mock_stream_response = web.StreamResponse()
     mock_hook_plugin_ctx.dispatch.side_effect = [
         HookResult(status=HookResults.PASSED, result=None, reason=None),
-        HookResult(status=HookResults.PASSED, result=mock_stream_response, reason=None),
+        HookResult(status=HookResults.PASSED, result=[mock_stream_response], reason=None),
     ]
 
     result = await auth_service.authorize(action)
@@ -478,9 +490,10 @@ async def test_authorize_with_valkey_cross_check_cleans_stale_sessions(
     mock_auth_repository.default_keypair.return_value = _make_mock_keypair()
 
     # Both hooks pass
-    mock_hook_plugin_ctx.dispatch.return_value = HookResult(
-        status=HookResults.PASSED, result=None, reason=None
-    )
+    mock_hook_plugin_ctx.dispatch.side_effect = [
+        HookResult(status=HookResults.PASSED, result=None, reason=None),
+        HookResult(status=HookResults.PASSED, result=[], reason=None),
+    ]
 
     # Valkey cross-check: stale session is NOT in Valkey
     mock_valkey_session_client.get_login_sessions.return_value = [None]
@@ -547,9 +560,10 @@ async def test_authorize_force_invalidates_existing_sessions(
     mock_auth_repository.default_keypair.return_value = _make_mock_keypair()
 
     # Both hooks pass
-    mock_hook_plugin_ctx.dispatch.return_value = HookResult(
-        status=HookResults.PASSED, result=None, reason=None
-    )
+    mock_hook_plugin_ctx.dispatch.side_effect = [
+        HookResult(status=HookResults.PASSED, result=None, reason=None),
+        HookResult(status=HookResults.PASSED, result=[], reason=None),
+    ]
 
     # Valkey cross-check: session IS live
     mock_valkey_session_client.get_login_sessions.return_value = [b"session_data"]
@@ -621,3 +635,132 @@ async def test_create_login_session_does_not_pass_max_concurrent_sessions_to_rep
     assert "max_concurrent_sessions" not in call_kwargs
     assert "tokens_to_invalidate" not in call_kwargs
     mock_auth_repository.delete_login_sessions_by_tokens.assert_not_called()
+
+
+_STREAM_RESPONSE = web.StreamResponse()
+_OTHER_STREAM_RESPONSE = web.StreamResponse()
+
+
+@dataclass(frozen=True)
+class _PostAuthorizeOutcomesCase:
+    outcome_by_plugin: Mapping[str, Any]
+
+
+class TestPostAuthorizeRunsEveryPlugin:
+    def _plugin_with_post_authorize_outcome(self, outcome: Any) -> MagicMock:
+        handler = (
+            AsyncMock(side_effect=outcome)
+            if isinstance(outcome, Exception)
+            else AsyncMock(return_value=outcome)
+        )
+        plugin = MagicMock(spec=HookPlugin)
+        plugin.get_handlers.return_value = [("POST_AUTHORIZE", handler)]
+        return plugin
+
+    @pytest.fixture
+    def dispatch_over_post_authorize_outcomes(
+        self,
+        case: _PostAuthorizeOutcomesCase,
+        mock_hook_plugin_ctx: MagicMock,
+        setup_successful_auth: None,
+    ) -> None:
+        plugin_ctx = HookPluginContext(MagicMock(spec=AsyncEtcd), {})
+        plugin_ctx.plugins = {
+            plugin_name: self._plugin_with_post_authorize_outcome(outcome)
+            for plugin_name, outcome in case.outcome_by_plugin.items()
+        }
+        mock_hook_plugin_ctx.dispatch.side_effect = plugin_ctx.dispatch
+
+    @pytest.fixture
+    def password_login_action(self) -> AuthorizeAction:
+        return AuthorizeAction(
+            type=AuthTokenType.KEYPAIR,
+            domain_name="default",
+            email="test@example.com",
+            password="correct_password",
+            request=MagicMock(),
+            stoken=None,
+            client_type_id=uuid4(),
+            otp=None,
+        )
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            pytest.param(
+                _PostAuthorizeOutcomesCase({"a": None, "totp": Reject("denied")}),
+                id="after_none",
+            ),
+            pytest.param(
+                _PostAuthorizeOutcomesCase({"a": True, "totp": Reject("denied")}),
+                id="after_a_value",
+            ),
+            pytest.param(
+                _PostAuthorizeOutcomesCase({"a": _STREAM_RESPONSE, "totp": Reject("denied")}),
+                id="after_a_stream_response",
+            ),
+        ],
+    )
+    @pytest.mark.usefixtures("dispatch_over_post_authorize_outcomes")
+    async def test_later_plugin_rejects_the_login(
+        self,
+        case: _PostAuthorizeOutcomesCase,
+        auth_service: AuthService,
+        password_login_action: AuthorizeAction,
+    ) -> None:
+        with pytest.raises(RejectedByHook):
+            await auth_service.authorize(password_login_action)
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            pytest.param(
+                _PostAuthorizeOutcomesCase({"a": None, "b": _STREAM_RESPONSE}),
+                id="after_none",
+            ),
+            pytest.param(
+                _PostAuthorizeOutcomesCase({"a": True, "b": _STREAM_RESPONSE}),
+                id="after_a_value",
+            ),
+            pytest.param(
+                _PostAuthorizeOutcomesCase({"a": _STREAM_RESPONSE, "b": _OTHER_STREAM_RESPONSE}),
+                id="before_another_stream_response",
+            ),
+        ],
+    )
+    @pytest.mark.usefixtures("dispatch_over_post_authorize_outcomes")
+    async def test_first_stream_response_is_returned(
+        self,
+        case: _PostAuthorizeOutcomesCase,
+        auth_service: AuthService,
+        password_login_action: AuthorizeAction,
+    ) -> None:
+        result = await auth_service.authorize(password_login_action)
+
+        assert result.stream_response is _STREAM_RESPONSE
+        assert result.authorization_result is None
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            pytest.param(
+                _PostAuthorizeOutcomesCase({"a": None, "b": None}),
+                id="only_none",
+            ),
+            pytest.param(
+                _PostAuthorizeOutcomesCase({"a": True, "b": None}),
+                id="a_value_that_is_not_a_stream_response",
+            ),
+        ],
+    )
+    @pytest.mark.usefixtures("dispatch_over_post_authorize_outcomes")
+    async def test_login_continues_without_a_stream_response(
+        self,
+        case: _PostAuthorizeOutcomesCase,
+        auth_service: AuthService,
+        password_login_action: AuthorizeAction,
+    ) -> None:
+        result = await auth_service.authorize(password_login_action)
+
+        assert result.stream_response is None
+        assert result.authorization_result is not None

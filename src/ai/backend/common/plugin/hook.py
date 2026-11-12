@@ -32,10 +32,8 @@ __all__ = (
 
 class HookHandler(Protocol):
     """
-    The handler should accept a single argument containing
-    a tuple of parameters passed to the handler.
-    If it decides to cancel the ongoing event, it should raise
-    :class:`HookDenied` exception.
+    Returns None when the handler does not handle the event, and a non-None result when it does.
+    Raises :class:`Reject` to reject the event.
     """
 
     async def __call__(self, *args: Any) -> Any:
@@ -151,12 +149,15 @@ class HookPluginContext(BasePluginContext[HookPlugin]):
                 )
             else:
                 if return_when == FIRST_COMPLETED:
-                    return HookResult(
-                        status=PASSED,
-                        src_plugin=plugin_name,
-                        result=result,
-                    )
-                results.append(result)
+                    # A handler returns None when the event is not its to handle, so the next handler gets it.
+                    if result is not None:
+                        return HookResult(
+                            status=PASSED,
+                            src_plugin=plugin_name,
+                            result=result,
+                        )
+                else:
+                    results.append(result)
         if not success_if_no_hook and not executed_plugin_names:
             return HookResult(
                 status=REJECTED,
