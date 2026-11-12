@@ -15,9 +15,9 @@ from . import AbstractPlugin, BasePluginContext
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
 __all__ = (
-    "ALL_COMPLETED",
+    "ALL_HANDLERS_RUNNER",
     "ERROR",
-    "FIRST_COMPLETED",
+    "FIRST_HANDLED_RUNNER",
     "PASSED",
     "REJECTED",
     "HookHandler",
@@ -148,8 +148,8 @@ class AllHandlersRunner(HookHandlerRunner):
         return HookResult(status=PASSED, src_plugin=executed_plugin_names, result=handler_results)
 
 
-ALL_COMPLETED: Final = AllHandlersRunner()
-FIRST_COMPLETED: Final = FirstHandledRunner()
+ALL_HANDLERS_RUNNER: Final = AllHandlersRunner()
+FIRST_HANDLED_RUNNER: Final = FirstHandledRunner()
 
 
 class HookPluginContext(BasePluginContext[HookPlugin]):
@@ -183,18 +183,18 @@ class HookPluginContext(BasePluginContext[HookPlugin]):
         event_name: str,
         args: tuple[Any, ...],
         *,
-        return_when: HookHandlerRunner = ALL_COMPLETED,
+        handler_runner: HookHandlerRunner = ALL_HANDLERS_RUNNER,
         success_if_no_hook: bool = True,
         order: Sequence[str] | None = None,
     ) -> HookResult:
         """
-        Invokes the handlers of ``event_name`` in order, as ``return_when`` describes.
+        Invokes the handlers of ``event_name`` in order with ``handler_runner``.
         A handler raising :class:`Reject` or any other exception ends the dispatch.
         """
         handlers = self._get_handlers(event_name, order=order)
         if not handlers and not success_if_no_hook:
             return HookResult(status=REJECTED, src_plugin=[], result=[])
-        return await return_when.run_handlers(handlers, args)
+        return await handler_runner.run_handlers(handlers, args)
 
     async def notify(
         self,

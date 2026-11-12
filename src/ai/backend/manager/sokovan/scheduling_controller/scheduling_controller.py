@@ -17,7 +17,7 @@ from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEve
 from ai.backend.common.events.event_types.session.broadcast import SchedulingBroadcastEvent
 from ai.backend.common.events.types import AbstractBroadcastEvent
 from ai.backend.common.exception import InvalidAPIParameters
-from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
+from ai.backend.common.plugin.hook import ALL_HANDLERS_RUNNER, PASSED, HookPluginContext
 from ai.backend.common.types import (
     ArchName,
     PreemptionOrder,
@@ -336,7 +336,7 @@ class SchedulingController:
             "PRE_ENQUEUE_SESSION",
             # No handler reads arguments; pass a dataclass from plugin/hook_args.py once one does.
             (),
-            return_when=ALL_COMPLETED,
+            handler_runner=ALL_HANDLERS_RUNNER,
         )
         if hook_result.status != PASSED:
             raise RejectedByHook.from_hook_result(hook_result)

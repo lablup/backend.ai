@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookResult, HookResults
+from ai.backend.common.plugin.hook import ALL_HANDLERS_RUNNER, PASSED, HookResult, HookResults
 from ai.backend.manager.dependencies.plugins.base import PluginsInput
 from ai.backend.manager.dependencies.plugins.hook import HookPluginDependency
 
@@ -50,7 +50,7 @@ class TestHookPluginDependency:
             mock_ctx.dispatch.assert_called_once_with(
                 "ACTIVATE_MANAGER",
                 (),
-                return_when=ALL_COMPLETED,
+                handler_runner=ALL_HANDLERS_RUNNER,
             )
 
         mock_ctx.cleanup.assert_called_once()

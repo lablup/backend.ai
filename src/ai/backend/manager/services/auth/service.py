@@ -30,7 +30,12 @@ from ai.backend.common.exception import (
     InvalidAPIParameters,
     UnreachableError,
 )
-from ai.backend.common.plugin.hook import ALL_COMPLETED, FIRST_COMPLETED, PASSED, HookPluginContext
+from ai.backend.common.plugin.hook import (
+    ALL_HANDLERS_RUNNER,
+    FIRST_HANDLED_RUNNER,
+    PASSED,
+    HookPluginContext,
+)
 from ai.backend.common.types import AccessKey, SecretKey
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -300,7 +305,7 @@ class AuthService:
         hook_result = await self._hook_plugin_ctx.dispatch(
             "AUTHORIZE",
             (action.request, params),
-            return_when=FIRST_COMPLETED,
+            handler_runner=FIRST_HANDLED_RUNNER,
         )
         if hook_result.status != PASSED:
             raise RejectedByHook.from_hook_result(hook_result)
@@ -353,7 +358,7 @@ class AuthService:
                 user,
                 await self._keypair_hook_payload(default_keypair),
             ),
-            return_when=ALL_COMPLETED,
+            handler_runner=ALL_HANDLERS_RUNNER,
         )
         if hook_result.status != PASSED:
             raise RejectedByHook.from_hook_result(hook_result)
@@ -535,7 +540,7 @@ class AuthService:
                     token=action.token,
                 ),
             ),
-            return_when=ALL_COMPLETED,
+            handler_runner=ALL_HANDLERS_RUNNER,
         )
         if hook_result.status != PASSED:
             raise RejectedByHook.from_hook_result(hook_result)
@@ -555,7 +560,7 @@ class AuthService:
                     password=action.password,
                 ),
             ),
-            return_when=ALL_COMPLETED,
+            handler_runner=ALL_HANDLERS_RUNNER,
         )
         if hook_result.status != PASSED:
             hook_result.reason = hook_result.reason or "invalid password format"
@@ -731,7 +736,7 @@ class AuthService:
                     password=action.new_password,
                 ),
             ),
-            return_when=ALL_COMPLETED,
+            handler_runner=ALL_HANDLERS_RUNNER,
         )
         if hook_result.status != PASSED:
             hook_result.reason = hook_result.reason or "invalid password format"
@@ -782,7 +787,7 @@ class AuthService:
                     password=new_password,
                 ),
             ),
-            return_when=ALL_COMPLETED,
+            handler_runner=ALL_HANDLERS_RUNNER,
         )
         if hook_result.status != PASSED:
             hook_result.reason = hook_result.reason or "invalid password format"

@@ -44,7 +44,7 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.exception import InvalidIpAddressValue
 from ai.backend.common.jwt.exceptions import JWTError
-from ai.backend.common.plugin.hook import FIRST_COMPLETED, PASSED
+from ai.backend.common.plugin.hook import FIRST_HANDLED_RUNNER, PASSED
 from ai.backend.common.types import AccessKey, ReadableCIDR, SecretKey
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.types import WebRequestHandler
@@ -806,7 +806,7 @@ async def _authenticate_via_hook(
     hook_result = await hook_plugin_ctx.dispatch(
         "PRE_AUTH_MIDDLEWARE",
         (request,),
-        return_when=FIRST_COMPLETED,
+        handler_runner=FIRST_HANDLED_RUNNER,
     )
 
     if hook_result.status != PASSED:

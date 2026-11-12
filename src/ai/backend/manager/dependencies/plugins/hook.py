@@ -5,7 +5,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import override
 
-from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
+from ai.backend.common.plugin.hook import ALL_HANDLERS_RUNNER, PASSED, HookPluginContext
 from ai.backend.logging.structured import StructuredLogger
 
 from .base import PluginDependency, PluginsInput
@@ -48,7 +48,7 @@ class HookPluginDependency(PluginDependency[HookPluginContext]):
         hook_result = await ctx.dispatch(
             "ACTIVATE_MANAGER",
             (),
-            return_when=ALL_COMPLETED,
+            handler_runner=ALL_HANDLERS_RUNNER,
         )
         if hook_result.status != PASSED:
             raise RuntimeError("Could not activate the manager instance.")

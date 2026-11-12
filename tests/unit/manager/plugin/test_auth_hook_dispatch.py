@@ -15,8 +15,8 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.plugin.hook import (
-    ALL_COMPLETED,
-    FIRST_COMPLETED,
+    ALL_HANDLERS_RUNNER,
+    FIRST_HANDLED_RUNNER,
     PASSED,
     REJECTED,
     HookPluginContext,
@@ -164,7 +164,7 @@ class TestAuthorizeAfterKeypairReturnsNone:
         hook_result = await keypair_and_openid_dispatch.ctx.dispatch(
             "AUTHORIZE",
             (keypair_and_openid_dispatch.request, _HOOK_PARAMS_WITHOUT_TOKEN),
-            return_when=FIRST_COMPLETED,
+            handler_runner=FIRST_HANDLED_RUNNER,
         )
 
         assert hook_result.status == case.expected_status
@@ -232,7 +232,7 @@ class TestPostAuthorizeAfterKeypairReturnsNone:
         authorize_result = await keypair_and_totp_dispatch.ctx.dispatch(
             "AUTHORIZE",
             (keypair_and_totp_dispatch.request, _HOOK_PARAMS_WITHOUT_TOKEN),
-            return_when=FIRST_COMPLETED,
+            handler_runner=FIRST_HANDLED_RUNNER,
         )
         post_authorize_result = await keypair_and_totp_dispatch.ctx.dispatch(
             "POST_AUTHORIZE",
@@ -242,7 +242,7 @@ class TestPostAuthorizeAfterKeypairReturnsNone:
                 _ACTIVE_USER_WITH_TOTP,
                 {},
             ),
-            return_when=ALL_COMPLETED,
+            handler_runner=ALL_HANDLERS_RUNNER,
         )
 
         assert authorize_result.status == PASSED
