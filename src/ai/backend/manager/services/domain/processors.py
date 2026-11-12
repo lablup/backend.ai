@@ -48,6 +48,11 @@ from ai.backend.manager.services.domain.actions.purge_domain import (
 )
 from ai.backend.manager.services.domain.actions.restore_domain import RestoreDomainAction
 from ai.backend.manager.services.domain.actions.scoped_search import ScopedSearchDomainsAction
+from ai.backend.manager.services.domain.actions.search_container_registry_relations import (
+    GlobalSearchDomainContainerRegistryRelationsAction,
+    ScopedSearchDomainContainerRegistryRelationsAction,
+    SearchDomainContainerRegistryRelationsActionResult,
+)
 from ai.backend.manager.services.domain.actions.search_domains import GlobalSearchDomainsAction
 from ai.backend.manager.services.domain.actions.update_container_registry_relations import (
     UpdateDomainContainerRegistryRelationsAction,
@@ -83,6 +88,14 @@ class DomainProcessors:
         UpdateDomainContainerRegistryRelationsAction,
         UpdateDomainContainerRegistryRelationsActionResult,
     ]
+    scoped_search_container_registry_relations: ScopeActionProcessor[
+        ScopedSearchDomainContainerRegistryRelationsAction,
+        SearchDomainContainerRegistryRelationsActionResult,
+    ]
+    global_search_container_registry_relations: GlobalActionProcessor[
+        GlobalSearchDomainContainerRegistryRelationsAction,
+        SearchDomainContainerRegistryRelationsActionResult,
+    ]
     create_dotfile: SingleEntityActionProcessor[
         CreateDomainDotfileAction, CreateDomainDotfileActionResult
     ]
@@ -102,6 +115,14 @@ class DomainProcessors:
         self.update_container_registry_relations = relation_group.relation(
             UpdateDomainContainerRegistryRelationsAction,
             service.update_container_registry_relations,
+        )
+        self.scoped_search_container_registry_relations = group.scope(
+            ScopedSearchDomainContainerRegistryRelationsAction,
+            service.scoped_search_container_registry_relations,
+        )
+        self.global_search_container_registry_relations = group.global_scope(
+            GlobalSearchDomainContainerRegistryRelationsAction,
+            service.global_search_container_registry_relations,
         )
         self.get = group.single_get_ops(GetDomainAction)
         self.lookup_name = group.public_lookup_ops(LookupDomainAction)

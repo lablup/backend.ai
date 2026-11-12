@@ -246,6 +246,10 @@ from ai.backend.manager.services.domain.actions.bulk_lookup import BulkLookupDom
 from ai.backend.manager.services.domain.actions.create_domain import CreateDomainAction
 from ai.backend.manager.services.domain.actions.get import GetDomainAction
 from ai.backend.manager.services.domain.actions.scoped_search import ScopedSearchDomainsAction
+from ai.backend.manager.services.domain.actions.search_container_registry_relations import (
+    GlobalSearchDomainContainerRegistryRelationsAction,
+    ScopedSearchDomainContainerRegistryRelationsAction,
+)
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.entity_label.actions.lookup_owner import (
     LookupBulkEntityLabelOwnerAction,
@@ -1342,6 +1346,8 @@ def test_owner_candidates_field_group_records_no_lookup_under_its_concern() -> N
 _OPS_ACTIONS_WIRED_TO_A_SERVICE: dict[type[Any], str] = {
     CreateDomainAction: "also creates the domain's model-store project in the same transaction",
     CreateProjectAction: "lends the project its resource policy in the same transaction",
+    ScopedSearchDomainContainerRegistryRelationsAction: "reads relation rows, which are not entity data",
+    GlobalSearchDomainContainerRegistryRelationsAction: "reads relation rows, which are not entity data",
     CreateIdleCheckerAction: "validates utilization labels against the referenced preset",
     UpdateIdleCheckerAction: "validates utilization labels against the referenced preset",
     PurgeRuntimeVariantAction: "purges the variant's presets first",
