@@ -155,7 +155,7 @@ async def admin_delete_keypair_v2(
 @gql_mutation(
     BackendAIGQLMeta(
         added_version="26.4.2",
-        description="Admin registers (overwrites) a user's SSH keypair.",
+        description="Admin registers (overwrites) a user's SSH public key.",
     )
 )
 async def admin_register_ssh_keypair_v2(

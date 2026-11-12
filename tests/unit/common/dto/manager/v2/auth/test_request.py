@@ -658,77 +658,31 @@ class TestUploadSSHKeypairInput:
     """Tests for UploadSSHKeypairInput model creation and validation."""
 
     def test_valid_creation(self) -> None:
-        req = UploadSSHKeypairInput(
-            pubkey="ssh-rsa AAAAB3NzaC1yc2E...",
-            privkey="-----BEGIN RSA PRIVATE KEY-----\nMIIEow...",
-        )
+        req = UploadSSHKeypairInput(pubkey="ssh-rsa AAAAB3NzaC1yc2E...")
         assert req.pubkey == "ssh-rsa AAAAB3NzaC1yc2E..."
-        assert req.privkey == "-----BEGIN RSA PRIVATE KEY-----\nMIIEow..."
 
     def test_pubkey_whitespace_is_stripped(self) -> None:
-        req = UploadSSHKeypairInput(
-            pubkey="  ssh-rsa AAAA...  ",
-            privkey="-----BEGIN RSA PRIVATE KEY-----",
-        )
+        req = UploadSSHKeypairInput(pubkey="  ssh-rsa AAAA...  ")
         assert req.pubkey == "ssh-rsa AAAA..."
-
-    def test_privkey_whitespace_is_stripped(self) -> None:
-        req = UploadSSHKeypairInput(
-            pubkey="ssh-rsa AAAA...",
-            privkey="  -----BEGIN RSA PRIVATE KEY-----  ",
-        )
-        assert req.privkey == "-----BEGIN RSA PRIVATE KEY-----"
 
     def test_empty_pubkey_raises_validation_error(self) -> None:
         with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
-            UploadSSHKeypairInput(
-                pubkey="",
-                privkey="-----BEGIN RSA PRIVATE KEY-----",
-            )
+            UploadSSHKeypairInput(pubkey="")
 
     def test_whitespace_only_pubkey_raises_validation_error(self) -> None:
         with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
-            UploadSSHKeypairInput(
-                pubkey="   ",
-                privkey="-----BEGIN RSA PRIVATE KEY-----",
-            )
-
-    def test_empty_privkey_raises_validation_error(self) -> None:
-        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
-            UploadSSHKeypairInput(
-                pubkey="ssh-rsa AAAA...",
-                privkey="",
-            )
-
-    def test_whitespace_only_privkey_raises_validation_error(self) -> None:
-        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
-            UploadSSHKeypairInput(
-                pubkey="ssh-rsa AAAA...",
-                privkey="   ",
-            )
+            UploadSSHKeypairInput(pubkey="   ")
 
     def test_missing_pubkey_raises_validation_error(self) -> None:
         with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
-            UploadSSHKeypairInput.model_validate({
-                "privkey": "-----BEGIN RSA PRIVATE KEY-----",
-            })
-
-    def test_missing_privkey_raises_validation_error(self) -> None:
-        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
-            UploadSSHKeypairInput.model_validate({
-                "pubkey": "ssh-rsa AAAA...",
-            })
+            UploadSSHKeypairInput.model_validate({})
 
 
 class TestUploadSSHKeypairInputRoundTrip:
     """Tests for UploadSSHKeypairInput serialization round-trip."""
 
     def test_round_trip(self) -> None:
-        req = UploadSSHKeypairInput(
-            pubkey="ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQ",
-            privkey="-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA",
-        )
+        req = UploadSSHKeypairInput(pubkey="ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQ")
         json_data = req.model_dump_json()
         restored = UploadSSHKeypairInput.model_validate_json(json_data)
         assert restored.pubkey == req.pubkey
-        assert restored.privkey == req.privkey
