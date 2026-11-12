@@ -10,7 +10,7 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.types import AccessKey, ResourceSlot
+from ai.backend.common.types import AccessKey, ResourceSlot, SSHPublicKey
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.keypair.row import KeyPairRow
@@ -155,7 +155,7 @@ class TestAdminUpdateSSHPublicKey:
     ) -> None:
         await repository.admin_update_ssh_public_key(
             access_key=keypair_with_ssh_keys.access_key,
-            ssh_public_key="ssh-rsa REGISTERED",
+            ssh_public_key=SSHPublicKey("ssh-rsa REGISTERED"),
         )
 
         async with db.begin_readonly_session() as session:

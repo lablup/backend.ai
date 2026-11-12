@@ -16,7 +16,7 @@ import sqlalchemy as sa
 from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.exception import UserNotFound
-from ai.backend.common.types import AccessKey, ResourceSlot, VFolderHostPermissionMap
+from ai.backend.common.types import AccessKey, ResourceSlot, SSHPublicKey, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.types import UserData
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.secret.types import KeyProviderType
@@ -580,7 +580,7 @@ class TestAuthRepository:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> None:
         """Replacing the SSH public key leaves the stored private key as it was"""
-        update_public_key = "ssh-rsa AAAAB3NzaC1yc2EUPDATED..."
+        update_public_key = SSHPublicKey("ssh-rsa AAAAB3NzaC1yc2EUPDATED...")
 
         await auth_repository.update_ssh_public_key(
             AccessKey(sample_user_data.access_key), update_public_key

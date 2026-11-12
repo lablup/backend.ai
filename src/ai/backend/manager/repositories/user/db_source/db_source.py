@@ -23,7 +23,7 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
 from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
-from ai.backend.common.types import AccessKey, VFolderID
+from ai.backend.common.types import AccessKey, SSHPublicKey, VFolderID
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.bootstrap_script.types import BootstrapScriptRevisionData
@@ -1143,7 +1143,7 @@ class UserDBSource:
     async def admin_update_ssh_public_key(
         self,
         access_key: AccessKey,
-        ssh_public_key: str,
+        ssh_public_key: SSHPublicKey,
     ) -> None:
         """Admin registers (overwrites) a user's SSH public key."""
         async with self._db.begin_session() as session:

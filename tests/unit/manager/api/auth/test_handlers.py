@@ -40,7 +40,7 @@ from ai.backend.common.dto.manager.auth.request import (
     VerifyAuthRequest,
 )
 from ai.backend.common.exception import InvalidAPIParameters
-from ai.backend.common.types import AccessKey, SecretKey
+from ai.backend.common.types import AccessKey, SecretKey, SSHPublicKey
 from ai.backend.manager.api.adapters.auth.adapter import AuthAdapter
 from ai.backend.manager.api.rest.auth.handler import AuthHandler
 from ai.backend.manager.api.rest.middleware.auth import (
@@ -723,7 +723,9 @@ class TestUploadSSHKeypair:
         body: BodyParam[UploadSSHKeypairRequest] = BodyParam(UploadSSHKeypairRequest)
         body.from_body({"pubkey": _SSH_PUBLIC_KEY})
         mock_processors.auth.upload_ssh_keypair.run = AsyncMock(
-            return_value=UploadSSHKeypairActionResult(public_key="ssh-rsa AAAAB3...\n")
+            return_value=UploadSSHKeypairActionResult(
+                public_key=SSHPublicKey("ssh-rsa AAAAB3...\n")
+            )
         )
 
         response = await handler.upload_ssh_keypair(body, user_context)

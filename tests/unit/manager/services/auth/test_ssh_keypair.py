@@ -4,7 +4,7 @@ from uuid import UUID
 import pytest
 
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.types import AccessKey
+from ai.backend.common.types import AccessKey, SSHPublicKey
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.repositories.user_resource_policy.repository import (
@@ -130,7 +130,7 @@ async def test_upload_ssh_keypair_replaces_only_the_public_key(
     action = UploadSSHKeypairAction(
         user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         access_key=AccessKey("AKIA1234567890ABCDEF"),
-        public_key="ssh-rsa AAAAB3NzaC1yc2EUPLOADED...",
+        public_key=SSHPublicKey("ssh-rsa AAAAB3NzaC1yc2EUPLOADED..."),
     )
 
     result = await auth_service.upload_ssh_keypair(action)

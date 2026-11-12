@@ -20,7 +20,7 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.common.types import AccessKey, SlotName
+from ai.backend.common.types import AccessKey, SlotName, SSHPublicKey
 from ai.backend.common.utils import nmget
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
@@ -482,7 +482,7 @@ class UserRepository:
     async def admin_update_ssh_public_key(
         self,
         access_key: AccessKey,
-        ssh_public_key: str,
+        ssh_public_key: SSHPublicKey,
     ) -> None:
         """Admin registers (overwrites) a user's SSH public key."""
         await self._db_source.admin_update_ssh_public_key(
