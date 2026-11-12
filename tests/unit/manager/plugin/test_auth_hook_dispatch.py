@@ -15,7 +15,6 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.plugin.hook import (
-    ALL_HANDLERS_RUNNER,
     FIRST_HANDLED_RUNNER,
     PASSED,
     REJECTED,
@@ -176,7 +175,6 @@ class TestAuthorizeAfterKeypairReturnsNone:
 class _PostAuthorizeDispatchCase:
     make_otp: Callable[[], str]
     expected_status: HookResults
-    expected_result: list[None] | None
     expected_src_plugin: str | list[str]
 
 
@@ -210,7 +208,6 @@ class TestPostAuthorizeAfterKeypairReturnsNone:
                 _PostAuthorizeDispatchCase(
                     make_otp=lambda: pyotp.TOTP(_TOTP_KEY).now(),
                     expected_status=PASSED,
-                    expected_result=[None],
                     expected_src_plugin=["totp"],
                 ),
                 id="totp_accepts_the_current_otp",
@@ -219,7 +216,6 @@ class TestPostAuthorizeAfterKeypairReturnsNone:
                 _PostAuthorizeDispatchCase(
                     make_otp=lambda: "not-an-otp",
                     expected_status=REJECTED,
-                    expected_result=None,
                     expected_src_plugin="totp",
                 ),
                 id="totp_rejects_a_wrong_otp",
@@ -242,11 +238,11 @@ class TestPostAuthorizeAfterKeypairReturnsNone:
                 _ACTIVE_USER_WITH_TOTP,
                 {},
             ),
-            handler_runner=ALL_HANDLERS_RUNNER,
+            handler_runner=FIRST_HANDLED_RUNNER,
         )
 
         assert authorize_result.status == PASSED
         assert authorize_result.result is None
         assert post_authorize_result.status == case.expected_status
-        assert post_authorize_result.result == case.expected_result
+        assert post_authorize_result.result is None
         assert post_authorize_result.src_plugin == case.expected_src_plugin
