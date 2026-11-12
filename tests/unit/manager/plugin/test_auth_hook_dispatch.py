@@ -15,7 +15,6 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.plugin.hook import (
-    ALL_COMPLETED,
     FIRST_COMPLETED,
     PASSED,
     REJECTED,
@@ -176,7 +175,7 @@ class TestAuthorizeAfterKeypairReturnsNone:
 class _PostAuthorizeDispatchCase:
     make_otp: Callable[[], str]
     expected_status: HookResults
-    expected_result: list[None] | None
+    expected_result: list[Any] | None
     expected_src_plugin: str | list[str]
 
 
@@ -210,7 +209,7 @@ class TestPostAuthorizeAfterKeypairReturnsNone:
                 _PostAuthorizeDispatchCase(
                     make_otp=lambda: pyotp.TOTP(_TOTP_KEY).now(),
                     expected_status=PASSED,
-                    expected_result=[None],
+                    expected_result=[],
                     expected_src_plugin=["totp"],
                 ),
                 id="totp_accepts_the_current_otp",
@@ -242,7 +241,7 @@ class TestPostAuthorizeAfterKeypairReturnsNone:
                 _ACTIVE_USER_WITH_TOTP,
                 {},
             ),
-            return_when=ALL_COMPLETED,
+            return_when=FIRST_COMPLETED,
         )
 
         assert authorize_result.status == PASSED

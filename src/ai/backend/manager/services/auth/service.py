@@ -352,18 +352,15 @@ class AuthService:
                 user,
                 await self._keypair_hook_payload(default_keypair),
             ),
-            return_when=ALL_COMPLETED,
+            return_when=FIRST_COMPLETED,
         )
         if hook_result.status != PASSED:
             raise RejectedByHook.from_hook_result(hook_result)
-        # HookResult.result is typed Any | None, but a PASSED result of ALL_COMPLETED
-        # always holds the list of every handler's result (empty when no handler is loaded).
-        for handler_result in cast(list[Any], hook_result.result):
-            if isinstance(handler_result, web.StreamResponse):
-                return AuthorizeActionResult(
-                    stream_response=handler_result,
-                    authorization_result=None,
-                )
+        if hook_result.result is not None and isinstance(hook_result.result, web.StreamResponse):
+            return AuthorizeActionResult(
+                stream_response=hook_result.result,
+                authorization_result=None,
+            )
 
         # Cross-check active sessions with Valkey
         session_data = await self._valkey_session_client.get_login_sessions([
