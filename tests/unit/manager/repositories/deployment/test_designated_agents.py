@@ -9,13 +9,18 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
-from ai.backend.common.data.entity.agent import AgentUUID
+from ai.backend.common.data.entity.agent import AgentEntityType, AgentUUID
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.resource_group import ResourceGroupID
-from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.common.data.entity.resource_group import (
+    ResourceGroupEntityType,
+    ResourceGroupID,
+    ResourceGroupName,
+)
+from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.types import AgentId, ResourceSlot
 from ai.backend.manager.data.agent.types import AgentStatus
+from ai.backend.manager.errors.resource import ResourceGroupNotFound
 from ai.backend.manager.errors.service import EndpointNotFound
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.agent.searchable_fields import AgentSearchableFields
@@ -39,9 +44,13 @@ from ai.backend.manager.models.resource_policy.row import (
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
 
 class TestDeploymentDesignatedAgents:
@@ -65,6 +74,9 @@ class TestDeploymentDesignatedAgents:
                 AgentRow,
                 EndpointRow,
                 DeploymentDesignatedAgentRow,
+                VirtualEntityRow,
+                ScopeBindingRow,
+                EntityMembershipRow,
             ],
         ):
             yield database_connection
@@ -155,6 +167,14 @@ class TestDeploymentDesignatedAgents:
                         architecture="x86_64",
                         version="26.10.0",
                     )
+                )
+            await db_sess.flush()
+            for agent_uuid in agent_uuids:
+                await VirtualEntitySeeder().create_in(
+                    db_sess,
+                    AgentEntityType(),
+                    agent_uuid,
+                    [(ResourceGroupEntityType(), resource_group.id)],
                 )
         return agent_uuids
 
@@ -259,21 +279,33 @@ class TestDeploymentDesignatedAgents:
                     version="26.10.0",
                 )
             )
+            await db_sess.flush()
+            await VirtualEntitySeeder().create_in(
+                db_sess, AgentEntityType(), outside, [(ResourceGroupEntityType(), other_group.id)]
+            )
 
-        agents = await repository.search_agents(
-            searcher=AgentSearcher(
+        agents = await repository.search_agents_in_resource_group(
+            ResourceGroupName(resource_group.name),
+            AgentSearcher(
                 pagination=NoPagination(),
                 conditions=[
-                    AgentSearchableFields.own.resource_group.filter.equals(
-                        StringMatchSpec(
-                            value=resource_group.name, case_insensitive=False, negated=False
-                        )
+                    AgentSearchableFields.own.uuid.filter.in_(
+                        UUIDInMatchSpec(values=[*agent_uuids, outside], negated=False)
                     ),
                 ],
-            )
+            ),
         )
 
         assert {agent.uuid for agent in agents} == set(agent_uuids)
+
+    async def test_searching_agents_of_an_unknown_resource_group_raises(
+        self, repository: DeploymentRepository
+    ) -> None:
+        with pytest.raises(ResourceGroupNotFound):
+            await repository.search_agents_in_resource_group(
+                ResourceGroupName(f"rg-{uuid.uuid4().hex[:8]}"),
+                AgentSearcher(pagination=NoPagination(), conditions=[]),
+            )
 
     async def test_fetching_many_groups_by_deployment_with_an_empty_list_for_none(
         self,

@@ -10,9 +10,10 @@ from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.resource_group import ResourceGroupName
 from ai.backend.common.data.entity.types import FieldIdentifier
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDInMatchSpec
+from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.data.model_deployment.types import (
     DeploymentStrategy,
     ModelDeploymentStatus,
@@ -436,18 +437,16 @@ class DeploymentService:
         operation: ActionOperationType,
     ) -> None:
         """Refuse agents that do not belong to the deployment's resource group."""
-        agents = await self._deployment_repository.search_agents(
-            searcher=AgentSearcher(
+        agents = await self._deployment_repository.search_agents_in_resource_group(
+            ResourceGroupName(resource_group),
+            AgentSearcher(
                 pagination=NoPagination(),
                 conditions=[
-                    AgentSearchableFields.own.resource_group.filter.equals(
-                        StringMatchSpec(value=resource_group, case_insensitive=False, negated=False)
-                    ),
                     AgentSearchableFields.own.uuid.filter.in_(
                         UUIDInMatchSpec(values=list(agent_uuids), negated=False)
                     ),
                 ],
-            )
+            ),
         )
         if outside := agent_uuids - {agent.uuid for agent in agents}:
             raise DesignatedAgentOutsideResourceGroup(

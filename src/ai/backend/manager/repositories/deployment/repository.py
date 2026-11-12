@@ -438,9 +438,14 @@ class DeploymentRepository:
         await self._db_source.set_designated_agents(deployment_id, agent_uuids)
 
     @deployment_repository_resilience.apply()
-    async def search_agents(self, *, searcher: AgentSearcher) -> list[AgentData]:
-        """The agents matching ``searcher``; the caller composes the conditions."""
-        return await self._db_source.search_agents(searcher=searcher)
+    async def search_agents_in_resource_group(
+        self, resource_group_name: ResourceGroupName, searcher: AgentSearcher
+    ) -> list[AgentData]:
+        """The agents of the named resource group matching ``searcher``.
+
+        Raises ``ResourceGroupNotFound`` if no resource group has the name.
+        """
+        return await self._db_source.search_agents_in_resource_group(resource_group_name, searcher)
 
     @deployment_repository_resilience.apply()
     async def fetch_designated_agents_by_deployment_ids(

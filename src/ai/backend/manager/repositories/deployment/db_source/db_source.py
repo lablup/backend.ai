@@ -128,6 +128,7 @@ from ai.backend.manager.errors.service import (
 )
 from ai.backend.manager.errors.storage import VFolderNotFound
 from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.agent.scopes import ResourceGroupAgentTarget
 from ai.backend.manager.models.agent.searchers import AgentSearcher
 from ai.backend.manager.models.deployment_designated_agent.row import (
     DeploymentDesignatedAgentRow,
@@ -183,6 +184,7 @@ from ai.backend.manager.models.project.row import ProjectRow, groups
 from ai.backend.manager.models.replica_group.creators import ReplicaGroupCreator
 from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
 from ai.backend.manager.models.replica_group.updaters import ReplicaGroupRevisionSwapUpdater
+from ai.backend.manager.models.resource_group.lookups import ResourceGroupNameLookup
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow, resource_groups
 from ai.backend.manager.models.resource_slot.row import (
     DeploymentRevisionResourceSlotRow,
@@ -2822,10 +2824,22 @@ class DeploymentDBSource:
                     ],
                 )
 
-    async def search_agents(self, *, searcher: AgentSearcher) -> list[AgentData]:
-        """The agents matching ``searcher``; the caller composes the conditions."""
+    async def search_agents_in_resource_group(
+        self, resource_group_name: ResourceGroupName, searcher: AgentSearcher
+    ) -> list[AgentData]:
+        """The agents of the named resource group matching ``searcher``.
+
+        Raises ``ResourceGroupNotFound`` if no resource group has the name.
+        """
         async with self._reconcile_ops.read_ops() as r:
-            result = await r.search_in_global(searcher)
+            resource_group_id = await r.lookup_entity_id(
+                ResourceGroupNameLookup(name=resource_group_name)
+            )
+            if resource_group_id is None:
+                raise ResourceGroupNotFound(f"Resource group {resource_group_name!r} not found")
+            result = await r.search_with_scopes(
+                [ResourceGroupAgentTarget(resource_group_id=resource_group_id)], searcher
+            )
         return list(result.items)
 
     async def fetch_designated_agents_by_deployment_ids(
