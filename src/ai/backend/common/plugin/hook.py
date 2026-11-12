@@ -21,11 +21,11 @@ __all__ = (
     "PASSED",
     "REJECTED",
     "HookHandler",
+    "HookHandlerRunner",
     "HookPlugin",
     "HookPluginContext",
     "HookResult",
     "HookResults",
-    "HookReturnTiming",
     "Reject",
 )
 
@@ -82,7 +82,7 @@ class HookResult:
     result: Any | None = None
 
 
-class HookReturnTiming(metaclass=ABCMeta):
+class HookHandlerRunner(metaclass=ABCMeta):
     """
     Decides how many handlers of an event run and what :class:`HookResult` they make.
     """
@@ -103,7 +103,7 @@ class HookReturnTiming(metaclass=ABCMeta):
                 return HookResult(status=ERROR, src_plugin=plugin_name, reason=repr(error))
 
 
-class FirstCompletedReturnTiming(HookReturnTiming):
+class FirstHandledRunner(HookHandlerRunner):
     """
     Returns the result of the first handler that handles the event, or None when none does.
     """
@@ -126,7 +126,7 @@ class FirstCompletedReturnTiming(HookReturnTiming):
         return HookResult(status=PASSED, src_plugin=executed_plugin_names, result=None)
 
 
-class AllCompletedReturnTiming(HookReturnTiming):
+class AllHandlersRunner(HookHandlerRunner):
     """
     Runs every handler and returns the list of their results.
     """
@@ -148,8 +148,8 @@ class AllCompletedReturnTiming(HookReturnTiming):
         return HookResult(status=PASSED, src_plugin=executed_plugin_names, result=handler_results)
 
 
-ALL_COMPLETED: Final = AllCompletedReturnTiming()
-FIRST_COMPLETED: Final = FirstCompletedReturnTiming()
+ALL_COMPLETED: Final = AllHandlersRunner()
+FIRST_COMPLETED: Final = FirstHandledRunner()
 
 
 class HookPluginContext(BasePluginContext[HookPlugin]):
@@ -183,7 +183,7 @@ class HookPluginContext(BasePluginContext[HookPlugin]):
         event_name: str,
         args: tuple[Any, ...],
         *,
-        return_when: HookReturnTiming = ALL_COMPLETED,
+        return_when: HookHandlerRunner = ALL_COMPLETED,
         success_if_no_hook: bool = True,
         order: Sequence[str] | None = None,
     ) -> HookResult:
