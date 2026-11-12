@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import enum
 import logging
 import uuid
 from collections.abc import Mapping, Sequence
@@ -16,7 +15,6 @@ from aiohttp import web
 
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.exception import UnreachableError
 from ai.backend.common.plugin.hook import HookHandler, HookPlugin, Reject
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.user.types import UserStatus
@@ -26,11 +24,6 @@ from ai.backend.manager.repositories.auth.repository import AuthRepository
 from .config import OIDCHookConfig
 
 log = StructuredLogger(logging.getLogger(__name__))
-
-
-class _STokenSource(enum.Enum):
-    REQUEST_PARAMS = enum.auto()
-    COOKIE = enum.auto()
 
 
 class OIDCHookPlugin(HookPlugin):
@@ -74,41 +67,24 @@ class OIDCHookPlugin(HookPlugin):
         secret = self._config.secret
 
         stoken_in_params = params.get("stoken") or params.get("sToken")
-        stoken_in_cookie = request.cookies.get("sToken")
-        if stoken_in_params:
-            # The caller sends this token to log in with it, so an expired or invalid one rejects the login.
-            stoken, stoken_source = stoken_in_params, _STokenSource.REQUEST_PARAMS
-        elif stoken_in_cookie:
-            # Only a client calling the manager directly sends this cookie without the token in params, and it may
-            # be left from an earlier login and come with a password login that auth_keypair leaves unhandled.
-            # An expired or invalid cookie therefore leaves the login to password verification instead of rejecting it.
-            stoken, stoken_source = stoken_in_cookie, _STokenSource.COOKIE
-        else:
+        stoken = stoken_in_params or request.cookies.get("sToken")
+        if not stoken:
             log.debug("openid auth token not found, proceeding with normal auth")
             return None
-
         try:
             payload = jwt.decode(stoken, secret, algorithms=["HS256"])
             user_id = UserID(uuid.UUID(payload["user"]))
             email = payload["email"]
-        except jwt.ExpiredSignatureError:
-            match stoken_source:
-                case _STokenSource.REQUEST_PARAMS:
-                    raise Reject("Expired authentication token") from None
-                case _STokenSource.COOKIE:
-                    log.debug("openid auth cookie expired, proceeding with password verification")
-                    return None
-                case _:
-                    raise UnreachableError(f"Unknown sToken source {stoken_source}") from None
-        except (jwt.PyJWTError, KeyError, ValueError):
-            match stoken_source:
-                case _STokenSource.REQUEST_PARAMS:
-                    raise Reject("Invalid authentication token") from None
-                case _STokenSource.COOKIE:
-                    log.debug("openid auth cookie invalid, proceeding with password verification")
-                    return None
-                case _:
-                    raise UnreachableError(f"Unknown sToken source {stoken_source}") from None
+        except (jwt.PyJWTError, KeyError, ValueError) as e:
+            if not stoken_in_params:
+                # Only a client calling the manager directly sends the cookie without the token in params, and it
+                # may be left from an earlier login and come with a password login that auth_keypair leaves
+                # unhandled, so an expired or invalid cookie leaves the login to password verification.
+                log.debug("openid auth cookie unusable, proceeding with password verification")
+                return None
+            if isinstance(e, jwt.ExpiredSignatureError):
+                raise Reject("Expired authentication token") from None
+            raise Reject("Invalid authentication token") from None
 
         log.debug("openid auth token decoded", user_id=user_id)
 
