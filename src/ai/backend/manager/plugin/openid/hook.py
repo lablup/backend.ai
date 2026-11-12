@@ -6,7 +6,6 @@ import uuid
 from collections.abc import Mapping, Sequence
 from typing import (
     Any,
-    assert_never,
     cast,
     override,
 )
@@ -17,6 +16,7 @@ from aiohttp import web
 
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.exception import UnreachableError
 from ai.backend.common.plugin.hook import HookHandler, HookPlugin, Reject
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.user.types import UserStatus
@@ -99,7 +99,7 @@ class OIDCHookPlugin(HookPlugin):
                     log.debug("openid auth cookie expired, proceeding with password verification")
                     return None
                 case _:
-                    assert_never(stoken_source)
+                    raise UnreachableError(f"Unknown sToken source {stoken_source}") from None
         except (jwt.PyJWTError, KeyError, ValueError):
             match stoken_source:
                 case _STokenSource.REQUEST_PARAMS:
@@ -108,7 +108,7 @@ class OIDCHookPlugin(HookPlugin):
                     log.debug("openid auth cookie invalid, proceeding with password verification")
                     return None
                 case _:
-                    assert_never(stoken_source)
+                    raise UnreachableError(f"Unknown sToken source {stoken_source}") from None
 
         log.debug("openid auth token decoded", user_id=user_id)
 
