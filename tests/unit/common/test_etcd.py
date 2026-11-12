@@ -724,6 +724,27 @@ async def test_etcd_not_opened_connects_per_request(
     await etcd.close()
 
 
+class TestAuthTokenRefresh:
+    @pytest.fixture
+    def connect_options_cls(self) -> Any:
+        with (
+            patch("ai.backend.common.etcd.ConnectOptions") as connect_options_cls,
+            patch("ai.backend.common.etcd.EtcdClient"),
+        ):
+            yield connect_options_cls
+
+    def test_credentials_turn_on_auto_token_refresh(self, connect_options_cls: MagicMock) -> None:
+        AsyncEtcd(
+            addrs=HostPortPair("127.0.0.1", 2379),
+            namespace="test-auth",
+            scope_prefix_map={ConfigScopes.GLOBAL: ""},
+            credentials={"user": ETCD_USER, "password": ETCD_PASSWORD},
+        )
+
+        connect_options_with_user = connect_options_cls.return_value.with_user.return_value
+        connect_options_with_user.with_auto_token_refresh.assert_called_once_with(True)
+
+
 class TestRequestRetry:
     @pytest.fixture
     def communicator(self) -> AsyncMock:

@@ -192,7 +192,10 @@ jobs:
       contents: read
       actions: write
     needs: plan-targets
-    if: needs.plan-targets.result == 'success' && needs.plan-targets.outputs.typecheck == 'true'
+    # Always runs on a tag push: a skipped `typecheck` skips `release` even past `lint-and-typecheck`.
+    if: >-
+      needs.plan-targets.result == 'success'
+      && (needs.plan-targets.outputs.typecheck == 'true' || startsWith(github.ref, 'refs/tags/'))
     uses: ./.github/workflows/ci-typecheck.yml
     with:
       targets-artifact: ci-targets

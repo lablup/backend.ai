@@ -45,6 +45,7 @@ from ai.backend.manager.errors.auth import (
     EmailAlreadyExistsError,
     GroupMembershipNotFoundError,
     PasswordExpired,
+    PasswordMismatch,
     TooManyConcurrentLoginSessions,
 )
 from ai.backend.manager.errors.common import (
@@ -256,7 +257,15 @@ class AuthService:
             raise InvalidAPIParameters("Unsupported authorization type")
         auth_config = self._config_provider.config.auth
         login_client_type_id = action.client_type_id
-        user, active_sessions = await self._verify_user(action, auth_config, login_client_type_id)
+        try:
+            user, active_sessions = await self._verify_user(
+                action, auth_config, login_client_type_id
+            )
+        except PasswordMismatch as e:
+            await self._record_login_failure(
+                e.user_id, action.domain_name, LoginAttemptResult.FAILED_INVALID_CREDENTIALS
+            )
+            raise
 
         try:
             post_result = await self._post_check(action, user, active_sessions, auth_config)
@@ -696,16 +705,6 @@ class AuthService:
     async def update_password(self, action: UpdatePasswordAction) -> UpdatePasswordActionResult:
         domain_name = action.domain_name
         email = action.email
-        if action.new_password != action.new_password_confirm:
-            log.trace(
-                "password update rejected, new password mismatch",
-                domain_name=domain_name,
-                user_email=email,
-            )
-            return UpdatePasswordActionResult(
-                success=False,
-                message="new password mismatch",
-            )
         auth_config = self._config_provider.config.auth
         try:
             credential = await self._auth_repository.check_credential_without_migration(

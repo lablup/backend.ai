@@ -63,7 +63,6 @@ async def test_update_password_successful(
         email="user@example.com",
         old_password="old_password",
         new_password="new_secure_password",
-        new_password_confirm="new_secure_password",
     )
 
     # Setup hook to pass password format verification
@@ -98,45 +97,6 @@ async def test_update_password_successful(
     mock_valkey_session_client.delete_login_sessions.assert_awaited_once_with(deleted_tokens)
 
 
-async def test_update_password_fails_when_new_passwords_dont_match(
-    mock_hook_plugin_ctx: AsyncMock,
-    mock_auth_repository: AsyncMock,
-    auth_service: AuthService,
-) -> None:
-    """Test password update fails when new passwords don't match"""
-    action = UpdatePasswordAction(
-        user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
-        domain_name="default",
-        email="user@example.com",
-        old_password="old_password",
-        new_password="new_password1",
-        new_password_confirm="new_password2",
-    )
-
-    # Setup hook to pass password format verification
-    mock_hook_plugin_ctx.dispatch.return_value = HookResult(
-        status=HookResults.PASSED,
-        result=None,
-        reason=None,
-    )
-
-    # Valid old password
-    mock_auth_repository.check_credential_without_migration.return_value = UserCredential(
-        user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
-        hashed_password="hashed_password",
-        username="test-user",
-    )
-
-    result = await auth_service.update_password(action)
-
-    assert result.success is False
-    assert result.message == "new password mismatch"
-    # When passwords don't match, we return early without checking old password
-    mock_auth_repository.check_credential_without_migration.assert_not_called()
-    # Password update should not be called when passwords don't match
-    mock_auth_repository.update_user_password.assert_not_called()
-
-
 async def test_update_password_fails_with_incorrect_old_password(
     mock_hook_plugin_ctx: AsyncMock,
     mock_auth_repository: AsyncMock,
@@ -149,7 +109,6 @@ async def test_update_password_fails_with_incorrect_old_password(
         email="user@example.com",
         old_password="wrong_old_password",
         new_password="new_password",
-        new_password_confirm="new_password",
     )
 
     # Setup hook to pass password format verification
@@ -184,7 +143,6 @@ async def test_update_password_with_hook_rejection(
         email="user@example.com",
         old_password="correct_old_password",
         new_password="weak",
-        new_password_confirm="weak",
     )
 
     # Valid old password
@@ -219,7 +177,6 @@ async def test_update_password_repository_call(
         email="update@example.com",
         old_password="old_pass",
         new_password="new_pass123",
-        new_password_confirm="new_pass123",
     )
 
     # Setup successful scenario
