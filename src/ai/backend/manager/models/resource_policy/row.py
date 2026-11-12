@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Self
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
@@ -16,10 +15,6 @@ from ai.backend.common.types import (
     DefaultForUnspecified,
     ResourceSlot,
     VFolderHostPermissionMap,
-)
-from ai.backend.manager.data.resource.types import (
-    ProjectResourcePolicyData,
-    UserResourcePolicyData,
 )
 from ai.backend.manager.models.base import (
     GUID,
@@ -158,17 +153,6 @@ class UserResourcePolicyRow(CreatedAtMixin, Base):
         self.max_customized_image_count = max_customized_image_count
         self.max_concurrent_logins = max_concurrent_logins
 
-    @classmethod
-    def from_dataclass(cls, data: UserResourcePolicyData) -> Self:
-        return cls(
-            name=data.name,
-            max_vfolder_count=data.max_vfolder_count,
-            max_quota_scope_size=data.max_quota_scope_size,
-            max_session_count_per_model_session=data.max_session_count_per_model_session,
-            max_customized_image_count=data.max_customized_image_count,
-            max_concurrent_logins=data.max_concurrent_logins,
-        )
-
 
 # NOTE: Deprecated legacy table reference for backward compatibility.
 # Use UserResourcePolicyRow class directly for new code.
@@ -207,15 +191,6 @@ class ProjectResourcePolicyRow(CreatedAtMixin, Base):
         self.max_vfolder_count = max_vfolder_count
         self.max_quota_scope_size = max_quota_scope_size
         self.max_network_count = max_network_count
-
-    @classmethod
-    def from_dataclass(cls, data: ProjectResourcePolicyData) -> Self:
-        return cls(
-            name=data.name,
-            max_vfolder_count=data.max_vfolder_count,
-            max_quota_scope_size=data.max_quota_scope_size,
-            max_network_count=data.max_network_count,
-        )
 
 
 # NOTE: Deprecated legacy table reference for backward compatibility.

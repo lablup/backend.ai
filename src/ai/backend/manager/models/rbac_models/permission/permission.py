@@ -1,15 +1,11 @@
 from __future__ import annotations
 
-from typing import Self
-
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.entity.permission import PermissionID
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.types import EntityType
-from ai.backend.manager.data.permission.bit import single_bit
-from ai.backend.manager.data.permission.permission import PermissionCreator
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.models.base import (
     GUID,
@@ -61,11 +57,3 @@ class PermissionRow(CreatedAtMixin, Base):
     all_fields: Mapped[bool] = mapped_column(
         "all_fields", sa.Boolean, nullable=False, server_default=sa.true()
     )
-
-    @classmethod
-    def from_input(cls, input: PermissionCreator) -> Self:
-        return cls(
-            role_id=input.role_id,
-            entity_type=input.entity_type,
-            permission=single_bit(input.permission),
-        )

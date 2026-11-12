@@ -63,7 +63,6 @@ from ai.backend.manager.data.model_serving.types import (
     EndpointAutoScalingRuleData,
     EndpointData,
     EndpointLifecycle,
-    EndpointTokenData,
     ScalingState,
 )
 from ai.backend.manager.errors.service import AutoScalingRuleNotFound
@@ -735,17 +734,6 @@ class EndpointTokenRow(Base):
         if not row:
             raise NoResultFound
         return row
-
-    def to_dataclass(self) -> EndpointTokenData:
-        return EndpointTokenData(
-            id=self.id,
-            token=self.token,
-            endpoint=self.endpoint,
-            domain=self.domain,
-            project=self.project,
-            session_owner=self.session_owner,
-            created_at=self.created_at,
-        )
 
 
 class EndpointAutoScalingRuleRow(Base):
