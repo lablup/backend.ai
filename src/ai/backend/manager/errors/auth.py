@@ -128,8 +128,8 @@ class LoginRejectedByHook(BackendAIError, web.HTTPUnauthorized):
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.PLUGIN,
-            operation=ErrorOperation.HOOK,
-            error_detail=ErrorDetail.UNAUTHORIZED,
+            operation=ErrorOperation.AUTH,
+            error_detail=ErrorDetail.FORBIDDEN, (or ErrorDetail.INVALID_PARAMETERS)
         )
 
     @classmethod
