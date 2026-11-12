@@ -310,7 +310,8 @@ class ModelServiceConfig(BaseConfigModel):
         description=(
             "Wire protocol the app-proxy uses for this model service. ``http`` (default) "
             "terminates HTTP at the proxy; ``tcp`` passes bytes through so TLS terminates "
-            "inside the replica. ``tcp`` cannot be combined with an enabled health check. "
+            "inside the replica, and the manager health check probes it over https "
+            "without verifying its certificate. "
             f"Added in {NEXT_RELEASE_VERSION}."
         ),
         examples=["http", "tcp"],
@@ -320,17 +321,6 @@ class ModelServiceConfig(BaseConfigModel):
     @classmethod
     def _resolve_start_command(cls, data: Any) -> Any:
         return resolve_model_service_start_command(data)
-
-    @model_validator(mode="after")
-    def _reject_tcp_with_health_check(self) -> Self:
-        # The manager probe is ``http://`` and TLS ends inside the replica.
-        if (
-            self.protocol is EndpointProtocol.TCP
-            and self.health_check is not None
-            and self.health_check.enable
-        ):
-            raise ValueError("health_check cannot be enabled when protocol is 'tcp'")
-        return self
 
 
 class ModelMetadata(BaseConfigModel):

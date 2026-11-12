@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from uuid import UUID
 
 from ai.backend.common.data.entity.replica import ReplicaID
+from ai.backend.common.types import EndpointProtocol
 
 
 @dataclass
@@ -22,6 +23,8 @@ class ReplicaProbeTarget:
     health_path: str
     inference_port: int
     replica_host: str
+    # ``tcp`` replicas terminate TLS themselves, so the probe speaks https to them.
+    protocol: EndpointProtocol = EndpointProtocol.HTTP
 
     def to_valkey_hash(self) -> Mapping[str, str]:
         return {
@@ -29,6 +32,7 @@ class ReplicaProbeTarget:
             "health_path": self.health_path,
             "inference_port": str(self.inference_port),
             "replica_host": self.replica_host,
+            "protocol": self.protocol.value,
         }
 
     @classmethod
@@ -38,6 +42,8 @@ class ReplicaProbeTarget:
             health_path=data["health_path"],
             inference_port=int(data["inference_port"]),
             replica_host=data["replica_host"],
+            # Targets written before the field existed are http.
+            protocol=EndpointProtocol(data.get("protocol", EndpointProtocol.HTTP.value)),
         )
 
 

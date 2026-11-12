@@ -770,6 +770,7 @@ class TestServiceProtocol:
         with pytest.raises(ModelDefinitionValidationError):
             self._definition({"protocol": "grpc"})
 
-    def test_tcp_with_enabled_health_check_rejected(self) -> None:
-        with pytest.raises(ModelDefinitionValidationError):
-            self._definition({"protocol": "tcp", "health_check": {"enable": True}})
+    def test_tcp_with_enabled_health_check_accepted(self) -> None:
+        definition = self._definition({"protocol": "tcp", "health_check": {"enable": True}})
+        assert definition.service_protocol() is EndpointProtocol.TCP
+        assert definition.health_check_config() is not None

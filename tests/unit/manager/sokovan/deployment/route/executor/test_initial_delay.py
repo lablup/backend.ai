@@ -15,7 +15,7 @@ from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.common.data.entity.replica import ReplicaID
-from ai.backend.common.types import SessionId
+from ai.backend.common.types import EndpointProtocol, SessionId
 from ai.backend.manager.data.deployment.types import (
     RouteData,
     RouteHealthStatus,
@@ -80,6 +80,32 @@ class TestRegisterReplicaProbeTargets:
         assert targets[0].health_path == "/healthz"
         assert targets[0].inference_port == 9000
         assert targets[0].replica_host == "10.0.0.2"
+        assert targets[0].protocol is EndpointProtocol.HTTP
+
+    async def test_registers_protocol_of_route_revision(
+        self,
+        route_executor: RouteExecutor,
+        mock_deployment_repo: AsyncMock,
+        mock_valkey_schedule: AsyncMock,
+    ) -> None:
+        """A route of a tcp revision gets a tcp probe target."""
+        route = _make_route(health_check=ModelHealthCheck(enable=True, path="/health"))
+        mock_deployment_repo.fetch_service_protocols_by_revision_ids.return_value = {
+            route.revision_id: EndpointProtocol.TCP
+        }
+
+        await route_executor._register_route_probe_targets(
+            [route],
+            {route.route_id: RouteSessionKernelInfo(replica_host="10.0.0.2", replica_port=9000)},
+        )
+
+        mock_deployment_repo.fetch_service_protocols_by_revision_ids.assert_awaited_once_with({
+            route.revision_id
+        })
+        targets: list[ReplicaProbeTarget] = (
+            mock_valkey_schedule.register_route_probe_targets_batch.call_args[0][0]
+        )
+        assert targets[0].protocol is EndpointProtocol.TCP
 
     async def test_skips_route_without_health_check(
         self,
@@ -138,6 +164,26 @@ class TestSyncReplicaProbeTargets:
         mock_valkey_schedule.register_route_probe_targets_batch.assert_awaited_once()
         assert result.successes == []
         assert result.errors == []
+
+    async def test_syncs_protocol_of_route_revision(
+        self,
+        route_executor: RouteExecutor,
+        mock_deployment_repo: AsyncMock,
+        mock_valkey_schedule: AsyncMock,
+    ) -> None:
+        """A resynced target keeps the protocol of the route's revision."""
+        route = _make_route(health_check=ModelHealthCheck(enable=True, path="/health"))
+        mock_deployment_repo.fetch_service_protocols_by_revision_ids.return_value = {
+            route.revision_id: EndpointProtocol.TCP
+        }
+
+        with RouteRecorderContext.scope("test", entity_ids=[route.route_id]):
+            await route_executor.sync_route_probe_targets([route])
+
+        targets: list[ReplicaProbeTarget] = (
+            mock_valkey_schedule.register_route_probe_targets_batch.call_args[0][0]
+        )
+        assert targets[0].protocol is EndpointProtocol.TCP
 
     async def test_skips_routes_without_health_check_or_replica_info(
         self,

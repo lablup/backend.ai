@@ -23,6 +23,7 @@ from ai.backend.common.clients.valkey_client.valkey_schedule import (
 )
 from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.data.entity.replica import ReplicaID
+from ai.backend.common.types import EndpointProtocol
 from ai.backend.logging.structured import StructuredLogger, with_log_context
 from ai.backend.manager.data.deployment.types import RouteData
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
@@ -117,6 +118,7 @@ class RouteHealthObserver(RouteObserver):
                 plan.target.health_path,
                 plan.health_check.max_wait_time,
                 plan.health_check.expected_status_code,
+                plan.target.protocol,
             )
             for plan in plans
         ])
@@ -144,14 +146,21 @@ class RouteHealthObserver(RouteObserver):
         path: str,
         max_wait_time: float,
         expected_status_code: int,
+        protocol: EndpointProtocol,
     ) -> bool:
-        """Perform HTTP GET health check."""
+        """Perform an HTTP GET health check; https for ``tcp`` replicas.
+
+        A ``tcp`` replica terminates TLS itself, usually with a self-signed certificate,
+        so its certificate is not verified.
+        """
         with with_log_context(route_id=route_id):
             # Build from parts so the path cannot replace the host (e.g. ``@other.host/``).
             path_part, _, query = path.partition("?")
+            is_tls = protocol is EndpointProtocol.TCP
+            scheme = "https" if is_tls else "http"
             try:
                 url = yarl.URL.build(
-                    scheme="http", host=host, port=port, path=path_part, query_string=query
+                    scheme=scheme, host=host, port=port, path=path_part, query_string=query
                 )
             except ValueError as e:
                 log.trace("route health check path is invalid: {}", path, reason=repr(e))
@@ -162,6 +171,7 @@ class RouteHealthObserver(RouteObserver):
                         url,
                         timeout=aiohttp.ClientTimeout(total=max_wait_time),
                         allow_redirects=False,
+                        ssl=not is_tls,
                     ) as resp:
                         if resp.status != expected_status_code:
                             log.trace(

@@ -31,7 +31,7 @@ from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEve
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.service_discovery import ServiceDiscovery
 from ai.backend.common.service_discovery.service_discovery import ModelServiceMetadata
-from ai.backend.common.types import SessionId
+from ai.backend.common.types import EndpointProtocol, SessionId
 from ai.backend.logging.structured import StructuredLogger, with_log_context
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -382,7 +382,10 @@ class RouteExecutor:
         )
 
     @staticmethod
-    def _build_probe_target(route: RouteData) -> ReplicaProbeTarget | None:
+    def _build_probe_target(
+        route: RouteData,
+        protocols: Mapping[DeploymentRevisionID, EndpointProtocol],
+    ) -> ReplicaProbeTarget | None:
         """Build a ReplicaProbeTarget from a route, or None if any required field is absent."""
         health_check = route.enabled_health_check
         if health_check is None or route.replica_host is None or route.replica_port is None:
@@ -392,7 +395,17 @@ class RouteExecutor:
             health_path=health_check.path,
             inference_port=route.replica_port,
             replica_host=route.replica_host,
+            protocol=protocols.get(route.revision_id, EndpointProtocol.HTTP),
         )
+
+    async def _fetch_probe_protocols(
+        self, routes: Sequence[RouteData]
+    ) -> Mapping[DeploymentRevisionID, EndpointProtocol]:
+        """The service protocol of each probed route's revision; the probe scheme follows it."""
+        revision_ids = {
+            route.revision_id for route in routes if route.enabled_health_check is not None
+        }
+        return await self._deployment_repo.fetch_service_protocols_by_revision_ids(revision_ids)
 
     async def _register_route_probe_targets(
         self,
@@ -400,12 +413,14 @@ class RouteExecutor:
         replica_info: Mapping[ReplicaID, RouteSessionKernelInfo],
     ) -> None:
         """Register ReplicaProbeTargets in Valkey for routes that just got replica info."""
+        protocols = await self._fetch_probe_protocols(routes)
         targets: list[ReplicaProbeTarget] = [
             ReplicaProbeTarget(
                 replica_id=route.route_id,
                 health_path=health_check.path,
                 inference_port=replica_info[route.route_id].replica_port,
                 replica_host=replica_info[route.route_id].replica_host,
+                protocol=protocols.get(route.revision_id, EndpointProtocol.HTTP),
             )
             for route in routes
             if (health_check := route.enabled_health_check) is not None
@@ -424,7 +439,10 @@ class RouteExecutor:
 
         Routes without health_check/replica_host/replica_port are skipped silently.
         """
-        targets = [t for route in routes if (t := self._build_probe_target(route)) is not None]
+        protocols = await self._fetch_probe_protocols(routes)
+        targets = [
+            t for route in routes if (t := self._build_probe_target(route, protocols)) is not None
+        ]
 
         if targets:
             with RouteRecorderContext.shared_phase(

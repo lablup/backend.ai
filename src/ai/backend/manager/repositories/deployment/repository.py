@@ -35,6 +35,7 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryAr
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import (
     AutoScalingMetricSource,
+    EndpointProtocol,
     KernelId,
     MountPermission,
     SessionId,
@@ -863,6 +864,14 @@ class DeploymentRepository:
     ) -> dict[DeploymentRevisionID, ModelHealthCheck | None]:
         """Fetch health check configurations for revisions."""
         return await self._db_source.fetch_health_check_configs_by_revision_ids(revision_ids)
+
+    @deployment_repository_resilience.apply()
+    async def fetch_service_protocols_by_revision_ids(
+        self,
+        revision_ids: set[DeploymentRevisionID],
+    ) -> dict[DeploymentRevisionID, EndpointProtocol]:
+        """Fetch the model service protocol of revisions."""
+        return await self._db_source.fetch_service_protocols_by_revision_ids(revision_ids)
 
     @deployment_repository_resilience.apply()
     async def delete_routes_by_route_ids(

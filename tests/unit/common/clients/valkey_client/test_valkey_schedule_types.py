@@ -11,6 +11,7 @@ from ai.backend.common.clients.valkey_client.valkey_schedule.types import (
     ReplicaProbeTarget,
 )
 from ai.backend.common.data.entity.replica import ReplicaID
+from ai.backend.common.types import EndpointProtocol
 
 
 class TestReplicaProbeTargetSerialization:
@@ -33,6 +34,7 @@ class TestReplicaProbeTargetSerialization:
         assert h["health_path"] == "/health"
         assert h["inference_port"] == "8080"
         assert h["replica_host"] == "10.0.0.1"
+        assert h["protocol"] == "http"
 
     def test_from_valkey_hash(self, replica_id: ReplicaID) -> None:
         data = {
@@ -46,10 +48,17 @@ class TestReplicaProbeTargetSerialization:
         assert target.health_path == "/healthz"
         assert target.inference_port == 9000
         assert target.replica_host == "192.168.1.100"
+        # A target written before the protocol field existed reads as http.
+        assert target.protocol is EndpointProtocol.HTTP
 
     def test_round_trip(self, target: ReplicaProbeTarget) -> None:
         restored = ReplicaProbeTarget.from_valkey_hash(target.to_valkey_hash())
         assert restored == target
+
+    def test_round_trip_tcp(self, target: ReplicaProbeTarget) -> None:
+        target.protocol = EndpointProtocol.TCP
+        restored = ReplicaProbeTarget.from_valkey_hash(target.to_valkey_hash())
+        assert restored.protocol is EndpointProtocol.TCP
 
 
 class TestReplicaHealthStatusSerialization:

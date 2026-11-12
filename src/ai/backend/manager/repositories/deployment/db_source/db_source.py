@@ -41,6 +41,7 @@ from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.types import (
     AccessKey,
+    EndpointProtocol,
     KernelId,
     SessionId,
     SlotName,
@@ -1895,6 +1896,29 @@ class DeploymentDBSource:
                     model_definition.health_check_config() if model_definition is not None else None
                 )
             return configs
+
+    async def fetch_service_protocols_by_revision_ids(
+        self,
+        revision_ids: set[DeploymentRevisionID],
+    ) -> dict[DeploymentRevisionID, EndpointProtocol]:
+        """Fetch the model service protocol of revisions; ``http`` without a model definition."""
+        if not revision_ids:
+            return {}
+
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(
+                DeploymentRevisionRow.id,
+                DeploymentRevisionRow.model_definition,
+            ).where(DeploymentRevisionRow.id.in_(revision_ids))
+            result = await db_sess.execute(query)
+            return {
+                DeploymentRevisionID(revision_id): (
+                    model_definition.service_protocol()
+                    if model_definition is not None
+                    else EndpointProtocol.HTTP
+                )
+                for revision_id, model_definition in result.all()
+            }
 
     async def delete_routes_by_route_ids(
         self,
