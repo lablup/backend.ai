@@ -67,7 +67,8 @@ class OIDCHookPlugin(HookPlugin):
         secret = self._config.secret
 
         stoken_in_params = params.get("stoken") or params.get("sToken")
-        stoken = stoken_in_params or request.cookies.get("sToken")
+        stoken_from_cookie = not stoken_in_params
+        stoken = request.cookies.get("sToken") if stoken_from_cookie else stoken_in_params
         if not stoken:
             log.debug("openid auth token not found, proceeding with normal auth")
             return None
@@ -76,7 +77,7 @@ class OIDCHookPlugin(HookPlugin):
             user_id = UserID(uuid.UUID(payload["user"]))
             email = payload["email"]
         except (jwt.PyJWTError, KeyError, ValueError) as e:
-            if not stoken_in_params:
+            if stoken_from_cookie:
                 # Only a client calling the manager directly sends the cookie without the token in params, and it
                 # may be left from an earlier login and come with a password login that auth_keypair leaves
                 # unhandled, so an expired or invalid cookie leaves the login to password verification.
