@@ -173,7 +173,7 @@ class AdminRegisterSSHKeypairInput(BaseRequestModel):
 
     @field_validator("ssh_public_key")
     @classmethod
-    def ssh_public_key_must_be_an_ssh_public_key(cls, value: str) -> str:
+    def _validate_ssh_public_key(cls, value: str) -> str:
         try:
             load_ssh_public_key(value.encode())
         except (ValueError, UnsupportedAlgorithm) as e:

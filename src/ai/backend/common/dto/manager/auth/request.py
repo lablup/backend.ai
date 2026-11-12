@@ -166,7 +166,7 @@ class UploadSSHKeypairRequest(BaseRequestModel):
 
     @field_validator("pubkey")
     @classmethod
-    def pubkey_must_be_an_ssh_public_key(cls, value: str) -> str:
+    def _validate_pubkey(cls, value: str) -> str:
         try:
             load_ssh_public_key(value.encode())
         except (ValueError, UnsupportedAlgorithm) as e:
