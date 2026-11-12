@@ -155,9 +155,10 @@ def setup_successful_auth(
       3. _create_login_session: create_login_session in DB, set_login_session in Valkey
     """
     # Both AUTHORIZE and POST_AUTHORIZE hooks pass
-    mock_hook_plugin_ctx.dispatch.return_value = HookResult(
-        status=HookResults.PASSED, result=None, reason=None
-    )
+    mock_hook_plugin_ctx.dispatch.side_effect = [
+        HookResult(status=HookResults.PASSED, result=None, reason=None),
+        HookResult(status=HookResults.PASSED, result=[], reason=None),
+    ]
 
     mock_user = _make_mock_user()
 
@@ -346,7 +347,7 @@ async def test_authorize_with_hook_authorization(
     # Second call (POST_AUTHORIZE): passes normally
     mock_hook_plugin_ctx.dispatch.side_effect = [
         HookResult(status=HookResults.PASSED, result=hook_user, reason=None),
-        HookResult(status=HookResults.PASSED, result=None, reason=None),
+        HookResult(status=HookResults.PASSED, result=[], reason=None),
     ]
 
     # When hook provides user, _verify_user calls get_active_session_tokens
@@ -489,9 +490,10 @@ async def test_authorize_with_valkey_cross_check_cleans_stale_sessions(
     mock_auth_repository.default_keypair.return_value = _make_mock_keypair()
 
     # Both hooks pass
-    mock_hook_plugin_ctx.dispatch.return_value = HookResult(
-        status=HookResults.PASSED, result=None, reason=None
-    )
+    mock_hook_plugin_ctx.dispatch.side_effect = [
+        HookResult(status=HookResults.PASSED, result=None, reason=None),
+        HookResult(status=HookResults.PASSED, result=[], reason=None),
+    ]
 
     # Valkey cross-check: stale session is NOT in Valkey
     mock_valkey_session_client.get_login_sessions.return_value = [None]
@@ -558,9 +560,10 @@ async def test_authorize_force_invalidates_existing_sessions(
     mock_auth_repository.default_keypair.return_value = _make_mock_keypair()
 
     # Both hooks pass
-    mock_hook_plugin_ctx.dispatch.return_value = HookResult(
-        status=HookResults.PASSED, result=None, reason=None
-    )
+    mock_hook_plugin_ctx.dispatch.side_effect = [
+        HookResult(status=HookResults.PASSED, result=None, reason=None),
+        HookResult(status=HookResults.PASSED, result=[], reason=None),
+    ]
 
     # Valkey cross-check: session IS live
     mock_valkey_session_client.get_login_sessions.return_value = [b"session_data"]

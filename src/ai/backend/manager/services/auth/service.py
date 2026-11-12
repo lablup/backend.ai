@@ -362,7 +362,9 @@ class AuthService:
         )
         if hook_result.status != PASSED:
             raise RejectedByHook.from_hook_result(hook_result)
-        for handler_result in hook_result.result or []:
+        # HookResult.result is typed Any | None, but a PASSED result of ALL_HANDLERS_RUNNER
+        # always holds the list of every handler's result (empty when no handler is loaded).
+        for handler_result in cast(list[Any], hook_result.result):
             if isinstance(handler_result, web.StreamResponse):
                 return AuthorizeActionResult(
                     stream_response=handler_result,
