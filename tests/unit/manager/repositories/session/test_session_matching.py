@@ -18,6 +18,7 @@ from dateutil.tz import tzutc
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
@@ -44,7 +45,9 @@ from ai.backend.manager.models.container_registry.row import ContainerRegistryRo
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
-from ai.backend.manager.models.kernel.searchers import MainKernelSearcher
+from ai.backend.manager.models.kernel.scopes import SessionKernelTarget
+from ai.backend.manager.models.kernel.searchable_fields import KernelSearchableFields
+from ai.backend.manager.models.kernel.searchers import KernelSearcher
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow, ProjectType
 from ai.backend.manager.models.resource_group.row import (
@@ -624,7 +627,19 @@ class TestLiveSessionsNamedSearcher:
         assert [row.id for row in result.items] == [live]
 
 
-class TestMainKernelSearcher:
+def _main_kernel_searcher() -> KernelSearcher:
+    """The main kernel read the registry and the session repository run."""
+    return KernelSearcher(
+        pagination=NoPagination(),
+        conditions=[
+            KernelSearchableFields.own.cluster_role.filter.equals(
+                StringMatchSpec(value=DEFAULT_ROLE, case_insensitive=False, negated=False)
+            )
+        ],
+    )
+
+
+class TestMainKernelRead:
     async def test_returns_the_main_kernel_of_the_session(
         self, db_with_tables: ExtendedAsyncSAEngine, add_session: _SessionFactory
     ) -> None:
@@ -632,8 +647,8 @@ class TestMainKernelSearcher:
         await add_session(name="another", with_main_kernel=True)
 
         async with V2DBOpsProvider(db_with_tables).read_ops() as r:
-            result = await r.search_in_global(
-                MainKernelSearcher(pagination=NoPagination(), session_id=SessionID(target))
+            result = await r.search_with_scopes(
+                [SessionKernelTarget(session_id=SessionID(target))], _main_kernel_searcher()
             )
 
         assert [kernel.session.session_id for kernel in result.items] == [str(target)]
@@ -646,8 +661,8 @@ class TestMainKernelSearcher:
         target = await add_session(name="no-kernel")
 
         async with V2DBOpsProvider(db_with_tables).read_ops() as r:
-            result = await r.search_in_global(
-                MainKernelSearcher(pagination=NoPagination(), session_id=SessionID(target))
+            result = await r.search_with_scopes(
+                [SessionKernelTarget(session_id=SessionID(target))], _main_kernel_searcher()
             )
 
         assert result.items == []

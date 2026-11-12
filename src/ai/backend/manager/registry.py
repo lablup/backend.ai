@@ -51,6 +51,7 @@ from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
+from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.defs.session import JOB_PRIORITY_DEFAULT, SESSION_PRIORITY_DEFAULT
 from ai.backend.common.docker import ImageRef, LabelName
 from ai.backend.common.dto.agent.response import (
@@ -145,7 +146,9 @@ from ai.backend.manager.models.kernel.row import (
     KernelRow,
     kernels,
 )
-from ai.backend.manager.models.kernel.searchers import MainKernelSearcher
+from ai.backend.manager.models.kernel.scopes import SessionKernelTarget
+from ai.backend.manager.models.kernel.searchable_fields import KernelSearchableFields
+from ai.backend.manager.models.kernel.searchers import KernelSearcher
 from ai.backend.manager.models.network.row import NetworkRow, NetworkType
 from ai.backend.manager.models.resource_group.row import resource_groups
 from ai.backend.manager.models.resource_slot.row import ResourceAllocationRow
@@ -567,8 +570,18 @@ class AgentRegistry:
             existing = await self._live_session_named(r, session_name, owner_access_key)
             if existing is not None:
                 main_kernels = (
-                    await r.search_in_global(
-                        MainKernelSearcher(pagination=NoPagination(), session_id=existing.id)
+                    await r.search_with_scopes(
+                        [SessionKernelTarget(session_id=existing.id)],
+                        KernelSearcher(
+                            pagination=NoPagination(),
+                            conditions=[
+                                KernelSearchableFields.own.cluster_role.filter.equals(
+                                    StringMatchSpec(
+                                        value=DEFAULT_ROLE, case_insensitive=False, negated=False
+                                    )
+                                )
+                            ],
+                        ),
                     )
                 ).items
         if existing is not None:

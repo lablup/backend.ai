@@ -45,7 +45,6 @@ from ai.backend.manager.errors.kernel import (
     SessionNotFound,
     TooManyKernelsFound,
 )
-from ai.backend.manager.models.kernel.searchers import MainKernelSearcher
 from ai.backend.manager.models.session.searchers import LiveSessionsNamedSearcher
 from ai.backend.manager.models.specs.searcher import SearcherResult
 from ai.backend.manager.plugin.network import NetworkPluginContext
@@ -560,16 +559,21 @@ class TestCreateSessionWithLiveNamesake:
             match searcher:
                 case LiveSessionsNamedSearcher():
                     items = [existing]
-                case MainKernelSearcher():
-                    items = list(main_kernels)
                 case _:
                     items = [image]
             return SearcherResult(
                 items=items, total_count=len(items), has_next_page=False, has_previous_page=False
             )
 
+        async def search_with_scopes(scopes: Any, searcher: Any) -> SearcherResult[Any]:
+            items = list(main_kernels)
+            return SearcherResult(
+                items=items, total_count=len(items), has_next_page=False, has_previous_page=False
+            )
+
         read_ops = MagicMock()
         read_ops.search_in_global = search_in_global
+        read_ops.search_with_scopes = search_with_scopes
 
         @asynccontextmanager
         async def open_read_ops() -> AsyncIterator[MagicMock]:

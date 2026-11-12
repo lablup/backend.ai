@@ -30,6 +30,7 @@ from ai.backend.manager.data.session.types import (
     SessionStatus,
 )
 from ai.backend.manager.data.user.types import SessionOwnerContext, UserData
+from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.errors.image import ImageNotFound
@@ -47,7 +48,9 @@ from ai.backend.manager.models.image.searchers import (
     ReferenceImageSearcher,
 )
 from ai.backend.manager.models.kernel.row import KernelRow
-from ai.backend.manager.models.kernel.searchers import MainKernelSearcher
+from ai.backend.manager.models.kernel.scopes import SessionKernelTarget
+from ai.backend.manager.models.kernel.searchable_fields import KernelSearchableFields
+from ai.backend.manager.models.kernel.searchers import KernelSearcher
 from ai.backend.manager.models.kernel.updaters import KernelSessionNameBatchUpdater
 from ai.backend.manager.models.project.row import groups
 from ai.backend.manager.models.resource_group.row import resource_groups
@@ -474,8 +477,18 @@ class SessionDBSource:
                 )
 
             main_kernels = (
-                await w.search_in_global(
-                    MainKernelSearcher(pagination=NoPagination(), session_id=session_id)
+                await w.search_with_scopes(
+                    [SessionKernelTarget(session_id=session_id)],
+                    KernelSearcher(
+                        pagination=NoPagination(),
+                        conditions=[
+                            KernelSearchableFields.own.cluster_role.filter.equals(
+                                StringMatchSpec(
+                                    value=DEFAULT_ROLE, case_insensitive=False, negated=False
+                                )
+                            )
+                        ],
+                    ),
                 )
             ).items
         service_ports = main_kernels[0].network.service_ports if main_kernels else None
@@ -637,8 +650,18 @@ class SessionDBSource:
                 raise SessionNotFound(f"Session (id={session_id}) does not exist.")
             session = sessions[0]
             kernels = (
-                await r.search_in_global(
-                    MainKernelSearcher(pagination=NoPagination(), session_id=session.id)
+                await r.search_with_scopes(
+                    [SessionKernelTarget(session_id=session.id)],
+                    KernelSearcher(
+                        pagination=NoPagination(),
+                        conditions=[
+                            KernelSearchableFields.own.cluster_role.filter.equals(
+                                StringMatchSpec(
+                                    value=DEFAULT_ROLE, case_insensitive=False, negated=False
+                                )
+                            )
+                        ],
+                    ),
                 )
             ).items
         if len(kernels) > 1:
