@@ -20,7 +20,7 @@
 - 직접 구현 (3)
   - create: 성공 있음 2 · 거부 있음 4 (global_scope)
   - purge: 성공 있음 1 · 거부 있음 4 (single_entity)
-  - sync_registry_relations: 성공 있음 2 · 거부 있음 1 (relation, scope)
+  - sync_registry_relations: 성공 있음 2 · 거부 있음 1 (relation)
 
 **bulk_get_ids**
 

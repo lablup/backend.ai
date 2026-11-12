@@ -20,7 +20,7 @@ Scenario: incomplete 3 / 15
 - direct implementation (3)
   - create: success present 2 · rejection present 4 (global_scope)
   - purge: success present 1 · rejection present 4 (single_entity)
-  - sync_registry_relations: success present 2 · rejection present 1 (relation, scope)
+  - sync_registry_relations: success present 2 · rejection present 1 (relation)
 
 **bulk_get_ids**
 

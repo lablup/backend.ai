@@ -12,13 +12,10 @@ from ai.backend.manager.actions.v2.relation.base import BaseRelationAction
 @dataclass(frozen=True)
 class UpdateDomainContainerRegistryRelationsAction(BaseRelationAction):
     """Set the registries the domain is related to to ``registry_ids``, in one transaction.
-
-    ``linked_registry_ids`` are the registries the caller read as related, so the
-    permission is asked of the registries this run may unlink too."""
+    The permission is asked of the domain and the registries named."""
 
     domain_id: DomainID
     registry_ids: Sequence[ContainerRegistryID]
-    linked_registry_ids: Sequence[ContainerRegistryID]
 
     @override
     @classmethod
@@ -32,7 +29,7 @@ class UpdateDomainContainerRegistryRelationsAction(BaseRelationAction):
 
     @override
     def scope_targets(self) -> Sequence[EntityIdentifier]:
-        return [self.domain_id, *dict.fromkeys([*self.registry_ids, *self.linked_registry_ids])]
+        return [self.domain_id, *self.registry_ids]
 
 
 @dataclass(frozen=True)
