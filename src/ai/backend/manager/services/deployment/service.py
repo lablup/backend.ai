@@ -348,7 +348,7 @@ class DeploymentService:
         designated_agents = action.creator.designated_agents
         if designated_agents:
             await self._ensure_agents_in_resource_group(
-                action.creator.metadata.resource_group,
+                ResourceGroupName(action.creator.metadata.resource_group),
                 designated_agents,
                 ActionOperationType.CREATE,
             )
@@ -419,7 +419,9 @@ class DeploymentService:
         if designated_agents:
             current = await self._deployment_repository.get_endpoint_info(action.deployment_id)
             await self._ensure_agents_in_resource_group(
-                current.metadata.resource_group, designated_agents, ActionOperationType.UPDATE
+                ResourceGroupName(current.metadata.resource_group),
+                designated_agents,
+                ActionOperationType.UPDATE,
             )
         deployment_info = await self._deployment_controller.update_deployment(
             action.updater.deployment_id, action.updater
@@ -432,13 +434,13 @@ class DeploymentService:
 
     async def _ensure_agents_in_resource_group(
         self,
-        resource_group: str,
+        resource_group_name: ResourceGroupName,
         agent_uuids: frozenset[AgentUUID],
         operation: ActionOperationType,
     ) -> None:
         """Refuse agents that do not belong to the deployment's resource group."""
         agents = await self._deployment_repository.search_agents_in_resource_group(
-            ResourceGroupName(resource_group),
+            resource_group_name,
             AgentSearcher(
                 pagination=NoPagination(),
                 conditions=[
@@ -450,7 +452,7 @@ class DeploymentService:
         )
         if outside := agent_uuids - {agent.uuid for agent in agents}:
             raise DesignatedAgentOutsideResourceGroup(
-                f"Agents {sorted(str(u) for u in outside)} are not in resource group {resource_group}",
+                f"Agents {sorted(str(u) for u in outside)} are not in resource group {resource_group_name}",
                 operation=operation,
             )
 
