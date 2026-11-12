@@ -4,6 +4,7 @@ import enum
 import logging
 import uuid
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from typing import (
     Any,
     cast,
@@ -24,6 +25,7 @@ from ai.backend.manager.models.user.queriers import AuthorizingUserQuerier
 from ai.backend.manager.repositories.auth.repository import AuthRepository
 
 from .config import OIDCHookConfig
+from .exceptions import ExpiredOpenIDSToken, InvalidOpenIDSToken, UnusableOpenIDSToken
 
 log = StructuredLogger(logging.getLogger(__name__))
 
@@ -31,6 +33,13 @@ log = StructuredLogger(logging.getLogger(__name__))
 class _STokenSource(enum.Enum):
     REQUEST_PARAMS = enum.auto()
     COOKIE = enum.auto()
+
+
+@dataclass(frozen=True)
+class _OpenIDSTokenClaims:
+    user_id: UserID
+    email: str
+    force: bool
 
 
 class OIDCHookPlugin(HookPlugin):
@@ -71,7 +80,6 @@ class OIDCHookPlugin(HookPlugin):
     ) -> Any:
         root_app = request.app["_root_app"]
         auth_repository = cast(AuthRepository, root_app["_auth_repository"])
-        secret = self._config.secret
 
         stoken_in_params = params.get("stoken") or params.get("sToken")
         stoken_in_cookie = request.cookies.get("sToken")
@@ -88,40 +96,48 @@ class OIDCHookPlugin(HookPlugin):
             return None
 
         try:
-            payload = jwt.decode(stoken, secret, algorithms=["HS256"])
-            user_id = UserID(uuid.UUID(payload["user"]))
-            email = payload["email"]
-        except (jwt.PyJWTError, KeyError, ValueError) as e:
-            unusable_stoken_reason = (
-                "Expired authentication token"
-                if isinstance(e, jwt.ExpiredSignatureError)
-                else "Invalid authentication token"
-            )
+            stoken_claims = self._decode_stoken(stoken)
+        except UnusableOpenIDSToken as e:
             match stoken_source:
                 case _STokenSource.REQUEST_PARAMS:
-                    raise Reject(unusable_stoken_reason) from None
+                    raise
                 case _STokenSource.COOKIE:
                     log.debug(
                         "openid auth cookie unusable, proceeding with password verification",
-                        reason=unusable_stoken_reason,
+                        reason=e.reason,
                     )
                     return None
                 case _:
                     raise UnreachableError(f"Unknown sToken source {stoken_source}") from None
 
-        log.debug("openid auth token decoded", user_id=user_id)
+        log.debug("openid auth token decoded", user_id=stoken_claims.user_id)
 
-        user = await auth_repository.query_user_data(AuthorizingUserQuerier(user_id))
+        user = await auth_repository.query_user_data(AuthorizingUserQuerier(stoken_claims.user_id))
         if user is None:
             raise Reject("user not found")
         if user.status != UserStatus.ACTIVE:
             raise Reject("user is inactivated")
 
-        if payload.get("force", False):
-            invalidated_tokens = await auth_repository.invalidate_active_login_sessions(user_id)
+        if stoken_claims.force:
+            invalidated_tokens = await auth_repository.invalidate_active_login_sessions(
+                stoken_claims.user_id
+            )
             valkey_session = cast(ValkeySessionClient, root_app["_valkey_session"])
             await valkey_session.delete_login_sessions(invalidated_tokens)
-            log.trace("openid login sessions force-invalidated", user_email=email)
+            log.trace("openid login sessions force-invalidated", user_email=stoken_claims.email)
 
-        log.trace("openid user authenticated by auth token", user_email=email)
+        log.trace("openid user authenticated by auth token", user_email=stoken_claims.email)
         return user
+
+    def _decode_stoken(self, stoken: str) -> _OpenIDSTokenClaims:
+        try:
+            payload = jwt.decode(stoken, self._config.secret, algorithms=["HS256"])
+            return _OpenIDSTokenClaims(
+                user_id=UserID(uuid.UUID(payload["user"])),
+                email=payload["email"],
+                force=payload.get("force", False),
+            )
+        except jwt.ExpiredSignatureError:
+            raise ExpiredOpenIDSToken() from None
+        except (jwt.PyJWTError, KeyError, ValueError):
+            raise InvalidOpenIDSToken() from None

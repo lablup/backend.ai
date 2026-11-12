@@ -10,6 +10,21 @@ from ai.backend.common.exception import (
     ErrorDomain,
     ErrorOperation,
 )
+from ai.backend.common.plugin.hook import Reject
+
+
+class UnusableOpenIDSToken(Reject):
+    pass
+
+
+class ExpiredOpenIDSToken(UnusableOpenIDSToken):
+    def __init__(self) -> None:
+        super().__init__("Expired authentication token")
+
+
+class InvalidOpenIDSToken(UnusableOpenIDSToken):
+    def __init__(self) -> None:
+        super().__init__("Invalid authentication token")
 
 
 class OpenIDRedirectError(BackendAIError):
