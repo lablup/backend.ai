@@ -4,6 +4,7 @@ import asyncio
 import time
 import uuid
 from collections.abc import AsyncGenerator, AsyncIterator, Mapping
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -38,10 +39,18 @@ from ai.backend.common.types import (
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.session.options import SessionStoredOptions
 from ai.backend.manager.data.session.types import SessionEntityData, SessionStatus
-from ai.backend.manager.errors.kernel import SessionNotFound
+from ai.backend.manager.errors.kernel import (
+    MainKernelNotFound,
+    SessionAlreadyExists,
+    SessionNotFound,
+    TooManyKernelsFound,
+)
+from ai.backend.manager.models.kernel.searchers import MainKernelSearcher
+from ai.backend.manager.models.session.searchers import LiveSessionsNamedSearcher
 from ai.backend.manager.models.specs.searcher import SearcherResult
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.types import UserScope
 
 
 class DummyEtcd:
@@ -494,3 +503,175 @@ class TestLiveSessionNamed:
         read_ops = _read_ops_answering([session])
 
         assert await registry._live_session_named(read_ops, "taken", access_key) is session
+
+
+class TestCreateSessionWithLiveNamesake:
+    """`create_session` when a live session already carries the requested name."""
+
+    @pytest.fixture
+    def access_key(self) -> AccessKey:
+        return AccessKey("AKIATEST")
+
+    @pytest.fixture
+    def existing(self, access_key: AccessKey) -> SessionEntityData:
+        return _session_entity_data("taken", access_key)
+
+    @pytest.fixture
+    def image_ref(self) -> MagicMock:
+        image_ref = MagicMock()
+        image_ref.is_local = True
+        return image_ref
+
+    @pytest.fixture
+    def main_kernel(self) -> MagicMock:
+        main_kernel = MagicMock()
+        main_kernel.network.service_ports = [{"name": "jupyter"}]
+        return main_kernel
+
+    @pytest.fixture
+    def registry(
+        self,
+        registry_ctx: tuple[
+            AgentRegistry,
+            MagicMock,
+            MagicMock,
+            MagicMock,
+            ManagerConfigProvider,
+            MagicMock,
+            MagicMock,
+        ],
+    ) -> AgentRegistry:
+        return registry_ctx[0]
+
+    def _answer_reads(
+        self,
+        registry: AgentRegistry,
+        existing: SessionEntityData,
+        main_kernels: list[MagicMock],
+        running_image_ref: MagicMock,
+    ) -> None:
+        """Answer the session, main kernel and image reads of `create_session`."""
+        image = MagicMock()
+        image.customized = False
+        image.image_ref = running_image_ref
+
+        async def search_in_global(searcher: Any) -> SearcherResult[Any]:
+            items: list[Any]
+            match searcher:
+                case LiveSessionsNamedSearcher():
+                    items = [existing]
+                case MainKernelSearcher():
+                    items = list(main_kernels)
+                case _:
+                    items = [image]
+            return SearcherResult(
+                items=items, total_count=len(items), has_next_page=False, has_previous_page=False
+            )
+
+        read_ops = MagicMock()
+        read_ops.search_in_global = search_in_global
+
+        @asynccontextmanager
+        async def open_read_ops() -> AsyncIterator[MagicMock]:
+            yield read_ops
+
+        ops_provider = MagicMock()
+        ops_provider.read_ops = open_read_ops
+        registry._ops_provider = ops_provider
+
+    async def _create_session(
+        self, registry: AgentRegistry, access_key: AccessKey, image_ref: MagicMock, *, reuse: bool
+    ) -> Mapping[str, Any]:
+        return await registry.create_session(
+            "taken",
+            image_ref,
+            UserScope(
+                domain_name="default",
+                group_id=uuid.uuid4(),
+                user_uuid=uuid.uuid4(),
+                user_role="user",
+            ),
+            access_key,
+            {},
+            SessionTypes.INTERACTIVE,
+            {"resources": None},
+            ClusterMode.SINGLE_NODE,
+            1,
+            reuse=reuse,
+        )
+
+    async def test_reuse_returns_the_live_session(
+        self,
+        registry: AgentRegistry,
+        access_key: AccessKey,
+        existing: SessionEntityData,
+        image_ref: MagicMock,
+        main_kernel: MagicMock,
+    ) -> None:
+        self._answer_reads(registry, existing, [main_kernel], image_ref)
+
+        resp = await self._create_session(registry, access_key, image_ref, reuse=True)
+
+        assert resp == {
+            "sessionId": str(existing.id),
+            "sessionName": "taken",
+            "status": existing.status.name,
+            "service_ports": [{"name": "jupyter"}],
+            "servicePorts": [{"name": "jupyter"}],
+            "created": False,
+        }
+
+    async def test_without_reuse_raises_already_exists(
+        self,
+        registry: AgentRegistry,
+        access_key: AccessKey,
+        existing: SessionEntityData,
+        image_ref: MagicMock,
+        main_kernel: MagicMock,
+    ) -> None:
+        self._answer_reads(registry, existing, [main_kernel], image_ref)
+
+        with pytest.raises(SessionAlreadyExists) as exc_info:
+            await self._create_session(registry, access_key, image_ref, reuse=False)
+
+        assert exc_info.value.extra_data == {"existingSessionId": str(existing.id)}
+
+    async def test_reuse_with_another_image_raises_already_exists(
+        self,
+        registry: AgentRegistry,
+        access_key: AccessKey,
+        existing: SessionEntityData,
+        image_ref: MagicMock,
+        main_kernel: MagicMock,
+    ) -> None:
+        self._answer_reads(registry, existing, [main_kernel], MagicMock())
+
+        with pytest.raises(SessionAlreadyExists) as exc_info:
+            await self._create_session(registry, access_key, image_ref, reuse=True)
+
+        assert exc_info.value.extra_data == {"existingSessionId": str(existing.id)}
+
+    async def test_no_main_kernel_raises_main_kernel_not_found(
+        self,
+        registry: AgentRegistry,
+        access_key: AccessKey,
+        existing: SessionEntityData,
+        image_ref: MagicMock,
+    ) -> None:
+        self._answer_reads(registry, existing, [], image_ref)
+
+        with pytest.raises(MainKernelNotFound):
+            await self._create_session(registry, access_key, image_ref, reuse=True)
+
+    async def test_several_main_kernels_raise_too_many_kernels_found(
+        self,
+        registry: AgentRegistry,
+        access_key: AccessKey,
+        existing: SessionEntityData,
+        image_ref: MagicMock,
+        main_kernel: MagicMock,
+    ) -> None:
+        self._answer_reads(registry, existing, [main_kernel, MagicMock()], image_ref)
+
+        with pytest.raises(TooManyKernelsFound):
+            await self._create_session(registry, access_key, image_ref, reuse=True)
