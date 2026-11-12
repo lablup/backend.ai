@@ -615,13 +615,21 @@ class AuthDBSource:
         """Verify credentials without password migration (for signout, etc.)"""
         async with self._db.begin_readonly_read_committed() as conn:
             result = await conn.execute(
-                sa.select(users.c.uuid, users.c.username, users.c.password).where(
-                    (users.c.email == email) & (users.c.domain_name == domain_name)
-                ),
+                sa.select(
+                    users.c.uuid,
+                    users.c.username,
+                    users.c.password,
+                    users.c.status,
+                    users.c.password_changed_at,
+                ).where((users.c.email == email) & (users.c.domain_name == domain_name)),
             )
             row = await self._password_matched_row(result.first(), target_password_info)
         return UserCredential(
-            user_id=UserID(row.uuid), username=row.username, hashed_password=row.password
+            user_id=UserID(row.uuid),
+            username=row.username,
+            hashed_password=row.password,
+            status=row.status,
+            password_changed_at=row.password_changed_at,
         )
 
     @auth_db_source_resilience.apply()

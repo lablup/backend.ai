@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock
 from uuid import UUID
 
@@ -6,6 +7,7 @@ import pytest
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.plugin.hook import HookResult, HookResults
 from ai.backend.manager.data.secret.types import KeyProviderType
+from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.errors.common import RejectedByHook
 from ai.backend.manager.plugin.hook_args import VerifyPasswordFormatHookArgs
@@ -19,6 +21,8 @@ from ai.backend.manager.services.auth.actions.update_password import (
 )
 from ai.backend.manager.services.auth.service import AuthService
 from ai.backend.manager.views.auth import UserCredential
+
+_PASSWORD_CHANGED_AT = datetime(2026, 1, 1, tzinfo=UTC)
 
 
 @pytest.fixture
@@ -77,6 +81,8 @@ async def test_update_password_successful(
         user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         hashed_password="hashed_password",
         username="test-user",
+        status=UserStatus.ACTIVE,
+        password_changed_at=_PASSWORD_CHANGED_AT,
     )
 
     # Password update succeeds
@@ -150,6 +156,8 @@ async def test_update_password_with_hook_rejection(
         user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         hashed_password="hashed_password",
         username="test-user",
+        status=UserStatus.ACTIVE,
+        password_changed_at=_PASSWORD_CHANGED_AT,
     )
 
     # Hook rejects the new password format
@@ -184,6 +192,8 @@ async def test_update_password_repository_call(
         user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         hashed_password="hashed_password",
         username="test-user",
+        status=UserStatus.ACTIVE,
+        password_changed_at=_PASSWORD_CHANGED_AT,
     )
     mock_hook_plugin_ctx.dispatch.return_value = HookResult(
         status=HookResults.PASSED,
