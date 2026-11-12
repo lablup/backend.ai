@@ -21,7 +21,7 @@ from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
-from ai.backend.common.types import AccessKey, VFolderID
+from ai.backend.common.types import AccessKey, SSHPublicKey, VFolderID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.common.bulk import BulkCreateFailure, BulkUpdateFailure
@@ -976,13 +976,12 @@ class UserDBSource:
                 raise KeyPairNotFound(f"Keypair {access_key} not found")
             return KeyPairSearchableFields.own.to_data(kp_row)
 
-    async def admin_update_ssh_keypair(
+    async def admin_update_ssh_public_key(
         self,
-        access_key: str,
-        ssh_public_key: str,
-        ssh_private_key: str,
+        access_key: AccessKey,
+        ssh_public_key: SSHPublicKey,
     ) -> None:
-        """Admin registers (overwrites) a user's SSH keypair."""
+        """Admin registers (overwrites) a user's SSH public key."""
         async with self._db.begin_session() as session:
             exists = (
                 await session.scalars(
@@ -994,10 +993,7 @@ class UserDBSource:
             await session.execute(
                 sa.update(keypairs)
                 .where(keypairs.c.access_key == access_key)
-                .values(
-                    ssh_public_key=ssh_public_key,
-                    ssh_private_key=ssh_private_key,
-                )
+                .values(ssh_public_key=ssh_public_key)
             )
 
     async def admin_clear_ssh_keypair(self, access_key: str) -> None:

@@ -255,17 +255,14 @@ type AdminRefreshDeploymentRevisionsPayload {
 }
 
 """
-Added in 26.4.2. Admin input for registering (overwriting) a user's SSH keypair.
+Added in 26.4.2. Admin input for registering (overwriting) a user's SSH public key. `sshPrivateKey` was removed in 26.9.9.
 """
 input AdminRegisterSSHKeypairInput {
-  """Access key whose SSH keypair will be replaced."""
+  """Access key whose SSH public key will be replaced."""
   accessKey: String!
 
   """PEM-encoded SSH public key."""
   sshPublicKey: String!
-
-  """PEM-encoded SSH private key."""
-  sshPrivateKey: String!
 }
 
 """
@@ -9814,7 +9811,7 @@ type Mutation {
   """
   adminDeleteKeypairV2(accessKey: String!): AdminDeleteKeypairPayload
 
-  """Added in 26.4.2. Admin registers (overwrites) a user's SSH keypair."""
+  """Added in 26.4.2. Admin registers (overwrites) a user's SSH public key."""
   adminRegisterSshKeypairV2(input: AdminRegisterSSHKeypairInput!): AdminRegisterSSHKeypairPayload
 
   """Added in 26.4.2. Admin clears a user's SSH keypair."""
