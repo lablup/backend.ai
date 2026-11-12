@@ -79,9 +79,9 @@ class OIDCHookPlugin(HookPlugin):
             # The caller sends this token to log in with it, so an expired or invalid one rejects the login.
             stoken, stoken_source = stoken_in_params, _STokenSource.REQUEST_PARAMS
         elif stoken_in_cookie:
-            # The browser sends the cookie of an earlier OIDC login with every login, and this hook also runs
-            # for a password login that auth_keypair leaves unhandled. An expired or invalid cookie therefore
-            # leaves the login to password verification instead of rejecting a correct password.
+            # Only a client calling the manager directly sends this cookie without the token in params, and it may
+            # be left from an earlier login and come with a password login that auth_keypair leaves unhandled.
+            # An expired or invalid cookie therefore leaves the login to password verification instead of rejecting it.
             stoken, stoken_source = stoken_in_cookie, _STokenSource.COOKIE
         else:
             log.debug("openid auth token not found, proceeding with normal auth")
