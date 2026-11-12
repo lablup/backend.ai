@@ -9,6 +9,8 @@ const USAGE_RENAME =
 const ACCEPTED_REMOVALS = {
   "AccessTokenFilter.token":
     "The token value is the credential itself, so no search condition may take it: a partial match narrows the value one character at a time even when the response never carries it.",
+  "AdminRegisterSSHKeypairInput.sshPrivateKey":
+    "The server keeps no SSH private key a client sends: registering takes only the public key and leaves the stored private key as it is.",
   "DeploymentUsedBy": USAGE_RENAME,
   "ModelCardUsedBy": USAGE_RENAME,
   "RoleUsedBy": USAGE_RENAME,

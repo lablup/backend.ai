@@ -76,7 +76,6 @@ CREATED_RATE_LIMIT = 30000
 """키를 만드는 요청이 요청 한도를 생략했을 때의 값."""
 
 SSH_PUBLIC_KEY = "ssh-rsa scenario-public-key"
-SSH_PRIVATE_KEY = "scenario-private-key"
 
 
 # ------------------------------------------------------------------ situations
@@ -377,7 +376,6 @@ class RegisteringAnSSHKey(When[AKeyOwnerAndACaller, UserAdapter, Answer]):
                 AdminRegisterSSHKeypairInput(
                     access_key=key,
                     ssh_public_key=SSH_PUBLIC_KEY,
-                    ssh_private_key=SSH_PRIVATE_KEY,
                 )
             )
             after = await adapter.admin_get_ssh_keypair(key)
@@ -1083,8 +1081,8 @@ class AGrantedUserRegistersAnothersSSHKey(
     @override
     def describe(self) -> str:
         return (
-            "대상 스코프에서 READ와 UPDATE를 받은 사용자가 공개키와 개인키를 주면, 형식 검사 없이 "
-            "덮어쓰고 access key가 답으로 온다"
+            "대상 스코프에서 READ와 UPDATE를 받은 사용자가 공개키를 주면, 형식 검사 없이 "
+            "공개키를 덮어쓰고 access key가 답으로 온다"
         )
 
     @override
