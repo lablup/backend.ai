@@ -91,21 +91,20 @@ class OIDCHookPlugin(HookPlugin):
             payload = jwt.decode(stoken, secret, algorithms=["HS256"])
             user_id = UserID(uuid.UUID(payload["user"]))
             email = payload["email"]
-        except jwt.ExpiredSignatureError:
+        except (jwt.PyJWTError, KeyError, ValueError) as e:
+            unusable_stoken_reason = (
+                "Expired authentication token"
+                if isinstance(e, jwt.ExpiredSignatureError)
+                else "Invalid authentication token"
+            )
             match stoken_source:
                 case _STokenSource.REQUEST_PARAMS:
-                    raise Reject("Expired authentication token") from None
+                    raise Reject(unusable_stoken_reason) from None
                 case _STokenSource.COOKIE:
-                    log.debug("openid auth cookie expired, proceeding with password verification")
-                    return None
-                case _:
-                    raise UnreachableError(f"Unknown sToken source {stoken_source}") from None
-        except (jwt.PyJWTError, KeyError, ValueError):
-            match stoken_source:
-                case _STokenSource.REQUEST_PARAMS:
-                    raise Reject("Invalid authentication token") from None
-                case _STokenSource.COOKIE:
-                    log.debug("openid auth cookie invalid, proceeding with password verification")
+                    log.debug(
+                        "openid auth cookie unusable, proceeding with password verification",
+                        reason=unusable_stoken_reason,
+                    )
                     return None
                 case _:
                     raise UnreachableError(f"Unknown sToken source {stoken_source}") from None
