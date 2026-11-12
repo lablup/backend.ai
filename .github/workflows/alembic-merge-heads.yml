@@ -1,0 +1,37 @@
+name: alembic-merge-heads
+
+# Two pull requests can each add a migration on the same parent and both merge,
+# leaving `main` with more than one manager alembic head. This opens the pull
+# request that merges them.
+
+on:
+  push:
+    branches:
+      - 'main'
+    paths:
+      - 'src/ai/backend/manager/models/alembic/versions/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  # One run at a time: runs share the pull request branch they force-push.
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  merge-heads:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the revision
+        uses: actions/checkout@v6
+        with:
+          lfs: false
+          # The pull request's checks only run when its branch is pushed by
+          # something other than the workflow's own token.
+          token: ${{ secrets.OCTODOG }}
+      - name: Open a pull request merging the heads
+        env:
+          GH_TOKEN: ${{ secrets.OCTODOG }}
+          COMMIT: ${{ github.sha }}
+        run: .github/scripts/merge-alembic-heads.sh "$COMMIT"

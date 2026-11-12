@@ -6,6 +6,7 @@ from typing import Any
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.exception import ResourceGroupConflict
@@ -16,8 +17,9 @@ from ai.backend.common.types import (
     ResourceSlot,
     SessionTypes,
 )
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.deployment.types import DeploymentHandlerOptions
 from ai.backend.manager.data.resource_group.types import PreemptionConfig as DataPreemptionConfig
+from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.resource import (
     DefaultResourceGroupAlreadyExists,
@@ -35,7 +37,6 @@ from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.entity_share.row import EntityShareRow
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.keypair.row import KeyPairRow
@@ -548,6 +549,22 @@ class TestScalingGroupRepositoryDB:
 
         assert result.scheduler.options.preemption.enabled is True
         assert result.scheduler.options.preemption.victim_scope == PreemptionVictimScope.DOMAIN
+
+    async def test_replacing_default_deployment_options_without_a_policy_keeps_it(
+        self,
+        resource_group_repository: ResourceGroupRepository,
+        sample_scaling_group_for_update: str,
+    ) -> None:
+        name = ResourceGroupName(sample_scaling_group_for_update)
+        await resource_group_repository.replace_default_deployment_options(
+            name, DeploymentHandlerOptions(), AgentSelectionPolicy.STRICT
+        )
+
+        stored = await resource_group_repository.replace_default_deployment_options(
+            name, DeploymentHandlerOptions(), None
+        )
+
+        assert stored.agent_selection_policy == AgentSelectionPolicy.STRICT
 
     async def test_update_scaling_group_not_found(
         self,

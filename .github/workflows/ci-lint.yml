@@ -68,6 +68,10 @@ jobs:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
     - name: Test the release-grade classifier
       run: python ./scripts/test_determine_release_type.py
+    - name: Test the NEXT_RELEASE_VERSION freeze
+      run: python ./scripts/test_freeze_release_version.py
+    - name: Check the changelog fragment names
+      run: python ./scripts/validate-changelog-fragments.py
     - name: Check the manager package __init__ files hold no imports
       run: python ./scripts/check-init-imports.py src/ai/backend/manager
     - name: Restore the Pants caches
@@ -75,7 +79,7 @@ jobs:
       with:
         mode: restore
     - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v11
+      uses: pantsbuild/actions/init-pants@0aaef864bd133c4055feb6adad0bfdce0de1c2e4  # v11
       with:
         # `pants-caches` restores and saves the caches instead: init-pants
         # saves whatever it restores, from every run.

@@ -8,6 +8,7 @@ from ai.backend.manager.data.ssh_keypair.types import SSHKeypairData
 from ai.backend.manager.models.specs.creator import FieldCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.ssh_keypair.row import SSHKeypairRow
+from ai.backend.manager.models.ssh_keypair.searchable_fields import SSHKeypairSearchableFields
 from ai.backend.manager.secret.types import SecretValue
 
 
@@ -36,10 +37,4 @@ class SSHKeypairCreator(FieldCreator[UserID, SSHKeypairRow, SSHKeypairData]):
 
     @override
     def to_data(self, row: SSHKeypairRow) -> SSHKeypairData:
-        return SSHKeypairData(
-            id=row.id,
-            user_id=row.user_id,
-            public_key=row.public_key,
-            private_key=row.private_key,
-            is_default=row.is_default,
-        )
+        return SSHKeypairSearchableFields.own.to_data(row)

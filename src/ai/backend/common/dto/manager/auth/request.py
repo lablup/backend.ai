@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from pydantic import AliasChoices, Field
+from pydantic import AliasChoices, Field, ValidationInfo, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 
@@ -96,6 +96,10 @@ class SignupRequest(BaseRequestModel):
         default=None,
         description="Free-text account description; defaults to empty string",
     )
+    token: str | None = Field(
+        default=None,
+        description="Signup token passed to the PRE_SIGNUP hook",
+    )
 
 
 class LogoutRequest(BaseRequestModel):
@@ -133,6 +137,13 @@ class UpdatePasswordRequest(BaseRequestModel):
     new_password2: str = Field(
         description="New password confirmation; must match new_password exactly"
     )
+
+    @field_validator("new_password2")
+    @classmethod
+    def validate_password_confirmation(cls, value: str, info: ValidationInfo) -> str:
+        if "new_password" in info.data and value != info.data["new_password"]:
+            raise ValueError("new password mismatch")
+        return value
 
 
 class UpdatePasswordNoAuthRequest(BaseRequestModel):

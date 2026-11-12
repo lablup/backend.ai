@@ -59,6 +59,7 @@ from ai.backend.common.dto.manager.v2.resource_slot.types import ResourceOptsDTO
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.schema.deployment import IntOrPercent
 from ai.backend.common.tristate.unset import UNSET, Unset
+from ai.backend.common.typed_validators import HealthCheckPath
 from ai.backend.common.types import (
     AutoScalingMetricSource,
     ClusterMode,
@@ -137,7 +138,7 @@ __all__ = (
 class ModelHealthCheckInput(BaseRequestModel):
     enable: bool = False
     interval: float | None = None
-    path: str | None = None
+    path: HealthCheckPath | None = None
     max_retries: int | None = None
     max_wait_time: float | None = None
     expected_status_code: int | None = None
@@ -669,7 +670,8 @@ class DeploymentFilter(BaseRequestModel):
     )
     entity_id: UUIDFilter | None = Field(default=None, description="Filter by deployment ID")
     desired_replicas: IntFilter | None = Field(
-        default=None, description="Filter by the requested replica count"
+        default=None,
+        description="Filter by the desired replica count, or the user-set replica count until autoscaling sets one",
     )
     scaling_state: DeploymentScalingStateFilter | None = Field(
         default=None, description="Filter by scaling state"

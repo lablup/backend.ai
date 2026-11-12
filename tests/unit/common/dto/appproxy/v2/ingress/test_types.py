@@ -31,7 +31,7 @@ class TestIngressFrontend:
             protocol=IngressProtocol.TCP,
             port=PortFrontend(number=10205),
         )
-        assert frontend.key() == "10205"
+        assert frontend.key() == "port-10205"
 
     def test_wildcard_frontend_key_is_subdomain(self) -> None:
         frontend = IngressFrontend(
@@ -39,7 +39,7 @@ class TestIngressFrontend:
             protocol=IngressProtocol.HTTP,
             wildcard=WildcardFrontend(subdomain="app-1"),
         )
-        assert frontend.key() == "app-1"
+        assert frontend.key() == "wildcard-app-1"
 
     def test_port_kind_without_port_is_rejected(self) -> None:
         with pytest.raises(ValidationError):
@@ -112,7 +112,7 @@ class TestIngressUserAccess:
 class TestIngress:
     def test_valid_payload_is_accepted(self, port_ingress_payload: dict[str, Any]) -> None:
         ingress = Ingress.model_validate(port_ingress_payload)
-        assert ingress.frontend.key() == "10205"
+        assert ingress.frontend.key() == "port-10205"
 
     def test_negative_revision_is_rejected(self, port_ingress_payload: dict[str, Any]) -> None:
         with pytest.raises(BackendAISchemaValidationFailed):
@@ -163,7 +163,7 @@ class TestIngress:
     ) -> None:
         ingress = Ingress.model_validate(port_ingress_payload)
         assert ingress.key() == IngressKey(
-            authority=IngressAuthority("worker-1"), frontend_key=IngressFrontendKey("10205")
+            authority=IngressAuthority("worker-1"), frontend_key=IngressFrontendKey("port-10205")
         )
 
     def test_unknown_field_is_ignored(self, port_ingress_payload: dict[str, Any]) -> None:
@@ -174,8 +174,8 @@ class TestIngress:
 class TestIngressRedisKey:
     def test_key_joins_prefix_authority_and_frontend_key(self) -> None:
         assert IngressRedisKey("appproxy:ingress").of(
-            IngressAuthority("worker-1"), IngressFrontendKey("10205")
-        ) == ("appproxy:ingress:worker-1:10205")
+            IngressAuthority("worker-1"), IngressFrontendKey("port-10205")
+        ) == ("appproxy:ingress:worker-1:port-10205")
 
     def test_pattern_matches_the_authority(self) -> None:
         assert IngressRedisKey("appproxy:ingress").pattern(IngressAuthority("worker-1")) == (

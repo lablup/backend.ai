@@ -1,4 +1,4 @@
-"""Session group GraphQL query resolvers."""
+"""Session group GraphQL query and mutation resolvers."""
 
 from __future__ import annotations
 
@@ -16,15 +16,25 @@ from ai.backend.common.dto.manager.v2.session_group.response import (
     AdminSearchSessionGroupsPayload,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.base import encode_cursor
-from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_root_field
+from ai.backend.manager.api.gql.base import encode_cursor, to_global_id
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_mutation,
+    gql_root_field,
+)
 from ai.backend.manager.api.gql.session_group.types import (
+    CreateSessionGroupInputGQL,
+    CreateSessionGroupPayloadGQL,
+    PurgeSessionGroupInputGQL,
+    PurgeSessionGroupPayloadGQL,
     SessionGroupConnectionGQL,
     SessionGroupEdgeGQL,
     SessionGroupFilterGQL,
     SessionGroupGQL,
     SessionGroupOrderByGQL,
     SessionGroupScopeGQL,
+    UpdateSessionGroupInputGQL,
+    UpdateSessionGroupPayloadGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
@@ -119,6 +129,60 @@ async def scoped_session_groups(
         )
     )
     return _build_connection(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Change a session group's placement direction and enforcement. Members placed "
+            "afterwards follow the new policy; a group a deployment's replica group holds "
+            "is refused as in use."
+        ),
+    )
+)
+async def update_session_group(
+    info: Info[StrawberryGQLContext],
+    input: UpdateSessionGroupInputGQL,
+) -> UpdateSessionGroupPayloadGQL | None:
+    payload = await info.context.adapters.session_group.update(input.to_pydantic())
+    return UpdateSessionGroupPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Create a session group in a project. The caller becomes its owner; the caller "
+            "needs the session group create permission on the project."
+        ),
+    )
+)
+async def create_session_group(
+    info: Info[StrawberryGQLContext],
+    input: CreateSessionGroupInputGQL,
+) -> CreateSessionGroupPayloadGQL | None:
+    payload = await info.context.adapters.session_group.create(input.to_pydantic())
+    return CreateSessionGroupPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Permanently remove a session group. Its member sessions remain with their group "
+            "cleared. A group a deployment's replica group references is refused as in use."
+        ),
+    )
+)
+async def purge_session_group(
+    info: Info[StrawberryGQLContext],
+    input: PurgeSessionGroupInputGQL,
+) -> PurgeSessionGroupPayloadGQL | None:
+    payload = await info.context.adapters.session_group.purge(input.to_pydantic())
+    return PurgeSessionGroupPayloadGQL.from_pydantic(
+        payload, extra={"purged_id": to_global_id(SessionGroupGQL, payload.entity_id)}
+    )
 
 
 def _build_connection(payload: AdminSearchSessionGroupsPayload) -> SessionGroupConnectionGQL:

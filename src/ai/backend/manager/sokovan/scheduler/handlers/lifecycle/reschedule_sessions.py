@@ -65,6 +65,11 @@ class RescheduleSessionsLifecycleHandler(SessionLifecycleHandler):
 
     @classmethod
     @override
+    def description(cls) -> str:
+        return "Removes the kernels of sessions marked for rescheduling and requeues them."
+
+    @classmethod
+    @override
     def target_statuses(cls) -> list[SessionStatus]:
         """Sessions in RESCHEDULING state."""
         return [SessionStatus.RESCHEDULING]

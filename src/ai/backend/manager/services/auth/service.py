@@ -11,6 +11,8 @@ from aiohttp import web
 from sqlalchemy import RowMapping
 
 from ai.backend.common import msgpack
+from ai.backend.common.auth.password import PasswordInfo
+from ai.backend.common.auth.ssh import generate_ssh_keypair
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
 from ai.backend.common.clients.valkey_client.valkey_session.types import (
     LoginSessionData,
@@ -20,6 +22,7 @@ from ai.backend.common.clients.valkey_client.valkey_session.types import (
 from ai.backend.common.contexts.client_ip import current_client_ip
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.bootstrap_script import BootstrapScript
+from ai.backend.common.data.entity.domain import DomainName
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserData
 from ai.backend.common.dto.manager.auth.types import AuthTokenType
@@ -42,6 +45,7 @@ from ai.backend.manager.errors.auth import (
     EmailAlreadyExistsError,
     GroupMembershipNotFoundError,
     PasswordExpired,
+    PasswordMismatch,
     TooManyConcurrentLoginSessions,
 )
 from ai.backend.manager.errors.common import (
@@ -51,18 +55,18 @@ from ai.backend.manager.errors.common import (
     RejectedByHook,
 )
 from ai.backend.manager.errors.user import KeyPairNotFound, UserResourcePolicyNotFound
-from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.keypair.row import (
-    KEYPAIR_SECRET_KEY_CONTEXT,
-    generate_ssh_keypair,
-)
+from ai.backend.manager.models.hasher.factory import compare_to_hashed_password
+from ai.backend.manager.models.keypair.row import KEYPAIR_SECRET_KEY_CONTEXT
 from ai.backend.manager.models.keypair.ssh_key_validator import SSHKeyValidator
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.row import (
-    INACTIVE_USER_STATUSES,
     UserRole,
     UserStatus,
-    compare_to_hashed_password,
+)
+from ai.backend.manager.plugin.hook_args import (
+    PostSignupHookArgs,
+    PreSignupHookArgs,
+    VerifyPasswordFormatHookArgs,
 )
 from ai.backend.manager.repositories.auth.db_source.db_source import ActiveSessionInfo
 from ai.backend.manager.repositories.auth.repository import AuthRepository
@@ -217,11 +221,13 @@ class AuthService:
         return await self._key_provider_pool.decrypt(keypair.secret_key, KEYPAIR_SECRET_KEY_CONTEXT)
 
     async def _keypair_hook_payload(self, keypair: KeyPairData) -> dict[str, object]:
-        """The legacy keypair payload, with user-owned dotfiles and bootstrap script."""
+        """The legacy keypair payload, with user-owned auto-generated files and bootstrap script."""
         bootstrap_script = await self._user_repository.default_bootstrap_script(
             UserID(keypair.user_id)
         )
-        dotfiles = await self._user_repository.get_default_dotfiles(UserID(keypair.user_id))
+        auto_generated_files = await self._user_repository.get_default_auto_generated_files(
+            UserID(keypair.user_id)
+        )
         return {
             "access_key": keypair.access_key,
             "secret_key": await self._secret_key_of(keypair),
@@ -238,7 +244,8 @@ class AuthService:
             "resource_policy": keypair.resource_policy_name,
             # Rows carry no aggregate size limit, so pack without DotfileEntries.pack()'s.
             "dotfiles": msgpack.packb([
-                {"path": e.path, "perm": e.perm, "data": e.data} for e in dotfiles.entries
+                {"path": e.path, "perm": e.perm, "data": e.data}
+                for e in auto_generated_files.entries
             ]),
             "bootstrap_script": (
                 bootstrap_script.script if bootstrap_script is not None else BootstrapScript.empty()
@@ -250,7 +257,15 @@ class AuthService:
             raise InvalidAPIParameters("Unsupported authorization type")
         auth_config = self._config_provider.config.auth
         login_client_type_id = action.client_type_id
-        user, active_sessions = await self._verify_user(action, auth_config, login_client_type_id)
+        try:
+            user, active_sessions = await self._verify_user(
+                action, auth_config, login_client_type_id
+            )
+        except PasswordMismatch as e:
+            await self._record_login_failure(
+                e.user_id, action.domain_name, LoginAttemptResult.FAILED_INVALID_CREDENTIALS
+            )
+            raise
 
         try:
             post_result = await self._post_check(action, user, active_sessions, auth_config)
@@ -320,7 +335,7 @@ class AuthService:
         """Step 2: User status checks, keypair lookup, POST_AUTHORIZE hook, Valkey cross-check."""
         if user.status == UserStatus.BEFORE_VERIFICATION:
             raise AuthorizationFailed("This account needs email verification.")
-        if user.status in INACTIVE_USER_STATUSES:
+        if user.status in UserStatus.auth_denied():
             raise AuthorizationFailed("User credential mismatch.")
         await self._check_password_age(user, auth_config)
 
@@ -505,10 +520,19 @@ class AuthService:
             log.exception("login history record failed", login_result=result, user_id=user_uuid)
 
     async def signup(self, action: SignupAction) -> SignupActionResult:
-        params = action.hook_params
         hook_result = await self._hook_plugin_ctx.dispatch(
             "PRE_SIGNUP",
-            (params,),
+            (
+                PreSignupHookArgs(
+                    domain_name=DomainName(action.domain_name),
+                    email=action.email,
+                    password=action.password,
+                    username=action.username,
+                    full_name=action.full_name,
+                    description=action.description,
+                    token=action.token,
+                ),
+            ),
             return_when=ALL_COMPLETED,
         )
         if hook_result.status != PASSED:
@@ -520,13 +544,15 @@ class AuthService:
             dict(result) for result in hook_results
         ])
 
-        # [Hooking point for VERIFY_PASSWORD_FORMAT with the ALL_COMPLETED requirement]
-        # The hook handlers should accept the request and whole ``params` dict.
-        # They should return None if the validation is successful and raise the
-        # Reject error otherwise.
         hook_result = await self._hook_plugin_ctx.dispatch(
             "VERIFY_PASSWORD_FORMAT",
-            (action.request, params),
+            (
+                VerifyPasswordFormatHookArgs(
+                    email=action.email,
+                    username=action.username,
+                    password=action.password,
+                ),
+            ),
             return_when=ALL_COMPLETED,
         )
         if hook_result.status != PASSED:
@@ -590,15 +616,9 @@ class AuthService:
         user = creation.user
         keypair = creation.keypair
 
-        # [Hooking point for POST_SIGNUP as one-way notification]
-        # The hook handlers should accept a tuple of the user email,
-        # the new user's UUID, and a dict with initial user's preferences.
-        initial_user_prefs = {
-            "lang": action.request.headers.get("Accept-Language", "en-us").split(",")[0].lower(),
-        }
         await self._hook_plugin_ctx.notify(
             "POST_SIGNUP",
-            (action.email, user.uuid, initial_user_prefs),
+            (PostSignupHookArgs(email=action.email, user_id=UserID(user.uuid), lang=action.lang),),
         )
         return SignupActionResult(
             user_id=user.uuid,
@@ -607,8 +627,11 @@ class AuthService:
         )
 
     async def logout(self, action: LogoutAction) -> LogoutActionResult:
-        await self._auth_repository.delete_login_session_by_token(
-            action.session_token, LoginAttemptResult.LOGOUT, await self._recorded_client_ip()
+        await self._auth_repository.delete_owned_login_session_by_token(
+            action.session_token,
+            action.user_id,
+            LoginAttemptResult.LOGOUT,
+            await self._recorded_client_ip(),
         )
         await self._valkey_session_client.delete_login_session(action.session_token)
         return LogoutActionResult(success=True)
@@ -641,10 +664,16 @@ class AuthService:
         if action.email != action.requester_email:
             raise GenericForbidden("Not the account owner")
         email = action.email
+        auth_config = self._config_provider.config.auth
         await self._auth_repository.check_credential_without_migration(
             action.domain_name,
             email,
-            action.password,
+            PasswordInfo(
+                password=action.password,
+                algorithm=auth_config.password_hash_algorithm,
+                rounds=auth_config.password_hash_rounds,
+                salt_size=auth_config.password_hash_salt_size,
+            ),
         )
         deleted_tokens = await self._auth_repository.delete_user_login_sessions(
             action.user_id,
@@ -658,6 +687,15 @@ class AuthService:
 
         return SignoutActionResult(success=True)
 
+    async def _revoke_user_login_sessions(self, user_id: UserID, domain_name: str) -> None:
+        deleted_tokens = await self._auth_repository.delete_user_login_sessions(
+            user_id,
+            domain_name,
+            LoginAttemptResult.REVOKED_BY_USER,
+            await self._recorded_client_ip(),
+        )
+        await self._valkey_session_client.delete_login_sessions(deleted_tokens)
+
     async def update_full_name(self, action: UpdateFullNameAction) -> UpdateFullNameActionResult:
         await self._auth_repository.update_user_full_name(
             action.email, action.domain_name, action.full_name
@@ -667,32 +705,30 @@ class AuthService:
     async def update_password(self, action: UpdatePasswordAction) -> UpdatePasswordActionResult:
         domain_name = action.domain_name
         email = action.email
-        if action.new_password != action.new_password_confirm:
-            log.trace(
-                "password update rejected, new password mismatch",
-                domain_name=domain_name,
-                user_email=email,
-            )
-            return UpdatePasswordActionResult(
-                success=False,
-                message="new password mismatch",
-            )
+        auth_config = self._config_provider.config.auth
         try:
-            await self._auth_repository.check_credential_without_migration(
+            credential = await self._auth_repository.check_credential_without_migration(
                 domain_name,
                 email,
-                action.old_password,
+                PasswordInfo(
+                    password=action.old_password,
+                    algorithm=auth_config.password_hash_algorithm,
+                    rounds=auth_config.password_hash_rounds,
+                    salt_size=auth_config.password_hash_salt_size,
+                ),
             )
         except AuthorizationFailed as e:
             raise AuthorizationFailed("Old password mismatch") from e
 
-        # [Hooking point for VERIFY_PASSWORD_FORMAT with the ALL_COMPLETED requirement]
-        # The hook handlers should accept the request and whole ``params` dict.
-        # They should return None if the validation is successful and raise the
-        # Reject error otherwise.
         hook_result = await self._hook_plugin_ctx.dispatch(
             "VERIFY_PASSWORD_FORMAT",
-            (action.request, action.hook_params),
+            (
+                VerifyPasswordFormatHookArgs(
+                    email=email,
+                    username=credential.username,
+                    password=action.new_password,
+                ),
+            ),
             return_when=ALL_COMPLETED,
         )
         if hook_result.status != PASSED:
@@ -708,6 +744,7 @@ class AuthService:
             salt_size=auth_config.password_hash_salt_size,
         )
         await self._auth_repository.update_user_password(email, password_info)
+        await self._revoke_user_login_sessions(action.user_id, domain_name)
 
         return UpdatePasswordActionResult(
             success=True,
@@ -723,19 +760,26 @@ class AuthService:
         checked_user = await self._auth_repository.check_credential_without_migration(
             action.domain_name,
             action.email,
-            password=action.current_password,
+            PasswordInfo(
+                password=action.current_password,
+                algorithm=auth_config.password_hash_algorithm,
+                rounds=auth_config.password_hash_rounds,
+                salt_size=auth_config.password_hash_salt_size,
+            ),
         )
         new_password = action.new_password
-        if compare_to_hashed_password(new_password, checked_user["password"]):
+        if compare_to_hashed_password(new_password, checked_user.hashed_password):
             raise AuthorizationFailed("Cannot update to the same password as an existing password.")
 
-        # [Hooking point for VERIFY_PASSWORD_FORMAT with the ALL_COMPLETED requirement]
-        # The hook handlers should accept the request and whole ``params` dict.
-        # They should return None if the validation is successful and raise the
-        # Reject error otherwise.
         hook_result = await self._hook_plugin_ctx.dispatch(
             "VERIFY_PASSWORD_FORMAT",
-            (action.request, action.hook_params),
+            (
+                VerifyPasswordFormatHookArgs(
+                    email=action.email,
+                    username=checked_user.username,
+                    password=new_password,
+                ),
+            ),
             return_when=ALL_COMPLETED,
         )
         if hook_result.status != PASSED:
@@ -749,11 +793,12 @@ class AuthService:
             salt_size=auth_config.password_hash_salt_size,
         )
         changed_at = await self._auth_repository.update_user_password_by_uuid(
-            checked_user["uuid"], password_info
+            checked_user.user_id, password_info
         )
+        await self._revoke_user_login_sessions(checked_user.user_id, action.domain_name)
 
         return UpdatePasswordNoAuthActionResult(
-            user_id=checked_user["uuid"],
+            user_id=checked_user.user_id,
             password_changed_at=changed_at,
         )
 

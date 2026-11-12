@@ -1,0 +1,1 @@
+.bai-dynamic-list{gap:var(--spacing-2);flex-direction:column;width:100%;display:flex}.bai-dynamic-list__row{align-items:start;column-gap:var(--spacing-2);width:100%;display:grid}.bai-dynamic-list__cell{min-width:0}.bai-dynamic-list__header{color:var(--color-text-secondary);font-weight:var(--font-weight-normal)}.bai-dynamic-list__remove-slot{width:var(--size-element-md)}

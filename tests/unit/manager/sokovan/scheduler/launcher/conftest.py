@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from dataclasses import replace
 from datetime import UTC, datetime
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
@@ -11,6 +12,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.network import NetworkID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.types import (
@@ -50,6 +52,22 @@ _PERSISTENT_NETWORK_REF_NAME = "bai-multinode-00000000-0000-0000-0000-0000000000
 # =============================================================================
 # Mock Dependencies
 # =============================================================================
+
+
+@pytest.fixture
+def mock_system_session_environ_repository() -> AsyncMock:
+    repository = AsyncMock()
+    repository.resolve = AsyncMock(
+        side_effect=lambda sessions, searcher: {session.session_id: {} for session in sessions}
+    )
+    return repository
+
+
+@pytest.fixture
+def session_name_bound_to_key_a(mock_system_session_environ_repository: AsyncMock) -> None:
+    mock_system_session_environ_repository.resolve.side_effect = lambda sessions, searcher: {
+        session.session_id: {"A": session.name} for session in sessions
+    }
 
 
 @pytest.fixture
@@ -127,6 +145,7 @@ def mock_valkey_schedule() -> AsyncMock:
 @pytest.fixture
 def launcher(
     mock_repository: AsyncMock,
+    mock_system_session_environ_repository: AsyncMock,
     mock_agent_client_pool: MagicMock,
     mock_network_plugin_ctx: MagicMock,
     mock_config_provider: MagicMock,
@@ -135,7 +154,8 @@ def launcher(
     """Create SessionLauncher with mocked dependencies."""
     return SessionLauncher(
         SessionLauncherArgs(
-            repository=mock_repository,
+            scheduler_repository=mock_repository,
+            system_session_environ_repository=mock_system_session_environ_repository,
             agent_client_pool=mock_agent_client_pool,
             network_plugin_ctx=mock_network_plugin_ctx,
             config_provider=mock_config_provider,
@@ -272,6 +292,8 @@ def _create_session_for_start(
         user_uuid=uuid4(),
         user_email="test@example.com",
         user_name="testuser",
+        domain_id=DomainID(uuid4()),
+        project_id=ProjectID(uuid4()),
         cluster_mode=cluster_mode,
         network_type=network_type or NetworkType.VOLATILE,
         network_id=network_id,
@@ -284,6 +306,11 @@ def _create_session_for_start(
 def session_for_start_single_kernel() -> SessionDataForStart:
     """Single session with one kernel for starting."""
     return _create_session_for_start()
+
+
+@pytest.fixture
+def session_for_start_with_user_environ() -> SessionDataForStart:
+    return replace(_create_session_for_start(), environ={"A": "mine", "U": "mine"})
 
 
 @pytest.fixture

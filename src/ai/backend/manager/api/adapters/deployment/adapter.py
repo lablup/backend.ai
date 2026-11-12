@@ -185,7 +185,7 @@ from ai.backend.common.schema.deployment import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.common.tristate.unset import Unset
 from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
 from ai.backend.manager.api.adapter_options.deployment.options import (
-    deployment_options_from_input,
+    deployment_handler_options_from_input,
     deployment_options_to_info,
 )
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
@@ -232,6 +232,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus as ManagerRouteTrafficStatus,
 )
 from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetValueData
+from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.errors.base.field import FieldNotFoundError
 from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound
@@ -888,15 +889,13 @@ class DeploymentAdapter(BaseAdapter):
     ) -> ReplaceDeploymentOptionsPayload:
         """Fully replace the ``options`` surface of a deployment.
 
-        Accepts the REST/GQL DTO input, converts to the domain
-        :class:`DeploymentOptions` (duplicate or unknown handler names
-        are rejected inside :func:`deployment_options_from_input`
-        against the coordinator's live registration), dispatches the
-        :class:`ReplaceDeploymentOptionsAction`, and returns only the
-        refreshed options surface (the repository path uses ``UPDATE ...
-        RETURNING`` and does not read the surrounding deployment node).
+        Converts the handler options to the domain
+        :class:`DeploymentHandlerOptions` (duplicate or unknown handler names
+        are rejected inside :func:`deployment_handler_options_from_input`),
+        passes the agent selection policy apart, and returns only the
+        refreshed options surface.
         """
-        options = deployment_options_from_input(
+        handler_options = deployment_handler_options_from_input(
             input.options,
             valid_handler_names=frozenset(
                 h.name() for h in self._deployment_coordinator.registered_handlers()
@@ -905,7 +904,12 @@ class DeploymentAdapter(BaseAdapter):
         action_result = await self._deployment.replace_deployment_options.run(
             ReplaceDeploymentOptionsAction(
                 deployment_id=deployment_id,
-                options=options,
+                handler_options=handler_options,
+                agent_selection_policy=(
+                    AgentSelectionPolicy(input.options.agent_selection_policy.value)
+                    if input.options.agent_selection_policy is not None
+                    else None
+                ),
             )
         )
         return ReplaceDeploymentOptionsPayload(
@@ -2465,6 +2469,7 @@ class DeploymentAdapter(BaseAdapter):
                 open_to_public=data.network_access.open_to_public,
             ),
             replica_state=ReplicaStateInfo(
+                replica_count=data.replica_state.replica_count,
                 desired_replica_count=data.replica_state.desired_replica_count,
                 replica_ids=data.replica_state.replica_ids,
             ),

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import io
 from collections.abc import Iterator
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 from unittest import mock
 from unittest.mock import AsyncMock
 
@@ -10,7 +10,12 @@ import aiohttp
 import pytest
 
 from ai.backend.client.config import API_VERSION, get_config
-from ai.backend.client.request import AttachedFile, Request
+from ai.backend.client.exceptions import (
+    BackendClientError,
+    BackendConnectError,
+    BackendConnectionRefusedError,
+)
+from ai.backend.client.request import AttachedFile, FetchContextManager, Request
 from ai.backend.client.session import AsyncSession, Session
 
 if TYPE_CHECKING:
@@ -131,3 +136,52 @@ async def test_fetch_invalid_method_async() -> None:
         with pytest.raises(ValueError):
             async with rqst.fetch():
                 pass
+
+
+class _FailingRequestContext:
+    _error: BaseException
+
+    def __init__(self, error: BaseException) -> None:
+        self._error = error
+
+    async def __aenter__(self) -> None:
+        raise self._error
+
+    async def __aexit__(self, *exc_info: Any) -> None:
+        return None
+
+
+def _connector_error(os_error: OSError) -> aiohttp.ClientConnectorError:
+    return aiohttp.ClientConnectorError(mock.MagicMock(host="m1", port=80, ssl=False), os_error)
+
+
+@pytest.mark.parametrize(
+    ("error", "expected"),
+    [
+        pytest.param(
+            _connector_error(ConnectionRefusedError(111, "Connection refused")),
+            BackendConnectionRefusedError,
+            id="refused",
+        ),
+        pytest.param(
+            _connector_error(OSError(-2, "Name or service not known")),
+            BackendConnectError,
+            id="dns",
+        ),
+        pytest.param(aiohttp.ConnectionTimeoutError(), BackendConnectError, id="connect-timeout"),
+        pytest.param(aiohttp.SocketTimeoutError(), BackendClientError, id="read-timeout"),
+        pytest.param(aiohttp.ServerDisconnectedError(), BackendClientError, id="disconnected"),
+    ],
+)
+async def test_fetch_tells_whether_the_request_was_sent(
+    error: aiohttp.ClientConnectionError, expected: type[BackendClientError]
+) -> None:
+    session = mock.MagicMock()
+    session.config.endpoints = ["http://m1"]
+    fetch_ctx = FetchContextManager(session, lambda: cast(Any, _FailingRequestContext(error)))
+
+    with pytest.raises(BackendClientError) as exc_info:
+        await fetch_ctx.__aenter__()
+
+    assert type(exc_info.value) is expected
+    assert exc_info.value.__cause__ is error

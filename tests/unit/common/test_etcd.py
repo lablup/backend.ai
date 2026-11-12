@@ -12,6 +12,7 @@ from etcd_client import CondVar, GRPCStatusCode, GRPCStatusError, WatchEventType
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes, Event
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import HostPortPair, QueueSentinel
+from ai.backend.testutils.bootstrap import ETCD_PASSWORD, ETCD_USER
 
 
 async def test_basic_crud(etcd: AsyncEtcd) -> None:
@@ -326,6 +327,52 @@ async def test_atomic_replace_prefixes_multiple_subtrees(etcd: AsyncEtcd) -> Non
     assert await etcd.get_prefix("cfg/services/bai_service_e") == {
         "loadBalancer": {"servers": {"0": "new"}}
     }
+
+
+@pytest.fixture
+async def router_at_revision_1(etcd: AsyncEtcd) -> None:
+    await etcd.put_prefix("cfg/routers/bai_router_f", {"rule": "old-rule"})
+    await etcd.put("cfg/revision_f", "1")
+
+
+@pytest.fixture
+async def router_at_revision_2(etcd: AsyncEtcd) -> None:
+    await etcd.put_prefix("cfg/routers/bai_router_g", {"rule": "kept-rule"})
+    await etcd.put("cfg/revision_g", "2")
+
+
+async def test_compare_and_replace_prefixes_replaces_while_the_guard_holds(
+    etcd: AsyncEtcd, router_at_revision_1: None
+) -> None:
+    replaced = await etcd.compare_and_replace_prefixes(
+        {"cfg/routers/bai_router_f": {"service": "bai_service_f"}},
+        guards={"cfg/revision_f": "1"},
+    )
+
+    assert replaced
+    assert await etcd.get_prefix("cfg/routers/bai_router_f") == {"service": "bai_service_f"}
+
+
+async def test_compare_and_replace_prefixes_leaves_the_subtree_when_the_guard_moved(
+    etcd: AsyncEtcd, router_at_revision_2: None
+) -> None:
+    replaced = await etcd.compare_and_replace_prefixes(
+        {"cfg/routers/bai_router_g": {"rule": "lost-rule"}},
+        guards={"cfg/revision_g": "1"},
+    )
+
+    assert not replaced
+    assert await etcd.get_prefix("cfg/routers/bai_router_g") == {"rule": "kept-rule"}
+
+
+async def test_compare_and_replace_prefixes_guards_an_absent_key(etcd: AsyncEtcd) -> None:
+    replaced = await etcd.compare_and_replace_prefixes(
+        {"cfg/routers/bai_router_h": {"rule": "first-rule"}},
+        guards={"cfg/revision_h": None},
+    )
+
+    assert replaced
+    assert await etcd.get_prefix("cfg/routers/bai_router_h") == {"rule": "first-rule"}
 
 
 async def test_watch(etcd: AsyncEtcd) -> None:
@@ -669,11 +716,33 @@ async def test_etcd_not_opened_connects_per_request(
         addrs=[etcd_container[1].to_legacy()],
         namespace=test_ns,
         scope_prefix_map={ConfigScopes.GLOBAL: "global"},
+        credentials={"user": ETCD_USER, "password": ETCD_PASSWORD},
     )
     await etcd.put("not-opened", "1")
     assert await etcd.get("not-opened") == "1"
     await etcd.delete_prefix("")
     await etcd.close()
+
+
+class TestAuthTokenRefresh:
+    @pytest.fixture
+    def connect_options_cls(self) -> Any:
+        with (
+            patch("ai.backend.common.etcd.ConnectOptions") as connect_options_cls,
+            patch("ai.backend.common.etcd.EtcdClient"),
+        ):
+            yield connect_options_cls
+
+    def test_credentials_turn_on_auto_token_refresh(self, connect_options_cls: MagicMock) -> None:
+        AsyncEtcd(
+            addrs=HostPortPair("127.0.0.1", 2379),
+            namespace="test-auth",
+            scope_prefix_map={ConfigScopes.GLOBAL: ""},
+            credentials={"user": ETCD_USER, "password": ETCD_PASSWORD},
+        )
+
+        connect_options_with_user = connect_options_cls.return_value.with_user.return_value
+        connect_options_with_user.with_auto_token_refresh.assert_called_once_with(True)
 
 
 class TestRequestRetry:
@@ -726,15 +795,49 @@ class TestRequestRetry:
 
         assert communicator.put.call_count == 4
 
-    async def test_timed_out_request_is_not_resent(
+    async def test_timed_out_get_is_resent(self, etcd: AsyncEtcd, communicator: AsyncMock) -> None:
+        communicator.get.side_effect = [
+            self._err(GRPCStatusCode.Cancelled, "Timeout expired"),
+            b"v",
+        ]
+
+        with patch("asyncio.sleep", new_callable=AsyncMock):
+            assert await etcd.get("k", scope=ConfigScopes.GLOBAL) == "v"
+
+        assert communicator.get.call_count == 2
+
+    async def test_timed_out_get_prefix_is_resent(
         self, etcd: AsyncEtcd, communicator: AsyncMock
     ) -> None:
-        communicator.get.side_effect = self._err(GRPCStatusCode.Cancelled, "Timeout expired")
+        communicator.get_prefix.side_effect = [
+            self._err(GRPCStatusCode.Cancelled, "Timeout expired"),
+            [(b"/sorna/test-retry/k/a", b"1")],
+        ]
+
+        with patch("asyncio.sleep", new_callable=AsyncMock):
+            assert await etcd.get_prefix("k", scope=ConfigScopes.GLOBAL) == {"a": "1"}
+
+        assert communicator.get_prefix.call_count == 2
+
+    async def test_timed_out_write_is_not_resent(
+        self, etcd: AsyncEtcd, communicator: AsyncMock
+    ) -> None:
+        communicator.put.side_effect = self._err(GRPCStatusCode.Cancelled, "Timeout expired")
 
         with pytest.raises(GRPCStatusError):
-            await etcd.get("k", scope=ConfigScopes.GLOBAL)
+            await etcd.put("k", "v")
 
-        assert communicator.get.call_count == 1
+        assert communicator.put.call_count == 1
+
+    async def test_timed_out_conditional_txn_is_not_resent(
+        self, etcd: AsyncEtcd, communicator: AsyncMock
+    ) -> None:
+        communicator.txn.side_effect = self._err(GRPCStatusCode.Cancelled, "Timeout expired")
+
+        with pytest.raises(GRPCStatusError):
+            await etcd.put_if_absent("k", "v")
+
+        assert communicator.txn.call_count == 1
 
     async def test_unconditional_write_is_resent_after_reaching_a_server(
         self, etcd: AsyncEtcd, communicator: AsyncMock

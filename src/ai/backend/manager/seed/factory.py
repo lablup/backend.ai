@@ -12,6 +12,7 @@ from ai.backend.manager.seed.container_registry_project.seed import (
 )
 from ai.backend.manager.seed.deployment_preset.seed import DeploymentPresetSeed
 from ai.backend.manager.seed.domain.seed import DomainSeed
+from ai.backend.manager.seed.domain_admin.seed import DomainAdminSeed
 from ai.backend.manager.seed.idle_checker.seed import IdleCheckerSeed
 from ai.backend.manager.seed.idle_checker_assignment.seed import IdleCheckerAssignmentSeed
 from ai.backend.manager.seed.login_client_type.seed import LoginClientTypeSeed
@@ -46,6 +47,7 @@ from ai.backend.manager.seed.runtime_variant_preset.seed import RuntimeVariantPr
 from ai.backend.manager.seed.session_template.seed import SessionTemplateSeed
 from ai.backend.manager.seed.storage_backend_type.seed import StorageBackendTypeSeed
 from ai.backend.manager.seed.storage_namespace.seed import StorageNamespaceSeed
+from ai.backend.manager.seed.system_session_environ.seed import SystemSessionEnvironSeed
 from ai.backend.manager.seed.types import SeedKind
 from ai.backend.manager.seed.user.seed import UserSeed
 from ai.backend.manager.seed.vfs_storage.seed import VFSStorageSeed
@@ -82,10 +84,12 @@ def create_seed_kind_registry() -> SeedKindRegistry:
         SeedKind.DEPLOYMENT_PRESET: (1, DeploymentPresetSeed),
         SeedKind.RESOURCE_GROUP: (1, ResourceGroupSeed),
         SeedKind.APP_CONFIG_FRAGMENT: (1, AppConfigFragmentSeed),
+        SeedKind.SYSTEM_SESSION_ENVIRON: (1, SystemSessionEnvironSeed),
         SeedKind.RESOURCE_PRESET: (1, ResourcePresetSeed),
         SeedKind.ROLE: (1, RoleSeed),
         SeedKind.SESSION_TEMPLATE: (1, SessionTemplateSeed),
         SeedKind.PROJECT_MEMBER: (1, ProjectMemberSeed),
+        SeedKind.DOMAIN_ADMIN: (1, DomainAdminSeed),
         SeedKind.RESOURCE_GROUP_FOR_DOMAIN: (1, ResourceGroupForDomainSeed),
         SeedKind.RESOURCE_GROUP_FOR_PROJECT: (1, ResourceGroupForProjectSeed),
         SeedKind.RESOURCE_GROUP_FOR_KEYPAIR: (1, ResourceGroupForKeypairSeed),

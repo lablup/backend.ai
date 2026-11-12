@@ -57,6 +57,11 @@ class StartSessionsLifecycleHandler(SessionLifecycleHandler):
 
     @classmethod
     @override
+    def description(cls) -> str:
+        return "Starts the kernels of sessions that passed the precondition check."
+
+    @classmethod
+    @override
     def target_statuses(cls) -> list[SessionStatus]:
         """Sessions in PREPARED state."""
         return [SessionStatus.PREPARED]

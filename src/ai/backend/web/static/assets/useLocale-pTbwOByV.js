@@ -1,0 +1,1 @@
+import{a as e}from"./rolldown-runtime-BWaJ3C7D.js";import{Zn as t}from"./icons-Btg1s2wy.js";import{N as n}from"./usePressFeedback-BIoIGSxE.js";var r=e(t(),1);function i(){return(0,r.use)(n).locale}export{i as t};

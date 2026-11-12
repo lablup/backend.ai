@@ -17,13 +17,13 @@ from ai.backend.manager.api.adapters.idle_checker_assignment.adapter import (
     IdleCheckerAssignmentAdapter,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.idle_checker import (
     AssignmentsAndACaller,
-    AssignmentsAnswered,
     EveryAssignmentComesBack,
     NoAssignmentIsProcessed,
     OneCheckerOnSomeDomains,
+    PartialBulkAnswered,
     assignment_ids,
 )
 from bai_scenario.runner.acting import ActingAs
@@ -31,11 +31,11 @@ from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Adapter = IdleCheckerAssignmentAdapter
-type EditingStep = Scenario[TestSeedingSession, AssignmentsAndACaller, Adapter, AssignmentsAnswered]
+type EditingStep = Scenario[TestSeedingSession, AssignmentsAndACaller, Adapter, PartialBulkAnswered]
 
 
 @dataclass(frozen=True)
-class DisablingEveryAssignment(When[AssignmentsAndACaller, Adapter, AssignmentsAnswered]):
+class DisablingEveryAssignment(When[AssignmentsAndACaller, Adapter, PartialBulkAnswered]):
     """심은 할당들을 한 번에 끈다."""
 
     @override
@@ -44,10 +44,13 @@ class DisablingEveryAssignment(When[AssignmentsAndACaller, Adapter, AssignmentsA
 
     @override
     def describe(self, laid: AssignmentsAndACaller) -> str:
-        return f"{laid.caller.username}이 할당 {len(laid.domains)}개를 한 번에 끔"
+        return Says(
+            f"{laid.caller.username}이 할당 {len(laid.domains)}개를 한 번에 비활성화합니다",
+            english=f"{laid.caller.username} disables {len(laid.domains)} assignments in one call",
+        )
 
     @override
-    async def call(self, adapter: Adapter, laid: AssignmentsAndACaller) -> AssignmentsAnswered:
+    async def call(self, adapter: Adapter, laid: AssignmentsAndACaller) -> PartialBulkAnswered:
         ids = await assignment_ids(adapter, laid)
         with ActingAs(laid.caller):
             payload = await adapter.partial_bulk_update(
@@ -58,12 +61,12 @@ class DisablingEveryAssignment(When[AssignmentsAndACaller, Adapter, AssignmentsA
                     ]
                 )
             )
-        return AssignmentsAnswered(ids=ids, payload=payload)
+        return PartialBulkAnswered(ids=ids, payload=payload)
 
 
 @dataclass(frozen=True)
 class TheSuperadminDisablesSeveral(
-    Scenario[TestSeedingSession, AssignmentsAndACaller, Adapter, AssignmentsAnswered]
+    Scenario[TestSeedingSession, AssignmentsAndACaller, Adapter, PartialBulkAnswered]
 ):
     started: datetime
 
@@ -73,24 +76,31 @@ class TheSuperadminDisablesSeveral(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 할당 여럿을 한 번에 끄면, 모두 꺼진 할당으로 오고 실패한 것은 없다"
+        return Says(
+            "superadmin 이 할당 여럿을 한 번에 비활성화하면, 모두 비활성 할당으로 오고 실패한 "
+            "것은 없습니다",
+            english=(
+                "when the superadmin disables several assignments in one call, all come back as "
+                "disabled assignments and nothing failed"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AssignmentsAndACaller]:
         return OneCheckerOnSomeDomains(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[AssignmentsAndACaller, Adapter, AssignmentsAnswered]:
+    def when(self) -> When[AssignmentsAndACaller, Adapter, PartialBulkAnswered]:
         return DisablingEveryAssignment()
 
     @override
-    def then(self) -> Then[AssignmentsAndACaller, AssignmentsAnswered]:
+    def then(self) -> Then[AssignmentsAndACaller, PartialBulkAnswered]:
         return EveryAssignmentComesBack(started=self.started, enabled=False)
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingDisablesNone(
-    Scenario[TestSeedingSession, AssignmentsAndACaller, Adapter, AssignmentsAnswered]
+    Scenario[TestSeedingSession, AssignmentsAndACaller, Adapter, PartialBulkAnswered]
 ):
     @override
     def summary(self) -> str:
@@ -98,9 +108,14 @@ class AUserGrantedNothingDisablesNone(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 받지 않은 사용자가 할당 여럿을 한 번에 끄려 하면, 끈 것 없이 모두 "
-            "찾을 수 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "아무 권한도 받지 않은 사용자가 할당 여럿을 한 번에 비활성화하려 하면, 비활성화한 "
+            "것 없이 모두 찾을 수 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when a user granted nothing tries to disable several assignments in one call, "
+                "none is disabled and all come back in the failed list because they cannot be "
+                "found"
+            ),
         )
 
     @override
@@ -108,11 +123,11 @@ class AUserGrantedNothingDisablesNone(
         return OneCheckerOnSomeDomains()
 
     @override
-    def when(self) -> When[AssignmentsAndACaller, Adapter, AssignmentsAnswered]:
+    def when(self) -> When[AssignmentsAndACaller, Adapter, PartialBulkAnswered]:
         return DisablingEveryAssignment()
 
     @override
-    def then(self) -> Then[AssignmentsAndACaller, AssignmentsAnswered]:
+    def then(self) -> Then[AssignmentsAndACaller, PartialBulkAnswered]:
         return NoAssignmentIsProcessed(reason="Cannot resolve the given idle_checker key")
 
 

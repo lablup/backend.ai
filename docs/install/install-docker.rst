@@ -94,16 +94,15 @@ Create ``manager.toml`` with the following content:
 
    [manager]
    num-proc = 4
-   distributed-lock = "filelock"
+   distributed-lock = "pg_advisory"
    service-addr = { host = "0.0.0.0", port = 8091 }
    heartbeat-timeout = 5.0
    secret = "some-secret-private-for-signing-manager-api-requests"
    hide-agents = true
    importer-image = "lablup/backend.ai-importer:manylinux2014"
-   use_sokovan = true
 
    [docker-registry]
-   enabled = false
+   ssl-verify = false
 
    [logging]
    level = "INFO"
@@ -137,16 +136,12 @@ Create ``webserver.conf`` with the following content:
    mode = "webui"
    enable_signup = false
    allow_anonymous_change_password = false
-   allow_project_resource_monitor = false
    allow_change_signin_mode = false
    allow_manual_image_name_for_session = false
    allow_signup_without_confirmation = false
-   always_enqueue_compute_session = false
    webui_debug = true
    mask_user_info = false
    enable_2FA = false
-   force_2FA = false
-   directory_based_usage = false
    enable_reservoir = false
 
    [resources]
@@ -180,7 +175,6 @@ Create ``webserver.conf`` with the following content:
    domain = "default"
    # Multiple endpoints: first for container-to-container communication, second for browser access
    endpoint = "http://backend-ai-manager:8091,http://127.0.0.1:8091"
-   text = "Backend.AI Cloud"
    ssl_verify = false
    auth_token_name = 'sToken'
 
@@ -221,7 +215,7 @@ Create ``webserver.conf`` with the following content:
 
    [apollo-router]
    enabled = true
-   endpoint = "http://host.docker.internal:4000"
+   endpoint = "http://backendai-half-apollo-router:4000"
 
 AppProxy Coordinator Configuration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -372,7 +366,7 @@ Alternatively, you can run the containers manually:
      -v /var/run/docker.sock:/var/run/docker.sock \
      -e PYTHONUNBUFFERED=1 \
      --restart unless-stopped \
-     backend.ai/manager:26.1.0rc1
+     backend.ai/manager:${PKGVER}
 
 **AppProxy Coordinator:**
 
@@ -386,7 +380,7 @@ Alternatively, you can run the containers manually:
      -v $(pwd)/proxy-coordinator.toml:/etc/backend.ai/proxy-coordinator.toml:ro \
      -e PYTHONUNBUFFERED=1 \
      --restart unless-stopped \
-     backend.ai/appproxy-coordinator:26.1.0rc1
+     backend.ai/appproxy-coordinator:${PKGVER}
 
 **AppProxy Worker:**
 
@@ -400,7 +394,7 @@ Alternatively, you can run the containers manually:
      -v $(pwd)/proxy-worker.toml:/etc/backend.ai/proxy-worker.toml:ro \
      -e PYTHONUNBUFFERED=1 \
      --restart unless-stopped \
-     backend.ai/appproxy-worker:26.1.0rc1
+     backend.ai/appproxy-worker:${PKGVER}
 
 **Webserver:**
 
@@ -413,7 +407,7 @@ Alternatively, you can run the containers manually:
      -p 8090:8090 \
      -v $(pwd)/webserver.conf:/etc/backend.ai/webserver.conf:ro \
      --restart unless-stopped \
-     backend.ai/webserver:26.1.0rc1
+     backend.ai/webserver:${PKGVER}
 
 Accessing the Services
 ----------------------
@@ -456,7 +450,7 @@ If you encounter DNS resolution errors, verify the pycares version:
 
 .. code-block:: bash
 
-   docker run --rm backend.ai/webserver:26.1.0rc1 pip list | grep pycares
+   docker run --rm backend.ai/webserver:${PKGVER} pip list | grep pycares
 
 It should show version 4.11.0.
 

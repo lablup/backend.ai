@@ -34,25 +34,29 @@ from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
     Held,
+    Language,
     Refused,
     Same,
     SameAs,
+    Says,
     Skipped,
     Then,
     Verdict,
+    in_language,
 )
 from bai_scenario.components.domain import Mentions, WrittenByThisRun
 from bai_scenario.components.runtime_variant import AVariantAndACaller
 from bai_scenario.components.system import (
     KEPT,
     Kept,
+    lay_a_caller,
     lay_a_public_reader,
     role_named,
 )
 from bai_scenario.seeds.runtime_variant.preset import TestSeedRuntimeVariantPreset
 from bai_scenario.seeds.runtime_variant.runtime_variant import TestSeedRuntimeVariant
 
-DESCRIBED = "미리 만들어 둔 프리셋"
+DESCRIBED = Says("미리 저장한 프리셋", english="a preset seeded in advance")
 """시드가 미리 만들어 두는 프리셋의 설명. 시나리오가 기대값으로 다시 쓰므로 한 곳에 둔다."""
 
 KEY = "PRESET_KEY"
@@ -95,13 +99,29 @@ class APresetAndSomeone(Given[Any, APresetAndACaller]):
     """변형 하나, 해당 변형의 프리셋 하나, 사용자 한 명."""
 
     role: UserRole = UserRole.USER
+    reading_in_public: bool = True
     preset_target: PresetTarget = PresetTarget.ENV
     value_type: PresetValueType = PresetValueType.STR
     default_value: str | None = None
 
     @override
     def describe(self) -> str:
-        return f"변형 하나와 해당 변형의 프리셋 하나, 그리고 {role_named(self.role)} 한 명"
+        who = role_named(self.role)
+        if not self.reading_in_public:
+            return Says(
+                f"변형 하나와 해당 변형의 프리셋 하나, 그리고 아무 권한도 없는 {who} 한 명",
+                english=(
+                    "one variant, one preset of that variant, "
+                    f"and one {in_language(who, Language.ENGLISH)} with no permission"
+                ),
+            )
+        return Says(
+            f"변형 하나와 해당 변형의 프리셋 하나, 그리고 {who} 한 명",
+            english=(
+                "one variant, one preset of that variant, "
+                f"and one {in_language(who, Language.ENGLISH)}"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> APresetAndACaller:
@@ -114,7 +134,11 @@ class APresetAndSomeone(Given[Any, APresetAndACaller]):
             ),
             variant,
         )
-        caller = await lay_a_public_reader(seeding, RuntimeVariantPresetEntityType(), self.role)
+        caller = (
+            await lay_a_public_reader(seeding, RuntimeVariantPresetEntityType(), self.role)
+            if self.reading_in_public
+            else await lay_a_caller(seeding, self.role)
+        )
         return APresetAndACaller(seeding.made(variant), seeding.made(preset), seeding.made(caller))
 
 
@@ -126,7 +150,14 @@ class TwoVariantsOneWithAPreset(Given[Any, TwoVariantsAndAPreset]):
 
     @override
     def describe(self) -> str:
-        return f"변형 둘과 한쪽에만 있는 프리셋 하나, 그리고 {role_named(self.role)} 한 명"
+        who = role_named(self.role)
+        return Says(
+            f"변형 둘과 한쪽에만 있는 프리셋 하나, 그리고 {who} 한 명",
+            english=(
+                "two variants, one preset that only one of them holds, "
+                f"and one {in_language(who, Language.ENGLISH)}"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> TwoVariantsAndAPreset:
@@ -144,11 +175,27 @@ class ManyPresetsAndSomeone(Given[Any, ManyPresetsAndACaller]):
     """한 변형의 프리셋 여러 개와 사용자 한 명."""
 
     role: UserRole = UserRole.USER
+    reading_in_public: bool = True
     besides: int = 1
 
     @override
     def describe(self) -> str:
-        return f"한 변형의 프리셋 {self.besides + 1}개와 {role_named(self.role)} 한 명"
+        who = role_named(self.role)
+        if not self.reading_in_public:
+            return Says(
+                f"한 변형의 프리셋 {self.besides + 1}개와 아무 권한도 없는 {who} 한 명",
+                english=(
+                    f"{self.besides + 1} presets of one variant "
+                    f"and one {in_language(who, Language.ENGLISH)} with no permission"
+                ),
+            )
+        return Says(
+            f"한 변형의 프리셋 {self.besides + 1}개와 {who} 한 명",
+            english=(
+                f"{self.besides + 1} presets of one variant "
+                f"and one {in_language(who, Language.ENGLISH)}"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> ManyPresetsAndACaller:
@@ -157,7 +204,11 @@ class ManyPresetsAndSomeone(Given[Any, ManyPresetsAndACaller]):
             await seeding.creating_from(TestSeedRuntimeVariantPreset(), variant)
             for _ in range(self.besides + 1)
         ]
-        caller = await lay_a_public_reader(seeding, RuntimeVariantPresetEntityType(), self.role)
+        caller = (
+            await lay_a_public_reader(seeding, RuntimeVariantPresetEntityType(), self.role)
+            if self.reading_in_public
+            else await lay_a_caller(seeding, self.role)
+        )
         return ManyPresetsAndACaller(
             variant=seeding.made(variant),
             laid=tuple(seeding.made(one) for one in presets),
@@ -171,7 +222,10 @@ class PresetsInTwoVariants(Given[Any, ManyPresetsAndACaller]):
 
     @override
     def describe(self) -> str:
-        return "두 변형에 나뉘어 있는 프리셋 세 개와 일반 사용자 한 명"
+        return Says(
+            "두 변형에 나뉘어 있는 프리셋 세 개와 일반 사용자 한 명",
+            english="three presets split across two variants and one regular user",
+        )
 
     @override
     async def lay(self, seeding: Any) -> ManyPresetsAndACaller:
@@ -200,7 +254,12 @@ class PresetsAcrossVersions(Given[Any, ManyPresetsAndACaller]):
 
     @override
     def describe(self) -> str:
-        return "추가 버전과 폐기 버전이 서로 다른 프리셋 다섯 개와 일반 사용자 한 명"
+        return Says(
+            "추가 버전과 폐기 버전이 서로 다른 프리셋 다섯 개와 일반 사용자 한 명",
+            english=(
+                "five presets with different added and deprecated versions and one regular user"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> ManyPresetsAndACaller:
@@ -252,11 +311,17 @@ def preset_verdicts(
 ) -> list[Verdict]:
     """Every place of one preset node, prefixed for a node inside a list."""
     return [
-        Skipped(f"{at}id", "데이터베이스가 만든다"),
+        Skipped(f"{at}id", Says("데이터베이스가 생성합니다", english="the database generates it")),
         Held(
             f"{at}runtime_variant_id",
             node.runtime_variant_id,
-            SameAs(variant_id, "미리 만들어 둔 변형의 식별자"),
+            SameAs(
+                variant_id,
+                Says(
+                    "미리 저장한 변형의 식별자",
+                    english="the identifier of the variant seeded in advance",
+                ),
+            ),
         ),
         Same(f"{at}name", node.name, named),
         Same(f"{at}description", node.description, described),
@@ -322,7 +387,10 @@ class TheNewPresetNode(Then[AVariantAndACaller, RuntimeVariantPresetNode]):
 
     @override
     def says(self) -> str:
-        return "생성한 프리셋 전체가 반환된다"
+        return Says(
+            "생성한 프리셋 전체가 반환됩니다",
+            english="the whole preset just created comes back",
+        )
 
     @override
     def look(
@@ -358,7 +426,10 @@ class TheSameNameUnderTheOtherVariant(Then[TwoVariantsAndAPreset, RuntimeVariant
 
     @override
     def says(self) -> str:
-        return "다른 변형에 생성한 프리셋 전체가 반환된다"
+        return Says(
+            "다른 변형에 생성한 프리셋 전체가 반환됩니다",
+            english="the whole preset created under the other variant comes back",
+        )
 
     @override
     def look(
@@ -396,7 +467,10 @@ class ThePresetNode(Then[APresetAndACaller, RuntimeVariantPresetNode]):
 
     @override
     def says(self) -> str:
-        return "미리 만들어 둔 프리셋 전체가 반환된다"
+        return Says(
+            "미리 저장한 프리셋 전체가 반환됩니다",
+            english="the whole preset seeded in advance comes back",
+        )
 
     @override
     def look(
@@ -436,7 +510,10 @@ class TheLaidPresetsAreLeft(Then[ManyPresetsAndACaller, SearchRuntimeVariantPres
 
     @override
     def says(self) -> str:
-        return "응답에 포함되어야 하는 프리셋만 반환된다"
+        return Says(
+            "응답에 포함되어야 하는 프리셋만 반환됩니다",
+            english="only the presets that belong in the response come back",
+        )
 
     @override
     def look(
@@ -465,7 +542,10 @@ class TheFirstPageOfPresets(Then[ManyPresetsAndACaller, SearchRuntimeVariantPres
 
     @override
     def says(self) -> str:
-        return "기본 크기의 첫 페이지가 반환된다"
+        return Says(
+            "기본 크기의 첫 페이지가 반환됩니다",
+            english="the first page of the default size comes back",
+        )
 
     @override
     def look(
@@ -490,7 +570,13 @@ class ThePresetsInTheOrderAsked(Then[ManyPresetsAndACaller, list[RuntimeVariantP
 
     @override
     def says(self) -> str:
-        return "요청한 순서대로 반환되며, 존재하지 않는 ID의 위치에는 빈 항목이 반환된다"
+        return Says(
+            "요청한 순서대로 반환되며, 존재하지 않는 id 의 위치에는 빈 항목이 반환됩니다",
+            english=(
+                "items come back in the order asked, and an empty item comes back "
+                "where the id does not exist"
+            ),
+        )
 
     @override
     def look(
@@ -507,7 +593,7 @@ class ThePresetsInTheOrderAsked(Then[ManyPresetsAndACaller, list[RuntimeVariantP
         for i, expected in enumerate(laid.laid):
             got = items[i] if i < len(items) else None
             if got is None:
-                seen.append(Same(f"items[{i}]", got, "노드"))
+                seen.append(Same(f"items[{i}]", got, Says("노드", english="a node")))
                 continue
             seen.extend(laid_preset_verdicts(f"items[{i}].", got, expected, written))
         last = items[asked - 1] if len(items) >= asked else "없음"
@@ -521,7 +607,10 @@ class TheDeletedPresetId(Then[APresetAndACaller, DeleteRuntimeVariantPresetPaylo
 
     @override
     def says(self) -> str:
-        return "삭제한 프리셋의 ID가 반환된다"
+        return Says(
+            "삭제한 프리셋의 id 가 반환됩니다",
+            english="the id of the preset deleted comes back",
+        )
 
     @override
     def look(
@@ -532,7 +621,15 @@ class TheDeletedPresetId(Then[APresetAndACaller, DeleteRuntimeVariantPresetPaylo
             return [Refused(EntityNotFoundError, answered.raised)]
         return [
             Held[UUID](
-                "id", payload.id, SameAs[UUID](laid.preset.id, "미리 만들어 둔 프리셋의 식별자")
+                "id",
+                payload.id,
+                SameAs[UUID](
+                    laid.preset.id,
+                    Says(
+                        "미리 저장한 프리셋의 식별자",
+                        english="the identifier of the preset seeded in advance",
+                    ),
+                ),
             )
         ]
 
@@ -553,8 +650,16 @@ class EveryLaidPresetComesBack(
     @override
     def says(self) -> str:
         if self.missing is None:
-            return "미리 만들어 둔 프리셋이 모두 처리된 목록에 오고, 실패한 것은 없다"
-        return "미리 만들어 둔 프리셋이 모두 처리된 목록에 오고, 없는 id 는 실패 목록에 온다"
+            return Says(
+                "미리 저장한 프리셋이 모두 처리된 목록에 오고, 실패한 것은 없습니다",
+                english="every preset seeded in advance comes back in the processed list, "
+                "and nothing failed",
+            )
+        return Says(
+            "미리 저장한 프리셋이 모두 처리된 목록에 오고, 없는 id 는 실패 목록에 옵니다",
+            english="every preset seeded in advance comes back in the processed list, "
+            "and an unknown id comes back in the failed list",
+        )
 
     @override
     def look(
@@ -579,8 +684,24 @@ class EveryLaidPresetComesBack(
         verdicts.append(Same("failed count", len(payload.failed), 1))
         for failure in payload.failed:
             verdicts += [
-                Held[UUID]("failed[0].id", failure.id, SameAs(self.missing, "요청에 넣은 없는 id")),
-                Skipped("failed[0].message", "이유는 문자열로 오고, 문자열은 바뀌어도 되는 값이다"),
+                Held[UUID](
+                    "failed[0].id",
+                    failure.id,
+                    SameAs(
+                        self.missing,
+                        Says("요청에 넣은 없는 id", english="the unknown id put in the request"),
+                    ),
+                ),
+                Skipped(
+                    "failed[0].message",
+                    Says(
+                        "이유는 문자열로 오고, 문자열은 변경되어도 되는 값입니다",
+                        english=(
+                            "the reason comes as a string, and the string is a value that "
+                            "may change"
+                        ),
+                    ),
+                ),
             ]
         return verdicts
 
@@ -595,7 +716,13 @@ class NoLaidPresetIsProcessed(
 
     @override
     def says(self) -> str:
-        return "처리된 프리셋 없이 미리 만들어 둔 프리셋이 모두 실패 목록에 온다"
+        return Says(
+            "처리된 프리셋 없이 미리 저장한 프리셋이 모두 실패 목록에 옵니다",
+            english=(
+                "no preset is processed and every preset seeded in advance comes back "
+                "in the failed list"
+            ),
+        )
 
     @override
     def look(
@@ -613,7 +740,15 @@ class NoLaidPresetIsProcessed(
         for i, (failure, one) in enumerate(zip(payload.failed, laid.laid, strict=False)):
             verdicts += [
                 Held[UUID](
-                    f"failed[{i}].id", failure.id, SameAs(one.id, "미리 만들어 둔 프리셋의 id")
+                    f"failed[{i}].id",
+                    failure.id,
+                    SameAs(
+                        one.id,
+                        Says(
+                            "미리 저장한 프리셋의 id",
+                            english="the id of the preset seeded in advance",
+                        ),
+                    ),
                 ),
                 Held(f"failed[{i}].message", failure.message, Mentions(self.reason)),
             ]

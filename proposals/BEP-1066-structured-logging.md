@@ -243,7 +243,8 @@ Conversion examples:
 |---|---|
 | Existing call sites | No change. Scope fields reach a log line once its call site moves to `StructuredLogger` |
 | OTel body | JSON string → message string, for each line once its call site moves to `StructuredLogger`. Queries relying on fields inside the body move to attributes. Two OTel log exporters run during the transition |
-| console/file/logstash/graylog | No change. The relay not forwarding fields stays as is |
+| console/file/graylog | The relay forwards fields. The console shows them as `name=value` after the message; file and graylog records carry `log_tag_*` |
+| logstash | No change. It sends fixed keys only |
 | `with_log_context_fields`, `BraceStyleAdapter` | Removed after their call sites move to `with_log_context` or a wrapper and to `StructuredLogger` |
 
 ## Implementation Plan

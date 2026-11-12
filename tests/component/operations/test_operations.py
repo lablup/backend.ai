@@ -9,11 +9,9 @@ from ai.backend.common.dto.manager.operations import (
     AppendErrorLogResponse,
     ClearErrorLogResponse,
     FetchManagerStatusResponse,
-    GetAnnouncementResponse,
     ListErrorLogsRequest,
     ListErrorLogsResponse,
     PerformSchedulerOpsRequest,
-    UpdateAnnouncementRequest,
     UpdateManagerStatusRequest,
 )
 from ai.backend.common.dto.manager.operations.types import (
@@ -151,46 +149,6 @@ class TestUpdateManagerStatus:
         await admin_registry.operations.update_manager_status(
             UpdateManagerStatusRequest(status=ManagerStatus.RUNNING)
         )
-
-
-class TestGetAnnouncement:
-    async def test_admin_gets_announcement(
-        self,
-        admin_registry: BackendAIClientRegistry,
-    ) -> None:
-        result = await admin_registry.operations.get_announcement()
-        assert isinstance(result, GetAnnouncementResponse)
-        assert result.enabled is False
-        assert result.message == ""
-
-
-class TestUpdateAnnouncement:
-    async def test_superadmin_updates_announcement(
-        self,
-        admin_registry: BackendAIClientRegistry,
-    ) -> None:
-        await admin_registry.operations.update_announcement(
-            UpdateAnnouncementRequest(enabled=True, message="Test announcement")
-        )
-        result = await admin_registry.operations.get_announcement()
-        assert result.enabled is True
-        assert result.message == "Test announcement"
-
-        # Disabling hides the announcement but retains the message
-        await admin_registry.operations.update_announcement(
-            UpdateAnnouncementRequest(enabled=False)
-        )
-        result = await admin_registry.operations.get_announcement()
-        assert result.enabled is False
-        assert result.message == "Test announcement"
-
-        # Cleanup: clear the stored message
-        await admin_registry.operations.update_announcement(
-            UpdateAnnouncementRequest(enabled=False, message="")
-        )
-        result = await admin_registry.operations.get_announcement()
-        assert result.enabled is False
-        assert result.message == ""
 
 
 class TestPerformSchedulerOps:

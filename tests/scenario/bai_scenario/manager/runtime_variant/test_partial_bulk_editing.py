@@ -17,7 +17,7 @@ from ai.backend.common.dto.manager.v2.runtime_variant.request import (
 from ai.backend.common.dto.manager.v2.runtime_variant.response import RuntimeVariantNode
 from ai.backend.manager.api.adapters.runtime_variant.adapter import RuntimeVariantAdapter
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.runtime_variant import (
     EveryLaidVariantComesBack,
     ManyVariantsAndACaller,
@@ -28,7 +28,7 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-EDITED = "한 번에 고친 설명"
+EDITED = Says("한 번에 수정한 설명", english="the description updated in one call")
 
 type Edited = PartialBulkPayload[RuntimeVariantNode]
 type EditingStep = Scenario[
@@ -46,7 +46,14 @@ class EditingEveryLaid(When[ManyVariantsAndACaller, RuntimeVariantAdapter, Edite
 
     @override
     def describe(self, laid: ManyVariantsAndACaller) -> str:
-        return f"{laid.caller.username}이 변형 {len(laid.laid)}개의 설명을 한 번에 고침"
+        return Says(
+            f"{laid.caller.username}이 인퍼런스 런타임 종류 {len(laid.laid)}개의 설명을 한 번에 "
+            "수정합니다",
+            english=(
+                f"{laid.caller.username} updates the description of {len(laid.laid)} runtime "
+                "variants in one call"
+            ),
+        )
 
     @override
     async def call(self, adapter: RuntimeVariantAdapter, laid: ManyVariantsAndACaller) -> Edited:
@@ -73,8 +80,13 @@ class TheSuperadminEditsSeveralVariants(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 변형 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다"
+        return Says(
+            "superadmin 이 인퍼런스 런타임 종류 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 "
+            "실패한 것은 없습니다",
+            english=(
+                "when the superadmin changes the description of several runtime variants in one "
+                "call, they all come back with the new description and nothing failed"
+            ),
         )
 
     @override
@@ -100,9 +112,14 @@ class AUserGrantedNothingEditsNone(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 없는 사용자가 변형 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 "
-            "모두 권한이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "아무 권한도 없는 사용자가 인퍼런스 런타임 종류 여럿을 한 번에 수정하려 하면, 수정된 것 "
+            "없이 모두 권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when a user granted nothing tries to update several runtime variants in one "
+                "call, nothing is updated and every one comes back in the failed list for lack "
+                "of permission"
+            ),
         )
 
     @override

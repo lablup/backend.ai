@@ -13,6 +13,7 @@ from decimal import Decimal
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.auth.password import PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.kernel import KernelID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
@@ -21,7 +22,6 @@ from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.keypair.row import KeyPairRow

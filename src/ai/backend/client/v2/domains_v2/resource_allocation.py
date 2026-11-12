@@ -17,6 +17,8 @@ from ai.backend.common.dto.manager.v2.resource_allocation.response import (
     KeypairResourceAllocationPayload,
     ProjectResourceAllocationPayload,
     ResourceGroupResourceAllocationPayload,
+    UserConcurrencyPayload,
+    UserResourceAllocationPayload,
 )
 
 _PATH = "/v2/resource-allocation"
@@ -26,7 +28,7 @@ class V2ResourceAllocationClient(BaseDomainClient):
     """SDK client for resource allocation operations."""
 
     async def my_keypair_usage(self) -> KeypairResourceAllocationPayload:
-        """Get keypair resource usage for the current user."""
+        """Deprecated. Use `my_user_usage`, which counts sessions from all of the user's keypairs."""
         return await self._client.typed_request(
             "GET",
             f"{_PATH}/keypair/my",
@@ -88,4 +90,20 @@ class V2ResourceAllocationClient(BaseDomainClient):
             f"{_PATH}/check-preset-availability",
             request=request,
             response_model=CheckPresetAvailabilityPayload,
+        )
+
+    async def my_concurrency(self) -> UserConcurrencyPayload:
+        """Get the number of sessions the current user is running."""
+        return await self._client.typed_request(
+            "GET",
+            f"{_PATH}/my/concurrency",
+            response_model=UserConcurrencyPayload,
+        )
+
+    async def my_user_usage(self) -> UserResourceAllocationPayload:
+        """Get the current user's resource usage across all their keypairs."""
+        return await self._client.typed_request(
+            "GET",
+            f"{_PATH}/my/usage",
+            response_model=UserResourceAllocationPayload,
         )

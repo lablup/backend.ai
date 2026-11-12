@@ -1,0 +1,1 @@
+var e={INTERACTIVE:`comp:BAISessionTypeToken.Interactive`,BATCH:`comp:BAISessionTypeToken.Batch`,INFERENCE:`comp:BAISessionTypeToken.Inference`,SYSTEM:`comp:BAISessionTypeToken.System`},t=(t,n)=>{let r=e[n];return r?t(r):n};export{t};

@@ -39,6 +39,7 @@ from sqlalchemy.types import CHAR, SchemaType, TypeDecorator, TypeEngine, Unicod
 
 from ai.backend.common import validators as tx
 from ai.backend.common.auth import PublicKey
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.exception import InvalidIpAddressValue
@@ -55,11 +56,9 @@ from ai.backend.common.types import (
     VFolderHostPermissionMap,
 )
 from ai.backend.logging.structured import StructuredLogger
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.resource import DataTransformationFailed
 from ai.backend.manager.errors.secret import InvalidSecretBinding
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.secret.types import SecretValue
 
 if TYPE_CHECKING:
@@ -1271,10 +1270,19 @@ async def populate_fixture(
 
             match op_mode:
                 case FixtureOpModes.INSERT:
-                    insert_stmt = (
-                        sa.dialects.postgresql.insert(table).values(rows).on_conflict_do_nothing()
-                    )
-                    await conn.execute(insert_stmt)
+                    # A multi-row INSERT takes its column list from the FIRST row, silently
+                    # dropping keys that only later rows carry. Group the rows by attribute
+                    # set so every row's own columns reach the server.
+                    row_groups: dict[tuple[str, ...], list[dict[str, Any]]] = {}
+                    for row in rows:
+                        row_groups.setdefault(tuple(sorted(row)), []).append(row)
+                    for row_group in row_groups.values():
+                        insert_stmt = (
+                            sa.dialects.postgresql.insert(table)
+                            .values(row_group)
+                            .on_conflict_do_nothing()
+                        )
+                        await conn.execute(insert_stmt)
                 case FixtureOpModes.UPDATE:
                     update_stmt = sa.update(table)
                     pkcols = []

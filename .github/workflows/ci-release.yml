@@ -63,7 +63,7 @@ jobs:
       with:
         mode: restore
     - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v11
+      uses: pantsbuild/actions/init-pants@0aaef864bd133c4055feb6adad0bfdce0de1c2e4  # v11
       with:
         named-caches-hash: disable
         cache-lmdb-store: 'false'
@@ -120,7 +120,7 @@ jobs:
       with:
         mode: restore
     - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v11
+      uses: pantsbuild/actions/init-pants@0aaef864bd133c4055feb6adad0bfdce0de1c2e4  # v11
       with:
         named-caches-hash: disable
         cache-lmdb-store: 'false'
@@ -171,7 +171,7 @@ jobs:
       with:
         mode: restore
     - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v11
+      uses: pantsbuild/actions/init-pants@0aaef864bd133c4055feb6adad0bfdce0de1c2e4  # v11
       with:
         named-caches-hash: disable
         cache-lmdb-store: 'false'
@@ -213,6 +213,7 @@ jobs:
     env:
       RELEASE_AUDIENCE: ${{ inputs.release-audience }}
       IS_PRERELEASE: ${{ inputs.is-prerelease }}
+      TAG: ${{ inputs.tag }}
     steps:
     - uses: actions/checkout@v6
     - name: Fetch remote tags
@@ -260,19 +261,19 @@ jobs:
         path: dist
     - name: Create GitHub Release
       run: |
-        if gh release view "${{ inputs.tag }}" > /dev/null 2>&1; then
+        if gh release view "$TAG" > /dev/null 2>&1; then
           echo "Release already exists, updating..."
-          gh release edit "${{ inputs.tag }}" \
-            --title "${{ inputs.tag }}" \
+          gh release edit "$TAG" \
+            --title "$TAG" \
             --notes-file "CHANGELOG_RELEASE.md"
-        elif [ "${{ env.IS_PRERELEASE }}" = "true" ]; then
-          gh release create "${{ inputs.tag }}" \
-            --title "${{ inputs.tag }}" \
+        elif [ "$IS_PRERELEASE" = "true" ]; then
+          gh release create "$TAG" \
+            --title "$TAG" \
             --notes-file "CHANGELOG_RELEASE.md" \
             --prerelease
         else
-          gh release create "${{ inputs.tag }}" \
-            --title "${{ inputs.tag }}" \
+          gh release create "$TAG" \
+            --title "$TAG" \
             --notes-file "CHANGELOG_RELEASE.md"
         fi
       env:
@@ -286,7 +287,7 @@ jobs:
           fi
           echo "Uploading $file..."
           for attempt in 1 2 3; do
-            if gh release upload "${{ inputs.tag }}" "$file" --clobber; then
+            if gh release upload "$TAG" "$file" --clobber; then
               echo "Successfully uploaded $file"
               break
             fi
@@ -310,7 +311,7 @@ jobs:
         # tag may sit on a release branch that predates the registry.
         git fetch --depth=1 origin main
         registry=$(git show FETCH_HEAD:.github/maintained-versions.yml)
-        series=$(awk -F'.' '{print $1"."$2}' <<< "${{ inputs.tag }}")
+        series=$(awk -F'.' '{print $1"."$2}' <<< "$TAG")
         edge=$(yq -e '.versions[].version' <<< "$registry" | sort -V | tail -n 1)
         stable=$(yq -e '.versions[] | select(.lts == true) | .version' <<< "$registry" | sort -V | tail -n 1)
         # An LTS line is supported for a year, so neither should ever come back
@@ -322,58 +323,50 @@ jobs:
           echo "SERIES=$series"
           echo "EDGE=$edge"
           echo "STABLE=$stable"
-        } >> $GITHUB_OUTPUT
+        } >> "$GITHUB_OUTPUT"
     - name: Update stable installer shorten URL
       if: ${{ inputs.is-prerelease == 'false' && steps.channels.outputs.STABLE != '' && steps.channels.outputs.STABLE == steps.channels.outputs.SERIES }}
+      env:
+        SHLINK_TOKEN: ${{ secrets.SHLINK_TOKEN }}
       run: |
         curl -X 'PATCH' \
           'https://bnd.ai/rest/v3/short-urls/installer-stable-macos-aarch64' \
           -H 'accept: application/json' \
-          -H 'X-Api-Key: ${{ secrets.SHLINK_TOKEN }}' \
+          -H "X-Api-Key: $SHLINK_TOKEN" \
           -H 'Content-Type: application/json' \
-          -d '{
-          "longUrl": "https://github.com/lablup/backend.ai/releases/download/${{ inputs.tag }}/backendai-install-macos-aarch64"
-        }'
+          -d "$(jq -n --arg longUrl "https://github.com/lablup/backend.ai/releases/download/$TAG/backendai-install-macos-aarch64" '{longUrl: $longUrl}')"
         curl -X 'PATCH' \
           'https://bnd.ai/rest/v3/short-urls/installer-stable-linux-aarch64' \
           -H 'accept: application/json' \
-          -H 'X-Api-Key: ${{ secrets.SHLINK_TOKEN }}' \
+          -H "X-Api-Key: $SHLINK_TOKEN" \
           -H 'Content-Type: application/json' \
-          -d '{
-          "longUrl": "https://github.com/lablup/backend.ai/releases/download/${{ inputs.tag }}/backendai-install-linux-aarch64"
-        }'
+          -d "$(jq -n --arg longUrl "https://github.com/lablup/backend.ai/releases/download/$TAG/backendai-install-linux-aarch64" '{longUrl: $longUrl}')"
         curl -X 'PATCH' \
           'https://bnd.ai/rest/v3/short-urls/installer-stable-linux-x86_64' \
           -H 'accept: application/json' \
-          -H 'X-Api-Key: ${{ secrets.SHLINK_TOKEN }}' \
+          -H "X-Api-Key: $SHLINK_TOKEN" \
           -H 'Content-Type: application/json' \
-          -d '{
-          "longUrl": "https://github.com/lablup/backend.ai/releases/download/${{ inputs.tag }}/backendai-install-linux-x86_64"
-        }'
+          -d "$(jq -n --arg longUrl "https://github.com/lablup/backend.ai/releases/download/$TAG/backendai-install-linux-x86_64" '{longUrl: $longUrl}')"
     - name: Update edge installer shorten URL
       if: ${{ steps.channels.outputs.EDGE != '' && startsWith(inputs.tag, steps.channels.outputs.EDGE) }}
+      env:
+        SHLINK_TOKEN: ${{ secrets.SHLINK_TOKEN }}
       run: |
         curl -X 'PATCH' \
           'https://bnd.ai/rest/v3/short-urls/installer-edge-macos-aarch64' \
           -H 'accept: application/json' \
-          -H 'X-Api-Key: ${{ secrets.SHLINK_TOKEN }}' \
+          -H "X-Api-Key: $SHLINK_TOKEN" \
           -H 'Content-Type: application/json' \
-          -d '{
-          "longUrl": "https://github.com/lablup/backend.ai/releases/download/${{ inputs.tag }}/backendai-install-macos-aarch64"
-        }'
+          -d "$(jq -n --arg longUrl "https://github.com/lablup/backend.ai/releases/download/$TAG/backendai-install-macos-aarch64" '{longUrl: $longUrl}')"
         curl -X 'PATCH' \
           'https://bnd.ai/rest/v3/short-urls/installer-edge-linux-aarch64' \
           -H 'accept: application/json' \
-          -H 'X-Api-Key: ${{ secrets.SHLINK_TOKEN }}' \
+          -H "X-Api-Key: $SHLINK_TOKEN" \
           -H 'Content-Type: application/json' \
-          -d '{
-          "longUrl": "https://github.com/lablup/backend.ai/releases/download/${{ inputs.tag }}/backendai-install-linux-aarch64"
-        }'
+          -d "$(jq -n --arg longUrl "https://github.com/lablup/backend.ai/releases/download/$TAG/backendai-install-linux-aarch64" '{longUrl: $longUrl}')"
         curl -X 'PATCH' \
           'https://bnd.ai/rest/v3/short-urls/installer-edge-linux-x86_64' \
           -H 'accept: application/json' \
-          -H 'X-Api-Key: ${{ secrets.SHLINK_TOKEN }}' \
+          -H "X-Api-Key: $SHLINK_TOKEN" \
           -H 'Content-Type: application/json' \
-          -d '{
-          "longUrl": "https://github.com/lablup/backend.ai/releases/download/${{ inputs.tag }}/backendai-install-linux-x86_64"
-        }'
+          -d "$(jq -n --arg longUrl "https://github.com/lablup/backend.ai/releases/download/$TAG/backendai-install-linux-x86_64" '{longUrl: $longUrl}')"

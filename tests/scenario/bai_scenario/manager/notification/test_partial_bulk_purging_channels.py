@@ -17,7 +17,7 @@ from ai.backend.common.dto.manager.v2.notification.request import (
 from ai.backend.common.dto.manager.v2.notification.response import NotificationChannelNode
 from ai.backend.manager.api.adapters.notification.adapter import NotificationAdapter
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.notification import (
     ManyChannelsAndACaller,
     NothingIsProcessed,
@@ -44,8 +44,14 @@ class PurgingEveryOne(When[ManyChannelsAndACaller, NotificationAdapter, Purged])
 
     @override
     def describe(self, laid: ManyChannelsAndACaller) -> str:
-        besides = " 와 없는 id 하나" if self.missing is not None else ""
-        return f"{laid.caller.username}이 채널 {len(laid.laid)}개{besides}를 한 번에 purge 함"
+        besides_ko = "와 없는 id 하나" if self.missing is not None else ""
+        besides_en = " and one unknown id" if self.missing is not None else ""
+        return Says(
+            f"{laid.caller.username}이 채널 {len(laid.laid)}개{besides_ko}를 한 번에 purge 합니다",
+            english=(
+                f"{laid.caller.username} purges {len(laid.laid)} channels{besides_en} at once"
+            ),
+        )
 
     @override
     async def call(self, adapter: NotificationAdapter, laid: ManyChannelsAndACaller) -> Purged:
@@ -71,9 +77,14 @@ class PurgingAnswersForTheMissingOne(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 채널 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 지우기 전 모습으로 "
-            "오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "superadmin 이 채널 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 삭제 전 모습으로 "
+            "오고 없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when the superadmin purges two channels and one unknown id at once, "
+                "the two come back as they were before the purge and the unknown id "
+                "comes back in the failed list because no target answers to it"
+            ),
         )
 
     @override
@@ -99,9 +110,14 @@ class AUserGrantedNothingPurgesNone(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 없는 사용자가 채널 여럿을 한 번에 purge 하려 하면, 지워진 것 없이 "
-            "모두 권한이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "아무 권한도 없는 사용자가 채널 여럿을 한 번에 purge 하려 하면, 삭제된 것 없이 "
+            "모두 권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when a user granted nothing purges several channels at once, nothing "
+                "is purged and every one comes back in the failed list because "
+                "permission is not enough"
+            ),
         )
 
     @override

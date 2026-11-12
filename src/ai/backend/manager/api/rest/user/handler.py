@@ -14,6 +14,7 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
+from ai.backend.common.auth.password import PasswordInfo
 from ai.backend.common.data.entity.domain import DomainName
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
@@ -38,7 +39,6 @@ from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.data.user.types import UserStatus as ManagerUserStatus
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.dto.user_request import GetUserPathParam, UpdateUserPathParam
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction

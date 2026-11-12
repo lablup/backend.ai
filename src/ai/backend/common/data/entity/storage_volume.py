@@ -1,13 +1,16 @@
-"""Entity type and id of the storage_volumes table."""
+"""Entity type, id and name of the storage_volumes table."""
 
-from typing import override
+from typing import NewType, override
 
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 
 __all__ = (
     "StorageVolumeEntityType",
     "StorageVolumeID",
+    "StorageVolumeName",
 )
+
+StorageVolumeName = NewType("StorageVolumeName", str)
 
 
 class StorageVolumeEntityType(EntityType):

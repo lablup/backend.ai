@@ -576,6 +576,11 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
             *self.apply_uuid_filter(filter_.entity_id, fields.id.filter),
             *self.apply_uuid_filter(filter_.runtime_variant_id, fields.runtime_variant_id.filter),
             *self.apply_string_filter(filter_.name, fields.name.filter),
+            *self.apply_to_many_filter(
+                filter_.labels,
+                DeploymentPresetSearchableFields.nested.labels.correlation,
+                self._convert_entity_label_filter,
+            ),
         ]
         if filter_.AND:
             for sub in filter_.AND:

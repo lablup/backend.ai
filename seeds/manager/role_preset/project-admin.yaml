@@ -5,6 +5,7 @@ items:
     name: project_admin
     scope_type: project
     auto_assign: false
+    auto_assign_to_owner: true
 
     permissions:
       agent:                            [read]
@@ -47,9 +48,13 @@ items:
       session:                          [read, update, create, soft_delete, hard_delete]
       session_group:                    [read, update, create, soft_delete, hard_delete]
       session_template:                 [read, update, create, soft_delete, hard_delete]
+      storage_backend:                  []
+      storage_backend_type:             []
       storage_namespace:                []
       storage_volume:                   []
+      system_session_environ:           [read, update, create, soft_delete, hard_delete]
       user:                             [read]
       user_resource_policy:             []
       vfolder:                          [read, update, create, soft_delete, hard_delete]
+      vfolder_auto_mount:               [read, update, create, soft_delete, hard_delete]
       vfs_storage:                      []

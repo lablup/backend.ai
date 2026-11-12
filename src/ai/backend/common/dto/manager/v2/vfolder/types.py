@@ -19,6 +19,7 @@ from ai.backend.common.dto.manager.field import (
 from ai.backend.common.dto.manager.query import EnumFilter
 from ai.backend.common.dto.manager.v2.common import BinarySizeInfo, OrderDirection
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import VFolderUsageMode
 
 __all__ = (
@@ -126,6 +127,12 @@ class VFolderUsedBy(BaseRequestModel):
     )
     model_card: list[UUID] | None = Field(
         default=None, description="Model cards built on the vfolder"
+    )
+    session: list[UUID] | None = Field(
+        default=None,
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. Sessions whose kernel groups mount the vfolder"
+        ),
     )
 
 

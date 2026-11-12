@@ -409,7 +409,7 @@ class BaseRunner(metaclass=ABCMeta):
                     "and the container may not work as expected."
                 )
             await self._handle_exception(
-                init_sshd_service(self.child_env),
+                init_sshd_service(self.child_env, self.cmdargs.cluster_roles),
                 "Verify agent installation with the embedded prebuilt binaries",
             )
         finally:
@@ -1016,10 +1016,11 @@ class BaseRunner(metaclass=ABCMeta):
         # so every session left one behind. Applied here to cover images' service-defs too.
         if service_name not in ("jupyter", "jupyterlab"):
             return cmdargs
-        overrides = ['--IdentityProvider.cookie_options={"expires_days": None}']
-        if session_id := os.environ.get("BACKENDAI_SESSION_ID"):
-            overrides.append(f"--IdentityProvider.cookie_name=bai-jupyter-{session_id}")
-        return [*cmdargs, *overrides]
+        return [
+            *cmdargs,
+            '--IdentityProvider.cookie_options={"expires_days": None}',
+            f"--IdentityProvider.cookie_name=bai-jupyter-{self.cmdargs.session_id}",
+        ]
 
     async def _wait_service_proc(
         self,

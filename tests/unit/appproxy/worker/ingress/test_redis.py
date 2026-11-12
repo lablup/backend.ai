@@ -25,7 +25,7 @@ from ai.backend.common.dto.appproxy.v2.ingress.types import (
 )
 
 AUTHORITY = IngressAuthority("worker-1")
-FRONTEND_KEY = IngressFrontendKey("10205")
+FRONTEND_KEY = IngressFrontendKey("port-10205")
 KEY_PREFIX = "appproxy:ingress"
 
 
@@ -72,8 +72,8 @@ def ingress_in_redis(valkey_client: AsyncMock, ingress: Ingress) -> None:
 @pytest.fixture
 def one_of_two_scanned_keys_deleted_before_read(valkey_client: AsyncMock, ingress: Ingress) -> None:
     valkey_client.scan_keys.return_value = [
-        f"{KEY_PREFIX}:{AUTHORITY}:10205",
-        f"{KEY_PREFIX}:{AUTHORITY}:10206",
+        f"{KEY_PREFIX}:{AUTHORITY}:port-10205",
+        f"{KEY_PREFIX}:{AUTHORITY}:port-10206",
     ]
     valkey_client.get_multiple_live_data.return_value = [ingress.model_dump_json().encode(), None]
 
@@ -84,7 +84,7 @@ class TestRedisIngressState:
         self, state: RedisIngressState, valkey_client: AsyncMock, ingress: Ingress
     ) -> None:
         assert await state.get(FRONTEND_KEY) == ingress
-        valkey_client.get_live_data.assert_awaited_once_with(f"{KEY_PREFIX}:{AUTHORITY}:10205")
+        valkey_client.get_live_data.assert_awaited_once_with(f"{KEY_PREFIX}:{AUTHORITY}:port-10205")
 
     async def test_get_returns_none_for_a_key_redis_does_not_hold(
         self, state: RedisIngressState

@@ -61,19 +61,31 @@ class AgentAlreadyExited(EntityError, web.HTTPConflict):
 
 class AgentHasConflictingSessions(EntityError, web.HTTPConflict):
     """
-    Raised when an agent has sessions conflicting with its resource group and
-    the caller did not request forced cleanup (the admin must drain first).
+    Raised when unterminated sessions run on an agent being moved, or unterminated
+    sessions and deployments of other resource groups designate it, and the caller
+    did not request forced cleanup (the admin must drain first).
     """
 
     error_type = "https://api.backend.ai/probs/agent-has-conflicting-sessions"
     error_title = "Agent has sessions conflicting with its resource group."
 
-    def __init__(self, agent_id: AgentId, conflicting_count: int) -> None:
+    def __init__(
+        self,
+        agent_id: AgentId,
+        *,
+        allocated_session_count: int,
+        designating_session_count: int,
+        designating_deployment_count: int,
+    ) -> None:
         self.agent_id = agent_id
-        self.conflicting_count = conflicting_count
+        self.allocated_session_count = allocated_session_count
+        self.designating_session_count = designating_session_count
+        self.designating_deployment_count = designating_deployment_count
         super().__init__(
-            f"Agent {agent_id} has {conflicting_count} session(s) conflicting with its "
-            "resource group; drain them or retry with force."
+            f"Agent {agent_id} has {allocated_session_count} session(s) running on it and is "
+            f"designated by {designating_session_count} session(s) and "
+            f"{designating_deployment_count} deployment(s) of other resource groups; "
+            "drain them or retry with force."
         )
 
     @override

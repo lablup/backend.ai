@@ -14,7 +14,7 @@ from ai.backend.manager.api.adapters.resource_slot.adapter import ResourceSlotAd
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Configured, Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.resource_allocation import (
     AKernelAndACaller,
@@ -45,7 +45,11 @@ class ReadingTheDomainOverview(When[AKernelAndACaller, ResourceSlotAdapter, Over
 
     @override
     def describe(self, laid: AKernelAndACaller) -> str:
-        return f"{laid.caller.username}이 {self.named or laid.domain.name} 도메인의 개요 조회"
+        name = self.named or laid.domain.name
+        return Says(
+            f"{laid.caller.username} 이 {name} 도메인의 개요를 조회합니다",
+            english=f"{laid.caller.username} reads the overview of the domain {name}",
+        )
 
     @override
     async def call(self, adapter: ResourceSlotAdapter, laid: AKernelAndACaller) -> Overview:
@@ -63,9 +67,16 @@ class TheSuperadminReadsADomainOverview(
 
     @override
     def describe(self) -> str:
-        return (
-            "대기 중인 커널만 있는 도메인의 개요를 슈퍼관리자가 조회하면 점유된 슬롯이 없고 세션 수가 0이다. "
-            "개요는 자원을 점유했거나 배정받은 커널만 세고, 요구만 한 커널은 세지 않는다"
+        return Says(
+            "대기 중인 커널만 있는 도메인의 개요를 superadmin 이 조회하면 점유된 슬롯이 없고 "
+            "세션 수가 0입니다. 개요는 자원을 점유했거나 배정받은 커널만 세고, 요구만 한 커널은 "
+            "세지 않습니다",
+            english=(
+                "when the superadmin reads the overview of a domain that holds only pending "
+                "kernels, no slot is occupied and the session count is 0. The overview counts "
+                "only kernels that occupied or were allocated a resource, not kernels that "
+                "only asked"
+            ),
         )
 
     @override
@@ -91,7 +102,14 @@ class AUserReadingSessionsInTheDomainReadsItsOverview(
 
     @override
     def describe(self) -> str:
-        return "도메인 범위에서 세션을 읽을 수 있는 사용자가 그 도메인의 개요를 조회하면 개요가 반환된다"
+        return Says(
+            "도메인 범위에서 세션을 읽을 수 있는 사용자가 그 도메인의 개요를 조회하면 개요가 "
+            "반환됩니다",
+            english=(
+                "when a user who can read sessions in the domain scope reads the overview of "
+                "that domain, the overview comes back"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AKernelAndACaller]:
@@ -116,9 +134,14 @@ class AUserReadingSessionsInTheProjectMayNotReadTheDomainOverview(
 
     @override
     def describe(self) -> str:
-        return (
-            "프로젝트 범위에서만 세션을 읽을 수 있는 사용자가 그 프로젝트가 속한 도메인의 개요를 조회하면 "
-            "권한 부족으로 거부된다. 도메인 개요는 도메인 범위의 권한을 검사한다"
+        return Says(
+            "프로젝트 범위에서만 세션을 읽을 수 있는 사용자가 그 프로젝트가 속한 도메인의 개요를 "
+            "조회하면 권한 부족으로 거부됩니다. 도메인 개요는 도메인 범위의 권한을 검사합니다",
+            english=(
+                "when a user who can read sessions only in the project scope reads the overview "
+                "of the domain the project belongs to, the call is rejected for lack of "
+                "permission. The domain overview checks the permission in the domain scope"
+            ),
         )
 
     @override
@@ -144,7 +167,12 @@ class AUserGrantedNothingMayNotReadADomainOverview(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 없는 사용자가 조회하면 권한 부족으로 거부된다"
+        return Says(
+            "아무 권한도 없는 사용자가 조회하면 권한 부족으로 거부됩니다",
+            english=(
+                "when a user granted nothing reads, the call is rejected for lack of permission"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AKernelAndACaller]:
@@ -169,7 +197,10 @@ class ADomainNameNothingAnswersToIsNotFound(
 
     @override
     def describe(self) -> str:
-        return "존재하지 않는 도메인 이름으로 조회하면 대상을 찾을 수 없다는 이유로 거부된다"
+        return Says(
+            "존재하지 않는 도메인 이름으로 조회하면 대상을 찾을 수 없다는 이유로 거부됩니다",
+            english=("reading with a domain name nothing answers to is rejected as not found"),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AKernelAndACaller]:
@@ -194,7 +225,12 @@ class EnforcementOffLetsAnyoneReadADomainOverview(
 
     @override
     def describe(self) -> str:
-        return "권한 검사를 끄면 아무 권한도 없는 사용자도 도메인의 개요를 조회할 수 있다"
+        return Says(
+            "권한 검사를 끄면 아무 권한도 없는 사용자도 도메인의 개요를 조회할 수 있습니다",
+            english=(
+                "turning permission checks off lets a user granted nothing read the domain overview"
+            ),
+        )
 
     @override
     def config(self) -> Mapping[str, Any]:

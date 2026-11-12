@@ -18,6 +18,7 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
 from sqlalchemy.engine.row import Row
 
+from ai.backend.common.auth.password import PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.user import UserID
@@ -27,7 +28,6 @@ from ai.backend.manager.api.gql.base import resolve_entity_id
 from ai.backend.manager.data.user.types import (
     UserData,
 )
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.minilang import (
     ExternalTableFilterSpec,
@@ -228,8 +228,10 @@ class UserNode(graphene.ObjectType):  # type: ignore[misc]
         )
 
     @classmethod
-    async def get_node(cls, info: graphene.ResolveInfo, id: str) -> Self:
+    async def get_node(cls, info: graphene.ResolveInfo, id: str) -> Self | None:
         graph_ctx: GraphQueryContext = info.context
+        if graph_ctx.user["role"] != UserRole.SUPERADMIN:
+            return None
 
         user_id = resolve_entity_id(id, UserID)
         query = sa.select(UserRow).where(UserRow.uuid == user_id)
@@ -498,7 +500,9 @@ class UserNode(graphene.ObjectType):  # type: ignore[misc]
                 result.append(GroupNode.from_data(ProjectSearchableFields.own.to_data(prj_row)))
             return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
-    async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs: Any) -> UserNode:
+    async def __resolve_reference(
+        self, info: graphene.ResolveInfo, **kwargs: Any
+    ) -> UserNode | None:
         return await UserNode.get_node(info, self.id)
 
 

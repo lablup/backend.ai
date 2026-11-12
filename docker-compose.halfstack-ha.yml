@@ -386,7 +386,7 @@ services:
     networks:
       - half
     ports:
-      - "4000:4000"
+      - "127.0.0.1:4000:4000"
     command: ["supergraph", "--host", "0.0.0.0"]
     environment:
       - PORT=4000
@@ -394,6 +394,7 @@ services:
       - BACKENDAI_MANAGER_HEALTH_CHECK_INTERVAL=${BACKENDAI_MANAGER_HEALTH_CHECK_INTERVAL:-}
       - BACKENDAI_MANAGER_HEALTH_CHECK_PROBE_TIMEOUT=${BACKENDAI_MANAGER_HEALTH_CHECK_PROBE_TIMEOUT:-}
       - BACKENDAI_MANAGER_HEALTH_CHECK_FAILURE_THRESHOLD=${BACKENDAI_MANAGER_HEALTH_CHECK_FAILURE_THRESHOLD:-}
+      - BACKENDAI_MANAGER_CONNECT_TIMEOUT=${BACKENDAI_MANAGER_CONNECT_TIMEOUT:-}
       - BACKENDAI_MANAGER_REQUEST_TIMEOUT=${BACKENDAI_MANAGER_REQUEST_TIMEOUT:-}
     volumes:
       - ./docs/manager/graphql-reference/supergraph.graphql:/gateway/supergraph.graphql:ro

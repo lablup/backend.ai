@@ -9,6 +9,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import uuid4
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole as DataUserRole
@@ -26,9 +27,7 @@ from ai.backend.common.dto.manager.user.types import UserRole as UserRoleDTO
 from ai.backend.common.dto.manager.user.types import UserStatus as UserStatusDTO
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.api.rest.user.adapter import UserAdapter
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.user.types import UserData, UserStatus
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 
 

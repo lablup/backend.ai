@@ -11,19 +11,18 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.types import (
     QuotaScopeID,
     QuotaScopeType,
     VFolderMountPolicy,
     VFolderUsageMode,
 )
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
 from ai.backend.manager.models.agent.row import AgentRow  # noqa: F401
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.entity_share.row import EntityShareRow
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image.row import ImageRow  # noqa: F401
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow

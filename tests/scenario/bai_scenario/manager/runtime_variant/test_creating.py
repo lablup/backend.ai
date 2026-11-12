@@ -20,7 +20,7 @@ from ai.backend.manager.api.adapters.runtime_variant.adapter import RuntimeVaria
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.resource import RuntimeVariantConflict
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Configured, Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.runtime_variant import (
     AVariantAndACaller,
@@ -33,7 +33,7 @@ from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 MADE = "vllm"
-DESCRIBED = "새로 지정한 설명"
+DESCRIBED = Says("새로 지정한 설명", english="a newly given description")
 
 type CreatingStep = Scenario[TestSeedingSession, Any, RuntimeVariantAdapter, RuntimeVariantNode]
 
@@ -51,7 +51,10 @@ class Creating(When[ACaller, RuntimeVariantAdapter, RuntimeVariantNode]):
 
     @override
     def describe(self, laid: ACaller) -> str:
-        return f"{laid.caller.username}이 {self.named} 변형을 생성"
+        return Says(
+            f"{laid.caller.username}이 {self.named} 인퍼런스 런타임 종류를 생성합니다",
+            english=f"{laid.caller.username} creates the runtime variant {self.named}",
+        )
 
     @override
     async def call(self, adapter: RuntimeVariantAdapter, laid: ACaller) -> RuntimeVariantNode:
@@ -72,7 +75,13 @@ class CreatingWithTheLaidName(When[AVariantAndACaller, RuntimeVariantAdapter, Ru
 
     @override
     def describe(self, laid: AVariantAndACaller) -> str:
-        return f"{laid.caller.username}이 이미 있는 이름 {laid.variant.name}(으)로 다시 생성"
+        return Says(
+            f"{laid.caller.username}이 이미 있는 이름 {laid.variant.name}(으)로 다시 생성합니다",
+            english=(
+                f"{laid.caller.username} creates another runtime variant under the name "
+                f"{laid.variant.name} that already exists"
+            ),
+        )
 
     @override
     async def call(
@@ -95,9 +104,14 @@ class TheSuperadminMakesOneWithANameAlone(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 이름만 지정해 변형을 생성하면, 설명은 비고 폴더 설정 파일은 읽지 않으며 "
-            "모델 정의는 코드가 정해 둔 기본값인 노드가 반환된다"
+        return Says(
+            "superadmin 이 이름만 지정해 인퍼런스 런타임 종류를 생성하면, 설명은 비고 vfolder 설정 "
+            "파일은 읽지 않으며 모델 정의는 코드가 정해 둔 기본값인 노드가 반환됩니다",
+            english=(
+                "when the superadmin creates a runtime variant with only a name, the description "
+                "is empty, no vfolder config file is read, and the model definition is the "
+                "default the code sets"
+            ),
         )
 
     @override
@@ -125,7 +139,14 @@ class ADescriptionComesBackAsGiven(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 이름과 설명을 함께 지정해 생성하면, 지정한 값이 그대로 담긴 노드가 반환된다"
+        return Says(
+            "superadmin 이 이름과 설명을 함께 지정해 생성하면, 지정한 값이 그대로 담긴 노드가 "
+            "반환됩니다",
+            english=(
+                "when the superadmin creates a runtime variant with a name and a description, "
+                "the node comes back carrying the given values"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ACaller]:
@@ -150,7 +171,14 @@ class ANameAlreadyTakenIsRefused(
 
     @override
     def describe(self) -> str:
-        return "같은 이름의 변형이 이미 있을 때 그 이름으로 다시 생성하면, 이름 중복으로 거부된다"
+        return Says(
+            "같은 이름의 인퍼런스 런타임 종류가 이미 있을 때 그 이름으로 다시 생성하면, 이름 중복으로 "
+            "거부됩니다",
+            english=(
+                "when a runtime variant with the same name already exists and one is created again "
+                "under that name, it is rejected as a duplicate name"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AVariantAndACaller]:
@@ -175,7 +203,13 @@ class AUserWhoIsNotTheSuperadminMayNotCreate(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 변형을 생성하면 역할 부족으로 거부된다"
+        return Says(
+            "superadmin 이 아닌 사용자가 인퍼런스 런타임 종류를 생성하면 역할 부족으로 거부됩니다",
+            english=(
+                "when a user who is not the superadmin creates a runtime variant, it is rejected "
+                "for lack of role"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ACaller]:
@@ -200,7 +234,13 @@ class EnforcementOffStillNeedsTheSuperadmin(
 
     @override
     def describe(self) -> str:
-        return "권한 검사를 꺼도 슈퍼관리자가 아니면 변형을 생성하지 못한다"
+        return Says(
+            "권한 검사를 꺼도 superadmin 이 아니면 인퍼런스 런타임 종류를 생성하지 못합니다",
+            english=(
+                "turning the permission check off still does not let a user who is not the "
+                "superadmin create a runtime variant"
+            ),
+        )
 
     @override
     def config(self) -> Mapping[str, Any]:

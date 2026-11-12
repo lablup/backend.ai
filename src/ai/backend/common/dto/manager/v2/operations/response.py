@@ -13,7 +13,6 @@ from ai.backend.common.dto.manager.v2.operations.types import (
 )
 
 __all__ = (
-    "AnnouncementNode",
     "AppendErrorLogPayload",
     "ClearErrorLogPayload",
     "ErrorLogNode",
@@ -133,15 +132,4 @@ class ManagerStatusPayload(BaseResponseModel):
     )
     active_sessions: int = Field(
         description="Total number of active sessions across all nodes",
-    )
-
-
-class AnnouncementNode(BaseResponseModel):
-    """Node model representing the system announcement."""
-
-    enabled: bool = Field(
-        description="Whether the announcement is currently enabled",
-    )
-    message: str = Field(
-        description="Announcement message text; empty string if disabled",
     )

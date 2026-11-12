@@ -9,10 +9,8 @@ parity-verification tool for the agent re-architecture (BEP-1057): run
 the observed container / returned kernel info / state transitions are unchanged.
 
 Connection uses the agent's own ``agent.toml`` (``-f/--config``): the RPC listen
-address and auth keypair are read from it. When the agent runs without RPC auth
-(the local-dev default, ``rpc-auth-agent-keypair`` unset) no keypair is needed.
-When auth is enabled, pass ``--manager-keypair`` pointing at the manager's
-``*.key_secret`` file.
+address and auth keypair are read from it. Pass ``--manager-keypair`` pointing at
+the manager's ``*.key_secret`` file.
 
 See ``PARITY.md`` in this directory for the per-step verification procedure.
 """
@@ -26,7 +24,7 @@ import uuid
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Final, cast
 
 import click
 
@@ -38,6 +36,9 @@ if TYPE_CHECKING:
     from ai.backend.common.types import ImageConfig
 
     from .kernel_spec import KernelCreateSpec
+
+# Without a session name, the shell prompt shows "[]".
+_FALLBACK_SESSION_NAME: Final[str] = ""
 
 
 # --- connection wiring -------------------------------------------------------
@@ -82,15 +83,12 @@ def _resolve_agent_addr(cfg: AgentUnifiedConfig) -> str:
 def _build_auth_handler(
     cfg: AgentUnifiedConfig,
     manager_keypair: Path | None,
-) -> Any | None:
-    """Build a ``ManagerAuthHandler`` when the agent has RPC auth enabled, else None."""
+) -> Any:
+    """Build the ``ManagerAuthHandler`` for the agent's RPC auth."""
     agent_keypair = cfg.agent_common.rpc_auth_agent_keypair
-    if agent_keypair is None:
-        # Agent binds RPC without CURVE auth (local-dev default).
-        return None
     if manager_keypair is None:
         raise click.ClickException(
-            "The agent has RPC auth enabled (rpc-auth-agent-keypair is set); "
+            "The agent requires RPC auth; "
             "pass --manager-keypair pointing at the manager's *.key_secret file."
         )
     from zmq.auth.certs import load_certificate
@@ -347,6 +345,7 @@ def create(
     spec = _load_spec(spec_path, image)
     kernel_id = kernel_id or str(uuid.uuid4())
     session_id = session_id or str(uuid.uuid4())
+    session_name = spec.session_name or _FALLBACK_SESSION_NAME
     owner_user_id = spec.owner_user_id or str(uuid.uuid4())
 
     async def _run() -> None:
@@ -367,6 +366,7 @@ def create(
                 image_config=image_config,
                 kernel_id=kernel_id,
                 session_id=session_id,
+                session_name=session_name,
                 owner_user_id=owner_user_id,
                 agent_addr=agent_addr,
             )

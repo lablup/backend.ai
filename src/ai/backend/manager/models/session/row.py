@@ -124,37 +124,16 @@ log = StructuredLogger(logging.getLogger(__spec__.name))
 __all__ = (
     "AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES",
     "ALLOWED_IMAGE_ROLES_FOR_SESSION_TYPE",
-    "DEAD_SESSION_STATUSES",
     "TERMINAL_SESSION_STATUSES",
     "PRIVATE_SESSION_TYPES",
-    "USER_RESOURCE_OCCUPYING_SESSION_STATUSES",
     "KernelLoadingStrategy",
     "SessionDependencyRow",
     "SessionRow",
-    "check_all_dependencies",
     "handle_session_exception",
 )
 
 log = StructuredLogger(logging.getLogger("ai.backend.manager.models.session"))
 
-
-FOLLOWING_SESSION_STATUSES = (
-    # Session statuses that need to wait all kernels belonging to the session
-    SessionStatus.PREPARED,
-    SessionStatus.RUNNING,
-    SessionStatus.TERMINATED,
-)
-LEADING_SESSION_STATUSES = tuple(
-    # Session statuses that declare first, do not need to wait any sibling kernel
-    s
-    for s in SessionStatus
-    if s not in FOLLOWING_SESSION_STATUSES
-)
-
-DEAD_SESSION_STATUSES = frozenset([
-    SessionStatus.CANCELLED,
-    SessionStatus.TERMINATED,
-])
 
 # Statuses treated as terminal for session-name reuse. Mirrors the
 # `ix_sessions_unique_name_per_user_nonterminal` partial unique index predicate
@@ -168,19 +147,6 @@ TERMINAL_SESSION_STATUSES = frozenset([
 
 # statuses to consider when calculating current resource usage
 AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES = tuple(
-    e
-    for e in SessionStatus
-    if e
-    not in (
-        SessionStatus.TERMINATED,
-        SessionStatus.PENDING,
-        SessionStatus.CANCELLED,
-    )
-)
-
-# statuses that occupy user resources
-# these statuses are used to calculate user resource usage
-USER_RESOURCE_OCCUPYING_SESSION_STATUSES = tuple(
     e
     for e in SessionStatus
     if e
@@ -257,7 +223,7 @@ def _build_session_fetch_query(
     if access_key:
         cond = cond & (SessionRow.access_key == access_key)
     if not allow_stale:
-        cond = cond & (~SessionRow.status.in_(DEAD_SESSION_STATUSES))
+        cond = cond & (~SessionRow.status.in_(SessionStatus.terminal_statuses()))
     query = (
         sa.select(SessionRow)
         .where(cond)
@@ -411,8 +377,8 @@ class SessionRow(CreatedAtMixin, Base):
     # JSONB side of SessionOptions — only fields that do not map to a
     # dedicated column (kernel_groups, timeouts, agent_selection_policy).
     # Individual columns still carry priority / is_preemptible /
-    # cluster_mode / cluster_size / scaling_group_name /
-    # designated_agent_ids so pre-existing filters keep working.
+    # cluster_mode / cluster_size / scaling_group_name so pre-existing
+    # filters keep working.
     options: Mapped[SessionStoredOptions] = mapped_column(
         "options",
         PydanticColumn(SessionStoredOptions),
@@ -421,9 +387,6 @@ class SessionRow(CreatedAtMixin, Base):
     )
     agent_ids: Mapped[list[str] | None] = mapped_column(
         "agent_ids", sa.ARRAY(sa.String), nullable=True
-    )
-    designated_agent_ids: Mapped[list[str] | None] = mapped_column(
-        "designated_agent_ids", sa.ARRAY(sa.String), nullable=True
     )
     # The placement group this session belongs to. NULL (the default) means no
     # placement constraint. ON DELETE SET NULL: a group may be swept before its
@@ -680,7 +643,6 @@ class SessionRow(CreatedAtMixin, Base):
             cluster_mode=session_data.cluster_mode,
             cluster_size=session_data.cluster_size,
             agent_ids=session_data.agent_ids,
-            designated_agent_ids=session_data.designated_agent_ids,
             session_group_id=session_data.session_group_id,
             scaling_group_name=session_data.resource_group_name,
             target_sgroup_names=session_data.target_sgroup_names,
@@ -728,7 +690,6 @@ class SessionRow(CreatedAtMixin, Base):
             cluster_mode=ClusterMode(self.cluster_mode),
             cluster_size=self.cluster_size,
             agent_ids=self.agent_ids,
-            designated_agent_ids=self.designated_agent_ids,
             session_group_id=self.session_group_id,
             resource_group_name=self.scaling_group_name,
             target_sgroup_names=self.target_sgroup_names,
@@ -900,12 +861,6 @@ class SessionRow(CreatedAtMixin, Base):
         async with db.connect() as db_conn:
             return await execute_with_txn_retry(fetch, db.begin_readonly_session, db_conn)
 
-    def delegate_ownership(self, user_uuid: UserID, access_key: AccessKey) -> None:
-        self.user_uuid = user_uuid
-        self.access_key = access_key
-        for kernel_row in self.kernels:
-            kernel_row.delegate_ownership(user_uuid, access_key)
-
     @classmethod
     async def set_session_result(
         cls,
@@ -1068,54 +1023,6 @@ class SessionRow(CreatedAtMixin, Base):
         return session_list[0]
 
     @classmethod
-    async def list_sessions(
-        cls,
-        db_session: SASession,
-        session_ids: list[UUID],
-        access_key: AccessKey | None = None,
-        *,
-        allow_stale: bool = False,
-        for_update: bool = False,
-        kernel_loading_strategy: KernelLoadingStrategy = KernelLoadingStrategy.NONE,
-        eager_loading_op: list[Any] | None = None,
-        max_load_count: int | None = None,
-    ) -> Iterable[SessionRow]:
-        _eager_loading_op = eager_loading_op or []
-        match kernel_loading_strategy:
-            case KernelLoadingStrategy.ALL_KERNELS:
-                _eager_loading_op.extend([
-                    noload("*"),
-                    selectinload(SessionRow.kernels).options(
-                        noload("*"),
-                        selectinload(KernelRow.agent_row).noload("*"),
-                    ),
-                ])
-            case KernelLoadingStrategy.MAIN_KERNEL_ONLY:
-                kernel_rel = SessionRow.kernels
-                kernel_rel.and_(KernelRow.cluster_role == DEFAULT_ROLE)
-                _eager_loading_op.extend([
-                    noload("*"),
-                    selectinload(kernel_rel).options(
-                        noload("*"),
-                        selectinload(KernelRow.agent_row).noload("*"),
-                    ),
-                ])
-
-        session_list = await cls.match_sessions(
-            db_session,
-            session_ids,
-            access_key,
-            allow_stale=allow_stale,
-            for_update=for_update,
-            eager_loading_op=_eager_loading_op,
-            max_matches=max_load_count,
-        )
-        try:
-            return session_list
-        except IndexError as e:
-            raise SessionNotFound(f"Session (ids={session_ids}) does not exist.") from e
-
-    @classmethod
     async def get_session_by_id(
         cls,
         db_session: SASession,
@@ -1160,24 +1067,6 @@ def by_status(statuses: Iterable[SessionStatus]) -> QueryCondition:
         return query_stmt.where(SessionRow.status.in_(statuses))
 
     return _by_status
-
-
-def by_user_id(user_id: UUID) -> QueryCondition:
-    def _by_user_id(
-        query_stmt: sa.sql.Select[Any],
-    ) -> sa.sql.Select[Any]:
-        return query_stmt.where(SessionRow.user_uuid == user_id)
-
-    return _by_user_id
-
-
-def by_project_id(project_id: UUID) -> QueryCondition:
-    def _by_project_id(
-        query_stmt: sa.sql.Select[Any],
-    ) -> sa.sql.Select[Any]:
-        return query_stmt.where(SessionRow.group_id == project_id)
-
-    return _by_project_id
 
 
 def by_domain_name(domain_name: str) -> QueryCondition:
@@ -1237,27 +1126,6 @@ class SessionDependencyRow(Base):
         # constraint
         sa.PrimaryKeyConstraint("session_id", "depends_on", name="sess_dep_pk"),
     )
-
-
-async def check_all_dependencies(
-    db_session: SASession,
-    sess_ctx: SessionRow,
-) -> list[SessionRow]:
-    j = sa.join(
-        SessionDependencyRow,
-        SessionRow,
-        SessionDependencyRow.depends_on == SessionDependencyRow.session_id,
-    )
-    query = (
-        sa.select(SessionRow.id, SessionRow.name, SessionRow.result)
-        .select_from(j)
-        .where(SessionDependencyRow.session_id == sess_ctx.id)
-    )
-    result = await db_session.execute(query)
-    rows = result.scalars().all()
-    return [
-        sess_row for sess_row in rows if SessionResult(sess_row.result) != SessionResult.SUCCESS
-    ]
 
 
 DEFAULT_SESSION_ORDERING = [

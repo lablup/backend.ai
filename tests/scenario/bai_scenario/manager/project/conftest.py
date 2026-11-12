@@ -92,6 +92,7 @@ async def adapter(
     )
     project = ProjectProcessors(
         registry.group(GroupMeta(ProjectEntityType())),
+        registry.concern(ConcernMeta(Concern.ORGANIZATION)).relation_group(),
         ProjectService(
             unwired(StorageSessionManager, "only folder work reaches it"),
             config,

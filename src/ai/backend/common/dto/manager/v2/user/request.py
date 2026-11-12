@@ -20,6 +20,7 @@ from ai.backend.common.dto.manager.query import (
     ToManyFilter,
     UUIDFilter,
 )
+from ai.backend.common.dto.manager.v2.entity_label.request import EntityLabelNestedFilter
 from ai.backend.common.dto.manager.v2.keypair.request import KeypairFilter
 from ai.backend.common.dto.manager.v2.user.types import (
     OrderDirection,
@@ -129,6 +130,11 @@ class UpdateUserInput(BaseRequestModel):
     password: str | None | Unset = Field(
         default=UNSET,
         description="New password. Omit to leave unchanged.",
+    )
+    old_password: str | None | Unset = Field(
+        default=UNSET,
+        repr=False,
+        description=f"Current password, required for own password changes. Added in {NEXT_RELEASE_VERSION}.",
     )
     full_name: str | None | Unset = Field(
         default=UNSET,
@@ -387,6 +393,10 @@ class UserFilter(BaseRequestModel):
     project: UserProjectFilter | None = Field(
         default=None, description="Nested filter for projects a user belongs to."
     )
+    labels: EntityLabelNestedFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by the labels on the entity.",
+    )
     AND: list[UserFilter] | None = Field(
         default=None, description="Combine multiple filters with AND logic."
     )
@@ -453,3 +463,16 @@ class AdminSearchUsersInput(BaseRequestModel):
     before: str | None = Field(default=None, description="Backward cursor pagination: cursor.")
     limit: int | None = Field(default=None, description="Offset pagination: maximum items.")
     offset: int | None = Field(default=None, description="Offset pagination: starting position.")
+
+
+class UpdatePasswordInput(BaseRequestModel):
+    """Credentials for changing the authenticated user's password."""
+
+    old_password: str = Field(
+        description=f"Current password. Added in {NEXT_RELEASE_VERSION}.",
+        repr=False,
+    )
+    new_password: str = Field(
+        description=f"New password. Added in {NEXT_RELEASE_VERSION}.",
+        repr=False,
+    )

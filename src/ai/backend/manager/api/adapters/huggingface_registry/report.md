@@ -1,343 +1,685 @@
 ## huggingface_registry
 
-[무엇을 보장하는가](/src/ai/backend/manager/api/adapters/huggingface_registry/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/huggingface_registry/adapter.py)
+[background](/src/ai/backend/manager/api/adapters/huggingface_registry/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/huggingface_registry/adapter.py)
 
-시나리오: 미완 7 / 9
+Scenario: complete
 
-- ops 로 구성 (1)
-  - batch_load_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-- 직접 구현 (8)
-  - create — 성공 없음 · 실패 없음 (global_scope) — SCENARIO-GAP
-  - get — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
-  - get_many — 성공 없음 · 실패 없음 (global_scope) — SCENARIO-GAP
-  - partial_bulk_purge — 성공 있음 3 · 실패 없음 (partial_bulk) — SCENARIO-GAP
-  - partial_bulk_update — 성공 있음 2 · 실패 없음 (partial_bulk) — SCENARIO-GAP
-  - purge — 성공 있음 1 · 실패 있음 1 (single_entity)
-  - search — 성공 없음 · 실패 없음 (global_scope) — SCENARIO-GAP
-  - update — 성공 있음 1 · 실패 있음 1 (single_entity)
+- ops + direct implementation (1)
+  - batch_load_by_ids: success present 1 · rejection present 1 (partial_bulk, partial_bulk_get_ops)
+- direct implementation (8)
+  - create: success present 1 · rejection present 1 (global_scope)
+  - get: success present 1 · rejection present 1 (single_entity)
+  - get_many: success present 1 · rejection present 1 (global_scope)
+  - partial_bulk_purge: success present 2 · rejection present 1 (partial_bulk)
+  - partial_bulk_update: success present 1 · rejection present 1 (partial_bulk)
+  - purge: success present 1 · rejection present 1 (single_entity)
+  - search: success present 1 · rejection present 1 (global_scope)
+  - update: success present 1 · rejection present 1 (single_entity)
+
+**batch_load_by_ids**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted permission to read registries loads two registries seeded in advance at once, the two come back in the requested order](#reading-a-user-granted-read-loads-several-registries-in-the-requested-order) | answered |
+| [when a user granted nothing loads several registry ids at once, instead of rejecting the whole request, every entry comes back holding a rejection for lack of permission](#reading-a-user-granted-nothing-loading-many-registry-ids-is-refused-on-every-id) | rejected |
+
+**create**
+
+| scenario | verdict |
+|---|---|
+| [when the superadmin creates a HuggingFace registry, the whole created registry comes back. This call is gated by the global role](#creating-the-superadmin-creates-a-huggingface-registry) | answered |
+| [when a user who is not the superadmin tries to create a HuggingFace registry, it is rejected for lack of permission. This call is gated by the global role](#creating-a-user-who-is-not-the-superadmin-may-not-create-a-huggingface-registry) | rejected |
+
+**get**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted permission to read HuggingFace registries reads one, the whole registry seeded in advance comes back](#reading-a-user-granted-read-gets-a-registry) | answered |
+| [when a user granted nothing tries to read a registry, it is rejected for lack of permission](#reading-a-user-granted-nothing-may-not-get-a-registry) | rejected |
+
+**get_many**
+
+| scenario | verdict |
+|---|---|
+| [when the superadmin reads two registries by id at once, both come back. This call is gated by the global role](#reading-the-superadmin-reads-several-huggingface-registries-by-id) | answered |
+| [when a user who is not the superadmin reads registries by id at once, it is rejected for lack of permission. This call is gated by the global role](#reading-a-user-who-is-not-the-superadmin-may-not-read-several-registries) | rejected |
 
 **partial_bulk_purge**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 레지스트리 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-registries) | 성공 |
-| [레지스트리 purge 권한을 받은 사용자가 여럿을 한 번에 purge 하면, 모두의 id 가 처리된 목록에 오고 실패한 것은 없다](#partial_bulk_purging-a-user-granted-purge-purges-several-registries) | 성공 |
-| [슈퍼관리자가 레지스트리 둘과 없는 id 하나를 한 번에 purge 하면, 둘의 id 는 처리된 목록에, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다. 슈퍼관리자는 검사를 모두 통과하므로 대상 없음이 그대로 드러난다](#partial_bulk_purging-purging-several-answers-for-the-missing-one) | 성공 |
+| [when a user granted permission to purge HuggingFace registries purges several at once, every id comes back in the processed list and none failed](#partial_bulk_purging-a-user-granted-purge-purges-several-registries) | answered |
+| [when the superadmin purges two HuggingFace registries and one id that does not exist at once, the two ids come back in the processed list and the id that does not exist comes back in the failed list because there is no such target. The superadmin passes every check, so the missing target is revealed as it is](#partial_bulk_purging-purging-several-answers-for-the-missing-one) | answered |
+| [when a user granted nothing tries to purge several HuggingFace registries at once, nothing is purged and all come back in the failed list because there is no permission](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-registries) | rejected |
 
 **partial_bulk_update**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 레지스트리 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-registries) | 성공 |
-| [레지스트리 수정 권한을 받은 사용자가 여럿의 주소를 한 번에 바꾸면, 모두 새 주소로 오고 실패한 것은 없다](#partial_bulk_editing-a-user-granted-update-edits-several-registries) | 성공 |
+| [when a user granted permission to edit HuggingFace registries changes the addresses of several at once, all come back with the new address and none failed](#partial_bulk_editing-a-user-granted-update-edits-several-registries) | answered |
+| [when a user granted nothing tries to edit several HuggingFace registries at once, nothing is edited and all come back in the failed list because there is no permission](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-registries) | rejected |
 
 **purge**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [레지스트리 purge 권한을 받은 사용자가 purge 하면, purge 한 레지스트리의 id 가 온다](#purging-a-user-granted-purge-purges-a-registry) | 성공 |
-| [아무 권한도 받지 않은 사용자가 purge 하려 하면 권한 부족으로 거부된다](#purging-a-user-granted-nothing-may-not-purge-a-registry) | 거부 |
+| [when a user granted permission to purge HuggingFace registries purges one, the id of the purged HuggingFace registry comes back](#purging-a-user-granted-purge-purges-a-registry) | answered |
+| [when a user granted nothing tries to purge, it is rejected for lack of permission](#purging-a-user-granted-nothing-may-not-purge-a-registry) | rejected |
+
+**search**
+
+| scenario | verdict |
+|---|---|
+| [when the superadmin searches HuggingFace registries and asks for one page, one of the two registries seeded in advance comes back and the total count is two. This call is gated by the global role](#searching-the-superadmin-searching-huggingface-registries-gets-one-page) | answered |
+| [when a user who is not the superadmin tries to search HuggingFace registries, it is rejected for lack of permission. This call is gated by the global role](#searching-a-user-who-is-not-the-superadmin-may-not-search-huggingface-registries) | rejected |
 
 **update**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [레지스트리 수정 권한을 받은 사용자가 주소를 바꾸면, 그 레지스트리가 새 주소로 온다](#editing-a-user-granted-update-edits-a-registry) | 성공 |
-| [아무 권한도 받지 않은 사용자가 주소를 바꾸려 하면 권한 부족으로 거부된다](#editing-a-user-granted-nothing-may-not-edit-a-registry) | 거부 |
+| [when a user granted permission to edit a HuggingFace registry changes the address, the HuggingFace registry comes back with the new address](#editing-a-user-granted-update-edits-a-registry) | answered |
+| [when a user granted nothing tries to change the address, it is rejected for lack of permission](#editing-a-user-granted-nothing-may-not-edit-a-registry) | rejected |
+
+### batch_load_by_ids
+
+<a id="reading-a-user-granted-read-loads-several-registries-in-the-requested-order"></a>
+
+#### [a-user-granted-read-loads-several-registries-in-the-requested-order](/tests/scenario/bai_scenario/manager/huggingface_registry/test_reading.py): pass
+
+when a user granted permission to read registries loads two registries seeded in advance at once, the two come back in the requested order
+
+Given
+
+- 2 HuggingFace registries and one regular user granted READ on registries
+  - HuggingFace registry registry-1: refers to https://huggingface.co
+  - HuggingFace registry registry-2: refers to https://huggingface.co
+  - Domain home-1
+  - Prepare a user granted permission on artifact registries in global
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role registry-keeper-1: applies only within the scope it is granted in
+    - Role registry-keeper-1: READ allowed on every artifact_registry
+    - regular user user-1: holds Role registry-keeper-1
+
+When
+
+- HuggingFaceRegistryAdapter.batch_load_by_ids: user-1 loads two registries seeded in advance by id at once
+
+Then
+
+- the registries seeded in advance come back in the requested order
+  - length = 2
+  - [0].id: same as the id of the registry created in advance
+  - [0].entity_id: same as the id of the registry created in advance
+  - [0].name = 'registry-1'
+  - [0].url = 'https://huggingface.co'
+  - [0].token = None
+  - [1].id: same as the id of the registry created in advance
+  - [1].entity_id: same as the id of the registry created in advance
+  - [1].name = 'registry-2'
+  - [1].url = 'https://huggingface.co'
+  - [1].token = None
+
+<a id="reading-a-user-granted-nothing-loading-many-registry-ids-is-refused-on-every-id"></a>
+
+#### [a-user-granted-nothing-loading-many-registry-ids-is-refused-on-every-id](/tests/scenario/bai_scenario/manager/huggingface_registry/test_reading.py): pass
+
+when a user granted nothing loads several registry ids at once, instead of rejecting the whole request, every entry comes back holding a rejection for lack of permission
+
+Given
+
+- 2 HuggingFace registries and one regular user with no permission
+  - HuggingFace registry registry-1: refers to https://huggingface.co
+  - HuggingFace registry registry-2: refers to https://huggingface.co
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- HuggingFaceRegistryAdapter.batch_load_by_ids: user-1 loads two registries seeded in advance by id at once
+
+Then
+
+- every entry comes back holding a rejection for lack of permission
+  - length = 2
+  - rejected: NotEnoughPermission
+  - rejected: NotEnoughPermission
+
+### create
+
+<a id="creating-the-superadmin-creates-a-huggingface-registry"></a>
+
+#### [the-superadmin-creates-a-huggingface-registry](/tests/scenario/bai_scenario/manager/huggingface_registry/test_creating.py): pass
+
+when the superadmin creates a HuggingFace registry, the whole created registry comes back. This call is gated by the global role
+
+Given
+
+- one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- HuggingFaceRegistryAdapter.create: user-1 creates a HuggingFace registry
+
+Then
+
+- the whole created registry comes back
+  - id: skipped: the database generates it
+  - entity_id: skipped: the database generates it
+  - name = 'made-huggingface'
+  - url = 'https://made.huggingface.example.com'
+  - token = None
+
+<a id="creating-a-user-who-is-not-the-superadmin-may-not-create-a-huggingface-registry"></a>
+
+#### [a-user-who-is-not-the-superadmin-may-not-create-a-huggingface-registry](/tests/scenario/bai_scenario/manager/huggingface_registry/test_creating.py): pass
+
+when a user who is not the superadmin tries to create a HuggingFace registry, it is rejected for lack of permission. This call is gated by the global role
+
+Given
+
+- one regular user
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- HuggingFaceRegistryAdapter.create: user-1 creates a HuggingFace registry
+
+Then
+
+- the call is rejected
+  - rejected: InsufficientPrivilege
+
+### get
+
+<a id="reading-a-user-granted-read-gets-a-registry"></a>
+
+#### [a-user-granted-read-gets-a-registry](/tests/scenario/bai_scenario/manager/huggingface_registry/test_reading.py): pass
+
+when a user granted permission to read HuggingFace registries reads one, the whole registry seeded in advance comes back
+
+Given
+
+- one HuggingFace registry and one regular user granted READ on registries
+  - HuggingFace registry registry-1: refers to https://huggingface.co
+  - Domain home-1
+  - Prepare a user granted permission on artifact registries in global
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role registry-keeper-1: applies only within the scope it is granted in
+    - Role registry-keeper-1: READ allowed on every artifact_registry
+    - regular user user-1: holds Role registry-keeper-1
+
+When
+
+- HuggingFaceRegistryAdapter.get: user-1 reads registry-1
+
+Then
+
+- the whole registry seeded in advance comes back
+  - id: same as the id of the registry created in advance
+  - entity_id: same as the id of the registry created in advance
+  - name = 'registry-1'
+  - url = 'https://huggingface.co'
+  - token = None
+
+<a id="reading-a-user-granted-nothing-may-not-get-a-registry"></a>
+
+#### [a-user-granted-nothing-may-not-get-a-registry](/tests/scenario/bai_scenario/manager/huggingface_registry/test_reading.py): pass
+
+when a user granted nothing tries to read a registry, it is rejected for lack of permission
+
+Given
+
+- one HuggingFace registry and one regular user with no permission
+  - HuggingFace registry registry-1: refers to https://huggingface.co
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- HuggingFaceRegistryAdapter.get: user-1 reads registry-1
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+### get_many
+
+<a id="reading-the-superadmin-reads-several-huggingface-registries-by-id"></a>
+
+#### [the-superadmin-reads-several-huggingface-registries-by-id](/tests/scenario/bai_scenario/manager/huggingface_registry/test_reading.py): pass
+
+when the superadmin reads two registries by id at once, both come back. This call is gated by the global role
+
+Given
+
+- 2 HuggingFace registries and one superadmin
+  - HuggingFace registry registry-1: refers to https://huggingface.co
+  - HuggingFace registry registry-2: refers to https://huggingface.co
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- HuggingFaceRegistryAdapter.get_many: user-1 reads two registries seeded in advance by id at once
+
+Then
+
+- every registry seeded in advance comes back
+  - items: same as the registries seeded in advance
+
+<a id="reading-a-user-who-is-not-the-superadmin-may-not-read-several-registries"></a>
+
+#### [a-user-who-is-not-the-superadmin-may-not-read-several-registries](/tests/scenario/bai_scenario/manager/huggingface_registry/test_reading.py): pass
+
+when a user who is not the superadmin reads registries by id at once, it is rejected for lack of permission. This call is gated by the global role
+
+Given
+
+- 2 HuggingFace registries and one regular user with no permission
+  - HuggingFace registry registry-1: refers to https://huggingface.co
+  - HuggingFace registry registry-2: refers to https://huggingface.co
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- HuggingFaceRegistryAdapter.get_many: user-1 reads two registries seeded in advance by id at once
+
+Then
+
+- the call is rejected
+  - rejected: InsufficientPrivilege
 
 ### partial_bulk_purge
 
-<a id="partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-registries"></a>
-
-#### [a-user-granted-nothing-purges-none-of-several-registries](/tests/scenario/bai_scenario/manager/huggingface_registry/test_partial_bulk_purging.py) — pass
-
-아무 권한도 받지 않은 사용자가 레지스트리 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
-
-Given
-
-- HuggingFace 레지스트리 2개와, 아무 권한도 받지 않은 일반 사용자 한 명
-  - HuggingFace 레지스트리 registry-1: https://huggingface.co 을 가리킨다
-  - HuggingFace 레지스트리 registry-2: https://huggingface.co 을 가리킨다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- HuggingFaceRegistryAdapter.partial_bulk_purge — user-1이 레지스트리 2개를 한 번에 purge 함
-
-Then
-
-- 처리된 레지스트리 없이 대상이 모두 실패 목록에 온다
-  - successes = []
-  - failed count = 2
-  - failed[0].id: 대상 레지스트리의 id와 같다
-  - failed[0].message: 'Insufficient permission'를 담은 이유
-  - failed[1].id: 대상 레지스트리의 id와 같다
-  - failed[1].message: 'Insufficient permission'를 담은 이유
-
 <a id="partial_bulk_purging-a-user-granted-purge-purges-several-registries"></a>
 
-#### [a-user-granted-purge-purges-several-registries](/tests/scenario/bai_scenario/manager/huggingface_registry/test_partial_bulk_purging.py) — pass
+#### [a-user-granted-purge-purges-several-registries](/tests/scenario/bai_scenario/manager/huggingface_registry/test_partial_bulk_purging.py): pass
 
-레지스트리 purge 권한을 받은 사용자가 여럿을 한 번에 purge 하면, 모두의 id 가 처리된 목록에 오고 실패한 것은 없다
+when a user granted permission to purge HuggingFace registries purges several at once, every id comes back in the processed list and none failed
 
 Given
 
-- HuggingFace 레지스트리 2개와, 레지스트리에 HARD_DELETE 권한을 받은 일반 사용자 한 명
-  - HuggingFace 레지스트리 registry-1: https://huggingface.co 을 가리킨다
-  - HuggingFace 레지스트리 registry-2: https://huggingface.co 을 가리킨다
-  - 도메인 home-1
-  - global 에서 아티팩트 레지스트리 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 registry-keeper-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 registry-keeper-1: artifact_registry 전체에 HARD_DELETE 허용
-    - 일반 사용자 user-1: 역할 registry-keeper-1 보유
+- 2 HuggingFace registries and one regular user granted HARD_DELETE on registries
+  - HuggingFace registry registry-1: refers to https://huggingface.co
+  - HuggingFace registry registry-2: refers to https://huggingface.co
+  - Domain home-1
+  - Prepare a user granted permission on artifact registries in global
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role registry-keeper-1: applies only within the scope it is granted in
+    - Role registry-keeper-1: HARD_DELETE allowed on every artifact_registry
+    - regular user user-1: holds Role registry-keeper-1
 
 When
 
-- HuggingFaceRegistryAdapter.partial_bulk_purge — user-1이 레지스트리 2개를 한 번에 purge 함
+- HuggingFaceRegistryAdapter.partial_bulk_purge: user-1 purges 2 HuggingFace registries at once
 
 Then
 
-- 대상 레지스트리의 id 가 모두 처리된 목록에 오고, 실패한 것은 없다
+- every target registry id comes back in the processed list and nothing failed
   - successes count = 2
-  - successes[0].id: 미리 만들어 둔 레지스트리의 id와 같다
-  - successes[1].id: 미리 만들어 둔 레지스트리의 id와 같다
+  - successes[0].id: same as the id of the registry created in advance
+  - successes[1].id: same as the id of the registry created in advance
   - failed = []
 
 <a id="partial_bulk_purging-purging-several-answers-for-the-missing-one"></a>
 
-#### [purging-several-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/huggingface_registry/test_partial_bulk_purging.py) — pass
+#### [purging-several-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/huggingface_registry/test_partial_bulk_purging.py): pass
 
-슈퍼관리자가 레지스트리 둘과 없는 id 하나를 한 번에 purge 하면, 둘의 id 는 처리된 목록에, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다. 슈퍼관리자는 검사를 모두 통과하므로 대상 없음이 그대로 드러난다
+when the superadmin purges two HuggingFace registries and one id that does not exist at once, the two ids come back in the processed list and the id that does not exist comes back in the failed list because there is no such target. The superadmin passes every check, so the missing target is revealed as it is
 
 Given
 
-- HuggingFace 레지스트리 2개와, 슈퍼관리자 한 명
-  - HuggingFace 레지스트리 registry-1: https://huggingface.co 을 가리킨다
-  - HuggingFace 레지스트리 registry-2: https://huggingface.co 을 가리킨다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- 2 HuggingFace registries and one superadmin
+  - HuggingFace registry registry-1: refers to https://huggingface.co
+  - HuggingFace registry registry-2: refers to https://huggingface.co
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- HuggingFaceRegistryAdapter.partial_bulk_purge — user-1이 레지스트리 2개 와 없는 id 하나를 한 번에 purge 함
+- HuggingFaceRegistryAdapter.partial_bulk_purge: user-1 purges 2 HuggingFace registries and one id that does not exist at once
 
 Then
 
-- 대상 레지스트리의 id 가 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+- every target registry id comes back in the processed list and an unknown id comes back in the failed list because no target answers to it
   - successes count = 2
-  - successes[0].id: 미리 만들어 둔 레지스트리의 id와 같다
-  - successes[1].id: 미리 만들어 둔 레지스트리의 id와 같다
+  - successes[0].id: same as the id of the registry created in advance
+  - successes[1].id: same as the id of the registry created in advance
   - failed count = 1
-  - failed[0].id: 요청에 넣은 없는 id와 같다
-  - failed[0].message: 'not found'를 담은 이유
+  - failed[0].id: same as the unknown id put in the request
+  - failed[0].message: a reason containing 'not found'
+
+<a id="partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-registries"></a>
+
+#### [a-user-granted-nothing-purges-none-of-several-registries](/tests/scenario/bai_scenario/manager/huggingface_registry/test_partial_bulk_purging.py): pass
+
+when a user granted nothing tries to purge several HuggingFace registries at once, nothing is purged and all come back in the failed list because there is no permission
+
+Given
+
+- 2 HuggingFace registries and one regular user with no permission
+  - HuggingFace registry registry-1: refers to https://huggingface.co
+  - HuggingFace registry registry-2: refers to https://huggingface.co
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- HuggingFaceRegistryAdapter.partial_bulk_purge: user-1 purges 2 HuggingFace registries at once
+
+Then
+
+- no registry is processed and every target comes back in the failed list
+  - successes = []
+  - failed count = 2
+  - failed[0].id: same as the id of the target registry
+  - rejected: failed[0]: Insufficient permission
+  - failed[1].id: same as the id of the target registry
+  - rejected: failed[1]: Insufficient permission
 
 ### partial_bulk_update
 
-<a id="partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-registries"></a>
-
-#### [a-user-granted-nothing-edits-none-of-several-registries](/tests/scenario/bai_scenario/manager/huggingface_registry/test_partial_bulk_editing.py) — pass
-
-아무 권한도 받지 않은 사용자가 레지스트리 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
-
-Given
-
-- HuggingFace 레지스트리 2개와, 아무 권한도 받지 않은 일반 사용자 한 명
-  - HuggingFace 레지스트리 registry-1: https://huggingface.co 을 가리킨다
-  - HuggingFace 레지스트리 registry-2: https://huggingface.co 을 가리킨다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- HuggingFaceRegistryAdapter.partial_bulk_update — user-1이 레지스트리 2개의 주소를 한 번에 바꿈
-
-Then
-
-- 처리된 레지스트리 없이 대상이 모두 실패 목록에 온다
-  - successes = []
-  - failed count = 2
-  - failed[0].id: 대상 레지스트리의 id와 같다
-  - failed[0].message: 'Insufficient permission'를 담은 이유
-  - failed[1].id: 대상 레지스트리의 id와 같다
-  - failed[1].message: 'Insufficient permission'를 담은 이유
-
 <a id="partial_bulk_editing-a-user-granted-update-edits-several-registries"></a>
 
-#### [a-user-granted-update-edits-several-registries](/tests/scenario/bai_scenario/manager/huggingface_registry/test_partial_bulk_editing.py) — pass
+#### [a-user-granted-update-edits-several-registries](/tests/scenario/bai_scenario/manager/huggingface_registry/test_partial_bulk_editing.py): pass
 
-레지스트리 수정 권한을 받은 사용자가 여럿의 주소를 한 번에 바꾸면, 모두 새 주소로 오고 실패한 것은 없다
+when a user granted permission to edit HuggingFace registries changes the addresses of several at once, all come back with the new address and none failed
 
 Given
 
-- HuggingFace 레지스트리 2개와, 레지스트리에 UPDATE 권한을 받은 일반 사용자 한 명
-  - HuggingFace 레지스트리 registry-1: https://huggingface.co 을 가리킨다
-  - HuggingFace 레지스트리 registry-2: https://huggingface.co 을 가리킨다
-  - 도메인 home-1
-  - global 에서 아티팩트 레지스트리 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 registry-keeper-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 registry-keeper-1: artifact_registry 전체에 UPDATE 허용
-    - 일반 사용자 user-1: 역할 registry-keeper-1 보유
+- 2 HuggingFace registries and one regular user granted UPDATE on registries
+  - HuggingFace registry registry-1: refers to https://huggingface.co
+  - HuggingFace registry registry-2: refers to https://huggingface.co
+  - Domain home-1
+  - Prepare a user granted permission on artifact registries in global
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role registry-keeper-1: applies only within the scope it is granted in
+    - Role registry-keeper-1: UPDATE allowed on every artifact_registry
+    - regular user user-1: holds Role registry-keeper-1
 
 When
 
-- HuggingFaceRegistryAdapter.partial_bulk_update — user-1이 레지스트리 2개의 주소를 한 번에 바꿈
+- HuggingFaceRegistryAdapter.partial_bulk_update: user-1 changes the addresses of 2 HuggingFace registries at once
 
 Then
 
-- 대상 레지스트리가 모두 새 주소로 오고, 실패한 것은 없다
+- every target registry comes back with the new URL and nothing failed
   - successes count = 2
   - failed = []
-  - successes[0].id: 미리 만들어 둔 레지스트리의 id와 같다
-  - successes[0].entity_id: 미리 만들어 둔 레지스트리의 id와 같다
+  - successes[0].id: same as the id of the registry created in advance
+  - successes[0].entity_id: same as the id of the registry created in advance
   - successes[0].name = 'registry-1'
   - successes[0].url = 'https://hub.example.com'
   - successes[0].token = None
-  - successes[1].id: 미리 만들어 둔 레지스트리의 id와 같다
-  - successes[1].entity_id: 미리 만들어 둔 레지스트리의 id와 같다
+  - successes[1].id: same as the id of the registry created in advance
+  - successes[1].entity_id: same as the id of the registry created in advance
   - successes[1].name = 'registry-2'
   - successes[1].url = 'https://hub.example.com'
   - successes[1].token = None
+
+<a id="partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-registries"></a>
+
+#### [a-user-granted-nothing-edits-none-of-several-registries](/tests/scenario/bai_scenario/manager/huggingface_registry/test_partial_bulk_editing.py): pass
+
+when a user granted nothing tries to edit several HuggingFace registries at once, nothing is edited and all come back in the failed list because there is no permission
+
+Given
+
+- 2 HuggingFace registries and one regular user with no permission
+  - HuggingFace registry registry-1: refers to https://huggingface.co
+  - HuggingFace registry registry-2: refers to https://huggingface.co
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- HuggingFaceRegistryAdapter.partial_bulk_update: user-1 changes the addresses of 2 HuggingFace registries at once
+
+Then
+
+- no registry is processed and every target comes back in the failed list
+  - successes = []
+  - failed count = 2
+  - failed[0].id: same as the id of the target registry
+  - rejected: failed[0]: Insufficient permission
+  - failed[1].id: same as the id of the target registry
+  - rejected: failed[1]: Insufficient permission
 
 ### purge
 
 <a id="purging-a-user-granted-purge-purges-a-registry"></a>
 
-#### [a-user-granted-purge-purges-a-registry](/tests/scenario/bai_scenario/manager/huggingface_registry/test_purging.py) — pass
+#### [a-user-granted-purge-purges-a-registry](/tests/scenario/bai_scenario/manager/huggingface_registry/test_purging.py): pass
 
-레지스트리 purge 권한을 받은 사용자가 purge 하면, purge 한 레지스트리의 id 가 온다
+when a user granted permission to purge HuggingFace registries purges one, the id of the purged HuggingFace registry comes back
 
 Given
 
-- HuggingFace 레지스트리 하나와, 레지스트리에 HARD_DELETE 권한을 받은 일반 사용자 한 명
-  - HuggingFace 레지스트리 registry-1: https://huggingface.co 을 가리킨다
-  - 도메인 home-1
-  - global 에서 아티팩트 레지스트리 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 registry-keeper-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 registry-keeper-1: artifact_registry 전체에 HARD_DELETE 허용
-    - 일반 사용자 user-1: 역할 registry-keeper-1 보유
+- one HuggingFace registry and one regular user granted HARD_DELETE on registries
+  - HuggingFace registry registry-1: refers to https://huggingface.co
+  - Domain home-1
+  - Prepare a user granted permission on artifact registries in global
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role registry-keeper-1: applies only within the scope it is granted in
+    - Role registry-keeper-1: HARD_DELETE allowed on every artifact_registry
+    - regular user user-1: holds Role registry-keeper-1
 
 When
 
-- HuggingFaceRegistryAdapter.purge — user-1이 registry-1을 purge 함
+- HuggingFaceRegistryAdapter.purge: user-1 purges registry-1
 
 Then
 
-- purge 한 레지스트리의 id 가 온다
-  - id: 미리 만들어 둔 레지스트리의 id와 같다
+- the id of the purged registry comes back
+  - id: same as the id of the registry created in advance
+  - entity_id: same as the id of the registry created in advance
 
 <a id="purging-a-user-granted-nothing-may-not-purge-a-registry"></a>
 
-#### [a-user-granted-nothing-may-not-purge-a-registry](/tests/scenario/bai_scenario/manager/huggingface_registry/test_purging.py) — pass
+#### [a-user-granted-nothing-may-not-purge-a-registry](/tests/scenario/bai_scenario/manager/huggingface_registry/test_purging.py): pass
 
-아무 권한도 받지 않은 사용자가 purge 하려 하면 권한 부족으로 거부된다
+when a user granted nothing tries to purge, it is rejected for lack of permission
 
 Given
 
-- HuggingFace 레지스트리 하나와, 아무 권한도 받지 않은 일반 사용자 한 명
-  - HuggingFace 레지스트리 registry-1: https://huggingface.co 을 가리킨다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one HuggingFace registry and one regular user with no permission
+  - HuggingFace registry registry-1: refers to https://huggingface.co
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- HuggingFaceRegistryAdapter.purge — user-1이 registry-1을 purge 함
+- HuggingFaceRegistryAdapter.purge: user-1 purges registry-1
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+### search
+
+<a id="searching-the-superadmin-searching-huggingface-registries-gets-one-page"></a>
+
+#### [the-superadmin-searching-huggingface-registries-gets-one-page](/tests/scenario/bai_scenario/manager/huggingface_registry/test_searching.py): pass
+
+when the superadmin searches HuggingFace registries and asks for one page, one of the two registries seeded in advance comes back and the total count is two. This call is gated by the global role
+
+Given
+
+- 2 HuggingFace registries and one superadmin
+  - HuggingFace registry registry-1: refers to https://huggingface.co
+  - HuggingFace registry registry-2: refers to https://huggingface.co
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- HuggingFaceRegistryAdapter.search: user-1 searches HuggingFace registries and asks for one page
+
+Then
+
+- only one of the two registries seeded in advance comes on the page and the other is on the next page
+  - length = 1
+  - items: one of the registries seeded in advance
+  - total_count = 2
+  - has_next_page = True
+  - has_previous_page = False
+
+<a id="searching-a-user-who-is-not-the-superadmin-may-not-search-huggingface-registries"></a>
+
+#### [a-user-who-is-not-the-superadmin-may-not-search-huggingface-registries](/tests/scenario/bai_scenario/manager/huggingface_registry/test_searching.py): pass
+
+when a user who is not the superadmin tries to search HuggingFace registries, it is rejected for lack of permission. This call is gated by the global role
+
+Given
+
+- 2 HuggingFace registries and one regular user with no permission
+  - HuggingFace registry registry-1: refers to https://huggingface.co
+  - HuggingFace registry registry-2: refers to https://huggingface.co
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- HuggingFaceRegistryAdapter.search: user-1 searches HuggingFace registries and asks for one page
+
+Then
+
+- the call is rejected
+  - rejected: InsufficientPrivilege
 
 ### update
 
 <a id="editing-a-user-granted-update-edits-a-registry"></a>
 
-#### [a-user-granted-update-edits-a-registry](/tests/scenario/bai_scenario/manager/huggingface_registry/test_editing.py) — pass
+#### [a-user-granted-update-edits-a-registry](/tests/scenario/bai_scenario/manager/huggingface_registry/test_editing.py): pass
 
-레지스트리 수정 권한을 받은 사용자가 주소를 바꾸면, 그 레지스트리가 새 주소로 온다
+when a user granted permission to edit a HuggingFace registry changes the address, the HuggingFace registry comes back with the new address
 
 Given
 
-- HuggingFace 레지스트리 하나와, 레지스트리에 UPDATE 권한을 받은 일반 사용자 한 명
-  - HuggingFace 레지스트리 registry-1: https://huggingface.co 을 가리킨다
-  - 도메인 home-1
-  - global 에서 아티팩트 레지스트리 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 registry-keeper-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 registry-keeper-1: artifact_registry 전체에 UPDATE 허용
-    - 일반 사용자 user-1: 역할 registry-keeper-1 보유
+- one HuggingFace registry and one regular user granted UPDATE on registries
+  - HuggingFace registry registry-1: refers to https://huggingface.co
+  - Domain home-1
+  - Prepare a user granted permission on artifact registries in global
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role registry-keeper-1: applies only within the scope it is granted in
+    - Role registry-keeper-1: UPDATE allowed on every artifact_registry
+    - regular user user-1: holds Role registry-keeper-1
 
 When
 
-- HuggingFaceRegistryAdapter.update — user-1이 registry-1의 주소를 바꿈
+- HuggingFaceRegistryAdapter.update: user-1 changes the address of registry-1
 
 Then
 
-- 미리 만들어 둔 레지스트리가 새 주소로 온다
-  - id: 미리 만들어 둔 레지스트리의 id와 같다
-  - entity_id: 미리 만들어 둔 레지스트리의 id와 같다
+- the registry created in advance comes back with the new URL
+  - id: same as the id of the registry created in advance
+  - entity_id: same as the id of the registry created in advance
   - name = 'registry-1'
   - url = 'https://hub.example.com'
   - token = None
 
 <a id="editing-a-user-granted-nothing-may-not-edit-a-registry"></a>
 
-#### [a-user-granted-nothing-may-not-edit-a-registry](/tests/scenario/bai_scenario/manager/huggingface_registry/test_editing.py) — pass
+#### [a-user-granted-nothing-may-not-edit-a-registry](/tests/scenario/bai_scenario/manager/huggingface_registry/test_editing.py): pass
 
-아무 권한도 받지 않은 사용자가 주소를 바꾸려 하면 권한 부족으로 거부된다
+when a user granted nothing tries to change the address, it is rejected for lack of permission
 
 Given
 
-- HuggingFace 레지스트리 하나와, 아무 권한도 받지 않은 일반 사용자 한 명
-  - HuggingFace 레지스트리 registry-1: https://huggingface.co 을 가리킨다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one HuggingFace registry and one regular user with no permission
+  - HuggingFace registry registry-1: refers to https://huggingface.co
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- HuggingFaceRegistryAdapter.update — user-1이 registry-1의 주소를 바꿈
+- HuggingFaceRegistryAdapter.update: user-1 changes the address of registry-1
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 

@@ -40,10 +40,13 @@ class GetDefaultBootstrapScriptActionResult:
 
 @dataclass(frozen=True)
 class UpdateDefaultBootstrapScriptAction(BaseSingleEntityAction):
-    """Rewrite the script of the user's default bootstrap script."""
+    """Append a revision to the user's default bootstrap script. A user with no default
+    gets a new script, set as the default."""
 
     user_id: UserID
     script: BootstrapScript
+    # Recorded on the revision. Under act-as this is the impersonated owner, not the caller.
+    creator_id: UserID
 
     @override
     def entity_id(self) -> EntityIdentifier:

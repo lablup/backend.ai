@@ -23,11 +23,11 @@ from sqlalchemy.orm import (
 )
 
 from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.kernel_group import KernelGroupID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import (
-    AccessKey,
     ClusterMode,
     KernelId,
     SessionId,
@@ -156,6 +156,20 @@ class KernelRow(CreatedAtMixin, Base):
         unique=False,
         index=True,
         nullable=False,
+    )
+    # NULL until the enqueue write sets it. `use_alter` keeps the FK out of the
+    # CREATE TABLE so table subsets that omit ``kernel_groups`` still build.
+    kernel_group_id: Mapped[KernelGroupID | None] = mapped_column(
+        "kernel_group_id",
+        GUID(KernelGroupID),
+        sa.ForeignKey(
+            "kernel_groups.id",
+            ondelete="RESTRICT",
+            use_alter=True,
+            name="fk_kernels_kernel_group_id_kernel_groups",
+        ),
+        index=True,
+        nullable=True,
     )
     session_creation_id: Mapped[str | None] = mapped_column(
         "session_creation_id", sa.String(length=32), unique=False, index=False, nullable=True
@@ -496,10 +510,6 @@ class KernelRow(CreatedAtMixin, Base):
 
         return await execute_with_retry(_query)
 
-    def delegate_ownership(self, user_uuid: UserID, access_key: AccessKey) -> None:
-        self.user_uuid = user_uuid
-        self.access_key = access_key
-
     def to_kernel_info(self) -> KernelInfo:
         return KernelInfo(
             id=self.id,
@@ -590,6 +600,7 @@ class KernelRow(CreatedAtMixin, Base):
                 callback_url=str(self.callback_url) if self.callback_url else None,
                 internal_data=self.internal_data,
             ),
+            kernel_group_id=self.kernel_group_id,
         )
 
 

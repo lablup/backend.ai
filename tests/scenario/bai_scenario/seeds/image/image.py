@@ -18,11 +18,13 @@ from ai.backend.manager.data.image.types import (
 )
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.models.image.creators import ImageAliasCreator, ImageCreator
+from ai.backend.testutils.scenario_steps import Says
 from bai_scenario.seeds.seeder import (
     Naming,
     TestSeedFieldCreator,
     TestSeedRowFrom,
     TestSeedRowFromTwo,
+    joined,
 )
 
 
@@ -39,18 +41,22 @@ class TestSeedImage(TestSeedRowFrom[ContainerRegistryData, ImageData]):
 
     @override
     def kind(self) -> str:
-        return "이미지"
+        return Says("이미지", english="Image")
 
     @override
     def detail(self) -> str:
-        marks = [f"{self.architecture} 이미지"]
+        marks = [Says(f"{self.architecture} 이미지", english=f"{self.architecture} image")]
         if self.status is not ImageStatus.ALIVE:
-            marks.append(f"상태는 {self.status.value}")
+            marks.append(Says(f"상태는 {self.status.value}", english=f"status {self.status.value}"))
         if self.customized:
-            marks.append("커스터마이즈된 이미지라 소유자가 있다")
+            marks.append(
+                Says("커스텀 이미지라 소유자가 있다", english="custom image with an owner")
+            )
         if self.accelerators is not None:
-            marks.append(f"가속기는 {self.accelerators}")
-        return ", ".join(marks)
+            marks.append(
+                Says(f"가속기는 {self.accelerators}", english=f"accelerator {self.accelerators}")
+            )
+        return joined(marks, ", ")
 
     @override
     def name(self, naming: Naming) -> str:
@@ -89,14 +95,20 @@ class TestSeedCommittedImage(TestSeedRowFromTwo[ContainerRegistryData, ProjectDa
 
     @override
     def kind(self) -> str:
-        return "커밋한 이미지"
+        return Says("커밋한 이미지", english="Committed image")
 
     @override
     def detail(self) -> str:
-        marks = ["커스터마이즈된 이미지라 소유자가 있다", "그 사람의 개인 프로젝트에 속한다"]
+        marks = [
+            Says("커스텀 이미지라 소유자가 있다", english="custom image with an owner"),
+            Says(
+                "그 사람의 개인 프로젝트에 속한다",
+                english="belongs to that user's personal project",
+            ),
+        ]
         if self.status is not ImageStatus.ALIVE:
-            marks.append(f"상태는 {self.status.value}")
-        return ", ".join(marks)
+            marks.append(Says(f"상태는 {self.status.value}", english=f"status {self.status.value}"))
+        return joined(marks, ", ")
 
     @override
     def name(self, naming: Naming) -> str:
@@ -119,11 +131,20 @@ class TestSeedTaggedImage(TestSeedRowFrom[ContainerRegistryData, ImageData]):
 
     @override
     def kind(self) -> str:
-        return "이미지"
+        return Says("이미지", english="Image")
 
     @override
     def detail(self) -> str:
-        return f"{self.architecture} 이미지, 설정 다이제스트는 {self.config_digest}"
+        return joined(
+            [
+                Says(f"{self.architecture} 이미지", english=f"{self.architecture} image"),
+                Says(
+                    f"설정 다이제스트는 {self.config_digest}",
+                    english=f"config digest is {self.config_digest}",
+                ),
+            ],
+            ", ",
+        )
 
     @override
     def name(self, naming: Naming) -> str:
@@ -160,7 +181,7 @@ class TestSeedAlias(TestSeedFieldCreator[ImageData, ImageAliasData]):
 
     @override
     def kind(self) -> str:
-        return f"별칭 {self.alias}"
+        return Says(f"별칭 {self.alias}", english=f"alias {self.alias}")
 
     @override
     def owner_id(self, owner: ImageData) -> ImageID:

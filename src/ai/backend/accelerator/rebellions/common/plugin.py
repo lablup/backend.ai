@@ -73,11 +73,16 @@ class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin,
     enabled: bool = True
     atom_config: Any
 
+    config_name: str = "atom"
+    api: type[ATOMAPI] = ATOMAPI
+
     _rbln_stat_path: str
     _all_devices: list[TATOMDevice] | None
+    _host_ipc: bool
     _enable_rsd: bool
 
     async def init(self, context: Any = None) -> None:
+        self._host_ipc = t.ToBool().check(self.plugin_config.get("host_ipc", True))
         self._all_devices = None
 
         raw_device_mask = self.plugin_config.get("device_mask")
@@ -86,7 +91,7 @@ class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin,
                 *map(lambda dev_id: DeviceId(dev_id), raw_device_mask.split(",")),
             ]
 
-        raw_cfg, cfg_src_path = config.read_from_file(None, "atom")
+        raw_cfg, cfg_src_path = config.read_from_file(None, self.config_name)
         self.atom_config = _atom_config_iv.check(raw_cfg)
         log.info("device config loaded", plugin_name=self.key, config_path=str(cfg_src_path))
         _rbln_stat_path = self.atom_config["general"]["rbln_stat_path"] or shutil.which("rbln-stat")
@@ -144,7 +149,7 @@ class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin,
 
         stat_prefix = self.key.replace("-", "_")
 
-        stats = await ATOMAPI.get_stats(self._rbln_stat_path)
+        stats = await self.api.get_stats(self._rbln_stat_path)
         if self.enabled:
             for device in await self.list_devices():
                 device_id = device.device_id
@@ -182,6 +187,9 @@ class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin,
             ),
         ]
 
+    def _container_device_files(self, container_info: Mapping[str, Any]) -> list[str]:
+        return [d["PathOnHost"] for d in container_info["HostConfig"]["Devices"]]
+
     async def gather_container_measures(
         self,
         ctx: StatContext,
@@ -202,7 +210,7 @@ class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin,
 
             # rbln-stat returns all devices
             # filtering devices relevant to actual containers is necessary
-            stats = await ATOMAPI.get_stats(self._rbln_stat_path)
+            stats = await self.api.get_stats(self._rbln_stat_path)
             device_stats_by_device_filename: dict[str, ATOMDeviceStat] = {}
             for device_stat in stats.devices:
                 device_filename = "/dev/" + device_stat.device
@@ -215,9 +223,9 @@ class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin,
                     util_stats[cid] = Decimal("0")
                     number_of_devices_per_container[cid] = 0
                     container_info = await docker.containers.get(cid)
-                    for device in container_info["HostConfig"]["Devices"]:
-                        if device["PathOnHost"] in device_stats_by_device_filename:
-                            device_stat = device_stats_by_device_filename[device["PathOnHost"]]
+                    for path in self._container_device_files(container_info):
+                        if path in device_stats_by_device_filename:
+                            device_stat = device_stats_by_device_filename[path]
                             mem_stats[cid] += int(device_stat.memory.used)
                             mem_sizes[cid] += int(device_stat.memory.total)
                             util_stats[cid] += Decimal(device_stat.util)
@@ -327,7 +335,7 @@ class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin,
         return {
             "HostConfig": {
                 "CapAdd": ["IPC_LOCK"],
-                "IpcMode": "host",
+                **({"IpcMode": "host"} if self._host_ipc else {}),
                 "Ulimits": [
                     {
                         "Name": "memlock",

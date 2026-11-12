@@ -24,18 +24,23 @@ from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
 from ai.backend.manager.data.user.types import UserData
+from ai.backend.manager.defs import SECRET_KEY_PLACEHOLDER
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Condition,
     Given,
     Held,
+    Language,
     Refused,
     Same,
     SameAs,
+    Says,
     Then,
     Verdict,
+    in_language,
 )
+from bai_scenario.components.answers import TheFailedItemIsRefused
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf
 from bai_scenario.components.system import role_named
 from bai_scenario.seeds.artifact_registry.registry import TestSeedReservoirRegistry
@@ -76,7 +81,10 @@ class SomeoneGrantedOnRegistries(TestSeedNest[Laid[UserData]]):
 
     @override
     def kind(self) -> str:
-        return "global 에서 아티팩트 레지스트리 권한을 받은 사용자 준비"
+        return Says(
+            "global 에서 아티팩트 레지스트리 권한을 받은 사용자 준비",
+            english="Prepare a user granted permission on artifact registries in global",
+        )
 
     @override
     def lay(self, seed: TestSeeder) -> Laid[UserData]:
@@ -110,13 +118,21 @@ async def lay_a_caller(
     return granted_caller
 
 
-def _holding(role: UserRole, granted: tuple[Permission, ...]) -> str:
+def _holding(role: UserRole, granted: tuple[Permission, ...]) -> Says:
+    named = role_named(role)
+    named_en = in_language(named, Language.ENGLISH)
     if role == UserRole.SUPERADMIN:
-        return f"{role_named(role)} 한 명"
+        return Says(f"{named} 한 명", english=f"one {named_en}")
     if not granted:
-        return f"아무 권한도 받지 않은 {role_named(role)} 한 명"
+        return Says(
+            f"아무 권한도 받지 않은 {named} 한 명",
+            english=f"one {named_en} with no permission",
+        )
     names = ", ".join(str(permission.name) for permission in granted)
-    return f"레지스트리에 {names} 권한을 받은 {role_named(role)} 한 명"
+    return Says(
+        f"레지스트리에 {names} 권한을 받은 {named} 한 명",
+        english=f"one {named_en} granted {names} on registries",
+    )
 
 
 @dataclass(frozen=True)
@@ -128,7 +144,11 @@ class ARegistryAndSomeone(Given[Any, ARegistryAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"Reservoir 레지스트리 하나와, {_holding(self.role, self.granted)}"
+        holding = _holding(self.role, self.granted)
+        return Says(
+            f"Reservoir 레지스트리 하나와, {holding}",
+            english=f"one Reservoir registry and {in_language(holding, Language.ENGLISH)}",
+        )
 
     @override
     async def lay(self, seeding: Any) -> ARegistryAndACaller:
@@ -147,7 +167,13 @@ class ManyRegistriesAndSomeone(Given[Any, ManyRegistriesAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"Reservoir 레지스트리 {self.count}개와, {_holding(self.role, self.granted)}"
+        holding = _holding(self.role, self.granted)
+        return Says(
+            f"Reservoir 레지스트리 {self.count}개와, {holding}",
+            english=(
+                f"{self.count} Reservoir registries and {in_language(holding, Language.ENGLISH)}"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> ManyRegistriesAndACaller:
@@ -166,14 +192,32 @@ def registry_verdicts(
 ) -> list[Verdict]:
     """Every place of one registry node, prefixed for a node inside a list."""
     return [
-        Held[UUID](f"{at}id", node.id, SameAs(registry.id, "미리 만들어 둔 레지스트리의 id")),
         Held[UUID](
-            f"{at}entity_id", node.entity_id, SameAs(registry.id, "미리 만들어 둔 레지스트리의 id")
+            f"{at}id",
+            node.id,
+            SameAs(
+                registry.id,
+                Says(
+                    "미리 저장한 레지스트리의 id",
+                    english="the id of the registry seeded in advance",
+                ),
+            ),
+        ),
+        Held[UUID](
+            f"{at}entity_id",
+            node.entity_id,
+            SameAs(
+                registry.id,
+                Says(
+                    "미리 저장한 레지스트리의 id",
+                    english="the id of the registry seeded in advance",
+                ),
+            ),
         ),
         Same(f"{at}name", node.name, registry.name),
         Same(f"{at}endpoint", node.endpoint, endpoint),
         Same(f"{at}access_key", node.access_key, registry.access_key),
-        Same(f"{at}secret_key", node.secret_key, registry.secret_key),
+        Same(f"{at}secret_key", node.secret_key, SECRET_KEY_PLACEHOLDER),
         Same(f"{at}api_version", node.api_version, registry.api_version),
     ]
 
@@ -186,7 +230,10 @@ class Mentions(Condition[str]):
 
     @override
     def says(self) -> str:
-        return f"'{self.phrase}'를 담은 이유"
+        return Says(
+            f"'{self.phrase}'를 담은 이유",
+            english=f"a reason containing '{self.phrase}'",
+        )
 
     @override
     def holds(self, got: str) -> bool:
@@ -199,7 +246,10 @@ class TheRegistryIsEdited(Then[ARegistryAndACaller, ReservoirRegistryNode]):
 
     @override
     def says(self) -> str:
-        return "미리 만들어 둔 레지스트리가 새 엔드포인트로 온다"
+        return Says(
+            "미리 저장한 레지스트리가 새 엔드포인트로 반환됩니다",
+            english="the registry seeded in advance comes back with the new endpoint",
+        )
 
     @override
     def look(
@@ -217,7 +267,10 @@ class ThePurgedIdComesBack(Then[ARegistryAndACaller, PurgeReservoirRegistryPaylo
 
     @override
     def says(self) -> str:
-        return "purge 한 레지스트리의 id 가 온다"
+        return Says(
+            "purge 한 레지스트리의 id 가 반환됩니다",
+            english="the id of the purged registry comes back",
+        )
 
     @override
     def look(
@@ -227,7 +280,28 @@ class ThePurgedIdComesBack(Then[ARegistryAndACaller, PurgeReservoirRegistryPaylo
         if payload is None:
             return [Refused(NotEnoughPermission, answered.raised)]
         return [
-            Held[UUID]("id", payload.id, SameAs(laid.registry.id, "미리 만들어 둔 레지스트리의 id"))
+            Held[UUID](
+                "id",
+                payload.id,
+                SameAs(
+                    laid.registry.id,
+                    Says(
+                        "미리 저장한 레지스트리의 id",
+                        english="the id of the registry seeded in advance",
+                    ),
+                ),
+            ),
+            Held[UUID](
+                "entity_id",
+                payload.entity_id,
+                SameAs(
+                    laid.registry.id,
+                    Says(
+                        "미리 저장한 레지스트리의 id",
+                        english="the id of the registry seeded in advance",
+                    ),
+                ),
+            ),
         ]
 
 
@@ -237,7 +311,10 @@ class EveryTargetIsEdited(Then[ManyRegistriesAndACaller, Edited]):
 
     @override
     def says(self) -> str:
-        return "대상 레지스트리가 모두 새 엔드포인트로 오고, 실패한 것은 없다"
+        return Says(
+            "대상 레지스트리가 모두 새 엔드포인트로 반환되고, 실패한 것은 없습니다",
+            english="every target registry comes back with the new endpoint and nothing failed",
+        )
 
     @override
     def look(self, laid: ManyRegistriesAndACaller, answered: Answered[Edited]) -> list[Verdict]:
@@ -264,10 +341,19 @@ class EveryTargetIsPurged(Then[ManyRegistriesAndACaller, Purged]):
     @override
     def says(self) -> str:
         if self.missing is None:
-            return "대상 레지스트리의 id 가 모두 처리된 목록에 오고, 실패한 것은 없다"
-        return (
+            return Says(
+                "대상 레지스트리의 id 가 모두 처리된 목록에 오고, 실패한 것은 없습니다",
+                english=(
+                    "every target registry id comes back in the processed list and nothing failed"
+                ),
+            )
+        return Says(
             "대상 레지스트리의 id 가 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 이유로 "
-            "실패 목록에 온다"
+            "실패 목록에 옵니다",
+            english=(
+                "every target registry id comes back in the processed list and an unknown id "
+                "comes back in the failed list because no target answers to it"
+            ),
         )
 
     @override
@@ -281,7 +367,13 @@ class EveryTargetIsPurged(Then[ManyRegistriesAndACaller, Purged]):
                 Held[UUID](
                     f"successes[{i}].id",
                     purged.id,
-                    SameAs(registry.id, "미리 만들어 둔 레지스트리의 id"),
+                    SameAs(
+                        registry.id,
+                        Says(
+                            "미리 저장한 레지스트리의 id",
+                            english="the id of the registry seeded in advance",
+                        ),
+                    ),
                 )
             )
         if self.missing is None:
@@ -289,7 +381,14 @@ class EveryTargetIsPurged(Then[ManyRegistriesAndACaller, Purged]):
         verdicts.append(Same("failed count", len(payload.failed), 1))
         for failure in payload.failed:
             verdicts += [
-                Held[UUID]("failed[0].id", failure.id, SameAs(self.missing, "요청에 넣은 없는 id")),
+                Held[UUID](
+                    "failed[0].id",
+                    failure.id,
+                    SameAs(
+                        self.missing,
+                        Says("요청에 넣은 없는 id", english="the unknown id put in the request"),
+                    ),
+                ),
                 Held("failed[0].message", failure.message, Mentions("not found")),
             ]
         return verdicts
@@ -303,7 +402,10 @@ class NothingIsProcessed(Then[ManyRegistriesAndACaller, Any]):
 
     @override
     def says(self) -> str:
-        return "처리된 레지스트리 없이 대상이 모두 실패 목록에 온다"
+        return Says(
+            "처리된 레지스트리 없이 대상이 모두 실패 목록에 옵니다",
+            english="no registry is processed and every target comes back in the failed list",
+        )
 
     @override
     def look(self, laid: ManyRegistriesAndACaller, answered: Answered[Any]) -> list[Verdict]:
@@ -317,8 +419,13 @@ class NothingIsProcessed(Then[ManyRegistriesAndACaller, Any]):
         for i, (failure, registry) in enumerate(zip(payload.failed, laid.laid, strict=False)):
             verdicts += [
                 Held[UUID](
-                    f"failed[{i}].id", failure.id, SameAs(registry.id, "대상 레지스트리의 id")
+                    f"failed[{i}].id",
+                    failure.id,
+                    SameAs(
+                        registry.id,
+                        Says("대상 레지스트리의 id", english="the id of the target registry"),
+                    ),
                 ),
-                Held(f"failed[{i}].message", failure.message, Mentions(self.reason)),
+                TheFailedItemIsRefused(f"failed[{i}]", failure.message, self.reason),
             ]
         return verdicts

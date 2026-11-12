@@ -12,9 +12,9 @@ import secrets
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.types import AccessKey
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.keypair.types import KeyPairSecrets
 from ai.backend.manager.data.resource.types import (
@@ -22,10 +22,10 @@ from ai.backend.manager.data.resource.types import (
     UserResourcePolicyData,
 )
 from ai.backend.manager.data.user.types import UserStatus
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.repositories.ops.v2.user.write import FullUserCreator
 from ai.backend.manager.secret.types import SecretValue
+from ai.backend.testutils.scenario_steps import Says
 from bai_scenario.seeds.seeder import Naming, TestSeedUser
 
 PASSWORD = "scenario-password"
@@ -45,26 +45,45 @@ class TestSeedUserOf(TestSeedUser[DomainData, UserResourcePolicyData, KeyPairRes
     status: UserStatus | None = None
     """Written as is when given; otherwise the row derives it from ``is_active``."""
     secret_key: SecretValue | None = None
+    need_password_change: bool = False
 
     @override
     def kind(self) -> str:
         match self.role:
             case UserRole.SUPERADMIN:
-                return "슈퍼관리자"
+                return Says("superadmin", english="superadmin")
             case UserRole.ADMIN:
-                return "도메인 관리자"
+                return Says("도메인 관리자", english="domain admin")
             case UserRole.MONITOR:
-                return "모니터"
+                return Says("모니터", english="monitor")
             case UserRole.USER:
-                return "일반 사용자"
+                return Says("일반 사용자", english="regular user")
 
     @override
     def detail(self) -> str:
+        if self.need_password_change:
+            return Says(
+                "자기 키페어와 개인 프로젝트를 갖습니다, 비밀번호 변경을 요구받습니다",
+                english=(
+                    "has their own keypair and personal project, and must change their password"
+                ),
+            )
         if self.status is not None and self.status != UserStatus.ACTIVE:
-            return f"상태 {self.status.value}, 자기 키와 개인 프로젝트를 갖는다"
+            return Says(
+                f"상태 {self.status.value}, 자기 키페어와 개인 프로젝트를 갖습니다",
+                english=f"status {self.status.value}, has their own keypair and personal project",
+            )
         if self.secret_key is not None and not isinstance(self.secret_key.content, str):
-            return "자기 키와 개인 프로젝트를 갖는다, 비밀 키는 암호화돼 있다"
-        return "자기 키와 개인 프로젝트를 갖는다"
+            return Says(
+                "자기 키페어와 개인 프로젝트를 갖습니다, 비밀 키는 암호화된 상태입니다",
+                english=(
+                    "has their own keypair and personal project, and their secret key is encrypted"
+                ),
+            )
+        return Says(
+            "자기 키페어와 개인 프로젝트를 갖습니다",
+            english="has their own keypair and personal project",
+        )
 
     @override
     def name(self, naming: Naming) -> str:
@@ -89,7 +108,7 @@ class TestSeedUserOf(TestSeedUser[DomainData, UserResourcePolicyData, KeyPairRes
                     rounds=1000,
                     salt_size=16,
                 ),
-                need_password_change=False,
+                need_password_change=self.need_password_change,
                 domain_id=domain.id,
                 role=self.role,
                 is_active=self.is_active,

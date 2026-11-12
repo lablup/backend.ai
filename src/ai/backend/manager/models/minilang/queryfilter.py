@@ -5,6 +5,7 @@ import sqlalchemy as sa
 from lark import Lark, LarkError, Transformer, Tree
 from lark.lexer import Token
 
+from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.resource import DataTransformationFailed
 
 from . import (
@@ -236,7 +237,7 @@ class QueryFilterParser:
             ).transform(ast)
             where_clause = where_clause_result
         except LarkError as e:
-            raise ValueError(f"Query filter parsing error: {e}") from e
+            raise InvalidAPIParameters(f"Query filter parsing error: {e}") from e
         return where_clause
 
     def append_filter(

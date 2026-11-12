@@ -6,6 +6,7 @@ from typing import override
 
 from pydantic import ConfigDict, Field, field_validator
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_policy import (
     KeyPairResourcePolicyUUID,
@@ -14,10 +15,8 @@ from ai.backend.common.data.entity.resource_policy import (
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import InvalidIpAddressValue
 from ai.backend.common.types import AccessKey, BackendAISchema, ReadableCIDR
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.secret import InvalidEncryptedSecretFormat
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair.upserters import KeypairUpserter
 from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.models.user.upserters import UserUpserter

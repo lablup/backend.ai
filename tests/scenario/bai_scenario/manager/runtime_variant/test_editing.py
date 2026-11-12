@@ -19,7 +19,7 @@ from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Configured, Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.runtime_variant import (
     AVariantAndACaller,
@@ -53,12 +53,24 @@ class Editing(When[AVariantAndACaller, RuntimeVariantAdapter, RuntimeVariantNode
     @override
     def describe(self, laid: AVariantAndACaller) -> str:
         target = "존재하지 않는 id" if self.unknown else laid.variant.name
+        target_en = "an unknown id" if self.unknown else laid.variant.name
         changing = []
+        changing_en = []
         if self.named is not None:
             changing.append("이름")
+            changing_en.append("name")
         if not isinstance(self.described, Unset):
             changing.append("설명")
-        return f"{laid.caller.username}이 {target}의 {' 및 '.join(changing) or '아무것도'} 수정"
+            changing_en.append("description")
+        if not changing:
+            return Says(
+                f"{laid.caller.username}이 {target}을 변경 값 없이 수정합니다",
+                english=f"{laid.caller.username} updates {target_en} without giving a value",
+            )
+        return Says(
+            f"{laid.caller.username}이 {target}의 {' 및 '.join(changing)}을 수정합니다",
+            english=(f"{laid.caller.username} updates the {', '.join(changing_en)} of {target_en}"),
+        )
 
     @override
     async def call(
@@ -88,7 +100,10 @@ class RenamingToAnothersName(
     @override
     def describe(self, laid: ManyVariantsAndACaller) -> str:
         other = next(one for one in laid.laid if one.id != laid.named.id)
-        return f"{laid.caller.username}이 {laid.named.name}의 이름을 {other.name}(으)로 수정"
+        return Says(
+            f"{laid.caller.username}이 {laid.named.name}의 이름을 {other.name}(으)로 수정합니다",
+            english=f"{laid.caller.username} renames {laid.named.name} to {other.name}",
+        )
 
     @override
     async def call(
@@ -114,7 +129,14 @@ class TheNameChangesAndTheDescriptionStays(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 변형의 이름만 바꾸면, 이름은 새 값이 되고 설명은 그대로 유지된다"
+        return Says(
+            "superadmin 이 인퍼런스 런타임 종류의 이름만 바꾸면, 이름은 새 값이 되고 설명은 그대로 "
+            "유지됩니다",
+            english=(
+                "when the superadmin changes only the name of a runtime variant, the name takes "
+                "the new value and the description stays"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AVariantAndACaller]:
@@ -141,7 +163,13 @@ class ClearingTheDescription(
 
     @override
     def describe(self) -> str:
-        return "설명이 있는 변형에 설명을 비우는 수정을 하면, 설명이 없어진다"
+        return Says(
+            "설명이 있는 인퍼런스 런타임 종류에 설명을 비우는 수정을 하면, 설명이 없어집니다",
+            english=(
+                "when a runtime variant that has a description is updated to clear it, "
+                "the description is gone"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AVariantAndACaller]:
@@ -168,7 +196,10 @@ class AnEmptyEditChangesNothing(
 
     @override
     def describe(self) -> str:
-        return "값을 하나도 지정하지 않고 수정하면 아무것도 바뀌지 않은 노드가 반환된다"
+        return Says(
+            "값을 하나도 지정하지 않고 수정하면 아무것도 바뀌지 않은 노드가 반환됩니다",
+            english=("when an update gives no value, the node comes back with nothing changed"),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AVariantAndACaller]:
@@ -193,9 +224,14 @@ class RenamingToATakenNameIsRefused(
 
     @override
     def describe(self) -> str:
-        return (
-            "변형 둘 중 한쪽의 이름을 다른 쪽 이름으로 바꾸면, 이름 중복으로 거부된다. "
-            "생성할 때와 달리 저장소의 제약 위반이 그대로 전파된다"
+        return Says(
+            "인퍼런스 런타임 종류 둘 중 한쪽의 이름을 다른 쪽 이름으로 바꾸면, 이름 중복으로 "
+            "거부됩니다. 생성할 때와 달리 저장소의 제약 위반이 그대로 전파됩니다",
+            english=(
+                "when one of two runtime variants is renamed to the other's name, it is rejected "
+                "as a duplicate name. Unlike on creation, the repository's constraint violation "
+                "propagates as is"
+            ),
         )
 
     @override
@@ -221,7 +257,13 @@ class TheSuperadminEditingAnUnknownIdIsNotFound(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 존재하지 않는 id를 수정하면 대상을 찾을 수 없다는 이유로 거부된다"
+        return Says(
+            "superadmin 이 존재하지 않는 id 를 수정하면 대상을 찾을 수 없다는 이유로 거부됩니다",
+            english=(
+                "when the superadmin updates an id that nothing answers to, it is rejected "
+                "because the target cannot be found"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AVariantAndACaller]:
@@ -246,9 +288,14 @@ class AUserGrantedNothingMayNotEdit(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 없는 사용자가 변형을 수정하면 권한 부족으로 거부된다. "
-            "변형은 어느 스코프에도 속하지 않아 그 권한을 받을 방법이 없다"
+        return Says(
+            "아무 권한도 없는 사용자가 인퍼런스 런타임 종류를 수정하면 권한 부족으로 거부됩니다. "
+            "인퍼런스 런타임 종류는 어느 스코프에도 속하지 않아 그 권한을 받을 방법이 없습니다",
+            english=(
+                "when a user granted nothing updates a runtime variant, it is rejected for lack "
+                "of permission. A runtime variant belongs to no scope, so there is no way to "
+                "grant that permission"
+            ),
         )
 
     @override
@@ -274,9 +321,14 @@ class AUserGrantedNothingEditingAnUnknownIdIsRefusedTheSameWay(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 없는 사용자가 존재하지 않는 id를 수정하면 대상 없음이 아니라 권한 부족으로 "
-            "거부된다. 권한 검사가 먼저 실행되고 없는 행에는 부여된 권한도 없기 때문이다"
+        return Says(
+            "아무 권한도 없는 사용자가 존재하지 않는 id 를 수정하면 대상 없음이 아니라 권한 부족으로 "
+            "거부됩니다. 권한 검사가 먼저 실행되고 없는 행에는 부여된 권한도 없기 때문입니다",
+            english=(
+                "when a user granted nothing updates an unknown id, it is rejected for lack of "
+                "permission, not as a missing target. The permission check runs first, and no "
+                "permission is granted on a row that does not exist"
+            ),
         )
 
     @override
@@ -305,7 +357,13 @@ class EnforcementOffLetsAnyoneEdit(
 
     @override
     def describe(self) -> str:
-        return "권한 검사를 끄면 아무 권한도 없는 사용자도 변형을 수정할 수 있다"
+        return Says(
+            "권한 검사를 끄면 아무 권한도 없는 사용자도 인퍼런스 런타임 종류를 수정할 수 있습니다",
+            english=(
+                "turning the permission check off lets even a user granted nothing update "
+                "a runtime variant"
+            ),
+        )
 
     @override
     def config(self) -> Mapping[str, Any]:

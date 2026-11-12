@@ -26,6 +26,17 @@ class RolePresetRow(SoftDeleteMixin, LifecycleTimestampsMixin, Base):
             "scope_type",
             "deleted_at",
         ),
+        # One preset name per scope. Soft-deleted rows count too, because restoring
+        # a preset brings it back under its old name.
+        sa.UniqueConstraint(
+            "name",
+            "scope_type",
+            "scope_id",
+            # scope_id is NULL for a preset that applies to every scope of its type.
+            # PostgreSQL treats NULLs as distinct by default, which would let two such
+            # presets share a name.
+            postgresql_nulls_not_distinct=True,
+        ),
     )
 
     id: Mapped[RolePresetID] = mapped_column(
@@ -44,4 +55,8 @@ class RolePresetRow(SoftDeleteMixin, LifecycleTimestampsMixin, Base):
     # Default for the ``auto_assign`` flag copied onto roles instantiated from this preset.
     auto_assign: Mapped[bool] = mapped_column(
         "auto_assign", sa.Boolean, nullable=False, server_default=sa.false()
+    )
+    # Whether a personal project's owner is mapped to the role made from this preset.
+    auto_assign_to_owner: Mapped[bool] = mapped_column(
+        "auto_assign_to_owner", sa.Boolean, nullable=False, server_default=sa.false()
     )

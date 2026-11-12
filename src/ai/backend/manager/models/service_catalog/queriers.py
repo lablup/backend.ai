@@ -15,7 +15,7 @@ from ai.backend.manager.models.specs.querier import BulkEntityQuerier
 
 
 class BulkServiceCatalogQuerier(BulkEntityQuerier[ServiceCatalogRow, ServiceCatalogData]):
-    """The registered services the caller named, without their endpoints."""
+    """The registered services the caller named."""
 
     @override
     def row_class(self) -> type[ServiceCatalogRow]:
@@ -27,4 +27,4 @@ class BulkServiceCatalogQuerier(BulkEntityQuerier[ServiceCatalogRow, ServiceCata
 
     @override
     def to_data(self, row: ServiceCatalogRow) -> ServiceCatalogData:
-        return ServiceCatalogSearchableFields.own.to_data_with_endpoints(row, [])
+        return ServiceCatalogSearchableFields.own.to_data(row)

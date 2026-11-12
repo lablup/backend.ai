@@ -10,6 +10,7 @@ from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
@@ -41,13 +42,14 @@ from ai.backend.manager.data.session.spec import (
     SessionSpec,
 )
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.data.vfolder.types import verify_vfolder_name
+from ai.backend.manager.data.vfolder.types import verify_mount_destination
 from ai.backend.manager.errors.common import InternalServerError, RejectedByHook
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.metrics.scheduler import (
     SchedulerOperationMetricObserver,
     SchedulerPhaseMetricObserver,
 )
+from ai.backend.manager.plugin.hook_args import PostEnqueueSessionHookArgs
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
@@ -76,6 +78,7 @@ from ai.backend.manager.sokovan.scheduling_controller.preparers.resources.merge_
 )
 from ai.backend.manager.sokovan.scheduling_controller.preparers.session_spec_preparer import (
     SessionSpecPreparer,
+    SessionSpecPreparerArgs,
 )
 from ai.backend.manager.sokovan.scheduling_controller.preparers.specs.assign_container_user_mapping_rule import (
     AssignContainerUserMappingRule,
@@ -128,6 +131,9 @@ from ai.backend.manager.sokovan.scheduling_controller.validators.required_resour
 )
 from ai.backend.manager.sokovan.scheduling_controller.validators.resource_limit_rule import (
     ResourceLimitRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.validators.runner_reserved_environ_rule import (
+    RunnerReservedEnvironRule,
 )
 from ai.backend.manager.sokovan.scheduling_controller.validators.service_port_rule import (
     ServicePortRule,
@@ -192,26 +198,31 @@ class SchedulingController:
         self._operation_metrics = SchedulerOperationMetricObserver.instance()
 
         # Draft-based spec preparer. Order matters — RG defaults merge
-        # first so later rules see the merged baseline; expand last on
-        # the options side so kernel specs exist before per-kernel rules
-        # run. The resource rules determine resource amounts (identity
-        # included so the draft can be promoted) and are runnable alone
-        # via prepare_resources() for the fitting check.
+        # first so the pre-expand rules see the merged baseline; those
+        # rules complete each group before expansion so a stored group
+        # and its kernels hold the same values; the per-kernel spec
+        # rules run after expansion. The resource rules determine
+        # resource amounts and run with expansion alone via
+        # prepare_resources() for the fitting check.
         self._spec_preparer = SessionSpecPreparer(
-            resource_rules=(
-                MergeResourceGroupDefaultsRule(),
-                ComputeKernelResourcesRule(),
-                DropZeroResourceSlotsRule(),
-                ExpandKernelGroupsRule(),
-            ),
-            spec_rules=(
-                AssignUserIdentityRule(),
-                AssignNetworkConfigRule(),
-                AssignContainerUserMappingRule(),
-                InjectSessionEnvironRule(),
-                BuildInternalDataRule(),
-                ResolveVFolderMountsRule(),
-            ),
+            SessionSpecPreparerArgs(
+                resource_rules=(
+                    MergeResourceGroupDefaultsRule(),
+                    ComputeKernelResourcesRule(),
+                    DropZeroResourceSlotsRule(),
+                ),
+                pre_expand_spec_rules=(
+                    InjectSessionEnvironRule(),
+                    ResolveVFolderMountsRule(),
+                ),
+                expand_rule=ExpandKernelGroupsRule(),
+                spec_rules=(
+                    AssignUserIdentityRule(),
+                    AssignNetworkConfigRule(),
+                    AssignContainerUserMappingRule(),
+                    BuildInternalDataRule(),
+                ),
+            )
         )
 
         # Draft-based spec validator chain. Runs against the finalized
@@ -229,6 +240,7 @@ class SchedulingController:
             MountNameValidationRule(),
             InferenceModelFolderRule(),
             DotfileVFolderConflictRule(),
+            RunnerReservedEnvironRule(),
         ])
         self._agent_selector = args.agent_selector
 
@@ -284,7 +296,7 @@ class SchedulingController:
         context = await self._build_session_spec_context(draft)
         spec = await self._finalize_session_spec(draft, context)
 
-        await self._dispatch_pre_enqueue_hook(spec)
+        await self._dispatch_pre_enqueue_hook()
 
         with self._metric_observer.measure_phase("scheduling_controller", rg_id, "spec_validation"):
             self._spec_validator.validate(spec, context)
@@ -318,16 +330,12 @@ class SchedulingController:
             scope = SessionScope.model_validate(draft.scope.model_dump(exclude_none=True))
             return SessionSpec(resource_spec=resource_spec, scope=scope)
 
-    async def _dispatch_pre_enqueue_hook(self, spec: SessionSpec) -> None:
+    async def _dispatch_pre_enqueue_hook(self) -> None:
         """Run the ``PRE_ENQUEUE_SESSION`` hook gate; a rejection raises."""
         hook_result = await self._hook_plugin_ctx.dispatch(
             "PRE_ENQUEUE_SESSION",
-            (
-                spec.resource_spec.identity.session_id,
-                spec.resource_spec.identity.session_name,
-                spec.resource_spec.identity.access_key,
-                spec.resource_spec.identity.user_uuid,
-            ),
+            # No handler reads arguments; pass a dataclass from plugin/hook_args.py once one does.
+            (),
             return_when=ALL_COMPLETED,
         )
         if hook_result.status != PASSED:
@@ -356,12 +364,7 @@ class SchedulingController:
             log.warning("scheduling request failed", session_id=session_id, exc_info=e)
         await self._hook_plugin_ctx.notify(
             "POST_ENQUEUE_SESSION",
-            (
-                session_id,
-                spec.resource_spec.identity.session_name,
-                spec.resource_spec.identity.access_key,
-                spec.resource_spec.identity.user_uuid,
-            ),
+            (PostEnqueueSessionHookArgs(session_id=SessionID(session_id)),),
         )
 
     @staticmethod
@@ -676,7 +679,7 @@ class SchedulingController:
                 alias_name = alias_name.replace("/home/work/", "")
             if alias_name == "":
                 raise InvalidAPIParameters("Alias name cannot be empty.")
-            if not verify_vfolder_name(alias_name):
+            if not verify_mount_destination(alias_name):
                 raise InvalidAPIParameters(str(alias_name) + " is reserved for internal path.")
             if alias_name in original_refs:
                 raise InvalidAPIParameters(

@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
+from dataclasses import replace
 from datetime import datetime
 from typing import Any, cast
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, noload, selectinload
+from sqlalchemy.orm import noload, selectinload
 from sqlalchemy.orm.strategy_options import _AbstractLoad
 
 from ai.backend.common.data.entity.session import SessionID
@@ -20,9 +21,11 @@ from ai.backend.common.types import (
     SessionId,
 )
 from ai.backend.manager.data.image.types import ImageData, ImageStatus
+from ai.backend.manager.data.resource.types import ResourceGroupProxyConnectionInfo
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.data.session.types import (
     SessionData,
+    SessionEntityData,
     SessionRoutingInfo,
     SessionStatus,
 )
@@ -38,6 +41,7 @@ from ai.backend.manager.errors.kernel import (
     TooManyKernelsFound,
     TooManySessionsMatched,
 )
+from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.image.searchers import (
     CanonicalImageSearcher,
@@ -46,11 +50,11 @@ from ai.backend.manager.models.image.searchers import (
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.kernel.searchable_fields import KernelSearchableFields
 from ai.backend.manager.models.kernel.searchers import KernelSearcher
+from ai.backend.manager.models.kernel.updaters import KernelSessionNameBatchUpdater
 from ai.backend.manager.models.project.row import groups
 from ai.backend.manager.models.resource_group.row import resource_groups
 from ai.backend.manager.models.resource_slot.row import ResourceAllocationRow
 from ai.backend.manager.models.session.row import (
-    DEAD_SESSION_STATUSES,
     TERMINAL_SESSION_STATUSES,
     KernelLoadingStrategy,
     SessionDependencyRow,
@@ -59,13 +63,14 @@ from ai.backend.manager.models.session.row import (
 from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
 from ai.backend.manager.models.session.searchers import SessionSearcher
 from ai.backend.manager.models.session.updaters import SessionUpdater
+from ai.backend.manager.models.session_designated_agent.row import SessionDesignatedAgentRow
 from ai.backend.manager.models.session_template.row import SessionTemplateRow
-from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.models.user.row import UserRole, UserRow
 from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
+from ai.backend.manager.repositories.ops.v2.read import V2ReadOps
 from ai.backend.manager.repositories.session.dependency_graph import find_dependency_sessions
 from ai.backend.manager.utils import query_userinfo
 
@@ -193,10 +198,9 @@ class SessionDBSource:
                     selectinload(KernelRow.agent_row).noload("*"),
                 ),
             ])
-        options.append(joinedload(SessionRow.user))
         cond = SessionRow.id == session_id
         if not allow_stale:
-            cond = cond & ~SessionRow.status.in_(DEAD_SESSION_STATUSES)
+            cond = cond & ~SessionRow.status.in_(SessionStatus.terminal_statuses())
         query = (
             sa.select(SessionRow)
             .where(cond)
@@ -212,13 +216,63 @@ class SessionDBSource:
         self,
         id_or_name_prefix: str,
         owner_access_key: AccessKey,
-    ) -> list[SessionRow]:
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            return await SessionRow.match_sessions(
-                db_sess,
-                id_or_name_prefix,
-                owner_access_key,
+    ) -> list[SessionEntityData]:
+        async with self._ops_provider.read_ops() as r:
+            return await self._match_sessions(
+                r, id_or_name_prefix, owner_access_key, allow_stale=True
             )
+
+    @staticmethod
+    async def _match_sessions(
+        r: V2ReadOps,
+        id_or_name: str,
+        access_key: AccessKey,
+        *,
+        allow_stale: bool,
+    ) -> list[SessionEntityData]:
+        """The sessions of ``access_key`` whose id or name equals ``id_or_name``.
+
+        An id match shuts out the name matches; up to 10 name matches come newest first.
+        """
+        fields = SessionSearchableFields.own
+        owned = [
+            fields.access_key.filter.equals(
+                StringMatchSpec(access_key, case_insensitive=False, negated=False)
+            )
+        ]
+        if not allow_stale:
+            owned.append(fields.status.filter.not_in(list(SessionStatus.terminal_statuses())))
+        try:
+            session_id = uuid.UUID(id_or_name)
+        except ValueError:
+            pass
+        else:
+            by_id = await r.search_in_global(
+                SessionSearcher(
+                    pagination=NoPagination(),
+                    conditions=[
+                        *owned,
+                        fields.id.filter.equals(
+                            UUIDEqualMatchSpec(value=session_id, negated=False)
+                        ),
+                    ],
+                )
+            )
+            if by_id.items:
+                return list(by_id.items)
+        by_name = await r.search_in_global(
+            SessionSearcher(
+                pagination=OffsetPagination(limit=10),
+                conditions=[
+                    *owned,
+                    fields.name.filter.equals(
+                        StringMatchSpec(id_or_name, case_insensitive=False, negated=False)
+                    ),
+                ],
+                orders=[fields.created_at.order.apply(ascending=False)],
+            )
+        )
+        return list(by_name.items)
 
     async def get_template_by_id(
         self,
@@ -353,19 +407,26 @@ class SessionDBSource:
             )
             return await conn.scalar(query)
 
-    async def get_resource_group_wsproxy_addr(
+    async def resource_group_proxy_connection_info(
         self,
         resource_group_name: str,
-    ) -> str | None:
+    ) -> ResourceGroupProxyConnectionInfo | None:
         async with self._db.begin_readonly() as conn:
             query = (
-                sa.select(resource_groups.c.wsproxy_addr)
+                sa.select(resource_groups.c.wsproxy_addr, resource_groups.c.wsproxy_api_token)
                 .select_from(resource_groups)
                 .where(resource_groups.c.name == resource_group_name)
             )
             result = await conn.execute(query)
-            sgroup = result.first()
-            return sgroup.wsproxy_addr if sgroup else None
+            resource_group = result.first()
+            if resource_group is None:
+                return None
+            if not resource_group.wsproxy_addr:
+                return None
+            return ResourceGroupProxyConnectionInfo(
+                addr=resource_group.wsproxy_addr,
+                api_token=resource_group.wsproxy_api_token,
+            )
 
     async def get_session_by_id(
         self,
@@ -385,49 +446,81 @@ class SessionDBSource:
         self,
         updater: SessionUpdater,
         session_name: str | None = None,
-    ) -> SessionRow | None:
+    ) -> SessionData:
         session_id = updater.session_id
-
-        async with self._db.begin_session() as db_session:
-            query_stmt = sa.select(SessionRow).where(SessionRow.id == session_id)
-            session_row = await db_session.scalar(query_stmt)
-            if session_row is None:
+        session_fields = SessionSearchableFields.own
+        kernel_fields = KernelSearchableFields.own
+        async with self._ops_provider.write_ops() as w:
+            found = await w.search_in_global(
+                SessionSearcher(
+                    pagination=NoPagination(),
+                    conditions=[
+                        session_fields.id.filter.equals(
+                            UUIDEqualMatchSpec(value=session_id, negated=False)
+                        )
+                    ],
+                )
+            )
+            if not found.items:
                 raise SessionNotFound(f"Session not found (id:{session_id})")
+            access_key = found.items[0].access_key
 
-            if session_name and session_row.access_key is not None:
+            if session_name and access_key is not None:
                 # Check the owner of the target session has any session with the same name
-                try:
-                    sess = await SessionRow.get_session(
-                        db_session,
-                        session_name,
-                        AccessKey(session_row.access_key),
+                matches = await self._match_sessions(
+                    w,
+                    session_name,
+                    access_key,
+                    allow_stale=False,
+                )
+                if len(matches) > 1:
+                    raise TooManySessionsMatched(
+                        extra_data={
+                            "matches": [
+                                {
+                                    "session_id": sess.id,
+                                    "session_name": sess.name,
+                                    "status": sess.status,
+                                    "created_at": sess.created_at,
+                                }
+                                for sess in matches
+                            ]
+                        }
                     )
-                except SessionNotFound:
-                    pass
-                else:
+                if matches:
                     raise SessionAlreadyExists(
-                        f"Duplicate session name. Session(id:{sess.id}) already has the name"
+                        f"Duplicate session name. Session(id:{matches[0].id}) already has the name"
                     )
 
-            updated = await V2WriteOps(db_session).update_data(updater)
+            updated = await w.update_data(updater)
             if updated is None:
                 raise SessionNotFound(f"Session not found (id:{session_id})")
 
             if session_name:
-                await db_session.execute(
-                    sa.update(KernelRow)
-                    .values(session_name=session_name)
-                    .where(KernelRow.session_id == session_id)
+                await w.batch_update_in_global(
+                    KernelSessionNameBatchUpdater(session_id=session_id, session_name=session_name)
                 )
 
-            # Re-fetch with kernels loaded for the return value
-            select_stmt = (
-                sa.select(SessionRow)
-                .options(selectinload(SessionRow.kernels))
-                .execution_options(populate_existing=True)
-                .where(SessionRow.id == session_id)
-            )
-            return cast(SessionRow | None, await db_session.scalar(select_stmt))
+            main_kernels = (
+                await w.search_in_global(
+                    KernelSearcher(
+                        pagination=NoPagination(),
+                        conditions=[
+                            kernel_fields.session_id.filter.equals(
+                                UUIDEqualMatchSpec(value=session_id, negated=False)
+                            ),
+                            kernel_fields.cluster_role.filter.equals(
+                                StringMatchSpec(DEFAULT_ROLE, case_insensitive=False, negated=False)
+                            ),
+                        ],
+                    )
+                )
+            ).items
+        service_ports = main_kernels[0].network.service_ports if main_kernels else None
+        return replace(
+            updated.to_session_data(),
+            service_ports=str(service_ports) if service_ports else None,
+        )
 
     async def query_userinfo(
         self,
@@ -542,14 +635,12 @@ class SessionDBSource:
         kernel_loading_strategy: KernelLoadingStrategy = KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         allow_stale: bool = False,
     ) -> SessionRow:
-        """Get session with group information eagerly loaded"""
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             return await self._session_by_id(
                 db_sess,
                 session_id,
                 kernel_loading_strategy=kernel_loading_strategy,
                 allow_stale=allow_stale,
-                eager_loading_op=[selectinload(SessionRow.group)],
             )
 
     async def get_session_with_routing_minimal(
@@ -559,7 +650,7 @@ class SessionDBSource:
         """Resolve a live session by ``session_id`` into its routing info.
 
         This is a pure lookup; session access authorization is the caller's
-        responsibility. Dead (terminated/cancelled) sessions are excluded. The main
+        responsibility. Errored, terminated and cancelled sessions are excluded. The main
         kernel's routing fields are read separately: a searcher answers with one
         entity's own columns.
         """
@@ -574,7 +665,9 @@ class SessionDBSource:
                             session_fields.id.filter.equals(
                                 UUIDEqualMatchSpec(value=session_id, negated=False)
                             ),
-                            session_fields.status.filter.not_in(list(DEAD_SESSION_STATUSES)),
+                            session_fields.status.filter.not_in(
+                                list(SessionStatus.terminal_statuses())
+                            ),
                         ],
                     )
                 )
@@ -654,6 +747,25 @@ class SessionDBSource:
             )
             for key in keys
         }
+
+    async def bulk_get_designated_agent_ids_by_session(
+        self,
+        session_ids: Sequence[SessionID],
+    ) -> dict[SessionID, list[AgentId]]:
+        """Read the agent ids each session designates; one with none is absent."""
+        if not session_ids:
+            return {}
+        stmt = (
+            sa.select(SessionDesignatedAgentRow.session_id, AgentRow.id)
+            .join(AgentRow, AgentRow.uuid == SessionDesignatedAgentRow.agent_uuid)
+            .where(SessionDesignatedAgentRow.session_id.in_(session_ids))
+            .order_by(AgentRow.id)
+        )
+        designated: dict[SessionID, list[AgentId]] = {}
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            for session_id, agent_id in await db_sess.execute(stmt):
+                designated.setdefault(SessionID(session_id), []).append(AgentId(agent_id))
+        return designated
 
     async def batch_get_resource_allocation_by_session(
         self,

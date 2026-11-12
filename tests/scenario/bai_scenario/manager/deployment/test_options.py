@@ -20,9 +20,11 @@ from ai.backend.common.dto.manager.v2.session_options.request import (
     HandlerOptionsEntryInput,
     HandlerOptionsInput,
 )
+from ai.backend.common.dto.manager.v2.session_options.types import AgentSelectionPolicyEnum
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.manager.api.adapters.deployment.adapter import DeploymentAdapter
 from ai.backend.manager.data.permission.types import Permission
+from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -34,6 +36,7 @@ from ai.backend.testutils.scenario_steps import (
     Refused,
     Same,
     SameAs,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -58,9 +61,10 @@ type OptionsStep = Scenario[
 
 @dataclass(frozen=True)
 class Replacing(When[ADeploymentAndACaller, DeploymentAdapter, ReplaceDeploymentOptionsPayload]):
-    """배포의 옵션을 준 것으로 갈아끼운다."""
+    """배포의 옵션을 준 것으로 갈아끼운다. ``policy``가 없으면 선택 정책을 주지 않는다."""
 
     entries: tuple[Entry, ...] = ()
+    policy: AgentSelectionPolicyEnum | None = None
 
     @override
     def operation(self) -> str:
@@ -69,10 +73,22 @@ class Replacing(When[ADeploymentAndACaller, DeploymentAdapter, ReplaceDeployment
     @override
     def describe(self, laid: ADeploymentAndACaller) -> str:
         if not self.entries:
-            given = "기본값만 담아"
+            given_ko = "기본값만 담아"
+            given_en = "only the defaults"
         else:
-            given = f"처리기별 설정 {', '.join(name for name, _, _ in self.entries)}을 담아"
-        return f"{laid.caller.username}이 {laid.deployment.metadata.name}의 옵션을 {given} 갈아끼움"
+            names = ", ".join(name for name, _, _ in self.entries)
+            given_ko = f"처리기별 설정 {names}을 담아"
+            given_en = f"the per-handler settings {names}"
+        if self.policy is not None:
+            given_ko = f"선택 정책 {self.policy.value}와 {given_ko}"
+            given_en = f"the selection policy {self.policy.value} and {given_en}"
+        return Says(
+            f"{laid.caller.username} 이 {laid.deployment.metadata.name}의 옵션을 {given_ko} 교체합니다",
+            english=(
+                f"{laid.caller.username} replaces the options of "
+                f"{laid.deployment.metadata.name} with {given_en}"
+            ),
+        )
 
     @override
     async def call(
@@ -88,7 +104,8 @@ class Replacing(When[ADeploymentAndACaller, DeploymentAdapter, ReplaceDeployment
                         )
                         for name, waits, retries in self.entries
                     ],
-                )
+                ),
+                agent_selection_policy=self.policy,
             )
         )
         with ActingAs(laid.caller):
@@ -100,10 +117,14 @@ class TheOptionsAreReplaced(Then[ADeploymentAndACaller, ReplaceDeploymentOptions
     """준 옵션이 통째로 온다. 배포 전체가 아니라 옵션만 싣는다."""
 
     entries: tuple[Entry, ...] = field(default_factory=tuple)
+    policy: AgentSelectionPolicyEnum = AgentSelectionPolicyEnum.PREFERRED
 
     @override
     def says(self) -> str:
-        return "갈아끼운 옵션만 온다"
+        return Says(
+            "교체한 옵션만 옵니다",
+            english="only the replaced options come back",
+        )
 
     @override
     def look(
@@ -116,7 +137,14 @@ class TheOptionsAreReplaced(Then[ADeploymentAndACaller, ReplaceDeploymentOptions
             return [Refused(EntityNotFoundError, answered.raised)]
         handler = payload.options.handler_options
         return [
-            Held("deployment_id", payload.deployment_id, SameAs(laid.deployment.id, "심은 배포")),
+            Held(
+                "deployment_id",
+                payload.deployment_id,
+                SameAs(
+                    laid.deployment.id,
+                    Says("미리 저장한 배포", english="the deployment seeded in advance"),
+                ),
+            ),
             Same("options.handler_options.default.timeout_sec", handler.default.timeout_sec, WAITS),
             Same(
                 "options.handler_options.default.max_retry_count",
@@ -127,6 +155,11 @@ class TheOptionsAreReplaced(Then[ADeploymentAndACaller, ReplaceDeploymentOptions
                 "options.handler_options.by_handler",
                 [(e.handler_name, e.timeout_sec, e.max_retry_count) for e in handler.by_handler],
                 sorted(self.entries),
+            ),
+            Same(
+                "options.agent_selection_policy",
+                payload.options.agent_selection_policy,
+                self.policy,
             ),
         ]
 
@@ -146,9 +179,14 @@ class WhatIsGivenBecomesTheOptions(
 
     @override
     def describe(self) -> str:
-        return (
-            "수정 권한을 받은 사용자가 기본값과 처리기별 설정을 담아 옵션을 갈아끼우면, "
-            "준 것이 통째로 새 옵션이 되고 답은 그 옵션만 싣는다"
+        return Says(
+            "수정 권한을 받은 사용자가 기본값과 처리기별 설정을 담아 옵션을 교체하면, "
+            "준 것이 전부 새 옵션이 되고 응답은 그 옵션만 싣습니다",
+            english=(
+                "when a user granted update replaces the options with the defaults and per-handler "
+                "settings, what was given becomes the new options as a whole and the response "
+                "carries only those options"
+            ),
         )
 
     @override
@@ -181,9 +219,13 @@ class WhatIsNotGivenDoesNotStay(
 
     @override
     def describe(self) -> str:
-        return (
-            "물려받은 처리기별 설정이 있는 배포에 기본값만 담아 옵션을 갈아끼우면, "
-            "물려받은 설정이 하나도 남지 않는다"
+        return Says(
+            "상속한 처리기별 설정이 있는 배포에 기본값만 담아 옵션을 교체하면, "
+            "상속한 설정이 하나도 남지 않습니다",
+            english=(
+                "replacing the options of a deployment that holds inherited per-handler settings "
+                "with only the defaults leaves none of the inherited settings"
+            ),
         )
 
     @override
@@ -202,6 +244,85 @@ class WhatIsNotGivenDoesNotStay(
 
 
 @dataclass(frozen=True)
+class TheGivenPolicyBecomesThePolicy(
+    Scenario[
+        TestSeedingSession,
+        ADeploymentAndACaller,
+        DeploymentAdapter,
+        ReplaceDeploymentOptionsPayload,
+    ]
+):
+    @override
+    def summary(self) -> str:
+        return "replacing-with-a-strict-policy-keeps-it-strict"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "선택 정책을 STRICT 로 담아 옵션을 교체하면, 새 옵션의 선택 정책도 STRICT 입니다",
+            english=(
+                "replacing the options with the selection policy STRICT keeps that policy "
+                "on the new options"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:
+        return ADeploymentInThatPlace(granted=(Permission.UPDATE,))
+
+    @override
+    def when(
+        self,
+    ) -> When[ADeploymentAndACaller, DeploymentAdapter, ReplaceDeploymentOptionsPayload]:
+        return Replacing(policy=AgentSelectionPolicyEnum.STRICT)
+
+    @override
+    def then(self) -> Then[ADeploymentAndACaller, ReplaceDeploymentOptionsPayload]:
+        return TheOptionsAreReplaced(policy=AgentSelectionPolicyEnum.STRICT)
+
+
+@dataclass(frozen=True)
+class AnOmittedPolicyStays(
+    Scenario[
+        TestSeedingSession,
+        ADeploymentAndACaller,
+        DeploymentAdapter,
+        ReplaceDeploymentOptionsPayload,
+    ]
+):
+    @override
+    def summary(self) -> str:
+        return "replacing-without-a-policy-keeps-the-stored-one"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "선택 정책이 STRICT 인 배포에서 선택 정책을 빼고 옵션을 교체하면, "
+            "선택 정책은 STRICT 로 남습니다",
+            english=(
+                "replacing the options of a deployment whose selection policy is STRICT "
+                "without a policy keeps it STRICT"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:
+        return ADeploymentInThatPlace(
+            granted=(Permission.UPDATE,), agent_selection_policy=AgentSelectionPolicy.STRICT
+        )
+
+    @override
+    def when(
+        self,
+    ) -> When[ADeploymentAndACaller, DeploymentAdapter, ReplaceDeploymentOptionsPayload]:
+        return Replacing()
+
+    @override
+    def then(self) -> Then[ADeploymentAndACaller, ReplaceDeploymentOptionsPayload]:
+        return TheOptionsAreReplaced(policy=AgentSelectionPolicyEnum.STRICT)
+
+
+@dataclass(frozen=True)
 class AnUnregisteredHandlerIsRefused(
     Scenario[
         TestSeedingSession,
@@ -216,7 +337,13 @@ class AnUnregisteredHandlerIsRefused(
 
     @override
     def describe(self) -> str:
-        return "등록되지 않은 처리기 이름을 담아 옵션을 갈아끼우면, 입력이 틀렸다는 이유로 거부된다"
+        return Says(
+            "등록되지 않은 처리기 이름을 담아 옵션을 교체하면, 입력이 틀렸다는 이유로 거부됩니다",
+            english=(
+                "replacing the options with an unregistered handler name is rejected because the "
+                "input is wrong"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:
@@ -248,7 +375,13 @@ class AHandlerNamedTwiceIsRefused(
 
     @override
     def describe(self) -> str:
-        return "같은 처리기 이름을 두 번 담아 옵션을 갈아끼우면, 입력이 틀렸다는 이유로 거부된다"
+        return Says(
+            "같은 처리기 이름을 두 번 담아 옵션을 교체하면, 입력이 틀렸다는 이유로 거부됩니다",
+            english=(
+                "replacing the options with the same handler name twice is rejected because the "
+                "input is wrong"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:
@@ -280,7 +413,13 @@ class ReadingIsNotEnoughToReplace(
 
     @override
     def describe(self) -> str:
-        return "읽기 권한만 받은 사용자가 옵션을 갈아끼우면, 권한 부족으로 거부된다"
+        return Says(
+            "읽기 권한만 받은 사용자가 옵션을 교체하면, 권한 부족으로 거부됩니다",
+            english=(
+                "when a user granted only read replaces the options, the call is rejected for "
+                "lack of permission"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:
@@ -300,6 +439,8 @@ class ReadingIsNotEnoughToReplace(
 SCENARIOS: list[OptionsStep] = [
     WhatIsGivenBecomesTheOptions(),
     WhatIsNotGivenDoesNotStay(),
+    TheGivenPolicyBecomesThePolicy(),
+    AnOmittedPolicyStays(),
     AnUnregisteredHandlerIsRefused(),
     AHandlerNamedTwiceIsRefused(),
     ReadingIsNotEnoughToReplace(),

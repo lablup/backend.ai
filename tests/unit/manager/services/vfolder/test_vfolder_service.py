@@ -31,6 +31,7 @@ from ai.backend.manager.errors.storage import (
     VFolderFilterStatusFailed,
     VFolderNotFound,
 )
+from ai.backend.manager.errors.watcher import WatcherTokenNotConfigured
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.services.vfolder.actions.base import (
     PurgeVFolderAction,
@@ -406,6 +407,69 @@ class TestVFolderServiceGetFolderUsage:
         assert result.vfolder_uuid == sample_vfolder_uuid
         assert result.usage is None
         mock_storage_manager.get_manager_facing_client.assert_not_called()
+
+    @pytest.mark.parametrize("status", sorted(VFolderOperationStatus.hard_deleted()))
+    async def test_hard_deleted_vfolder_raises_not_found_without_storage_call(
+        self,
+        vfolder_service: VFolderService,
+        mock_vfolder_repository: MagicMock,
+        mock_storage_manager: MagicMock,
+        sample_vfolder_data: VFolderData,
+        sample_action: GetVFolderUsageAction,
+        status: VFolderOperationStatus,
+    ) -> None:
+        """Hard-deleted vfolders have only their row left: VFolderNotFound is
+        raised and no storage client is consulted."""
+        deleted_data = dataclasses.replace(sample_vfolder_data, status=status)
+        mock_vfolder_repository.get_by_id = AsyncMock(return_value=deleted_data)
+
+        with pytest.raises(VFolderNotFound):
+            await vfolder_service.get_folder_usage(sample_action)
+
+        mock_storage_manager.get_manager_facing_client.assert_not_called()
+
+
+class TestVFolderServiceWatcherInfo:
+    async def test_watcher_port_defaults_to_watcher_service_addr_port(self) -> None:
+        agent_id = "test-agent-watcher"
+        etcd = MagicMock()
+        etcd.get = AsyncMock(
+            side_effect=lambda key: {f"nodes/agents/{agent_id}/ip": "192.168.1.100"}.get(key)
+        )
+        vfolder_service = VFolderService(
+            config_provider=MagicMock(),
+            etcd=etcd,
+            storage_manager=MagicMock(),
+            background_task_manager=MagicMock(),
+            vfolder_repository=MagicMock(),
+            user_repository=MagicMock(),
+            valkey_stat_client=MagicMock(),
+            own_check=MagicMock(),
+        )
+
+        watcher_addr = await vfolder_service._get_watcher_addr(agent_id)
+
+        assert watcher_addr.port == 6009
+
+    @pytest.mark.parametrize("token", [None, ""], ids=["missing", "empty"])
+    async def test_validate_watcher_token_rejects_unconfigured_token(
+        self, token: str | None
+    ) -> None:
+        config_provider = MagicMock()
+        config_provider.config.watcher.token = token
+        vfolder_service = VFolderService(
+            config_provider=config_provider,
+            etcd=MagicMock(),
+            storage_manager=MagicMock(),
+            background_task_manager=MagicMock(),
+            vfolder_repository=MagicMock(),
+            user_repository=MagicMock(),
+            valkey_stat_client=MagicMock(),
+            own_check=MagicMock(),
+        )
+
+        with pytest.raises(WatcherTokenNotConfigured):
+            vfolder_service._validate_watcher_token()
 
 
 class TestVFolderServiceBulkLoadMountLevels:

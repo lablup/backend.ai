@@ -88,6 +88,16 @@ async def _drive_to_unhealthy(pool: HealthyEndpointPool, endpoint: str, *, attem
                 raise ConnectionError("simulated")
 
 
+class _WrappedError(Exception):
+    """Stands in for a client library error that wraps the connection error as ``__cause__``."""
+
+
+def _refused_error() -> aiohttp.ClientConnectorError:
+    return aiohttp.ClientConnectorError(
+        MagicMock(host="m1", port=80, ssl=False), ConnectionRefusedError(111, "Connection refused")
+    )
+
+
 class TestAcquire:
     async def test_round_robin_distributes_among_healthy(self) -> None:
         pool = HealthyEndpointPool(
@@ -132,6 +142,30 @@ class TestAcquire:
             await _drive_to_unhealthy(pool, "http://m1", attempts=1)
             with pytest.raises(NoHealthyEndpointError):
                 async with pool.acquire():
+                    pytest.fail("acquire should have raised before yielding")
+
+    async def test_acquire_skips_excluded_endpoints(self) -> None:
+        pool = HealthyEndpointPool(
+            endpoints=["http://m1", "http://m2"],
+            spec=_make_spec(),
+            strategy=RoundRobinStrategy(),
+            probe_session_factory=_make_session_factory(),
+        )
+        async with _running_pool(pool):
+            for _ in range(2):
+                async with pool.acquire(exclude=["http://m1"]) as acquired:
+                    assert acquired.endpoint == "http://m2"
+
+    async def test_acquire_raises_when_every_healthy_endpoint_is_excluded(self) -> None:
+        pool = HealthyEndpointPool(
+            endpoints=["http://m1", "http://m2"],
+            spec=_make_spec(),
+            strategy=RoundRobinStrategy(),
+            probe_session_factory=_make_session_factory(),
+        )
+        async with _running_pool(pool):
+            with pytest.raises(NoHealthyEndpointError):
+                async with pool.acquire(exclude=["http://m1", "http://m2"]):
                     pytest.fail("acquire should have raised before yielding")
 
     async def test_least_connections_picks_idle_endpoint(self) -> None:
@@ -218,6 +252,90 @@ class TestOutcomeRecording:
                 async with pool.acquire():
                     raise TimeoutError
             assert not pool.is_healthy("http://m1")
+
+    async def test_wrapped_connection_error_counts_as_failure(self) -> None:
+        pool = HealthyEndpointPool(
+            endpoints=["http://m1"],
+            spec=_make_spec(failure_threshold=2),
+            strategy=RoundRobinStrategy(),
+            probe_session_factory=_make_session_factory(),
+        )
+        async with _running_pool(pool):
+            for _ in range(2):
+                with pytest.raises(_WrappedError):
+                    async with pool.acquire():
+                        raise _WrappedError() from aiohttp.ServerDisconnectedError()
+            assert not pool.is_healthy("http://m1")
+
+    @pytest.mark.parametrize(
+        "error_factory",
+        [
+            pytest.param(lambda: ConnectionRefusedError(111, "refused"), id="os-error"),
+            pytest.param(_refused_error, id="aiohttp-connector-error"),
+        ],
+    )
+    async def test_refused_connection_excludes_endpoint_immediately(
+        self, error_factory: Callable[[], BaseException]
+    ) -> None:
+        pool = HealthyEndpointPool(
+            endpoints=["http://m1", "http://m2"],
+            spec=_make_spec(failure_threshold=3),
+            strategy=RoundRobinStrategy(),
+            probe_session_factory=_make_session_factory(),
+        )
+        async with _running_pool(pool):
+            with pytest.raises(_WrappedError):
+                async with pool.acquire_sticky("http://m1"):
+                    raise _WrappedError() from error_factory()
+            assert not pool.is_healthy("http://m1")
+            assert pool.is_healthy("http://m2")
+
+    async def test_refused_only_endpoint_waits_for_threshold(self) -> None:
+        pool = HealthyEndpointPool(
+            endpoints=["http://m1"],
+            spec=_make_spec(failure_threshold=2),
+            strategy=RoundRobinStrategy(),
+            probe_session_factory=_make_session_factory(),
+        )
+        async with _running_pool(pool):
+            with pytest.raises(_WrappedError):
+                async with pool.acquire():
+                    raise _WrappedError() from _refused_error()
+            assert pool.is_healthy("http://m1")
+            with pytest.raises(_WrappedError):
+                async with pool.acquire():
+                    raise _WrappedError() from _refused_error()
+            assert not pool.is_healthy("http://m1")
+
+    async def test_refused_last_healthy_endpoint_waits_for_threshold(self) -> None:
+        pool = HealthyEndpointPool(
+            endpoints=["http://m1", "http://m2"],
+            spec=_make_spec(failure_threshold=3),
+            strategy=RoundRobinStrategy(),
+            probe_session_factory=_make_session_factory(),
+        )
+        async with _running_pool(pool):
+            with pytest.raises(_WrappedError):
+                async with pool.acquire_sticky("http://m1"):
+                    raise _WrappedError() from _refused_error()
+            with pytest.raises(_WrappedError):
+                async with pool.acquire_sticky("http://m2"):
+                    raise _WrappedError() from _refused_error()
+            assert not pool.is_healthy("http://m1")
+            assert pool.is_healthy("http://m2")
+
+    async def test_connect_timeout_waits_for_threshold(self) -> None:
+        pool = HealthyEndpointPool(
+            endpoints=["http://m1"],
+            spec=_make_spec(failure_threshold=2),
+            strategy=RoundRobinStrategy(),
+            probe_session_factory=_make_session_factory(),
+        )
+        async with _running_pool(pool):
+            with pytest.raises(_WrappedError):
+                async with pool.acquire():
+                    raise _WrappedError() from aiohttp.ConnectionTimeoutError()
+            assert pool.is_healthy("http://m1")
 
     async def test_business_exception_does_not_count_as_failure(self) -> None:
         pool = HealthyEndpointPool(

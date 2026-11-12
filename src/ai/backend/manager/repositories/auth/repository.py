@@ -3,8 +3,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-import sqlalchemy as sa
-
+from ai.backend.common.auth.password import PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
@@ -19,7 +18,6 @@ from ai.backend.manager.data.auth.types import (
     UserCreationData,
 )
 from ai.backend.manager.data.keypair.types import KeyPairData
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.specs.lookup import DataLookup
 from ai.backend.manager.models.specs.querier import DataQuerier
 from ai.backend.manager.models.user.creators import UserCreator
@@ -33,6 +31,7 @@ from ai.backend.manager.repositories.auth.db_source.db_source import (
 )
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.secret.pool import KeyProviderPool
+from ai.backend.manager.views.auth import UserCredential
 
 auth_repository_resilience = Resilience(
     policies=[
@@ -189,11 +188,11 @@ class AuthRepository:
         self,
         domain_name: str,
         email: str,
-        password: str,
-    ) -> sa.RowMapping:
+        target_password_info: PasswordInfo,
+    ) -> UserCredential:
         """Check credentials without password migration (for signout, etc.)"""
         return await self._db_source.verify_credential_without_migration(
-            domain_name, email, password
+            domain_name, email, target_password_info
         )
 
     @auth_repository_resilience.apply()
@@ -216,13 +215,16 @@ class AuthRepository:
         )
 
     @auth_repository_resilience.apply()
-    async def delete_login_session_by_token(
+    async def delete_owned_login_session_by_token(
         self,
         session_token: str,
+        user_id: UserID,
         result: LoginAttemptResult,
         client_ip: str | None = None,
     ) -> None:
-        await self._db_source.delete_session_by_token(session_token, result, client_ip)
+        await self._db_source.delete_owned_session_by_token(
+            session_token, user_id, result, client_ip
+        )
 
     @auth_repository_resilience.apply()
     async def delete_user_login_sessions(
@@ -260,5 +262,6 @@ class AuthRepository:
         )
 
     @auth_repository_resilience.apply()
-    async def invalidate_active_login_sessions(self, user_id: UserID) -> None:
-        await self._db_source.invalidate_active_login_sessions(user_id)
+    async def invalidate_active_login_sessions(self, user_id: UserID) -> list[str]:
+        """Return only tokens of this user's sessions invalidated by this call."""
+        return await self._db_source.invalidate_active_login_sessions(user_id)

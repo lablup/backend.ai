@@ -9,6 +9,7 @@ from ai.backend.common.bgtask.task.base import (
     BaseBackgroundTaskHandler,
     BaseBackgroundTaskManifest,
 )
+from ai.backend.common.data.entity.storage_volume import StorageVolumeName
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.vfolder.anycast import (
     VFolderCloneFailureEvent,
@@ -55,7 +56,7 @@ class VFolderCloneTaskHandler(BaseBackgroundTaskHandler[VFolderCloneManifest, No
     @override
     async def execute(self, manifest: VFolderCloneManifest) -> None:
         try:
-            volume = self._volume_pool.get_volume_by_name(manifest.volume)
+            volume = self._volume_pool.get_volume_by_name(StorageVolumeName(manifest.volume))
             await volume.clone_vfolder(
                 manifest.src_vfolder,
                 manifest.dst_vfolder,

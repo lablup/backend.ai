@@ -17,6 +17,7 @@ from ai.backend.common.types import ServiceCatalogStatus
 from ai.backend.manager.data.service_catalog.types import ServiceCatalogEndpointData
 from ai.backend.manager.models.service_catalog.creators import ServiceCatalogEndpointCreator
 from ai.backend.manager.models.service_catalog.upserters import ServiceCatalogUpserter
+from ai.backend.testutils.scenario_steps import Language, Says, in_language
 from bai_scenario.seeds.seeder import Naming, TestSeedFieldCreator, TestSeedRow
 
 VERSION = "26.9.0"
@@ -26,9 +27,9 @@ STARTED_UP = datetime(2026, 1, 1, tzinfo=UTC)
 """The startup time every laid service reports. Fixed, so the report reads the same each run."""
 
 STATUS_NAMES: Final[dict[ServiceCatalogStatus, str]] = {
-    ServiceCatalogStatus.HEALTHY: "정상",
-    ServiceCatalogStatus.UNHEALTHY: "비정상",
-    ServiceCatalogStatus.DEREGISTERED: "등록 해제",
+    ServiceCatalogStatus.HEALTHY: Says("정상", english="healthy"),
+    ServiceCatalogStatus.UNHEALTHY: Says("비정상", english="unhealthy"),
+    ServiceCatalogStatus.DEREGISTERED: Says("등록 해제", english="deregistered"),
 }
 """레포트가 각 상태를 부르는 이름."""
 
@@ -60,11 +61,14 @@ class TestSeedService(TestSeedRow[ServiceCatalogID]):
 
     @override
     def kind(self) -> str:
-        return "서비스"
+        return Says("서비스", english="Service")
 
     @override
     def detail(self) -> str:
-        return f"{self.service_group} 그룹에 정상 상태로 등록됨"
+        return Says(
+            f"{self.service_group} 그룹에 정상 상태로 등록합니다",
+            english=f"registered as healthy in the {self.service_group} group",
+        )
 
     @override
     def name(self, naming: Naming) -> str:
@@ -96,11 +100,18 @@ class TestSeedServiceInStatus(TestSeedRow[ServiceCatalogID]):
 
     @override
     def kind(self) -> str:
-        return "서비스"
+        return Says("서비스", english="Service")
 
     @override
     def detail(self) -> str:
-        return f"{self.service_group} 그룹에 {STATUS_NAMES[self.status]} 상태로 등록됨"
+        status = STATUS_NAMES[self.status]
+        return Says(
+            f"{self.service_group} 그룹에 {status} 상태로 등록합니다",
+            english=(
+                f"registered as {in_language(status, Language.ENGLISH)} "
+                f"in the {self.service_group} group"
+            ),
+        )
 
     @override
     def name(self, naming: Naming) -> str:
@@ -133,7 +144,10 @@ class TestSeedEndpointOf(TestSeedFieldCreator[ServiceCatalogID, ServiceCatalogEn
 
     @override
     def kind(self) -> str:
-        return f"{self.protocol}://{self.address}:{self.port} 엔드포인트 하나를 갖는다"
+        return Says(
+            f"{self.protocol}://{self.address}:{self.port} 엔드포인트 하나를 갖습니다",
+            english=f"has one endpoint at {self.protocol}://{self.address}:{self.port}",
+        )
 
     @override
     def owner_id(self, owner: ServiceCatalogID) -> ServiceCatalogID:

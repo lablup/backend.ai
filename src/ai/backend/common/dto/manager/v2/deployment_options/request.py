@@ -9,6 +9,7 @@ from ai.backend.common.dto.manager.v2.session_options import (
     HandlerOptionsEntryInput,
     HandlerOptionsInput,
 )
+from ai.backend.common.dto.manager.v2.session_options.types import AgentSelectionPolicyEnum
 
 
 class DeploymentHandlerOptionsInput(BaseRequestModel):
@@ -37,4 +38,8 @@ class DeploymentOptionsInput(BaseRequestModel):
 
     handler_options: DeploymentHandlerOptionsInput = Field(
         description="Handler-keyed scheduler policy (timeout + retry).",
+    )
+    agent_selection_policy: AgentSelectionPolicyEnum | None = Field(
+        default=None,
+        description="How the designated agents are enforced. `null` keeps the stored policy.",
     )

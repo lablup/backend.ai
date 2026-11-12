@@ -1,15 +1,13 @@
-Backend.AI Logging Subsystem
-============================
+# Backend.AI Logging Subsystem
 
-Package Structure
------------------
+## Package Structure
 
 * `ai.backend.logging`
   - `abc`: Abstract base classes
   - `logger`: The core logging facility
     - `Logger`: The standard multiprocess-friendly logger using `RelayHandler` based on ZeroMQ
-    - `LocalLogger`: A minimalized console/file logger that does not require serialization via networks at all
+    - `LocalLogger`: A minimal console and file logger that does not serialize messages over the network
   - `handler`: Collection of vendor-specific handler implementations
   - `formatter`: Collection of formatters
-  - `types`: Definition of enums/types like `LogLevel`
+  - `types`: Definition of enums and types such as `LogLevel`
   - `utils`: Brace-style message formatting adapters and other extras

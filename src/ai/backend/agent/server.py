@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import errno
+import fcntl
 import functools
 import inspect
 import logging
@@ -27,6 +29,7 @@ from ipaddress import ip_network
 from pathlib import Path
 from pprint import pformat, pprint
 from typing import (
+    IO,
     Any,
     ClassVar,
     Final,
@@ -55,6 +58,7 @@ from ai.backend.agent.errors import (
     ResourceError,
 )
 from ai.backend.agent.errors.agent import (
+    AgentAlreadyRunningError,
     ImagePullFailedError,
     ImagePullTimeoutError,
     KernelNotFoundError,
@@ -111,6 +115,7 @@ from ai.backend.common.metrics.http import (
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.networking import force_threaded_dns_resolver
+from ai.backend.common.plugin import load_configured_wheelhouse
 from ai.backend.common.process.child_exit import ChildExitMonitor, ChildStatus
 from ai.backend.common.process.crashdump import enable_crash_dump
 from ai.backend.common.service_discovery.etcd_discovery.service_discovery import (
@@ -315,9 +320,9 @@ class AgentRPCServer(aobject):
     rpc_function: ClassVar[RPCFunctionRegistry] = RPCFunctionRegistry()
     rpc_function_v2: ClassVar[RPCFunctionRegistryV2] = RPCFunctionRegistryV2()
 
-    rpc_auth_manager_public_key: PublicKey | None
-    rpc_auth_agent_public_key: PublicKey | None
-    rpc_auth_agent_secret_key: SecretKey | None
+    rpc_auth_manager_public_key: PublicKey
+    rpc_auth_agent_public_key: PublicKey
+    rpc_auth_agent_secret_key: SecretKey
 
     loop: asyncio.AbstractEventLoop
     etcd: AsyncEtcd
@@ -367,36 +372,30 @@ class AgentRPCServer(aobject):
         await self.stats_monitor.init()
         await self.error_monitor.init()
 
-        if self.local_config.agent_common.rpc_auth_agent_keypair is not None:
-            manager_pkey, _ = load_certificate(
-                str(self.local_config.agent_common.rpc_auth_manager_public_key)
+        manager_pkey, _ = load_certificate(
+            str(self.local_config.agent_common.rpc_auth_manager_public_key)
+        )
+        self.rpc_auth_manager_public_key = PublicKey(manager_pkey)
+        agent_pkey, agent_skey = load_certificate(
+            str(self.local_config.agent_common.rpc_auth_agent_keypair)
+        )
+        if agent_skey is None:
+            raise AgentInitializationError(
+                "Agent secret key is not available from the keypair file."
             )
-            self.rpc_auth_manager_public_key = PublicKey(manager_pkey)
-            agent_pkey, agent_skey = load_certificate(
-                str(self.local_config.agent_common.rpc_auth_agent_keypair)
-            )
-            if agent_skey is None:
-                raise AgentInitializationError(
-                    "Agent secret key is not available from the keypair file."
-                )
-            self.rpc_auth_agent_public_key = PublicKey(agent_pkey)
-            self.rpc_auth_agent_secret_key = SecretKey(agent_skey)
-            log.info(
-                "rpc encryption and authentication enabled",
-                agent_public_key=self.rpc_auth_agent_public_key.decode("ascii"),
-                manager_public_key=self.rpc_auth_manager_public_key.decode("ascii"),
-            )
-            auth_handler = AgentAuthHandler(
-                "local",
-                self.rpc_auth_manager_public_key,
-                self.rpc_auth_agent_public_key,
-                self.rpc_auth_agent_secret_key,
-            )
-        else:
-            self.rpc_auth_manager_public_key = None
-            self.rpc_auth_agent_public_key = None
-            self.rpc_auth_agent_secret_key = None
-            auth_handler = None
+        self.rpc_auth_agent_public_key = PublicKey(agent_pkey)
+        self.rpc_auth_agent_secret_key = SecretKey(agent_skey)
+        log.info(
+            "rpc encryption and authentication enabled",
+            agent_public_key=self.rpc_auth_agent_public_key.decode("ascii"),
+            manager_public_key=self.rpc_auth_manager_public_key.decode("ascii"),
+        )
+        auth_handler = AgentAuthHandler(
+            "local",
+            self.rpc_auth_manager_public_key,
+            self.rpc_auth_agent_public_key,
+            self.rpc_auth_agent_secret_key,
+        )
 
         self.runtime = await AgentRuntime.create_runtime(
             self.local_config,
@@ -689,7 +688,6 @@ class AgentRPCServer(aobject):
         connectivity = await self.health_probe.get_connectivity_status()
         response = HealthResponse(
             status=HealthStatus.OK if connectivity.overall_healthy else HealthStatus.DEGRADED,
-            version=VERSION,
             component="agent",
             connectivity=connectivity,
         )
@@ -863,7 +861,8 @@ class AgentRPCServer(aobject):
         # Failures raised by `_create_kernel` are logged in their kernel scope; this logs the rest.
         try:
             agent = self.runtime.get_agent(agent_id)
-            throttle_sema = asyncio.Semaphore(agent.local_config.agent.kernel_creation_concurrency)
+            # The agent's own: `kernel-creation-concurrency` bounds the agent, not one request.
+            throttle_sema = agent.kernel_creation_sema
             session_id = SessionId(UUID(raw_session_id))
             coros = []
             for raw_kernel_id, raw_config in zip(raw_kernel_ids, raw_configs, strict=True):
@@ -1326,11 +1325,8 @@ async def server_main_logwrapper(
 def _build_agent_health_response(connectivity: ConnectivityCheckResponse) -> web.Response:
     """Detail /health — always 200; informational tier failures reported as
     DEGRADED in the body but not surfaced via HTTP status."""
-    from . import __version__
-
     response = HealthResponse(
         status=HealthStatus.OK if connectivity.overall_healthy else HealthStatus.DEGRADED,
-        version=__version__,
         component="agent",
         connectivity=connectivity,
     )
@@ -1339,12 +1335,9 @@ def _build_agent_health_response(connectivity: ConnectivityCheckResponse) -> web
 
 def _build_agent_probe_response(connectivity: ConnectivityCheckResponse) -> web.Response:
     """/livez, /readyz — 503 when any gating check fails so K8s probes trip."""
-    from . import __version__
-
     is_healthy = connectivity.overall_healthy
     response = HealthResponse(
         status=HealthStatus.OK if is_healthy else HealthStatus.ERROR,
-        version=__version__,
         component="agent",
         connectivity=connectivity,
     )
@@ -1467,23 +1460,13 @@ async def aiomonitor_ctx(
 
 @asynccontextmanager
 async def etcd_ctx(local_config: AgentUnifiedConfig) -> AsyncGenerator[AsyncEtcd]:
-    etcd_credentials = None
-    if local_config.etcd.user and local_config.etcd.password:
-        etcd_credentials = {
-            "user": local_config.etcd.user,
-            "password": local_config.etcd.password,
-        }
     scope_prefix_map = {
         ConfigScopes.GLOBAL: "",
         ConfigScopes.SGROUP: f"sgroup/{local_config.agent.legacy_sgroup_name()}",
         ConfigScopes.NODE: f"nodes/agents/{local_config.agent.defaulted_id}",
     }
-    etcd_config_data = local_config.etcd.to_dataclass()
-    async with AsyncEtcd(
-        [addr.to_legacy() for addr in etcd_config_data.addrs],
-        local_config.etcd.namespace,
-        scope_prefix_map,
-        credentials=etcd_credentials,
+    async with AsyncEtcd.create_from_config(
+        local_config.etcd.to_dataclass(), scope_prefix_map
     ) as etcd:
         yield etcd
 
@@ -1712,6 +1695,63 @@ async def server_main(
         await agent_init_stack.__aexit__(None, None, None)
 
 
+_PID_FILE_LOCK_ATTEMPTS: Final = 5
+
+
+def _is_same_file(handle: IO[str], path: Path) -> bool:
+    try:
+        on_disk = path.stat()
+    except FileNotFoundError:
+        return False
+    opened = os.fstat(handle.fileno())
+    return (opened.st_dev, opened.st_ino) == (on_disk.st_dev, on_disk.st_ino)
+
+
+def _write_pid(handle: IO[str]) -> None:
+    handle.seek(0)
+    handle.truncate()
+    handle.write(str(os.getpid()))
+    handle.flush()
+
+
+def _hold_pid_file(pid_file: Path) -> IO[str] | None:
+    """Write the pid under an exclusive `flock`, held until the returned handle is closed.
+
+    Returns None without locking for /dev/null, non-regular paths, or a filesystem without flock.
+    """
+    resolved = pid_file.resolve()
+    if resolved == Path(os.devnull).resolve() or (resolved.exists() and not resolved.is_file()):
+        return None
+    for _ in range(_PID_FILE_LOCK_ATTEMPTS):
+        handle = pid_file.open("a+")
+        try:
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError as e:
+            if e.errno in (errno.EWOULDBLOCK, errno.EAGAIN):
+                handle.close()
+                raise AgentAlreadyRunningError(
+                    f"another agent process already holds {pid_file}"
+                ) from e
+            # The filesystem cannot lock it (ENOLCK, EOPNOTSUPP on NFS/FUSE): run unlocked.
+            # Printed: this runs in `main()` before the logger is configured.
+            print(
+                f"Warning: pid file {pid_file} cannot be locked"
+                f" ({errno.errorcode.get(e.errno or 0, str(e.errno))});"
+                " running without the single-instance guard",
+                file=sys.stderr,
+            )
+            _write_pid(handle)
+            handle.close()
+            return None
+        if not _is_same_file(handle, pid_file):
+            # The holder unlinked the file we opened; the lock we got is on an orphaned inode.
+            handle.close()
+            continue
+        _write_pid(handle)
+        return handle
+    raise AgentAlreadyRunningError(f"{pid_file} kept being replaced while locking it")
+
+
 @click.group(invoke_without_command=True)
 @click.option(
     "-f",
@@ -1802,7 +1842,12 @@ def main(
         raise click.Abort() from e
 
     if not is_invoked_subcommand:
-        server_config.agent_common.pid_file.write_text(str(os.getpid()))
+        try:
+            # Forked workers inherit the lock fd, so the lock lives until they all exit too.
+            pid_lock = _hold_pid_file(server_config.agent_common.pid_file)
+        except AgentAlreadyRunningError as e:
+            print(f"AgentAlreadyRunningError: {e}", file=sys.stderr)
+            raise click.Abort() from e
         image_commit_path = server_config.agent_common.image_commit_path
         image_commit_path.mkdir(parents=True, exist_ok=True)
         ipc_base_path = server_config.agent_common.ipc_base_path
@@ -1827,6 +1872,7 @@ def main(
                     "supervisor",
                 )
                 log.info("agent starting", version=VERSION, runtime=utils.env_info())
+                load_configured_wheelhouse(server_config.wheelhouse)
 
                 # Built here rather than at module scope: these allocate shared memory
                 # and a semaphore, which no other `ag` subcommand has any use for.
@@ -1870,6 +1916,9 @@ def main(
             if server_config.agent_common.pid_file.is_file():
                 # check is_file() to prevent deleting /dev/null!
                 server_config.agent_common.pid_file.unlink()
+            if pid_lock is not None:
+                # Released after the unlink so that no successor's pid file gets removed.
+                pid_lock.close()
     else:
         # Click is going to invoke a subcommand.
         pass

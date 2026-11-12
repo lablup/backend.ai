@@ -159,6 +159,10 @@ class SessionGroupIdPathParam(BaseRequestModel):
     session_group_id: UUID = Field(description="Session group UUID")
 
 
+class VFolderAutoMountIdPathParam(BaseRequestModel):
+    vfolder_auto_mount_id: UUID = Field(description="VFolder auto-mount UUID")
+
+
 class SlotNamePathParam(BaseRequestModel):
     slot_name: str = Field(description="Resource slot name")
 

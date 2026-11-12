@@ -25,6 +25,7 @@ from ai.backend.testutils.scenario_steps import (
     Refused,
     Same,
     SameAs,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -57,8 +58,19 @@ class PurgingEveryType(When[ManyTypesAndACaller, LoginClientTypeAdapter, Purged]
 
     @override
     def describe(self, laid: ManyTypesAndACaller) -> str:
-        besides = " 와 없는 id 하나" if self.missing is not None else ""
-        return f"{laid.caller.username}이 종류 {len(laid.laid)}개{besides}를 한 번에 purge 함"
+        has_missing = self.missing is not None
+        besides_ko = " 와 없는 id 하나" if has_missing else ""
+        besides_en = " and one unknown id" if has_missing else ""
+        return Says(
+            (
+                f"{laid.caller.username} 이 로그인 클라이언트 유형 {len(laid.laid)}개{besides_ko}를 "
+                "한 번에 purge 합니다"
+            ),
+            english=(
+                f"{laid.caller.username} purges {len(laid.laid)} login client types{besides_en} "
+                "at once"
+            ),
+        )
 
     @override
     async def call(self, adapter: LoginClientTypeAdapter, laid: ManyTypesAndACaller) -> Purged:
@@ -78,7 +90,16 @@ class EveryTypeIsPurged(Then[ManyTypesAndACaller, Purged]):
 
     @override
     def says(self) -> str:
-        return "종류가 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            (
+                "로그인 클라이언트 유형이 모두 처리된 목록에 오고 없는 id 는 대상이 없다는 이유로 "
+                "실패 목록에 옵니다"
+            ),
+            english=(
+                "every login client type comes back in the processed list and the unknown id comes "
+                "back in the failed list because no target answers to it"
+            ),
+        )
 
     @override
     def look(self, laid: ManyTypesAndACaller, answered: Answered[Purged]) -> list[Verdict]:
@@ -98,7 +119,17 @@ class EveryTypeIsPurged(Then[ManyTypesAndACaller, Purged]):
         verdicts.append(Same("failed count", len(payload.failed), 1))
         for failure in payload.failed:
             verdicts += [
-                Held[UUID]("failed[0].id", failure.id, SameAs(self.missing, "요청에 넣은 없는 id")),
+                Held[UUID](
+                    "failed[0].id",
+                    failure.id,
+                    SameAs(
+                        self.missing,
+                        Says(
+                            "요청에 넣은 없는 id",
+                            english="the unknown id put in the request",
+                        ),
+                    ),
+                ),
                 Held("failed[0].message", failure.message, Mentions("not found")),
             ]
         return verdicts
@@ -117,9 +148,16 @@ class PurgingAnswersForTheMissingOne(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 종류 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 처리된 목록에 오고 "
-            "없는 id 는 대상이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            (
+                "superadmin 이 로그인 클라이언트 유형 둘과 없는 id 하나를 한 번에 purge 하면 둘은 "
+                "처리된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다"
+            ),
+            english=(
+                "when the superadmin purges two login client types and an unknown id at once, the "
+                "two come back in the processed list and the unknown id comes back in the failed "
+                "list because no target answers to it"
+            ),
         )
 
     @override
@@ -145,9 +183,16 @@ class AUserGrantedNothingPurgesNone(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 없는 사용자가 종류 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 "
-            "모두 권한이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            (
+                "아무 권한도 없는 사용자가 로그인 클라이언트 유형 여럿을 한 번에 purge 하려 하면 "
+                "purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다"
+            ),
+            english=(
+                "when a user granted nothing tries to purge several login client types at once, "
+                "nothing is purged and every one comes back in the failed list because there is no "
+                "permission"
+            ),
         )
 
     @override

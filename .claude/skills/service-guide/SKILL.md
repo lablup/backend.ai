@@ -27,7 +27,7 @@ Services implement 6 standard operations:
 5. **delete** - Delete entity
 6. **purge** - Permanently remove entity
 
-**Multi-target:** `batch_*` (atomic, one statement) vs `bulk_*` (per-row, partial failures). See `/repository-guide`.
+**Multi-target:** `batch_*` (atomic, one statement) versus `bulk_*` (per-row, partial failures). See `/repository-guide`.
 
 **Method naming (no prefix):**
 ```python
@@ -107,19 +107,19 @@ services/{domain}/
 - `{entity}`: Fetch → check not found → return
 - `search_{entities}`: Build scope/filters → repository.search
 - `update_{entity}`: Validate → update → return
-- `delete_{entity}`: Soft delete (status change)
-- `purge_{entity}`: Hard delete
+- `delete_{entity}`: Mark the row as deleted while keeping it (status change)
+- `purge_{entity}`: Permanently remove the row
 
 ### Repository Call Pattern
 
 **Core principle (preferred):**
-- Service method SHOULD call a single repository method
+- Service method should call a single repository method
 - Avoid combining multiple repository calls in service layer
 - If complex composition is needed, consider adding specialized repository method
 
 **Transaction boundary:**
 - DB sessions are created and managed at repository method level
-- Service methods do NOT create transactions directly
+- Service methods do not create transactions directly
 - Repository uses `begin_session()` (write) or `begin_readonly_session()` (read)
 - Each repository public method defines its own transaction scope
 
@@ -132,7 +132,6 @@ services/{domain}/
 - `services/storage_namespace/service.py:38-81` - Single repository call pattern
 - `services/domain/service.py` - Multi-repository coordination (exceptional case)
 - `repositories/README.md:54-61` - Service-Repository integration principles
-
 
 ## Implementation Workflow
 
@@ -181,7 +180,7 @@ Protocol with all standard operations
 
 **See:** `/test-guide` for complete testing workflow
 
-**Critical:** Service tests MUST mock repositories (no real DB)
+**Critical:** Service tests must mock repositories (no real DB)
 
 ### Step 8: Integrate with API
 
@@ -193,7 +192,7 @@ Protocol with all standard operations
 |-----------|-----------|-------------------|
 | **create** | validate → check existence → create → return | `{Entity}AlreadyExists` |
 | **get** | fetch → not found check → return | `{Entity}NotFound` |
-| **search** | build scope → repository.search → return | - |
+| **search** | build scope → repository.search → return | none |
 | **update** | validate → fetch → update → return | `{Entity}NotFound`, `Invalid{Entity}` |
 | **delete** | check exists → delete → return | `{Entity}NotFound` |
 | **purge** | check exists → check dependencies → purge → return | `{Entity}HasDependents` |
@@ -221,16 +220,16 @@ Protocol with all standard operations
 - Property pattern
 
 ### Testing
-- Mock repositories (never real DB)
+- Mock repositories (no real DB)
 - Test business logic
-- Verify repository calls
+- Check repository calls
 
 **See:** `/test-guide` skill
 
-## Related Documentation
+## Related documents
 
 - **Repository Layer**: `/repository-guide` - Data access
-- **API Integration**: `/api-guide` - REST/GraphQL
+- **API Integration**: `/api-guide` - REST and GraphQL
 - **Testing**: `/test-guide` - Scenario-first testing
 - **Service README**: `src/ai/backend/manager/services/README.md`
 

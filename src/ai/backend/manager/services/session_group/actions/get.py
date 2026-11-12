@@ -22,7 +22,7 @@ class GetSessionGroupAction(BaseSingleEntityAction):
     A group a replica group holds is answered for as not found.
     """
 
-    group_id: SessionGroupID
+    session_group_id: SessionGroupID
 
     @override
     @classmethod
@@ -36,7 +36,7 @@ class GetSessionGroupAction(BaseSingleEntityAction):
 
     @override
     def entity_id(self) -> EntityIdentifier:
-        return self.group_id
+        return self.session_group_id
 
     def to_searcher(self) -> SessionGroupSearcher:
         """The group named, unless a replica group holds it."""
@@ -44,7 +44,9 @@ class GetSessionGroupAction(BaseSingleEntityAction):
         return SessionGroupSearcher(
             pagination=NoPagination(),
             conditions=[
-                fields.own.id.filter.equals(UUIDEqualMatchSpec(value=self.group_id, negated=False)),
+                fields.own.id.filter.equals(
+                    UUIDEqualMatchSpec(value=self.session_group_id, negated=False)
+                ),
                 fields.linked.replica_groups.not_exists(),
             ],
         )

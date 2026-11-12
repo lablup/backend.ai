@@ -232,6 +232,7 @@ def _spec_context(
             policy=_user_policy(),
             container_user=ContainerUserInfo(uid=1000, main_gid=1000, supplementary_gids=[]),
             dotfiles=DotfileBundle(),
+            default_bootstrap_script=None,
             pending_session_count=0,
             pending_session_resource_slots={},
             vfolder_mounts_by_role={"main": (_vfolder_mount(),)},
@@ -338,6 +339,11 @@ class TestEnqueueSessionFromDraft:
         # vfolder mounts flowed through context → resolved on the kernel spec
         assert len(kernel.vfolder_mounts) == 1
         assert kernel.vfolder_mounts[0].kernel_path == PurePosixPath("/home/work/data")
+        # ... and narrowed onto the group the kernel was expanded from
+        enqueued_groups = enqueued_spec.resource_spec.options.kernel_groups
+        assert len(enqueued_groups) == 1
+        group_mounts = enqueued_groups[0].execution_spec.mounts
+        assert [m.mount_destination for m in group_mounts] == ["/home/work/data"]
 
         # PRE + POST hooks fired
         assert hook_plugin_ctx.dispatch.await_count == 1

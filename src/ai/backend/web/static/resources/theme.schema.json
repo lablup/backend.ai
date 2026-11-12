@@ -104,6 +104,10 @@
               "headerBg": {
                 "$ref": "#/definitions/colorValue",
                 "description": "Header band background color."
+              },
+              "headerBgAdmin": {
+                "$ref": "#/definitions/colorValue",
+                "description": "Header band background color on system admin pages."
               }
             },
             "additionalProperties": false

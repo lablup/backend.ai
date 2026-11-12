@@ -27,8 +27,8 @@ from ai.backend.common.dto.appproxy.v2.ingress.types import (
 )
 
 AUTHORITY = IngressAuthority("worker-1")
-STORED_KEY = IngressFrontendKey("10205")
-OTHER_KEY = IngressFrontendKey("10206")
+STORED_KEY = IngressFrontendKey("port-10205")
+OTHER_KEY = IngressFrontendKey("port-10206")
 STARTED_AT = 1000.0
 TTL = 60.0
 NEGATIVE_TTL = 5.0
@@ -238,7 +238,7 @@ class TestInMemoryIngressState:
     async def test_remember_missing_marks_the_key(
         self, negative_caching_state: InMemoryIngressState
     ) -> None:
-        key = IngressFrontendKey("10207")
+        key = IngressFrontendKey("port-10207")
         await negative_caching_state.remember_missing(key)
         with pytest.raises(IngressNotFoundError):
             await negative_caching_state.get(key)

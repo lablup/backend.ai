@@ -5,7 +5,7 @@ Backend.AI makes use of Etcd as the distributed configuration store.
 Launch the service using docker compose by generating the file ``$HOME/halfstack/etcd-cluster-default/docker-compose.yaml`` and populating it with the following YAML.
 Feel free to adjust the volume paths and port settings.
 Please refer `the latest configuration <https://github.com/lablup/backend.ai/blob/main/docker-compose.halfstack-main.yml>`_
-(it's a symbolic link so follow the filename in it) if needed.
+if needed.
 
 .. code-block:: yaml
 
@@ -20,7 +20,7 @@ Please refer `the latest configuration <https://github.com/lablup/backend.ai/blo
       backendai-half-etcd:
          <<: *base
          container_name: backendai-halfstack-etcd
-         image: quay.io/coreos/etcd:v3.4.15
+         image: quay.io/coreos/etcd:v3.5.14
          restart: unless-stopped
          command: >
             /usr/local/bin/etcd
@@ -37,7 +37,7 @@ Please refer `the latest configuration <https://github.com/lablup/backend.ai/blo
          volumes:
             - "${HOME}/.data/backend.ai/etcd-data:/etcd-data:rw"
          healthcheck:
-            test: ["CMD", "etcdctl", "endpoint", "health"]
+            test: ["CMD", "etcdctl", "endpoint", "status"]
             interval: 10s
             timeout: 3s
             retries: 10

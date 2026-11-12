@@ -3,17 +3,10 @@ from __future__ import annotations
 from typing import Any
 
 from ai.backend.manager.actions.registry.group import ProcessorGroup
-from ai.backend.manager.actions.v2.global_scope.processor import (
-    GlobalActionProcessor,
-    PublicActionProcessor,
-)
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.services.manager_admin.actions.fetch_status import (
     FetchManagerStatusAction,
     FetchManagerStatusActionResult,
-)
-from ai.backend.manager.services.manager_admin.actions.get_announcement import (
-    GetAnnouncementAction,
-    GetAnnouncementActionResult,
 )
 from ai.backend.manager.services.manager_admin.actions.get_db_cxn_status import (
     GetDbCxnStatusAction,
@@ -23,10 +16,6 @@ from ai.backend.manager.services.manager_admin.actions.perform_scheduler_ops imp
     PerformSchedulerOpsAction,
     PerformSchedulerOpsActionResult,
 )
-from ai.backend.manager.services.manager_admin.actions.update_announcement import (
-    UpdateAnnouncementAction,
-    UpdateAnnouncementActionResult,
-)
 from ai.backend.manager.services.manager_admin.actions.update_status import (
     UpdateManagerStatusAction,
     UpdateManagerStatusActionResult,
@@ -35,7 +24,7 @@ from ai.backend.manager.services.manager_admin.service import ManagerAdminServic
 
 
 class ManagerAdminProcessors:
-    """The manager's own state — its status, its announcement, its scheduler.
+    """The manager's own state — its status and its scheduler.
 
     None of it belongs to an entity and all of it reaches etcd or the scheduler, so every
     operation is global and the service stays.
@@ -43,10 +32,6 @@ class ManagerAdminProcessors:
 
     fetch_status: GlobalActionProcessor[FetchManagerStatusAction, FetchManagerStatusActionResult]
     update_status: GlobalActionProcessor[UpdateManagerStatusAction, UpdateManagerStatusActionResult]
-    get_announcement: PublicActionProcessor[GetAnnouncementAction, GetAnnouncementActionResult]
-    update_announcement: GlobalActionProcessor[
-        UpdateAnnouncementAction, UpdateAnnouncementActionResult
-    ]
     perform_scheduler_ops: GlobalActionProcessor[
         PerformSchedulerOpsAction, PerformSchedulerOpsActionResult
     ]
@@ -55,10 +40,6 @@ class ManagerAdminProcessors:
     def __init__(self, group: ProcessorGroup[Any], service: ManagerAdminService) -> None:
         self.fetch_status = group.global_scope(FetchManagerStatusAction, service.fetch_status)
         self.update_status = group.global_scope(UpdateManagerStatusAction, service.update_status)
-        self.get_announcement = group.public(GetAnnouncementAction, service.get_announcement)
-        self.update_announcement = group.global_scope(
-            UpdateAnnouncementAction, service.update_announcement
-        )
         self.perform_scheduler_ops = group.global_scope(
             PerformSchedulerOpsAction, service.perform_scheduler_ops
         )

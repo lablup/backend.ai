@@ -1,4 +1,5 @@
 from ai.backend.common.types import KernelId
+from ai.backend.manager.clients.prometheus.metric_types import ensure_container_metric_name
 from ai.backend.manager.repositories.metric.repository import MetricRepository
 from ai.backend.manager.services.metric.actions.batch_get_kernel_live_stats import (
     BatchGetKernelLiveStatsAction,
@@ -38,6 +39,7 @@ class MetricService:
         self,
         action: SearchUserContainerMetricsAction,
     ) -> SearchUserContainerMetricsActionResult:
+        ensure_container_metric_name(action.metric_name)
         result = await self._metric_repository.query_container_metric(
             action.metric_name,
             action.labels(),
@@ -49,6 +51,7 @@ class MetricService:
         self,
         action: GlobalSearchContainerMetricsAction,
     ) -> GlobalSearchContainerMetricsActionResult:
+        ensure_container_metric_name(action.metric_name)
         result = await self._metric_repository.query_container_metric(
             action.metric_name,
             action.labels,

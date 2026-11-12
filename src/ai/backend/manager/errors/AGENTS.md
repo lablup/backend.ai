@@ -1,6 +1,6 @@
-# Errors
+# Errors: Guardrails
 
-`errors/{domain}.py` holds this component's `BackendAIError` subclasses (e.g. `user.py`, `session.py`); `errors/base/` holds the two bases they build on. The "inherit from `BackendAIError`, never raise built-ins" rule lives in the root `AGENTS.md`.
+`errors/{domain}.py` holds this component's `BackendAIError` subclasses (for example `user.py`, `session.py`); `errors/base/` holds the two bases they build on. The "inherit from `BackendAIError`, never raise built-ins" rule lives in the root `AGENTS.md`.
 
 ## Rules
 
@@ -9,15 +9,15 @@
 3. Error modules are split per domain (`errors/{domain}.py`, later `errors/{domain}/`).
 4. One meaning, one class. Before defining, search for an existing class with the same name or the same code.
 
-Three bases, drawn by what the error is about:
+Three bases, chosen by what the error is about:
 
 | The error is about | Base | `ErrorCode.domain` |
 |---|---|---|
 | An entity (user, session, vfolder, ...) | `EntityError` | `EntityType` of that entity |
-| A field row (kernel, keypair, replica, ...) | `FieldError` | `{owner entity}-{field row}`; a dangling kind (`DanglingFieldType`, e.g. audit_log) reports its own alone |
+| A field row (kernel, keypair, replica, ...) | `FieldError` | `{owner entity}-{field row}`; a dangling kind (`DanglingFieldType`, for example audit_log) reports only its own domain |
 | The system (api, auth, database, bgtask, plugin, leader-election, message-queue, event, watcher, health-check, metric, storage-proxy, appproxy, external-system) | `BackendAIError` | `ErrorDomain` |
 
-The row types come from the identifiers: `EntityIdentifier.entity_type()`, `FieldIdentifier.field_type()`. A field type answers its own owner, so nothing beside it declares one. A spec that names a row by key declares the type on itself (`DataLookup.entity_type()`, `FieldKeyLookup.field_type()`).
+The row types come from the identifiers: `EntityIdentifier.entity_type()`, `FieldIdentifier.field_type()`. A field type returns its own owner, so nothing else declares one. A spec that names a row by key declares the type itself (`DataLookup.entity_type()`, `FieldKeyLookup.field_type()`).
 
 ## Base and enums
 
@@ -33,8 +33,8 @@ grep -rn "class .*BackendAIError" src/ai/backend                  # all componen
 ## Define
 
 An entity or field error subclasses `EntityError` / `FieldError` plus the matching aiohttp
-HTTP type, and **answers with its triple instead of declaring it in fields** — the way
-every error answers with its code. `operation` is an `ActionOperationType`, not an
+HTTP type, and **returns its triple instead of declaring it in fields**: the way
+every error returns its code. `operation` is an `ActionOperationType`, not an
 `ErrorOperation`: a row is acted on with the action vocabulary, and the base maps it to
 the code's operation.
 
@@ -53,16 +53,16 @@ raise EntityNotFoundError(msg, entity_type=entity_id.entity_type(), operation=Ac
 raise FieldNotFoundError(msg, field_type=field_id.field_type())
 ```
 
-A root that still owes its code cannot be constructed: `ErrorMeta` refuses it, because
+A root that still owes its code cannot be constructed: `ErrorMeta` rejects it, because
 `Exception.__new__` skips the check `ABCMeta` records for an ordinary abstract class.
 
 `EntityNotFoundError` and `FieldNotFoundError` share `NotFoundError`, so a caller that
-answers the same way for a missing entity and a missing field row catches that one name.
+handles a missing entity and a missing field row the same way catches that one name.
 
 A system error subclasses `BackendAIError` plus the matching aiohttp HTTP type, and implements `error_code()`:
 
 - A concrete exception **MUST inherit an HTTP status type (`web.HTTP*`) at definition
-  time** — there is no telling when it will surface externally, and a status-less
+  time**: there is no telling when it will surface externally, and a status-less
   exception leaks out as a generic 500. Only domain bases that are never raised
   directly stay mixin-less.
 

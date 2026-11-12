@@ -29,7 +29,7 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - uses: lablup/auto-labeler@main
+      - uses: lablup/auto-labeler@98637c08ff3e0abc1f8706e36cd45d292879dc89  # main
 
   detect-changes:
     # `contents: read`: only diffs against the base revision
@@ -59,7 +59,7 @@ jobs:
     - name: Detect release PR
       id: release
       uses: ./.github/actions/detect-release-pr
-    - uses: dorny/paths-filter@v3
+    - uses: dorny/paths-filter@0e4a8c6effa4802afeda77dc8d303f8176d7dfad  # v3
       id: filter
       with:
         filters: |
@@ -69,6 +69,7 @@ jobs:
             - '**/BUILD'
             - 'pants.toml'
             - 'pants.ci.toml'
+            - 'get-pants.sh'
             - 'python*.lock'
             - 'tools/*.lock'
             - '.github/workflows/ci*.yml'
@@ -155,7 +156,7 @@ jobs:
       with:
         mode: restore
     - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v11
+      uses: pantsbuild/actions/init-pants@0aaef864bd133c4055feb6adad0bfdce0de1c2e4  # v11
       with:
         named-caches-hash: disable
         cache-lmdb-store: 'false'
@@ -191,7 +192,10 @@ jobs:
       contents: read
       actions: write
     needs: plan-targets
-    if: needs.plan-targets.result == 'success' && needs.plan-targets.outputs.typecheck == 'true'
+    # Always runs on a tag push: a skipped `typecheck` skips `release` even past `lint-and-typecheck`.
+    if: >-
+      needs.plan-targets.result == 'success'
+      && (needs.plan-targets.outputs.typecheck == 'true' || startsWith(github.ref, 'refs/tags/'))
     uses: ./.github/workflows/ci-typecheck.yml
     with:
       targets-artifact: ci-targets

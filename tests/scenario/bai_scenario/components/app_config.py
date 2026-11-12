@@ -18,6 +18,7 @@ from ai.backend.common.data.entity.app_config import AppConfigEntityType
 from ai.backend.common.data.entity.app_config_allow_list import AppConfigAllowListEntityType
 from ai.backend.common.data.entity.app_config_definition import AppConfigDefinitionEntityType
 from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentEntityType
+from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
@@ -27,17 +28,21 @@ from ai.backend.manager.data.app_config.types import (
     AppConfigDefinitionData,
 )
 from ai.backend.manager.data.domain.types import DomainData
+from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
     Held,
+    Language,
     Same,
     SameAs,
+    Says,
     Then,
     Told,
     Verdict,
+    in_language,
 )
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf
 from bai_scenario.seeds.app_config.allow_list import SCOPE_NAMES, TestSeedAllowListEntry
@@ -52,11 +57,11 @@ ENFORCEMENT = "manager.rbac.enforcement_enabled"
 UNREGISTERED = "unregistered"
 """등록되지 않은 설정 이름. 미리 만들어 두는 값이 아니므로 리터럴로 둔다."""
 
-ENTITY_NAMES: Mapping[EntityType, str] = {
-    AppConfigEntityType(): "설정",
-    AppConfigDefinitionEntityType(): "설정 정의",
-    AppConfigAllowListEntityType(): "허용 목록 항목",
-    AppConfigFragmentEntityType(): "설정 조각",
+ENTITY_NAMES: Mapping[EntityType, Says] = {
+    AppConfigEntityType(): Says("설정", english="config"),
+    AppConfigDefinitionEntityType(): Says("설정 정의", english="config definition"),
+    AppConfigAllowListEntityType(): Says("허용 목록 항목", english="allow-list entry"),
+    AppConfigFragmentEntityType(): Says("설정 조각", english="config fragment"),
 }
 """레포트에서 권한 대상 엔티티 종류를 가리키는 이름."""
 
@@ -80,9 +85,19 @@ class SomeoneGrantedOnTheirOwn(TestSeedNest[Laid[UserData]]):
     @override
     def kind(self) -> str:
         what = ENTITY_NAMES[self.entity_type]
+        what_en = in_language(what, Language.ENGLISH)
         if not self.granted:
-            return f"{what} 권한이 하나도 없는 사용자 준비"
-        return f"자기 스코프에서 {what}에 대한 {names_of(self.granted)} 권한을 받은 사용자 준비"
+            return Says(
+                f"{what} 권한이 하나도 없는 사용자 준비",
+                english=f"Prepare a user with no {what_en} permission",
+            )
+        return Says(
+            f"자기 스코프에서 {what}에 대한 {names_of(self.granted)} 권한을 받은 사용자 준비",
+            english=(
+                f"Prepare a user granted the {names_of(self.granted)} permission on "
+                f"{what_en} in their own scope"
+            ),
+        )
 
     @override
     def lay(self, seed: TestSeeder) -> Laid[UserData]:
@@ -115,9 +130,19 @@ class SomeoneGrantedOn[Seat](TestSeedNest[Laid[UserData]]):
     @override
     def kind(self) -> str:
         what = ENTITY_NAMES[self.entity_type]
+        what_en = in_language(what, Language.ENGLISH)
         if not self.granted:
-            return f"{what} 권한이 하나도 없는 사용자 준비"
-        return f"{self.seat.describe}에서 {what}에 대한 {names_of(self.granted)} 권한을 받은 사용자 준비"
+            return Says(
+                f"{what} 권한이 하나도 없는 사용자 준비",
+                english=f"Prepare a user with no {what_en} permission",
+            )
+        return Says(
+            f"{self.seat.describe}에서 {what}에 대한 {names_of(self.granted)} 권한을 받은 사용자 준비",
+            english=(
+                f"Prepare a user granted the {names_of(self.granted)} permission on "
+                f"{what_en} in {in_language(self.seat.describe, Language.ENGLISH)}"
+            ),
+        )
 
     @override
     def lay(self, seed: TestSeeder) -> Laid[UserData]:
@@ -125,6 +150,50 @@ class SomeoneGrantedOn[Seat](TestSeedNest[Laid[UserData]]):
         if not self.granted:
             return someone
         role = seed.creating_from(TestSeedRole(self.seat_id, name_hint="seated"), self.seat)
+        for one in self.granted:
+            seed.adding(TestSeedPermission(entity_type=self.entity_type, permission=one), role)
+        seed.granting(role, someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id))
+        return someone
+
+
+@dataclass(frozen=True)
+class SomeoneGrantedInGlobal(TestSeedNest[Laid[UserData]]):
+    """global 스코프에 부여된 역할로, 한 엔티티 종류에 지정한 권한만 받은 사용자.
+
+    global 스코프에서 만들어지는 엔티티의 권한은 global 스코프의 역할로만 부여된다.
+    """
+
+    domain: Laid[DomainData]
+    entity_type: EntityType
+    granted: tuple[Permission, ...] = ()
+    role: UserRole = UserRole.USER
+
+    @override
+    def kind(self) -> str:
+        what = ENTITY_NAMES[self.entity_type]
+        what_en = in_language(what, Language.ENGLISH)
+        if not self.granted:
+            return Says(
+                f"{what} 권한이 하나도 없는 사용자 준비",
+                english=f"Prepare a user with no {what_en} permission",
+            )
+        return Says(
+            f"global 스코프에서 {what}에 대한 {names_of(self.granted)} 권한을 받은 사용자 준비",
+            english=(
+                f"Prepare a user granted the {names_of(self.granted)} permission on "
+                f"{what_en} in the global scope"
+            ),
+        )
+
+    @override
+    def lay(self, seed: TestSeeder) -> Laid[UserData]:
+        someone = seed.within(SomeoneOf(self.domain, role=self.role))
+        if not self.granted:
+            return someone
+        role = seed.creating_from(
+            TestSeedRole(lambda _: global_entity_id(GlobalEntityName.GLOBAL), name_hint="global"),
+            someone,
+        )
         for one in self.granted:
             seed.adding(TestSeedPermission(entity_type=self.entity_type, permission=one), role)
         seed.granting(role, someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id))
@@ -153,9 +222,18 @@ class ADesignOf(TestSeedNest[LaidDesign]):
     @override
     def kind(self) -> str:
         if not self.allowed:
-            return "어느 스코프에도 허용되지 않은 설정 이름 준비"
-        opened = "·".join(SCOPE_NAMES[one] for one in self.allowed)
-        return f"{opened} 스코프에 허용된 설정 이름 준비"
+            return Says(
+                "어느 스코프에도 허용되지 않은 설정 이름 준비",
+                english="Prepare a config name opened in no scope",
+            )
+        opened_ko = ", ".join(str(SCOPE_NAMES[one]) for one in self.allowed)
+        opened_en = ", ".join(
+            in_language(SCOPE_NAMES[one], Language.ENGLISH) for one in self.allowed
+        )
+        return Says(
+            f"{opened_ko} 스코프에 허용된 설정 이름 준비",
+            english=f"Prepare a config name opened in the {opened_en} scope",
+        )
 
     @override
     def lay(self, seed: TestSeeder) -> LaidDesign:
@@ -225,15 +303,34 @@ class AConfigLaidAcross(Given[Any, AMergeAndACaller]):
     @override
     def describe(self) -> str:
         who = (
-            "자기 스코프에서 설정 읽기 권한을 받은 사용자 한 명"
+            Says(
+                "자기 스코프에서 설정 읽기 권한을 받은 사용자 한 명",
+                english="one user granted the config read permission in their own scope",
+            )
             if self.granted
-            else "설정 권한이 하나도 없는 사용자 한 명"
+            else Says(
+                "설정 권한이 하나도 없는 사용자 한 명",
+                english="one user with no config permission",
+            )
         )
+        who_en = in_language(who, Language.ENGLISH)
         if not self.defined:
-            return f"등록되지 않은 설정 이름과, {who}"
+            return Says(
+                f"등록되지 않은 설정 이름과, {who}",
+                english=f"an unregistered config name, and {who_en}",
+            )
         laid = [SCOPE_NAMES[one] for one in self._allowed()]
-        where = "·".join(laid) if laid else "어느 스코프에도 허용되지 않은"
-        return f"{where} 스코프에 허용된 설정 이름 하나와, {who}"
+        if laid:
+            where_ko = ", ".join(str(one) for one in laid)
+            where_en = ", ".join(in_language(one, Language.ENGLISH) for one in laid)
+            return Says(
+                f"{where_ko} 스코프에 허용된 설정 이름 하나와, {who}",
+                english=f"one config name opened in the {where_en} scope, and {who_en}",
+            )
+        return Says(
+            f"어느 스코프에도 허용되지 않은 설정 이름 하나와, {who}",
+            english=f"one config name opened in no scope, and {who_en}",
+        )
 
     @override
     async def lay(self, seeding: Any) -> AMergeAndACaller:
@@ -301,11 +398,23 @@ class SeveralConfigsLaid(Given[Any, AMergeAndACaller]):
     @override
     def describe(self) -> str:
         who = (
-            "자기 스코프에서 설정 읽기 권한을 받은 사용자 한 명"
+            Says(
+                "자기 스코프에서 설정 읽기 권한을 받은 사용자 한 명",
+                english="one user granted the config read permission in their own scope",
+            )
             if self.granted
-            else "설정 권한이 하나도 없는 사용자 한 명"
+            else Says(
+                "설정 권한이 하나도 없는 사용자 한 명",
+                english="one user with no config permission",
+            )
         )
-        return f"공개 설정 조각을 하나씩 가진 설정 이름 {len(self.publics)}개와, {who}"
+        return Says(
+            f"공개 설정 조각을 하나씩 가진 설정 이름 {len(self.publics)}개와, {who}",
+            english=(
+                f"{len(self.publics)} config names each holding a public config fragment, "
+                f"and {in_language(who, Language.ENGLISH)}"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> AMergeAndACaller:
@@ -335,7 +444,7 @@ class NotRefused(Verdict):
 
     @override
     def told(self) -> Told:
-        says = "응답이 반환된다"
+        says = Says("응답이 반환됩니다", english="a response comes back")
         if self.raised is None:
             return Told(says)
         return Told(says, problems=(f"{says} 이어야 하는데 {type(self.raised).__name__}",))
@@ -349,7 +458,10 @@ class TheMergedConfigs(Then[AMergeAndACaller, GetAppConfigsPayload]):
 
     @override
     def says(self) -> str:
-        return "요청한 이름마다 병합된 설정이 반환된다"
+        return Says(
+            "요청한 이름마다 병합된 설정이 반환됩니다",
+            english="the merged config comes back for every requested name",
+        )
 
     @override
     def look(
@@ -364,7 +476,10 @@ class TheMergedConfigs(Then[AMergeAndACaller, GetAppConfigsPayload]):
                 Held(
                     f"app_configs[{i}].config_name",
                     got.config_name,
-                    SameAs(laid.names[i], "요청한 이름"),
+                    SameAs(
+                        laid.names[i],
+                        Says("요청한 이름", english="the requested name"),
+                    ),
                 )
             )
             seen.append(Same(f"app_configs[{i}].config", got.config, dict(wanted)))

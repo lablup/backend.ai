@@ -4,12 +4,12 @@
 
 ## Overview
 
-Deployment is Backend.AI's deployment management system that handles deployment, scaling, and routing of various services including model serving (vLLM, TGI, SGLang, etc.).
+Deployment is the Backend.AI deployment management system. It handles deployment, scaling and routing of various services, including model serving (vLLM, TGI, SGLang and so on).
 
 **Key Responsibilities:**
 - **Lifecycle Management**: Orchestrates the entire lifecycle from deployment creation to termination
-- **Replica Management**: Handles creation, management, and auto-scaling of replicas
-- **Type-specific Definition Generation**: Automatically generates session definitions tailored to each deployment type (vLLM, TGI, SGLang, etc.)
+- **Replica Management**: Handles creation, management and auto-scaling of replicas
+- **Type-specific Definition Generation**: Generates session definitions for each deployment type automatically (vLLM, TGI, SGLang and so on)
 - **Routing Management**: Manages routes for deployed services and distributes traffic
 - **Health Checks**: Detects unhealthy replicas through periodic monitoring and enables automatic recovery
 
@@ -41,9 +41,9 @@ Deployment is Backend.AI's deployment management system that handles deployment,
 
 Deployment depends on the following infrastructure components:
 
-**PostgreSQL**: Persists deployment, replica, and route states
+**PostgreSQL**: Persists deployment, replica and route states
 
-**Redis (Valkey)**: Caches replica states, collects metrics
+**Valkey**: Caches replica states and collects metrics
 
 **etcd**: Shares global configuration
 
@@ -51,7 +51,7 @@ Deployment depends on the following infrastructure components:
 
 ### DeploymentCoordinator
 
-DeploymentCoordinator acts as the top-level orchestrator of deployment lifecycles and serves as the central hub of the deployment system. It periodically processes deployment lifecycles and invokes appropriate handlers based on each deployment's current state. It works closely with RouteController to automatically update routing configurations according to deployment state changes and propagates deployment-related events to other components.
+DeploymentCoordinator acts as the top-level orchestrator of deployment lifecycles and as the central hub of the deployment system. It processes deployment lifecycles periodically and invokes the handler that matches the current state of each deployment. It works closely with RouteController to update routing configurations automatically as the deployment state changes, and it propagates deployment events to other components.
 
 **Key Methods:**
 - `process_deployment_lifecycle()`: Processes the entire lifecycle of deployments
@@ -74,7 +74,7 @@ DeploymentCoordinator acts as the top-level orchestrator of deployment lifecycle
 
 ### DeploymentController
 
-DeploymentController performs the actual control logic for deployments. It handles basic CRUD operations such as creating, updating, and deleting deployments, and manages the replica count for each deployment. It automatically generates final revision spec tailored to deployment types (vLLM, TGI, SGLang, etc.) with deployment user request, deployment-config.yaml file, and applies configured auto-scaling policies to deployments.
+DeploymentController performs the actual control logic for deployments. It handles the basic CRUD operations that create, update and delete deployments, and it manages the replica count of each deployment. It generates the final revision spec for each deployment type (vLLM, TGI, SGLang and so on) from the deployment user request and the deployment-config.yaml file, and it applies the configured auto-scaling policies to deployments.
 
 **Key Methods:**
 - `create_deployment()`: Creates a new deployment
@@ -107,7 +107,7 @@ DeploymentController performs the actual control logic for deployments. It handl
 
 ## Definition Generators
 
-Definition Generators transform finalized model revisions into runtime-specific session configurations. Each deployment type (vLLM, TGI, SGLang, NIM, etc.) requires different container images, environment variables, and resource requirements. Definition Generators abstract these runtime-specific differences and provide a consistent interface for session creation.
+Definition Generators transform finalized model revisions into runtime-specific session configurations. Each deployment type (vLLM, TGI, SGLang, NIM and so on) requires different container images, environment variables and resource requirements. Definition Generators abstract these runtime-specific differences and provide a consistent interface for session creation.
 
 > **Note**: Specific configurations for each deployment type will be managed as DB-based fixtures in the future.
 
@@ -123,7 +123,7 @@ Definition Generators transform finalized model revisions into runtime-specific 
 
 ## Revision Generators
 
-Revision Generators process draft model revisions from API requests and produce validated, deployment-ready model revision specifications. They handle the integration of deployment configs stored in vfolders with user-provided parameters, implementing a sophisticated override mechanism.
+Revision Generators process draft model revisions from API requests and produce validated model revision specifications that are ready for deployment. They handle the integration of deployment configs stored in vfolders with user-provided parameters, and they implement a sophisticated override mechanism.
 
 **Key Responsibilities:**
 - Load and parse deployment config files from vfolders
@@ -205,15 +205,15 @@ If the API request specifies `resource_slots.gpu = 4`, the final value will be `
 4. Return validated ModelRevisionSpec
 ```
 
-> **Note**: Deployment config files are optional. If no deployment config exists, the API request must provide all required configuration. When a deployment config is present, it serves as a template that users can selectively override through API parameters, reducing repetitive configuration for commonly deployed models.
+> **Note**: Deployment config files are optional. If no deployment config exists, the API request must provide all required configuration. When a deployment config is present, it serves as a template that users can selectively override through API parameters, which reduces repetitive configuration for commonly deployed models.
 
 ## State-Specific Handlers
 
-The deployment system provides specialized handlers for each deployment state, performing necessary operations for each state.
+The deployment system provides a specialized handler for each deployment state, and each handler performs the operations that the state needs.
 
 ### PendingHandler
 
-PendingHandler handles the initial setup and preparation stage of deployments. This handler initializes deployments, generates session creation requests for the configured initial replica count, and prepares resources needed for the deployment.
+PendingHandler handles the initial setup and preparation stage of deployments. This handler initializes deployments, generates session creation requests for the configured initial replica count, and prepares the resources that the deployment needs.
 
 **Processing Flow:**
 ```
@@ -228,7 +228,7 @@ PendingHandler handles the initial setup and preparation stage of deployments. T
 
 ### ReplicaHandler
 
-ReplicaHandler is responsible for managing replicas and synchronizing their states. This handler continuously monitors the state of each replica session, detects failed or abnormally terminated replicas and automatically regenerates them. To maintain the target replica count configured for the deployment, it creates new replicas when insufficient and removes them when excess.
+ReplicaHandler manages replicas and synchronizes their states. This handler monitors the state of each replica session continuously, detects failed or abnormally terminated replicas, and regenerates them automatically. To maintain the target replica count configured for the deployment, it creates new replicas when the count is insufficient and removes replicas when the count is in excess.
 
 **Processing Flow:**
 ```
@@ -242,11 +242,11 @@ ReplicaHandler is responsible for managing replicas and synchronizing their stat
 3. Update deployment state
 ```
 
-Replicas can have states such as HEALTHY (operating normally), UNHEALTHY (health check failed), STARTING (starting up), TERMINATING (shutting down), and the handler takes appropriate action based on this state information.
+Replicas can have states such as HEALTHY (operating normally), UNHEALTHY (health check failed), STARTING (starting up) and TERMINATING (shutting down), and the handler takes the appropriate action based on this state information.
 
 ### ScalingHandler
 
-ScalingHandler processes metric-based auto-scaling. This handler collects and analyzes metrics such as CPU utilization, memory utilization, request count, and response time, compares them with configured thresholds to make scale-up or scale-down decisions. Based on decisions, it dynamically adjusts replica count through DeploymentController.
+ScalingHandler processes metric-based auto-scaling. This handler collects and analyzes metrics such as CPU utilization, memory utilization, request count and response time, compares them with the configured thresholds, and makes scale-up or scale-down decisions. Based on the decisions, it adjusts the replica count dynamically through DeploymentController.
 
 **Scaling Policy:**
 ```python
@@ -280,7 +280,7 @@ ScalingHandler processes metric-based auto-scaling. This handler collects and an
 
 ### DestroyingHandler
 
-DestroyingHandler is responsible for termination processing of deployments. This handler requests termination of all replicas belonging to the deployment, cleans up resources (network, storage, etc.) associated with the deployment, and removes routes for that deployment through RouteController.
+DestroyingHandler handles termination processing of deployments. This handler requests termination of all replicas that belong to the deployment, cleans up the resources associated with the deployment (network, storage and so on), and removes the routes of that deployment through RouteController.
 
 **Processing Flow:**
 ```
@@ -297,17 +297,17 @@ DestroyingHandler is responsible for termination processing of deployments. This
 
 ## Route Management
 
-The route management system handles network routing for deployed services. It distributes external client requests to appropriate replicas and dynamically adjusts routing based on replica state.
+The route management system handles network routing for deployed services. It distributes external client requests to the appropriate replicas and adjusts routing as the replica state changes.
 
 ### RouteCoordinator
 
-RouteCoordinator is the orchestrator of route lifecycles, selecting and executing appropriate handlers based on route state. It orchestrates health check tasks to detect unhealthy endpoints and updates the endpoint list in real-time as replicas are added or removed.
+RouteCoordinator is the orchestrator of route lifecycles. It selects and executes the handler that matches the route state. It orchestrates the health check tasks that detect unhealthy endpoints and updates the endpoint list in real time as replicas are added or removed.
 
 Key methods include `process_routes()` for processing routes, `handle_route_provisioning()` for handling the provisioning stage, `handle_route_running()` for managing running routes, and `handle_route_health_check()` for performing health checks.
 
 ### RouteController
 
-RouteController performs the actual control logic for routes. It creates or updates new routes, configures traffic routing rules, and manages endpoint lists. It also applies load balancing strategies across multiple replicas.
+RouteController performs the actual control logic for routes. It creates or updates routes, configures traffic routing rules and manages endpoint lists. It also applies load balancing strategies across multiple replicas.
 
 Key methods include `create_route()` for creating new routes, `update_route()` for updating route configuration, `delete_route()` for deleting routes, and `get_endpoint()` for querying accessible endpoints.
 
@@ -330,20 +330,20 @@ Key methods include `create_route()` for creating new routes, `update_route()` f
 
 #### ProvisioningRouteHandler
 
-ProvisioningRouteHandler processes the provisioning stage of routes. It configures initial route setup, validates the validity of replica endpoints, and completes initial load balancer configuration.
+ProvisioningRouteHandler processes the provisioning stage of routes. It configures the initial route setup, validates replica endpoints and completes the initial load balancer configuration.
 
 #### RunningRouteHandler
 
-RunningRouteHandler manages running routes. It routes client requests to appropriate replicas, synchronizes the endpoint list as replicas are added or removed, and applies configured load balancing policies. Load balancing strategies include ROUND_ROBIN which distributes sequentially, LEAST_CONNECTIONS which selects the endpoint with the fewest connections, and WEIGHTED which distributes based on weights.
+RunningRouteHandler manages running routes. It routes client requests to the appropriate replicas, synchronizes the endpoint list as replicas are added or removed, and applies the configured load balancing policies. Load balancing strategies include ROUND_ROBIN, which distributes sequentially, LEAST_CONNECTIONS, which selects the endpoint with the fewest connections, and WEIGHTED, which distributes based on weights.
 
 #### HealthCheckRouteHandler
 
-HealthCheckRouteHandler performs periodic health checks using a 3-state health classification system. The handler queries health status data from Redis (populated by agents) and classifies routes based on readiness checks and data freshness.
+HealthCheckRouteHandler performs periodic health checks using a 3-state health classification system. The handler queries health status data from Valkey (populated by agents) and classifies routes based on readiness checks and data freshness.
 
 **3-State Health Classification:**
 - **HEALTHY**: Readiness check passes and health data is fresh
 - **UNHEALTHY**: Readiness check fails
-- **DEGRADED**: Health data is stale or missing (TTL expired in Redis)
+- **DEGRADED**: Health data is stale or missing (TTL expired in Valkey)
 
 **Processing Flow:**
 ```
@@ -362,18 +362,18 @@ HealthCheckRouteHandler performs periodic health checks using a 3-state health c
 3. Update route status in database
 ```
 
-**Note**: Health data is written to Redis by app-proxy workers during their periodic readiness checks on kernels. The manager reads this data to determine route status.
+**Note**: App proxy workers write health data to Valkey during their periodic readiness checks on kernels. The manager reads this data to determine route status.
 
 #### RouteEvictionHandler
 
-RouteEvictionHandler automatically cleans up routes based on scaling group configuration. This handler provides flexible route lifecycle management by allowing different cleanup policies per scaling group.
+RouteEvictionHandler cleans up routes automatically based on resource group configuration. This handler provides flexible route lifecycle management by allowing different cleanup policies per resource group.
 
 **Key Features:**
-- Configurable cleanup targets per scaling group
+- Configurable cleanup targets per resource group
 - Supports selective eviction based on route health status
 - No-lock operation for efficiency
 
-**Scaling Group Configuration:**
+**Resource Group Configuration:**
 ```python
 {
     "route_cleanup_target_statuses": ["unhealthy"]  # Default
@@ -412,7 +412,7 @@ Complete cleanup (remove all non-healthy):
 
 #### TerminatingRouteHandler
 
-TerminatingRouteHandler is responsible for termination processing of routes. It blocks new requests and performs traffic draining by waiting for in-progress requests to complete, then removes endpoints and cleans up related resources once all requests are completed.
+TerminatingRouteHandler handles termination processing of routes. It blocks new requests and drains traffic by waiting for in-progress requests to complete, then it removes endpoints and cleans up related resources once all requests are completed.
 
 ## Complete Processing Flow
 
@@ -541,7 +541,7 @@ STARTING ┤      ↕       ├─→ TERMINATING → TERMINATED
          └─→ UNHEALTHY ┘
 ```
 
-> **Note**: HEALTHY and UNHEALTHY states can transition bidirectionally based on health check results.
+> **Note**: HEALTHY and UNHEALTHY states can transition in both directions based on health check results.
 
 **Transition Condition Details:**
 
@@ -596,92 +596,92 @@ PENDING → PROVISIONING → ├─→ HEALTHY ┤ → TERMINATING → TERMINATE
 
 **Health Status Lifecycle:**
 - **Fresh → Stale threshold**: 5 minutes (configurable via MAX_HEALTH_STALENESS_SEC)
-- **Redis TTL**: 2 minutes (ROUTE_HEALTH_TTL_SEC)
+- **Valkey TTL**: 2 minutes (ROUTE_HEALTH_TTL_SEC)
 - **Recovery**: Routes can transition from UNHEALTHY/DEGRADED back to HEALTHY when conditions improve
 
 ## Configuration and Tuning
 
 ### Deployment Type-Specific Configuration
 
-Each deployment type (vLLM, TGI, SGLang, etc.) requires different configuration. Refer to each Definition Generator's documentation to identify and apply appropriate configuration for the deployment type.
+Each deployment type (vLLM, TGI, SGLang and so on) requires different configuration. Refer to each Definition Generator's documentation to identify and apply the appropriate configuration for the deployment type.
 
 ### Replica Configuration
 
-Replica-related configurations include `min_replicas` specifying the minimum replica count to maintain, `max_replicas` limiting the maximum replica count that auto-scaling can increase to, and `initial_replicas` setting the initial replica count to start when creating the deployment.
+Replica-related configurations include `min_replicas`, which specifies the minimum replica count to maintain, `max_replicas`, which limits the maximum replica count that auto-scaling can increase to, and `initial_replicas`, which sets the initial replica count to start when creating the deployment.
 
 ### Scaling Policy
 
-Auto-scaling policy is configured by selecting the metric type to monitor (cpu, memory, requests, latency, etc.), setting thresholds to trigger scale-up and scale-down, and specifying the cooldown period which is the minimum wait time between consecutive scaling operations.
+The auto-scaling policy is configured by selecting the metric type to monitor (cpu, memory, requests, latency and so on), setting thresholds to trigger scale-up and scale-down, and specifying the cooldown period, which is the minimum wait time between consecutive scaling operations.
 
 ### Health Check Configuration
 
-Health checks are configured by setting check interval and timeout, specifying thresholds for marking replicas as unhealthy or healthy, and setting the HTTP path and method for performing health checks.
+Health checks are configured by setting the check interval and timeout, specifying thresholds for marking replicas as unhealthy or healthy, and setting the HTTP path and method for performing health checks.
 
 ### Routing Configuration
 
-Routing-related configurations include selecting the load balancing strategy to use (round-robin, least connections, weight-based), setting request timeout, and configuring retry policy for failed requests.
+Routing-related configurations include selecting the load balancing strategy to use (round-robin, least connections, weight-based), setting request timeout, and configuring the retry policy for failed requests.
 
 ## Performance Considerations
 
 ### Replica Management
 
-As the number of replicas increases, monitoring load also increases, so appropriate monitoring intervals should be set according to system scale. Using batch processing instead of handling multiple replicas individually can improve efficiency.
+As the number of replicas increases, the monitoring load increases too, so set the monitoring interval according to the system scale. Using batch processing instead of handling multiple replicas individually can improve efficiency.
 
 ### Health Checks
 
-Health check intervals should be set considering the tradeoff between accuracy and load. Checking too frequently causes unnecessary network load, while checking too infrequently can delay failure detection.
+Set health check intervals considering the tradeoff between accuracy and load. Checking too frequently causes unnecessary network load, while checking too infrequently can delay failure detection.
 
 ### Scaling
 
-Minimize decision latency to enable fast response, but set cooldown periods appropriately to prevent unnecessary scaling fluctuations. Also consider the cost of metric collection and selectively collect only necessary metrics.
+Minimize decision latency to enable a fast response, but set cooldown periods appropriately to prevent unnecessary scaling fluctuations. Also consider the cost of metric collection and collect only the necessary metrics.
 
 ### Routing
 
-Appropriately adjust the update frequency of endpoint lists, minimize overhead from load balancing, and improve performance by caching frequently queried information.
+Adjust the update frequency of endpoint lists appropriately, minimize the overhead from load balancing, and improve performance by caching frequently queried information.
 
 ## Extension Points
 
 ### Adding New Definition Generator
 
-To support a new deployment type, inherit from `BaseDefinitionGenerator`, implement the `generate()` method for generating session definitions and the `validate()` method for validating configuration, then register in DefinitionGeneratorRegistry.
+To support a new deployment type, inherit from `BaseDefinitionGenerator`, implement the `generate()` method that generates session definitions and the `validate()` method that validates configuration, then register the generator in DefinitionGeneratorRegistry.
 
 ### Adding New Scaling Metric
 
-To support new metric-based scaling, implement metric collection logic, add the metric to scaling policy, and update ScalingHandler to process the new metric.
+To support scaling on a new metric, implement the metric collection logic, add the metric to the scaling policy, and update ScalingHandler to process the new metric.
 
 ### Adding New Load Balancing Strategy
 
-To add a new load balancing algorithm, implement the strategy class and integrate it into RouteController to provide as a selectable option.
+To add a new load balancing algorithm, implement the strategy class and integrate it into RouteController as a selectable option.
 
 ## Monitoring and Debugging
 
 ### Metrics
 
-To monitor system state, track deployment creation, update, and deletion counts, changes in replica count over time, frequency of scaling events, success and failure rates of health checks, and average response time of endpoints.
+To monitor system state, track the counts of deployment creation, update and deletion, the change in replica count over time, the frequency of scaling events, the success and failure rates of health checks, and the average response time of endpoints.
 
 ## Troubleshooting
 
 ### 1. Deployment Stuck in PENDING/PROVISIONING State
 
 **Symptoms**:
-- Deployment remains in PENDING or PROVISIONING state for extended time
+- Deployment remains in PENDING or PROVISIONING state for an extended time
 - No replica creation
 
 **Causes**:
-- Deployment configuration errors such as model definition
+- Deployment configuration errors such as an incorrect model definition
 - Session creation failure due to insufficient resources
-- Scaling group configuration errors
+- Resource group configuration errors
 
 **Diagnosis**:
-- **Deployment Details**: Check deployment configuration and scaling policy
-- **Replica Sessions**: Verify if replica sessions were actually created, check session state
-- **Session History**: Identify session creation failure reasons
-- **Scaling Group Resources**: Check available resources
+- **Deployment Details**: Check the deployment configuration and scaling policy
+- **Replica Sessions**: Check whether replica sessions were actually created and what state they are in
+- **Session History**: Identify the reasons for session creation failure
+- **Resource Group Resources**: Check the available resources
 
 **Resolution**:
-1. Validate deployment configuration (model name, resource requests, etc.)
-2. Check scaling group resource availability
-3. Identify session creation failure cause from Session History
+1. Validate the deployment configuration (model name, resource requests and so on)
+2. Check the resource availability of the resource group
+3. Identify the cause of session creation failure from Session History
 
 ### 2. Auto-Scaling Not Working
 
@@ -692,49 +692,49 @@ To monitor system state, track deployment creation, update, and deletion counts,
 **Causes**:
 - Metric collection failure
 - Scaling policy configuration errors
-- Waiting within cooldown period
+- Waiting within the cooldown period
 - New session creation impossible due to insufficient resources
 
 **Diagnosis**:
-- **Scaling Policy**: Check min/max replica count and thresholds
-- **Current Metrics**: Check current metric values like CPU, memory, RPS
-- **Replica State**: Check current replica count and state distribution
-- **Session Creation Possibility**: Check scaling group available resources and session creation success
+- **Scaling Policy**: Check the min/max replica count and thresholds
+- **Current Metrics**: Check the current metric values such as CPU, memory and RPS (requests per second)
+- **Replica State**: Check the current replica count and state distribution
+- **Session Creation Possibility**: Check the available resources of the resource group and the session creation success
 
 **Resolution**:
-1. Check metric collection status
-2. Validate scaling policy configuration
-3. Adjust cooldown period
-4. Add agents or secure resources if resource shortage
+1. Check the metric collection status
+2. Validate the scaling policy configuration
+3. Adjust the cooldown period
+4. Add agents or secure resources if resources are short
 
-> **Note**: Scale-up can fail if unable to create new sessions due to resource shortage even if metrics are normal.
+> **Note**: Scale-up can fail if new sessions cannot be created due to a resource shortage even when the metrics are normal.
 
 ### 3. Routes Stuck in DEGRADED State
 
 **Symptoms**:
 - Multiple routes remain in DEGRADED state
-- Routes don't transition back to HEALTHY despite kernel running
+- Routes do not transition back to HEALTHY despite the kernel running
 
 **Causes**:
-- App-proxy worker health check cycle not running
-- Redis connectivity issues between app-proxy and manager
-- Health check TTL too short for app-proxy check interval
+- App proxy worker health check cycle not running
+- Valkey connectivity issues between app proxy and manager
+- Health check TTL too short for the app proxy check interval
 
 **Diagnosis**:
-- **Route Details**: Check route status and last health check timestamp
-- **App-proxy Health**: Verify app-proxy health check is running
-- **Redis Connection**: Check app-proxy can write to Redis
-- **Timing Configuration**: Compare ROUTE_HEALTH_TTL_SEC vs app-proxy check interval
+- **Route Details**: Check the route status and the last health check timestamp
+- **App proxy Health**: Check that the app proxy health check is running
+- **Valkey Connection**: Check that the app proxy can write to Valkey
+- **Timing Configuration**: Compare ROUTE_HEALTH_TTL_SEC with the app proxy check interval
 
 **Resolution**:
-1. Verify app-proxy health check cycle is active
-2. Check Redis connectivity from app-proxy workers
-3. Increase ROUTE_HEALTH_TTL_SEC if app-proxy checks are slower
-4. Review MAX_HEALTH_STALENESS_SEC threshold
+1. Check that the app proxy health check cycle is active
+2. Check Valkey connectivity from app proxy workers
+3. Increase ROUTE_HEALTH_TTL_SEC if app proxy checks are slower
+4. Review the MAX_HEALTH_STALENESS_SEC threshold
 
 ## Parent Document
 - [Sokovan Overall Architecture](../README.md)
 
-## Related Documents
+## Related documents
 - [Scheduler Architecture](../scheduler/README.md)
 - [SchedulingController Architecture](../scheduling_controller/README.md)

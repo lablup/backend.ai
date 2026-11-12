@@ -229,20 +229,38 @@ class FieldCreator[TOwnerID: EntityIdentifier, TRow: Base, TData: FieldData](
         raise NotImplementedError
 
 
-class DanglingFieldCreator[TRow: Base, TData: FieldData](FieldRowCreator[TRow, TData], ABC):
+class GuardedDanglingFieldCreator[TRow: Base, TData: FieldData](FieldRowCreator[TRow, TData], ABC):
     """Insert spec of a field row written without an owner to build under.
 
     No owner names it, so what the row says about the entity it concerns is the spec's
     own value like every other column — the kind it is about where there is one, nothing
     where there is not. An operation that names scopes and no entity type is the latter.
 
-    Reachable only by a read that names no owner either.
+    Reachable only by a read that names no owner either. Carries preconditions as
+    :class:`GuardedEntityCreator` does; a spec with none answers via
+    :class:`DanglingFieldCreator`.
     """
+
+    @abstractmethod
+    def precondition_checks(self) -> Sequence[PreconditionCheck]:
+        """What must not be there for this write to stand."""
+        raise NotImplementedError
 
     @abstractmethod
     def build_row(self) -> TRow:
         """Build the row, which no owner names."""
         raise NotImplementedError
+
+
+class DanglingFieldCreator[TRow: Base, TData: FieldData](
+    GuardedDanglingFieldCreator[TRow, TData], ABC
+):
+    """Insert spec of an ownerless field row nothing outside the row can refuse."""
+
+    @final
+    @override
+    def precondition_checks(self) -> Sequence[PreconditionCheck]:
+        return ()
 
 
 @dataclass(frozen=True)

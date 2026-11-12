@@ -9,7 +9,7 @@ import secrets
 import shutil
 import time
 from collections import deque
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncIterator, Mapping, Sequence
 from pathlib import Path, PurePosixPath
 from typing import Any, ClassVar, final, override
 
@@ -18,16 +18,25 @@ import janus
 import trafaret as t
 
 from ai.backend.common.asyncio import run_in_executor_with_context
+from ai.backend.common.configs.volume_status_check import VolumeStatusCheckConfig
+from ai.backend.common.data.entity.storage_volume import StorageVolumeName
 from ai.backend.common.data.storage.types import (
+    StorageBackendCapabilities,
     StorageBackendCapability,
+    StorageBackendMetadata,
     StorageBackendType,
 )
 from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE
+from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
+from ai.backend.common.storage.probe.volume import AbstractVolumeStatusCheck
+from ai.backend.common.storage.volume.mount import VolumeMountStatusCheck
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage.errors import (
     InvalidAPIParameters,
     InvalidQuotaScopeError,
+    InvalidSubpathError,
     MetadataTooLargeError,
     ProcessExecutionError,
     QuotaDirectoryNotEmptyError,
@@ -35,6 +44,7 @@ from ai.backend.storage.errors import (
     QuotaScopeCreationFailedError,
     QuotaScopeNotFoundError,
 )
+from ai.backend.storage.errors.volume import VolumePerfMetricNotSupportedError
 from ai.backend.storage.subproc import run
 from ai.backend.storage.types import (
     SENTINEL,
@@ -50,7 +60,11 @@ from ai.backend.storage.types import (
     VFolderID,
     VolumeInfo,
 )
-from ai.backend.storage.utils import fstime2datetime
+from ai.backend.storage.utils import (
+    NOFOLLOW_REFUSED_ERRNOS,
+    fstime2datetime,
+    open_dir_nofollow,
+)
 from ai.backend.storage.volumes.abc import (
     _CURRENT_DIR,
     AbstractFSOpModel,
@@ -241,6 +255,7 @@ class BaseFSOpModel(AbstractFSOpModel):
                 shutil.copytree,
                 src_path,
                 dst_path,
+                symlinks=True,
                 dirs_exist_ok=True,
             ),
         )
@@ -400,6 +415,33 @@ class BaseFSOpModel(AbstractFSOpModel):
 
 class BaseVolume(AbstractVolume):
     name: ClassVar[StorageBackendType] = StorageBackendType("vfs")
+    _status_check: VolumeMountStatusCheck | None
+
+    def __init__(
+        self,
+        local_config: Mapping[str, Any],
+        mount_path: Path,
+        *,
+        etcd: AsyncEtcd,
+        event_dispatcher: EventDispatcher,
+        event_producer: EventProducer,
+        watcher: WatcherClient | None = None,
+        options: Mapping[str, Any] | None = None,
+        volume_name: StorageVolumeName,
+        status_check_config: VolumeStatusCheckConfig | None,
+    ) -> None:
+        super().__init__(
+            local_config,
+            mount_path,
+            etcd=etcd,
+            options=options,
+            volume_name=volume_name,
+            status_check_config=status_check_config,
+            event_dispatcher=event_dispatcher,
+            event_producer=event_producer,
+            watcher=watcher,
+        )
+        self._status_check = None
 
     @override
     def info(self) -> VolumeInfo:
@@ -421,6 +463,21 @@ class BaseVolume(AbstractVolume):
             self.local_config["storage-proxy"]["scandir-limit"],
             self.watcher,
         )
+
+    @override
+    async def volume_status_checker(self) -> AbstractVolumeStatusCheck | None:
+        if self._status_check_config is None:
+            return None
+        if self._status_check is None:
+            supported = await self.get_capabilities()
+            metadata = StorageBackendMetadata(
+                name=self.name,
+                capabilities=StorageBackendCapabilities(supported=supported),
+            )
+            self._status_check = VolumeMountStatusCheck.create(
+                self._volume_name, metadata, self.mount_path, self._status_check_config
+            )
+        return self._status_check
 
     @override
     async def get_capabilities(self) -> frozenset[StorageBackendCapability]:
@@ -531,7 +588,7 @@ class BaseVolume(AbstractVolume):
 
     @override
     async def get_performance_metric(self) -> FSPerfMetric:
-        raise NotImplementedError
+        raise VolumePerfMetricNotSupportedError
 
     @override
     async def get_fs_usage(self) -> CapacityUsage:
@@ -658,9 +715,24 @@ class BaseVolume(AbstractVolume):
 
         def _create_target() -> None:
             upload_base_path = vfpath / ".upload"
-            upload_base_path.mkdir(exist_ok=True)
-            upload_target_path = upload_base_path / session_id
-            upload_target_path.touch()
+            try:
+                upload_base_path.mkdir()
+            except FileExistsError:
+                pass
+            try:
+                with open_dir_nofollow(upload_base_path) as dir_fd:
+                    os.close(
+                        os.open(
+                            session_id,
+                            os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                            0o666,
+                            dir_fd=dir_fd,
+                        )
+                    )
+            except OSError as e:
+                if e.errno in NOFOLLOW_REFUSED_ERRNOS:
+                    raise InvalidSubpathError(vfid, PurePosixPath(".upload")) from e
+                raise
 
         await run_in_executor_with_context(None, _create_target)
         return session_id

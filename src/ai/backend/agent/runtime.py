@@ -17,8 +17,17 @@ from ai.backend.agent.tasks import CollectNodeStatTask, UpdateSlotsTask
 from ai.backend.agent.types import AgentBackend, get_agent_discovery
 from ai.backend.common.auth import PublicKey
 from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
-from ai.backend.common.cron import LocalCron
+from ai.backend.common.cron import LocalCron, PeriodicTask
+from ai.backend.common.data.entity.storage_volume import StorageVolumeName
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+from ai.backend.common.storage.probe.registry import VolumeStatusCheckRegistry
+from ai.backend.common.storage.probe.report import (
+    StorageStatusReportTask,
+    StorageStatusReportTaskArgs,
+)
+from ai.backend.common.storage.probe.reporter import VolumeStatusReporter, VolumeStatusReporterArgs
+from ai.backend.common.storage.probe.runner import ProbeCheckRunner, ProbeCheckRunnerArgs
+from ai.backend.common.storage.probe.volume import AbstractVolumeStatusCheck
 from ai.backend.common.types import AgentId, DeviceName, SlotName
 
 if TYPE_CHECKING:
@@ -35,6 +44,8 @@ class AgentRuntime:
     _metadata_server: MetadataServer | None
 
     _stop_signal: signal.Signals
+    _volume_status_check_registry: VolumeStatusCheckRegistry
+    _probe_check_runner: ProbeCheckRunner[StorageVolumeName]
     _local_cron: LocalCron
 
     @classmethod
@@ -99,6 +110,7 @@ class AgentRuntime:
             metadata_server=metadata_server,
         )
         await runtime._local_cron.start()
+        await runtime._probe_check_runner.start()
         return runtime
 
     @classmethod
@@ -167,12 +179,39 @@ class AgentRuntime:
         self._metadata_server = metadata_server
 
         self._stop_signal = signal.SIGTERM
-        self._local_cron = LocalCron([
+        volume_status_checks: list[AbstractVolumeStatusCheck] = []
+        self._volume_status_check_registry = VolumeStatusCheckRegistry(volume_status_checks)
+        self._probe_check_runner = ProbeCheckRunner(
+            ProbeCheckRunnerArgs(checks=volume_status_checks)
+        )
+        periodic_tasks: list[PeriodicTask] = [
             UpdateSlotsTask(self),
             CollectNodeStatTask(self, local_config),
-        ])
+        ]
+        sd_config = local_config.service_discovery
+        # The manager tells reports apart by these ids, so without both there is nothing to report.
+        if sd_config.instance_id and sd_config.service_group:
+            reporter = VolumeStatusReporter(
+                VolumeStatusReporterArgs(
+                    registry=self._volume_status_check_registry,
+                    service_catalog_instance_id=sd_config.instance_id,
+                    service_catalog_service_group=sd_config.service_group,
+                )
+            )
+            periodic_tasks.append(
+                StorageStatusReportTask(
+                    StorageStatusReportTaskArgs(
+                        reporter=reporter,
+                        event_producer=primary_agent.event_producer,
+                        interval=local_config.storage_status_report.interval,
+                        initial_delay=local_config.storage_status_report.initial_delay,
+                    )
+                )
+            )
+        self._local_cron = LocalCron(periodic_tasks)
 
     async def __aexit__(self, *exc_info: Any) -> None:
+        await self._probe_check_runner.stop()
         await self._local_cron.stop()
         for agent in self._agents.values():
             await agent.shutdown(self._stop_signal)

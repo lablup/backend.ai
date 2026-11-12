@@ -1,10 +1,10 @@
-# `docker/` — Service and infra images
+# `docker/`: Service and infra images
 
 The `backend.ai-*` dockerfiles in this directory are built and published to
-Docker Hub for every release tag by `.github/workflows/docker-images.yml` in a
-single `docker buildx bake` run (`docker-bake.hcl` at the repository root),
-multi-arch (`linux/amd64` + `linux/arm64`).
-`scripts/list-dockerfiles.sh` stays the publishing allowlist — the workflow
+Docker Hub for every release tag by `.github/workflows/docker-images.yml`.
+The workflow runs one `docker buildx bake` invocation (`docker-bake.hcl` at the
+repository root) for both architectures (`linux/amd64` and `linux/arm64`).
+`scripts/list-dockerfiles.sh` stays the publishing allowlist: the workflow
 fails when it and the bake targets drift apart
 (`scripts/check-bake-targets.sh`). The remaining dockerfiles are runtime
 helper images and are not published.
@@ -15,9 +15,9 @@ All published images are thin layers over a shared, **unpublished** base image
 (`backend.ai-base.dockerfile`) that installs every backend.ai package once:
 
 - Every image contains **all** backend.ai packages and the full `backend.ai`
-  CLI; the images differ only in their default command, prepared directories,
-  and service extras (e.g. the agent's Docker CLI and entrypoint).
-- A host running several services downloads the shared base layers once; the
+  CLI. The images differ only in their default command, prepared directories
+  and service extras (for example, the agent's Docker CLI and entrypoint).
+- A host running several services downloads the shared base layers once. The
   per-service layers are a few KB.
 - The same-version rule below is structural: one base build feeds all seven
   images of a release.
@@ -36,16 +36,16 @@ All published images are thin layers over a shared, **unpublished** base image
 
 | Tag | Meaning |
 |---|---|
-| `<version>` (e.g. `26.9.0`, `26.9.0rc1`) | The normalized package version of the release tag that built the image |
-| `latest` | Applied to **any** final (non-prerelease) release — never moved by rc/alpha/beta releases. This includes hotfixes cut from older release branches, so `latest` can move *backwards*; pin explicit versions in production |
+| `<version>` (for example, `26.9.0`, `26.9.0rc1`) | The normalized package version of the release tag that built the image |
+| `latest` | Applied to **any** final (non-prerelease) release. An rc, alpha or beta release never moves it. This includes hotfixes cut from older release branches, so `latest` can move *backwards*; pin explicit versions in production |
 
 **Build contract.** The base image takes `PYTHON_VERSION` (from `pants.toml`)
 and `PKGVER` (normalized `VERSION`) and installs the release wheels staged in
-`dist/` (falling back to PyPI for a version already released there); the
+`dist/`. For a version already released to PyPI, it falls back to PyPI. The
 service dockerfiles take only `PKGVER` and start
-`FROM backend.ai-base:${PKGVER}`. Always build through bake — it builds the
-base as an in-run dependency of the service targets (via a named build
-context), so the base never needs to be pre-built or pushed anywhere:
+`FROM backend.ai-base:${PKGVER}`. Always build through bake: bake builds the
+base as an in-run dependency of the service targets (through a named build
+context), so the base never needs a pre-build or a push:
 
 ```sh
 PYTHON_VERSION=<ver from pants.toml> \
@@ -56,16 +56,16 @@ PKGVER=$(python3 scripts/normalize-version.py "$(cat VERSION)") \
 (Bake target names replace the `.` of the image name with `_`; the build
 context is the repository root.)
 
-**Run every `lablup/backend.ai-*` image in one deployment at the SAME version.**
-The components exchange serialized messages over the shared Redis/Valkey event
-bus, and the message schema evolves between minor releases; a mixed-version
-fleet fails at runtime with deserialization errors (e.g. a pre-26.8 subscriber
-crashes on the `triggered_user` metadata field added in 26.8).
+**Run every `lablup/backend.ai-*` image in one deployment at the same version.**
+The components exchange serialized messages over the shared Valkey event
+bus, and the message schema evolves between minor releases. A mixed-version
+fleet fails at runtime with deserialization errors (for example, a pre-26.8
+subscriber crashes on the `triggered_user` metadata field added in 26.8).
 
 ## Infra images (not published)
 
-Runtime helper images loaded on demand by the agent from bundled archives —
-not published to Docker Hub.
+Runtime helper images that the agent loads on demand from bundled archives.
+They are not published to Docker Hub.
 
 | Dockerfile | Role |
 |---|---|
@@ -80,165 +80,165 @@ path the image's default command reads:
 
 | Service | Config mount target | Notes |
 |---|---|---|
-| manager | `/etc/backend.ai/manager.toml` | also mount `fixtures/` at `/app/fixtures` **read-write** — manager RPC keypair (auto-generated at first start) + DB fixtures |
+| manager | `/etc/backend.ai/manager.toml` | also mount `fixtures/` at `/app/fixtures` **read-write**: the manager RPC keypair (auto-generated at first start) and DB fixtures |
 | agent | `/etc/backend.ai/agent.toml` | see the privilege and path-parity sections below |
 | webserver | `/etc/backend.ai/webserver.conf` | note the `.conf` target name, not `.toml` |
-| storage-proxy | `/etc/backend.ai/storage-proxy.toml` | to run unprivileged with the chown watcher, set the `user`/`group` knobs in `storage-proxy.toml` (the daemon drops privileges itself after starting as root); when the watcher is not used, compose `user:` works too — the DOCKER install mode runs it as the installing user this way. If TLS is enabled, mount the cert material read-only at whatever path `ssl-cert`/`ssl-privkey` point to |
+| storage-proxy | `/etc/backend.ai/storage-proxy.toml` | to run unprivileged with the chown watcher, set the `user`/`group` knobs in `storage-proxy.toml` (the daemon drops privileges itself after starting as root). When the watcher is not used, compose `user:` works too: the DOCKER install mode runs it as the installing user this way. If TLS is enabled, mount the cert material read-only at the path `ssl-cert`/`ssl-privkey` point to |
 | appproxy-coordinator | `/etc/backend.ai/proxy-coordinator.toml` | |
-| appproxy-worker | `/etc/backend.ai/proxy-worker.toml` | one container per worker: each needs its OWN toml with a unique `authority`, protocol (`http`/`tcp`), `api_bind_addr` port, and a non-overlapping `[proxy_worker.port_proxy] bind_port_range` (port-based frontends only) — and the compose port mappings must match |
+| appproxy-worker | `/etc/backend.ai/proxy-worker.toml` | one container per worker: each needs its own toml with a unique `authority`, protocol (`http`/`tcp`), `api_bind_addr` port and a non-overlapping `[proxy_worker.port_proxy] bind_port_range` (port-based frontends only), and the compose port mappings must match |
 
-The `/etc/backend.ai/*` targets are what the images' **default commands**
-read; the DOCKER install mode (see the reference compose file below) follows
-the same convention, mounting each generated config at its default-command
-path read-only.
+The images' **default commands** read the `/etc/backend.ai/*` targets. The
+DOCKER install mode (see the reference compose file below) follows the same
+convention and mounts each generated config read-only at its default-command
+path.
 
 Shared prerequisites:
 
 | Item | Used by | Why |
 |---|---|---|
-| halfstack services (PostgreSQL, Valkey/Redis, etcd) | all | the reference definitions live in `docker-compose.halfstack-main.yml` |
-| `supergraph.graphql` + a GraphQL gateway (e.g. `ghcr.io/graphql-hive/gateway`) | GraphQL federation | the supergraph schema is generated per release (`scripts/generate-graphql-schema.sh`); the gateway composes manager subgraphs |
-| RPC auth key distribution | manager, agent | the agent needs the manager's RPC **public** key to authenticate RPC calls — e.g. share the parity-mounted fixtures directory across nodes, or mount a common key directory at `/etc/backend.ai/keys:ro` |
-| `wheelhouse/` mount at `/app/wheelhouse` | manager, agent | staging dir for extra plugin wheels (e.g. accelerator plugins) — the DOCKER install mode creates and mounts `<install-dir>/wheelhouse` read-write (installing from it unpacks the wheels in place); nothing in the images consumes it automatically, so install with `docker exec <container> pip install /app/wheelhouse/*.whl` or build a derived image |
+| halfstack services (PostgreSQL, Valkey, etcd) | all | the reference definitions live in `docker-compose.halfstack-main.yml` |
+| `supergraph.graphql` and a GraphQL gateway (for example, `ghcr.io/graphql-hive/gateway`) | GraphQL federation | the supergraph schema is generated per release (`scripts/generate-graphql-schema.sh`); the gateway composes manager subgraphs |
+| RPC auth key distribution | manager, agent | the agent needs the manager's RPC **public** key to authenticate RPC calls: share the parity-mounted fixtures directory across nodes, or mount a common key directory at `/etc/backend.ai/keys:ro` |
+| `wheelhouse/` mount at `/app/wheelhouse` | manager, agent | staging directory for extra plugin wheels (for example, accelerator plugins). The DOCKER install mode creates and mounts `<install-dir>/wheelhouse` read-write (installing from it unpacks the wheels in place). Nothing reads it by default. Set `allow = true` under `[wheelhouse]` in `manager.toml` or `agent.toml` to load its wheels at startup: the images run from `/app`, so the default `path` of `./wheelhouse` is this directory. Otherwise install with `docker exec <container> pip install /app/wheelhouse/*.whl` or build a derived image |
 
 ## Container privileges
 
-Most services run fine with compose defaults (bridge network, config file
+Most services run with compose defaults (bridge network, config file
 bind-mounted read-only). Only the **agent** needs real host privileges; the
-manager needs at most the Docker socket. Grant each item consciously —
-together they amount to root-equivalent control of the host.
+manager needs at most the Docker socket. Grant each item deliberately: together
+they amount to root-equivalent control of the host.
 
 | Requirement | manager | agent | Why |
 |---|---|---|---|
-| `network_mode: host` | optional | ✅ | Agent: kernel↔agent ZMQ/service ports and agent RPC are advertised on host addresses; kernels spawned on the host network must reach them. Manager: convenience only — the bridge alternative works via the `announce-addr` / `announce-internal-addr` knobs |
-| `privileged: true` | default | ✅ | Agent: container/device management against the host daemon; sysfs reads for metrics. The manager does not strictly need it — the Docker socket alone suffices for its (conditional) Docker use — but the DOCKER install mode's generated compose grants it by default; remove the flag for a least-privilege deployment |
+| `network_mode: host` | optional | ✅ | Agent: kernel-agent ZMQ/service ports and agent RPC are advertised on host addresses; kernels spawned on the host network must reach them. Manager: convenience only; the bridge alternative works through the `announce-addr` / `announce-internal-addr` knobs |
+| `privileged: true` | default | ✅ | Agent: container and device management against the host daemon; sysfs reads for metrics. The manager does not strictly need it (the Docker socket alone suffices for its conditional Docker use), but the DOCKER install mode's generated compose grants it by default. Remove the flag for a least-privilege deployment |
 | `/var/run/docker.sock` bind mount | conditional | ✅ | DooD: containers are created by talking to the **host** Docker daemon. Manager: only when the `local` container registry is used |
-| `pid: host` | — | ✅ | Host PID namespace visibility: the agent inspects and signals kernel processes by host PID |
-| `cgroup: host` (host cgroup namespace) | — | ✅ | **Required, not optional** — see below |
-| Host `/sys` visibility | — | ✅ | Container resource metrics are read from the host cgroupfs/sysfs (follows automatically from the host cgroup namespace) |
-| GPU device reservation | — | ✅ (GPU nodes) | compose-native form: `deploy.resources.reservations.devices` with `driver: nvidia, count: all, capabilities: [gpu]` (requires the NVIDIA container toolkit on the host) |
-| Path parity mounts | — | ✅ | See below |
+| `pid: host` | none | ✅ | Host PID namespace visibility: the agent inspects and signals kernel processes by host PID |
+| `cgroup: host` (host cgroup namespace) | none | ✅ | **Required, not optional**; see below |
+| Host `/sys` visibility | none | ✅ | Container resource metrics are read from the host cgroupfs/sysfs (follows automatically from the host cgroup namespace) |
+| GPU device reservation | none | ✅ (GPU nodes) | compose-native form: `deploy.resources.reservations.devices` with `driver: nvidia, count: all, capabilities: [gpu]` (requires the NVIDIA container toolkit on the host) |
+| Path parity mounts | none | ✅ | See below |
 
 ### The agent cgroup-namespace trap
 
-The agent's host-PID→container-PID translation
-(`host_pid_to_container_pid` in `src/ai/backend/agent/utils.py`, via
-`src/ai/backend/common/cgroup.py`) parses `/proc/<pid>/cgroup` expecting
-**host-rooted** paths (`docker/<id>` or `system.slice/docker-<id>.scope`) and
-reads hardcoded `/sys/fs/cgroup/...` paths; the metrics path separately
-resolves the cgroupfs mount point from `/proc/mounts`. In a private cgroup
+The agent's host-PID-to-container-PID translation
+(`host_pid_to_container_pid` in `src/ai/backend/agent/utils.py`, through
+`src/ai/backend/common/cgroup.py`) parses `/proc/<pid>/cgroup` and expects
+**host-rooted** paths (`docker/<id>` or `system.slice/docker-<id>.scope`). It
+reads hardcoded `/sys/fs/cgroup/...` paths, and the metrics path resolves the
+cgroupfs mount point separately from `/proc/mounts`. In a private cgroup
 namespace, sibling-container paths are not host-rooted and the mounted cgroupfs
-is namespaced — PID translation and sysfs metrics both break.
+is namespaced, so PID translation and sysfs metrics both break.
 
 **On cgroup v2 hosts Docker defaults to a private cgroup namespace even for
-`--privileged` containers**, so `cgroup: host` (CLI: `--cgroupns=host`) must be
-set explicitly.
+`--privileged` containers**, so set `cgroup: host` (CLI: `--cgroupns=host`)
+explicitly.
 
 ### Agent path parity
 
 Docker resolves bind-mount *sources* in the **host** filesystem, so any
 absolute path the containerized agent hands to the host daemon must exist at
-the same absolute path on both sides. The paths are set by `agent.toml` —
-**every one of them must be an absolute path**, bind-mounted host↔container at
-the identical location:
+the same absolute path on both sides. `agent.toml` sets the paths, and
+**each one must be an absolute path**, bind-mounted at the identical location
+on host and container:
 
-The values below are the defaults the DOCKER install mode writes — all under
-fixed system paths, so the install directory itself is never mounted into a
-running service; a hand-rolled deployment may choose any absolute paths as
-long as the parity rule holds.
+The values below are the defaults the DOCKER install mode writes. All of them
+sit under fixed system paths, so the install directory itself is never mounted
+into a running service. A hand-rolled deployment may choose any absolute paths
+as long as the parity rule holds.
 
 | Config knob (`agent.toml`) | DOCKER-mode default | Used for |
 |---|---|---|
 | `[container] scratch-root` | `/var/lib/backend.ai/scratches` | Scratch roots of kernel containers |
 | `[agent] mount-path` | `/vfroot/local` | Vfolder tree whose subdirectories become kernel bind-mount sources |
-| `[agent] ipc-base-path` | `/tmp/backend.ai/ipc/agent` | Agent↔kernel IPC sockets |
-| `[agent] var-base-path` | `/var/lib/backend.ai` | Plugin state bind-mounted into kernels (e.g. accelerator hook caches); plugin dirs live as siblings of `scratches/`, `commit/`, and `krunner/` |
+| `[agent] ipc-base-path` | `/tmp/backend.ai/ipc/agent` | IPC sockets between the agent and kernels |
+| `[agent] var-base-path` | `/var/lib/backend.ai` | Plugin state bind-mounted into kernels (for example, accelerator hook caches); plugin dirs live as siblings of `scratches/`, `commit/`, and `krunner/` |
 | `[agent] image-commit-path` | `/var/lib/backend.ai/commit` | Session image-commit tarballs written by the host daemon |
-| env `BACKENDAI_KRUNNER_SHARED` | `/var/lib/backend.ai/krunner` | Kernel-runner files: the image entrypoint copies them here so the host daemon can mount them into kernels; the entrypoint **refuses to start** without the share being host-backed |
+| env `BACKENDAI_KRUNNER_SHARED` | `/var/lib/backend.ai/krunner` | Kernel-runner files: the image entrypoint copies them here so the host daemon can mount them into kernels; the entrypoint **does not start** without a host-backed share |
 
 With these defaults, three parity mounts cover everything on the agent:
-`/var/lib/backend.ai` (which also backs the krunner share), `/tmp/backend.ai`,
+`/var/lib/backend.ai` (which also backs the krunner share), `/tmp/backend.ai`
 and `/vfroot/local`. The Docker daemon creates the missing host directories
-on first start; they stay root-owned, which is fine — the agent runs as
-root, and the storage-proxy's `/vfroot/local/volume1` is chowned to the
-installing user by the installer.
+on first start and they stay root-owned. That is fine: the agent runs as
+root, and the installer chowns the storage-proxy's `/vfroot/local/volume1` to the
+installing user.
 
-Vfolder roots (e.g. `/vfroot/local/volume1`) follow the same rule on the
-**storage-proxy**: mount each volume at the identical absolute path on host and
-in the storage-proxy container, so the kernel bind-mount sources it reports
+Vfolder roots (for example, `/vfroot/local/volume1`) follow the same rule on the
+**storage-proxy**: mount each volume at the identical absolute path on the host
+and in the storage-proxy container, so the kernel bind-mount sources it reports
 resolve on the host. The agent container itself does not need the vfroot mount
-— unless the agent itself performs the volume mounting
-(`cohabiting-storage-proxy = false`), in which case its `mount-path` must be a
+unless the agent performs the volume mounting
+(`cohabiting-storage-proxy = false`). In that case its `mount-path` must be a
 **shared-propagation** bind mount (`bind-propagation: rshared`) so host-side
-mounts become visible inside the container. Also, `scratch-type = "memory"` is
-unsupported in the containerized agent — a tmpfs mounted inside the container's
-namespace is invisible to the host daemon — use `hostdir`.
+mounts become visible inside the container. `scratch-type = "memory"` is
+unsupported in the containerized agent because a tmpfs mounted inside the
+container's namespace is invisible to the host daemon; use `hostdir`.
 
 ### Agent bind addresses
 
-The bundled `agent.toml` pins both of the agent's bind addresses to
-`127.0.0.1`, which is correct for the DEVELOP/PACKAGE modes: there the agent,
+The bundled `agent.toml` pins both agent bind addresses to
+`127.0.0.1`, which is correct for the DEVELOP and PACKAGE modes: there the agent,
 the app-proxy workers and the published kernel ports all share the host
 loopback. In this deployment the workers are **bridge** containers that cannot
-reach it, so the DOCKER install mode rewrites both to the public facing
+reach it, so the DOCKER install mode rewrites both to the public-facing
 address:
 
 | Config knob (`agent.toml`) | DOCKER-mode value | Reaches |
 |---|---|---|
-| `[container] bind-host` | public facing address | Host interface the kernel service ports are published on |
-| `[agent] rpc-listen-addr.host` | public facing address | Interface the agent's RPC listener binds, and the address it registers as its contact |
+| `[container] bind-host` | public-facing address | Host interface the kernel service ports are published on |
+| `[agent] rpc-listen-addr.host` | public-facing address | Interface the agent's RPC listener binds, and the address it registers as its contact |
 
-Left on loopback, kernel apps are unroutable from the proxy and the manager
-records a loopback contact address for the agent. The rewrite is DOCKER-mode
-only — DEVELOP/PACKAGE keep the defaults, which do not expose these ports
-off-host. Since these now listen on a routable interface, firewall the kernel
+On loopback, kernel apps are unroutable from the proxy and the manager
+records a loopback contact address for the agent. The rewrite applies to
+DOCKER mode only; DEVELOP and PACKAGE keep the defaults, which do not expose these ports
+off-host. Because these addresses now listen on a routable interface, firewall the kernel
 port range and the agent RPC port if the host is exposed.
 
-The equivalent for a hand-rolled deployment is either editing those two lines
-or setting `BACKEND_BIND_HOST_OVERRIDE` / `BACKEND_AGENT_HOST_OVERRIDE` on the
+For a hand-rolled deployment, either edit those two lines
+or set `BACKEND_BIND_HOST_OVERRIDE` / `BACKEND_AGENT_HOST_OVERRIDE` on the
 agent container.
 
 ## Reference compose file
 
 `docker-compose.monorepo.yml` at the repository root is a **partial, legacy
-example** — it uses different image names, includes no agent or storage-proxy,
+example**: it uses different image names, includes no agent or storage-proxy
 and runs on a bridge network. The authoritative reference is the compose file
 the **DOCKER install mode** of `backend.ai-installer` generates at
-`<install-dir>/docker-compose.yaml` (rendered from the
-`src/ai/backend/install/configs/docker-compose.services.yml` template — the
-standard output name means a bare `docker compose` in the install directory
-addresses the deployment). Its contract:
+`<install-dir>/docker-compose.yaml`. It is rendered from the
+`src/ai/backend/install/configs/docker-compose.services.yml` template; the
+standard output name lets a bare `docker compose` in the install directory
+address the deployment. Its contract:
 
 - Every service reads its generated config from the image's default
-  `/etc/backend.ai/*` path via a per-file read-only mount and runs the
-  image's default command — the same convention as the deployment layout
+  `/etc/backend.ai/*` path through a per-file read-only mount and runs the
+  image's default command, the same convention as the deployment layout
   above.
-- The installer merges the halfstack definition (PostgreSQL/Redis/etcd +
-  optional observability) INTO the generated file, so the WHOLE deployment
-  is ONE compose file and ONE compose project.
-- Host networking is granted only to the manager and the agent (and the
-  `manager-cli` one-off tool). The other services join the halfstack's
-  `half` bridge network with published ports and `depends_on` health gating;
-  their generated configs get DB/etcd/apollo-router addresses rewritten to compose
-  service DNS names (container-side ports), redis addressed by the host
-  public IP + published port everywhere (it is shared across both network
-  profiles via the etcd `config/redis/addr`), the manager API rewritten to
-  the host's public facing address (the host-network manager binds
-  0.0.0.0), and bind addresses forced to `0.0.0.0` — while
-  announce/advertised addresses are untouched.
+- The installer merges the halfstack definition (PostgreSQL, Valkey, etcd and
+  optional observability) into the generated file, so the whole deployment
+  is one compose file and one compose project.
+- Host networking is granted only to the manager, the agent and the
+  `manager-cli` one-off tool. The other services join the halfstack's
+  `half` bridge network with published ports and `depends_on` health gating.
+  Their generated configs get the DB, etcd and apollo-router addresses
+  rewritten to compose service DNS names (container-side ports). Valkey is
+  addressed by the host public IP and published port everywhere, because both
+  network profiles share it through the etcd `config/redis/addr`. The manager
+  API is rewritten to the host's public-facing address (the host-network
+  manager binds 0.0.0.0), and bind addresses are forced to `0.0.0.0`, while
+  announce and advertised addresses stay untouched.
 - **No running service mounts the install directory.** The daemon-visible
-  state lives under fixed system paths with host==container path parity:
-  `/var/lib/backend.ai` + `/tmp/backend.ai` (agent) and `/vfroot/local`
-  (agent + storage-proxy). Only `manager-cli`, the installer's one-off tool,
-  mounts the install directory (for fixture files). The manager exchanges
+  state lives under fixed system paths with host and container path parity:
+  `/var/lib/backend.ai` and `/tmp/backend.ai` (agent), and `/vfroot/local`
+  (agent and storage-proxy). Only `manager-cli`, the installer's one-off tool,
+  mounts the install directory for fixture files. The manager exchanges
   the RPC keypair through `<install-dir>/fixtures` mounted at
   `/app/fixtures`, and the storage-proxy reads its TLS material from a
   read-only mount of `<install-dir>/configs/storage-proxy`.
 - The storage-proxy runs as the **installing user** (compose `user:`),
-  matching PACKAGE-mode file ownership; the installer chowns
-  `/vfroot/local/volume1` to that user via a root one-off container.
+  matching PACKAGE-mode file ownership. The installer chowns
+  `/vfroot/local/volume1` to that user through a root one-off container.
 - `/etc/machine-id` is passed through read-only to the manager and agent so
-  anything deriving a stable host identity sees the host's, not the
+  anything that derives a stable host identity sees the host's, not the
   container's.
 - All images are pinned to the installer's own version (the event-bus
   version-skew rule above).
@@ -253,7 +253,7 @@ addresses the deployment). Its contract:
 
 The fragment below reproduces the two elevated services. Replace `<version>`
 with a tag from the tagging scheme above and `<install-dir>` with the install
-target directory. The `cgroup:` key requires Docker Compose v2.15+.
+target directory. The `cgroup:` key requires Docker Compose v2.15 or newer.
 
 ```yaml
 name: backendai-services
@@ -296,7 +296,7 @@ services:
     restart: unless-stopped
 ```
 
-Bind mounts are fixed at container **creation**, so after adding or changing
+Bind mounts are fixed at container **creation**. After adding or changing
 the parity mounts, recreate the container
-(`docker compose up -d --force-recreate agent`) — the entrypoint does re-run
+(`docker compose up -d --force-recreate agent`): the entrypoint re-runs
 on a plain restart, but the old container's mounts cannot change.

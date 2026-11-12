@@ -29,6 +29,11 @@ from ai.backend.common.data.entity.deployment import DeploymentEntityType
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
 from ai.backend.common.data.entity.image import ImageEntityType, ImageID
 from ai.backend.common.data.entity.kernel import KernelFieldType
+from ai.backend.common.data.entity.kernel_group import KernelGroupFieldType
+from ai.backend.common.data.entity.kernel_group_environ import KernelGroupEnvironFieldType
+from ai.backend.common.data.entity.kernel_group_resource_slot import (
+    KernelGroupResourceSlotFieldType,
+)
 from ai.backend.common.data.entity.model_card import ModelCardEntityType
 from ai.backend.common.data.entity.notification import (
     NotificationChannelEntityType,
@@ -61,6 +66,11 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
+from ai.backend.manager.data.kernel_group.types import (
+    KernelGroupData,
+    KernelGroupEnvironData,
+    KernelGroupResourceSlotData,
+)
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
@@ -74,6 +84,7 @@ from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
 from ai.backend.manager.models.resource_slot.row import AgentResourceRow
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.container_registry.db_source import ContainerRegistryDBSource
 from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
@@ -94,11 +105,29 @@ from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.session.actions.lookup_bulk_kernel_group_environ_owner import (
+    LookupBulkKernelGroupEnvironOwnerAction,
+)
+from ai.backend.manager.services.session.actions.lookup_bulk_kernel_group_owner import (
+    LookupBulkKernelGroupOwnerAction,
+)
+from ai.backend.manager.services.session.actions.lookup_bulk_kernel_group_resource_slot_owner import (
+    LookupBulkKernelGroupResourceSlotOwnerAction,
+)
 from ai.backend.manager.services.session.actions.lookup_bulk_kernel_owner import (
     LookupBulkKernelOwnerAction,
 )
 from ai.backend.manager.services.session.actions.lookup_kernel_field_owner import (
     LookupKernelFieldOwnerAction,
+)
+from ai.backend.manager.services.session.actions.lookup_kernel_group_environ_field_owner import (
+    LookupKernelGroupEnvironFieldOwnerAction,
+)
+from ai.backend.manager.services.session.actions.lookup_kernel_group_field_owner import (
+    LookupKernelGroupFieldOwnerAction,
+)
+from ai.backend.manager.services.session.actions.lookup_kernel_group_resource_slot_field_owner import (
+    LookupKernelGroupResourceSlotFieldOwnerAction,
 )
 from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.resource_allocation.processors import (
@@ -116,7 +145,12 @@ from ai.backend.testutils.fixtures import DomainFixtureData
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
-    from tests.component.conftest import ServerInfo, UserFixtureData
+    from tests.component.conftest import (
+        ProvisionedUserData,
+        ServerInfo,
+        UserFixtureData,
+        VirtualEntitySeeder,
+    )
 
     from ai.backend.common.plugin.hook import HookPluginContext
 
@@ -209,6 +243,24 @@ async def session_processors(
             KernelInfo,
             LookupKernelFieldOwnerAction,
             LookupBulkKernelOwnerAction,
+        ),
+        processor_registry.group(GroupMeta(SessionEntityType())).field_group(
+            FieldGroupMeta(KernelGroupFieldType()),
+            KernelGroupData,
+            LookupKernelGroupFieldOwnerAction,
+            LookupBulkKernelGroupOwnerAction,
+        ),
+        processor_registry.group(GroupMeta(SessionEntityType())).field_group(
+            FieldGroupMeta(KernelGroupEnvironFieldType()),
+            KernelGroupEnvironData,
+            LookupKernelGroupEnvironFieldOwnerAction,
+            LookupBulkKernelGroupEnvironOwnerAction,
+        ),
+        processor_registry.group(GroupMeta(SessionEntityType())).field_group(
+            FieldGroupMeta(KernelGroupResourceSlotFieldType()),
+            KernelGroupResourceSlotData,
+            LookupKernelGroupResourceSlotFieldOwnerAction,
+            LookupBulkKernelGroupResourceSlotOwnerAction,
         ),
         ResourceAllocationProcessors(
             processor_registry.group(GroupMeta(UserEntityType())),
@@ -484,6 +536,53 @@ async def admin_session_seed(
 
 
 @pytest.fixture()
+async def place_personal_session(
+    db_engine: SAEngine,
+    domain_fixture: DomainFixtureData,
+    resource_group_name: ResourceGroupName,
+    resource_group_id: ResourceGroupID,
+    virtual_entity_seeder: VirtualEntitySeeder,
+    provision_user: Callable[[], Coroutine[Any, Any, ProvisionedUserData]],
+) -> AsyncIterator[Callable[[ProvisionedUserData], Coroutine[Any, Any, SessionID]]]:
+    """Seed a RUNNING session in a user's personal project, with the graph rows creating
+    it writes: the user and the project each own and govern it."""
+    placed: list[SessionID] = []
+
+    async def place(owner: ProvisionedUserData) -> SessionID:
+        seed = await _seed_session(
+            db_engine,
+            domain_name=domain_fixture.domain_name,
+            domain_id=domain_fixture.domain_id,
+            group_id=owner.personal_project_id,
+            user_uuid=owner.user_id,
+            access_key=owner.keypair.access_key,
+            resource_group=resource_group_name,
+            resource_group_id=resource_group_id,
+        )
+        placed.append(seed.session_id)
+        async with db_engine.begin() as conn:
+            await virtual_entity_seeder.place_entity(
+                conn,
+                SessionEntityType(),
+                seed.session_id,
+                [
+                    (UserEntityType(), owner.user_id),
+                    (ProjectEntityType(), owner.personal_project_id),
+                ],
+            )
+        return seed.session_id
+
+    yield place
+    ve = VirtualEntityRow.__table__
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            ve.delete().where(ve.c.entity_type == SessionEntityType(), ve.c.entity_id.in_(placed))
+        )
+    for session_id in placed:
+        await _cleanup_session(db_engine, session_id)
+
+
+@pytest.fixture()
 async def user_session_seed(
     db_engine: SAEngine,
     domain_fixture: DomainFixtureData,
@@ -732,6 +831,24 @@ async def compute_session_processors(
             KernelInfo,
             LookupKernelFieldOwnerAction,
             LookupBulkKernelOwnerAction,
+        ),
+        processor_registry.group(GroupMeta(SessionEntityType())).field_group(
+            FieldGroupMeta(KernelGroupFieldType()),
+            KernelGroupData,
+            LookupKernelGroupFieldOwnerAction,
+            LookupBulkKernelGroupOwnerAction,
+        ),
+        processor_registry.group(GroupMeta(SessionEntityType())).field_group(
+            FieldGroupMeta(KernelGroupEnvironFieldType()),
+            KernelGroupEnvironData,
+            LookupKernelGroupEnvironFieldOwnerAction,
+            LookupBulkKernelGroupEnvironOwnerAction,
+        ),
+        processor_registry.group(GroupMeta(SessionEntityType())).field_group(
+            FieldGroupMeta(KernelGroupResourceSlotFieldType()),
+            KernelGroupResourceSlotData,
+            LookupKernelGroupResourceSlotFieldOwnerAction,
+            LookupBulkKernelGroupResourceSlotOwnerAction,
         ),
         ResourceAllocationProcessors(
             processor_registry.group(GroupMeta(UserEntityType())),

@@ -7,6 +7,7 @@ permissions.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, override
 from uuid import UUID
 
@@ -26,14 +27,57 @@ from ai.backend.testutils.scenario_steps import (
     Refused,
     Same,
     SameAs,
+    Says,
     Then,
     Verdict,
 )
 from bai_scenario.components.deployment import lay_a_deployment, lay_a_place
-from bai_scenario.components.domain import Mentions
+from bai_scenario.components.domain import Mentions, WrittenByThisRun
 from bai_scenario.seeds.deployment.auto_scaling_rule import TestSeedAutoScalingRuleOf
 
 LAID_METRIC = "cpu_util"
+
+RULE_ID = Says("미리 저장한 규칙의 id", english="the id of the rule seeded in advance")
+
+
+@dataclass(frozen=True)
+class TheRuleNode:
+    """미리 저장한 규칙의 노드가 어떤 값으로 와야 하는지. 값은 심은 것에서 읽는다."""
+
+    started: datetime
+
+    def verdicts(
+        self, node: AutoScalingRuleNode, laid: ModelDeploymentAutoScalingRuleData, at: str = ""
+    ) -> list[Verdict]:
+        return [
+            Held[UUID](f"{at}id", node.id, SameAs(laid.id, RULE_ID)),
+            Held[UUID](f"{at}field_id", node.field_id, SameAs(laid.id, RULE_ID)),
+            Held[UUID](
+                f"{at}deployment_id",
+                node.deployment_id,
+                SameAs(
+                    laid.model_deployment_id,
+                    Says(
+                        "규칙이 걸린 배포의 id", english="the id of the deployment the rule scales"
+                    ),
+                ),
+            ),
+            Same(f"{at}metric_source", node.metric_source, laid.metric_source.name),
+            Same(f"{at}metric_name", node.metric_name, laid.metric_name),
+            Same(f"{at}min_threshold", node.min_threshold, laid.min_threshold),
+            Same(f"{at}max_threshold", node.max_threshold, laid.max_threshold),
+            Same(f"{at}step_size", node.step_size, laid.step_size),
+            Same(f"{at}time_window", node.time_window, laid.time_window),
+            Same(f"{at}min_replicas", node.min_replicas, laid.min_replicas),
+            Same(f"{at}max_replicas", node.max_replicas, laid.max_replicas),
+            Same(
+                f"{at}prometheus_query_preset_id",
+                node.prometheus_query_preset_id,
+                laid.prometheus_query_preset_id,
+            ),
+            Held(f"{at}created_at", node.created_at, WrittenByThisRun(self.started)),
+            Same(f"{at}last_triggered_at", node.last_triggered_at, laid.last_triggered_at),
+        ]
 
 
 @dataclass(frozen=True)
@@ -43,6 +87,8 @@ class RulesOfADeploymentAndACaller:
     deployment: DeploymentInfo
     rules: tuple[ModelDeploymentAutoScalingRuleData, ...]
     caller: UserData
+    excluded: ModelDeploymentAutoScalingRuleData | None = None
+    outside: ModelDeploymentAutoScalingRuleData | None = None
 
 
 @dataclass(frozen=True)
@@ -51,15 +97,27 @@ class RulesOfADeployment(Given[Any, RulesOfADeploymentAndACaller]):
 
     granted: tuple[Permission, ...] = ()
     count: int = 2
+    excluded_metric: str | None = None
+    outside: bool = False
 
     @override
     def describe(self) -> str:
-        who = (
-            "아무 배포 권한도 받지 않은 사용자"
-            if not self.granted
-            else f"배포에 {', '.join(p.name or '' for p in self.granted)} 권한을 받은 사용자"
-        )
-        return f"자동 스케일링 규칙 {self.count}개가 걸린 배포 하나와, {who} 한 명"
+        if not self.granted:
+            who_ko = "아무 배포 권한도 받지 않은 사용자"
+            who_en = "a user with no deployment permission"
+        else:
+            names = ", ".join(p.name or "" for p in self.granted)
+            who_ko = f"배포에 {names} 권한을 받은 사용자"
+            who_en = f"a user granted the {names} permission on deployments"
+        ko = f"자동 스케일링 규칙 {self.count}개가 걸린 배포 하나와, {who_ko} 한 명"
+        en = f"one deployment holding {self.count} auto-scaling rules, and {who_en}"
+        if self.excluded_metric is not None:
+            ko += ", 같은 배포에 지표 이름이 다른 규칙 하나가 더 걸려 있고"
+            en += ", one more rule with a different metric name on the same deployment"
+        if self.outside:
+            ko += ", 규칙 하나가 다른 배포에 걸려 있고"
+            en += ", and one rule on another deployment"
+        return Says(ko, english=en)
 
     @override
     async def lay(self, seeding: Any) -> RulesOfADeploymentAndACaller:
@@ -69,9 +127,26 @@ class RulesOfADeployment(Given[Any, RulesOfADeploymentAndACaller]):
             await seeding.adding(TestSeedAutoScalingRuleOf(metric_name=LAID_METRIC), deployment)
             for _ in range(self.count)
         ]
+        excluded: ModelDeploymentAutoScalingRuleData | None = None
+        if self.excluded_metric is not None:
+            excluded = seeding.made(
+                await seeding.adding(
+                    TestSeedAutoScalingRuleOf(metric_name=self.excluded_metric), deployment
+                )
+            )
+        outside: ModelDeploymentAutoScalingRuleData | None = None
+        if self.outside:
+            other_deployment = await lay_a_deployment(seeding, place, name_hint="other")
+            outside = seeding.made(
+                await seeding.adding(
+                    TestSeedAutoScalingRuleOf(metric_name=LAID_METRIC), other_deployment
+                )
+            )
         return RulesOfADeploymentAndACaller(
             deployment=seeding.made(deployment),
             rules=tuple(seeding.made(rule) for rule in rules),
+            excluded=excluded,
+            outside=outside,
             caller=seeding.made(place.caller),
         )
 
@@ -88,10 +163,19 @@ class EveryRuleComesBack(
     @override
     def says(self) -> str:
         if self.missing is None:
-            return f"규칙이 모두 지표 이름 '{self.metric_name}'으로 오고, 실패한 것은 없다"
-        return (
+            return Says(
+                f"규칙이 모두 지표 이름 '{self.metric_name}'으로 오고, 실패한 것은 없습니다",
+                english=(
+                    f"every rule comes back with metric name '{self.metric_name}', and none failed"
+                ),
+            )
+        return Says(
             f"규칙이 모두 지표 이름 '{self.metric_name}'으로 오고, 없는 id 는 대상이 없다는 "
-            "이유로 실패 목록에 온다"
+            "이유로 실패 목록에 옵니다",
+            english=(
+                f"every rule comes back with metric name '{self.metric_name}', and the "
+                "missing id comes back in the failed list with a reason that it does not exist"
+            ),
         )
 
     @override
@@ -106,7 +190,17 @@ class EveryRuleComesBack(
         verdicts: list[Verdict] = [Same("successes count", len(payload.successes), len(laid.rules))]
         for i, (node, rule) in enumerate(zip(payload.successes, laid.rules, strict=False)):
             verdicts += [
-                Held[UUID](f"successes[{i}].id", node.id, SameAs(rule.id, "심은 규칙의 id")),
+                Held[UUID](
+                    f"successes[{i}].id",
+                    node.id,
+                    SameAs(
+                        rule.id,
+                        Says(
+                            "미리 저장한 규칙의 id",
+                            english="the id of the rule seeded in advance",
+                        ),
+                    ),
+                ),
                 Same(f"successes[{i}].metric_name", node.metric_name, self.metric_name),
             ]
         if self.missing is None:
@@ -114,7 +208,17 @@ class EveryRuleComesBack(
         verdicts.append(Same("failed count", len(payload.failed), 1))
         for failure in payload.failed:
             verdicts += [
-                Held[UUID]("failed[0].id", failure.id, SameAs(self.missing, "요청에 넣은 없는 id")),
+                Held[UUID](
+                    "failed[0].id",
+                    failure.id,
+                    SameAs(
+                        self.missing,
+                        Says(
+                            "요청에 넣은 없는 id",
+                            english="the nonexistent id sent in the request",
+                        ),
+                    ),
+                ),
                 Held("failed[0].message", failure.message, Mentions("not found")),
             ]
         return verdicts
@@ -130,7 +234,10 @@ class NoRuleIsProcessed(
 
     @override
     def says(self) -> str:
-        return "처리된 규칙 없이 규칙이 모두 실패 목록에 온다"
+        return Says(
+            "처리된 규칙 없이 규칙이 모두 실패 목록에 옵니다",
+            english="no rule is processed and every rule comes back in the failed list",
+        )
 
     @override
     def look(
@@ -147,7 +254,17 @@ class NoRuleIsProcessed(
         ]
         for i, (failure, rule) in enumerate(zip(payload.failed, laid.rules, strict=False)):
             verdicts += [
-                Held[UUID](f"failed[{i}].id", failure.id, SameAs(rule.id, "심은 규칙의 id")),
+                Held[UUID](
+                    f"failed[{i}].id",
+                    failure.id,
+                    SameAs(
+                        rule.id,
+                        Says(
+                            "미리 저장한 규칙의 id",
+                            english="the id of the rule seeded in advance",
+                        ),
+                    ),
+                ),
                 Held(f"failed[{i}].message", failure.message, Mentions(self.reason)),
             ]
         return verdicts

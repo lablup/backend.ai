@@ -2,14 +2,17 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
+from ai.backend.common.dto.manager.v2.session_group.request import PurgeSessionGroupInput
 from ai.backend.common.dto.manager.v2.session_group.response import (
     AdminSearchSessionGroupsPayload,
+    PurgeSessionGroupPayload,
     SessionGroupNode,
 )
 from ai.backend.common.dto.manager.v2.session_group.types import (
@@ -17,9 +20,13 @@ from ai.backend.common.dto.manager.v2.session_group.types import (
     SessionGroupPlacementEnforcementEnum,
     SessionGroupScope,
 )
-from ai.backend.manager.api.gql.base import UUIDScopeGQL
+from ai.backend.manager.api.gql.base import UUIDScopeGQL, to_global_id
 from ai.backend.manager.api.gql.session_group import resolver
-from ai.backend.manager.api.gql.session_group.types import SessionGroupScopeGQL
+from ai.backend.manager.api.gql.session_group.types import (
+    PurgeSessionGroupInputGQL,
+    SessionGroupGQL,
+    SessionGroupScopeGQL,
+)
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 
 
@@ -136,3 +143,38 @@ class TestScopedSessionGroups:
         assert result.count == 0
         assert result.page_info.start_cursor is None
         assert result.page_info.end_cursor is None
+
+
+class TestPurgeSessionGroup:
+    @pytest.fixture
+    def group_id(self) -> uuid.UUID:
+        return uuid.uuid4()
+
+    @pytest.fixture
+    def info(self, group_id: uuid.UUID) -> MagicMock:
+        info = MagicMock()
+        info.context.adapters.session_group.purge = AsyncMock(
+            return_value=PurgeSessionGroupPayload(entity_id=group_id)
+        )
+        return info
+
+    async def test_the_group_id_reaches_the_adapter(
+        self, info: MagicMock, group_id: uuid.UUID
+    ) -> None:
+        await cast(Any, resolver.purge_session_group).base_resolver(
+            info, PurgeSessionGroupInputGQL(id=group_id)
+        )
+
+        info.context.adapters.session_group.purge.assert_awaited_once_with(
+            PurgeSessionGroupInput(id=group_id)
+        )
+
+    async def test_the_payload_names_the_purged_group(
+        self, info: MagicMock, group_id: uuid.UUID
+    ) -> None:
+        result = await cast(Any, resolver.purge_session_group).base_resolver(
+            info, PurgeSessionGroupInputGQL(id=group_id)
+        )
+
+        assert result.entity_id == group_id
+        assert result.purged_id == to_global_id(SessionGroupGQL, group_id)

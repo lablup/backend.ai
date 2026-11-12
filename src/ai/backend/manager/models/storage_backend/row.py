@@ -78,7 +78,7 @@ class StorageBackendRow(LifecycleTimestampsMixin, Base):
         primary_key=True,
         server_default=sa.text("uuid_generate_v7()"),
     )
-    name: Mapped[str] = mapped_column("name", sa.String(length=64), nullable=False)
+    name: Mapped[str] = mapped_column("name", sa.String(length=64), unique=True, nullable=False)
     storage_backend_type_id: Mapped[StorageBackendTypeID] = mapped_column(
         "storage_backend_type_id",
         GUID(StorageBackendTypeID),

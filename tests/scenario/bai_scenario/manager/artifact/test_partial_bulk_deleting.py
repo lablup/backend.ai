@@ -19,7 +19,7 @@ from ai.backend.common.dto.manager.v2.artifact.types import ArtifactAvailability
 from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.manager.api.adapters.artifact.adapter import ArtifactAdapter
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.artifact import (
     ArtifactLook,
     EveryTargetComesBack,
@@ -47,8 +47,16 @@ class SoftDeletingEveryTarget(When[ManyArtifactsAndACaller, ArtifactAdapter, Del
 
     @override
     def describe(self, laid: ManyArtifactsAndACaller) -> str:
-        besides = " 와 없는 id 하나" if self.missing is not None else ""
-        return f"{laid.caller.username}이 아티팩트 {len(laid.laid)}개{besides}를 한 번에 soft delete 함"
+        besides_ko = "와 존재하지 않는 id 하나" if self.missing is not None else ""
+        besides_en = " and one id that does not exist" if self.missing is not None else ""
+        return Says(
+            f"{laid.caller.username}이 아티팩트 {len(laid.laid)}개{besides_ko}를 한 번에 "
+            "soft delete 합니다",
+            english=(
+                f"{laid.caller.username} soft deletes {len(laid.laid)} artifacts{besides_en} "
+                "at once"
+            ),
+        )
 
     @override
     async def call(self, adapter: ArtifactAdapter, laid: ManyArtifactsAndACaller) -> Deleted:
@@ -69,9 +77,13 @@ class SoftDeletingThenRestoringEveryTarget(When[ManyArtifactsAndACaller, Artifac
 
     @override
     def describe(self, laid: ManyArtifactsAndACaller) -> str:
-        return (
+        return Says(
             f"{laid.caller.username}이 아티팩트 {len(laid.laid)}개를 한 번에 soft delete "
-            "했다가 한 번에 restore 함"
+            "했다가 한 번에 restore 합니다",
+            english=(
+                f"{laid.caller.username} soft deletes {len(laid.laid)} artifacts at once and "
+                "then restores them at once"
+            ),
         )
 
     @override
@@ -95,9 +107,14 @@ class SoftDeletingAnswersForTheMissingOne(
 
     @override
     def describe(self) -> str:
-        return (
-            "아티팩트 둘과 없는 id 하나를 한 번에 soft delete 하면, 둘은 삭제됨 상태로 오고 "
-            "없는 id 는 대상이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "아티팩트 둘과 존재하지 않는 id 하나를 한 번에 soft delete 하면, 둘은 삭제됨 상태로 "
+            "오고 존재하지 않는 id 는 대상이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when two artifacts and one id that does not exist are soft deleted at once, "
+                "the two come back in the deleted state and the id that does not exist comes "
+                "back in the failed list because there is no such target"
+            ),
         )
 
     @override
@@ -127,9 +144,14 @@ class AUserGrantedNothingSoftDeletesNone(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "아무 권한도 받지 않은 사용자가 아티팩트 여럿을 한 번에 soft delete 하려 하면, "
-            "soft delete 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다"
+            "soft delete 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when a user granted nothing tries to soft delete several artifacts at once, "
+                "nothing is soft deleted and all come back in the failed list because there is "
+                "no permission"
+            ),
         )
 
     @override
@@ -157,7 +179,13 @@ class RestoringBringsSeveralBack(
 
     @override
     def describe(self) -> str:
-        return "soft delete 된 아티팩트 여럿을 한 번에 restore 하면, 모두 살아 있는 상태로 온다"
+        return Says(
+            "soft delete 된 아티팩트 여럿을 한 번에 restore 하면, 모두 살아 있는 상태로 옵니다",
+            english=(
+                "when several soft-deleted artifacts are restored at once, all come back in "
+                "the live state"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyArtifactsAndACaller]:

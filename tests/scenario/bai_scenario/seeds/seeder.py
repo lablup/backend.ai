@@ -13,6 +13,7 @@ Which ops path writes a row follows from the spec's type, so no scenario names a
     EntityUpserter                  -> upsert_entity
     GlobalEntityUpserter            -> upsert_global_entity
     GuardedDataUpdater              -> update_data
+    DataBatchUpdater                -> batch_update_in_global
     TestSeedRegistryPair            -> create_registry
 
 A field row is written under an owner, so it has its own entry, ``adding``. A
@@ -47,12 +48,14 @@ from ai.backend.manager.models.specs.creator import (
     GlobalEntityCreator,
     GuardedEntityCreator,
     NestedFieldCreator,
+    NestedFieldToCreate,
     RoleManagedEntityCreator,
     RoleManagedGlobalEntityCreator,
 )
 from ai.backend.manager.models.specs.relation import RelationCreator
-from ai.backend.manager.models.specs.updater import GuardedDataUpdater
+from ai.backend.manager.models.specs.updater import DataBatchUpdater, GuardedDataUpdater
 from ai.backend.manager.models.specs.upserter import (
+    DanglingFieldUpserter,
     EntityUpserter,
     FieldUpserter,
     GlobalEntityUpserter,
@@ -61,6 +64,7 @@ from ai.backend.manager.repositories.ops.v2.user.write import (
     FullUserCreator,
     FullUserCreatorResult,
 )
+from ai.backend.testutils.scenario_steps import Language, Says, in_language
 from bai_scenario.seeds.ops import TestSeedOps
 
 
@@ -145,6 +149,21 @@ class TestSeedRowFromThree[A, B, C, D](TestSeed, ABC):
 
     @abstractmethod
     def seed(self, name: str, first: A, second: B, third: C) -> WriteSpec[D]:
+        raise NotImplementedError
+
+
+class TestSeedBatchUpdate[A, D](TestSeed, ABC):
+    """A row the manager stamps in one batch across the table.
+
+    A retention boundary is written this way: the spec selects the rows, the batch
+    update answers with the rows it changed.
+    """
+
+    __test__ = False
+
+    @abstractmethod
+    def updater(self, source: A) -> DataBatchUpdater[Any, D]:
+        """The update spec, built from the row laid before it."""
         raise NotImplementedError
 
 
@@ -257,6 +276,39 @@ class TestSeedFieldUpserter[A, D: FieldData](TestSeedField[A, D]):
         return await ops.upsert_field_entity(owner_id, self.seed())
 
 
+class TestSeedDanglingFieldUpserter[A, D: FieldData](TestSeedField[A, D]):
+    """A field row the manager upserts whose owner is a value on the row, such as a fair
+    share keyed by a resource group."""
+
+    @abstractmethod
+    def seed(self, owner_id: Any) -> DanglingFieldUpserter[Any, D]:
+        raise NotImplementedError
+
+    @override
+    async def write(self, ops: TestSeedOps, owner_id: Any) -> D:
+        return await ops.upsert_dangling_field(self.seed(owner_id))
+
+
+class TestSeedNestedFieldCreator[A, D: FieldData](TestSeedField[A, D]):
+    """A field row another field row owns, such as a kernel group's environ rows.
+
+    The manager writes these under the owner's settled id with
+    ``atomic_create_nested_fields``; laying one takes that same write.
+    """
+
+    @abstractmethod
+    def seed(self) -> NestedFieldCreator[Any, Any, D]:
+        raise NotImplementedError
+
+    @override
+    async def write(self, ops: TestSeedOps, owner_id: Any) -> D:
+        return (
+            await ops.atomic_create_nested_fields([
+                NestedFieldToCreate(owner_id=owner_id, creator=self.seed())
+            ])
+        )[0]
+
+
 class TestSeedLink[S, T](ABC):
     """A row that links two entities and belongs to neither.
 
@@ -340,12 +392,31 @@ def _since(start: datetime) -> Callable[[datetime], bool]:
     return condition
 
 
-def _there_is(seed: TestSeed, name: str) -> str:
-    return f"{seed.kind()} {name}"
+def _english(text: str) -> str:
+    return in_language(text, Language.ENGLISH)
 
 
-def _states(sentence: str, detail: str) -> str:
-    return f"{sentence}: {detail}" if detail else sentence
+def _pair(korean: str, english: str) -> Says:
+    return Says(korean, english=english)
+
+
+def joined(parts: Sequence[str], separator: str = ", ") -> Says:
+    """``parts`` in order, each in the language the report asks for."""
+    return _pair(
+        separator.join(str(one) for one in parts),
+        separator.join(_english(one) for one in parts),
+    )
+
+
+def _there_is(seed: TestSeed, name: str) -> Says:
+    kind = seed.kind()
+    return _pair(f"{kind} {name}", f"{_english(kind)} {name}")
+
+
+def _states(sentence: str, detail: str) -> Says:
+    if not detail:
+        return _pair(str(sentence), _english(sentence))
+    return _pair(f"{sentence}: {detail}", f"{_english(sentence)}: {_english(detail)}")
 
 
 async def _write(ops: TestSeedOps, spec: WriteSpec[Any]) -> Any:
@@ -434,11 +505,15 @@ class TestSeeder:
 
         return self._remember(self._given(seed, name, (), write, _there_is(seed, name)))
 
-    def creating_from[A, D](self, seed: TestSeedRowFrom[A, D], a: Laid[A], /) -> Laid[D]:
+    def creating_from[A, D](
+        self, seed: TestSeedRowFrom[A, D] | TestSeedBatchUpdate[A, D], a: Laid[A], /
+    ) -> Laid[D]:
         """Lay a row that reads one row laid before it."""
         name = seed.name(self.name)
 
         async def write(ops: TestSeedOps, values: Sequence[Any]) -> Any:
+            if isinstance(seed, TestSeedBatchUpdate):
+                return (await ops.batch_update_in_global(seed.updater(values[0])))[0]
             return await _write(ops, seed.seed(name, values[0]))
 
         return self._remember(self._given(seed, name, (a,), write, _there_is(seed, name)))
@@ -498,7 +573,10 @@ class TestSeeder:
             name=user.name,
             kind=user.kind,
             nest=tuple(self._nesting),
-            describe=f"{user.describe}의 개인 프로젝트",
+            describe=_pair(
+                f"{user.describe}의 개인 프로젝트",
+                f"personal project of {_english(user.describe)}",
+            ),
             states="",
             sources=(provisioned,),
             write=project,
@@ -515,8 +593,14 @@ class TestSeeder:
                 name=owner.name,
                 kind=owner.kind,
                 nest=tuple(self._nesting),
-                describe=f"{owner.describe}({seed.kind()})",
-                states=f"{owner.describe}: {seed.kind()}",
+                describe=_pair(
+                    f"{owner.describe}({seed.kind()})",
+                    f"{_english(owner.describe)}({_english(seed.kind())})",
+                ),
+                states=_pair(
+                    f"{owner.describe}: {seed.kind()}",
+                    f"{_english(owner.describe)}: {_english(seed.kind())}",
+                ),
                 sources=(owner,),
                 write=write,
             )
@@ -539,8 +623,14 @@ class TestSeeder:
                 name=owner.name,
                 kind=owner.kind,
                 nest=tuple(self._nesting),
-                describe=f"{owner.describe}({seed.kind()})",
-                states=f"{owner.describe}: {seed.kind()}",
+                describe=_pair(
+                    f"{owner.describe}({seed.kind()})",
+                    f"{_english(owner.describe)}({_english(seed.kind())})",
+                ),
+                states=_pair(
+                    f"{owner.describe}: {seed.kind()}",
+                    f"{_english(owner.describe)}: {_english(seed.kind())}",
+                ),
                 sources=(owner,),
                 write=write,
             )
@@ -562,7 +652,10 @@ class TestSeeder:
                 kind=target.kind,
                 nest=tuple(self._nesting),
                 describe=target.describe,
-                states=f"{scope.describe} {seed.kind()} {target.describe}",
+                states=_pair(
+                    f"{scope.describe} {seed.kind()} {target.describe}",
+                    f"{_english(scope.describe)} {_english(seed.kind())} {_english(target.describe)}",
+                ),
                 sources=(scope, target),
                 write=write,
             )
@@ -585,7 +678,10 @@ class TestSeeder:
                 kind=offer.kind,
                 nest=tuple(self._nesting),
                 describe=offer.describe,
-                states=f"{offer.describe}: {seed.kind()}",
+                states=_pair(
+                    f"{offer.describe}: {seed.kind()}",
+                    f"{_english(offer.describe)}: {_english(seed.kind())}",
+                ),
                 sources=(offer,),
                 write=write,
             )
@@ -610,7 +706,10 @@ class TestSeeder:
                 kind=to.kind,
                 nest=tuple(self._nesting),
                 describe=to.describe,
-                states=f"{to.describe}: {role.describe} 보유",
+                states=_pair(
+                    f"{to.describe}: {role.describe} 보유",
+                    f"{_english(to.describe)}: holds {_english(role.describe)}",
+                ),
                 sources=(role, to),
                 write=write,
             )
@@ -635,7 +734,11 @@ class TestSeeder:
                 kind=member.kind,
                 nest=tuple(self._nesting),
                 describe=member.describe,
-                states=f"{member.describe}: {project.describe} 명부에 오름",
+                states=_pair(
+                    f"{member.describe}: {project.describe} 멤버 목록에 추가됨",
+                    f"{_english(member.describe)}: added to the member list of "
+                    f"{_english(project.describe)}",
+                ),
                 sources=(project, member),
                 write=write,
             )
@@ -653,7 +756,7 @@ class TestSeeder:
             name=name,
             kind=seed.kind(),
             nest=tuple(self._nesting),
-            describe=f"{seed.kind()} {name}",
+            describe=_there_is(seed, name),
             states=_states(sentence, seed.detail()),
             sources=tuple(sources),
             write=write,

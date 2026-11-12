@@ -5422,6 +5422,11 @@ input CreateRolePresetInput
   """
   autoAssign: Boolean! = false
 
+  """
+  Added in 26.10.0. Whether a personal project's owner is mapped to the role made from this preset. Allowed only on a project preset.
+  """
+  autoAssignToOwner: Boolean! = false
+
   """Permission entries carried by the preset."""
   permissions: [RolePermissionPresetEntryInput!]!
 }
@@ -5542,12 +5547,65 @@ input CreateScalingGroupInput
   use_host_network: Boolean = false
 }
 
+"""
+Added in 26.10.0. Input for creating a session group in a project. The caller becomes its owner.
+"""
+input CreateSessionGroupInput
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the project the session group is created in."""
+  projectId: UUID!
+
+  """How the member sessions sit relative to each other, per agent."""
+  placementDirection: SessionGroupPlacementDirection!
+
+  """How hard the placement direction is enforced."""
+  placementEnforcement: SessionGroupPlacementEnforcement!
+}
+
+"""Added in 26.10.0. Payload for a session group creation."""
+type CreateSessionGroupPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The created session group."""
+  sessionGroup: SessionGroup!
+}
+
 """Added in 26.4.2. Session types allowed for user-initiated creation."""
 enum CreateSessionType
   @join__type(graph: STRAWBERRY)
 {
   INTERACTIVE @join__enumValue(graph: STRAWBERRY)
   BATCH @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in 26.10.0. Input for binding a value source to an environment variable name at one scope.
+"""
+input CreateSystemSessionEnvironInput
+  @join__type(graph: STRAWBERRY)
+{
+  """The environment variable name the value is injected under."""
+  key: String!
+
+  """
+  Which value of the starting session is injected, as a value source name systemSessionEnvironValueSources lists.
+  """
+  valueSource: String!
+
+  """Whether the row applies to every session, a domain's or a project's."""
+  scopeType: SystemSessionEnvironScopeType!
+
+  """The id of the domain or the project. Left out for public."""
+  scopeId: UUID = null
+}
+
+"""Added in 26.10.0. Payload for a system session environ row create."""
+type CreateSystemSessionEnvironPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The created row."""
+  systemSessionEnviron: SystemSessionEnviron!
 }
 
 """Added in 26.4.2. Input for creating a file upload session."""
@@ -5720,6 +5778,36 @@ type CreateUserV2Payload
   Added in 26.4.4. The default keypair automatically generated for the user, including its one-time secret key.
   """
   keypair: CreateKeypairPayload!
+}
+
+"""
+Added in 26.10.0. Input for auto-mounting a vfolder into every session created in a project or by a user. The vfolder must belong to that project, or be owned by that user.
+"""
+input CreateVFolderAutoMountInput
+  @join__type(graph: STRAWBERRY)
+{
+  """The project or the user the vfolder is auto-mounted for."""
+  scope: VFolderAutoMountScopeRef!
+
+  """ID of the vfolder to auto-mount."""
+  vfolderId: UUID!
+
+  """Path in the session container the vfolder is mounted at."""
+  mountDestination: String!
+
+  """Path inside the vfolder that is mounted."""
+  subpath: String! = "."
+
+  """Permission the vfolder is mounted with."""
+  mountPermission: MountPermission!
+}
+
+"""Added in 26.10.0. Payload for a vfolder auto-mount creation."""
+type CreateVFolderAutoMountPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The created auto-mount."""
+  vfolderAutoMount: VFolderAutoMount!
 }
 
 """
@@ -6613,6 +6701,26 @@ type DeleteScalingGroup
 }
 
 """
+Added in 26.10.0. Payload returned after soft-deleting a storage volume.
+"""
+type DeleteStorageVolumePayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The soft-deleted storage volume."""
+  item: StorageVolumeV2!
+}
+
+"""
+Added in 26.10.0. Payload for a system session environ row soft delete.
+"""
+type DeleteSystemSessionEnvironPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The soft-deleted row."""
+  systemSessionEnviron: SystemSessionEnviron!
+}
+
+"""
 Instead of really deleting user, just mark the account as deleted status.
 
 All related keypairs will also be inactivated.
@@ -6666,6 +6774,22 @@ type DeleteUserV2Payload
 
   """Added in 26.10.0. The soft-deleted user."""
   user: UserV2!
+}
+
+"""Added in 26.10.0. Identifies the vfolder auto-mount to delete."""
+input DeleteVFolderAutoMountInput
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the auto-mount to delete."""
+  id: UUID!
+}
+
+"""Added in 26.10.0. Payload for a vfolder auto-mount deletion."""
+type DeleteVFolderAutoMountPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The auto-mount marked deleted."""
+  vfolderAutoMount: VFolderAutoMount!
 }
 
 """
@@ -6735,7 +6859,9 @@ input DeploymentFilter
   """Added in 26.9.0. Filter by deployment ID."""
   entityId: UUIDFilter = null
 
-  """Added in 26.9.0. Filter by the requested replica count."""
+  """
+  Added in 26.9.0. Filter by the desired replica count. Falls back to the user-set replica count until autoscaling sets one.
+  """
   desiredReplicas: IntFilter = null
 
   """Added in 26.9.0. Filter by scaling state."""
@@ -6863,6 +6989,9 @@ type DeploymentOptionsInfo
 {
   """Handler-keyed scheduler policy (timeout + retry)."""
   handlerOptions: DeploymentHandlerOptionsInfo!
+
+  """Added in 26.10.0. How the designated agents are enforced."""
+  agentSelectionPolicy: SessionAgentSelectionPolicy!
 }
 
 """Added in 26.4.4. Deployment options payload input."""
@@ -6870,6 +6999,11 @@ input DeploymentOptionsInput
   @join__type(graph: STRAWBERRY)
 {
   handlerOptions: DeploymentHandlerOptionsInput!
+
+  """
+  Added in 26.10.0. How the designated agents are enforced. null keeps the stored policy.
+  """
+  agentSelectionPolicy: SessionAgentSelectionPolicy = null
 }
 
 """Added in 25.19.0. """
@@ -7037,6 +7171,9 @@ input DeploymentRevisionPresetFilter
 
   """Variant ID filter."""
   runtimeVariantId: UUIDFilter = null
+
+  """Added in 26.10.0. Select entities by the labels on them."""
+  labels: EntityLabelNestedFilter = null
 
   """Added in 26.7.0. Match all of the given sub-filters."""
   AND: [DeploymentRevisionPresetFilter!] = null
@@ -7911,6 +8048,11 @@ type DomainV2 implements Node
 
   """Added in 26.9.0. Resource groups this domain may schedule on."""
   resourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection
+
+  """
+  Added in 26.10.0. System session environ rows bound to this domain itself, soft-deleted ones included.
+  """
+  systemSessionEnvirons(filter: SystemSessionEnvironFilter = null, orderBy: [SystemSessionEnvironOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SystemSessionEnvironConnection
 }
 
 """
@@ -8300,6 +8442,11 @@ input EnqueueSessionInput
 
   """Network UUID to attach."""
   attachNetwork: ID = null
+
+  """
+  Added in 26.10.0. Session group UUID the session joins. The group must belong to the session's owner and project.
+  """
+  sessionGroupId: ID = null
 
   """User-defined tag."""
   tag: String = null
@@ -9342,6 +9489,10 @@ type HuggingFaceRegistry implements Node
   entityId: UUID!
   url: String!
   name: String!
+
+  """
+  Access token for the registry. Masked unless the caller is a superadmin.
+  """
   token: String
 }
 
@@ -10587,6 +10738,371 @@ type KernelEdge
   cursor: String!
 }
 
+"""
+Added in 26.10.0. One role of a session and the execution spec its kernels share.
+"""
+type KernelGroup implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """ID of the kernel group."""
+  fieldId: UUID!
+
+  """ID of the session the group belongs to."""
+  sessionId: UUID!
+
+  """Role of the group, unique within its session."""
+  role: String!
+
+  """ID of the image the group's kernels run."""
+  imageId: UUID
+
+  """Shared memory requested for the group. Null means the runtime default."""
+  shmem: BinarySizeInfo
+
+  """Command the group's kernels run at startup."""
+  startupCommand: String
+
+  """Ports pre-opened on the group's kernels."""
+  preopenPorts: [Int!]!
+
+  """
+  Reserved start time requested at creation. Honored only for batch sessions.
+  """
+  requestedStartsAt: DateTime
+
+  """Batch execution timeout in seconds."""
+  batchTimeout: Int
+
+  """The session the group belongs to."""
+  session: SessionV2
+
+  """The image the group's kernels run."""
+  image: ImageV2
+
+  """Environment variables requested on the group."""
+  environ(filter: KernelGroupEnvironFilter = null, orderBy: [KernelGroupEnvironOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelGroupEnvironConnection
+
+  """Resource slots requested on each kernel of the group."""
+  resourceSlots(filter: KernelGroupResourceSlotFilter = null, orderBy: [KernelGroupResourceSlotOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelGroupResourceSlotConnection
+}
+
+"""Added in 26.10.0. Paginated connection for kernel groups."""
+type KernelGroupConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [KernelGroupEdge!]!
+
+  """Total number of kernel groups matching the query."""
+  count: Int!
+}
+
+"""Added in 26.10.0. One kernel group within a connection."""
+type KernelGroupEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: KernelGroup!
+}
+
+"""
+Added in 26.10.0. One environment variable requested on a kernel group.
+"""
+type KernelGroupEnviron implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """ID of the environ row."""
+  fieldId: UUID!
+
+  """ID of the kernel group the row belongs to."""
+  kernelGroupId: UUID!
+
+  """Variable name."""
+  key: String!
+
+  """Variable value."""
+  value: String!
+}
+
+"""Added in 26.10.0. Paginated connection for kernel group environ rows."""
+type KernelGroupEnvironConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [KernelGroupEnvironEdge!]!
+
+  """Total number of environ rows matching the query."""
+  count: Int!
+}
+
+"""Added in 26.10.0. One kernel group environ row within a connection."""
+type KernelGroupEnvironEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: KernelGroupEnviron!
+}
+
+"""Added in 26.10.0. Filter for kernel group environ rows."""
+input KernelGroupEnvironFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Filter by environ row ID."""
+  fieldId: UUIDFilter = null
+
+  """Filter by the kernel group the row belongs to."""
+  kernelGroupId: UUIDFilter = null
+
+  """Filter by variable name."""
+  key: StringFilter = null
+
+  """Match all nested filters."""
+  AND: [KernelGroupEnvironFilter!] = null
+
+  """Match any nested filter."""
+  OR: [KernelGroupEnvironFilter!] = null
+
+  """Negate nested filters."""
+  NOT: [KernelGroupEnvironFilter!] = null
+}
+
+"""
+Added in 26.10.0. Filter sessions by conditions on the environ rows of their kernel groups.
+"""
+input KernelGroupEnvironNestedFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Matches sessions with at least one environ row when true, and sessions with none when false. Says nothing about what the rows hold.
+  """
+  exists: Boolean = null
+
+  """
+  Matches sessions with at least one environ row satisfying all conditions.
+  """
+  some: KernelGroupEnvironFilter = null
+
+  """
+  Matches sessions where every environ row satisfies all conditions (also true when the session has none).
+  """
+  every: KernelGroupEnvironFilter = null
+
+  """Matches sessions with no environ row satisfying all conditions."""
+  none: KernelGroupEnvironFilter = null
+}
+
+"""Added in 26.10.0. One ordering rule for a kernel group environ search."""
+input KernelGroupEnvironOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  """Field to order by."""
+  field: KernelGroupEnvironOrderField!
+
+  """Order direction."""
+  direction: OrderDirection! = ASC
+}
+
+"""
+Added in 26.10.0. Fields available for ordering kernel group environ rows.
+"""
+enum KernelGroupEnvironOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  KEY @join__enumValue(graph: STRAWBERRY)
+}
+
+"""Added in 26.10.0. Filter for kernel groups."""
+input KernelGroupFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Filter by kernel group ID."""
+  fieldId: UUIDFilter = null
+
+  """Filter by role."""
+  role: StringFilter = null
+
+  """Filter by image ID."""
+  imageId: UUIDFilter = null
+
+  """Filter by creation time."""
+  createdAt: DateTimeFilter = null
+
+  """Match all nested filters."""
+  AND: [KernelGroupFilter!] = null
+
+  """Match any nested filter."""
+  OR: [KernelGroupFilter!] = null
+
+  """Negate nested filters."""
+  NOT: [KernelGroupFilter!] = null
+}
+
+"""Added in 26.10.0. One ordering rule for a kernel group search."""
+input KernelGroupOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  """Field to order by."""
+  field: KernelGroupOrderField!
+
+  """Order direction."""
+  direction: OrderDirection! = ASC
+}
+
+"""Added in 26.10.0. Fields available for ordering kernel groups."""
+enum KernelGroupOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  ROLE @join__enumValue(graph: STRAWBERRY)
+  REQUESTED_STARTS_AT @join__enumValue(graph: STRAWBERRY)
+  CREATED_AT @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in 26.10.0. One slot's amount requested on each kernel of a kernel group.
+"""
+type KernelGroupResourceSlot implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """ID of the resource slot row."""
+  fieldId: UUID!
+
+  """ID of the kernel group the row belongs to."""
+  kernelGroupId: UUID!
+
+  """Resource slot name (e.g. cpu, mem)."""
+  slotName: String!
+
+  """Amount requested on each kernel of the group."""
+  quantity: Decimal!
+}
+
+"""
+Added in 26.10.0. Paginated connection for kernel group resource slot rows.
+"""
+type KernelGroupResourceSlotConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [KernelGroupResourceSlotEdge!]!
+
+  """Total number of resource slot rows matching the query."""
+  count: Int!
+}
+
+"""
+Added in 26.10.0. One kernel group resource slot row within a connection.
+"""
+type KernelGroupResourceSlotEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: KernelGroupResourceSlot!
+}
+
+"""Added in 26.10.0. Filter for kernel group resource slot rows."""
+input KernelGroupResourceSlotFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Filter by resource slot row ID."""
+  fieldId: UUIDFilter = null
+
+  """Filter by the kernel group the row belongs to."""
+  kernelGroupId: UUIDFilter = null
+
+  """Filter by slot name."""
+  slotName: StringFilter = null
+
+  """Filter by the amount requested on each kernel."""
+  quantity: DecimalFilter = null
+
+  """Match all nested filters."""
+  AND: [KernelGroupResourceSlotFilter!] = null
+
+  """Match any nested filter."""
+  OR: [KernelGroupResourceSlotFilter!] = null
+
+  """Negate nested filters."""
+  NOT: [KernelGroupResourceSlotFilter!] = null
+}
+
+"""
+Added in 26.10.0. Filter sessions by conditions on the resource slot rows of their kernel groups.
+"""
+input KernelGroupResourceSlotNestedFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Matches sessions with at least one resource slot row when true, and sessions with none when false. Says nothing about what the rows hold.
+  """
+  exists: Boolean = null
+
+  """
+  Matches sessions with at least one resource slot row satisfying all conditions.
+  """
+  some: KernelGroupResourceSlotFilter = null
+
+  """
+  Matches sessions where every resource slot row satisfies all conditions (also true when the session has none).
+  """
+  every: KernelGroupResourceSlotFilter = null
+
+  """Matches sessions with no resource slot row satisfying all conditions."""
+  none: KernelGroupResourceSlotFilter = null
+}
+
+"""
+Added in 26.10.0. One ordering rule for a kernel group resource slot search.
+"""
+input KernelGroupResourceSlotOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  """Field to order by."""
+  field: KernelGroupResourceSlotOrderField!
+
+  """Order direction."""
+  direction: OrderDirection! = ASC
+}
+
+"""
+Added in 26.10.0. Fields available for ordering kernel group resource slot rows.
+"""
+enum KernelGroupResourceSlotOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  SLOT_NAME @join__enumValue(graph: STRAWBERRY)
+  QUANTITY @join__enumValue(graph: STRAWBERRY)
+}
+
 """Added in 24.09.0."""
 type KernelNode implements Node
   @join__implements(graph: GRAPHENE, interface: "Node")
@@ -10828,6 +11344,9 @@ type KernelV2 implements Node
   """
   imageId: ID
 
+  """Added in 26.10.0. ID of the kernel group this kernel belongs to."""
+  kernelGroupId: UUID
+
   """Startup command executed when the kernel starts."""
   startupCommand: String
 
@@ -10854,6 +11373,9 @@ type KernelV2 implements Node
 
   """Added in 26.4.3. The image used by this kernel."""
   image: ImageV2
+
+  """Added in 26.10.0. The kernel group this kernel belongs to."""
+  kernelGroup: KernelGroup
 
   """Added in 26.2.0. The user who owns this kernel."""
   user: UserV2
@@ -13390,7 +13912,7 @@ input ModifyGroupInput
   resource_policy: String
 
   """Added in 24.03.0"""
-  container_registry: JSONString = "{}"
+  container_registry: JSONString
 }
 
 type ModifyImage
@@ -13806,9 +14328,9 @@ type Mutation
     """Agent ID to rescan GPU alloc map"""
     agent_id: String!
   ): RescanGPUAllocMaps @join__field(graph: GRAPHENE)
-  create_keypair(props: KeyPairInput!, user_id: String!): CreateKeyPair @join__field(graph: GRAPHENE)
-  modify_keypair(access_key: String!, props: ModifyKeyPairInput!): ModifyKeyPair @join__field(graph: GRAPHENE)
-  delete_keypair(access_key: String!): DeleteKeyPair @join__field(graph: GRAPHENE)
+  create_keypair(props: KeyPairInput!, user_id: String!): CreateKeyPair @join__field(graph: GRAPHENE) @deprecated(reason: "Deprecated since 26.10.0. Use `adminCreateKeypairV2` instead.")
+  modify_keypair(access_key: String!, props: ModifyKeyPairInput!): ModifyKeyPair @join__field(graph: GRAPHENE) @deprecated(reason: "Deprecated since 26.10.0. Use `adminUpdateKeypairV2` instead.")
+  delete_keypair(access_key: String!): DeleteKeyPair @join__field(graph: GRAPHENE) @deprecated(reason: "Deprecated since 26.10.0. Use `adminDeleteKeypairV2` instead.")
   rescan_images(
     """Added in 25.1.0."""
     project: String
@@ -14315,6 +14837,11 @@ type Mutation
 
   """Added in 25.16.0. Delete model deployment."""
   deleteModelDeployment(input: DeleteDeploymentInput!): DeleteDeploymentPayload @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Fully replace the ``options`` surface of a deployment. Replace semantics — the supplied payload is the complete new value, except an omitted agent selection policy, which keeps the stored one.
+  """
+  replaceDeploymentOptions(input: ReplaceDeploymentOptionsInput!): ReplaceDeploymentOptionsPayload @join__field(graph: STRAWBERRY)
 
   """
   Added in 25.16.0. Force syncs up-to-date replica information. In normal situations this will be automatically handled by Backend.AI schedulers.
@@ -14831,7 +15358,7 @@ type Mutation
   adminUpdateUserV2(userId: UUID!, input: UpdateUserV2Input!): UpdateUserV2Payload @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.2.0. Update the current user's information. Users can only update their own profile. Non-superadmins can set only fullName, password and allowedClientIp
+  Added in 26.2.0. Update the current user's information. Users can only update their own profile. Non-superadmins can set only fullName, password and allowedClientIp. Password changes require oldPassword
   """
   updateUserV2(input: UpdateUserV2Input!): UpdateUserV2Payload @join__field(graph: STRAWBERRY)
 
@@ -14948,6 +15475,26 @@ type Mutation
   Added in 26.10.0. Permanently remove several query definitions, answering for each one.
   """
   partialBulkPurgePrometheusQueryPresets(input: PartialBulkPurgeQueryDefinitionsInput!): PartialBulkQueryDefinitionsPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Retune one storage volume: its name, its usage exposure and its stale threshold.
+  """
+  updateStorageVolume(id: UUID!, input: UpdateStorageVolumeInput!): UpdateStorageVolumePayload @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Remove one storage volume from the catalog. Refused while a folder sits on it.
+  """
+  purgeStorageVolume(id: UUID!): PurgeStorageVolumePayload @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Soft-delete one storage volume, withholding it from new use. The folders already on it keep working. A get still answers it; a search lists it only when the filter gives deletedAt.
+  """
+  deleteStorageVolume(id: UUID!): DeleteStorageVolumePayload @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Restore one soft-deleted storage volume back into use.
+  """
+  restoreStorageVolume(id: UUID!): RestoreStorageVolumePayload @join__field(graph: STRAWBERRY)
 
   """Added in 26.3.0. Create a new query preset category (admin only)."""
   adminCreatePrometheusQueryPresetCategory(input: CreateCategoryInput!): CreateCategoryPayload @join__field(graph: STRAWBERRY)
@@ -15339,6 +15886,27 @@ type Mutation
   updateRuntimeVariant(input: UpdateRuntimeVariantInput!): UpdateRuntimeVariantPayload! @join__field(graph: STRAWBERRY)
 
   """
+  Added in 26.10.0. Bind a value source to an environment variable name at the public scope, a domain or a project.
+  """
+  createSystemSessionEnviron(input: CreateSystemSessionEnvironInput!): CreateSystemSessionEnvironPayload @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Change a system session environ row's key. Only provided fields are updated.
+  """
+  updateSystemSessionEnviron(id: UUID!, input: UpdateSystemSessionEnvironInput!): UpdateSystemSessionEnvironPayload @join__field(graph: STRAWBERRY)
+
+  """Added in 26.10.0. Soft-delete a system session environ row."""
+  deleteSystemSessionEnviron(id: UUID!): DeleteSystemSessionEnvironPayload @join__field(graph: STRAWBERRY)
+
+  """Added in 26.10.0. Restore a soft-deleted system session environ row."""
+  restoreSystemSessionEnviron(id: UUID!): RestoreSystemSessionEnvironPayload @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Remove a system session environ row for good, soft-deleted or not.
+  """
+  purgeSystemSessionEnviron(id: UUID!): PurgeSystemSessionEnvironPayload @join__field(graph: STRAWBERRY)
+
+  """
   Added in 26.10.0. Purge a runtime variant with the presets in its catalog.
   """
   purgeRuntimeVariant(id: UUID!): PurgeRuntimeVariantPayload! @join__field(graph: STRAWBERRY)
@@ -15621,6 +16189,36 @@ type Mutation
   Added in 26.9.0. Include checker-session pairs into idle checks, resetting them so checks start from the initial grace period. Per-session RBAC permission is enforced by the bulk validator; any denial fails the whole request.
   """
   includeSessionIdleChecks(input: IncludeSessionIdleChecksInput!): IncludeSessionIdleChecksPayload @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Change a session group's placement direction and enforcement. Members placed afterwards follow the new policy; a group a deployment's replica group holds is refused as in use.
+  """
+  updateSessionGroup(input: UpdateSessionGroupInput!): UpdateSessionGroupPayload @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Create a session group in a project. The caller becomes its owner; the caller needs the session group create permission on the project.
+  """
+  createSessionGroup(input: CreateSessionGroupInput!): CreateSessionGroupPayload @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Permanently remove a session group. Its member sessions remain with their group cleared. A group a deployment's replica group references is refused as in use.
+  """
+  purgeSessionGroup(input: PurgeSessionGroupInput!): PurgeSessionGroupPayload @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Auto-mount a vfolder into every session created in a project or by a user. The vfolder must belong to the project, or be owned by the user, and the caller needs the auto-mount create permission on that project or user.
+  """
+  createVfolderAutoMount(input: CreateVFolderAutoMountInput!): CreateVFolderAutoMountPayload @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Change where and how an auto-mounted vfolder is mounted. Sessions created afterwards follow the change.
+  """
+  updateVfolderAutoMount(input: UpdateVFolderAutoMountInput!): UpdateVFolderAutoMountPayload @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Mark a vfolder auto-mount deleted. Sessions created afterwards no longer mount it.
+  """
+  deleteVfolderAutoMount(input: DeleteVFolderAutoMountInput!): DeleteVFolderAutoMountPayload @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.9.0. Set one key on an entity, replacing the value it carries. Reachable by any caller RBAC authorizes to write the entity.
@@ -16089,6 +16687,10 @@ type ObjectStorage implements Node
   name: String!
   host: String!
   accessKey: String!
+
+  """
+  Secret key for authentication. Masked unless the caller is a superadmin.
+  """
   secretKey: String!
   endpoint: String!
   region: String!
@@ -19174,6 +19776,16 @@ type ProjectV2 implements Node
 
   """Added in 26.9.0. Model cards belonging to this project."""
   modelCards(filter: ModelCardV2Filter = null, orderBy: [ModelCardV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelCardV2Connection
+
+  """
+  Added in 26.10.0. VFolders auto-mounted into every session created in this project.
+  """
+  vfolderAutoMounts(filter: VFolderAutoMountFilter = null, orderBy: [VFolderAutoMountOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderAutoMountConnection
+
+  """
+  Added in 26.10.0. System session environ rows registered in this project, soft-deleted ones included.
+  """
+  systemSessionEnvirons(filter: SystemSessionEnvironFilter = null, orderBy: [SystemSessionEnvironOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SystemSessionEnvironConnection
 }
 
 """
@@ -19806,6 +20418,49 @@ type PurgeRuntimeVariantPresetPayload
   purgedId: ID!
 
   """UUID of the purged runtime variant preset."""
+  entityId: UUID!
+}
+
+"""Added in 26.10.0. Identifies the session group to purge."""
+input PurgeSessionGroupInput
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the session group to purge."""
+  id: UUID!
+}
+
+"""
+Added in 26.10.0. Names the session group removed. Its member sessions remain.
+"""
+type PurgeSessionGroupPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """Global ID of the purged session group."""
+  purgedId: ID!
+
+  """UUID of the purged session group."""
+  entityId: UUID!
+}
+
+"""Added in 26.10.0. Payload returned after purging a storage volume."""
+type PurgeStorageVolumePayload
+  @join__type(graph: STRAWBERRY)
+{
+  """Global ID of the purged storage volume."""
+  purgedId: ID!
+
+  """UUID of the purged storage volume."""
+  entityId: UUID!
+}
+
+"""Added in 26.10.0. Payload for a system session environ row purge."""
+type PurgeSystemSessionEnvironPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """Global ID of the purged row."""
+  purgedId: ID!
+
+  """The id of the purged row."""
   entityId: UUID!
 }
 
@@ -20515,6 +21170,26 @@ type Query
   schedulingHandlers: [SchedulingHandlerNode!] @join__field(graph: STRAWBERRY)
 
   """
+  Added in 26.10.0. Search every system session environ row at every scope, soft-deleted ones included (superadmin only).
+  """
+  adminSystemSessionEnvirons(filter: SystemSessionEnvironFilter = null, orderBy: [SystemSessionEnvironOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SystemSessionEnvironConnection @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. List every value source name a system session environ row can carry, the values ``SystemSessionEnviron.valueSource`` holds.
+  """
+  systemSessionEnvironValueSources: [String!] @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Page through the system session environ rows the named scopes reach, combined with OR, soft-deleted ones included. Every scope is authorized before the read runs.
+  """
+  scopedSystemSessionEnvirons(scope: SystemSessionEnvironScope!, filter: SystemSessionEnvironFilter = null, orderBy: [SystemSessionEnvironOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SystemSessionEnvironConnection @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. List all registered session lifecycle handlers (superadmin only). The returned ``name`` values are valid keys for ``DefaultSessionOptionsInfo.handlerOptions.byHandler``.
+  """
+  adminSessionLifecycleHandlers: [SessionLifecycleHandlerNode!] @join__field(graph: STRAWBERRY)
+
+  """
   Added in 26.8.0. Compute whether a session could be created on a resource group, without actually provisioning it. Checks each kernel's resource request against the group's agents and returns per-kernel admission outcomes, with hints on what to reduce for kernels that do not fit.
   """
   computeSchedule(input: ComputeScheduleInput!): ComputeSchedulePayload @join__field(graph: STRAWBERRY)
@@ -20541,6 +21216,19 @@ type Query
 
   """Added in 26.3.0. Query service catalog entries. Admin only."""
   adminServiceCatalogs(filter: ServiceCatalogFilter = null, orderBy: [ServiceCatalogOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): [ServiceCatalog!] @join__field(graph: STRAWBERRY)
+
+  """Added in 26.10.0. Read one storage volume."""
+  storageVolume(id: UUID!): StorageVolumeV2 @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Page through every declared storage volume. Admin only.
+  """
+  adminStorageVolumes(filter: StorageVolumeFilter = null, orderBy: [StorageVolumeOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): StorageVolumeV2Connection @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Page through every storage volume service attachment. Admin only.
+  """
+  adminStorageVolumeServiceAttachments(filter: StorageVolumeServiceAttachmentFilter = null, orderBy: [StorageVolumeServiceAttachmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): StorageVolumeServiceAttachmentConnection @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. List session scheduling history (admin only)"""
   adminSessionSchedulingHistories(filter: SessionSchedulingHistoryFilter = null, orderBy: [SessionSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionSchedulingHistoryConnection @join__field(graph: STRAWBERRY)
@@ -20801,6 +21489,11 @@ type Query
   Added in 26.10.0. Page through the session groups the named scopes reach, combined with OR. Every scope is authorized before the read runs, and groups a deployment's replica group holds are left out.
   """
   scopedSessionGroups(scope: SessionGroupScope!, filter: SessionGroupFilter = null, orderBy: [SessionGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionGroupConnection @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Page through the vfolder auto-mounts of the named projects and users, combined with OR. Every project is authorized before the read runs. Auto-mounts marked deleted are left out unless the filter names `deletedAt`.
+  """
+  scopedVfolderAutoMounts(scope: VFolderAutoMountScope!, filter: VFolderAutoMountFilter = null, orderBy: [VFolderAutoMountOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderAutoMountConnection @join__field(graph: STRAWBERRY)
 
   """Added in 25.19.0. List deployments within a specific project."""
   projectDeployments(
@@ -21500,8 +22193,15 @@ type Query
   """
   modelCardAvailablePresets(scope: ModelCardAvailablePresetsScope!, filter: DeploymentRevisionPresetFilter = null, orderBy: [DeploymentRevisionPresetOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DeploymentRevisionPresetConnection @join__field(graph: STRAWBERRY)
 
-  """Added in 26.4.2. Get my keypair resource allocation (current user)."""
-  myKeypairResourceAllocationV2: KeypairResourceAllocationV2 @join__field(graph: STRAWBERRY)
+  """
+  Added in 26.4.2. Get my keypair resource allocation (current user). Deprecated since 26.10.0. Use `myUserResourceAllocationV2`.
+  """
+  myKeypairResourceAllocationV2: KeypairResourceAllocationV2 @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.10.0. Use `myUserResourceAllocationV2`, which counts sessions from all of the user's keypairs.")
+
+  """
+  Added in 26.10.0. Get my resource allocation summed across all of my keypairs.
+  """
+  myUserResourceAllocationV2: UserResourceAllocationV2 @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Get project resource allocation (project usage)."""
   projectResourceAllocationV2(projectId: UUID!): ProjectResourceAllocationV2 @join__field(graph: STRAWBERRY)
@@ -21526,6 +22226,11 @@ type Query
   Added in 26.4.2. Check which resource presets are available for session creation.
   """
   checkPresetAvailabilityV2(input: CheckPresetAvailabilityV2Input!): CheckPresetAvailabilityPayloadV2 @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Get the number of sessions the current user is running.
+  """
+  myConcurrency: UserConcurrency! @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Search all virtual folders (superadmin only)."""
   adminVfoldersV2(
@@ -21979,6 +22684,29 @@ input RejectRoleInvitationInput
 }
 
 """
+Added in 26.10.0. Input for the replaceDeploymentOptions mutation. Full-replace semantics — the supplied payload is the complete new value, except an omitted agent selection policy, which keeps the stored one.
+"""
+input ReplaceDeploymentOptionsInput
+  @join__type(graph: STRAWBERRY)
+{
+  deploymentId: UUID!
+  options: DeploymentOptionsInput!
+}
+
+"""
+Added in 26.10.0. Payload returned after replacing a deployment's options. Only the refreshed options surface is returned.
+"""
+type ReplaceDeploymentOptionsPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the deployment whose ``options`` were replaced."""
+  deploymentId: ID!
+
+  """The newly persisted ``options`` surface."""
+  options: DeploymentOptionsInfo!
+}
+
+"""
 Added in 26.4.4. Input for the replaceResourceGroupDefaultDeploymentOptions mutation. Full-replace semantics — the supplied payload is the complete new value.
 """
 input ReplaceResourceGroupDefaultDeploymentOptionsInput
@@ -22303,6 +23031,10 @@ Added in 25.19.0. Represents the current replica state of a deployment, includin
 type ReplicaState
   @join__type(graph: STRAWBERRY)
 {
+  """
+  Added in 26.10.0. The replica count the user set. Autoscaling changes only desiredReplicaCount, so the two differ when an autoscaling rule set the count.
+  """
+  replicaCount: Int!
   desiredReplicaCount: Int!
 }
 
@@ -22370,6 +23102,10 @@ type ReservoirRegistry implements Node
   name: String!
   endpoint: String!
   accessKey: String!
+
+  """
+  Secret key for authentication. Masked unless the caller is a superadmin.
+  """
   secretKey: String!
   apiVersion: String!
 
@@ -23214,6 +23950,24 @@ type RestoreRolePresetPayload
   rolePreset: RolePreset!
 }
 
+"""
+Added in 26.10.0. Payload returned after restoring a soft-deleted storage volume.
+"""
+type RestoreStorageVolumePayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The restored storage volume."""
+  item: StorageVolumeV2!
+}
+
+"""Added in 26.10.0. Payload for a system session environ row restore."""
+type RestoreSystemSessionEnvironPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The restored row."""
+  systemSessionEnviron: SystemSessionEnviron!
+}
+
 """Added in 26.9.0. Payload for single user restore mutation."""
 type RestoreUserV2Payload
   @join__type(graph: STRAWBERRY)
@@ -23246,6 +24000,7 @@ enum RetentionCategory
   SESSIONS @join__enumValue(graph: STRAWBERRY)
   USAGE_RECORDS @join__enumValue(graph: STRAWBERRY)
   USAGE_BUCKETS @join__enumValue(graph: STRAWBERRY)
+  PROJECTS @join__enumValue(graph: STRAWBERRY)
 }
 
 """
@@ -23677,6 +24432,9 @@ input RoleFilter
 
   """Added in 26.10.0. Filter by role ID."""
   entityId: UUIDFilter = null
+
+  """Added in 26.10.0. Select entities by the labels on them."""
+  labels: EntityLabelNestedFilter = null
   AND: [RoleFilter!] = null
   OR: [RoleFilter!] = null
   NOT: [RoleFilter!] = null
@@ -24036,13 +24794,25 @@ type RolePreset implements Node
   """Role preset name."""
   name: String!
 
-  """Scope type this preset targets (e.g., domain, project)."""
+  """
+  Scope type this preset targets (e.g., domain, project). A preset of the `global` type reads as the global entity its role is created in: `global` or `public`.
+  """
   scopeType: String!
+
+  """
+  Added in 26.10.0. Jinja template rendering the name of each role instantiated from this preset.
+  """
+  roleNameTemplate: String
 
   """
   Default value for the `auto_assign` flag copied onto roles instantiated from this preset.
   """
   autoAssign: Boolean!
+
+  """
+  Added in 26.10.0. Whether a personal project's owner is mapped to the role made from this preset. Allowed only on a project preset.
+  """
+  autoAssignToOwner: Boolean!
 
   """
   Soft-delete flag. Set by the delete mutation and cleared by the restore mutation; archived rows are excluded from default searches.
@@ -24108,6 +24878,9 @@ input RolePresetFilter
   """Filter by auto-assign flag."""
   autoAssign: Boolean = null
 
+  """Added in 26.10.0. Filter by the assign-to-owner flag."""
+  autoAssignToOwner: Boolean = null
+
   """
   Filter by soft-delete flag. Searches exclude soft-deleted rows by default; set this explicitly to `true` to inspect archived presets.
   """
@@ -24122,6 +24895,9 @@ input RolePresetFilter
   Added in 26.9.0. Filter by conditions on the permission entries the preset carries.
   """
   permissions: RolePresetPermissionNestedFilter = null
+
+  """Added in 26.10.0. Select entities by the labels on them."""
+  labels: EntityLabelNestedFilter = null
 
   """Combine multiple filters with AND logic. All conditions must match."""
   AND: [RolePresetFilter!] = null
@@ -25161,7 +25937,6 @@ type ScalingGroupNode implements Node
   is_public: Boolean @join__field(graph: GRAPHENE)
   created_at: DateTime @join__field(graph: GRAPHENE)
   wsproxy_addr: String @join__field(graph: GRAPHENE)
-  wsproxy_api_token: String @join__field(graph: GRAPHENE)
   driver: String @join__field(graph: GRAPHENE)
   driver_opts: JSONString @join__field(graph: GRAPHENE)
   scheduler: String @join__field(graph: GRAPHENE)
@@ -25541,31 +26316,10 @@ type ServiceCatalog implements Node
   """Hash of the service configuration."""
   configHash: String!
 
-  """Endpoints exposed by this service instance."""
-  endpoints: [ServiceCatalogEndpoint!]!
-}
-
-"""Added in 26.3.0. An endpoint exposed by a service instance."""
-type ServiceCatalogEndpoint
-  @join__type(graph: STRAWBERRY)
-{
-  """Role of this endpoint (e.g., 'main', 'health')."""
-  role: String!
-
-  """Network scope (e.g., 'public', 'private', 'internal')."""
-  scope: String!
-
-  """Hostname or IP address."""
-  address: String!
-
-  """Port number."""
-  port: Int!
-
-  """Protocol (e.g., 'grpc', 'http', 'https')."""
-  protocol: String!
-
-  """Additional metadata."""
-  metadata: JSON
+  """
+  Added in 26.10.0. The storage volumes attached to this service, one attachment per volume.
+  """
+  storageVolumeAttachments(filter: StorageVolumeServiceAttachmentFilter = null, orderBy: [StorageVolumeServiceAttachmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): StorageVolumeServiceAttachmentConnection
 }
 
 """Added in 26.3.0. Filter for service catalog queries."""
@@ -25998,6 +26752,21 @@ input SessionIdleCheckTargetInput
 }
 
 """
+Added in 26.10.0. Metadata for a single registered session lifecycle handler. Surfaces the ``name`` accepted in ``DefaultSessionOptionsInfo.handlerOptions.byHandler``.
+"""
+type SessionLifecycleHandlerNode
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Handler key accepted in the session options' handler_options.by_handler.
+  """
+  name: String!
+
+  """One-line description of what the handler does."""
+  description: String!
+}
+
+"""
 Added in 26.8.0. Configures the maximum lifetime of a running session. The checker expires a session after the configured duration is reached.
 """
 type SessionLifetimeIdleCheckerSpec
@@ -26269,6 +27038,9 @@ input SessionUses
 
   """Resource groups the session runs in."""
   resourceGroup: [UUID!] = null
+
+  """Added in 26.10.0. Vfolders the session's kernel groups mount."""
+  vfolder: [UUID!] = null
 }
 
 """Added in 26.3.0. Represents a compute session in Backend.AI."""
@@ -26329,6 +27101,12 @@ type SessionV2 implements Node
 
   """Added in 26.3.0. The kernels belonging to this session."""
   kernels: KernelV2Connection
+
+  """Added in 26.10.0. The main kernel group of this session."""
+  mainKernelGroup: KernelGroup
+
+  """Added in 26.10.0. The kernel groups of this session, one per role."""
+  kernelGroups(filter: KernelGroupFilter = null, orderBy: [KernelGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelGroupConnection
 
   """
   Added in 26.4.4. The model deployment replica served by this session: a single replica instance of a model deployment that runs in this compute session and serves inference requests. Null for non-inference sessions.
@@ -26455,6 +27233,16 @@ input SessionV2Filter
   Added in 26.10.0. Filter by the reserved start time requested at creation.
   """
   requestedStartsAt: DateTimeFilter = null
+
+  """
+  Added in 26.10.0. Filter by the environ rows of the session's kernel groups.
+  """
+  kernelGroupEnviron: KernelGroupEnvironNestedFilter = null
+
+  """
+  Added in 26.10.0. Filter by the resource slot rows of the session's kernel groups.
+  """
+  kernelGroupResourceSlots: KernelGroupResourceSlotNestedFilter = null
   AND: [SessionV2Filter!] = null
   OR: [SessionV2Filter!] = null
   NOT: [SessionV2Filter!] = null
@@ -26903,12 +27691,257 @@ type StorageVolume implements Item
   name: String
 }
 
+"""Added in 26.10.0. Filter for storage volume queries."""
+input StorageVolumeFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Filter by volume ID."""
+  entityId: UUIDFilter = null
+
+  """Filter by volume name."""
+  name: StringFilter = null
+
+  """Filter by the backend the volume sits on."""
+  storageBackendId: UUIDFilter = null
+
+  """
+  Filter by deletion time. Setting it on the top-level filter includes the volumes marked deleted; inside AND, OR or NOT it does not.
+  """
+  deletedAt: NullableDateTimeFilter = null
+
+  """Combine multiple filters with AND logic."""
+  AND: [StorageVolumeFilter!] = null
+
+  """Combine multiple filters with OR logic."""
+  OR: [StorageVolumeFilter!] = null
+
+  """Negate the given filters."""
+  NOT: [StorageVolumeFilter!] = null
+}
+
 type StorageVolumeList implements PaginatedList
   @join__implements(graph: GRAPHENE, interface: "PaginatedList")
   @join__type(graph: GRAPHENE)
 {
   items: [StorageVolume]!
   total_count: Int!
+}
+
+"""Added in 26.10.0. Specifies ordering for storage volume queries."""
+input StorageVolumeOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  """The field to order by."""
+  field: StorageVolumeOrderField!
+
+  """Sort direction."""
+  direction: OrderDirection! = ASC
+}
+
+"""Added in 26.10.0. Fields available for ordering storage volumes."""
+enum StorageVolumeOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  NAME @join__enumValue(graph: STRAWBERRY)
+  CREATED_AT @join__enumValue(graph: STRAWBERRY)
+  UPDATED_AT @join__enumValue(graph: STRAWBERRY)
+  DELETED_AT @join__enumValue(graph: STRAWBERRY)
+}
+
+"""Added in 26.10.0. A storage volume as one service has it attached."""
+type StorageVolumeServiceAttachment implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """ID of the service the volume is attached to."""
+  serviceCatalogId: UUID!
+
+  """ID of the attached volume."""
+  storageVolumeId: UUID!
+
+  """When the service last checked the volume. Null until the first check."""
+  statusCheckedAt: DateTime
+
+  """Creation timestamp."""
+  createdAt: DateTime!
+
+  """Last update timestamp."""
+  updatedAt: DateTime!
+
+  """The attached volume."""
+  storageVolume: StorageVolumeV2!
+
+  """The service the volume is attached to."""
+  serviceCatalog: ServiceCatalog!
+}
+
+"""
+Added in 26.10.0. Paginated connection for storage volume service attachments.
+"""
+type StorageVolumeServiceAttachmentConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [StorageVolumeServiceAttachmentEdge!]!
+
+  """Total number of storage volume service attachments matching the query."""
+  count: Int!
+}
+
+"""
+Added in 26.10.0. One storage volume service attachment within a connection.
+"""
+type StorageVolumeServiceAttachmentEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: StorageVolumeServiceAttachment!
+}
+
+"""Added in 26.10.0. Filter for the storage volume service attachments."""
+input StorageVolumeServiceAttachmentFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Filter by when the service last checked the volume."""
+  statusCheckedAt: NullableDateTimeFilter = null
+
+  """Filter by conditions on the attached volume."""
+  storageVolume: StorageVolumeFilter = null
+
+  """Filter by conditions on the service the volume is attached to."""
+  serviceCatalog: ServiceCatalogFilter = null
+
+  """Combine multiple filters with AND logic."""
+  AND: [StorageVolumeServiceAttachmentFilter!] = null
+
+  """Combine multiple filters with OR logic."""
+  OR: [StorageVolumeServiceAttachmentFilter!] = null
+
+  """Negate the given filters."""
+  NOT: [StorageVolumeServiceAttachmentFilter!] = null
+}
+
+"""
+Added in 26.10.0. Specifies ordering for the storage volume service attachments.
+"""
+input StorageVolumeServiceAttachmentOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  """The field to order by."""
+  field: StorageVolumeServiceAttachmentOrderField!
+
+  """Sort direction."""
+  direction: OrderDirection! = ASC
+}
+
+"""
+Added in 26.10.0. Fields available for ordering the storage volume service attachments.
+"""
+enum StorageVolumeServiceAttachmentOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  STATUS_CHECKED_AT @join__enumValue(graph: STRAWBERRY)
+  CREATED_AT @join__enumValue(graph: STRAWBERRY)
+  UPDATED_AT @join__enumValue(graph: STRAWBERRY)
+}
+
+"""Added in 26.10.0. Which usage figures a volume shows a user."""
+type StorageVolumeUsageExposure
+  @join__type(graph: STRAWBERRY)
+{
+  """The usage figures the volume shows."""
+  exposed: [StorageVolumeUsageField!]!
+}
+
+"""Added in 26.10.0. Input for which usage figures a volume shows a user."""
+input StorageVolumeUsageExposureInput
+  @join__type(graph: STRAWBERRY)
+{
+  """The usage figures the volume shows. Replaces the whole set."""
+  exposed: [StorageVolumeUsageField!]!
+}
+
+"""Added in 26.10.0. A usage figure a volume may show a user."""
+enum StorageVolumeUsageField
+  @join__type(graph: STRAWBERRY)
+{
+  PERCENTAGE @join__enumValue(graph: STRAWBERRY)
+  USED_BYTES @join__enumValue(graph: STRAWBERRY)
+  CAPACITY_BYTES @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in 26.10.0. A volume on a storage backend, identified by the name every service declares it under.
+"""
+type StorageVolumeV2 implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """UUID of the storage volume."""
+  entityId: UUID!
+
+  """Volume name, as every service declares it."""
+  name: String!
+
+  """ID of the backend the volume sits on."""
+  storageBackendId: UUID!
+
+  """
+  How long the volume may go without a fresh check before it counts as stale.
+  """
+  statusStaleAfterSeconds: Int!
+
+  """Which usage figures the volume shows a user."""
+  usageExposure: StorageVolumeUsageExposure!
+
+  """Creation timestamp."""
+  createdAt: DateTime!
+
+  """Last update timestamp."""
+  updatedAt: DateTime!
+
+  """Deletion timestamp. Null while the volume is in use."""
+  deletedAt: DateTime
+
+  """The services this volume is attached to, one attachment per service."""
+  serviceAttachments(filter: StorageVolumeServiceAttachmentFilter = null, orderBy: [StorageVolumeServiceAttachmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): StorageVolumeServiceAttachmentConnection
+}
+
+"""Added in 26.10.0. Paginated connection for storage volumes."""
+type StorageVolumeV2Connection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [StorageVolumeV2Edge!]!
+
+  """Total number of storage volumes matching the query."""
+  count: Int!
+}
+
+"""Added in 26.10.0. One storage volume within a connection."""
+type StorageVolumeV2Edge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: StorageVolumeV2!
 }
 
 """
@@ -27038,6 +28071,210 @@ type SyncReplicaPayload
 {
   """Whether the sync succeeded"""
   success: Boolean!
+}
+
+"""
+Added in 26.10.0. A system session environ row: binds a value of a starting session to an environment variable name at the public scope, a domain or a project.
+"""
+type SystemSessionEnviron implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """The id of the row."""
+  entityId: UUID!
+
+  """The environment variable name the value is injected under."""
+  key: String!
+
+  """
+  Which value of the starting session is injected, as a value source name systemSessionEnvironValueSources lists.
+  """
+  valueSource: String!
+
+  """The scope the row is bound to."""
+  scope: SystemSessionEnvironScopeInfo!
+
+  """When the row was created."""
+  createdAt: DateTime!
+
+  """When the row was last changed."""
+  updatedAt: DateTime!
+
+  """When the row was soft-deleted, or null if it is not."""
+  deletedAt: DateTime
+}
+
+"""
+Added in 26.10.0. Paginated connection for system session environ rows.
+"""
+type SystemSessionEnvironConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [SystemSessionEnvironEdge!]!
+
+  """Total number of rows matching the query."""
+  count: Int!
+}
+
+"""Added in 26.10.0. One system session environ row within a connection."""
+type SystemSessionEnvironEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: SystemSessionEnviron!
+}
+
+"""Added in 26.10.0. Filter for system session environ rows."""
+input SystemSessionEnvironFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Filter by the row's id."""
+  entityId: UUIDFilter = null
+
+  """Filter by the environment variable name."""
+  key: StringFilter = null
+
+  """Filter by which value of the starting session is injected."""
+  valueSource: SystemSessionEnvironValueSourceFilter = null
+
+  """Filter by the kind of scope the row is bound to."""
+  scopeType: SystemSessionEnvironScopeTypeFilter = null
+
+  """Filter by the id of the public entity, the domain or the project."""
+  scopeId: UUIDFilter = null
+
+  """Filter by when the row was created."""
+  createdAt: DateTimeFilter = null
+
+  """Filter by when the row was last changed."""
+  updatedAt: DateTimeFilter = null
+
+  """Filter by when the row was soft-deleted."""
+  deletedAt: NullableDateTimeFilter = null
+
+  """Combine multiple filters with AND logic."""
+  AND: [SystemSessionEnvironFilter!] = null
+
+  """Combine multiple filters with OR logic."""
+  OR: [SystemSessionEnvironFilter!] = null
+
+  """Negate the given filters."""
+  NOT: [SystemSessionEnvironFilter!] = null
+}
+
+"""
+Added in 26.10.0. One ordering rule for a system session environ search.
+"""
+input SystemSessionEnvironOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  """Field to order by."""
+  field: SystemSessionEnvironOrderField!
+
+  """Order direction."""
+  direction: OrderDirection! = ASC
+}
+
+"""
+Added in 26.10.0. Fields available for ordering system session environ rows.
+"""
+enum SystemSessionEnvironOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  KEY @join__enumValue(graph: STRAWBERRY)
+  VALUE_SOURCE @join__enumValue(graph: STRAWBERRY)
+  SCOPE_TYPE @join__enumValue(graph: STRAWBERRY)
+  CREATED_AT @join__enumValue(graph: STRAWBERRY)
+  UPDATED_AT @join__enumValue(graph: STRAWBERRY)
+  DELETED_AT @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in 26.10.0. Scope for the scoped system session environ query. Each list is OR'd internally and across lists, and every scope named is authorized before the read runs.
+"""
+input SystemSessionEnvironScope
+  @join__type(graph: STRAWBERRY)
+{
+  """Domains whose rows are being read."""
+  domain: [UUIDScope!] = null
+
+  """Projects whose rows are being read."""
+  project: [UUIDScope!] = null
+
+  """Include the rows registered in public."""
+  public: Boolean! = false
+}
+
+"""Added in 26.10.0. The scope a system session environ row is bound to."""
+type SystemSessionEnvironScopeInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """Whether the row applies to every session, a domain's or a project's."""
+  scopeType: SystemSessionEnvironScopeType!
+
+  """
+  The id of the public entity, the domain or the project the row is bound to.
+  """
+  scopeId: UUID!
+}
+
+"""
+Added in 26.10.0. Whether a system session environ row applies to every session, a domain's or a project's.
+"""
+enum SystemSessionEnvironScopeType
+  @join__type(graph: STRAWBERRY)
+{
+  PUBLIC @join__enumValue(graph: STRAWBERRY)
+  DOMAIN @join__enumValue(graph: STRAWBERRY)
+  PROJECT @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in 26.10.0. Filter for the scope type with equality and membership operators.
+"""
+input SystemSessionEnvironScopeTypeFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Exact match."""
+  equals: SystemSessionEnvironScopeType = null
+
+  """Match any of the provided values."""
+  in: [SystemSessionEnvironScopeType!] = null
+
+  """Exclude an exact match."""
+  notEquals: SystemSessionEnvironScopeType = null
+
+  """Exclude any of the provided values."""
+  notIn: [SystemSessionEnvironScopeType!] = null
+}
+
+"""
+Added in 26.10.0. Filter by value source name with equality and membership operators. The names are the ones systemSessionEnvironValueSources lists.
+"""
+input SystemSessionEnvironValueSourceFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Exact match."""
+  equals: String = null
+
+  """Match any of the provided values."""
+  in: [String!] = null
+
+  """Exclude an exact match."""
+  notEquals: String = null
+
+  """Exclude any of the provided values."""
+  notIn: [String!] = null
 }
 
 """Added in 26.4.2. Payload returned after terminating sessions."""
@@ -27257,7 +28494,7 @@ input UpdateAgentResourceGroupInput
   policy: ConflictingSessionCleanupPolicy = null
 
   """
-  When false, the change is rejected with a conflict error if the agent still has active sessions. When true, the group is changed anyway and the conflicting sessions are cleaned up per the policy.
+  When false, the change is rejected with a conflict error if the agent still has active sessions or unterminated sessions or deployments of other resource groups designate it. When true, the group is changed anyway, the active sessions are cleaned up per the policy, and those designations are removed.
   """
   force: Boolean! = false
 }
@@ -28528,6 +29765,11 @@ input UpdateRolePresetBodyInput
   Updated default value for the `auto_assign` flag of instantiated roles.
   """
   autoAssign: Boolean
+
+  """
+  Added in 26.10.0. Updated value for whether a personal project's owner is mapped to the role made from this preset. Allowed only on a project preset.
+  """
+  autoAssignToOwner: Boolean
 }
 
 """
@@ -28546,6 +29788,11 @@ input UpdateRolePresetInput
   Updated default value for the `auto_assign` flag of instantiated roles.
   """
   autoAssign: Boolean
+
+  """
+  Added in 26.10.0. Updated value for whether a personal project's owner is mapped to the role made from this preset. Allowed only on a project preset.
+  """
+  autoAssignToOwner: Boolean
 }
 
 """Added in 26.4.4. Payload returned after updating a role preset."""
@@ -28655,6 +29902,72 @@ type UpdateRuntimeVariantPresetPayload
 }
 
 """
+Added in 26.10.0. Input for changing a session group's placement policy. At least one of the two fields must be given; members placed afterwards follow the new policy.
+"""
+input UpdateSessionGroupInput
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the session group to update."""
+  id: UUID!
+
+  """New placement direction. Omit to leave unchanged."""
+  placementDirection: SessionGroupPlacementDirection
+
+  """New placement enforcement. Omit to leave unchanged."""
+  placementEnforcement: SessionGroupPlacementEnforcement
+}
+
+"""Added in 26.10.0. Payload for a session group update."""
+type UpdateSessionGroupPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The updated session group."""
+  sessionGroup: SessionGroup!
+}
+
+"""
+Added in 26.10.0. Input for updating the metadata an administrator owns on a volume.
+"""
+input UpdateStorageVolumeInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Updated volume name."""
+  name: String
+
+  """Updated stale threshold, in seconds."""
+  statusStaleAfterSeconds: Int
+
+  """Updated usage exposure."""
+  usageExposure: StorageVolumeUsageExposureInput
+}
+
+"""Added in 26.10.0. Payload returned after updating a storage volume."""
+type UpdateStorageVolumePayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The updated storage volume."""
+  item: StorageVolumeV2!
+}
+
+"""
+Added in 26.10.0. Input for changing a system session environ row's key.
+"""
+input UpdateSystemSessionEnvironInput
+  @join__type(graph: STRAWBERRY)
+{
+  """New environment variable name."""
+  key: String
+}
+
+"""Added in 26.10.0. Payload for a system session environ row update."""
+type UpdateSystemSessionEnvironPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The updated row."""
+  systemSessionEnviron: SystemSessionEnviron!
+}
+
+"""
 Added in 26.4.2. Input for updating a user resource policy. All fields optional.
 """
 input UpdateUserResourcePolicyInput
@@ -28697,6 +30010,11 @@ input UpdateUserV2Input
 
   """New password."""
   password: String
+
+  """
+  Added in 26.10.0. Current password, required when changing your own password.
+  """
+  oldPassword: String
 
   """New full display name."""
   fullName: String
@@ -28749,6 +30067,33 @@ type UpdateUserV2Payload
 {
   """The updated user."""
   user: UserV2!
+}
+
+"""
+Added in 26.10.0. Input for changing where and how an auto-mounted vfolder is mounted. At least one of the three fields must be given.
+"""
+input UpdateVFolderAutoMountInput
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the auto-mount to update."""
+  id: UUID!
+
+  """New path in the session container. Omit to leave unchanged."""
+  mountDestination: String
+
+  """New path inside the vfolder. Omit to leave unchanged."""
+  subpath: String
+
+  """New mount permission. Omit to leave unchanged."""
+  mountPermission: MountPermission
+}
+
+"""Added in 26.10.0. Payload for a vfolder auto-mount update."""
+type UpdateVFolderAutoMountPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The updated auto-mount."""
+  vfolderAutoMount: VFolderAutoMount!
 }
 
 """
@@ -29032,6 +30377,22 @@ type User implements Item
   """
   container_gids: [Int]
   groups: [UserGroup]
+}
+
+"""Added in 26.10.0. Number of sessions a user is running."""
+type UserConcurrency
+  @join__type(graph: STRAWBERRY)
+{
+  """User UUID."""
+  userId: UUID!
+
+  """
+  Number of interactive, batch and inference sessions the user is running.
+  """
+  sessionCount: Int!
+
+  """Number of system sessions, such as SFTP sessions, the user is running."""
+  privateSessionCount: Int!
 }
 
 """Added in 24.03.0"""
@@ -29396,6 +30757,14 @@ input UserProjectNestedFilter
 {
   name: StringFilter = null
   isActive: Boolean = null
+}
+
+"""Added in 26.10.0. Payload for user resource allocation query."""
+type UserResourceAllocationV2
+  @join__type(graph: STRAWBERRY)
+{
+  """User resource usage summed across all of the user's keypairs."""
+  user: ScopeResourceUsageV2!
 }
 
 type UserResourcePolicy
@@ -29850,6 +31219,11 @@ type UserV2 implements Node
 
   """Added in 26.9.0. Resource groups this user may schedule on."""
   resourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection
+
+  """
+  Added in 26.10.0. VFolders auto-mounted into every session this user creates. Those of the user's personal project are not included.
+  """
+  vfolderAutoMounts(filter: VFolderAutoMountFilter = null, orderBy: [VFolderAutoMountOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderAutoMountConnection
 }
 
 """
@@ -29995,6 +31369,9 @@ input UserV2Filter
   Filter by the user's projects. Deprecated since 26.9.0. The condition is evaluated on rows the caller may not be able to read. Use `projectUsersV2`, which reads the users of one project.
   """
   project: UserProjectNestedFilter = null
+
+  """Added in 26.10.0. Select entities by the labels on them."""
+  labels: EntityLabelNestedFilter = null
   AND: [UserV2Filter!] = null
   OR: [UserV2Filter!] = null
   NOT: [UserV2Filter!] = null
@@ -30266,7 +31643,7 @@ type VFolder implements Node
   entityId: UUID!
 
   """
-  Current operation status. READY, CLONING, DELETE_PENDING, DELETE_ONGOING, DELETE_COMPLETE, or DELETE_ERROR.
+  Current operation status. READY, CREATING, CLONING, DELETE_PENDING, DELETE_ONGOING, DELETE_COMPLETE, or DELETE_ERROR.
   """
   status: VFolderOperationStatus!
 
@@ -30278,7 +31655,9 @@ type VFolder implements Node
   """
   metadata: VFolderMetadataInfo!
 
-  """Access control including permission level and ownership type."""
+  """
+  Access control including the folder's default mount permission level and ownership type.
+  """
   accessControl: VFolderAccessControlInfo!
 
   """
@@ -30308,19 +31687,29 @@ type VFolder implements Node
   entityLabels(filter: EntityLabelFilter = null, orderBy: [EntityLabelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityLabelConnection
 
   """
-  Added in 26.9.0. The permission bits the current user holds on this vfolder.
+  Added in 26.9.0. The permission bits the current user holds on this vfolder. On a folder shared to them, capped by the share's `EntityShare.permissions`. Separate from the mount level (`mountPermission`).
   """
   permissions: [PermissionBit!]!
+
+  """
+  Added in 26.10.0. The level the current user mounts this vfolder at: NONE without read access, READ_WRITE on a personal folder they own, otherwise their own mount policy or the folder's default (`accessControl.permission`).
+  """
+  mountPermission: VFolderMountPermission
+
+  """
+  Added in 26.10.0. The auto-mounts set on this vfolder, in every project or user they are set on.
+  """
+  vfolderAutoMounts(filter: VFolderAutoMountFilter = null, orderBy: [VFolderAutoMountOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderAutoMountConnection
 }
 
 """
-Added in 26.4.2. Access control information for a virtual folder. Includes the mount permission level (read-only, read-write, read-write-delete) and ownership type (user or project).
+Added in 26.4.2. Access control information for a virtual folder. Includes the folder's default mount permission level (read-only, read-write, read-write-delete) and ownership type (user or project).
 """
 type VFolderAccessControlInfo
   @join__type(graph: STRAWBERRY)
 {
   """
-  Mount permission level: READ_ONLY (ro), READ_WRITE (rw), or RW_DELETE (wd).
+  The folder's default mount permission level: READ_ONLY (ro), READ_WRITE (rw), or RW_DELETE (wd). Applies to a shared user without their own `vfolderMountPolicies` entry. The level the current user mounts at is `VFolder.mountPermission`.
   """
   permission: VFolderMountPermission!
 
@@ -30328,6 +31717,228 @@ type VFolderAccessControlInfo
   Ownership type: USER (personal folder) or GROUP (project-shared folder).
   """
   ownershipType: VFolderOwnershipType!
+}
+
+"""
+Added in 26.10.0. A vfolder mounted into every session created in a project, a personal project included, or by a user.
+"""
+type VFolderAutoMount implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """ID of the auto-mount."""
+  entityId: UUID!
+
+  """Kind of the scope the auto-mount is set on."""
+  scopeType: VFolderAutoMountScopeType!
+
+  """ID of the project or the user."""
+  scopeId: UUID!
+
+  """ID of the auto-mounted vfolder."""
+  vfolderId: UUID!
+
+  """Path in the session container the vfolder is mounted at."""
+  mountDestination: String!
+
+  """Path inside the vfolder that is mounted."""
+  subpath: String!
+
+  """Permission the vfolder is mounted with."""
+  mountPermission: MountPermission!
+
+  """Creation timestamp."""
+  createdAt: DateTime!
+
+  """Last update timestamp."""
+  updatedAt: DateTime!
+
+  """Deletion timestamp. Null while the auto-mount is in use."""
+  deletedAt: DateTime
+
+  """The project the vfolder is auto-mounted in. Null for a user one."""
+  project: ProjectV2
+
+  """The user the vfolder is auto-mounted for. Null for a project one."""
+  user: UserV2
+
+  """The auto-mounted vfolder."""
+  vfolder: VFolder
+}
+
+"""Added in 26.10.0. Paginated connection for vfolder auto-mounts."""
+type VFolderAutoMountConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [VFolderAutoMountEdge!]!
+
+  """Total number of auto-mounts matching the query."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type VFolderAutoMountEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: VFolderAutoMount!
+}
+
+"""
+Added in 26.10.0. Filter for vfolder auto-mounts. Auto-mounts marked deleted are left out unless the top-level filter gives `deletedAt`; one inside AND, OR or NOT does not lift that.
+"""
+input VFolderAutoMountFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Filter by auto-mount ID."""
+  entityId: UUIDFilter = null
+
+  """Filter by the kind of scope the auto-mount is set on."""
+  scopeType: VFolderAutoMountScopeTypeFilter = null
+
+  """Filter by the ID of the project or the user."""
+  scopeId: UUIDFilter = null
+
+  """Filter by vfolder ID."""
+  vfolderId: UUIDFilter = null
+
+  """Filter by mount destination."""
+  mountDestination: StringFilter = null
+
+  """Filter by mount permission."""
+  mountPermission: VFolderAutoMountPermissionFilter = null
+
+  """Filter by creation time."""
+  createdAt: DateTimeFilter = null
+
+  """Filter by last update time."""
+  updatedAt: DateTimeFilter = null
+
+  """
+  Filter by deletion time. Setting it on the top-level filter includes the auto-mounts marked deleted; inside AND, OR or NOT it does not.
+  """
+  deletedAt: NullableDateTimeFilter = null
+
+  """Match all nested filters."""
+  AND: [VFolderAutoMountFilter!] = null
+
+  """Match any nested filter."""
+  OR: [VFolderAutoMountFilter!] = null
+
+  """Negate nested filters."""
+  NOT: [VFolderAutoMountFilter!] = null
+}
+
+"""Added in 26.10.0. One ordering rule for a vfolder auto-mount search."""
+input VFolderAutoMountOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  """Field to order by."""
+  field: VFolderAutoMountOrderField!
+
+  """Order direction."""
+  direction: OrderDirection! = ASC
+}
+
+"""Added in 26.10.0. Fields available for ordering vfolder auto-mounts."""
+enum VFolderAutoMountOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  MOUNT_DESTINATION @join__enumValue(graph: STRAWBERRY)
+  CREATED_AT @join__enumValue(graph: STRAWBERRY)
+  UPDATED_AT @join__enumValue(graph: STRAWBERRY)
+  DELETED_AT @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in 26.10.0. Filter for the mount permission with equality and membership operators.
+"""
+input VFolderAutoMountPermissionFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Exact match."""
+  equals: MountPermission = null
+
+  """Match any of the provided values."""
+  in: [MountPermission!] = null
+
+  """Exclude an exact match."""
+  notEquals: MountPermission = null
+
+  """Exclude any of the provided values."""
+  notIn: [MountPermission!] = null
+}
+
+"""
+Added in 26.10.0. Scope for the scoped vfolder auto-mount query. The items are OR'd, and every scope named is authorized before the read runs. At least one of `project`, `user` and `vfolder` must be non-empty.
+"""
+input VFolderAutoMountScope
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Projects whose auto-mounts are being read. A personal project included.
+  """
+  project: [UUIDScope!] = null
+
+  """
+  Users whose own auto-mounts are being read; those of a personal project are not.
+  """
+  user: [UUIDScope!] = null
+
+  """
+  VFolders whose auto-mounts are being read, in every scope they are set on.
+  """
+  vfolder: [UUIDScope!] = null
+}
+
+"""Added in 26.10.0. The one project or user an auto-mount is set on."""
+input VFolderAutoMountScopeRef
+  @join__type(graph: STRAWBERRY)
+{
+  """Kind of the scope."""
+  scopeType: VFolderAutoMountScopeType!
+
+  """ID of the project or the user."""
+  scopeId: UUID!
+}
+
+"""
+Added in 26.10.0. Whether an auto-mount is set on a project or on a user.
+"""
+enum VFolderAutoMountScopeType
+  @join__type(graph: STRAWBERRY)
+{
+  PROJECT @join__enumValue(graph: STRAWBERRY)
+  USER @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in 26.10.0. Filter for the scope type with equality and membership operators.
+"""
+input VFolderAutoMountScopeTypeFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Exact match."""
+  equals: VFolderAutoMountScopeType = null
+
+  """Match any of the provided values."""
+  in: [VFolderAutoMountScopeType!] = null
+
+  """Exclude an exact match."""
+  notEquals: VFolderAutoMountScopeType = null
+
+  """Exclude any of the provided values."""
+  notIn: [VFolderAutoMountScopeType!] = null
 }
 
 """
@@ -30522,6 +32133,7 @@ enum VFolderOperationStatus
   @join__type(graph: STRAWBERRY)
 {
   READY @join__enumValue(graph: STRAWBERRY)
+  CREATING @join__enumValue(graph: STRAWBERRY)
   CLONING @join__enumValue(graph: STRAWBERRY)
   DELETE_PENDING @join__enumValue(graph: STRAWBERRY)
   DELETE_ONGOING @join__enumValue(graph: STRAWBERRY)
@@ -30714,6 +32326,9 @@ input VFolderUsedBy
 
   """Model cards built on the vfolder."""
   modelCard: [UUID!] = null
+
+  """Added in 26.10.0. Sessions whose kernel groups mount the vfolder."""
+  session: [UUID!] = null
 }
 
 """Added in 25.16.0. VFS Storage configuration."""

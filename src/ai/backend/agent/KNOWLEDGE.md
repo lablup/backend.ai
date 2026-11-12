@@ -14,22 +14,24 @@ generated:
 status: stable
 ---
 
-# Agent — Knowledge
+# Agent: Knowledge
 
 > Rules: `AGENTS.md` in the same directory.
+
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
 ## Why this component exists
 
 The agent is **the component that actually creates and manages kernels
 (containers)**. Turning the sessions the manager decided on into running state
-on a node and keeping them there — creation/destruction, node resource
-allocation, status collection/reporting — all happens here.
+on a node and keeping them there: creation/destruction, node resource
+allocation, status collection/reporting: all happens here.
 
 ## The node is the authority
 
-- The agent owns what is actually running on the node — the manager's DB is a projection of what the agent reported.
+- The agent owns what is actually running on the node: the manager's DB is a projection of what the agent reported.
 - Communication is deliberately asymmetric: manager→agent is ZeroMQ RPC, agent→manager is events plus periodic heartbeats.
-- The heartbeat payload carries the full image list and resource slots — extending `AgentInfo` is a manager-compatibility concern.
+- The heartbeat payload carries the full image list and resource slots: extending `AgentInfo` is a manager-compatibility concern.
 
 ## Three generations of RPC coexist
 
@@ -44,12 +46,12 @@ allocation, status collection/reporting — all happens here.
 
 ## State must survive restarts
 
-- The kernel registry is persisted via pickle snapshots plus container-label mirroring and recovered at boot (`kernel_registry/recovery/`).
+- The docker agent persists each kernel's recovery record in its scratch config directory and rebuilds the kernel registry from those records at boot (`kernel_registry/recovery/`). The kubernetes agent has no persistent registry and starts empty.
 - Any new field that must survive restarts has to be added to the recovery data, not just the in-memory object.
 
 ## The watcher is a separate privileged process
 
-- It is its own aiohttp process and can start/stop/reset the agent — do not assume the agent owns its own restart.
-- The auth token (etcd `config/watcher/token`) defaults to the literal `"insecure"` — it must be configured in deployments.
+- It is its own aiohttp process and can start/stop/reset the agent: do not assume the agent owns its own restart.
+- The auth token (etcd `config/watcher/token`) defaults to the literal `"insecure"`: it must be configured in deployments.
 - Do not fold the watcher's duties into the agent server.
-- This structure is not an agent-specific end state — **the plan is to generalize it so every server can be run the same way (a watcher managing the server process)**.
+- This structure is not an agent-specific end state: **the plan is to generalize it so every server can be run the same way (a watcher managing the server process)**.

@@ -18,8 +18,8 @@ are visible to the scheduler from the first tick.
 
 ``endpoints.session_owner`` has no FK, and a user purge that delegates ownership skips
 non-``created`` deployments, so an owner may be gone. Such a deployment passes to its
-``created_user`` when that user remains; one with neither user nor route is removed, as
-a purge without delegation removes it.
+``created_user`` when that user remains; one with neither user left is removed even
+when routed, its routes going with it, as a purge without delegation removes it.
 
 Revision ID: 8f3c1d5a2b47
 Revises: 890490020974
@@ -64,6 +64,17 @@ REMOVE_UNOWNED_SQL = (
     f"DELETE FROM endpoint_tokens WHERE endpoint IN ({_UNOWNED})",
     f"DELETE FROM endpoints WHERE id IN ({_UNOWNED})",
 )
+
+# Routes of a deployment with neither user left belong to live users the purge did
+# not touch (``routings.session_owner`` is a RESTRICT FK), so they survive the purge
+# and would keep the deployment out of ``_UNOWNED`` and carry its deleted owner into
+# the backfill. Dropping them first lets the removal above take the deployment too;
+# the routes' sessions stay and simply stay out of the membership backfill.
+REMOVE_ORPHANED_ROUTES_SQL = f"""
+DELETE FROM routings r
+USING endpoints e
+WHERE r.endpoint = e.id AND {_OWNER_GONE} AND NOT {_CREATOR_LEFT}
+"""
 
 # One session group per existing replica group, in a single statement: the
 # ``new_groups`` CTE holds the generated ids so the INSERT and the UPDATE agree
@@ -172,7 +183,11 @@ def upgrade() -> None:
             ["id"],
         )
 
-    for statement in (*REASSIGN_TO_CREATOR_SQL, *REMOVE_UNOWNED_SQL):
+    for statement in (
+        *REASSIGN_TO_CREATOR_SQL,
+        REMOVE_ORPHANED_ROUTES_SQL,
+        *REMOVE_UNOWNED_SQL,
+    ):
         op.execute(statement)
     op.execute(BACKFILL_SQL)
     op.alter_column("replica_groups", "session_group_id", nullable=False)

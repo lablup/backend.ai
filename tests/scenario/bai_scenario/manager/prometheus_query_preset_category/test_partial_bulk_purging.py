@@ -19,6 +19,7 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset_category.response 
 from ai.backend.manager.api.adapters.prometheus_query_preset_category.adapter import (
     PrometheusQueryPresetCategoryAdapter,
 )
+from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
@@ -28,6 +29,7 @@ from ai.backend.testutils.scenario_steps import (
     Refused,
     Same,
     SameAs,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -61,8 +63,15 @@ class PurgingEveryCategory(When[ManyCategoriesAndACaller, Adapter, Purged]):
 
     @override
     def describe(self, laid: ManyCategoriesAndACaller) -> str:
-        besides = " 와 없는 id 하나" if self.missing is not None else ""
-        return f"{laid.caller.username}이 카테고리 {len(laid.laid)}개{besides}를 한 번에 purge 함"
+        besides_ko = " 와 없는 id 하나" if self.missing is not None else ""
+        besides_en = " and one missing id" if self.missing is not None else ""
+        return Says(
+            f"{laid.caller.username}이 카테고리 {len(laid.laid)}개{besides_ko}를 한 번에 "
+            "purge 합니다",
+            english=(
+                f"{laid.caller.username} purges {len(laid.laid)} categories{besides_en} in one call"
+            ),
+        )
 
     @override
     async def call(self, adapter: Adapter, laid: ManyCategoriesAndACaller) -> Purged:
@@ -77,15 +86,26 @@ class PurgingEveryCategory(When[ManyCategoriesAndACaller, Adapter, Purged]):
 
 @dataclass(frozen=True)
 class EveryCategoryIsPurged(Then[ManyCategoriesAndACaller, Purged]):
-    """대상이 모두 지워지기 전 모습으로 처리된 목록에 오고, 없는 id 만 실패 목록에 온다."""
+    """대상이 모두 지워지기 전 모습으로 처리된 목록에 온다. `missing`이 있으면 그 id 만 실패 목록에 온다."""
 
-    missing: UUID
+    missing: UUID | None = None
 
     @override
     def says(self) -> str:
-        return (
-            "대상 카테고리가 모두 지워지기 전 모습으로 오고, 없는 id 는 대상이 없다는 이유로 "
-            "실패 목록에 온다"
+        if self.missing is None:
+            return Says(
+                "대상 카테고리가 모두 삭제되기 전 모습으로 오고, 실패한 것은 없습니다",
+                english=(
+                    "every target category comes back as it was before deletion and nothing failed"
+                ),
+            )
+        return Says(
+            "대상 카테고리가 모두 삭제되기 전 모습으로 오고, 없는 id 는 대상이 없다는 이유로 "
+            "실패 목록에 옵니다",
+            english=(
+                "every target category comes back as it was before deletion, and the missing "
+                "id comes back in the failed list because there is no such target"
+            ),
         )
 
     @override
@@ -95,17 +115,31 @@ class EveryCategoryIsPurged(Then[ManyCategoriesAndACaller, Purged]):
             return [Refused(NotEnoughPermission, answered.raised)]
         verdicts: list[Verdict] = [
             Same("successes count", len(payload.successes), len(laid.laid)),
-            Same("failed count", len(payload.failed), 1),
         ]
         for i, (node, category) in enumerate(zip(payload.successes, laid.laid, strict=False)):
             verdicts.append(
                 Held[CategoryNode](
-                    f"successes[{i}]", node, SameAs(node_of(category), "대상 카테고리 전체")
+                    f"successes[{i}]",
+                    node,
+                    SameAs(
+                        node_of(category),
+                        Says("대상 카테고리 전체", english="the whole target category"),
+                    ),
                 )
             )
+        if self.missing is None:
+            return [*verdicts, Same("failed", payload.failed, [])]
+        verdicts.append(Same("failed count", len(payload.failed), 1))
         for failure in payload.failed:
             verdicts += [
-                Held[UUID]("failed[0].id", failure.id, SameAs(self.missing, "요청에 넣은 없는 id")),
+                Held[UUID](
+                    "failed[0].id",
+                    failure.id,
+                    SameAs(
+                        self.missing,
+                        Says("요청에 넣은 없는 id", english="the missing id in the request"),
+                    ),
+                ),
                 Held("failed[0].message", failure.message, Mentions("not found")),
             ]
         return verdicts
@@ -123,9 +157,14 @@ class PurgingAnswersForTheMissingOne(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 카테고리 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 지워지기 전 모습으로 "
-            "오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "superadmin 이 카테고리 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 삭제되기 전 "
+            "모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when the superadmin purges two categories and one missing id in one call, "
+                "the two come back as they were before deletion and the missing id comes back "
+                "in the failed list because there is no such target"
+            ),
         )
 
     @override
@@ -142,6 +181,39 @@ class PurgingAnswersForTheMissingOne(
 
 
 @dataclass(frozen=True)
+class AUserGrantedHardDeletePurgesEveryCategory(
+    Scenario[TestSeedingSession, ManyCategoriesAndACaller, Adapter, Purged]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-granted-hard-delete-purges-every-category-of-several"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "global 에서 카테고리 영구 삭제 권한을 받은 사용자가 카테고리 여럿을 한 번에 "
+            "purge 하면, 모두 삭제되기 전 모습으로 오고 실패한 것은 없습니다",
+            english=(
+                "when a user granted hard delete on categories in global purges several "
+                "categories in one call, every one comes back as it was before deletion and "
+                "nothing failed"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ManyCategoriesAndACaller]:
+        return ManyCategoriesAndSomeone(granted=(Permission.HARD_DELETE,))
+
+    @override
+    def when(self) -> When[ManyCategoriesAndACaller, Adapter, Purged]:
+        return PurgingEveryCategory()
+
+    @override
+    def then(self) -> Then[ManyCategoriesAndACaller, Purged]:
+        return EveryCategoryIsPurged()
+
+
+@dataclass(frozen=True)
 class AUserGrantedNothingPurgesNone(
     Scenario[TestSeedingSession, ManyCategoriesAndACaller, Adapter, Purged]
 ):
@@ -151,9 +223,14 @@ class AUserGrantedNothingPurgesNone(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 받지 않은 사용자가 카테고리 여럿을 한 번에 purge 하려 하면, 지워진 것 없이 "
-            "모두 권한이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "아무 권한도 받지 않은 사용자가 카테고리 여럿을 한 번에 purge 하려 하면, 삭제된 것 "
+            "없이 모두 권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when a user granted nothing tries to purge several categories in one call, "
+                "none is deleted and every one comes back in the failed list for lack of "
+                "permission"
+            ),
         )
 
     @override
@@ -170,6 +247,7 @@ class AUserGrantedNothingPurgesNone(
 
 
 SCENARIOS: list[PurgingStep] = [
+    AUserGrantedHardDeletePurgesEveryCategory(),
     PurgingAnswersForTheMissingOne(),
     AUserGrantedNothingPurgesNone(),
 ]

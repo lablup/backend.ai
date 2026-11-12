@@ -61,6 +61,11 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
 
     @classmethod
     @override
+    def description(cls) -> str:
+        return "Assigns pending sessions to agents."
+
+    @classmethod
+    @override
     def target_statuses(cls) -> list[SessionStatus]:
         """Sessions in PENDING state."""
         return [SessionStatus.PENDING]

@@ -1978,6 +1978,7 @@ class KernelCreationConfig(TypedDict):
     image: ImageConfig
     kernel_id: str  # the kernel's ID
     session_id: str  # the session's ID
+    session_name: str  # the session's name
     owner_user_id: str  # the owner user's ID
     owner_project_id: str | None  # the owner project's ID (for project-owned sessions)
     network_id: str

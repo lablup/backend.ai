@@ -62,6 +62,7 @@ from ai.backend.manager.data.deployment.scale_modifier import (
 from ai.backend.manager.data.deployment.types import (
     AccessTokenSearchResult,
     DeploymentHandlerCategory,
+    DeploymentHandlerOptions,
     DeploymentInfo,
     DeploymentInfoSearchResult,
     DeploymentInfoWithAutoScalingRules,
@@ -98,6 +99,7 @@ from ai.backend.manager.data.session.creation import (
     ResolvedPresetValues,
     UserContext,
 )
+from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.vfolder.types import VFolderLocation
 from ai.backend.manager.errors.deployment import (
@@ -208,6 +210,7 @@ from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
 from ai.backend.manager.models.session.searchers import SessionSearcher
 from ai.backend.manager.models.session_group.creators import SessionGroupCreator
+from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.specs.creator import FieldToCreate
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user.row import UserRow
@@ -365,7 +368,6 @@ class DeploymentDBSource:
             # placement policy of its replicas.
             primary_session_group = await w.create_entity(
                 SessionGroupCreator.for_replica_group(
-                    domain_name=deployment.metadata.domain,
                     project_id=ProjectID(deployment.metadata.project),
                     owner_user_id=UserID(deployment.metadata.session_owner),
                 )
@@ -2746,24 +2748,38 @@ class DeploymentDBSource:
     async def replace_deployment_options(
         self,
         deployment_id: DeploymentID,
-        options: DeploymentOptions,
+        handler_options: DeploymentHandlerOptions,
+        agent_selection_policy: AgentSelectionPolicy | None,
     ) -> DeploymentOptions:
         """Replace the ``endpoints.options`` JSONB column for a deployment
-        and return the stored value in a single round-trip (``UPDATE ...
-        RETURNING``).
+        and return the stored value (``UPDATE ... RETURNING``).
 
         The column is typed as :class:`PydanticColumn` so the domain model
-        is persisted verbatim. This is a full-replace — callers are
-        expected to pass the complete new value.
+        is persisted verbatim. This is a full-replace except the agent
+        selection policy, which a ``None`` keeps as stored.
 
         Raises:
             EndpointNotFound: If the endpoint does not exist.
         """
         async with self._begin_session_read_committed() as db_sess:
+            if agent_selection_policy is None:
+                stored_options = await db_sess.scalar(
+                    sa.select(EndpointRow.options)
+                    .where(EndpointRow.id == deployment_id)
+                    .with_for_update()
+                )
+                if stored_options is None:
+                    raise EndpointNotFound(f"Endpoint {deployment_id} not found")
+                agent_selection_policy = stored_options.agent_selection_policy
             stmt = (
                 sa.update(EndpointRow)
                 .where(EndpointRow.id == deployment_id)
-                .values(options=options)
+                .values(
+                    options=DeploymentOptions(
+                        handler_options=handler_options,
+                        agent_selection_policy=agent_selection_policy,
+                    )
+                )
                 .returning(EndpointRow.options)
             )
             result = await db_sess.execute(stmt)
@@ -3109,8 +3125,11 @@ class DeploymentDBSource:
 
         Marking the live (non-DRAINED) groups DRAINING with zeroed desired counts stops the
         reconcile from provisioning replicas for the destroyed endpoint; the group draining
-        reconcile then retires them to DRAINED. Done in one transaction so the destroy cleanup
-        cannot leave a group requesting replicas while its endpoint is gone.
+        reconcile then retires them to DRAINED. The owning session groups take the destroy
+        moment as their retention boundary, so the sweep still collects them when the
+        replica group rows are purged before the drain reaches DRAINED. Done in one
+        transaction so the destroy cleanup cannot leave a group requesting replicas while
+        its endpoint is gone.
         """
         if not deployment_ids:
             return
@@ -3125,6 +3144,18 @@ class DeploymentDBSource:
                     desired_target_replica_count=0,
                     scaling_status=ReplicaGroupScalingStatus.SCALING,
                 )
+            )
+            await db_sess.execute(
+                sa.update(SessionGroupRow)
+                .where(
+                    SessionGroupRow.id.in_(
+                        sa.select(ReplicaGroupRow.session_group_id).where(
+                            ReplicaGroupRow.deployment_id.in_(deployment_ids)
+                        )
+                    ),
+                    SessionGroupRow.deleted_at.is_(None),
+                )
+                .values(deleted_at=sa.func.now())
             )
             await db_sess.execute(
                 sa.update(EndpointRow)

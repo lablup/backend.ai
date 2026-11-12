@@ -17,6 +17,8 @@ from ai.backend.common.data.entity.types import (
     RuntimeEntityID,
 )
 from ai.backend.common.exception import BackendAIError
+from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
+from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
@@ -28,6 +30,7 @@ from ai.backend.manager.models.specs.creator import (
     FieldCreator,
     FieldToCreate,
     GlobalEntityCreator,
+    GuardedDanglingFieldCreator,
     NestedFieldCreator,
     RoleManagedEntityCreator,
     RoleManagedGlobalEntityCreator,
@@ -71,6 +74,19 @@ from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
 __all__ = ("OpsRepository",)
 
+_ops_repository_resilience = Resilience(
+    policies=[
+        RetryPolicy(
+            RetryArgs(
+                max_retries=3,
+                retry_delay=0.1,
+                backoff_strategy=BackoffStrategy.FIXED,
+                non_retryable_exceptions=(BackendAIError,),
+            )
+        ),
+    ]
+)
+
 
 class OpsRepository[TData]:
     """Ops-backed repository for one entity, parameterized only by its ``data/`` type.
@@ -84,6 +100,7 @@ class OpsRepository[TData]:
     def __init__(self, ops_provider: V2DBOpsProvider) -> None:
         self._ops = ops_provider
 
+    @_ops_repository_resilience.apply()
     async def get(self, querier: DataQuerier[Any, TData]) -> TData:
         async with self._ops.read_ops() as r:
             data = await r.query_data(querier)
@@ -96,6 +113,7 @@ class OpsRepository[TData]:
                 )
             return data
 
+    @_ops_repository_resilience.apply()
     async def bulk_get(
         self, querier: BulkEntityQuerier[Any, TData], entity_ids: Sequence[EntityIdentifier]
     ) -> Mapping[EntityIdentifier, TData]:
@@ -107,6 +125,7 @@ class OpsRepository[TData]:
         async with self._ops.read_ops() as r:
             return await r.query_bulk_data(querier, entity_ids)
 
+    @_ops_repository_resilience.apply()
     async def get_field[TFieldData: FieldData](
         self, querier: FieldQuerier[Any, TFieldData]
     ) -> TFieldData:
@@ -121,6 +140,7 @@ class OpsRepository[TData]:
                 )
             return data
 
+    @_ops_repository_resilience.apply()
     async def lookup[TEntityID: EntityIdentifier](
         self, lookup: DataLookup[Any, TEntityID]
     ) -> TEntityID:
@@ -139,6 +159,7 @@ class OpsRepository[TData]:
                 )
             return entity_id
 
+    @_ops_repository_resilience.apply()
     async def bulk_lookup[TKey, TEntityID: EntityIdentifier](
         self, lookup: BulkDataLookup[TKey, TEntityID], keys: Sequence[TKey]
     ) -> Mapping[TKey, TEntityID]:
@@ -146,6 +167,7 @@ class OpsRepository[TData]:
         async with self._ops.read_ops() as r:
             return await r.lookup_entity_ids(lookup, keys)
 
+    @_ops_repository_resilience.apply()
     async def bulk_get_fields[TFieldData: FieldData](
         self, querier: BulkFieldQuerier[Any, TFieldData], field_ids: Sequence[FieldIdentifier]
     ) -> Mapping[FieldIdentifier, TFieldData]:
@@ -153,6 +175,7 @@ class OpsRepository[TData]:
         async with self._ops.read_ops() as r:
             return await r.query_bulk_field_data(querier, field_ids)
 
+    @_ops_repository_resilience.apply()
     async def owned_fields[TOwnerID: EntityIdentifier, TFieldData: FieldData](
         self,
         querier: OwnedFieldQuerier[TOwnerID, Any, TFieldData],
@@ -162,6 +185,7 @@ class OpsRepository[TData]:
         async with self._ops.read_ops() as r:
             return await r.query_owned_fields(querier, owner_ids)
 
+    @_ops_repository_resilience.apply()
     async def field_owners(
         self, lookup: FieldOwnerLookup[Any, Any], field_ids: Sequence[FieldIdentifier]
     ) -> Mapping[FieldIdentifier, EntityIdentifier]:
@@ -187,6 +211,7 @@ class OpsRepository[TData]:
             )
         return owner
 
+    @_ops_repository_resilience.apply()
     async def runtime_field_owners(
         self, lookup: RuntimeFieldOwnerLookup[Any], field_ids: Sequence[FieldIdentifier]
     ) -> Mapping[FieldIdentifier, RuntimeEntityID]:
@@ -194,6 +219,7 @@ class OpsRepository[TData]:
         async with self._ops.read_ops() as r:
             return await r.lookup_runtime_field_owners(lookup, field_ids)
 
+    @_ops_repository_resilience.apply()
     async def field_owner_candidates(
         self, candidates: FieldOwnerCandidates[Any], field_ids: Sequence[FieldIdentifier]
     ) -> Mapping[FieldIdentifier, Sequence[RuntimeEntityID]]:
@@ -215,6 +241,7 @@ class OpsRepository[TData]:
             )
         return owner
 
+    @_ops_repository_resilience.apply()
     async def field_owner_by_key[TOwnerID: EntityIdentifier](
         self, lookup: FieldOwnerKeyLookup[TOwnerID]
     ) -> TOwnerID:
@@ -233,6 +260,7 @@ class OpsRepository[TData]:
             )
         return owner
 
+    @_ops_repository_resilience.apply()
     async def field_by_key[TFieldID: FieldIdentifier, TOwnerID: EntityIdentifier](
         self, lookup: FieldKeyLookup[TFieldID, TOwnerID]
     ) -> tuple[TFieldID, TOwnerID]:
@@ -251,6 +279,7 @@ class OpsRepository[TData]:
             )
         return resolved
 
+    @_ops_repository_resilience.apply()
     async def fields_by_keys[TKey, TFieldID: FieldIdentifier, TOwnerID: EntityIdentifier](
         self, lookup: BulkFieldKeyLookup[TKey, TFieldID, TOwnerID], keys: Sequence[TKey]
     ) -> Mapping[TKey, tuple[TFieldID, TOwnerID]]:
@@ -259,6 +288,7 @@ class OpsRepository[TData]:
         async with self._ops.read_ops() as r:
             return await r.lookup_fields_by_keys(lookup, keys)
 
+    @_ops_repository_resilience.apply()
     async def search_in_scopes(
         self,
         scopes: Sequence[OperationScope],
@@ -274,6 +304,7 @@ class OpsRepository[TData]:
         async with self._ops.read_ops() as r:
             return await r.search_with_scopes(scopes, searcher)
 
+    @_ops_repository_resilience.apply()
     async def scoped_search(self, scoped: ScopedSearcher[Any, TData]) -> SearcherResult[TData]:
         """Read a page restricted to the searcher's scopes and narrowed by its uses.
 
@@ -282,6 +313,7 @@ class OpsRepository[TData]:
         async with self._ops.read_ops() as r:
             return await r.scoped_search(scoped)
 
+    @_ops_repository_resilience.apply()
     async def global_search(
         self, global_searcher: GlobalSearcher[Any, TData]
     ) -> SearcherResult[TData]:
@@ -289,6 +321,7 @@ class OpsRepository[TData]:
         async with self._ops.read_ops() as r:
             return await r.global_search(global_searcher)
 
+    @_ops_repository_resilience.apply()
     async def search_in_global(self, searcher: Searcher[Any, TData]) -> SearcherResult[TData]:
         """Read a page across the entire table, with no scope filter.
 
@@ -299,10 +332,12 @@ class OpsRepository[TData]:
         async with self._ops.read_ops() as r:
             return await r.search_in_global(searcher)
 
+    @_ops_repository_resilience.apply()
     async def create_global_entity(self, creator: GlobalEntityCreator[Any, TData]) -> TData:
         async with self._ops.write_ops() as w:
             return await w.create_global_entity(creator)
 
+    @_ops_repository_resilience.apply()
     async def create_global_entity_with_fields[TEntityData: EntityData, TFieldData: FieldData](
         self,
         creator: GlobalEntityCreator[Any, TEntityData],
@@ -318,12 +353,14 @@ class OpsRepository[TData]:
             fields = await w.atomic_create_field_entities(data.entity_id(), field_creators)
             return EntityWithFieldsResult(data=data, fields=fields)
 
+    @_ops_repository_resilience.apply()
     async def create_entity(self, creator: EntityCreator[Any, TData]) -> TData:
         """Insert one entity row; the write provisions its virtual entity and joins
         the declared memberships. No roles are involved on this path."""
         async with self._ops.write_ops() as w:
             return await w.create_entity(creator)
 
+    @_ops_repository_resilience.apply()
     async def create_entity_with_fields[TEntityData: EntityData, TFieldData: FieldData](
         self,
         creator: EntityCreator[Any, TEntityData],
@@ -339,6 +376,7 @@ class OpsRepository[TData]:
             fields = await w.atomic_create_field_entities(data.entity_id(), field_creators)
             return EntityWithFieldsResult(data=data, fields=fields)
 
+    @_ops_repository_resilience.apply()
     async def create_role_managed_global_entity(
         self, creator: RoleManagedGlobalEntityCreator[Any, TData]
     ) -> TData:
@@ -346,6 +384,7 @@ class OpsRepository[TData]:
         async with self._ops.write_ops() as w:
             return await w.create_role_managed_global_entity(creator)
 
+    @_ops_repository_resilience.apply()
     async def create_role_managed_entity(
         self, creator: RoleManagedEntityCreator[Any, TData]
     ) -> TData:
@@ -354,6 +393,7 @@ class OpsRepository[TData]:
         async with self._ops.write_ops() as w:
             return await w.create_role_managed_entity(creator)
 
+    @_ops_repository_resilience.apply()
     async def create_field[TFieldData: FieldData](
         self, owner_id: Any, creator: FieldCreator[Any, Any, TFieldData]
     ) -> TFieldData:
@@ -361,6 +401,7 @@ class OpsRepository[TData]:
         async with self._ops.write_ops() as w:
             return await w.create_field(owner_id, creator)
 
+    @_ops_repository_resilience.apply()
     async def atomic_create_global_entities(
         self, creators: Sequence[GlobalEntityCreator[Any, TData]]
     ) -> list[TData]:
@@ -368,6 +409,7 @@ class OpsRepository[TData]:
         async with self._ops.write_ops() as w:
             return await w.atomic_create_global_entities(creators)
 
+    @_ops_repository_resilience.apply()
     async def atomic_create_entities(
         self, creators: Sequence[EntityCreator[Any, TData]]
     ) -> list[TData]:
@@ -375,6 +417,7 @@ class OpsRepository[TData]:
         async with self._ops.write_ops() as w:
             return await w.atomic_create_entities(creators)
 
+    @_ops_repository_resilience.apply()
     async def atomic_create_role_managed_global_entities(
         self, creators: Sequence[RoleManagedGlobalEntityCreator[Any, TData]]
     ) -> list[TData]:
@@ -383,6 +426,7 @@ class OpsRepository[TData]:
         async with self._ops.write_ops() as w:
             return await w.atomic_create_role_managed_global_entities(creators)
 
+    @_ops_repository_resilience.apply()
     async def atomic_create_role_managed_entities(
         self, creators: Sequence[RoleManagedEntityCreator[Any, TData]]
     ) -> list[TData]:
@@ -391,6 +435,7 @@ class OpsRepository[TData]:
         async with self._ops.write_ops() as w:
             return await w.atomic_create_role_managed_entities(creators)
 
+    @_ops_repository_resilience.apply()
     async def atomic_create_field_entities[TFieldData: FieldData](
         self, owner_id: Any, creators: Sequence[FieldCreator[Any, Any, TFieldData]]
     ) -> list[TFieldData]:
@@ -398,12 +443,14 @@ class OpsRepository[TData]:
         async with self._ops.write_ops() as w:
             return await w.atomic_create_field_entities(owner_id, creators)
 
+    @_ops_repository_resilience.apply()
     async def create_dangling_field[TFieldData: FieldData](
-        self, creator: DanglingFieldCreator[Any, TFieldData]
+        self, creator: GuardedDanglingFieldCreator[Any, TFieldData]
     ) -> TFieldData:
         async with self._ops.write_ops() as w:
             return await w.create_dangling_field(creator)
 
+    @_ops_repository_resilience.apply()
     async def atomic_create_fields[TOwnerID: EntityIdentifier, TFieldData: FieldData](
         self, creations: Sequence[FieldToCreate[TOwnerID, Any, TFieldData]]
     ) -> list[TFieldData]:
@@ -411,6 +458,7 @@ class OpsRepository[TData]:
         async with self._ops.write_ops() as w:
             return await w.atomic_create_fields(creations)
 
+    @_ops_repository_resilience.apply()
     async def atomic_create_fields_with_nested[
         TOwnerID: EntityIdentifier,
         TFieldData: FieldData,
@@ -424,12 +472,14 @@ class OpsRepository[TData]:
         async with self._ops.write_ops() as w:
             return await w.atomic_create_fields_with_nested(creations, nested_creators)
 
+    @_ops_repository_resilience.apply()
     async def atomic_create_dangling_fields[TFieldData: FieldData](
         self, creators: Sequence[DanglingFieldCreator[Any, TFieldData]]
     ) -> list[TFieldData]:
         async with self._ops.write_ops() as w:
             return await w.atomic_create_dangling_fields(creators)
 
+    @_ops_repository_resilience.apply()
     async def atomic_create_dangling_fields_with_nested[
         TFieldData: FieldData,
         TNestedData: FieldData,
@@ -441,6 +491,7 @@ class OpsRepository[TData]:
         async with self._ops.write_ops() as w:
             return await w.atomic_create_dangling_fields_with_nested(creators, field_creators)
 
+    @_ops_repository_resilience.apply()
     async def purge_entity(self, purger: GuardedEntityPurger[Any, TData]) -> TData:
         """Hard-delete one entity row, tearing its scope down with it.
 
@@ -458,6 +509,7 @@ class OpsRepository[TData]:
                 )
             return data
 
+    @_ops_repository_resilience.apply()
     async def purge_field_entity[TFieldData: FieldData](
         self, purger: GuardedFieldPurger[Any, TFieldData]
     ) -> TFieldData:
@@ -474,6 +526,7 @@ class OpsRepository[TData]:
                 )
             return data
 
+    @_ops_repository_resilience.apply()
     async def partial_bulk_purge_entities(
         self, purgers: Mapping[EntityIdentifier, GuardedEntityPurger[Any, TData]]
     ) -> BulkResultWithFailures[TData]:
@@ -481,6 +534,7 @@ class OpsRepository[TData]:
         async with self._ops.write_ops() as w:
             return await w.partial_bulk_purge_entities(purgers)
 
+    @_ops_repository_resilience.apply()
     async def partial_bulk_purge_field_entities[TFieldData: FieldData](
         self, purgers: Mapping[FieldIdentifier, GuardedFieldPurger[Any, TFieldData]]
     ) -> BulkFieldOpsResult[TFieldData]:
@@ -488,29 +542,34 @@ class OpsRepository[TData]:
         async with self._ops.write_ops() as w:
             return await w.partial_bulk_purge_field_entities(purgers)
 
+    @_ops_repository_resilience.apply()
     async def upsert_global_entity(self, upserter: GlobalEntityUpserter[Any, TData]) -> TData:
         """Insert or update a global row on conflict. Never absent."""
         async with self._ops.write_ops() as w:
             return await w.upsert_global_entity(upserter)
 
+    @_ops_repository_resilience.apply()
     async def upsert_entity(self, upserter: EntityUpserter[Any, TData]) -> TData:
         """Insert or update an entity row on conflict; the scope stays provisioned
         idempotently. Never absent."""
         async with self._ops.write_ops() as w:
             return await w.upsert_entity(upserter)
 
+    @_ops_repository_resilience.apply()
     async def atomic_upsert_global_entities(
         self, upserters: Sequence[GlobalEntityUpserter[Any, TData]]
     ) -> list[TData]:
         async with self._ops.write_ops() as w:
             return await w.atomic_upsert_global_entities(upserters)
 
+    @_ops_repository_resilience.apply()
     async def atomic_upsert_entities(
         self, upserters: Sequence[EntityUpserter[Any, TData]]
     ) -> list[TData]:
         async with self._ops.write_ops() as w:
             return await w.atomic_upsert_entities(upserters)
 
+    @_ops_repository_resilience.apply()
     async def upsert_field_entity[TFieldData: FieldData](
         self, owner_id: Any, upserter: FieldUpserter[Any, Any, TFieldData]
     ) -> TFieldData:
@@ -518,6 +577,7 @@ class OpsRepository[TData]:
         async with self._ops.write_ops() as w:
             return await w.upsert_field_entity(owner_id, upserter)
 
+    @_ops_repository_resilience.apply()
     async def partial_bulk_upsert_field_entities[TFieldData: FieldData](
         self, upserters: Mapping[Any, Sequence[FieldUpserter[Any, Any, TFieldData]]]
     ) -> BulkResultWithFailures[list[TFieldData]]:
@@ -525,6 +585,7 @@ class OpsRepository[TData]:
         async with self._ops.write_ops() as w:
             return await w.partial_bulk_upsert_field_entities(upserters)
 
+    @_ops_repository_resilience.apply()
     async def update(self, updater: GuardedDataUpdater[Any, TData]) -> TData:
         """Apply the update, telling a missing row from a refused one.
 
@@ -551,6 +612,7 @@ class OpsRepository[TData]:
             msg, entity_type=target.entity_type(), operation=ActionOperationType.UPDATE
         )
 
+    @_ops_repository_resilience.apply()
     async def partial_bulk_update(
         self, updaters: Mapping[EntityIdentifier, GuardedDataUpdater[Any, TData]]
     ) -> BulkResultWithFailures[TData]:
@@ -562,6 +624,7 @@ class OpsRepository[TData]:
         async with self._ops.write_ops() as w:
             return await w.partial_bulk_update_data(updaters)
 
+    @_ops_repository_resilience.apply()
     async def batch_update_in_scopes(
         self, scopes: Sequence[OperationScope], updater: DataBatchUpdater[Any, TData]
     ) -> list[TData]:
@@ -569,11 +632,13 @@ class OpsRepository[TData]:
         async with self._ops.write_ops() as w:
             return await w.batch_update_in_scopes(scopes, updater)
 
+    @_ops_repository_resilience.apply()
     async def batch_update_in_global(self, updater: DataBatchUpdater[Any, TData]) -> list[TData]:
         """Update every matching row across the table; caller holds the authority."""
         async with self._ops.write_ops() as w:
             return await w.batch_update_in_global(updater)
 
+    @_ops_repository_resilience.apply()
     async def batch_purge_entities_in_scopes(
         self, scopes: Sequence[OperationScope], purger: EntityBatchPurger[Any, TData]
     ) -> list[TData]:
@@ -581,6 +646,7 @@ class OpsRepository[TData]:
         async with self._ops.write_ops() as w:
             return await w.batch_purge_entities_in_scopes(scopes, purger)
 
+    @_ops_repository_resilience.apply()
     async def batch_purge_entities_in_global(
         self, purger: EntityBatchPurger[Any, TData]
     ) -> list[TData]:

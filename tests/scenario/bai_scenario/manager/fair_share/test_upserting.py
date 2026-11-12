@@ -15,7 +15,7 @@ from ai.backend.common.dto.manager.v2.fair_share.response import DomainFairShare
 from ai.backend.manager.api.adapters.fair_share.adapter import FairShareAdapter
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.fair_share import (
     WEIGHT,
@@ -41,8 +41,15 @@ class SettingTheWeight(When[DomainsInAGroupAndACaller, FairShareAdapter, Upserte
 
     @override
     def describe(self, laid: DomainsInAGroupAndACaller) -> str:
-        return (
-            f"{laid.caller.username}이 {laid.group.name} 안 {laid.domains[0].name}의 가중치를 정함"
+        return Says(
+            (
+                f"{laid.caller.username} 이 {laid.group.name} 안 {laid.domains[0].name}의 가중치를 "
+                "정합니다"
+            ),
+            english=(
+                f"{laid.caller.username} sets the weight of {laid.domains[0].name} in "
+                f"{laid.group.name}"
+            ),
         )
 
     @override
@@ -70,9 +77,15 @@ class TheSuperadminSetsTheWeight(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 그룹 안 도메인의 가중치를 정하면, 그 가중치를 실은 기록이 오고 "
-            "나머지 설정은 그룹 기본값이다"
+        return Says(
+            (
+                "superadmin 이 그룹 안 도메인의 가중치를 정하면 그 가중치를 담은 기록이 오고 나머지 "
+                "설정은 그룹 기본값입니다"
+            ),
+            english=(
+                "when the superadmin sets the weight of a domain in the group, the record comes "
+                "back carrying that weight and the rest of the settings are the group defaults"
+            ),
         )
 
     @override
@@ -98,9 +111,17 @@ class AUserGrantedUpdateOnTheGroupMayNotSetTheWeight(
 
     @override
     def describe(self) -> str:
-        return (
-            "그 그룹에 앉힌 역할로 수정 권한을 받은 사용자가 도메인의 가중치를 정하려 하면 "
-            "권한 부족으로 거부된다. 가중치 쓰기는 그룹이 아니라 전역 대상으로 권한을 본다"
+        return Says(
+            (
+                "그 그룹에 부여한 역할로 수정 권한을 받은 사용자가 도메인의 가중치를 정하려 하면 "
+                "권한 부족으로 거부됩니다. 가중치 쓰기는 그룹이 아니라 전역 대상을 기준으로 권한을 "
+                "검사합니다"
+            ),
+            english=(
+                "when a user granted the update permission through a role assigned on the group "
+                "tries to set the weight of a domain, it is rejected for a lack of permission. A "
+                "weight write checks permission against the global target, not the group"
+            ),
         )
 
     @override
@@ -126,7 +147,16 @@ class AUserGrantedNothingMayNotSetTheWeight(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 받지 않은 사용자가 도메인의 가중치를 정하려 하면 권한 부족으로 거부된다"
+        return Says(
+            (
+                "아무 권한도 받지 않은 사용자가 도메인의 가중치를 정하려 하면 권한 부족으로 "
+                "거부됩니다"
+            ),
+            english=(
+                "when a user granted nothing tries to set the weight of a domain, it is rejected "
+                "for a lack of permission"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, DomainsInAGroupAndACaller]:

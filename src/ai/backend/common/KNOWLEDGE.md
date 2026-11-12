@@ -1,7 +1,7 @@
 ---
 name: common-membership-criterion
 type: design-rationale
-description: membership criterion for common — things shared by two or more components, or needed to keep the import direction downward
+description: membership criterion for common: things shared by two or more components, or needed to keep the import direction downward
 scope: src/ai/backend/common
 keywords: [dependency-direction, shared, upward-import, stage, resilience, schema]
 generated:
@@ -10,11 +10,13 @@ generated:
 status: stable
 ---
 
-# Common — Knowledge
+# Common: Knowledge
 
 > Rules: `AGENTS.md` in the same directory. Event/queue semantics:
 > [message_queue/KNOWLEDGE.md](message_queue/KNOWLEDGE.md) and
 > [events/KNOWLEDGE.md](events/KNOWLEDGE.md).
+
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
 ## Why this package exists
 
@@ -25,5 +27,5 @@ types belong here is the core of this document.
 
 - The stated criterion: things **shared by two or more components**.
 - The second criterion: types that, if placed in a higher layer, **would force an upward import** (`common/schema/` states this explicitly and is used only by the manager).
-- Single-consumer subpackages (`stage/` — agent-only, `resilience/` — manager-only) are not defects.
+- Single-consumer subpackages (`stage/` agent-only, `resilience/` manager-only) are not defects.
 - "It is convenient to put it somewhere neutral" is not a membership reason.

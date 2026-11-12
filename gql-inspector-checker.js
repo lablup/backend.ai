@@ -5,6 +5,9 @@
 // Every `usedBy` element the `usage` rename took out shares one reason.
 const USAGE_RENAME =
   "The `usedBy` search input became `usage`, which splits the relation into `usedBy` and `uses` so a condition says which side uses which. It was added in this same unreleased cycle and went out in no release tag.";
+// Both service catalog endpoint elements share one reason.
+const SERVICE_CATALOG_ENDPOINTS =
+  "A service catalog node carries only the values of the `service_catalog` table. The endpoints will return in a follow-up as a connection on the node, searched within that service catalog. The web UI does not read them.";
 
 const ACCEPTED_REMOVALS = {
   "AccessTokenFilter.token":
@@ -35,16 +38,23 @@ const ACCEPTED_REMOVALS = {
   "Query.myVfolders.usedBy": USAGE_RENAME,
   "SessionUsedBy.agent": USAGE_RENAME,
   "SessionUsedBy.resourceGroup": USAGE_RENAME,
+  "ServiceCatalogEndpoint": SERVICE_CATALOG_ENDPOINTS,
+  "ServiceCatalog.endpoints": SERVICE_CATALOG_ENDPOINTS,
+  "ScalingGroupNode.wsproxy_api_token":
+    "The token is the App Proxy API credential, and every domain member could read it through `domain_nodes { scaling_groups }`. Superadmins still read it on `ScalingGroup`.",
 };
 
 // Type changes decided deliberately, keyed and dropped the same way as ACCEPTED_REMOVALS.
 const ENTITY_SHARE_FILTER_RETYPE =
   "The old type failed DTO validation for every value, so no client could use the field.";
+const NULLABLE_MUTATION_PAYLOAD =
+  "The payload became nullable so a failed mutation leaves the other fields of the response. It was added in this same unreleased cycle and went out in no release tag.";
 
 const ACCEPTED_TYPE_CHANGES = {
   "EntityShareFilter.status": ENTITY_SHARE_FILTER_RETYPE,
   "EntityShareFilter.recipientEntityId": ENTITY_SHARE_FILTER_RETYPE,
   "EntityShareFilter.recipientEmail": ENTITY_SHARE_FILTER_RETYPE,
+  "Mutation.purgeSessionGroup": NULLABLE_MUTATION_PAYLOAD,
 };
 
 const TYPE_CHANGES = ["INPUT_FIELD_TYPE_CHANGED", "FIELD_TYPE_CHANGED"];

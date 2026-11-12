@@ -151,6 +151,10 @@ class KernelNode(BaseResponseModel):
         default=None,
         description="The UUID of the image used by this kernel. Null if the image has been purged.",
     )
+    kernel_group_id: UUID | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. ID of the kernel group this kernel belongs to.",
+    )
     startup_command: str | None = Field(
         default=None, description="Startup command executed when the kernel starts."
     )

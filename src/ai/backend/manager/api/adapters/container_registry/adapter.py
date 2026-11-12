@@ -37,7 +37,10 @@ from ai.backend.manager.actions.v2.bulk.result import PartialBulkResult
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
-from ai.backend.manager.errors.image import ContainerRegistryGroupsAssociationNotFound
+from ai.backend.manager.errors.image import (
+    ContainerRegistryGroupsAssociationNotFound,
+    ProjectDefaultContainerRegistryConflict,
+)
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import (
     combine_conditions_and,
@@ -278,6 +281,23 @@ class ContainerRegistryAdapter(BaseAdapter):
             raise ContainerRegistryGroupsAssociationNotFound(
                 f"Tried to remove non-existing associations for registry_id: {registry_id}, "
                 f"group_ids: {allowed_groups.remove}"
+            )
+
+    async def link_project_as_default(
+        self, project_id: ProjectID, registry_id: ContainerRegistryID
+    ) -> None:
+        """Link the registry to a project without a default registry, as its default.
+        The permission is asked of both. A pair already linked keeps its row, so it is
+        refused rather than left without the default."""
+        result = await self._rbac.create_relation.run(
+            CreateRelationAction(
+                pairs=[RelationPair(scope=project_id, target=registry_id)],
+                creator=ContainerRegistryProjectCreator(is_default=True),
+            )
+        )
+        if not result.results[0].linked:
+            raise ProjectDefaultContainerRegistryConflict(
+                f"Project {project_id} is already allowed on container registry {registry_id}"
             )
 
     async def admin_purge(self, registry_id: ContainerRegistryID) -> PurgeContainerRegistryPayload:

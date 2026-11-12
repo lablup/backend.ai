@@ -15,7 +15,7 @@ from collections.abc import AsyncGenerator, AsyncIterator, Callable, Sequence
 from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from pprint import pformat, pprint
+from pprint import pformat
 from typing import Any
 
 import aiohttp_cors
@@ -35,7 +35,7 @@ from ai.backend.common.metrics.multiprocess_setup import cleanup_prometheus_mult
 from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.networking import force_threaded_dns_resolver
-from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
+from ai.backend.common.plugin import AbstractPlugin, BasePluginContext, load_configured_wheelhouse
 from ai.backend.common.types import HostPortPair as CommonHostPortPair
 from ai.backend.common.utils import env_info
 from ai.backend.logging import Logger, LogLevel
@@ -188,6 +188,7 @@ async def api_ctx(
                 str(local_config.api.client.ssl_privkey),
             )
         client_api_app = await init_client_app(root_ctx)
+        client_api_app.on_response_prepare.append(_on_prepare)
         if local_config.otel.enabled:
             client_api_app.middlewares.insert(0, build_otel_server_middleware())
         client_api_runner = web.AppRunner(client_api_app)
@@ -217,6 +218,7 @@ async def api_ctx(
                 str(local_config.api.manager.ssl_privkey),
             )
         manager_api_app = await init_manager_app(root_ctx)
+        manager_api_app.on_response_prepare.append(_on_prepare)
         if local_config.otel.enabled:
             manager_api_app.middlewares.insert(
                 0, build_otel_server_middleware(parent_required_prefixes=("/",))
@@ -245,6 +247,7 @@ async def api_ctx(
     @asynccontextmanager
     async def internal_api_ctx() -> AsyncGenerator[web.Application]:
         internal_api_app = init_internal_app(root_ctx)
+        internal_api_app.on_response_prepare.append(_on_prepare)
         if local_config.otel.enabled:
             internal_api_app.middlewares.insert(0, build_otel_server_middleware())
         internal_api_runner = web.AppRunner(internal_api_app)
@@ -363,6 +366,7 @@ async def server_main(
             health_probe=dep_resources.system.health_probe,
             volume_stats_observer=dep_resources.storage.volume_stats.observer,
             volume_stats_state=dep_resources.storage.volume_stats.state,
+            volume_status_check_registry=dep_resources.storage.status_probe.registry,
             backends={**dep_resources.plugins.backends},
             artifact_verifier_ctx=ArtifactVerifierContext(),
         )
@@ -489,12 +493,10 @@ def main(
                 log.info("Backend.AI Storage Proxy starting", version=VERSION)
                 log.info("runtime environment", runtime_info=env_info())
                 log.info("storage-proxy node", node_id=local_config.storage_proxy.node_id)
+                load_configured_wheelhouse(local_config.wheelhouse)
                 log_config = logging.getLogger("ai.backend.agent.config")
                 if local_config.debug.enabled:
                     log_config.debug("debug mode enabled.")
-                if local_config.debug.enabled:
-                    print("== Storage proxy configuration ==")
-                    pprint(local_config.model_dump())
                 runner: Callable[..., Any]
                 match local_config.storage_proxy.event_loop:
                     case EventLoopType.UVLOOP:

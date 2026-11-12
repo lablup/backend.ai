@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.config.bootstrap import BootstrapConfig
     from ai.backend.manager.config.provider import ManagerConfigProvider
     from ai.backend.manager.config.unified import ManagerUnifiedConfig
+    from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
     from .types import RedisConnectionSet
 
@@ -72,32 +73,10 @@ class CLIContext:
 
 @contextlib.asynccontextmanager
 async def etcd_ctx(cli_ctx: CLIContext) -> AsyncIterator[AsyncEtcd]:
-    from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-    from ai.backend.common.exception import ConfigurationError
+    from ai.backend.common.etcd import AsyncEtcd
 
     bootstrap_config = await cli_ctx.get_bootstrap_config()
-    etcd_config_data = bootstrap_config.etcd.to_dataclass()
-    creds = None
-    if etcd_config_data.user:
-        if not etcd_config_data.password:
-            raise ConfigurationError({
-                "etcd": "password is required when user is set",
-            })
-
-        creds = {
-            "user": etcd_config_data.user,
-            "password": etcd_config_data.password,
-        }
-    scope_prefix_map = {
-        ConfigScopes.GLOBAL: "",
-        # TODO: provide a way to specify other scope prefixes
-    }
-    async with AsyncEtcd(
-        [addr.to_legacy() for addr in etcd_config_data.addrs],
-        etcd_config_data.namespace,
-        scope_prefix_map,
-        credentials=creds,
-    ) as etcd:
+    async with AsyncEtcd.create_from_config(bootstrap_config.etcd.to_dataclass()) as etcd:
         yield etcd
 
 
@@ -114,7 +93,7 @@ async def config_ctx(cli_ctx: CLIContext) -> AsyncIterator[ManagerUnifiedConfig]
     async with AsyncEtcd.create_from_config(etcd_config_data) as etcd:
         etcd_loader = LegacyEtcdLoader(etcd)
         redis_config = await etcd_loader.load()
-        unified_config = ManagerUnifiedConfig(**redis_config)
+        unified_config = ManagerUnifiedConfig(**redis_config, etcd=bootstrap_config.etcd)
     yield unified_config
 
 
@@ -171,6 +150,18 @@ async def config_provider_ctx(cli_ctx: CLIContext) -> AsyncIterator[ManagerConfi
             yield config_provider
         finally:
             await config_provider.terminate()
+
+
+@contextlib.asynccontextmanager
+async def db_ctx(cli_ctx: CLIContext) -> AsyncIterator[ExtendedAsyncSAEngine]:
+    """Connect to the manager DB and load the global entity ids, as the server DI does."""
+    from ai.backend.manager.repositories.db.engine import connect_database
+    from ai.backend.manager.repositories.global_entity.loader import GlobalEntityIDLoader
+
+    bootstrap_config = await cli_ctx.get_bootstrap_config()
+    async with connect_database(bootstrap_config.db) as db:
+        await GlobalEntityIDLoader(db).load()
+        yield db
 
 
 @contextlib.asynccontextmanager

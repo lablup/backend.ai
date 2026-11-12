@@ -1,11 +1,11 @@
 {
   "version": 8,
   "valid_for_interpreter_constraints": [
-    "CPython==3.13.7"
+    "CPython==3.13.18"
   ],
   "generated_with_requirements": [
     "Cython~=3.0",
-    "setuptools~=84.0.0",
+    "setuptools~=84.2.1",
     "wheel~=0.46.2"
   ],
   "manylinux": null,

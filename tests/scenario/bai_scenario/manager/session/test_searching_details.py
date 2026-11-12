@@ -15,7 +15,7 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.session.request import AdminSearchSessionsInput
 from ai.backend.common.dto.manager.v2.session.response import AdminSearchSessionsPayload
-from ai.backend.common.types import AgentId, SessionTypes
+from ai.backend.common.types import SessionTypes
 from ai.backend.manager.api.adapters.session.adapter import SessionAdapter
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.resource_group.types import ResourceGroupData
@@ -31,12 +31,15 @@ from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
     Held,
+    Language,
     Same,
     SameAs,
+    Says,
     Scenario,
     Then,
     Verdict,
     When,
+    in_language,
 )
 from bai_scenario.components.answers import MissingResponse
 from bai_scenario.components.resource_allocation import Granted, lay_a_caller_of, lay_a_place
@@ -45,18 +48,21 @@ from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 from bai_scenario.seeds.agent.agent import TestSeedAgent
 from bai_scenario.seeds.seeder import Naming, TestSeedRowFromTwo
-from bai_scenario.seeds.session.session import TestSeedSession
+from bai_scenario.seeds.session.session import TestSeedDesignatedAgentOf, TestSeedSession
 
 
 @dataclass(frozen=True)
 class TestSeedSessionGroup(TestSeedRowFromTwo[ProjectData, UserData, SessionGroupData]):
     @override
     def kind(self) -> str:
-        return "세션 그룹"
+        return Says("세션 그룹", english="Session group")
 
     @override
     def detail(self) -> str:
-        return "가능하면 세션들을 서로 다른 에이전트에 배치한다"
+        return Says(
+            "가능하면 세션들을 서로 다른 에이전트에 배치합니다",
+            english="places the sessions on different agents when possible",
+        )
 
     @override
     def name(self, naming: Naming) -> str:
@@ -65,7 +71,6 @@ class TestSeedSessionGroup(TestSeedRowFromTwo[ProjectData, UserData, SessionGrou
     @override
     def seed(self, name: str, first: ProjectData, second: UserData) -> SessionGroupCreator:
         return SessionGroupCreator.for_replica_group(
-            domain_name=first.domain_name,
             project_id=ProjectID(first.id),
             owner_user_id=UserID(second.id),
         )
@@ -75,11 +80,13 @@ class TestSeedSessionGroup(TestSeedRowFromTwo[ProjectData, UserData, SessionGrou
 class TestSeedSessionWithSchedulingConditions(TestSeedSession):
     image_id: ImageID
     session_group_id: SessionGroupID
-    designated_agents: tuple[AgentId, ...]
 
     @override
     def detail(self) -> str:
-        return "세션 그룹, designated_agent_ids 둘, requested_starts_at을 지정한 대기 세션"
+        return Says(
+            "세션 그룹, requested_starts_at 을 지정한 대기 세션",
+            english="a pending session with a session group and requested_starts_at set",
+        )
 
     @override
     def seed(
@@ -97,10 +104,6 @@ class TestSeedSessionWithSchedulingConditions(TestSeedSession):
                 starts_at=datetime(2030, 1, 2, 3, 4, tzinfo=UTC),
             ),
         )
-        scheduling_target = resource_spec.options.scheduling_target.model_copy(
-            update={"designated_agents": list(self.designated_agents)}
-        )
-        options = resource_spec.options.model_copy(update={"scheduling_target": scheduling_target})
         classification = resource_spec.classification.model_copy(
             update={"session_type": SessionTypes.BATCH}
         )
@@ -108,7 +111,6 @@ class TestSeedSessionWithSchedulingConditions(TestSeedSession):
             update={
                 "classification": classification,
                 "kernel_specs": (kernel,),
-                "options": options,
             }
         )
         scope = creator.spec.scope.model_copy(update={"session_group_id": self.session_group_id})
@@ -120,6 +122,7 @@ class TestSeedSessionWithSchedulingConditions(TestSeedSession):
 class ASessionAndACaller:
     session: SessionEntityData
     caller: UserData
+    designated_agent_ids: list[str] | None
 
 
 @dataclass(frozen=True)
@@ -128,32 +131,47 @@ class ASessionToRead(Given[TestSeedingSession, ASessionAndACaller]):
 
     @override
     def describe(self) -> str:
-        detail = "세 값이 지정된" if self.configured else "세 값이 미설정인"
-        return f"세션 그룹, designated_agent_ids, requested_starts_at의 {detail} 세션과 슈퍼관리자"
+        detail = (
+            Says("지정된", english="with all three values set")
+            if self.configured
+            else Says("미설정인", english="with none of the three values set")
+        )
+        return Says(
+            f"세션 그룹, designated_agent_ids, requested_starts_at 세 값이 {detail} 세션과 superadmin",
+            english=f"a session {in_language(detail, Language.ENGLISH)} and the superadmin",
+        )
 
     @override
     async def lay(self, seeding: TestSeedingSession) -> ASessionAndACaller:
         place = await lay_a_place(seeding, slots=0)
         session_seed: TestSeedSession = TestSeedSession(access_key=place.access_key)
+        agents = []
         if self.configured:
             group = await seeding.creating_from_two(
                 TestSeedSessionGroup(), place.project, place.owner
             )
-            first_agent = await seeding.creating_from(TestSeedAgent(), place.group)
-            second_agent = await seeding.creating_from(TestSeedAgent(), place.group)
+            agents = [
+                await seeding.creating_from(TestSeedAgent(), place.group),
+                await seeding.creating_from(TestSeedAgent(), place.group),
+            ]
             session_seed = TestSeedSessionWithSchedulingConditions(
                 access_key=place.access_key,
                 image_id=ImageID(seeding.made(place.image).id),
                 session_group_id=seeding.made(group).id,
-                designated_agents=(AgentId(first_agent.name), AgentId(second_agent.name)),
             )
         session = await seeding.creating_from_three(
             session_seed, place.project, place.owner, place.group
         )
+        for agent in agents:
+            await seeding.adding(TestSeedDesignatedAgentOf(agent_uuid=seeding.made(agent)), session)
         caller = await lay_a_caller_of(
             seeding, place, role=UserRole.SUPERADMIN, granted=Granted.NOTHING
         )
-        return ASessionAndACaller(session=seeding.made(session), caller=seeding.made(caller))
+        return ASessionAndACaller(
+            session=seeding.made(session),
+            caller=seeding.made(caller),
+            designated_agent_ids=sorted(agent.name for agent in agents) or None,
+        )
 
 
 @dataclass(frozen=True)
@@ -164,7 +182,10 @@ class SearchingSessions(When[ASessionAndACaller, SessionAdapter, AdminSearchSess
 
     @override
     def describe(self, laid: ASessionAndACaller) -> str:
-        return f"{laid.caller.username}이 필터 없이 전체 조회"
+        return Says(
+            f"{laid.caller.username}이 필터 없이 전체를 조회합니다",
+            english=f"{laid.caller.username} searches everything without a filter",
+        )
 
     @override
     async def call(
@@ -178,7 +199,13 @@ class SearchingSessions(When[ASessionAndACaller, SessionAdapter, AdminSearchSess
 class TheWholeSessionIsReturned(Then[ASessionAndACaller, AdminSearchSessionsPayload]):
     @override
     def says(self) -> str:
-        return "스케줄링 조건을 포함한 세션 정보 전체가 저장된 그대로 반환된다"
+        return Says(
+            "스케줄링 조건을 포함한 세션 정보 전체가 저장된 그대로 반환됩니다",
+            english=(
+                "the whole session information including the scheduling conditions comes back "
+                "exactly as it was stored"
+            ),
+        )
 
     @override
     def look(
@@ -216,7 +243,7 @@ class TheWholeSessionIsReturned(Then[ASessionAndACaller, AdminSearchSessionsPayl
                 },
                 "resource_group_name": session.resource_group_name,
                 "session_group_id": session.session_group_id,
-                "designated_agent_ids": session.designated_agent_ids,
+                "designated_agent_ids": laid.designated_agent_ids,
             },
             "lifecycle": {
                 "status": "PENDING",
@@ -244,7 +271,13 @@ class TheWholeSessionIsReturned(Then[ASessionAndACaller, AdminSearchSessionsPayl
             Held(
                 "items",
                 [node.model_dump() for node in page.items],
-                SameAs([expected], "저장된 세션의 전체 정보"),
+                SameAs(
+                    [expected],
+                    Says(
+                        "저장된 세션의 전체 정보",
+                        english="the whole information of the stored session",
+                    ),
+                ),
             ),
             Same("total_count", page.total_count, 1),
             Same("has_next_page", page.has_next_page, False),
@@ -265,8 +298,16 @@ class SessionSchedulingConditionsArePreserved(
 
     @override
     def describe(self) -> str:
-        detail = "지정된" if self.configured else "미설정인"
-        return f"슈퍼관리자가 {detail} 세션 스케줄링 조건을 읽으면 기존 세션 정보와 함께 유지된다"
+        detail = (
+            Says("지정된", english="set") if self.configured else Says("미설정인", english="unset")
+        )
+        return Says(
+            f"superadmin 이 {detail} 세션 스케줄링 조건을 조회하면 기존 세션 정보와 함께 유지됩니다",
+            english=(
+                f"when the superadmin reads the {in_language(detail, Language.ENGLISH)} session "
+                "scheduling conditions, they are kept with the existing session information"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ASessionAndACaller]:

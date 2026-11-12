@@ -7,6 +7,7 @@ from typing import override
 
 from ai.backend.manager.data.app_config.types import AppConfigDefinitionData
 from ai.backend.manager.models.app_config_definition.creators import AppConfigDefinitionCreator
+from ai.backend.testutils.scenario_steps import Says
 from bai_scenario.seeds.seeder import Naming, TestSeedRow
 
 
@@ -18,11 +19,13 @@ class TestSeedDefinition(TestSeedRow[AppConfigDefinitionData]):
 
     @override
     def kind(self) -> str:
-        return "설정 정의"
+        return Says("설정 정의", english="Config definition")
 
     @override
     def detail(self) -> str:
-        return "이 이름의 설정이 등록돼 있다"
+        return Says(
+            "이 이름의 설정을 등록했습니다", english="the config of this name is registered"
+        )
 
     @override
     def name(self, naming: Naming) -> str:

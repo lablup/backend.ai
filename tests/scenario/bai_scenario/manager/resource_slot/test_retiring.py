@@ -21,7 +21,7 @@ from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.errors.resource_slot import ResourceSlotTypeInUse
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Configured, Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.resource_allocation import (
     ASlotTypeAKernelAsksForAndSomeone,
@@ -55,8 +55,12 @@ class Purging(When[ASlotTypeAndACaller, ResourceSlotAdapter, Purged]):
 
     @override
     def describe(self, laid: ASlotTypeAndACaller) -> str:
-        target = "존재하지 않는 id" if self.unknown else laid.slot_type.slot_name
-        return f"{laid.caller.username}이 {target} 삭제"
+        target_ko = "존재하지 않는 id" if self.unknown else laid.slot_type.slot_name
+        target_en = "an id nothing answers to" if self.unknown else laid.slot_type.slot_name
+        return Says(
+            f"{laid.caller.username} 이 {target_ko} 를 영구 삭제합니다",
+            english=f"{laid.caller.username} purges {target_en}",
+        )
 
     @override
     async def call(self, adapter: ResourceSlotAdapter, laid: ASlotTypeAndACaller) -> Purged:
@@ -74,7 +78,14 @@ class TheSuperadminPurgesASlotType(
 
     @override
     def describe(self) -> str:
-        return "아무것도 참조하지 않는 슬롯 종류를 슈퍼관리자가 id로 삭제하면 삭제한 이름을 담은 응답이 반환된다"
+        return Says(
+            "아무것도 참조하지 않는 자원 슬롯 유형을 superadmin 이 id 로 영구 삭제하면 삭제한 "
+            "이름을 담은 응답이 반환됩니다",
+            english=(
+                "when the superadmin purges a slot type nothing refers to by its id, the answer "
+                "carries the name that was deleted"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ASlotTypeAndACaller]:
@@ -99,7 +110,14 @@ class ASlotAKernelStillAsksForMayNotBePurged(
 
     @override
     def describe(self) -> str:
-        return "커널이 아직 할당받은 슬롯 종류를 슈퍼관리자가 삭제하면 아직 사용 중이라는 이유로 거부된다"
+        return Says(
+            "커널이 아직 할당받은 자원 슬롯 유형을 superadmin 이 영구 삭제하면 아직 사용 중이라는 "
+            "이유로 거부됩니다",
+            english=(
+                "when the superadmin purges a slot type a kernel still holds an allocation for, "
+                "the call is rejected because the slot type is still in use"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ASlotTypeAndACaller]:
@@ -124,7 +142,14 @@ class ASlotARevisionStillUsesMayNotBePurged(
 
     @override
     def describe(self) -> str:
-        return "배포 리비전이 아직 사용하는 슬롯 종류를 슈퍼관리자가 삭제하면 아직 사용 중이라는 이유로 거부된다"
+        return Says(
+            "배포 리비전이 아직 사용하는 자원 슬롯 유형을 superadmin 이 영구 삭제하면 아직 사용 "
+            "중이라는 이유로 거부됩니다",
+            english=(
+                "when the superadmin purges a slot type a deployment revision still uses, the "
+                "call is rejected because the slot type is still in use"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ASlotTypeAndACaller]:
@@ -149,7 +174,14 @@ class AnIdNothingAnswersToIsNotFound(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다"
+        return Says(
+            "superadmin 이 존재하지 않는 id 를 영구 삭제하면 대상을 찾을 수 없다는 이유로 "
+            "거부됩니다",
+            english=(
+                "when the superadmin purges an id nothing answers to, the call is rejected as "
+                "not found"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ASlotTypeAndACaller]:
@@ -174,9 +206,14 @@ class AUserGrantedNothingMayNotPurge(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 없는 사용자가 슬롯 종류를 삭제하면 권한 부족으로 거부된다. "
-            "수정이 역할 부족으로 거부되는 것과는 다른 검사다"
+        return Says(
+            "아무 권한도 없는 사용자가 자원 슬롯 유형을 영구 삭제하면 권한 부족으로 거부됩니다. "
+            "수정이 역할 부족으로 거부되는 것과는 다른 검사입니다",
+            english=(
+                "when a user granted nothing purges a slot type, the call is rejected for lack "
+                "of permission. This is a different check from the one that rejects an edit for "
+                "lack of role"
+            ),
         )
 
     @override
@@ -202,9 +239,15 @@ class AUserGrantedNothingPurgingAnUnknownIdIsRefusedByPermission(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 없는 사용자가 존재하지 않는 id를 삭제하면 대상 없음이 아니라 권한 부족으로 거부된다. "
-            "호출한 사용자가 쓸 수 있는지를 대상을 찾기 전에 검사하기 때문이다"
+        return Says(
+            "아무 권한도 없는 사용자가 존재하지 않는 id 를 영구 삭제하면 대상 없음이 아니라 권한 "
+            "부족으로 거부됩니다. 호출한 사용자가 쓸 수 있는지를 대상을 찾기 전에 검사하기 "
+            "때문입니다",
+            english=(
+                "when a user granted nothing purges an id nothing answers to, the call is "
+                "rejected for lack of permission, not as not found, because whether the caller "
+                "can use it is checked before the target is found"
+            ),
         )
 
     @override
@@ -230,7 +273,10 @@ class EnforcementOffLetsAnyonePurge(
 
     @override
     def describe(self) -> str:
-        return "권한 검사를 끄면 아무 권한도 없는 사용자도 슬롯 종류를 삭제할 수 있다"
+        return Says(
+            "권한 검사를 끄면 아무 권한도 없는 사용자도 자원 슬롯 유형을 영구 삭제할 수 있습니다",
+            english=("turning permission checks off lets a user granted nothing purge a slot type"),
+        )
 
     @override
     def config(self) -> Mapping[str, Any]:

@@ -50,6 +50,7 @@ from ai.backend.manager.clients.valkey_client.statistics import (
 )
 from ai.backend.manager.data.deployment.creator import DeploymentPolicyConfig
 from ai.backend.manager.data.deployment.scale import (
+    AutoScalingAction,
     AutoScalingRule,
     AutoScalingRuleCreator,
     ModelDeploymentAutoScalingRuleCreator,
@@ -62,6 +63,7 @@ from ai.backend.manager.data.deployment.types import (
     AccessTokenSearchResult,
     DeploymentConfig,
     DeploymentHandlerCategory,
+    DeploymentHandlerOptions,
     DeploymentInfo,
     DeploymentInfoSearchResult,
     DeploymentInfoWithAutoScalingRules,
@@ -87,6 +89,7 @@ from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.model_serving.types import AppProxyRouteEntry, RoutingData
 from ai.backend.manager.data.resource.types import ResourceGroupProxyTarget
 from ai.backend.manager.data.session.creation import DeploymentContext
+from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
 from ai.backend.manager.errors.service import EndpointNotFound
@@ -402,18 +405,22 @@ class DeploymentRepository:
     async def replace_deployment_options(
         self,
         deployment_id: DeploymentID,
-        options: DeploymentOptions,
+        handler_options: DeploymentHandlerOptions,
+        agent_selection_policy: AgentSelectionPolicy | None,
     ) -> DeploymentOptions:
         """Fully replace a deployment's ``options`` surface.
 
-        Returns the persisted :class:`DeploymentOptions` value in a
-        single ``UPDATE ... RETURNING`` round-trip. Callers that need
-        the full deployment node should re-read separately.
+        ``agent_selection_policy`` replaces the policy; ``None`` keeps the stored one.
+
+        Returns the persisted :class:`DeploymentOptions` value. Callers that
+        need the full deployment node should re-read separately.
 
         Raises:
             EndpointNotFound: If the deployment does not exist.
         """
-        return await self._db_source.replace_deployment_options(deployment_id, options)
+        return await self._db_source.replace_deployment_options(
+            deployment_id, handler_options, agent_selection_policy
+        )
 
     @deployment_repository_resilience.apply()
     async def replace_designated_agents(
@@ -1135,34 +1142,16 @@ class DeploymentRepository:
                     )
 
             if should_trigger:
-                # Calculate new replica count
-                new_replica_count = max(
-                    0, current_replica_count + scale_direction * rule.action.step_size
+                new_replica_count = self._replica_count_after_step_within_limit(
+                    current_replica_count, scale_direction, rule.action
                 )
-
-                # Check min/max limits
-                if (
-                    rule.action.min_replicas is not None
-                    and new_replica_count < rule.action.min_replicas
-                ):
+                if new_replica_count is None:
                     log.debug(
-                        "autoscaling replica count below minimum, rule skipped",
+                        "autoscaling replica count cannot move, rule skipped",
                         deployment_id=deployment.id,
                         rule_id=rule.id,
-                        new_replica_count=new_replica_count,
+                        current_replica_count=current_replica_count,
                         min_replica_count=rule.action.min_replicas,
-                    )
-                    continue
-
-                if (
-                    rule.action.max_replicas is not None
-                    and new_replica_count > rule.action.max_replicas
-                ):
-                    log.debug(
-                        "autoscaling replica count above maximum, rule skipped",
-                        deployment_id=deployment.id,
-                        rule_id=rule.id,
-                        new_replica_count=new_replica_count,
                         max_replica_count=rule.action.max_replicas,
                     )
                     continue
@@ -1195,6 +1184,27 @@ class DeploymentRepository:
                 return new_replica_count
 
         return None
+
+    @staticmethod
+    def _replica_count_after_step_within_limit(
+        current_replica_count: int,
+        scale_direction: int,
+        action: AutoScalingAction,
+    ) -> int | None:
+        """Scale-out stops at `max_replicas` and scale-in at `min_replicas`; the other limit is
+        not applied, so a count already past it still moves by `step_size` in its direction.
+        None when the count cannot move by even one replica."""
+        if scale_direction > 0:
+            new_replica_count = current_replica_count + action.step_size
+            if action.max_replicas is not None:
+                new_replica_count = min(new_replica_count, action.max_replicas)
+            moves_in_scale_direction = new_replica_count > current_replica_count
+        else:
+            new_replica_count = max(0, current_replica_count - action.step_size)
+            if action.min_replicas is not None:
+                new_replica_count = max(new_replica_count, action.min_replicas)
+            moves_in_scale_direction = new_replica_count < current_replica_count
+        return new_replica_count if moves_in_scale_direction else None
 
     @deployment_repository_resilience.apply()
     async def fetch_session_statuses_by_route_ids(

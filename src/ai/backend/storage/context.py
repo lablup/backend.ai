@@ -16,6 +16,7 @@ from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
 from ai.backend.common.clients.valkey_client.valkey_tus.client import (
     ValkeyTusClient,
 )
+from ai.backend.common.data.entity.storage_volume import StorageVolumeName
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import (
     EventDispatcher,
@@ -23,6 +24,7 @@ from ai.backend.common.events.dispatcher import (
 )
 from ai.backend.common.health_checker.probe import HealthProbe
 from ai.backend.common.metrics.metric import CommonMetricRegistry
+from ai.backend.common.storage.probe.registry import VolumeStatusCheckRegistry
 from ai.backend.logging.structured import StructuredLogger
 
 from .client.manager import ManagerHTTPClientPool
@@ -78,6 +80,7 @@ class RootContext:
     health_probe: HealthProbe
     volume_stats_observer: VolumeStatsObserver
     volume_stats_state: VolumeState
+    volume_status_check_registry: VolumeStatusCheckRegistry
 
     # volume backend states
     backends: MutableMapping[str, type[AbstractVolume]]
@@ -92,5 +95,5 @@ class RootContext:
             plugins[plugin_name] = plugin_instance
         self.artifact_verifier_ctx.load_verifiers(plugins)
 
-    def list_volumes(self) -> Mapping[str, VolumeInfo]:
+    def list_volumes(self) -> Mapping[StorageVolumeName, VolumeInfo]:
         return {name: info.to_dataclass() for name, info in self.local_config.volume.items()}

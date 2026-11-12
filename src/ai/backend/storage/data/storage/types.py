@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, override
 
 from ai.backend.common.artifact_storage import AbstractStorage, AbstractStoragePool
+from ai.backend.common.data.entity.storage_volume import StorageVolumeName
 from ai.backend.common.data.storage.registries.types import ModelTarget
 from ai.backend.common.data.storage.types import (
     ArtifactStorageImportStep,
@@ -162,7 +163,9 @@ class StorageMappingResolver:
         if storage_step_mappings.storage_step_target_mappings:
             for step, target in storage_step_mappings.storage_step_target_mappings.items():
                 if isinstance(target, VFolderStorageTarget):
-                    volume = self._volume_pool.get_volume_by_name(target.volume_name)
+                    volume = self._volume_pool.get_volume_by_name(
+                        StorageVolumeName(target.volume_name)
+                    )
                     adapter = VFolderStorage(
                         name="vfolder_storage",
                         volume=volume,

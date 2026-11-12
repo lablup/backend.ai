@@ -13,10 +13,13 @@ from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import BackendAIError
-from ai.backend.manager.errors.permission import VirtualEntityNotFound
+from ai.backend.manager.data.permission.status import RoleStatus
+from ai.backend.manager.errors.permission import RoleNotFound, VirtualEntityNotFound
 from ai.backend.manager.errors.repository import ForeignKeyViolationError, RepositoryIntegrityError
 from ai.backend.manager.errors.resource import ProjectMemberNotJoinableError
 from ai.backend.manager.models.project.row import ProjectRow, ProjectType
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.specs.upserter import EntityUpserter, FieldUpserter
 from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
@@ -28,6 +31,7 @@ from ai.backend.manager.repositories.ops.v2.roster.write import V2RosterWriteOps
 from ai.backend.manager.repositories.ops.v2.seed.types import (
     SeedItemWrite,
     SeedRelationWrite,
+    SeedRoleGrantWrite,
     SeedRosterWrite,
     SeedWrite,
     SeedWriteItemResult,
@@ -74,6 +78,8 @@ class V2SeedWriteOps(V2RelationWriteOps, V2RosterWriteOps, V2ResourcePolicyWrite
                 return await self._write_relation_item(write)
             case SeedRosterWrite():
                 return await self._write_roster_item(write)
+            case SeedRoleGrantWrite():
+                return await self._write_role_grant_item(write)
             case _:
                 assert_never(write)
 
@@ -94,6 +100,29 @@ class V2SeedWriteOps(V2RelationWriteOps, V2RosterWriteOps, V2ResourcePolicyWrite
             f"User {write.user_id} cannot join project {write.project_id}"
         )
 
+    async def _write_role_grant_item(self, write: SeedRoleGrantWrite) -> bool:
+        """Whether the grant was written. A user already holding the role is left as it
+        stands; a role no preset provisioned in the scope fails the item."""
+        role_id = await self._preset_role(write.scope, write.preset_name)
+        [granted] = await self.grant_roles(write.user_id, [role_id])
+        return granted
+
+    async def _preset_role(self, scope: EntityIdentifier, preset_name: str) -> RoleID:
+        role_id = await self._sess.scalar(
+            sa.select(RoleRow.id)
+            .join(RolePresetRow, RolePresetRow.id == RoleRow.role_preset_id)
+            .where(
+                RoleRow.scope_type == scope.entity_type(),
+                RoleRow.scope_id == scope,
+                RoleRow.status == RoleStatus.ACTIVE,
+                RolePresetRow.name == preset_name,
+                RolePresetRow.deleted_at.is_(None),
+            )
+        )
+        if role_id is None:
+            raise RoleNotFound(f"The {preset_name} role is not provisioned in {scope}")
+        return RoleID(role_id)
+
     async def _on_roster(self, project_id: ProjectID, user_id: UserID) -> bool:
         stmt = sa.select(user_scope_membership_exists(ProjectEntityType(), project_id, user_id))
         return bool(await self._sess.scalar(stmt))
@@ -113,7 +142,7 @@ class V2SeedWriteOps(V2RelationWriteOps, V2RosterWriteOps, V2ResourcePolicyWrite
         owner = UserID(project.creator_id)
         if await self._on_roster(entity, owner):
             return False
-        await self._join(entity, owner)
+        await self._join_as_owner(entity, owner)
         return True
 
     async def _restate_resource_policy_shares(self, entity: EntityIdentifier) -> None:

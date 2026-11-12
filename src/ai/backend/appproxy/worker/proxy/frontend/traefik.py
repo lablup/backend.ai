@@ -9,7 +9,7 @@ from typing import Any, Final, override
 
 from aiohttp import web
 
-from ai.backend.appproxy.common.config import get_default_redis_key_ttl
+from ai.backend.appproxy.common.config import ContentEncodingConfig, get_default_redis_key_ttl
 from ai.backend.appproxy.common.errors import ServerMisconfiguredError
 from ai.backend.appproxy.common.types import RouteInfo
 from ai.backend.appproxy.worker.errors import InvalidFrontendTypeError, MissingTraefikConfigError
@@ -118,6 +118,11 @@ class AbstractTraefikFrontend[TCircuitKeyType: (int, str)](
             access_log=None,
             max_field_size=root_context.local_config.proxy_worker.max_header_field_size,
         )
+
+    @override
+    def apply_content_encoding_config(self, config: ContentEncodingConfig) -> None:
+        # The Go plugin applies the config the coordinator writes to Traefik etcd.
+        pass
 
     @override
     async def start(self) -> None:

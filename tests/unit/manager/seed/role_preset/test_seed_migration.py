@@ -24,6 +24,14 @@ _PUBLIC_MEMBER_REVISION = "c3e8a1f05b27_add_preset_scope_and_public_member_role"
 _MEMBER_READS_REVISION = "a1f6b7c4d902_grant_image_and_project_reads_to_members"
 _OWN_POLICY_READS_REVISION = "b8e0c1f4a276_grant_seed_roles_read_on_their_own_policy"
 _USER_OWNER_APP_CONFIG_REVISION = "d6e297fca9ae_grant_user_owners_read_on_app_configs"
+_SYSTEM_SESSION_ENVIRON_GRANTS_REVISION = (
+    "bf07cae92d86_grant_role_presets_on_system_session_environ"
+)
+_SYSTEM_SESSION_ENVIRON_MEMBER_REVOKES_REVISION = (
+    "995eabef0eac_revoke_members_read_on_system_session_environ"
+)
+_VFOLDER_AUTO_MOUNT_REVISION = "456a338e7c3a_add_vfolder_auto_mounts"
+_USER_OWNER_VFOLDER_AUTO_MOUNT_REVISION = "8bb02f0415eb_grant_user_owners_on_vfolder_auto_mounts"
 _REPOSITORY = Path(__file__).resolve().parents[5]
 _VERSIONS = _REPOSITORY / "src/ai/backend/manager/models/alembic/versions"
 
@@ -77,6 +85,26 @@ def own_policy_reads_migration() -> Any:
 @pytest.fixture(scope="module")
 def user_owner_app_config_migration() -> Any:
     return load_python_file(str(_VERSIONS), f"{_USER_OWNER_APP_CONFIG_REVISION}.py")
+
+
+@pytest.fixture(scope="module")
+def system_session_environ_grants_migration() -> Any:
+    return load_python_file(str(_VERSIONS), f"{_SYSTEM_SESSION_ENVIRON_GRANTS_REVISION}.py")
+
+
+@pytest.fixture(scope="module")
+def system_session_environ_member_revokes_migration() -> Any:
+    return load_python_file(str(_VERSIONS), f"{_SYSTEM_SESSION_ENVIRON_MEMBER_REVOKES_REVISION}.py")
+
+
+@pytest.fixture(scope="module")
+def vfolder_auto_mount_migration() -> Any:
+    return load_python_file(str(_VERSIONS), f"{_VFOLDER_AUTO_MOUNT_REVISION}.py")
+
+
+@pytest.fixture(scope="module")
+def user_owner_vfolder_auto_mount_migration() -> Any:
+    return load_python_file(str(_VERSIONS), f"{_USER_OWNER_VFOLDER_AUTO_MOUNT_REVISION}.py")
 
 
 @pytest.fixture(scope="module")
@@ -144,133 +172,80 @@ class TestMigrationMatchesFixture:
         member_reads_migration: Any,
         own_policy_reads_migration: Any,
         user_owner_app_config_migration: Any,
+        system_session_environ_grants_migration: Any,
+        system_session_environ_member_revokes_migration: Any,
+        vfolder_auto_mount_migration: Any,
+        user_owner_vfolder_auto_mount_migration: Any,
         fixture: dict[str, Any],
     ) -> None:
+        """Compared by what a grant is: the seed upserts on that key."""
         written = {
-            (
-                migration._identify("role_permission_preset", preset.id, entity_type, str(bit)),
-                preset.id,
-                entity_type,
-                bit,
-            )
+            (preset.id, entity_type, bit)
             for preset in migration._PRESETS
             for entity_type, bits in preset.grants
             for bit in bits
         }
         written |= {
-            (
-                domain_member_migration._identify(
-                    "role_permission_preset",
-                    domain_member_migration._PRESET_ID,
-                    entity_type,
-                    str(bit),
-                ),
-                domain_member_migration._PRESET_ID,
-                entity_type,
-                bit,
-            )
+            (domain_member_migration._PRESET_ID, entity_type, bit)
             for entity_type, bits in domain_member_migration._GRANTS
             for bit in bits
         }
         written |= {
-            (
-                public_member_migration._identify(
-                    "role_permission_preset",
-                    public_member_migration._PRESET_ID,
-                    entity_type,
-                    str(bit),
-                ),
-                public_member_migration._PRESET_ID,
-                entity_type,
-                bit,
-            )
+            (public_member_migration._PRESET_ID, entity_type, bit)
             for entity_type, bits in public_member_migration._GRANTS
             for bit in bits
         }
-        written.add((
-            domain_member_read_migration._identify(
-                "role_permission_preset",
-                domain_member_read_migration._PRESET_ID,
-                domain_member_read_migration._ENTITY_TYPE,
-                str(domain_member_read_migration._READ),
-            ),
-            domain_member_read_migration._PRESET_ID,
-            domain_member_read_migration._ENTITY_TYPE,
-            domain_member_read_migration._READ,
-        ))
-        written.add((
-            domain_member_preset_migration._identify(
-                "role_permission_preset",
-                domain_member_preset_migration._PRESET_ID,
-                domain_member_preset_migration._ENTITY_TYPE,
-                str(domain_member_preset_migration._READ),
-            ),
-            domain_member_preset_migration._PRESET_ID,
-            domain_member_preset_migration._ENTITY_TYPE,
-            domain_member_preset_migration._READ,
-        ))
-        written.add((
-            project_member_read_migration._identify(
-                "role_permission_preset",
-                project_member_read_migration._PRESET_ID,
-                project_member_read_migration._ENTITY_TYPE,
-                str(project_member_read_migration._READ),
-            ),
-            project_member_read_migration._PRESET_ID,
-            project_member_read_migration._ENTITY_TYPE,
-            project_member_read_migration._READ,
-        ))
-        written.add((
-            user_owner_app_config_migration._identify(
-                "role_permission_preset",
-                user_owner_app_config_migration._PRESET_ID,
-                user_owner_app_config_migration._ENTITY_TYPE,
-                str(user_owner_app_config_migration._READ),
-            ),
-            user_owner_app_config_migration._PRESET_ID,
-            user_owner_app_config_migration._ENTITY_TYPE,
-            user_owner_app_config_migration._READ,
-        ))
+        for single in (
+            domain_member_read_migration,
+            domain_member_preset_migration,
+            project_member_read_migration,
+            user_owner_app_config_migration,
+        ):
+            written.add((single._PRESET_ID, single._ENTITY_TYPE, single._READ))
         written |= {
-            (
-                member_reads_migration._identify(
-                    "role_permission_preset",
-                    preset_id,
-                    entity_type,
-                    str(member_reads_migration._READ),
-                ),
-                preset_id,
-                entity_type,
-                member_reads_migration._READ,
-            )
+            (preset_id, entity_type, member_reads_migration._READ)
             for preset_id, entity_type in member_reads_migration._GRANTS
         }
         written |= {
-            (
-                own_policy_reads_migration._identify(
-                    "role_permission_preset",
-                    preset_id,
-                    entity_type,
-                    str(own_policy_reads_migration._READ),
-                ),
-                preset_id,
-                entity_type,
-                own_policy_reads_migration._READ,
-            )
+            (preset_id, entity_type, own_policy_reads_migration._READ)
             for preset_id, entity_type in own_policy_reads_migration._GRANTS
         }
+        written |= {
+            (preset_id, entity_type, bit)
+            for preset_id, entity_type, bit in system_session_environ_grants_migration._GRANTS
+        }
+        written -= set(system_session_environ_member_revokes_migration._REVOKES)
+        written |= {
+            (preset_id, vfolder_auto_mount_migration._ENTITY_TYPE, bit)
+            for preset_id, bits in vfolder_auto_mount_migration._GRANTS
+            for bit in bits
+        }
+        written |= {
+            (
+                user_owner_vfolder_auto_mount_migration._PRESET_ID,
+                user_owner_vfolder_auto_mount_migration._ENTITY_TYPE,
+                bit,
+            )
+            for bit in user_owner_vfolder_auto_mount_migration._BITS
+        }
         seeded = {
-            (row["id"], row["role_preset_id"], row["entity_type"], row["permission"])
+            (row["role_preset_id"], row["entity_type"], row["permission"])
             for row in fixture["role_permission_presets"]
         }
         assert written == seeded
 
 
 class TestEntityTypeSweep:
-    def test_the_seed_names_only_kept_types(self, migration: Any, fixture: dict[str, Any]) -> None:
-        """What the sweep keeps covers what the presets grant, or it deletes the grants."""
-        named = {row["entity_type"] for row in fixture["role_permission_presets"]}
-        assert named <= migration._ENTITY_TYPES
+    def test_the_presets_it_writes_name_only_kept_types(self, migration: Any) -> None:
+        """What the sweep keeps covers what the revision's own presets grant. A later revision
+        grants after the sweep has run, so the current fixture is not what it answers for."""
+        granted = {
+            entity_type
+            for preset in migration._PRESETS
+            for entity_type, bits in preset.grants
+            if bits
+        }
+        assert granted <= migration._ENTITY_TYPES
 
     def test_the_retired_names_are_not_kept(self, migration: Any) -> None:
         for name, replacement in migration._RETIRED.items():

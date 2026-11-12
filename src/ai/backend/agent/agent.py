@@ -115,6 +115,7 @@ from ai.backend.common.docker import (
     DEFAULT_KERNEL_FEATURE,
     MAX_KERNELSPEC,
     MIN_KERNELSPEC,
+    RUNNER_RESERVED_ENVIRON_KEYS,
     ImageRef,
     KernelFeatures,
     LabelName,
@@ -178,6 +179,7 @@ from ai.backend.common.events.types import (
 )
 from ai.backend.common.exception import (
     ConfigurationError,
+    InvalidVFolderMountSourceError,
     VolumeMountFailed,
 )
 from ai.backend.common.json import (
@@ -196,6 +198,7 @@ from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.runner.types import Runner
 from ai.backend.common.service_ports import parse_service_ports
+from ai.backend.common.storage.vfolder.subpath import VFolderSubpath, resolve_vfolder_subpath
 from ai.backend.common.typed_validators import HostPortPair
 from ai.backend.common.types import (
     AbuseReportValue,
@@ -267,7 +270,6 @@ from .kernel import (
     match_distro_data,
     read_krunner_python_version,
 )
-from .kernel_registry.writer.types import KernelRegistrySaveMetadata
 from .observer.host_port import HostPortObserver
 from .observer.kernel_presence import KernelPresenceObserver
 from .observer.orphan_kernel_cleanup import OrphanKernelCleanupObserver
@@ -288,7 +290,7 @@ from .types import (
     LifecycleEvent,
     MountInfo,
 )
-from .utils import generate_local_instance_id, get_arch_name
+from .utils import SECRET_MASK, generate_local_instance_id, get_arch_name
 
 if TYPE_CHECKING:
     from ai.backend.common.auth import PublicKey
@@ -415,6 +417,12 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
     async def prepare_scratch(self) -> None:
         pass
 
+    async def destroy_scratch(self) -> None:
+        """Undo `prepare_scratch` for a create that does not get past it. No-op by default.
+
+        Must tolerate a partially prepared scratch.
+        """
+
     @abstractmethod
     async def get_intrinsic_mounts(self) -> Sequence[Mount]:
         return []
@@ -424,6 +432,17 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
         Replace user-defined bootstrap script to an arbitrary one created by agent.
         """
         self.kernel_config["bootstrap_script"] = script
+
+    def kernel_config_for_restart(self) -> KernelCreationConfig:
+        """
+        Return the kernel config to store for restarts, without the registry account.
+        """
+        image = self.kernel_config["image"]
+        registry = {**image["registry"], "username": None, "password": None}
+        return cast(
+            KernelCreationConfig,
+            {**self.kernel_config, "image": {**image, "registry": registry}},
+        )
 
     @property
     @abstractmethod
@@ -546,6 +565,21 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
         arch = get_arch_name()
         return arch, matched_distro, matched_libc_style, krunner_volume, krunner_pyver
 
+    async def _resolve_vfolder_mount_source(self, vfolder: VFolderMount) -> Path:
+        host_path = Path(vfolder.host_path)
+        subpath_parts = vfolder.vfsubpath.parts
+        if not subpath_parts:
+            return host_path
+        if host_path.parts[-len(subpath_parts) :] != subpath_parts:
+            raise InvalidVFolderMountSourceError(
+                f"The host path {host_path} does not end with the subpath {vfolder.vfsubpath}"
+            )
+        target = VFolderSubpath(
+            base_path=Path(*host_path.parts[: -len(subpath_parts)]),
+            subpath=vfolder.vfsubpath,
+        )
+        return await run_in_executor_with_context(None, resolve_vfolder_subpath, target)
+
     async def mount_vfolders(
         self,
         vfolders: Sequence[VFolderMount],
@@ -555,9 +589,10 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
             if self.internal_data.get("prevent_vfolder_mounts", False):
                 if vfolder.name != ".logs":
                     continue
+            source = await self._resolve_vfolder_mount_source(vfolder)
             mount = Mount(
                 MountTypes.BIND,
-                Path(vfolder.host_path),
+                source,
                 Path(vfolder.kernel_path),
                 vfolder.mount_perm,
             )
@@ -838,6 +873,8 @@ class AbstractAgent[
     port_pool: PortPool
 
     restarting_kernels: MutableMapping[KernelId, RestartTracker]
+    #: How many containers this agent may be building at once, shared by every request.
+    kernel_creation_sema: asyncio.Semaphore
     _local_cron: LocalCron | None
     container_lifecycle_queue: asyncio.Queue[ContainerLifecycleEvent | Sentinel]
 
@@ -862,6 +899,8 @@ class AbstractAgent[
     # Health monitoring tracking
     _active_pulls: dict[str, PullTaskInfo]  # key: image canonical name
     _active_creates: dict[KernelId, CreateTaskInfo]
+    # DESTROYs that came while a create had no container yet; that create sends them.
+    _deferred_destroys: dict[KernelId, list[ContainerLifecycleEvent]]
 
     @contextmanager
     def track_pull(self, image: str) -> Generator[bool, None, None]:
@@ -949,6 +988,7 @@ class AbstractAgent[
         # Initialize health monitoring tracking maps
         self._active_pulls = {}
         self._active_creates = {}
+        self._deferred_destroys = {}
         self._sync_container_lifecycle_observer = SyncContainerLifecycleObserver.instance()
         self._clean_kernel_registry_task = asyncio.create_task(self._clean_kernel_registry_loop())
 
@@ -960,6 +1000,9 @@ class AbstractAgent[
         """
         self.resource_lock = asyncio.Lock()
         self.registry_lock = asyncio.Lock()
+        self.kernel_creation_sema = asyncio.Semaphore(
+            self.local_config.agent.kernel_creation_concurrency
+        )
         self.container_lifecycle_queue = asyncio.Queue()
 
         if self.local_config.redis is None:
@@ -1142,7 +1185,6 @@ class AbstractAgent[
                 if kernel_obj.runner is not None:
                     await kernel_obj.runner.close()
                 await kernel_obj.close()
-            await self.save_last_registry(force=True)
 
         # Stop timers.
         if self._local_cron is not None:
@@ -1178,11 +1220,7 @@ class AbstractAgent[
         raise NotImplementedError
 
     @abstractmethod
-    async def _write_kernel_registry_to_recovery(
-        self,
-        kernel_registry: MutableMapping[KernelId, AbstractKernel],
-        metadata: KernelRegistrySaveMetadata,
-    ) -> None:
+    async def _write_kernel_to_recovery(self, kernel: AbstractKernel) -> None:
         raise NotImplementedError
 
     async def _pre_anycast_event(self, event: AbstractEvent) -> None:
@@ -1200,8 +1238,6 @@ class AbstractAgent[
                             await t
                         except asyncio.CancelledError:
                             continue
-        if isinstance(event, (KernelStartedAnycastEvent, KernelTerminatedAnycastEvent)):
-            await self.save_last_registry()
 
     async def anycast_event(self, event: AbstractAnycastEvent) -> None:
         """
@@ -1435,6 +1471,7 @@ class AbstractAgent[
                 raise AsyncioTaskNotAvailableError("No current asyncio task is available.")
             if ev.kernel_id not in self._ongoing_destruction_tasks:
                 self._ongoing_destruction_tasks[ev.kernel_id] = current_task
+            container_id = ev.container_id
             async with self.registry_lock:
                 kernel_obj = self.kernel_registry.get(ev.kernel_id)
                 if kernel_obj is None:
@@ -1457,13 +1494,29 @@ class AbstractAgent[
                         ev.set_done_future_result(None)
                         return
                 else:
+                    if (
+                        kernel_obj.container_id is None
+                        and ev.kernel_id in self._active_creates
+                        and (
+                            ev.kernel_id in self._deferred_destroys
+                            or kernel_obj.state != KernelLifecycleStatus.TERMINATING
+                        )
+                    ):
+                        # The create has no container yet; `_unwind_failed_create` sends this
+                        # DESTROY once the create knows what it made.
+                        kernel_obj.state = KernelLifecycleStatus.TERMINATING
+                        self._deferred_destroys.setdefault(ev.kernel_id, []).append(ev)
+                        return
+                    if container_id is None:
+                        # Made after this DESTROY was injected.
+                        container_id = kernel_obj.container_id
                     kernel_obj.state = KernelLifecycleStatus.TERMINATING
                     kernel_obj.termination_reason = ev.reason
                     if kernel_obj.runner is not None:
                         await kernel_obj.runner.close()
                     kernel_obj.clean_event = ev.done_future
                 try:
-                    await self.destroy_kernel(ev.kernel_id, ev.container_id)
+                    await self.destroy_kernel(ev.kernel_id, container_id)
                 except Exception as e:
                     ev.set_done_future_exception(e)
                     raise
@@ -1474,7 +1527,7 @@ class AbstractAgent[
                         ContainerLifecycleEvent(
                             ev.kernel_id,
                             ev.session_id,
-                            ev.container_id,
+                            container_id,
                             LifecycleEvent.CLEAN,
                             ev.reason,
                             suppress_events=ev.suppress_events,
@@ -1522,7 +1575,9 @@ class AbstractAgent[
                     kernel_obj = self.kernel_registry.pop(ev.kernel_id, None)
                 try:
                     if kernel_obj is not None:
-                        host_ports = kernel_obj.get("host_ports")
+                        # Popped: a restart keeps this object, and a later CLEAN of it must not
+                        # give back ports another kernel may have taken since.
+                        host_ports = kernel_obj.pop("host_ports", None)
                         if host_ports is not None:
                             self._restore_ports(host_ports)
                         await kernel_obj.close()
@@ -1641,7 +1696,6 @@ class AbstractAgent[
                 ev = await self.container_lifecycle_queue.get()
                 log.debug("lifecycle event received", lifecycle_event=str(ev))
                 if isinstance(ev, Sentinel):
-                    await self.save_last_registry(force=True)
                     return
                 # attrs currently does not support customizing getstate/setstate dunder methods
                 # until the next release.
@@ -1722,6 +1776,9 @@ class AbstractAgent[
                 kernel_id=kernel_id,
                 lifecycle_event=event,
             )
+        # The reason may be free text (RPC `status_info`, or a restored `termination_reason`); a
+        # non-enum value would kill the lifecycle task in `_handle_clean_event`.
+        reason = KernelLifecycleEventReason.from_value(reason) or KernelLifecycleEventReason.UNKNOWN
         await self.container_lifecycle_queue.put(
             ContainerLifecycleEvent(
                 kernel_id,
@@ -2565,6 +2622,101 @@ class AbstractAgent[
             service.start_command = f"{service.start_command} {shlex.join(extra_args)}"
         return models
 
+    async def _unwind_failed_create(
+        self,
+        kernel_id: KernelId,
+        session_id: SessionId,
+        registered: AbstractKernel | None,
+        made: Sequence[Callable[[], Awaitable[None]]],
+    ) -> None:
+        """Take back what a failed or cancelled create left on this host, shielded as a whole.
+
+        See `_take_back_failed_create`.
+        """
+        await asyncio.shield(
+            asyncio.ensure_future(
+                self._take_back_failed_create(kernel_id, session_id, registered, made)
+            )
+        )
+
+    async def _take_back_failed_create(
+        self,
+        kernel_id: KernelId,
+        session_id: SessionId,
+        registered: AbstractKernel | None,
+        made: Sequence[Callable[[], Awaitable[None]]],
+    ) -> None:
+        """A kernel this create registered gets exactly one lifecycle DESTROY, whose CLEAN frees
+        its scratch, ports and devices. Before registration, the undo stack runs in reverse.
+        A DESTROY held while the create had no container is sent instead.
+        """
+        deferred = self._deferred_destroys.pop(kernel_id, [])
+        if registered is None:
+            for undo in reversed(made):
+                try:
+                    await undo()
+                except Exception:
+                    log.exception(
+                        "failed create could not undo what it had made on this host",
+                        kernel_id=kernel_id,
+                        session_id=session_id,
+                    )
+            await self.reconstruct_resource_usage()
+        else:
+            if self.kernel_registry.get(kernel_id) is registered:
+                # A failed re-creation ends the kernel: CLEAN must forget it, not keep it.
+                self.restarting_kernels.pop(kernel_id, None)
+        if deferred:
+            # Held while this create had no container; sent now with the one it made, if any.
+            container_id = registered.container_id if registered is not None else None
+            for ev in deferred:
+                await self.container_lifecycle_queue.put(
+                    ContainerLifecycleEvent(
+                        kernel_id,
+                        session_id,
+                        container_id,
+                        LifecycleEvent.DESTROY,
+                        ev.reason,
+                        done_future=ev.done_future,
+                        suppress_events=ev.suppress_events,
+                    ),
+                )
+            return
+        if registered is None:
+            return
+        if self.kernel_registry.get(kernel_id) is not registered:
+            # Already destroyed by someone else, whose CLEAN took everything back.
+            return
+        if registered.state == KernelLifecycleStatus.TERMINATING:
+            # A DESTROY that knew the container is running; its CLEAN takes everything back.
+            return
+        await self.inject_container_lifecycle_event(
+            kernel_id,
+            session_id,
+            LifecycleEvent.DESTROY,
+            KernelLifecycleEventReason.FAILED_TO_CREATE,
+            container_id=registered.container_id,
+        )
+
+    @staticmethod
+    def _mask_kernel_config(config: KernelCreationConfig) -> dict[str, Any]:
+        image = config["image"]
+        registry = image["registry"]
+        return {
+            **config,
+            "image": {
+                **image,
+                "registry": {
+                    **registry,
+                    "password": SECRET_MASK if registry["password"] else None,
+                },
+            },
+            "environ": dict.fromkeys(config["environ"], SECRET_MASK),
+            "bootstrap_script": SECRET_MASK if config["bootstrap_script"] else None,
+            # internal_data carries the SSH keypair and dotfile contents.
+            "internal_data": SECRET_MASK if config["internal_data"] else None,
+        }
+
     async def create_kernel(
         self,
         ownership_data: KernelOwnershipData,
@@ -2601,7 +2753,8 @@ class AbstractAgent[
                 # Initialize the creation context
                 if self.local_config.debug.log_kernel_config:
                     log.debug(
-                        "kernel creation config dumped", kernel_config=str(pretty(kernel_config))
+                        "kernel creation config dumped",
+                        kernel_config=str(pretty(self._mask_kernel_config(kernel_config))),
                     )
                 ctx = await self.init_kernel_context(
                     ownership_data,
@@ -2611,7 +2764,12 @@ class AbstractAgent[
                     cluster_ssh_port_mapping=cluster_info.get("cluster_ssh_port_mapping"),
                 )
                 log.debug("kernel creation context initialized")
-                environ: dict[str, str] = {**kernel_config["environ"]}
+                # Drop the runner-reserved keys the caller sent; the agent sets them below.
+                environ: dict[str, str] = {
+                    k: v
+                    for k, v in kernel_config["environ"].items()
+                    if k not in RUNNER_RESERVED_ENVIRON_KEYS
+                }
 
                 # Inject Backend.AI-intrinsic env-variables for gosu
                 if (ouid := ctx.get_overriding_uid()) is not None:
@@ -2730,9 +2888,15 @@ class AbstractAgent[
                             )
                             raise
                     log.debug("kernel resources allocated")
+                # Undo steps for what this create made on the host before registering a kernel.
+                made: list[Callable[[], Awaitable[None]]] = []
+                # Only the kernel object this create registered is unwound, never a restart's old one.
+                registered: KernelObjectType | None = None
                 try:
                     # Prepare scratch spaces and dotfiles inside it.
                     if not restarting:
+                        # Registered before it is made: a part-way failure leaves something.
+                        made.append(ctx.destroy_scratch)
                         await ctx.prepare_scratch()
                         log.debug("kernel scratch prepared")
 
@@ -2927,6 +3091,9 @@ class AbstractAgent[
                         cmdargs += ["--"]
                     if self.local_config.debug.kernel_runner:
                         krunner_opts.append("--debug")
+                    krunner_opts += ["--session-id", str(session_id)]
+                    for cluster_role in cluster_info["replicas"]:
+                        krunner_opts += ["--cluster-role", cluster_role]
                     cmdargs += [
                         "/opt/backend.ai/bin/python",
                         "-s",
@@ -2946,14 +3113,13 @@ class AbstractAgent[
                     await self.restart_kernel__store_config(
                         kernel_id,
                         "kconfig.dat",
-                        pickle.dumps(ctx.kernel_config),
+                        pickle.dumps(ctx.kernel_config_for_restart()),
                     )
-                    if not restarting:
-                        await self.restart_kernel__store_config(
-                            kernel_id,
-                            "cluster.json",
-                            dump_json(cluster_info),
-                        )
+                    await self.restart_kernel__store_config(
+                        kernel_id,
+                        "cluster.json",
+                        dump_json(cluster_info),
+                    )
                     log.debug("kernel restart configs stored")
 
                     if self.local_config.debug.log_kernel_config:
@@ -2972,6 +3138,7 @@ class AbstractAgent[
                     kernel_obj.session_type = kernel_config["session_type"]
                     async with self.registry_lock:
                         self.kernel_registry[kernel_id] = kernel_obj
+                        registered = kernel_obj
                     log.debug("kernel container starting")
                     try:
                         container_data = await ctx.start_container(
@@ -2983,26 +3150,16 @@ class AbstractAgent[
                         )
                     except ContainerCreationError as e:
                         msg = e.message or "unknown"
-                        cid = e.container_id
-                        async with self.registry_lock:
-                            self.kernel_registry[ctx.kernel_id].set_container_id(ContainerId(cid))
-                        await self.inject_container_lifecycle_event(
-                            kernel_id,
-                            session_id,
-                            LifecycleEvent.DESTROY,
-                            KernelLifecycleEventReason.FAILED_TO_CREATE,
-                            container_id=ContainerId(cid),
-                        )
+                        # Only record the container; `_unwind_failed_create` owns the DESTROY.
+                        if e.container_id:
+                            async with self.registry_lock:
+                                # The object, not the registry: a concurrent CLEAN may have
+                                # dropped it.
+                                kernel_obj.set_container_id(ContainerId(e.container_id))
                         raise ContainerCreationFailedError(
                             f"Kernel failed to create container (k:{ctx.kernel_id!s}, detail:{msg})"
                         ) from e
                     except Exception as e:
-                        await self.inject_container_lifecycle_event(
-                            kernel_id,
-                            session_id,
-                            LifecycleEvent.DESTROY,
-                            KernelLifecycleEventReason.FAILED_TO_CREATE,
-                        )
                         raise ContainerCreationFailedError(
                             f"Kernel failed to create container (k:{kernel_id!s}, detail: {e!s})"
                         ) from e
@@ -3014,6 +3171,11 @@ class AbstractAgent[
                         if "container_id" in container_data:
                             self.kernel_registry[kernel_id].set_container_id(
                                 container_data["container_id"]
+                            )
+                        if kernel_id in self._deferred_destroys:
+                            # Destroyed while its container was being made.
+                            raise ContainerStartupCancelledError(
+                                f"Kernel destroyed during container creation (k:{kernel_id!s})"
                             )
                     await kernel_obj.init(self.event_producer)
                     log.debug(
@@ -3078,48 +3240,28 @@ class AbstractAgent[
                             service_ports=str(service_ports),
                         )
                     except TimeoutError as e:
-                        await self.inject_container_lifecycle_event(
-                            kernel_id,
-                            session_id,
-                            LifecycleEvent.DESTROY,
-                            KernelLifecycleEventReason.FAILED_TO_START,
-                            container_id=ContainerId(container_data["container_id"]),
-                        )
+                        # `_unwind_failed_create` sends the one DESTROY, with this reason.
+                        kernel_obj.termination_reason = KernelLifecycleEventReason.FAILED_TO_START
                         raise ContainerStartupTimeoutError(
                             f"Timeout during container startup (k:{ctx.kernel_id!s}, container:{container_data['container_id']})"
                         ) from e
                     except asyncio.CancelledError as e:
-                        await self.inject_container_lifecycle_event(
-                            kernel_id,
-                            session_id,
-                            LifecycleEvent.DESTROY,
-                            KernelLifecycleEventReason.FAILED_TO_START,
-                            container_id=ContainerId(container_data["container_id"]),
-                        )
+                        # `_unwind_failed_create` sends the one DESTROY, with this reason.
+                        kernel_obj.termination_reason = KernelLifecycleEventReason.FAILED_TO_START
                         raise ContainerStartupCancelledError(
                             f"Cancelled waiting of container startup (k:{ctx.kernel_id!s}, container:{container_data['container_id']})"
                         ) from e
                     except RetryError as e:
-                        await self.inject_container_lifecycle_event(
-                            kernel_id,
-                            session_id,
-                            LifecycleEvent.DESTROY,
-                            KernelLifecycleEventReason.FAILED_TO_START,
-                            container_id=ContainerId(container_data["container_id"]),
-                        )
+                        # `_unwind_failed_create` sends the one DESTROY, with this reason.
+                        kernel_obj.termination_reason = KernelLifecycleEventReason.FAILED_TO_START
                         err_msg = (
                             "Container startup failed, the container might be missing or failed to initialize "
                             f"(k:{ctx.kernel_id!s}, container:{container_data['container_id']})"
                         )
                         raise ContainerStartupFailedError(err_msg) from e
                     except BaseException:
-                        await self.inject_container_lifecycle_event(
-                            kernel_id,
-                            session_id,
-                            LifecycleEvent.DESTROY,
-                            KernelLifecycleEventReason.FAILED_TO_START,
-                            container_id=ContainerId(container_data["container_id"]),
-                        )
+                        # `_unwind_failed_create` sends the one DESTROY, with this reason.
+                        kernel_obj.termination_reason = KernelLifecycleEventReason.FAILED_TO_START
                         raise
                     finally:
                         self._pending_creation_tasks[kernel_id].remove(current_task)
@@ -3200,18 +3342,7 @@ class AbstractAgent[
                             resource_spec.allocations, attached_devices
                         ),
                     )
-                    await self.anycast_and_broadcast_event(
-                        KernelStartedAnycastEvent(
-                            kernel_id=kernel_id,
-                            session_id=session_id,
-                            creation_info=creation_info,
-                        ),
-                        KernelStartedBroadcastEvent(
-                            kernel_id=kernel_id,
-                            session_id=session_id,
-                            creation_info=creation_info,
-                        ),
-                    )
+                    await self._notify_kernel_started(kernel_obj, creation_info)
                     async with self.registry_lock:
                         kernel_obj.state = KernelLifecycleStatus.RUNNING
 
@@ -3221,9 +3352,32 @@ class AbstractAgent[
                     # The startup command for the batch-type sessions will be executed by the manager
                     # upon firing of the "session_started" event.
                     return kernel_creation_info
-                except Exception:
-                    await self.reconstruct_resource_usage()
+                except BaseException:
+                    # BaseException: a cancelled create (launcher timeout) leaves the same state.
+                    await self._unwind_failed_create(kernel_id, session_id, registered, made)
                     raise
+
+    async def _notify_kernel_started(
+        self,
+        kernel_obj: KernelObjectType,
+        creation_info: KernelCreationInfo,
+    ) -> None:
+        try:
+            await self._write_kernel_to_recovery(kernel_obj)
+        except Exception as e:
+            log.exception("kernel recovery data save failed", error_repr=repr(e))
+        await self.anycast_and_broadcast_event(
+            KernelStartedAnycastEvent(
+                kernel_id=kernel_obj.kernel_id,
+                session_id=kernel_obj.session_id,
+                creation_info=creation_info,
+            ),
+            KernelStartedBroadcastEvent(
+                kernel_id=kernel_obj.kernel_id,
+                session_id=kernel_obj.session_id,
+                creation_info=creation_info,
+            ),
+        )
 
     async def start_model_service_and_handle_failure(
         self,
@@ -3382,6 +3536,30 @@ class AbstractAgent[
         """
         pass
 
+    async def _forget_kernel_of_failed_restart(
+        self,
+        kernel_id: KernelId,
+        session_id: SessionId,
+        old_kernel: AbstractKernel | None,
+    ) -> None:
+        """A re-creation that failed before registering leaves the old, already destroyed object.
+
+        A CLEAN without a container forgets it, frees its scratch and devices, and reports it once.
+        """
+        if old_kernel is None or self.kernel_registry.get(kernel_id) is not old_kernel:
+            # A new object was registered; the failed create's own unwind destroys it.
+            return
+        # Queued directly: injecting would name the deleted container and the RESTARTING reason.
+        await self.container_lifecycle_queue.put(
+            ContainerLifecycleEvent(
+                kernel_id,
+                session_id,
+                None,
+                LifecycleEvent.CLEAN,
+                KernelLifecycleEventReason.FAILED_TO_CREATE,
+            ),
+        )
+
     async def restart_kernel(
         self,
         ownership_data: KernelOwnershipData,
@@ -3411,6 +3589,7 @@ class AbstractAgent[
         )
         async with tracker.request_lock:
             tracker.done_event.clear()
+            old_kernel = self.kernel_registry.get(kernel_id)
             await self.inject_container_lifecycle_event(
                 kernel_id,
                 session_id,
@@ -3439,11 +3618,14 @@ class AbstractAgent[
                         existing_cluster_info,
                         restarting=True,
                     )
+                except BaseException:
+                    # Not logged here: the RPC handler reports the raised failure.
                     self.restarting_kernels.pop(kernel_id, None)
-                except Exception:
-                    # TODO: retry / cancel others?
-                    log.exception("kernel re-creation on restart failed")
-            tracker.done_event.set()
+                    await self._forget_kernel_of_failed_restart(kernel_id, session_id, old_kernel)
+                    raise
+                finally:
+                    self.restarting_kernels.pop(kernel_id, None)
+                    tracker.done_event.set()
         kernel_obj = self.kernel_registry[kernel_id]
         return {
             "container_id": kernel_obj["container_id"],
@@ -3572,12 +3754,6 @@ class AbstractAgent[
     async def ping_kernel(self, kernel_id: KernelId) -> dict[str, float] | None:
         return await self._get_live_kernel(kernel_id).ping()
 
-    async def save_last_registry(self, force: bool = False) -> None:
-        await self._write_kernel_registry_to_recovery(
-            self.kernel_registry,
-            KernelRegistrySaveMetadata(force),
-        )
-
 
 async def handle_volume_mount(
     context: AbstractAgent[Any, Any],
@@ -3605,8 +3781,7 @@ async def handle_volume_mount(
             event.fs_type,
             event.cmd_options,
             event.edit_fstab,
-            event.fstab_path,
-            mount_prefix,
+            mount_prefix=mount_prefix,
         )
         if context.local_config.agent.mount_path_uid_gid is not None:
             await chown(
@@ -3653,7 +3828,6 @@ async def handle_volume_umount(
             str(real_path),
             mount_prefix,
             event.edit_fstab,
-            event.fstab_path,
             timeout_sec=float(timeout) if timeout is not None else None,
         )
     except VolumeMountFailed as e:

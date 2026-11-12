@@ -8,10 +8,9 @@ import hashlib
 import secrets
 from typing import override
 
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.common.auth.password import HashInfo, PasswordHashAlgorithm, PasswordInfo
 
 from .base import PasswordHasher
-from .types import HashInfo, PasswordInfo
 
 
 class PBKDF2_SHA256Hasher(PasswordHasher):

@@ -35,6 +35,12 @@ class SessionLifecycleHandler(ABC):
 
     @classmethod
     @abstractmethod
+    def description(cls) -> str:
+        """Get a one-line description of what the handler does, shown in the handler listing."""
+        raise NotImplementedError("Subclasses must implement description()")
+
+    @classmethod
+    @abstractmethod
     def target_statuses(cls) -> list[SessionStatus]:
         """Get the target session statuses for this handler.
 

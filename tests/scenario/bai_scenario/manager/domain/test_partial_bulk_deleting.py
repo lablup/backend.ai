@@ -23,13 +23,16 @@ from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
     Held,
+    Language,
     Refused,
     Same,
     SameAs,
+    Says,
     Scenario,
     Then,
     Verdict,
     When,
+    in_language,
 )
 from bai_scenario.components.domain import (
     DomainLook,
@@ -58,8 +61,16 @@ class SoftDeletingEveryTarget(When[ManyDomainsAndACaller, DomainAdapter, Deleted
 
     @override
     def describe(self, laid: ManyDomainsAndACaller) -> str:
-        besides = " 와 없는 id 하나" if self.missing is not None else ""
-        return f"{laid.caller.username}이 도메인 {len(laid.elsewhere())}개{besides}를 한 번에 soft delete 함"
+        besides_ko = " 와 없는 id 하나" if self.missing is not None else ""
+        besides_en = " and one missing id" if self.missing is not None else ""
+        return Says(
+            f"{laid.caller.username}이 도메인 {len(laid.elsewhere())}개{besides_ko}를 "
+            "한 번에 soft delete 합니다",
+            english=(
+                f"{laid.caller.username} soft deletes {len(laid.elsewhere())} domains"
+                f"{besides_en} at once"
+            ),
+        )
 
     @override
     async def call(self, adapter: DomainAdapter, laid: ManyDomainsAndACaller) -> Deleted:
@@ -80,9 +91,13 @@ class SoftDeletingThenRestoringEveryTarget(When[ManyDomainsAndACaller, DomainAda
 
     @override
     def describe(self, laid: ManyDomainsAndACaller) -> str:
-        return (
+        return Says(
             f"{laid.caller.username}이 도메인 {len(laid.elsewhere())}개를 한 번에 soft delete "
-            "했다가 한 번에 restore 함"
+            "한 뒤 한 번에 restore 합니다",
+            english=(
+                f"{laid.caller.username} soft deletes {len(laid.elsewhere())} domains at "
+                "once and then restores them at once"
+            ),
         )
 
     @override
@@ -91,6 +106,29 @@ class SoftDeletingThenRestoringEveryTarget(When[ManyDomainsAndACaller, DomainAda
         with ActingAs(laid.caller):
             await adapter.partial_bulk_delete(PartialBulkDeleteDomainsInput(ids=ids))
             return await adapter.partial_bulk_restore(PartialBulkRestoreDomainsInput(ids=ids))
+
+
+@dataclass(frozen=True)
+class RestoringEveryTarget(When[ManyDomainsAndACaller, DomainAdapter, Deleted]):
+    """대상 도메인들을 한 번에 restore 한다."""
+
+    @override
+    def operation(self) -> str:
+        return "partial_bulk_restore"
+
+    @override
+    def describe(self, laid: ManyDomainsAndACaller) -> str:
+        return Says(
+            f"{laid.caller.username}이 도메인 {len(laid.elsewhere())}개를 한 번에 restore 합니다",
+            english=f"{laid.caller.username} restores {len(laid.elsewhere())} domains at once",
+        )
+
+    @override
+    async def call(self, adapter: DomainAdapter, laid: ManyDomainsAndACaller) -> Deleted:
+        with ActingAs(laid.caller):
+            return await adapter.partial_bulk_restore(
+                PartialBulkRestoreDomainsInput(ids=[domain.id for domain in laid.elsewhere()])
+            )
 
 
 @dataclass(frozen=True)
@@ -103,11 +141,25 @@ class EveryTargetComesBack(Then[ManyDomainsAndACaller, Deleted]):
 
     @override
     def says(self) -> str:
-        state = "활성" if self.active else "비활성"
+        state = (
+            Says("활성", english="active") if self.active else Says("비활성", english="inactive")
+        )
         if self.missing is None:
-            return f"대상 도메인이 모두 {state}으로 오고, 실패한 것은 없다"
-        return (
-            f"대상 도메인이 모두 {state}으로 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다"
+            return Says(
+                f"대상 도메인이 모두 {state} 상태로 오고, 실패한 것은 없습니다",
+                english=(
+                    f"every target domain comes back "
+                    f"{in_language(state, Language.ENGLISH)} and none failed"
+                ),
+            )
+        return Says(
+            f"대상 도메인이 모두 {state} 상태로 오고, "
+            "없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                f"every target domain comes back "
+                f"{in_language(state, Language.ENGLISH)} and the missing id comes back "
+                "in the failed list because there is no such target"
+            ),
         )
 
     @override
@@ -125,7 +177,14 @@ class EveryTargetComesBack(Then[ManyDomainsAndACaller, Deleted]):
         verdicts.append(Same("failed count", len(payload.failed), 1))
         for failure in payload.failed:
             verdicts += [
-                Held[UUID]("failed[0].id", failure.id, SameAs(self.missing, "요청에 넣은 없는 id")),
+                Held[UUID](
+                    "failed[0].id",
+                    failure.id,
+                    SameAs(
+                        self.missing,
+                        Says("요청에 넣은 없는 id", english="the missing id in the request"),
+                    ),
+                ),
                 Held("failed[0].message", failure.message, Mentions("not found")),
             ]
         return verdicts
@@ -144,9 +203,14 @@ class SoftDeletingAnswersForTheMissingOne(
 
     @override
     def describe(self) -> str:
-        return (
-            "활성 도메인 둘과 없는 id 하나를 한 번에 soft delete 하면, 둘은 비활성으로 오고 "
-            "없는 id 는 대상이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "활성 도메인 둘과 없는 id 하나를 한 번에 soft delete 하면, 둘은 비활성 상태로 오고 "
+            "없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when two active domains and one missing id are soft-deleted at once, "
+                "the two come back inactive and the missing id comes back in the failed "
+                "list because there is no such target"
+            ),
         )
 
     @override
@@ -172,9 +236,14 @@ class AUserGrantedNothingSoftDeletesNone(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "아무 권한도 받지 않은 사용자가 도메인 여럿을 한 번에 soft delete 하려 하면, "
-            "soft delete 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다"
+            "soft delete 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when a user granted nothing soft-deletes several domains at once, "
+                "none is soft-deleted and every one comes back in the failed list for "
+                "lack of permission"
+            ),
         )
 
     @override
@@ -202,7 +271,13 @@ class RestoringBringsSeveralBack(
 
     @override
     def describe(self) -> str:
-        return "soft delete 된 도메인 여럿을 한 번에 restore 하면, 모두 활성으로 온다"
+        return Says(
+            "soft delete 된 도메인 여럿을 한 번에 restore 하면, 모두 활성 상태로 옵니다",
+            english=(
+                "when several soft-deleted domains are restored at once, "
+                "all of them come back active"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyDomainsAndACaller]:
@@ -217,10 +292,44 @@ class RestoringBringsSeveralBack(
         return EveryTargetComesBack(started=self.started, active=True)
 
 
+@dataclass(frozen=True)
+class AUserGrantedNothingRestoresNone(
+    Scenario[TestSeedingSession, ManyDomainsAndACaller, DomainAdapter, Deleted]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-granted-nothing-restores-none-of-several-domains"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "아무 권한도 받지 않은 사용자가 비활성 도메인 여럿을 한 번에 restore 하려 하면, "
+            "restore 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when a user granted nothing restores several inactive domains at once, "
+                "none is restored and every one comes back in the failed list for lack of "
+                "permission"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ManyDomainsAndACaller]:
+        return ManyDomainsAndSomeone(besides=1, targets_inactive=True)
+
+    @override
+    def when(self) -> When[ManyDomainsAndACaller, DomainAdapter, Deleted]:
+        return RestoringEveryTarget()
+
+    @override
+    def then(self) -> Then[ManyDomainsAndACaller, Deleted]:
+        return NothingIsProcessed(reason="Insufficient permission")
+
+
 SCENARIOS: list[DomainStep] = [
     SoftDeletingAnswersForTheMissingOne(started=datetime.now(UTC)),
     AUserGrantedNothingSoftDeletesNone(),
     RestoringBringsSeveralBack(started=datetime.now(UTC)),
+    AUserGrantedNothingRestoresNone(),
 ]
 
 

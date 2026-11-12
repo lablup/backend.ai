@@ -15,30 +15,30 @@ status: draft
 
 # Entity catalog
 
-이 패키지는 종류마다 `EntityType` 또는 `FieldType` 서브클래스를 하나 둔다. 클래스는
-`name()`과 `description()`을 답하고, 필드 종류는 행을 소유하는 엔티티 종류를
-`owner_type()`으로 답한다. 소유자 종류가 고정되지 않는 필드 종류(audit_log,
-audit_log_scope, label, secret, fair share 3종)는 `DanglingFieldType`을 상속해 `None`을
-답한다. 무엇을 소유하고 무엇에 묶이는지는 이 문서에 적는다. 전부 개념 수준이며, 어느 테이블이 담는지는 `models`
-문서가 맡는다.
+This package holds one `EntityType` or `FieldType` subclass per kind. A class answers `name()` and
+`description()`; a field kind answers the entity kind that owns the row through `owner_type()`. Field kinds whose
+owner kind is not fixed (audit_log, audit_log_scope, label, secret, the three fair share kinds) inherit
+`DanglingFieldType` and answer `None`. This document states what is owned and what is bound to what. Everything
+is at the conceptual level; which table holds it belongs to the `models` documents.
 
-## 타입 값 규칙
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
-- 값은 사용처에서 `AgentEntityType()`처럼 인자 없이 만든다. 모듈 인스턴스 상수를 두지
-  않는다.
-- 필드 종류는 `owner_type()`으로 행을 소유하는 엔티티 종류를 답한다. 소유자가 행의
-  값이라 고정되지 않으면 `DanglingFieldType`을 상속해 `None`을 답한다.
-- `EntityType(value)`는 base 인스턴스를 만들며 `name()`과 `description()`을 답하지
-  않는다. 문자열을 읽는 경계(행 컬럼, legacy 액션, RBAC 요소)에서만 쓰고 그 밖에서는
-  만들지 않는다.
-- pydantic은 base로 선언한 필드면 문자열을 그대로 받고, 종류로 선언한 필드면 그 이름만
-  받는다. 행에는 `name()` 문자열이 저장된다.
-- secret은 여러 엔티티의 암호화된 컬럼에 저장된 필드이며 소유자 종류가 고정되지 않는다.
-  자체 행 없이 상태 조회와 재암호화를 수행한다.
+## Type value rules
+
+- Create a value at the point of use, like `AgentEntityType()`, with no arguments. Do not keep module-level
+  instance constants.
+- A field kind answers the entity kind that owns the row through `owner_type()`. When the owner is a value on the
+  row and not fixed, inherit `DanglingFieldType` and answer `None`.
+- `EntityType(value)` creates a base instance and answers neither `name()` nor `description()`. Use it only at the
+  boundaries that read a string (row columns, legacy actions, RBAC elements); do not create it elsewhere.
+- pydantic accepts a string as is for a field declared as the base, and only that name for a field declared as a
+  kind. The row stores the `name()` string.
+- A secret is a field stored in an encrypted column of several entities, and its owner kind is not fixed. It has
+  no row of its own and performs status reads and re-encryption.
 
 ## Entity
 
-An entity that belongs somewhere. There is no common root — several entities sit at the
+An entity that belongs somewhere. There is no common root: several entities sit at the
 top.
 
 ```
@@ -85,7 +85,7 @@ container registry
 
 | Relation | Targets |
 |---|---|
-| field | kernel |
+| field | kernel, kernel group, kernel group resource slot |
 | reference | image, vfolder, session group, resource group |
 
 ### deployment
@@ -272,7 +272,7 @@ Ownership relations with no foreign key declared.
 
 Most id types identify an entity or a field, so they are declared in the same file as the
 type class. Adding only one of the two then shows up simply by opening the file,
-and a file with no type class becomes a signal in itself — either a field, or not yet
+and a file with no type class becomes a signal in itself: either a field, or not yet
 classified.
 
 - A scope identifier is an alias of an entity identifier, so it belongs on this axis.

@@ -228,7 +228,15 @@ class TestAuthenticateByUserStatus:
             db, key_provider_pool, JWTValidator(jwt_config), AsyncMock(), token
         )
 
-    @pytest.mark.parametrize("status", [UserStatus.INACTIVE, UserStatus.BEFORE_VERIFICATION])
+    @pytest.mark.parametrize(
+        "status",
+        [
+            UserStatus.INACTIVE,
+            UserStatus.BEFORE_VERIFICATION,
+            UserStatus.PURGING,
+            UserStatus.PURGE_ERROR,
+        ],
+    )
     async def test_hmac_rejects_user(
         self, db: ExtendedAsyncSAEngine, key_provider_pool: KeyProviderPool, status: UserStatus
     ) -> None:
@@ -236,7 +244,15 @@ class TestAuthenticateByUserStatus:
         with pytest.raises(AuthorizationFailed):
             await self._authenticate_hmac(db, key_provider_pool, access_key)
 
-    @pytest.mark.parametrize("status", [UserStatus.INACTIVE, UserStatus.BEFORE_VERIFICATION])
+    @pytest.mark.parametrize(
+        "status",
+        [
+            UserStatus.INACTIVE,
+            UserStatus.BEFORE_VERIFICATION,
+            UserStatus.PURGING,
+            UserStatus.PURGE_ERROR,
+        ],
+    )
     async def test_jwt_rejects_user(
         self,
         db: ExtendedAsyncSAEngine,

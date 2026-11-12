@@ -29,7 +29,7 @@ from ai.backend.common.dto.appproxy.v2.ingress.types import (
 )
 
 AUTHORITY = IngressAuthority("worker-1")
-FRONTEND_KEY = IngressFrontendKey("10205")
+FRONTEND_KEY = IngressFrontendKey("port-10205")
 NEGATIVE_TTL = 5.0
 
 

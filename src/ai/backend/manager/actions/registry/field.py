@@ -26,7 +26,10 @@ from ai.backend.manager.actions.v2.bulk.validator.base import (
     AtomicBulkActionValidator,
     PartialBulkActionValidator,
 )
-from ai.backend.manager.actions.v2.field.base import BaseSingleFieldAction
+from ai.backend.manager.actions.v2.field.base import (
+    BaseRuntimeSingleFieldAction,
+    BaseSingleFieldAction,
+)
 from ai.backend.manager.actions.v2.field.bulk_base import BasePartialBulkFieldAction
 from ai.backend.manager.actions.v2.field.bulk_processor import (
     OwnerBulkLookupProcessor,
@@ -42,6 +45,7 @@ from ai.backend.manager.actions.v2.field.ops import (
     PartialBulkPurgeFieldOpsAction,
     PurgeFieldOpsAction,
     RestoreFieldOpsAction,
+    RuntimeGetFieldOpsAction,
     RuntimePurgeFieldOpsAction,
     RuntimeUpdateFieldOpsAction,
     UpdateFieldOpsAction,
@@ -471,6 +475,44 @@ class LookupFieldGroup[TFieldData: FieldData](FieldGroup[TFieldData]):
         )
         return SingleFieldActionProcessor(
             FieldPurgeService(self._deps.repository).execute,
+            self._owner_lookup,
+            monitors=(*self._deps.monitors.single_entity, *monitors),
+            validators=(*self._deps.validators.single_entity, *validators),
+        )
+
+    def runtime_get_ops[TAction: RuntimeGetFieldOpsAction[Any, Any, Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        validators: Sequence[SingleEntityActionValidator] = (),
+        monitors: Sequence[SingleEntityActionMonitor] = (),
+    ) -> SingleFieldActionProcessor[TAction, EntityOpsResult[TFieldData]]:
+        """A read of a field row whose owning entity is polymorphic; the read
+        counterpart of :meth:`runtime_purge_ops`."""
+        self._record(
+            action_cls, ActionKind.SINGLE_ENTITY, ActionGate.PERMISSION, ActionBacking.GENERIC
+        )
+        return SingleFieldActionProcessor(
+            FieldGetService(self._deps.repository).execute,
+            self._owner_lookup,
+            monitors=(*self._deps.monitors.single_entity, *monitors),
+            validators=(*self._deps.validators.single_entity, *validators),
+        )
+
+    def runtime_single_field[TAction: BaseRuntimeSingleFieldAction[Any], TResult](
+        self,
+        action_cls: type[TAction],
+        func: Callable[[TAction], Awaitable[TResult]],
+        *,
+        validators: Sequence[SingleEntityActionValidator] = (),
+        monitors: Sequence[SingleEntityActionMonitor] = (),
+    ) -> SingleFieldActionProcessor[TAction, TResult]:
+        """:meth:`single_field` for a field row whose owning entity is polymorphic."""
+        self._record(
+            action_cls, ActionKind.SINGLE_ENTITY, ActionGate.PERMISSION, ActionBacking.CUSTOM
+        )
+        return SingleFieldActionProcessor(
+            func,
             self._owner_lookup,
             monitors=(*self._deps.monitors.single_entity, *monitors),
             validators=(*self._deps.validators.single_entity, *validators),

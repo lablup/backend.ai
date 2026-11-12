@@ -8,10 +8,10 @@ from sqlalchemy.orm import Mapped, mapped_column
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.service_catalog import ServiceCatalogID
 from ai.backend.common.data.entity.storage_backend import StorageBackendID
-from ai.backend.common.data.entity.storage_volume import StorageVolumeID
+from ai.backend.common.data.entity.storage_volume import StorageVolumeID, StorageVolumeName
 from ai.backend.common.data.storage.types import (
     DEFAULT_STATUS_STALE_AFTER,
-    ServiceStorageStatus,
+    StorageAnomaly,
     StorageVolumeUsageExposure,
 )
 from ai.backend.manager.models.base import (
@@ -44,7 +44,9 @@ class StorageVolumeRow(LifecycleTimestampsMixin, Base):
         primary_key=True,
         server_default=sa.text("uuid_generate_v7()"),
     )
-    name: Mapped[str] = mapped_column("name", sa.String(length=64), nullable=False)
+    name: Mapped[StorageVolumeName] = mapped_column(
+        "name", sa.String(length=64), unique=True, nullable=False
+    )
     storage_backend_id: Mapped[StorageBackendID] = mapped_column(
         "storage_backend_id",
         GUID(StorageBackendID),
@@ -94,11 +96,11 @@ class StorageVolumeServiceHoldingRow(LifecycleTimestampsMixin, Base):
         ),
         primary_key=True,
     )
-    status: Mapped[ServiceStorageStatus] = mapped_column(
-        "status", StrEnumType(ServiceStorageStatus), nullable=False
+    status: Mapped[StorageAnomaly] = mapped_column(
+        "status", StrEnumType(StorageAnomaly), nullable=False
     )
     # When the service measured ``status``, not when its heartbeat delivered it.
-    # Null exactly while ``status`` is not_checked.
+    # Null while the service has not checked the volume yet.
     status_checked_at: Mapped[datetime | None] = mapped_column(
         "status_checked_at", sa.DateTime(timezone=True), nullable=True
     )

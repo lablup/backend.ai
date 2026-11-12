@@ -34,7 +34,7 @@ would be:
    [service]
    ip = "0.0.0.0"
    port = 8080
-   wsproxy.url = {url = "http://127.0.0.1:5050"}
+   wsproxy.url = ""
 
    # Set or enable it when using reverse proxy for SSL-termination
    # force_endpoint_protocol = "https"
@@ -42,13 +42,10 @@ would be:
    mode = "webui"
    enable_signup = false
    allow_signup_without_confirmation = false
-   always_enqueue_compute_session = false
-   allow_project_resource_monitor = false
    allow_change_signin_mode = false
    mask_user_info = false
    enable_container_commit = false
    hide_agents = true
-   directory_based_usage = false
 
    [resources]
    open_port_to_public = false
@@ -62,16 +59,12 @@ would be:
    # Maximum per-file upload size (bytes)
    max_file_upload_size = 4294967296
 
-   [environments]
-   # allowlist = ""
-
    [ui]
    menu_blocklist = "pipeline"
 
    [api]
    domain = "default"
    endpoint = "http://bai-m1:8081"
-   text = "Backend.AI"
    ssl-verify = false
 
    [session]
@@ -85,6 +78,7 @@ would be:
    max_count_for_preopen_ports = 10
 
    [webserver]
+   pid-file = "./webserver.pid"
 
    [logging]
    # One of: "NOTSET", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"
@@ -112,8 +106,7 @@ would be:
    path = "./logs"
    filename = "webserver.log"
 
-   # Set the maximum number of recent container coredumps in the coredump directory.
-   # Oldest coredumps are deleted if there is more than this number of coredumps.
+   # Number of outdated log files to retain.
    backup-count = 10
 
    # The log file size to begin rotation.

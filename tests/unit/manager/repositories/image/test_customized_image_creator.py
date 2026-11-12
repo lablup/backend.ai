@@ -20,6 +20,7 @@ import pytest
 import sqlalchemy as sa
 import yarl
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import (
     ContainerRegistryEntityType,
@@ -38,7 +39,6 @@ from ai.backend.manager.container_registry.base import (
     all_updates,
     rescan_counts,
 )
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.image.types import ImageData, ImageIdentifier, ImageStatus, ImageType
 from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.errors.common import InternalServerError
@@ -49,7 +49,6 @@ from ai.backend.manager.models.association_container_registries_groups.row impor
 )
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image.creators import ImageCreator
 from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
 from ai.backend.manager.models.keypair.row import KeyPairRow
@@ -645,6 +644,68 @@ class TestImageOwnershipGraph:
             db_with_cleanup,
             registry_id,
             {ImageIdentifier(canonical, "x86_64"): payload},
+        )
+
+        assert await self._kind_and_creator(db_with_cleanup, image_id) == (True, None)
+
+    async def test_a_scanned_image_owned_by_an_unknown_user_is_created_without_a_creator(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_id: DomainID,
+        registry_id: ContainerRegistryID,
+    ) -> None:
+        canonical = f"{REGISTRY_NAME}/{REGISTRY_PROJECT}/python:a"
+
+        scanned = await self._commit_rescan(
+            db_with_cleanup,
+            registry_id,
+            {ImageIdentifier(canonical, "x86_64"): self._scan_payload(UserID(uuid4()))},
+        )
+
+        assert [(image.customized, image.creator_id) for image in scanned] == [(True, None)]
+        assert await self._owning_projects(db_with_cleanup, scanned[0].id) == []
+
+    async def test_an_unknown_owner_leaves_the_other_scanned_images_registered(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_id: DomainID,
+        registry_id: ContainerRegistryID,
+    ) -> None:
+        unknown = f"{REGISTRY_NAME}/{REGISTRY_PROJECT}/python:a"
+        plain = f"{REGISTRY_NAME}/{REGISTRY_PROJECT}/python:b"
+
+        scanned = await self._commit_rescan(
+            db_with_cleanup,
+            registry_id,
+            {
+                ImageIdentifier(unknown, "x86_64"): self._scan_payload(UserID(uuid4())),
+                ImageIdentifier(plain, "x86_64"): self._scan_payload(None),
+            },
+        )
+
+        assert {(str(image.name), image.customized, image.creator_id) for image in scanned} == {
+            (unknown, True, None),
+            (plain, False, None),
+        }
+
+    async def test_rescanning_an_image_whose_creator_was_purged_clears_the_creator(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_id: DomainID,
+        registry_id: ContainerRegistryID,
+    ) -> None:
+        owner_id = await self._create_user(db_with_cleanup, domain_id, "owner@test.io")
+        image_id, canonical = await self._create_image(
+            db_with_cleanup, registry_id, "a", owner_user_id=owner_id
+        )
+        async with db_with_cleanup.begin_session() as sess:
+            await sess.execute(sa.delete(UserRow).where(UserRow.uuid == owner_id))
+            await sess.commit()
+
+        await self._commit_rescan(
+            db_with_cleanup,
+            registry_id,
+            {ImageIdentifier(canonical, "x86_64"): self._scan_payload(owner_id)},
         )
 
         assert await self._kind_and_creator(db_with_cleanup, image_id) == (True, None)

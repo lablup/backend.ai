@@ -7,6 +7,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.common import (
     BinarySizeInfo,
     ResourceLimitEntryInfo,
@@ -24,6 +25,8 @@ __all__ = (
     "ResourceGroupResourceAllocationPayload",
     "ResourceGroupUsageNode",
     "ScopeResourceUsageNode",
+    "UserConcurrencyPayload",
+    "UserResourceAllocationPayload",
 )
 
 
@@ -104,6 +107,14 @@ class KeypairResourceAllocationPayload(BaseResponseModel):
     keypair: ScopeResourceUsageNode = Field(description="Keypair resource usage.")
 
 
+class UserResourceAllocationPayload(BaseResponseModel):
+    """Payload for user resource allocation query."""
+
+    user: ScopeResourceUsageNode = Field(
+        description="User resource usage summed across all of the user's keypairs."
+    )
+
+
 class ProjectResourceAllocationPayload(BaseResponseModel):
     """Payload for project resource allocation query."""
 
@@ -120,3 +131,15 @@ class ResourceGroupResourceAllocationPayload(BaseResponseModel):
     """Payload for resource group resource allocation query."""
 
     resource_group: ResourceGroupUsageNode = Field(description="Resource group resource usage.")
+
+
+class UserConcurrencyPayload(BaseResponseModel):
+    """Payload for a user's concurrent session counts."""
+
+    user_id: UserID = Field(description="User UUID.")
+    session_count: int = Field(
+        description="Number of interactive, batch and inference sessions the user is running."
+    )
+    private_session_count: int = Field(
+        description="Number of system sessions, such as SFTP sessions, the user is running."
+    )

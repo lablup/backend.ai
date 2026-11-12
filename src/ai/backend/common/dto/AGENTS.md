@@ -1,11 +1,11 @@
-# Common DTO — Guardrails
+# Common DTO: Guardrails
 
 > This package is shared by all components. Changes here affect manager, agent, storage, and client SDK
-> at the same time — check all callers before modifying fields.
+> at the same time: check all callers before changing fields.
 
 ## Purpose
 
-DTOs shared by multiple backend.ai components (manager, agent, storage, client SDK). DTOs used by only a
+DTOs shared by multiple Backend.AI components (manager, agent, storage, client SDK). DTOs used by only a
 single component belong in that component's `dto/` directory.
 
 ## Directory structure
@@ -15,9 +15,8 @@ Organized by target component: `common/dto/{manager|agent|storage|clients|intern
 ## Rules
 
 - All DTOs must inherit from `BaseRequestModel` (Pydantic v2).
-- No business logic — validation and serialization only.
-- Check all callers across components before modifying fields.
-- Use only `v2/` DTOs (e.g., `common/dto/manager/v2/`). DTOs outside `v2/` are deprecated and must not be used in new code.
+- No business logic: validation and serialization only.
+- Use only `v2/` DTOs (for example, `common/dto/manager/v2/`). DTOs outside `v2/` are deprecated and must not be used in new code.
 
 ## Create and update input schemas
 
@@ -27,11 +26,11 @@ Tri-state is meaningful in update schemas only.
 
 ### Create
 
-Do NOT use `Unset`.
+Do not use `Unset`.
 
 | Field | Declaration |
 |---|---|
-| required | required — no default |
+| required | required: no default |
 | nullable | `X \| None = Field(default=None)` |
 
 When adding a field:
@@ -42,7 +41,7 @@ When adding a field:
 - **Nullable value**: add it with `default=None`. The logic takes the null and applies its own
   default.
 
-Reference: `CreateQueryDefinitionRequest` in
+See `CreateQueryDefinitionRequest` in
 `common/dto/manager/prometheus_query_preset/request.py`.
 
 ### Update
@@ -50,7 +49,7 @@ Reference: `CreateQueryDefinitionRequest` in
 Only the id that selects the target is required. Every other field is
 `X | None | Unset = Field(default=UNSET)`.
 
-What null means is decided by the target column, and the constructor the adapter uses states it.
+The target column decides what null means, and the constructor the adapter uses states that meaning.
 
 | Column | Adapter | null | unset |
 |---|---|---|---|
@@ -67,10 +66,10 @@ it. Keep the lambda body to a single field access.
 | non-nullable | `and_optional` |
 | nullable | `and_tri` |
 
-An absent parent and a null parent are both nop. Do NOT read the parent as a `TriState` and let a
-nullify spread into the children — only the child's own null clears it.
+An absent parent and a null parent are both nop. Do not read the parent as a `TriState` and let a
+null value propagate to the children: only the child's own null clears it.
 
-A nested model that occupies one nullable column whole is not taken apart. Use
+A nested model that maps to exactly one nullable column is not split into separate fields. Use
 `TriState.from_unset(...).map(...)`.
 
 A `from_unset` feeding `and_optional` / `and_tri` MUST name its generic type. Other `from_unset`

@@ -32,6 +32,7 @@ from ai.backend.testutils.scenario_steps import (
     Held,
     Same,
     SameAs,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -78,6 +79,7 @@ def registry_snapshot(
 ) -> tuple[object, ...]:
     return (
         registry.id,
+        registry.entity_id if isinstance(registry, ContainerRegistryNode) else registry.entity_id(),
         registry.url,
         registry.registry_name,
         registry.type,
@@ -92,7 +94,10 @@ def registry_snapshot(
 def registry_items_match(
     got: Sequence[ContainerRegistryNode],
     wanted: Sequence[ContainerRegistryData],
-    came_from: str = "미리 만들어 둔 레지스트리",
+    came_from: str = Says(
+        "미리 저장한 컨테이너 레지스트리",
+        english="the container registries seeded in advance",
+    ),
 ) -> Verdict:
     return Held(
         "items",
@@ -115,8 +120,14 @@ class Searching(
     def describe(self, laid: ManyRegistriesAndACaller) -> str:
         who = laid.caller.username
         if self.filter_kind is FilterKind.NONE:
-            return f"{who}이 조건 없이 검색"
-        return f"{who}이 {self.filter_kind.value} 필터로 검색"
+            return Says(
+                f"{who}이 조건 없이 검색합니다",
+                english=f"{who} searches with no condition",
+            )
+        return Says(
+            f"{who}이 {self.filter_kind.value} 필터로 검색합니다",
+            english=f"{who} searches with the {self.filter_kind.value} filter",
+        )
 
     def _filter(self, laid: ManyRegistriesAndACaller) -> ContainerRegistryFilter | None:
         match self.filter_kind:
@@ -145,7 +156,10 @@ class AllSeededRegistriesAreReturned(
 ):
     @override
     def says(self) -> str:
-        return "미리 만들어 둔 레지스트리가 모두 집계된다"
+        return Says(
+            "미리 저장한 컨테이너 레지스트리가 모두 집계됩니다",
+            english="every container registry seeded in advance is counted",
+        )
 
     @override
     def look(
@@ -173,7 +187,10 @@ class OnlyTheMatchingRegistryIsReturned(
 ):
     @override
     def says(self) -> str:
-        return "필터와 일치하는 레지스트리 하나만 남는다"
+        return Says(
+            "필터와 일치하는 컨테이너 레지스트리 하나만 남습니다",
+            english="only one container registry that matches the filter remains",
+        )
 
     @override
     def look(
@@ -198,7 +215,10 @@ class OnlyNonGlobalRegistriesAreReturned(
 ):
     @override
     def says(self) -> str:
-        return "전역이 아닌 레지스트리만 반환된다"
+        return Says(
+            "전역이 아닌 컨테이너 레지스트리만 반환됩니다",
+            english="only container registries that are not global come back",
+        )
 
     @override
     def look(
@@ -232,7 +252,13 @@ class SearchingWithoutAFilterCountsEvery(ContainerRegistrySearchScenario):
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 조건 없이 검색하면 미리 만들어 둔 레지스트리가 모두 반환된다"
+        return Says(
+            "superadmin 이 조건 없이 검색하면 미리 저장한 컨테이너 레지스트리가 모두 반환됩니다",
+            english=(
+                "when the superadmin searches with no condition, every container registry "
+                "seeded in advance comes back"
+            ),
+        )
 
     @override
     def given(self) -> SearchGiven:
@@ -255,7 +281,13 @@ class ATypeNarrowsTheSearch(ContainerRegistrySearchScenario):
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 종류 필터로 검색하면 그 종류의 레지스트리만 남는다"
+        return Says(
+            "superadmin 이 종류 필터로 검색하면 그 종류의 컨테이너 레지스트리만 남습니다",
+            english=(
+                "when the superadmin searches with the type filter, only container registries "
+                "of that type remain"
+            ),
+        )
 
     @override
     def given(self) -> SearchGiven:
@@ -278,7 +310,13 @@ class GlobalVisibilityNarrowsTheSearch(ContainerRegistrySearchScenario):
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 전역 여부 필터로 검색하면 전역이 아닌 레지스트리만 남는다"
+        return Says(
+            "superadmin 이 전역 여부 필터로 검색하면 전역이 아닌 컨테이너 레지스트리만 남습니다",
+            english=(
+                "when the superadmin searches with the global visibility filter, only container "
+                "registries that are not global remain"
+            ),
+        )
 
     @override
     def given(self) -> SearchGiven:
@@ -301,9 +339,14 @@ class APlainUserMayNotSearch(ContainerRegistrySearchScenario):
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 아닌 사용자가 레지스트리를 검색하려 하면 권한 부족으로 거부된다. "
-            "이 호출은 호출자가 슈퍼관리자인지만 검사하고, 부여된 권한은 보지 않는다"
+        return Says(
+            "superadmin 이 아닌 사용자가 컨테이너 레지스트리를 검색하려 하면 권한 부족으로 "
+            "거부됩니다. 이 호출은 호출자가 superadmin 인지만 검사하고 부여된 권한은 보지 않습니다",
+            english=(
+                "when a user who is not the superadmin tries to search container registries, "
+                "it is rejected for lack of permission. This call checks only whether the "
+                "caller is the superadmin and does not look at the permissions granted"
+            ),
         )
 
     @override

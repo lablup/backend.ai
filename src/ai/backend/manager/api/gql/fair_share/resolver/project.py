@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import uuid
 
-from aiohttp import web
 from strawberry import Info
 from strawberry.relay import PageInfo
 
@@ -34,6 +33,7 @@ from ai.backend.manager.api.gql.fair_share.types.project import (
 )
 from ai.backend.manager.api.gql.types import ResourceGroupProjectScope, StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
+from ai.backend.manager.errors.auth import SuperadminRequired
 
 # Admin APIs
 
@@ -194,7 +194,7 @@ async def project_fair_share(
     """Get a single project fair share record."""
     me = current_user()
     if me is None or not me.is_superadmin:
-        raise web.HTTPForbidden(reason="Only superadmin can access fair share data.")
+        raise SuperadminRequired("Only superadmin can access fair share data.")
 
     result = await info.context.adapters.fair_share.get_project(
         GetProjectFairShareInput(resource_group=resource_group_name, project_id=project_id)
@@ -222,7 +222,7 @@ async def project_fair_shares(
     """Search project fair shares with pagination."""
     me = current_user()
     if me is None or not me.is_superadmin:
-        raise web.HTTPForbidden(reason="Only superadmin can access fair share data.")
+        raise SuperadminRequired("Only superadmin can access fair share data.")
 
     pydantic_filter = filter.to_pydantic() if filter else None
     pydantic_orders = [o.to_pydantic() for o in order_by] if order_by else None
@@ -348,7 +348,7 @@ async def bulk_upsert_project_fair_share_weight(
     """Bulk upsert project fair share weights."""
     me = current_user()
     if me is None or not me.is_superadmin:
-        raise web.HTTPForbidden(reason="Only superadmin can modify fair share data.")
+        raise SuperadminRequired("Only superadmin can modify fair share data.")
 
     result = await info.context.adapters.fair_share.atomic_bulk_upsert_project(input.to_pydantic())
     return BulkUpsertProjectFairShareWeightPayload.from_pydantic(result)

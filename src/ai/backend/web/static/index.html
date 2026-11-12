@@ -23,9 +23,7 @@
        packages/backend.ai-ui/src/styles/backend.ai-ui.css and
        packages/backend.ai-ui/.storybook/astryx.css;
        scripts/migration-gates/layer-order-gate.mjs fails on drift. -->
-  <style nonce="{{nonce}}">
-    @layer reset, theme, base, astryx-base, astryx-theme, ui-common, components, utilities;
-  </style>
+  <style nonce="{{nonce}}">@layer reset,theme,base,astryx-base,astryx-theme,ui-common,components,utilities;</style>
   <link rel="icon" href="manifest/favicon.ico">
   <link rel="apple-touch-icon" sizes="256x256" href="manifest/backend-ai.iconset/icon_256x256@2x.png">
   <link rel="icon" type="image/png" sizes="32x32" href="manifest/backend-ai.iconset/icon_32x32@1x.png">
@@ -77,19 +75,7 @@
        `packages/backend.ai-ui/src/styles/zIndexLadder.ts`; this file is parsed
        before any JS, so it cannot import it. verify.sh's z-index ladder gate
        fails on drift. -->
-  <style nonce="{{nonce}}">
-    :root { --bai-z-splash: 900; }
-    html[data-theme="light"] { color-scheme: light; }
-    html[data-theme="dark"] { color-scheme: dark; }
-    body { margin: 0; background-color: light-dark(#F7F7F6, #191919); }
-    #splash {
-      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      z-index: var(--bai-z-splash); display: flex; align-items: center; justify-content: center;
-      background-color: light-dark(#F7F7F6, #191919);
-      transition: opacity 0.3s ease-out;
-    }
-    .splash-hidden { opacity: 0; pointer-events: none; }
-  </style>
+  <style nonce="{{nonce}}">:root{--bai-z-splash:900}html[data-theme=light]{color-scheme:light}html[data-theme=dark]{color-scheme:dark}body{background-color:light-dark(#f7f7f6,#191919);margin:0}#splash{width:100%;height:100%;z-index:var(--bai-z-splash);background-color:light-dark(#f7f7f6,#191919);justify-content:center;align-items:center;transition:opacity .3s ease-out;display:flex;position:fixed;top:0;left:0}.splash-hidden{opacity:0;pointer-events:none}</style>
   <script nonce="{{nonce}}">
     globalThis.isElectron = isElectron();
     if (isElectron) {
@@ -97,16 +83,157 @@
     }
     globalThis.enableSW = true;
 
-    globalThis.packageVersion = "26.10.0-alpha.0";
-    globalThis.buildNumber = "9328";
+    globalThis.packageVersion = "26.10.0-alpha.2";
+    globalThis.buildNumber = "9653";
     globalThis.baiNonce = "{{nonce}}";
 
     // DO NOT CHANGE BELOW LINE
     
   </script>
   <!-- DO NOT CHANGE BELOW LINE -->
-  <script type="module" nonce="{{nonce}}" crossorigin src="/assets/index-4XAoWQdC.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-CJTJ4MIU.css">
+  <script type="module" nonce="{{nonce}}" crossorigin src="/assets/index-49VU5B_r.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/rolldown-runtime-BWaJ3C7D.js">
+  <link rel="modulepreload" crossorigin href="/assets/icons-Btg1s2wy.js">
+  <link rel="modulepreload" crossorigin href="/assets/compiler-runtime-CZQb2eIb.js">
+  <link rel="modulepreload" crossorigin href="/assets/loginConfig-BaK0F5Gz.js">
+  <link rel="modulepreload" crossorigin href="/assets/lodash-ClfL87UH.js">
+  <link rel="modulepreload" crossorigin href="/assets/useBAILogger-CRaS0DnM.js">
+  <link rel="modulepreload" crossorigin href="/assets/defineProperty-BbfpZ9Tg.js">
+  <link rel="modulepreload" crossorigin href="/assets/classPrivateFieldGet2-CB7J8LIR.js">
+  <link rel="modulepreload" crossorigin href="/assets/parse-BHrB9HvH.js">
+  <link rel="modulepreload" crossorigin href="/assets/useWebUIConfig-DvlZdUc9.js">
+  <link rel="modulepreload" crossorigin href="/assets/useActiveErrorBoundary-BslA7C66.js">
+  <link rel="modulepreload" crossorigin href="/assets/jsx-runtime-BapUIyWk.js">
+  <link rel="modulepreload" crossorigin href="/assets/themeProps-DAmi2erv.js">
+  <link rel="modulepreload" crossorigin href="/assets/useLayerDismissal-CHWzA42G.js">
+  <link rel="modulepreload" crossorigin href="/assets/useTooltip-oRD7n8um.js">
+  <link rel="modulepreload" crossorigin href="/assets/Tooltip-QQJy2agO.js">
+  <link rel="modulepreload" crossorigin href="/assets/useMediaQuery-CgWO6NUN.js">
+  <link rel="modulepreload" crossorigin href="/assets/sharedMutationObserver-DPU7CtZ4.js">
+  <link rel="modulepreload" crossorigin href="/assets/preload-helper-BbbETgeG.js">
+  <link rel="modulepreload" crossorigin href="/assets/usePressFeedback-BIoIGSxE.js">
+  <link rel="modulepreload" crossorigin href="/assets/composeEventHandlers-DRl-AN66.js">
+  <link rel="modulepreload" crossorigin href="/assets/rtlStyles-CVVETNV7.js">
+  <link rel="modulepreload" crossorigin href="/assets/StatusDot-B2UXcn95.js">
+  <link rel="modulepreload" crossorigin href="/assets/catalog-BNHCAujK.js">
+  <link rel="modulepreload" crossorigin href="/assets/Button-BKkkrlg5.js">
+  <link rel="modulepreload" crossorigin href="/assets/Stack-DAq8jfQV.js">
+  <link rel="modulepreload" crossorigin href="/assets/locale-B_xqv1wE.js">
+  <link rel="modulepreload" crossorigin href="/assets/Skeleton-D35z7Ria.js">
+  <link rel="modulepreload" crossorigin href="/assets/container.stylex-DUE2vkhz.js">
+  <link rel="modulepreload" crossorigin href="/assets/modalOutlet-aQUnyB6w.js">
+  <link rel="modulepreload" crossorigin href="/assets/Dialog-BEFy0RME.js">
+  <link rel="modulepreload" crossorigin href="/assets/focusableSelector-DXZeMU85.js">
+  <link rel="modulepreload" crossorigin href="/assets/useFocusTrap-BqwHsCs9.js">
+  <link rel="modulepreload" crossorigin href="/assets/Modal2-DnaQJkP1.js">
+  <link rel="modulepreload" crossorigin href="/assets/touchPresentation-DFVwvLsY.js">
+  <link rel="modulepreload" crossorigin href="/assets/VStack-DaUzGF31.js">
+  <link rel="modulepreload" crossorigin href="/assets/form-engine-mhqCLVoE.js">
+  <link rel="modulepreload" crossorigin href="/assets/computeTargetAndRel-CFo07ZaQ.js">
+  <link rel="modulepreload" crossorigin href="/assets/useInteractiveRole-C6pFCHM9.js">
+  <link rel="modulepreload" crossorigin href="/assets/disabledInteraction-XM19PcsP.js">
+  <link rel="modulepreload" crossorigin href="/assets/BAIFlex-BElkJeHW.js">
+  <link rel="modulepreload" crossorigin href="/assets/Card-CocqIvLx.js">
+  <link rel="modulepreload" crossorigin href="/assets/MediaTheme-DBjbdvwF.js">
+  <link rel="modulepreload" crossorigin href="/assets/app-shim-DTEBzR8d.js">
+  <link rel="modulepreload" crossorigin href="/assets/defineSyntaxTheme-CJa0aPhr.js">
+  <link rel="modulepreload" crossorigin href="/assets/dayjs.min-PJVk-kyH.js">
+  <link rel="modulepreload" crossorigin href="/assets/debounce-DPoC4s1g-CqNXCj0s.js">
+  <link rel="modulepreload" crossorigin href="/assets/helper-BWFKT_2Y.js">
+  <link rel="modulepreload" crossorigin href="/assets/useThemeMode-Dg5yAWy7.js">
+  <link rel="modulepreload" crossorigin href="/assets/react-relay-BfoHYpUf.js">
+  <link rel="modulepreload" crossorigin href="/assets/useToggle-CAWNf18k.js">
+  <link rel="modulepreload" crossorigin href="/assets/IconButton-DGkWhkpU.js">
+  <link rel="modulepreload" crossorigin href="/assets/Kbd-FMEXxTTS.js">
+  <link rel="modulepreload" crossorigin href="/assets/BAIText-CtDfjLnS.js">
+  <link rel="modulepreload" crossorigin href="/assets/Banner-ElTQ2msG.js">
+  <link rel="modulepreload" crossorigin href="/assets/customThemeConfig-CUkcX77V.js">
+  <link rel="modulepreload" crossorigin href="/assets/react-error-boundary-DESmfvQ5.js">
+  <link rel="modulepreload" crossorigin href="/assets/dist-C3M-rFln.js">
+  <link rel="modulepreload" crossorigin href="/assets/FolderExplorerOpener-DAkYQMOx.js">
+  <link rel="modulepreload" crossorigin href="/assets/DefaultProviders-BFjPhnQa.js">
+  <link rel="modulepreload" crossorigin href="/assets/BAIIconWithTooltip-uPQTnQkb.js">
+  <link rel="modulepreload" crossorigin href="/assets/StackItem-3LBG1jv4.js">
+  <link rel="modulepreload" crossorigin href="/assets/Form-DK4EItCB.js">
+  <link rel="modulepreload" crossorigin href="/assets/astryxLabel-C5P0iFEX.js">
+  <link rel="modulepreload" crossorigin href="/assets/BAIButton-FCOTP7us.js">
+  <link rel="modulepreload" crossorigin href="/assets/isRtlElement-BG33-k_H.js">
+  <link rel="modulepreload" crossorigin href="/assets/useListFocus-BEW0bZDL.js">
+  <link rel="modulepreload" crossorigin href="/assets/useKeyboardHint-PcUehrrP.js">
+  <link rel="modulepreload" crossorigin href="/assets/usePopover-DW33lkk7.js">
+  <link rel="modulepreload" crossorigin href="/assets/menuItemRoles-Bod0knkp.js">
+  <link rel="modulepreload" crossorigin href="/assets/Item-Bq2FxtOq.js">
+  <link rel="modulepreload" crossorigin href="/assets/useTypeahead-Dl8SfvsW.js">
+  <link rel="modulepreload" crossorigin href="/assets/useAdaptivePresentation-4E95xQde.js">
+  <link rel="modulepreload" crossorigin href="/assets/useFocusReturnVisibility-CtoP8ain.js">
+  <link rel="modulepreload" crossorigin href="/assets/useBusyAnnouncement-0TKCBG7A.js">
+  <link rel="modulepreload" crossorigin href="/assets/Divider-ze3owNF7.js">
+  <link rel="modulepreload" crossorigin href="/assets/clampInlineSize-A-Zlg_sJ.js">
+  <link rel="modulepreload" crossorigin href="/assets/menuBottomSheet.stylex-DcPCJ_PV.js">
+  <link rel="modulepreload" crossorigin href="/assets/DropdownMenu-C-9Wznw4.js">
+  <link rel="modulepreload" crossorigin href="/assets/hooks-UUY7pxyu.js">
+  <link rel="modulepreload" crossorigin href="/assets/useIntervalValue-DvoJPhVO.js">
+  <link rel="modulepreload" crossorigin href="/assets/helper-DF1Eunoe.js">
+  <link rel="modulepreload" crossorigin href="/assets/FieldStatus-B8nLKvfH.js">
+  <link rel="modulepreload" crossorigin href="/assets/fieldParts-BKTnvYp0.js">
+  <link rel="modulepreload" crossorigin href="/assets/Field-8P45In25.js">
+  <link rel="modulepreload" crossorigin href="/assets/InputClearButton-DaozmTPl.js">
+  <link rel="modulepreload" crossorigin href="/assets/useResolvedRequired-D2JtCrHx.js">
+  <link rel="modulepreload" crossorigin href="/assets/inputDisabledFocus-BCNxuTEz.js">
+  <link rel="modulepreload" crossorigin href="/assets/Badge-8q4sdq1t.js">
+  <link rel="modulepreload" crossorigin href="/assets/useHighlightedOptionScroll-CTL7kYDW.js">
+  <link rel="modulepreload" crossorigin href="/assets/CheckboxIndicator-I3M-4ahW.js">
+  <link rel="modulepreload" crossorigin href="/assets/useIndicator-DvzI6XM8.js">
+  <link rel="modulepreload" crossorigin href="/assets/CheckboxInput-DV2mX0Ah.js">
+  <link rel="modulepreload" crossorigin href="/assets/textEntryTraits-CwekT1b8.js">
+  <link rel="modulepreload" crossorigin href="/assets/PanelSearchInput-DGS6vnNt.js">
+  <link rel="modulepreload" crossorigin href="/assets/hooks-BkYytuB8.js">
+  <link rel="modulepreload" crossorigin href="/assets/Selector-DY2LnOcT.js">
+  <link rel="modulepreload" crossorigin href="/assets/formControl-BEhzmalq.js">
+  <link rel="modulepreload" crossorigin href="/assets/BAISelect-D7nL9svF.js">
+  <link rel="modulepreload" crossorigin href="/assets/springs-QRn-gj_5.js">
+  <link rel="modulepreload" crossorigin href="/assets/bottomSheetEscape-BVaCnMga.js">
+  <link rel="modulepreload" crossorigin href="/assets/Popover-BpJL-xE6.js">
+  <link rel="modulepreload" crossorigin href="/assets/BAIUnmountAfterClose-Cxr4Dp_U.js">
+  <link rel="modulepreload" crossorigin href="/assets/compiled-Dfvzj6n2.js">
+  <link rel="modulepreload" crossorigin href="/assets/logoSource-C8CeZn6Y.js">
+  <link rel="modulepreload" crossorigin href="/assets/BAISkeleton-MIjJv1Hr.js">
+  <link rel="modulepreload" crossorigin href="/assets/BAIModal-XZIjYM23.js">
+  <link rel="modulepreload" crossorigin href="/assets/ListItem-CUehsp5R.js">
+  <link rel="modulepreload" crossorigin href="/assets/iconShim-Bbvmk4Tr.js">
+  <link rel="modulepreload" crossorigin href="/assets/BAISessionsIcon-C9bDjyiS.js">
+  <link rel="modulepreload" crossorigin href="/assets/useWebUIMenuCatalog-B86KpyMs.js">
+  <link rel="modulepreload" crossorigin href="/assets/animator-DobHrapp.js">
+  <link rel="modulepreload" crossorigin href="/assets/PressTracker-DC4LxcaD.js">
+  <link rel="modulepreload" crossorigin href="/assets/BAISegmentedControlItem-erYb9KqU.js">
+  <link rel="modulepreload" crossorigin href="/assets/useInputStatusIcon-BdJMOU4S.js">
+  <link rel="modulepreload" crossorigin href="/assets/TextInput-C_tSDoXF.js">
+  <link rel="modulepreload" crossorigin href="/assets/TextInput-B89-yA_Q.js">
+  <link rel="modulepreload" crossorigin href="/assets/useAccessibleProjects-gzoxrvLz.js">
+  <link rel="modulepreload" crossorigin href="/assets/utils-DCpr9tfC.js">
+  <link rel="modulepreload" crossorigin href="/assets/useCurrentProject-BaleCvMA.js">
+  <link rel="modulepreload" crossorigin href="/assets/useCurrentUserProjectRoles-CLTXJ3AL.js">
+  <link rel="modulepreload" crossorigin href="/assets/pathBuilder-BpKje1m9.js">
+  <link rel="modulepreload" crossorigin href="/assets/useRouteScope-Dgi-LDmN.js">
+  <link rel="modulepreload" crossorigin href="/assets/useWebUIMenuItems-D7l6adrU.js">
+  <link rel="modulepreload" crossorigin href="/assets/BAIFormItem-xrBTQyTs.js">
+  <link rel="modulepreload" crossorigin href="/assets/SanitizedHtml-rwimTTi_.js">
+  <link rel="modulepreload" crossorigin href="/assets/AstryxSecondaryTheme-CI-CS4ra.js">
+  <link rel="modulepreload" crossorigin href="/assets/useAppConfig-YxMPgnp9.js">
+  <link rel="modulepreload" crossorigin href="/assets/userSettingsModal-D5kB2pDk.js">
+  <link rel="modulepreload" crossorigin href="/assets/useHelpURL-CJ4tnmAw.js">
+  <link rel="modulepreload" crossorigin href="/assets/useControllableState-CIRQ-zvl.js">
+  <link rel="stylesheet" crossorigin href="/assets/src-C0i8rXb_.css">
+  <link rel="stylesheet" crossorigin href="/assets/Modal2-CNxwJFYv.css">
+  <link rel="stylesheet" crossorigin href="/assets/BAIText-CqKGKX-T.css">
+  <link rel="stylesheet" crossorigin href="/assets/DefaultProviders-dpi5thqj.css">
+  <link rel="stylesheet" crossorigin href="/assets/BAIIconWithTooltip-B97aA3zw.css">
+  <link rel="stylesheet" crossorigin href="/assets/Form-YsKImk6e.css">
+  <link rel="stylesheet" crossorigin href="/assets/BAISelect-tVfRoQ3W.css">
+  <link rel="stylesheet" crossorigin href="/assets/logoSource-DifCCqAE.css">
+  <link rel="stylesheet" crossorigin href="/assets/BAIModal-DkZY2Any.css">
+  <link rel="stylesheet" crossorigin href="/assets/useWebUIMenuItems-Dp4ReYMO.css">
+  <link rel="stylesheet" crossorigin href="/assets/index-BDYvHkcf.css">
 </head>
 
 <body>

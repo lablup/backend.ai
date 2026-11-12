@@ -18,7 +18,10 @@ from ai.backend.common.dto.manager.v2.session_group.types import (
 
 __all__ = (
     "AdminSearchSessionGroupsPayload",
+    "CreateSessionGroupPayload",
+    "PurgeSessionGroupPayload",
     "SessionGroupNode",
+    "UpdateSessionGroupPayload",
 )
 
 
@@ -51,3 +54,21 @@ class AdminSearchSessionGroupsPayload(BaseResponseModel):
     total_count: int = Field(description="Total number of session groups matching the filter.")
     has_next_page: bool = Field(description="Whether there is a next page.")
     has_previous_page: bool = Field(description="Whether there is a previous page.")
+
+
+class PurgeSessionGroupPayload(BaseResponseModel):
+    """Payload naming the session group removed."""
+
+    entity_id: UUID = Field(description="UUID of the purged session group.")
+
+
+class UpdateSessionGroupPayload(BaseResponseModel):
+    """Payload for a session group update."""
+
+    session_group: SessionGroupNode = Field(description="The updated session group.")
+
+
+class CreateSessionGroupPayload(BaseResponseModel):
+    """Payload for a session group creation."""
+
+    session_group: SessionGroupNode = Field(description="The created session group.")

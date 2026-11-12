@@ -46,8 +46,11 @@ from ai.backend.appproxy.common.defs import (
     MEDIA_TYPE_HTML,
     MEDIA_TYPE_JSON,
     WORKER_AUTHORITY_LABEL,
+    WORKER_HOSTNAME_LABEL,
     WORKER_INGRESS_DELIVERY_MODE_LABEL,
     WORKER_SERVICE_GROUP,
+    WORKER_TLS_LISTEN_LABEL,
+    WORKER_WILDCARD_DOMAIN_LABEL,
 )
 from ai.backend.appproxy.common.errors import (
     CoordinatorConnectionError,
@@ -518,7 +521,7 @@ async def worker_registration_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     ):
         with attempt:
             try:
-                await register_worker(root_ctx, str(uuid.uuid4()))
+                registration = await register_worker(root_ctx, str(uuid.uuid4()))
             except CoordinatorConnectionError as e:
                 log.warning(
                     "failed to connect to the coordinator; retrying",
@@ -527,15 +530,20 @@ async def worker_registration_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                     ),
                 )
                 raise TryAgain from e
+            root_ctx.proxy_frontend.apply_content_encoding_config(registration.content_encoding)
 
     circuits = await list_worker_circuits(root_ctx, str(uuid.uuid4()))
+    registered_circuits: list[Circuit] = []
     for circuit in circuits:
-        await root_ctx.proxy_frontend.register_circuit(circuit, circuit.route_info)
+        if await root_ctx.proxy_frontend.register_circuit(circuit, circuit.route_info):
+            registered_circuits.append(circuit)
     # Applied rather than replaced, so circuits from events handled meanwhile are kept.
     ingress_writer = root_ctx.ingress_state.writer
     if ingress_writer is not None:
         ingress_authority = IngressAuthority(root_ctx.local_config.proxy_worker.authority)
-        await ingress_writer.apply([circuit.to_ingress(ingress_authority) for circuit in circuits])
+        await ingress_writer.apply([
+            circuit.to_ingress(ingress_authority) for circuit in registered_circuits
+        ])
 
     cron = LocalCron([WorkerHeartbeatTask(root_ctx)])
     await cron.start()
@@ -595,6 +603,18 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     announce_addr = root_ctx.local_config.proxy_worker.announce_addr
     if announce_addr is None:
         raise MissingAnnounceAddressError("Announce address is not configured")
+    proxy_worker_config = root_ctx.local_config.proxy_worker
+    service_discovery_labels = {
+        WORKER_AUTHORITY_LABEL: proxy_worker_config.authority,
+        WORKER_INGRESS_DELIVERY_MODE_LABEL: proxy_worker_config.ingress.delivery_mode,
+        WORKER_HOSTNAME_LABEL: (
+            proxy_worker_config.api_advertised_addr or proxy_worker_config.api_bind_addr
+        ).host,
+        WORKER_TLS_LISTEN_LABEL: str(proxy_worker_config.tls_listen).lower(),
+    }
+    served_wildcard_domain = proxy_worker_config.served_wildcard_domain()
+    if served_wildcard_domain is not None:
+        service_discovery_labels[WORKER_WILDCARD_DOMAIN_LABEL] = served_wildcard_domain
     sd_loop = ServiceDiscoveryLoop(
         sd_type,
         service_discovery,
@@ -609,10 +629,7 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 # It can be separated into an internal-purpose port later.
                 prometheus_address=str(announce_addr),
             ),
-            labels={
-                WORKER_AUTHORITY_LABEL: root_ctx.local_config.proxy_worker.authority,
-                WORKER_INGRESS_DELIVERY_MODE_LABEL: root_ctx.local_config.proxy_worker.ingress.delivery_mode,
-            },
+            labels=service_discovery_labels,
         ),
     )
 
@@ -678,7 +695,6 @@ def _build_worker_health_response(connectivity: ConnectivityCheckResponse) -> we
     DEGRADED in the body but not surfaced via HTTP status."""
     response = HealthResponse(
         status=HealthStatus.OK if connectivity.overall_healthy else HealthStatus.DEGRADED,
-        version=__version__,
         component="appproxy-worker",
         connectivity=connectivity,
     )
@@ -690,7 +706,6 @@ def _build_worker_probe_response(connectivity: ConnectivityCheckResponse) -> web
     is_healthy = connectivity.overall_healthy
     response = HealthResponse(
         status=HealthStatus.OK if is_healthy else HealthStatus.ERROR,
-        version=__version__,
         component="appproxy-worker",
         connectivity=connectivity,
     )
@@ -745,13 +760,15 @@ async def handle_proxy_route_event(
         case AppProxyCircuitCreatedEvent():
             log.debug("circuits created: {}", [str(c.id) for c in event.circuits])
             created_circuits = [Circuit.from_serialized_circuit(c) for c in event.circuits]
+            registered_circuits: list[Circuit] = []
             for created_circuit in created_circuits:
-                await context.proxy_frontend.register_circuit(
+                if await context.proxy_frontend.register_circuit(
                     created_circuit, created_circuit.route_info
-                )
+                ):
+                    registered_circuits.append(created_circuit)
             if ingress_writer is not None:
                 await ingress_writer.apply([
-                    circuit.to_ingress(ingress_authority) for circuit in created_circuits
+                    circuit.to_ingress(ingress_authority) for circuit in registered_circuits
                 ])
             await context.event_producer.broadcast_event(
                 AppProxyWorkerCircuitAddedEvent(
@@ -763,12 +780,13 @@ async def handle_proxy_route_event(
             log.debug("circuit routes updated: {}", event.circuit.id)
             updated_circuit = Circuit.from_serialized_circuit(event.circuit)
             await context.proxy_frontend.update_circuit_route_info(updated_circuit, event.routes)
-            # The frontend stores the new routes on the circuit it holds and skips one it does not.
-            held_circuit = context.proxy_frontend.circuits.get(
+            # The frontend stores the new routes on the circuit of the backend it holds and skips a
+            # circuit it holds no backend of.
+            held_backend = context.proxy_frontend.backends.get(
                 context.proxy_frontend.get_circuit_key(updated_circuit)
             )
-            if ingress_writer is not None and held_circuit is not None:
-                await ingress_writer.apply([held_circuit.to_ingress(ingress_authority)])
+            if ingress_writer is not None and held_backend is not None:
+                await ingress_writer.apply([held_backend.circuit.to_ingress(ingress_authority)])
         case AppProxyCircuitRemovedEvent():
             log.debug("circuits removed: {}", [str(c.id) for c in event.circuits])
             removed_circuits = [Circuit.from_serialized_circuit(c) for c in event.circuits]
@@ -946,7 +964,6 @@ async def server_main(
         # Start aiomonitor.
         m = aiomonitor.Monitor(
             loop,
-            host="0.0.0.0",
             termui_port=local_config.proxy_worker.aiomonitor_termui_port + pidx,
             webui_port=local_config.proxy_worker.aiomonitor_webui_port + pidx,
             console_enabled=False,
