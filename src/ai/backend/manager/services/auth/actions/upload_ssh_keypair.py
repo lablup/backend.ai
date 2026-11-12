@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.services.auth.actions.base import UserEntityAction
 
@@ -10,7 +11,7 @@ class UploadSSHKeypairAction(UserEntityAction):
     """Overwrite the SSH public key the named user's keypair carries with a given one."""
 
     public_key: str
-    access_key: str
+    access_key: AccessKey
 
     @override
     @classmethod

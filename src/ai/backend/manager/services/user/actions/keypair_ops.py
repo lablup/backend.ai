@@ -269,7 +269,7 @@ class AdminSearchKeypairsAction(GlobalSearcherOpsAction[KeyPairRow, KeyPairData]
 class AdminRegisterSSHKeypairAction(_KeypairOfUserAction):
     """Overwrite the SSH public key a keypair row carries."""
 
-    access_key: str
+    access_key: AccessKey
     ssh_public_key: str
 
     @override

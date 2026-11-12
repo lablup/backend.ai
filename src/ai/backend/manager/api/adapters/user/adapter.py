@@ -1052,7 +1052,7 @@ class UserAdapter(BaseAdapter):
         result = await self._user.admin_register_ssh_keypair.run(
             AdminRegisterSSHKeypairAction(
                 user_id=await self._resolve_keypair_owner(input.access_key),
-                access_key=input.access_key,
+                access_key=AccessKey(input.access_key),
                 ssh_public_key=input.ssh_public_key,
             )
         )

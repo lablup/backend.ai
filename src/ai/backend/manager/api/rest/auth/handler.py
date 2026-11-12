@@ -51,6 +51,7 @@ from ai.backend.common.dto.manager.auth.types import (
 )
 from ai.backend.common.dto.manager.v2.user.request import UpdatePasswordInput
 from ai.backend.common.exception import UnreachableError
+from ai.backend.common.types import AccessKey
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.adapters.auth.adapter import AuthAdapter
 from ai.backend.manager.api.rest.middleware.auth import extract_client_ip
@@ -324,7 +325,7 @@ class AuthHandler:
             UploadSSHKeypairAction(
                 user_id=UserID(ctx.user_uuid),
                 public_key=pubkey,
-                access_key=ctx.access_key,
+                access_key=AccessKey(ctx.access_key),
             )
         )
         resp = UploadSSHKeypairResponse(ssh_public_key=result.public_key)
