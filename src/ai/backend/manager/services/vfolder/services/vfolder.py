@@ -289,18 +289,17 @@ class VFolderService:
         return PartialBulkResult(items=items)
 
     async def lookup_vfolder(self, action: LookupVFolderAction) -> LookupVFolderActionResult:
-        """Resolve one vfolder name into its id.
+        """Resolve a vfolder name into the folder a session of the owner in the project mounts.
 
-        No access checking — the session-create path that still accepts names in
-        ``creation_config["mounts"]`` validates the resolved ids downstream.
+        A folder the caller cannot read is passed over: the lookup gate would refuse it.
         """
-        name_to_id = await self._vfolder_repository.resolve_vfolder_ids_by_names([
-            action.vfolder_name
-        ])
-        vfolder_id = name_to_id.get(action.vfolder_name)
-        if vfolder_id is None:
-            raise VFolderNotFound(extra_data=[action.vfolder_name])
-        return LookupVFolderActionResult(vfolder_uuid=VFolderUUID(vfolder_id))
+        vfolder_id = await self._vfolder_repository.resolve_mountable_vfolder_id_by_name(
+            action.owner_access_key,
+            action.project_id,
+            action.vfolder_name,
+            self._own_check.held,
+        )
+        return LookupVFolderActionResult(vfolder_uuid=vfolder_id)
 
     async def create(self, action: CreateVFolderAction) -> CreateVFolderActionResult:
         """Create the vfolder the action's insert spec describes.

@@ -5,8 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, override
 
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
+from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.v2.lookup.base import (
     BaseLookupAction,
     BaseLookupActionResult,
@@ -31,14 +33,15 @@ class VFolderNameKey(LookupKey):
 
 @dataclass
 class LookupVFolderAction(BaseLookupAction):
-    """Resolve a folder name into the folder it names.
+    """Resolve a folder name into the folder a session of the owner in the project mounts.
 
     Legacy-only: the v1 CLI accepts ``-v <vfolder-name>`` where the modern
-    surface passes ids. Names are not unique across owners, so the row a
-    duplicate name resolves to is arbitrary.
+    surface passes ids.
     """
 
     vfolder_name: str
+    owner_access_key: AccessKey
+    project_id: ProjectID
 
     @override
     @classmethod
