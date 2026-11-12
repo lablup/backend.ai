@@ -2,7 +2,13 @@ from typing import override
 
 from aiohttp import web
 
-from ai.backend.common.exception import BackendAIError, ErrorCode, ErrorDetail, ErrorOperation
+from ai.backend.common.exception import (
+    BackendAIError,
+    ErrorCode,
+    ErrorDetail,
+    ErrorDomain,
+    ErrorOperation,
+)
 
 
 class InvalidSSHPublicKey(BackendAIError, web.HTTPBadRequest):
@@ -12,7 +18,7 @@ class InvalidSSHPublicKey(BackendAIError, web.HTTPBadRequest):
     @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
-            domain="user-keypair",
+            domain=ErrorDomain.KEYPAIR,
             operation=ErrorOperation.CREATE,
             error_detail=ErrorDetail.INVALID_DATA_FORMAT,
         )
