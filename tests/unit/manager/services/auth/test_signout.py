@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock
 from uuid import UUID
 
@@ -5,6 +6,7 @@ import pytest
 
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.secret.types import KeyProviderType
+from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.models.user import UserRole, UserStatus
@@ -15,6 +17,8 @@ from ai.backend.manager.repositories.user_resource_policy.repository import (
 from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.auth.actions.signout import SignoutAction
 from ai.backend.manager.services.auth.service import AuthService
+
+_PASSWORD_CHANGED_AT = datetime(2026, 1, 1, tzinfo=UTC)
 
 
 @pytest.fixture
@@ -59,12 +63,22 @@ async def test_signout_successful_with_valid_credentials(
     )
 
     # Setup valid credential check
+<<<<<<< HEAD
     mock_auth_repository.check_credential_without_migration.return_value = {
         "uuid": UUID("12345678-1234-5678-1234-567812345678"),
         "email": "user@example.com",
         "role": UserRole.USER,
         "status": UserStatus.ACTIVE,
     }
+=======
+    mock_auth_repository.check_credential_without_migration.return_value = UserCredential(
+        user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
+        hashed_password="hashed_password",
+        username="test-user",
+        status=UserStatus.ACTIVE,
+        password_changed_at=_PASSWORD_CHANGED_AT,
+    )
+>>>>>>> 5eb92247 (fix(BA-8805): count TOTP failures toward the login block and open update-password-no-auth only to expired passwords (#16477))
     mock_auth_repository.deactivate_user_and_keypairs.return_value = None
 
     result = await auth_service.signout(action)
