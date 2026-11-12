@@ -16,6 +16,7 @@ from strawberry.utils.await_maybe import AwaitableOrValue
 from ai.backend.common.exception import (
     BackendAIError,
     BackendAISchemaValidationFailed,
+    ErrorCode,
 )
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.errors.common import InternalServerError
@@ -64,12 +65,17 @@ class GQLExceptionHandlerExtension(SchemaExtension):
                 log.trace(
                     "graphql client error", error_code=str(e.error_code()), error_message=str(e)
                 )
-            else:
-                log.exception("graphql server error", error_code=str(e.error_code()))
-            raise self._wrap_backend_error(e) from e
+                raise GraphQLError(message=str(e), extensions={"code": str(e.error_code())}) from e
+            log.exception("graphql server error", error_code=str(e.error_code()))
+            raise GraphQLError(
+                message=e.error_title, extensions={"code": str(e.error_code())}
+            ) from e
         except Exception as e:
             log.exception("graphql unexpected error")
-            raise self._wrap_backend_error(InternalServerError()) from e
+            raise GraphQLError(
+                message=InternalServerError.error_title,
+                extensions={"code": str(ErrorCode.default())},
+            ) from e
         if asyncio.iscoroutine(result):
             return self._handle_async(result)
         return result
@@ -91,17 +97,17 @@ class GQLExceptionHandlerExtension(SchemaExtension):
                 log.trace(
                     "graphql client error", error_code=str(e.error_code()), error_message=str(e)
                 )
-            else:
-                log.exception("graphql server error", error_code=str(e.error_code()))
-            raise self._wrap_backend_error(e) from e
+                raise GraphQLError(message=str(e), extensions={"code": str(e.error_code())}) from e
+            log.exception("graphql server error", error_code=str(e.error_code()))
+            raise GraphQLError(
+                message=e.error_title, extensions={"code": str(e.error_code())}
+            ) from e
         except Exception as e:
             log.exception("graphql unexpected error")
-            raise self._wrap_backend_error(InternalServerError()) from e
-
-    def _wrap_backend_error(self, e: BackendAIError) -> GraphQLError:
-        if e.is_client_error():
-            return GraphQLError(message=str(e), extensions={"code": str(e.error_code())})
-        return GraphQLError(message=e.error_title, extensions={"code": str(e.error_code())})
+            raise GraphQLError(
+                message=InternalServerError.error_title,
+                extensions={"code": str(ErrorCode.default())},
+            ) from e
 
     @override
     def on_stream_result(self, result: StreamExecutionResult) -> Iterator[None]:
@@ -140,15 +146,20 @@ class GQLExceptionHandlerExtension(SchemaExtension):
                             error_code=str(e.error_code()),
                             error_message=str(e),
                         )
-                        converted = self._wrap_backend_error(e)
+                        converted = GraphQLError(str(e), extensions={"code": str(e.error_code())})
                     case BackendAIError() as e:
                         log.error(
                             "graphql server error", exc_info=e, error_code=str(e.error_code())
                         )
-                        converted = self._wrap_backend_error(e)
+                        converted = GraphQLError(
+                            e.error_title, extensions={"code": str(e.error_code())}
+                        )
                     case e:
                         log.error("graphql unexpected error", exc_info=e)
-                        converted = self._wrap_backend_error(InternalServerError())
+                        converted = GraphQLError(
+                            InternalServerError.error_title,
+                            extensions={"code": str(ErrorCode.default())},
+                        )
                 masked.append(
                     GraphQLError(
                         message=converted.message,

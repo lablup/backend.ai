@@ -3427,7 +3427,7 @@ class GQLExceptionMiddleware:
         except BackendAIError as e:
             raise self._wrap_backend_error(e) from e
         except Exception as e:
-            raise self._wrap_backend_error(InternalServerError()) from e
+            raise self._wrap_unexpected_error(e) from e
         if asyncio.iscoroutine(res):
             # Async resolvers raise while being awaited by graphql-core,
             # outside this try block; wrap the coroutine to catch them.
@@ -3444,7 +3444,7 @@ class GQLExceptionMiddleware:
         except BackendAIError as e:
             raise self._wrap_backend_error(e) from e
         except BaseException as e:
-            raise self._wrap_backend_error(InternalServerError()) from e
+            raise self._wrap_unexpected_error(e) from e
 
     def _wrap_integrity_error(self, e: RepositoryIntegrityError) -> GraphQLError:
         # Its message carries the PostgreSQL diagnostic; answer with the title only.
@@ -3457,6 +3457,13 @@ class GQLExceptionMiddleware:
             return GraphQLError(message=str(e), extensions={"code": str(e.error_code())})
         log.exception("graphql server error", error_code=str(e.error_code()))
         return GraphQLError(message=e.error_title, extensions={"code": str(e.error_code())})
+
+    def _wrap_unexpected_error(self, e: BaseException) -> GraphQLError:
+        log.exception("graphql unexpected error")
+        return GraphQLError(
+            message=InternalServerError.error_title,
+            extensions={"code": str(ErrorCode.default())},
+        )
 
 
 class GQLMetricMiddleware:
