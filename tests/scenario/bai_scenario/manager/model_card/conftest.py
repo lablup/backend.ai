@@ -24,6 +24,7 @@ from ai.backend.manager.api.adapters.deployment_revision_preset.adapter import (
 from ai.backend.manager.api.adapters.model_card.adapter import ModelCardAdapter
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.repositories.deployment_revision_preset.repository import (
     DeploymentPresetRepository,
@@ -132,6 +133,7 @@ async def adapter(
             DeploymentService(
                 controller,
                 deployments,
+                unwired(AgentRepository, "no deployment here designates an agent"),
                 unwired(AppProxyClientPool, "only a served deployment reaches the proxy"),
             ),
         ),

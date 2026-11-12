@@ -30,6 +30,7 @@ from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.secret.types import KeyProviderType
+from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.repositories.deployment_revision_preset.repository import (
     DeploymentPresetRepository,
@@ -171,6 +172,7 @@ async def adapter(
     deployment_service = DeploymentService(
         deployment_controller,
         deployment_repository,
+        unwired(AgentRepository, "no deployment here designates an agent"),
         unwired(AppProxyClientPool, "only a served deployment reaches the proxy"),
         preset_repository,
     )
