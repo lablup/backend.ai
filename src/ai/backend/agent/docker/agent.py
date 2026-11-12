@@ -958,7 +958,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
     @override
     async def process_mounts(self, mounts: Sequence[Mount]) -> None:
-        await run_in_executor_with_context(None, self._create_mount_points_in_work_dir, mounts)
+        loop = current_loop()
+        await loop.run_in_executor(None, self._create_mount_points_in_work_dir, mounts)
 
         def fix_unsupported_perm(folder_perm: MountPermission) -> MountPermission:
             if folder_perm == MountPermission.RW_DELETE:

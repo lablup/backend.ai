@@ -3,11 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
-from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
-from pytest_mock import MockerFixture
 
 from ai.backend.agent.docker.agent import DockerKernelCreationContext
 from ai.backend.agent.resources import Mount
@@ -31,15 +29,8 @@ class _ProcessMountsSituation:
 class TestProcessMounts:
     @pytest.fixture
     def process_mounts_situation(
-        self, case: _MountPointCase, tmp_path: Path, mocker: MockerFixture
+        self, case: _MountPointCase, tmp_path: Path
     ) -> _ProcessMountsSituation:
-        async def run_in_executor_sync(executor: Any, fn: Any, *args: Any) -> Any:
-            return fn(*args)
-
-        mocker.patch(
-            "ai.backend.agent.docker.agent.run_in_executor_with_context",
-            side_effect=run_in_executor_sync,
-        )
         work_dir = tmp_path / "scratch" / "work"
         work_dir.mkdir(parents=True)
         source = tmp_path / "vfolder"
