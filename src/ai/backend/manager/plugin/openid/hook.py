@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import enum
 import logging
 import uuid
 from collections.abc import Mapping, Sequence
 from typing import (
     Any,
+    assert_never,
     cast,
     override,
 )
@@ -24,6 +26,11 @@ from ai.backend.manager.repositories.auth.repository import AuthRepository
 from .config import OIDCHookConfig
 
 log = StructuredLogger(logging.getLogger(__name__))
+
+
+class _STokenSource(enum.Enum):
+    REQUEST_PARAMS = enum.auto()
+    COOKIE = enum.auto()
 
 
 class OIDCHookPlugin(HookPlugin):
@@ -67,25 +74,41 @@ class OIDCHookPlugin(HookPlugin):
         secret = self._config.secret
 
         stoken_in_params = params.get("stoken") or params.get("sToken")
-        stoken = stoken_in_params or request.cookies.get("sToken")
-        if not stoken:
+        stoken_in_cookie = request.cookies.get("sToken")
+        if stoken_in_params:
+            # The caller sends this token to log in with it, so an expired or invalid one rejects the login.
+            stoken, stoken_source = stoken_in_params, _STokenSource.REQUEST_PARAMS
+        elif stoken_in_cookie:
+            # The browser sends the cookie of an earlier OIDC login with every login, and this hook also runs
+            # for a password login that auth_keypair leaves unhandled. An expired or invalid cookie therefore
+            # leaves the login to password verification instead of rejecting a correct password.
+            stoken, stoken_source = stoken_in_cookie, _STokenSource.COOKIE
+        else:
             log.debug("openid auth token not found, proceeding with normal auth")
             return None
-        # A browser sends the cookie on its own, so a stale one must not block a password login.
+
         try:
             payload = jwt.decode(stoken, secret, algorithms=["HS256"])
             user_id = UserID(uuid.UUID(payload["user"]))
             email = payload["email"]
         except jwt.ExpiredSignatureError:
-            if stoken_in_params:
-                raise Reject("Expired authentication token") from None
-            log.debug("openid auth cookie expired, proceeding with normal auth")
-            return None
+            match stoken_source:
+                case _STokenSource.REQUEST_PARAMS:
+                    raise Reject("Expired authentication token") from None
+                case _STokenSource.COOKIE:
+                    log.debug("openid auth cookie expired, proceeding with password verification")
+                    return None
+                case _:
+                    assert_never(stoken_source)
         except (jwt.PyJWTError, KeyError, ValueError):
-            if stoken_in_params:
-                raise Reject("Invalid authentication token") from None
-            log.debug("openid auth cookie invalid, proceeding with normal auth")
-            return None
+            match stoken_source:
+                case _STokenSource.REQUEST_PARAMS:
+                    raise Reject("Invalid authentication token") from None
+                case _STokenSource.COOKIE:
+                    log.debug("openid auth cookie invalid, proceeding with password verification")
+                    return None
+                case _:
+                    assert_never(stoken_source)
 
         log.debug("openid auth token decoded", user_id=user_id)
 
