@@ -13,16 +13,16 @@ from ai.backend.common.exception import (
 from ai.backend.common.plugin.hook import Reject
 
 
-class UnusableOpenIDSToken(Reject):
+class OpenIDSTokenVerificationFailed(Reject):
     pass
 
 
-class ExpiredOpenIDSToken(UnusableOpenIDSToken):
+class ExpiredOpenIDSToken(OpenIDSTokenVerificationFailed):
     def __init__(self) -> None:
         super().__init__("Expired authentication token")
 
 
-class InvalidOpenIDSToken(UnusableOpenIDSToken):
+class InvalidOpenIDSToken(OpenIDSTokenVerificationFailed):
     def __init__(self) -> None:
         super().__init__("Invalid authentication token")
 
