@@ -486,7 +486,12 @@ class SessionHandler:
             raise UnreachableError("authenticated user missing from request context")
         return user.user_id
 
-    async def _normalize_legacy_mounts(self, validated_config: dict[str, Any]) -> dict[str, Any]:
+    async def _normalize_legacy_mounts(
+        self,
+        validated_config: dict[str, Any],
+        owner_access_key: AccessKey,
+        project_id: ProjectID,
+    ) -> dict[str, Any]:
         """One-stop processor for the legacy ``mounts`` / ``mount_map`` /
         ``mount_options`` surfaces: route UUID-shaped entries onto the
         UUID-keyed buckets, then resolve any remaining names to UUIDs and
@@ -502,6 +507,8 @@ class SessionHandler:
             validated_config.get("mounts") or (),
             validated_config.get("mount_map") or {},
             validated_config.get("mount_options") or {},
+            owner_access_key,
+            project_id,
         )
         return _merge_resolved_legacy_mounts(validated_config, resolutions)
 
@@ -510,6 +517,8 @@ class SessionHandler:
         mounts: Sequence[str],
         mount_map: Mapping[str, str],
         mount_options: Mapping[str, Any],
+        owner_access_key: AccessKey,
+        project_id: ProjectID,
     ) -> dict[str, LegacyMountResolution]:
         """Resolve legacy v1 CLI name-keyed mount surfaces into a map
         ``name → LegacyMountResolution(vfid, subpath_or_None)``.
@@ -562,7 +571,13 @@ class SessionHandler:
 
         resolved = {
             name: (
-                await self._vfolder.lookup.run(LookupVFolderAction(vfolder_name=name))
+                await self._vfolder.lookup.run(
+                    LookupVFolderAction(
+                        vfolder_name=name,
+                        owner_access_key=owner_access_key,
+                        project_id=project_id,
+                    )
+                )
             ).entity_id()
             for name in names_to_resolve
         }
@@ -593,8 +608,6 @@ class SessionHandler:
             template=True,
         )
 
-        validated_config = await self._normalize_legacy_mounts(validated_config)
-
         scope = await self._auth.public_resolve_access_key_scope.run(
             PublicResolveAccessKeyScopeAction(
                 owner_access_key=params.owner_access_key,
@@ -603,6 +616,10 @@ class SessionHandler:
         requester_access_key, owner_access_key = scope.requester_access_key, scope.owner_access_key
 
         domain_name = params.domain or request["user"]["domain_name"]
+        project_id = await self._resolve_project_id(domain_name, str(params.group))
+        validated_config = await self._normalize_legacy_mounts(
+            validated_config, owner_access_key, project_id
+        )
 
         # Use model_fields_set to detect which fields were explicitly provided
         # (equivalent to the old Trafaret ``undefined`` sentinel).
@@ -610,7 +627,7 @@ class SessionHandler:
 
         result = await self._session.create_from_template.run(
             CreateFromTemplateAction(
-                project_id=await self._resolve_project_id(domain_name, str(params.group)),
+                project_id=project_id,
                 params=CreateFromTemplateActionParams(
                     template_id=params.template_id or UUID(int=0),
                     session_name=(
@@ -688,8 +705,6 @@ class SessionHandler:
         api_version = request["api_version"]
         validated_config = _validate_creation_config(api_version, params.config)
 
-        validated_config = await self._normalize_legacy_mounts(validated_config)
-
         agent_list = cast(list[str] | None, validated_config.get("agent_list"))
         if agent_list is not None:
             if (
@@ -707,11 +722,15 @@ class SessionHandler:
             )
         )
         requester_access_key, owner_access_key = scope.requester_access_key, scope.owner_access_key
+        project_id = await self._resolve_project_id(domain_name, params.group)
+        validated_config = await self._normalize_legacy_mounts(
+            validated_config, owner_access_key, project_id
+        )
         architecture = params.architecture or DEFAULT_IMAGE_ARCH
 
         result = await self._session.create_from_params.run(
             CreateFromParamsAction(
-                project_id=await self._resolve_project_id(domain_name, params.group),
+                project_id=project_id,
                 params=CreateFromParamsActionParams(
                     session_name=params.session_name,
                     image=params.image,
