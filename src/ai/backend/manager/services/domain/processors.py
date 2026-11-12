@@ -1,5 +1,6 @@
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.registry.relation import RelationGroup
 from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.lookup.bulk_processor import BulkLookupActionProcessor
@@ -12,6 +13,7 @@ from ai.backend.manager.actions.v2.ops.result import (
     LookupOpsResult,
     ScopedBatchOpsResult,
 )
+from ai.backend.manager.actions.v2.relation.processor import RelationActionProcessor
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import (
     SingleEntityActionProcessor,
@@ -47,6 +49,10 @@ from ai.backend.manager.services.domain.actions.purge_domain import (
 from ai.backend.manager.services.domain.actions.restore_domain import RestoreDomainAction
 from ai.backend.manager.services.domain.actions.scoped_search import ScopedSearchDomainsAction
 from ai.backend.manager.services.domain.actions.search_domains import GlobalSearchDomainsAction
+from ai.backend.manager.services.domain.actions.update_container_registry_relations import (
+    UpdateDomainContainerRegistryRelationsAction,
+    UpdateDomainContainerRegistryRelationsActionResult,
+)
 from ai.backend.manager.services.domain.actions.update_domain import UpdateDomainAction
 from ai.backend.manager.services.domain.actions.update_domain_dotfile import (
     UpdateDomainDotfileAction,
@@ -73,6 +79,10 @@ class DomainProcessors:
     partial_bulk_update: PartialBulkActionProcessor[PartialBulkUpdateDomainsAction, DomainData]
     partial_bulk_delete: PartialBulkActionProcessor[PartialBulkDeleteDomainsAction, DomainData]
     partial_bulk_restore: PartialBulkActionProcessor[PartialBulkRestoreDomainsAction, DomainData]
+    update_container_registry_relations: RelationActionProcessor[
+        UpdateDomainContainerRegistryRelationsAction,
+        UpdateDomainContainerRegistryRelationsActionResult,
+    ]
     create_dotfile: SingleEntityActionProcessor[
         CreateDomainDotfileAction, CreateDomainDotfileActionResult
     ]
@@ -86,8 +96,13 @@ class DomainProcessors:
     def __init__(
         self,
         group: ProcessorGroup[DomainData],
+        relation_group: RelationGroup,
         service: DomainService,
     ) -> None:
+        self.update_container_registry_relations = relation_group.relation(
+            UpdateDomainContainerRegistryRelationsAction,
+            service.update_container_registry_relations,
+        )
         self.get = group.single_get_ops(GetDomainAction)
         self.lookup_name = group.public_lookup_ops(LookupDomainAction)
         self.bulk_lookup_names = group.public_bulk_lookup_ops(BulkLookupDomainsAction)

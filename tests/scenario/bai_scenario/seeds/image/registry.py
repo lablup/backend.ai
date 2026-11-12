@@ -7,12 +7,17 @@ from typing import override
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
+from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.models.container_registry.creators import (
     ContainerRegistryCreator,
     ContainerRegistryProjectCreator,
+)
+from ai.backend.manager.models.domain_container_registry_relation.creators import (
+    DomainContainerRegistryRelationCreator,
 )
 from ai.backend.testutils.scenario_steps import Says
 from bai_scenario.seeds.seeder import Naming, TestSeedLink, TestSeedRow, joined
@@ -85,3 +90,22 @@ class AllowProjectAsDefault(AllowProject):
     @override
     def seed(self) -> ContainerRegistryProjectCreator:
         return ContainerRegistryProjectCreator(is_default=True)
+
+
+@dataclass(frozen=True)
+class AllowDomain(TestSeedLink[DomainData, ContainerRegistryData]):
+    @override
+    def kind(self) -> str:
+        return Says("가 허용한", english="allows")
+
+    @override
+    def scope_id(self, scope: DomainData) -> DomainID:
+        return DomainID(scope.id)
+
+    @override
+    def target_id(self, target: ContainerRegistryData) -> ContainerRegistryID:
+        return ContainerRegistryID(target.id)
+
+    @override
+    def seed(self) -> DomainContainerRegistryRelationCreator:
+        return DomainContainerRegistryRelationCreator()

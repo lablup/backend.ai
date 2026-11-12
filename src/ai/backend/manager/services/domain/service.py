@@ -23,6 +23,10 @@ from ai.backend.manager.services.domain.actions.purge_domain import (
     PurgeDomainAction,
     PurgeDomainActionResult,
 )
+from ai.backend.manager.services.domain.actions.update_container_registry_relations import (
+    UpdateDomainContainerRegistryRelationsAction,
+    UpdateDomainContainerRegistryRelationsActionResult,
+)
 from ai.backend.manager.services.domain.actions.update_domain_dotfile import (
     UpdateDomainDotfileAction,
     UpdateDomainDotfileActionResult,
@@ -42,6 +46,16 @@ class DomainService:
         model-store project, in the same transaction."""
         return CreatedEntityOpsResult(
             data=await self._repository.create_domain(action.to_creator())
+        )
+
+    async def update_container_registry_relations(
+        self, action: UpdateDomainContainerRegistryRelationsAction
+    ) -> UpdateDomainContainerRegistryRelationsActionResult:
+        change = await self._repository.update_container_registry_relations(
+            action.domain_id, action.registry_ids
+        )
+        return UpdateDomainContainerRegistryRelationsActionResult(
+            linked=change.linked, unlinked=change.unlinked
         )
 
     async def purge(self, action: PurgeDomainAction) -> PurgeDomainActionResult:

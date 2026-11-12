@@ -14,7 +14,12 @@ import pytest
 from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
-from ai.backend.manager.actions.registry.types import GroupMeta, ProcessorDependencies
+from ai.backend.manager.actions.registry.types import (
+    Concern,
+    ConcernMeta,
+    GroupMeta,
+    ProcessorDependencies,
+)
 from ai.backend.manager.actions.v2.validators import ActionValidators as V2ActionValidators
 from ai.backend.manager.api.adapters.domain.adapter import DomainAdapter
 from ai.backend.manager.repositories.domain.repository import DomainRepository
@@ -39,9 +44,9 @@ async def adapter(
             repository=OpsRepository(provider),
         )
     )
-    return DomainAdapter(
-        DomainProcessors(
-            registry.group(GroupMeta(DomainEntityType())),
-            DomainService(DomainRepository(engine, DomainOpsProvider(engine))),
-        ),
+    domain = DomainProcessors(
+        registry.group(GroupMeta(DomainEntityType())),
+        registry.concern(ConcernMeta(Concern.ORGANIZATION)).relation_group(),
+        DomainService(DomainRepository(engine, DomainOpsProvider(engine))),
     )
+    return DomainAdapter(domain)

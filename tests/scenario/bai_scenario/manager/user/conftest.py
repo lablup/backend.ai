@@ -18,6 +18,8 @@ from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
+    Concern,
+    ConcernMeta,
     FieldGroupMeta,
     GroupMeta,
     ProcessorDependencies,
@@ -122,6 +124,7 @@ async def adapter(
     user = _user_processors(engine, registry, key_pool, valkey)
     domain = DomainProcessors(
         registry.group(GroupMeta(DomainEntityType())),
+        registry.concern(ConcernMeta(Concern.ORGANIZATION)).relation_group(),
         DomainService(DomainRepository(engine, DomainOpsProvider(engine))),
     )
     return UserAdapter(user, domain, config.config.auth, key_pool)

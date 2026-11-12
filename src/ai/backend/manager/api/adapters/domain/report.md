@@ -2,7 +2,7 @@
 
 [background](/src/ai/backend/manager/api/adapters/domain/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/domain/adapter.py)
 
-Scenario: incomplete 3 / 14
+Scenario: incomplete 3 / 15
 
 - built from ops (12)
   - bulk_get_ids: representative success ✓ · representative rejection ✓
@@ -17,9 +17,10 @@ Scenario: incomplete 3 / 14
   - restore: representative success ✓ · representative rejection ✓
   - scoped_search: representative success ✓ · representative rejection ✓
   - update: representative success ✓ · representative rejection ✓
-- direct implementation (2)
+- direct implementation (3)
   - create: success present 2 · rejection present 4 (global_scope)
   - purge: success present 1 · rejection present 4 (single_entity)
+  - sync_registry_relations: success present 2 · rejection present 1 (relation)
 
 **bulk_get_ids**
 
@@ -141,6 +142,14 @@ Scenario: incomplete 3 / 14
 | [a domain holding a user cannot be purged even by the superadmin](#deleting-a-domain-holding-a-user-is-not-purged) | rejected |
 | [a user granted nothing cannot purge a domain even when nothing else refers to it](#deleting-a-user-granted-nothing-may-not-purge-a-domain) | rejected |
 | [purging a name no domain answers to is rejected as not found](#deleting-purging-a-name-nothing-answers-to-is-not-found) | rejected |
+
+**sync_registry_relations**
+
+| scenario | verdict |
+|---|---|
+| [when the superadmin syncs with a registry, the domain and that registry become related](#syncing_registry_relations-giving-a-registry-links-the-domain-to-it) | answered |
+| [syncing with an empty list removes the relation to a registry left out](#syncing_registry_relations-leaving-a-linked-registry-out-unlinks-it) | answered |
+| [a user granted nothing on the domain is refused when syncing the relations](#syncing_registry_relations-a-user-granted-nothing-may-not-sync-registry-relations) | rejected |
 
 ### bulk_get_ids
 
@@ -1780,4 +1789,85 @@ Then
 
 - the call is rejected
   - rejected: EntityNotFoundError
+
+### sync_registry_relations
+
+<a id="syncing_registry_relations-giving-a-registry-links-the-domain-to-it"></a>
+
+#### [giving-a-registry-links-the-domain-to-it](/tests/scenario/bai_scenario/manager/domain/test_syncing_registry_relations.py): pass
+
+when the superadmin syncs with a registry, the domain and that registry become related
+
+Given
+
+- one domain, one registry, and one superadmin in that domain
+  - Domain allowing-1
+  - Container registry allowed-1: image source
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- DomainAdapter.sync_registry_relations: user-1 syncs the relations of allowing-1 to that registry
+
+Then
+
+- the call returns nothing and raises nothing
+  - response = None
+
+<a id="syncing_registry_relations-leaving-a-linked-registry-out-unlinks-it"></a>
+
+#### [leaving-a-linked-registry-out-unlinks-it](/tests/scenario/bai_scenario/manager/domain/test_syncing_registry_relations.py): pass
+
+syncing with an empty list removes the relation to a registry left out
+
+Given
+
+- one domain and one registry already related to each other, and one superadmin in that domain
+  - Domain allowing-1
+  - Container registry allowed-1: image source
+  - Domain allowing-1 allows Container registry allowed-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- DomainAdapter.sync_registry_relations: user-1 syncs the relations of allowing-1 to an empty list
+
+Then
+
+- the call returns nothing and raises nothing
+  - response = None
+
+<a id="syncing_registry_relations-a-user-granted-nothing-may-not-sync-registry-relations"></a>
+
+#### [a-user-granted-nothing-may-not-sync-registry-relations](/tests/scenario/bai_scenario/manager/domain/test_syncing_registry_relations.py): pass
+
+a user granted nothing on the domain is refused when syncing the relations
+
+Given
+
+- one domain, one registry, and one user in that domain
+  - Domain allowing-1
+  - Container registry allowed-1: image source
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- DomainAdapter.sync_registry_relations: user-1 syncs the relations of allowing-1 to that registry
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
 

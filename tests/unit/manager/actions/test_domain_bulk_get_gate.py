@@ -23,7 +23,12 @@ from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
-from ai.backend.manager.actions.registry.types import GroupMeta, ProcessorDependencies
+from ai.backend.manager.actions.registry.types import (
+    Concern,
+    ConcernMeta,
+    GroupMeta,
+    ProcessorDependencies,
+)
 from ai.backend.manager.actions.v2.bulk.validator.rbac import (
     VirtualEntityPartialBulkActionRBACValidator,
 )
@@ -228,7 +233,11 @@ def processors(db: ExtendedAsyncSAEngine) -> DomainProcessors:
             repository=OpsRepository(V2DBOpsProvider(db)),
         )
     )
-    return DomainProcessors(registry.group(GroupMeta(DomainEntityType())), MagicMock())
+    return DomainProcessors(
+        registry.group(GroupMeta(DomainEntityType())),
+        registry.concern(ConcernMeta(Concern.ORGANIZATION)).relation_group(),
+        MagicMock(),
+    )
 
 
 def _member(domains: _Domains) -> UserData:

@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
+
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.exception import BackendAIError, DomainNotFound
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -11,9 +14,23 @@ from ai.backend.manager.errors.resource import DomainDeletionFailed
 from ai.backend.manager.models.domain.creators import DomainCreator
 from ai.backend.manager.models.domain.purgers import DomainKernelPurger, DomainPurger
 from ai.backend.manager.models.domain.updaters import DomainDotfilesUpdater
+from ai.backend.manager.models.domain_container_registry_relation.creators import (
+    DomainContainerRegistryRelationCreator,
+)
+from ai.backend.manager.models.domain_container_registry_relation.purgers import (
+    DomainContainerRegistryRelationPurger,
+)
+from ai.backend.manager.models.domain_container_registry_relation.scopes import (
+    DomainContainerRegistryRelationTarget,
+)
+from ai.backend.manager.models.domain_container_registry_relation.searchers import (
+    DomainContainerRegistryRelationSearcher,
+)
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.domain.db_source.db_source import DomainDBSource
 from ai.backend.manager.repositories.ops.v2.domain.provider import DomainOpsProvider
+from ai.backend.manager.views.container_registry import DomainContainerRegistryRelationChange
 
 domain_repository_resilience = Resilience(
     policies=[
@@ -64,6 +81,30 @@ class DomainRepository:
             if data is None:
                 raise DomainNotFound(f"Domain not found: {updater.target_id_value()}")
             return data
+
+    @domain_repository_resilience.apply()
+    async def update_container_registry_relations(
+        self, domain_id: DomainID, registry_ids: Sequence[ContainerRegistryID]
+    ) -> DomainContainerRegistryRelationChange:
+        """Set the domain's registries to ``registry_ids`` in one transaction. An unchanged
+        relation keeps its row."""
+        async with self._v2_ops.write_ops() as w:
+            current = await w.search_with_scopes(
+                [DomainContainerRegistryRelationTarget(domain_id)],
+                DomainContainerRegistryRelationSearcher(pagination=NoPagination()),
+            )
+            linked = {item.container_registry_id for item in current.items}
+            to_unlink = [registry_id for registry_id in linked if registry_id not in registry_ids]
+            to_link = [registry_id for registry_id in registry_ids if registry_id not in linked]
+            await w.purge_relations(
+                DomainContainerRegistryRelationPurger(),
+                [(domain_id, registry_id) for registry_id in to_unlink],
+            )
+            await w.create_relations(
+                DomainContainerRegistryRelationCreator(),
+                [(domain_id, registry_id) for registry_id in to_link],
+            )
+        return DomainContainerRegistryRelationChange(linked=to_link, unlinked=to_unlink)
 
     @domain_repository_resilience.apply()
     async def get_domain_id_by_name(self, name: DomainName) -> DomainID:
