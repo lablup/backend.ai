@@ -2524,7 +2524,8 @@ class ScheduleDBSource:
         ]
         ssh_keypair: SSHKeypair | None = None
         if row.ssh_public_key:
-            # Agents write the private key out with `.encode()`, so a missing one goes as "".
+            # TODO(BA-8467): Drop the private key once keypairs stop storing it. Until then a
+            # missing one goes as "", since agents write it out with `.encode()`.
             ssh_keypair = SSHKeypair(
                 public_key=row.ssh_public_key,
                 private_key=row.ssh_private_key or "",
