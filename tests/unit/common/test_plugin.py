@@ -508,7 +508,9 @@ class TestFirstHandledRunnerDispatch:
         ],
     )
     async def test_dispatch_result(
-        self, case: _FirstHandledRunnerCase, first_handled_runner_dispatch: _FirstHandledRunnerDispatch
+        self,
+        case: _FirstHandledRunnerCase,
+        first_handled_runner_dispatch: _FirstHandledRunnerDispatch,
     ) -> None:
         hook_result = await first_handled_runner_dispatch.ctx.dispatch(
             _HOOK_EVENT, (), handler_runner=FIRST_HANDLED_RUNNER
