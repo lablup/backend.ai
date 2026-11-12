@@ -12,9 +12,9 @@ from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.exception import ConfigurationError
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
 from ai.backend.common.plugin.hook import (
-    ALL_COMPLETED,
+    ALL_HANDLERS_RUNNER,
     ERROR,
-    FIRST_COMPLETED,
+    FIRST_HANDLED_RUNNER,
     PASSED,
     REJECTED,
     HookPlugin,
@@ -385,43 +385,43 @@ async def test_hook_dispatch(etcd: AsyncEtcd, mocker: MockerFixture) -> None:
     try:
         await ctx.init()
 
-        hook_result = await ctx.dispatch("HOOK1", ("a", "b"), return_when=FIRST_COMPLETED)
+        hook_result = await ctx.dispatch("HOOK1", ("a", "b"), handler_runner=FIRST_HANDLED_RUNNER)
         assert hook_result.status == PASSED
         assert hook_result.result == 1
         assert hook_result.reason is None
         assert hook_result.src_plugin == "hook-p"
 
-        # If a plugin rejects when set ALL_COMPLETED, only the rejected result is returned.
-        hook_result = await ctx.dispatch("HOOK1", ("a", "b"), return_when=ALL_COMPLETED)
+        # If a plugin rejects with ALL_HANDLERS_RUNNER, only the rejected result is returned.
+        hook_result = await ctx.dispatch("HOOK1", ("a", "b"), handler_runner=ALL_HANDLERS_RUNNER)
         assert hook_result.status == REJECTED
         assert hook_result.result is None
         assert hook_result.reason == "dummy rejected 1"
         assert hook_result.src_plugin == "hook-r"
 
-        # Even when all plguins pass, FIRST_COMPLETED executes only the first successful plugin.
-        hook_result = await ctx.dispatch("HOOK2", ("c", "d"), return_when=FIRST_COMPLETED)
+        # Even when all plguins pass, FIRST_HANDLED_RUNNER executes only the first successful plugin.
+        hook_result = await ctx.dispatch("HOOK2", ("c", "d"), handler_runner=FIRST_HANDLED_RUNNER)
         assert hook_result.status == PASSED
         assert hook_result.result == 2
         assert hook_result.reason is None
         assert hook_result.src_plugin == "hook-p"
 
-        # For when return_when=ALL_COMPLETED and all plugin succeeds,
+        # For when handler_runner=ALL_HANDLERS_RUNNER and all plugin succeeds,
         # the caller may map the result returned as a list with src_plugin returned as a list.
-        hook_result = await ctx.dispatch("HOOK2", ("c", "d"), return_when=ALL_COMPLETED)
+        hook_result = await ctx.dispatch("HOOK2", ("c", "d"), handler_runner=ALL_HANDLERS_RUNNER)
         assert hook_result.status == PASSED
         assert hook_result.result == [2, 3]
         assert hook_result.reason is None
         assert hook_result.src_plugin == ["hook-p", "hook-r"]
 
         # If a plugin raises an arbitrary exception other than Reject, it's marked as ERROR.
-        hook_result = await ctx.dispatch("HOOK3", ("e", "f"), return_when=FIRST_COMPLETED)
+        hook_result = await ctx.dispatch("HOOK3", ("e", "f"), handler_runner=FIRST_HANDLED_RUNNER)
         assert hook_result.status == ERROR
         assert hook_result.result is None
         assert hook_result.reason is not None
         assert "ZeroDivisionError" in hook_result.reason
         assert "oops" in hook_result.reason
         assert hook_result.src_plugin == "hook-e"
-        hook_result = await ctx.dispatch("HOOK3", ("e", "f"), return_when=ALL_COMPLETED)
+        hook_result = await ctx.dispatch("HOOK3", ("e", "f"), handler_runner=ALL_HANDLERS_RUNNER)
         assert hook_result.status == ERROR
         assert hook_result.result is None
         assert hook_result.reason is not None
@@ -453,7 +453,7 @@ _HOOK_EVENT = "HOOK_EVENT"
 
 
 @dataclass(frozen=True)
-class _FirstCompletedCase:
+class _FirstHandledRunnerCase:
     handler_result_by_plugin: Mapping[str, Any]
     expected_result: Any
     expected_src_plugin: str | list[str]
@@ -461,16 +461,16 @@ class _FirstCompletedCase:
 
 
 @dataclass(frozen=True)
-class _FirstCompletedDispatch:
+class _FirstHandledRunnerDispatch:
     ctx: HookPluginContext
     handler_by_plugin: Mapping[str, AsyncMock]
 
 
-class TestFirstCompletedDispatch:
+class TestFirstHandledRunnerDispatch:
     @pytest.fixture
-    def first_completed_dispatch(
-        self, case: _FirstCompletedCase, mocker: MockerFixture
-    ) -> _FirstCompletedDispatch:
+    def first_handled_runner_dispatch(
+        self, case: _FirstHandledRunnerCase, mocker: MockerFixture
+    ) -> _FirstHandledRunnerDispatch:
         handler_by_plugin = {
             plugin_name: AsyncMock(return_value=handler_result)
             for plugin_name, handler_result in case.handler_result_by_plugin.items()
@@ -482,13 +482,13 @@ class TestFirstCompletedDispatch:
             )
             for plugin_name, handler in handler_by_plugin.items()
         }
-        return _FirstCompletedDispatch(ctx=ctx, handler_by_plugin=handler_by_plugin)
+        return _FirstHandledRunnerDispatch(ctx=ctx, handler_by_plugin=handler_by_plugin)
 
     @pytest.mark.parametrize(
         "case",
         [
             pytest.param(
-                _FirstCompletedCase(
+                _FirstHandledRunnerCase(
                     handler_result_by_plugin={"a": None, "b": "answer", "c": "unreached"},
                     expected_result="answer",
                     expected_src_plugin="b",
@@ -497,9 +497,9 @@ class TestFirstCompletedDispatch:
                 id="none_then_value_stops_at_the_value",
             ),
             pytest.param(
-                _FirstCompletedCase(
+                _FirstHandledRunnerCase(
                     handler_result_by_plugin={"a": None, "b": None},
-                    expected_result=[],
+                    expected_result=None,
                     expected_src_plugin=["a", "b"],
                     expected_called_plugins=["a", "b"],
                 ),
@@ -508,10 +508,12 @@ class TestFirstCompletedDispatch:
         ],
     )
     async def test_dispatch_result(
-        self, case: _FirstCompletedCase, first_completed_dispatch: _FirstCompletedDispatch
+        self,
+        case: _FirstHandledRunnerCase,
+        first_handled_runner_dispatch: _FirstHandledRunnerDispatch,
     ) -> None:
-        hook_result = await first_completed_dispatch.ctx.dispatch(
-            _HOOK_EVENT, (), return_when=FIRST_COMPLETED
+        hook_result = await first_handled_runner_dispatch.ctx.dispatch(
+            _HOOK_EVENT, (), handler_runner=FIRST_HANDLED_RUNNER
         )
 
         assert hook_result.status == PASSED
@@ -519,7 +521,7 @@ class TestFirstCompletedDispatch:
         assert hook_result.src_plugin == case.expected_src_plugin
         called_plugins = [
             plugin_name
-            for plugin_name, handler in first_completed_dispatch.handler_by_plugin.items()
+            for plugin_name, handler in first_handled_runner_dispatch.handler_by_plugin.items()
             if handler.await_count > 0
         ]
         assert called_plugins == case.expected_called_plugins

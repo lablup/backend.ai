@@ -11,7 +11,7 @@ import pytest
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.plugin.hook import FIRST_COMPLETED, PASSED, HookPluginContext
+from ai.backend.common.plugin.hook import FIRST_HANDLED_RUNNER, PASSED, HookPluginContext
 from ai.backend.manager.data.auth.types import AuthorizingUser
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.plugin.keypair.hook import KeypairAuthHookPlugin
@@ -75,7 +75,7 @@ class TestAuthorizeAfterKeypairReturnsNone:
         hook_result = await cookie_login_with_keypair_and_openid.ctx.dispatch(
             "AUTHORIZE",
             (cookie_login_with_keypair_and_openid.request, {"stoken": "", "sToken": ""}),
-            return_when=FIRST_COMPLETED,
+            handler_runner=FIRST_HANDLED_RUNNER,
         )
 
         assert hook_result.status == PASSED
