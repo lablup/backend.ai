@@ -57,6 +57,7 @@ from ai.backend.manager.errors.common import (
 from ai.backend.manager.errors.user import KeyPairNotFound, UserResourcePolicyNotFound
 from ai.backend.manager.models.hasher.factory import compare_to_hashed_password
 from ai.backend.manager.models.keypair.row import KEYPAIR_SECRET_KEY_CONTEXT
+from ai.backend.manager.models.keypair.ssh_key_validator import SSHKeyValidator
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.row import (
     UserRole,
@@ -150,6 +151,7 @@ class AuthService:
     _user_resource_policy_repository: UserResourcePolicyRepository
     _user_repository: UserRepository
     _group_repository: ProjectRepository
+    _ssh_key_validator: SSHKeyValidator
     _client_ip_masking_repository: ClientIPMaskingRepository
 
     def __init__(
@@ -161,6 +163,7 @@ class AuthService:
         user_resource_policy_repository: UserResourcePolicyRepository,
         user_repository: UserRepository,
         group_repository: ProjectRepository,
+        ssh_key_validator: SSHKeyValidator,
         client_ip_masking_repository: ClientIPMaskingRepository,
         key_provider_pool: KeyProviderPool,
     ) -> None:
@@ -171,6 +174,7 @@ class AuthService:
         self._user_resource_policy_repository = user_resource_policy_repository
         self._user_repository = user_repository
         self._group_repository = group_repository
+        self._ssh_key_validator = ssh_key_validator
         self._client_ip_masking_repository = client_ip_masking_repository
         self._key_provider_pool = key_provider_pool
 
@@ -818,6 +822,8 @@ class AuthService:
     async def upload_ssh_keypair(
         self, action: UploadSSHKeypairAction
     ) -> UploadSSHKeypairActionResult:
+        self._ssh_key_validator.validate(action.public_key)
+
         await self._auth_repository.update_ssh_public_key(action.access_key, action.public_key)
         return UploadSSHKeypairActionResult(public_key=action.public_key)
 

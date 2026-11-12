@@ -19,6 +19,7 @@ from ai.backend.manager.actions.v2.validators import ActionValidators as V2Actio
 from ai.backend.manager.api.adapters.login_session.adapter import LoginSessionAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.secret.types import KeyProviderType
+from ai.backend.manager.models.keypair.ssh_key_validator import SSHKeyValidator
 from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.repositories.client_ip_masking.repository import (
     ClientIPMaskingRepository,
@@ -63,6 +64,7 @@ async def adapter(
             unwired(UserResourcePolicyRepository, "only signing up reads user policies"),
             unwired(UserRepository, "only the login flow reads users"),
             unwired(ProjectRepository, "only role lookups read projects"),
+            unwired(SSHKeyValidator, "only uploading an SSH key validates one"),
             ClientIPMaskingRepository(engine),
             key_pool,
         ),

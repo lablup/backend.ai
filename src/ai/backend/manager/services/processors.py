@@ -40,6 +40,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
     from ai.backend.manager.config.provider import ManagerConfigProvider
     from ai.backend.manager.idle import IdleCheckerHost
+    from ai.backend.manager.models.keypair.ssh_key_validator import SSHKeyValidator
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
     from ai.backend.manager.notification.notification_center import NotificationCenter
     from ai.backend.manager.registry import AgentRegistry
@@ -371,6 +372,7 @@ class ServiceArgs:
     appproxy_client_pool: AppProxyClientPool
     registry_quota_client_pool: ContainerRegistryQuotaClientPool
     prometheus_client: PrometheusClient
+    ssh_key_validator: SSHKeyValidator
     key_provider_pool: KeyProviderPool
 
 

@@ -7,12 +7,9 @@ from __future__ import annotations
 from typing import Self
 from uuid import UUID
 
-from cryptography.exceptions import UnsupportedAlgorithm
-from cryptography.hazmat.primitives.serialization import load_ssh_public_key
-from pydantic import Field, field_validator
+from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
-from ai.backend.common.auth.exception import InvalidSSHPublicKey
 from ai.backend.common.dto.manager.defs import MAX_PAGE_LIMIT
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection
@@ -170,15 +167,6 @@ class AdminRegisterSSHKeypairInput(BaseRequestModel):
 
     access_key: str = Field(description="Access key whose SSH public key will be replaced.")
     ssh_public_key: str = Field(description="PEM-encoded SSH public key.")
-
-    @field_validator("ssh_public_key")
-    @classmethod
-    def _validate_ssh_public_key(cls, value: str) -> str:
-        try:
-            load_ssh_public_key(value.encode())
-        except (ValueError, UnsupportedAlgorithm) as e:
-            raise InvalidSSHPublicKey("ssh_public_key is not a valid SSH public key") from e
-        return value
 
 
 class AdminDeleteSSHKeypairInput(BaseRequestModel):

@@ -8,10 +8,23 @@ from typing import override
 
 from aiohttp import web
 
+from ai.backend.common.data.entity.keypair import KeyPairFieldType
 from ai.backend.common.data.entity.resource_policy import KeyPairResourcePolicyEntityType
 from ai.backend.common.exception import ErrorDetail
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.errors.base.entity import EntityError, EntityErrorCode
+from ai.backend.manager.errors.base.field import FieldError, FieldErrorCode
+
+
+class InvalidSSHPublicKey(FieldError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/invalid-ssh-public-key"
+    error_title = "The SSH public key is invalid or in an unsupported format."
+
+    @override
+    def field_error_code(self) -> FieldErrorCode:
+        return FieldErrorCode(
+            KeyPairFieldType(), ActionOperationType.CREATE, ErrorDetail.INVALID_DATA_FORMAT
+        )
 
 
 class KeypairResourcePolicyNotFound(EntityError, web.HTTPBadRequest):

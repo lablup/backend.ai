@@ -66,8 +66,6 @@ from ai.backend.manager.services.auth.actions.update_password_no_auth import (
 )
 from ai.backend.manager.services.auth.actions.upload_ssh_keypair import UploadSSHKeypairActionResult
 
-_SSH_PUBLIC_KEY = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICq33r1BP5Jbc+JSvADo7sDmG1TUyNz/GmRQzraa1krs"
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -721,7 +719,7 @@ class TestUploadSSHKeypair:
     ) -> None:
         """Verify processor is called and only the public key is returned."""
         body: BodyParam[UploadSSHKeypairRequest] = BodyParam(UploadSSHKeypairRequest)
-        body.from_body({"pubkey": _SSH_PUBLIC_KEY})
+        body.from_body({"pubkey": "ssh-rsa AAAAB3..."})
         mock_processors.auth.upload_ssh_keypair.run = AsyncMock(
             return_value=UploadSSHKeypairActionResult(
                 public_key=SSHPublicKey("ssh-rsa AAAAB3...\n")

@@ -101,6 +101,7 @@ from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.event_dispatcher.dispatch import DispatcherArgs, Dispatchers
 from ai.backend.manager.event_dispatcher.handlers.stream_cleanup import StreamCleanupEventHandler
 from ai.backend.manager.idle import IdleCheckerHost
+from ai.backend.manager.models.keypair.ssh_key_validator import SSHKeyValidator
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.notification.notification_center import NotificationCenter
 from ai.backend.manager.registry import AgentRegistry
@@ -360,6 +361,8 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
             ],
         )
 
+        ssh_key_validator = SSHKeyValidator()
+
         service_args = ServiceArgs(
             db=setup_input.db,
             repositories=setup_input.repositories,
@@ -387,6 +390,7 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
             appproxy_client_pool=setup_input.appproxy_client_pool,
             registry_quota_client_pool=setup_input.registry_quota_client_pool,
             prometheus_client=setup_input.prometheus_client,
+            ssh_key_validator=ssh_key_validator,
             key_provider_pool=setup_input.key_provider_pool,
         )
 
