@@ -45,7 +45,7 @@ from ai.backend.manager.errors.kernel import (
     SessionNotFound,
     TooManyKernelsFound,
 )
-from ai.backend.manager.models.session.searchers import LiveSessionsNamedSearcher
+from ai.backend.manager.models.session.searchers import SessionSearcher
 from ai.backend.manager.models.specs.searcher import SearcherResult
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
@@ -557,7 +557,7 @@ class TestCreateSessionWithLiveNamesake:
         async def search_in_global(searcher: Any) -> SearcherResult[Any]:
             items: list[Any]
             match searcher:
-                case LiveSessionsNamedSearcher():
+                case SessionSearcher():
                     items = [existing]
                 case _:
                     items = [image]

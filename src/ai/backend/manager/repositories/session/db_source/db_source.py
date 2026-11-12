@@ -42,6 +42,7 @@ from ai.backend.manager.errors.kernel import (
     TooManySessionsMatched,
 )
 from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.condition_utils import combine_conditions_or
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.image.searchers import (
     CanonicalImageSearcher,
@@ -63,7 +64,6 @@ from ai.backend.manager.models.session.row import (
 )
 from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
 from ai.backend.manager.models.session.searchers import (
-    LiveSessionsNamedSearcher,
     SessionSearcher,
 )
 from ai.backend.manager.models.session.updaters import SessionUpdater
@@ -455,10 +455,36 @@ class SessionDBSource:
 
             if session_name and access_key is not None:
                 # Check the owner of the target session has any session with the same name
+                named = [
+                    session_fields.name.filter.equals(
+                        StringMatchSpec(session_name, case_insensitive=False, negated=False)
+                    )
+                ]
+                try:
+                    named_id = uuid.UUID(session_name)
+                except ValueError:
+                    pass
+                else:
+                    named.append(
+                        session_fields.id.filter.equals(
+                            UUIDEqualMatchSpec(value=named_id, negated=False)
+                        )
+                    )
                 matches = (
                     await w.search_in_global(
-                        LiveSessionsNamedSearcher(
-                            pagination=NoPagination(), access_key=access_key, name=session_name
+                        SessionSearcher(
+                            pagination=NoPagination(),
+                            conditions=[
+                                session_fields.access_key.filter.equals(
+                                    StringMatchSpec(
+                                        access_key, case_insensitive=False, negated=False
+                                    )
+                                ),
+                                combine_conditions_or(named),
+                                session_fields.status.filter.not_in(
+                                    SessionStatus.terminal_statuses()
+                                ),
+                            ],
                         )
                     )
                 ).items

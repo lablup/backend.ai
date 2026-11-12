@@ -51,7 +51,7 @@ from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
-from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec
 from ai.backend.common.defs.session import JOB_PRIORITY_DEFAULT, SESSION_PRIORITY_DEFAULT
 from ai.backend.common.docker import ImageRef, LabelName
 from ai.backend.common.dto.agent.response import (
@@ -133,6 +133,7 @@ from ai.backend.manager.models.bootstrap_script_revision.searchable_fields impor
 from ai.backend.manager.models.bootstrap_script_revision.searchers import (
     DefaultBootstrapScriptRevisionSearcher,
 )
+from ai.backend.manager.models.condition_utils import combine_conditions_or
 from ai.backend.manager.models.domain.row import domains
 from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.image.searchers import (
@@ -157,7 +158,8 @@ from ai.backend.manager.models.session.row import (
     SessionRow,
     handle_session_exception,
 )
-from ai.backend.manager.models.session.searchers import LiveSessionsNamedSearcher
+from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
+from ai.backend.manager.models.session.searchers import SessionSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.plugin.network import NetworkPluginContext
@@ -361,9 +363,28 @@ class AgentRegistry:
         r: V2ReadOps, session_name: str, access_key: AccessKey
     ) -> SessionEntityData | None:
         """The live session of ``access_key`` named ``session_name``, if there is one."""
+        fields = SessionSearchableFields.own
+        named = [
+            fields.name.filter.equals(
+                StringMatchSpec(session_name, case_insensitive=False, negated=False)
+            )
+        ]
+        try:
+            named_id = uuid.UUID(session_name)
+        except ValueError:
+            pass
+        else:
+            named.append(fields.id.filter.equals(UUIDEqualMatchSpec(value=named_id, negated=False)))
         result = await r.search_in_global(
-            LiveSessionsNamedSearcher(
-                pagination=NoPagination(), access_key=access_key, name=session_name
+            SessionSearcher(
+                pagination=NoPagination(),
+                conditions=[
+                    fields.access_key.filter.equals(
+                        StringMatchSpec(access_key, case_insensitive=False, negated=False)
+                    ),
+                    combine_conditions_or(named),
+                    fields.status.filter.not_in(SessionStatus.terminal_statuses()),
+                ],
             )
         )
         return result.items[0] if result.items else None

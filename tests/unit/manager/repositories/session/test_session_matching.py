@@ -64,10 +64,7 @@ from ai.backend.manager.models.resource_policy.row import (
 )
 from ai.backend.manager.models.resource_slot.row import AgentResourceRow, ResourceSlotTypeRow
 from ai.backend.manager.models.session.row import SessionRow
-from ai.backend.manager.models.session.searchers import (
-    LiveSessionsMountingVFolderSearcher,
-    LiveSessionsNamedSearcher,
-)
+from ai.backend.manager.models.session.searchers import LiveSessionsMountingVFolderSearcher
 from ai.backend.manager.models.session.updaters import SessionUpdater
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
@@ -496,6 +493,22 @@ class TestUpdateSessionRename:
                 self._rename(target, str(other)), session_name=str(other)
             )
 
+    async def test_namesake_of_another_key_does_not_block(
+        self,
+        db_source: SessionDBSource,
+        other_access_key: AccessKey,
+        add_session: _SessionFactory,
+    ) -> None:
+        target = await add_session(name="renamed-me", with_main_kernel=True)
+        await add_session(name="theirs", access_key=other_access_key)
+
+        result = await db_source.update_session(
+            self._rename(target, "theirs"), session_name="theirs"
+        )
+
+        assert result is not None
+        assert result.name == "theirs"
+
     async def test_errored_namesake_does_not_block(
         self, db_source: SessionDBSource, add_session: _SessionFactory
     ) -> None:
@@ -583,48 +596,6 @@ class TestLiveSessionsMountingVFolder:
             )
 
         assert result.items == [running]
-
-
-class TestLiveSessionsNamedSearcher:
-    async def test_lists_only_the_live_sessions_of_the_key_with_the_name(
-        self,
-        db_with_tables: ExtendedAsyncSAEngine,
-        owner: _Owner,
-        other_access_key: AccessKey,
-        add_session: _SessionFactory,
-    ) -> None:
-        live = await add_session(name="taken")
-        await add_session(name="other-name")
-        await add_session(name="taken", access_key=other_access_key)
-        for status in SessionStatus.terminal_statuses():
-            await add_session(name="taken", status=status)
-
-        async with V2DBOpsProvider(db_with_tables).read_ops() as r:
-            result = await r.search_in_global(
-                LiveSessionsNamedSearcher(
-                    pagination=NoPagination(), access_key=owner.access_key, name="taken"
-                )
-            )
-
-        assert [row.id for row in result.items] == [live]
-
-    async def test_lists_the_live_session_whose_id_is_the_name(
-        self,
-        db_with_tables: ExtendedAsyncSAEngine,
-        owner: _Owner,
-        add_session: _SessionFactory,
-    ) -> None:
-        live = await add_session(name="some-name")
-        await add_session(name="other-name")
-
-        async with V2DBOpsProvider(db_with_tables).read_ops() as r:
-            result = await r.search_in_global(
-                LiveSessionsNamedSearcher(
-                    pagination=NoPagination(), access_key=owner.access_key, name=str(live)
-                )
-            )
-
-        assert [row.id for row in result.items] == [live]
 
 
 def _main_kernel_searcher() -> KernelSearcher:
