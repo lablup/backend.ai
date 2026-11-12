@@ -392,7 +392,7 @@ async def test_hook_dispatch(etcd: AsyncEtcd, mocker: MockerFixture) -> None:
         assert hook_result.reason is None
         assert hook_result.src_plugin == "hook-p"
 
-        # If a plugin rejects with ALL_COMPLETED, only the rejected result is returned.
+        # If a plugin rejects when set ALL_COMPLETED, only the rejected result is returned.
         hook_result = await ctx.dispatch("HOOK1", ("a", "b"), return_when=ALL_COMPLETED)
         assert hook_result.status == REJECTED
         assert hook_result.result is None
