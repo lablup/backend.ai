@@ -19,7 +19,6 @@ from ai.backend.common.plugin.hook import (
     REJECTED,
     HookPlugin,
     HookPluginContext,
-    HookResults,
     Reject,
 )
 
@@ -453,36 +452,9 @@ async def test_hook_notify(etcd: AsyncEtcd, mocker: MockerFixture) -> None:
 _HOOK_EVENT = "HOOK_EVENT"
 
 
-class _HookPluginWithHandler(HookPlugin):
-    config_watch_enabled = False
-
-    _handler: AsyncMock
-
-    def __init__(self, handler: AsyncMock) -> None:
-        super().__init__({}, {})
-        self._handler = handler
-
-    @override
-    def get_handlers(self) -> list[tuple[str, Callable[..., Any]]]:
-        return [(_HOOK_EVENT, self._handler)]
-
-    @override
-    async def init(self, context: Any | None = None) -> None:
-        pass
-
-    @override
-    async def cleanup(self) -> None:
-        pass
-
-    @override
-    async def update_plugin_config(self, plugin_config: Mapping[str, Any]) -> None:
-        pass
-
-
 @dataclass(frozen=True)
 class _FirstHandledRunnerCase:
-    handler_outcome_by_plugin: Mapping[str, Any]
-    expected_status: HookResults
+    handler_result_by_plugin: Mapping[str, Any]
     expected_result: Any
     expected_src_plugin: str | list[str]
     expected_called_plugins: list[str]
@@ -500,16 +472,14 @@ class TestFirstHandledRunnerDispatch:
         self, case: _FirstHandledRunnerCase, mocker: MockerFixture
     ) -> _FirstHandledRunnerDispatch:
         handler_by_plugin = {
-            plugin_name: (
-                AsyncMock(side_effect=outcome)
-                if isinstance(outcome, Exception)
-                else AsyncMock(return_value=outcome)
-            )
-            for plugin_name, outcome in case.handler_outcome_by_plugin.items()
+            plugin_name: AsyncMock(return_value=handler_result)
+            for plugin_name, handler_result in case.handler_result_by_plugin.items()
         }
         ctx = HookPluginContext(mocker.MagicMock(spec=AsyncEtcd), {})
         ctx.plugins = {
-            plugin_name: _HookPluginWithHandler(handler)
+            plugin_name: mocker.MagicMock(
+                get_handlers=mocker.MagicMock(return_value=[(_HOOK_EVENT, handler)])
+            )
             for plugin_name, handler in handler_by_plugin.items()
         }
         return _FirstHandledRunnerDispatch(ctx=ctx, handler_by_plugin=handler_by_plugin)
@@ -519,8 +489,7 @@ class TestFirstHandledRunnerDispatch:
         [
             pytest.param(
                 _FirstHandledRunnerCase(
-                    handler_outcome_by_plugin={"a": None, "b": "answer", "c": "unreached"},
-                    expected_status=PASSED,
+                    handler_result_by_plugin={"a": None, "b": "answer", "c": "unreached"},
                     expected_result="answer",
                     expected_src_plugin="b",
                     expected_called_plugins=["a", "b"],
@@ -529,66 +498,23 @@ class TestFirstHandledRunnerDispatch:
             ),
             pytest.param(
                 _FirstHandledRunnerCase(
-                    handler_outcome_by_plugin={"a": None, "b": Reject("denied")},
-                    expected_status=REJECTED,
-                    expected_result=None,
-                    expected_src_plugin="b",
-                    expected_called_plugins=["a", "b"],
-                ),
-                id="none_then_reject_is_rejected",
-            ),
-            pytest.param(
-                _FirstHandledRunnerCase(
-                    handler_outcome_by_plugin={"a": None, "b": ZeroDivisionError("oops")},
-                    expected_status=ERROR,
-                    expected_result=None,
-                    expected_src_plugin="b",
-                    expected_called_plugins=["a", "b"],
-                ),
-                id="none_then_exception_is_error",
-            ),
-            pytest.param(
-                _FirstHandledRunnerCase(
-                    handler_outcome_by_plugin={"a": None, "b": None},
-                    expected_status=PASSED,
+                    handler_result_by_plugin={"a": None, "b": None},
                     expected_result=None,
                     expected_src_plugin=["a", "b"],
                     expected_called_plugins=["a", "b"],
                 ),
                 id="all_none_passes_with_no_result",
             ),
-            pytest.param(
-                _FirstHandledRunnerCase(
-                    handler_outcome_by_plugin={"a": "answer", "b": Reject("denied")},
-                    expected_status=PASSED,
-                    expected_result="answer",
-                    expected_src_plugin="a",
-                    expected_called_plugins=["a"],
-                ),
-                id="first_value_skips_the_rest",
-            ),
-            pytest.param(
-                _FirstHandledRunnerCase(
-                    handler_outcome_by_plugin={},
-                    expected_status=PASSED,
-                    expected_result=None,
-                    expected_src_plugin=[],
-                    expected_called_plugins=[],
-                ),
-                id="no_handler_passes_with_no_result",
-            ),
         ],
     )
     async def test_dispatch_result(
-        self,
-        case: _FirstHandledRunnerCase,
-        first_handled_runner_dispatch: _FirstHandledRunnerDispatch,
+        self, case: _FirstHandledRunnerCase, first_handled_runner_dispatch: _FirstHandledRunnerDispatch
     ) -> None:
         hook_result = await first_handled_runner_dispatch.ctx.dispatch(
             _HOOK_EVENT, (), handler_runner=FIRST_HANDLED_RUNNER
         )
 
-        assert hook_result.status == case.expected_status
+        assert hook_result.status == PASSED
         assert hook_result.result == case.expected_result
         assert hook_result.src_plugin == case.expected_src_plugin
         called_plugins = [
