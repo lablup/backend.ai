@@ -288,7 +288,7 @@ type AdminRefreshDeploymentRevisionsPayload
 }
 
 """
-Added in 26.4.2. Admin input for registering (overwriting) a user's SSH public key. `sshPrivateKey` was removed in 26.10.0.
+Added in 26.4.2. Admin input for registering (overwriting) a user's SSH public key. `sshPrivateKey` was removed in 26.4.20.
 """
 input AdminRegisterSSHKeypairInput
   @join__type(graph: STRAWBERRY)
