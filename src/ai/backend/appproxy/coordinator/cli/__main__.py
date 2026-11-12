@@ -123,7 +123,7 @@ async def _generate() -> dict[str, Any]:
     "--output",
     "-o",
     default=None,
-    type=click.Path(dir_okay=False, writable=True),
+    type=click.Path(dir_okay=False, writable=True, path_type=Path),
     help="Output file path (default: stdout)",
 )
 def generate_openapi_spec(output: Path | None) -> None:

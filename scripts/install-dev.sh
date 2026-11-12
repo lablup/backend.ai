@@ -1087,11 +1087,26 @@ setup_environment() {
   fi
 }
 
+enable_etcd_auth() {
+  # The etcd image has no shell, so etcdctl runs through `docker compose exec`.
+  local etcd_service="backendai-half-etcd"
+  if [ $CONFIGURE_HA -eq 1 ]; then
+    etcd_service="backendai-half-etcd-node01"
+  fi
+  local etcdctl="$docker_sudo docker compose -f docker-compose.halfstack.current.yml exec -T ${etcd_service} etcdctl"
+  if $etcdctl auth status 2>/dev/null | grep -q "Authentication Status: false"; then
+    show_info "Enabling etcd authentication..."
+    $etcdctl user add root --new-user-password=develove 2>/dev/null || true
+    $etcdctl auth enable
+  fi
+}
+
 configure_backendai() {
   wait_for_docker
   show_info "Creating docker compose \"halfstack\"..."
   $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" $HALFSTACK_PROFILE_ARGS up -d --wait
   $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" $HALFSTACK_PROFILE_ARGS ps   # You should see containers here.
+  enable_etcd_auth
 
   # Install rover cli for Supergraph generation
   install_rover_cli
@@ -1190,6 +1205,10 @@ configure_backendai() {
 
   # configure agent
   cp configs/agent/halfstack.toml ./agent.toml
+  if [ ! -f fixtures/agent/agent.key_secret ]; then
+    mkdir -p fixtures/agent
+    ./backend.ai mgr generate-rpc-keypair fixtures/agent agent
+  fi
   mkdir -p "$VAR_BASE_PATH"
   sed_inplace "s/port = 8120/port = ${ETCD_PORT}/" ./agent.toml
   sed_inplace "s/port = 6001/port = ${AGENT_RPC_PORT}/" ./agent.toml

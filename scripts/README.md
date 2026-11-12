@@ -31,6 +31,7 @@ current, see `AGENTS.md` in this directory.
 | `refresh-graphql-gateway.sh` | Regenerates the schema, copies it to the root and restarts the Apollo Router (`--recreate` recreates the container so config updates apply) | person |
 | `alembic-rebase.py` | Rebases a migration branch when alembic heads have diverged | person (`src/ai/backend/README.md`) |
 | `download-webui-release.sh` | Downloads and unpacks a WebUI bundle into `src/ai/backend/web` | person; `release.sh` |
+| `new-changelog.py` | Writes a changelog fragment named `changes/<YYYYMMDD>-<HHMMSS>-<6 chars>.<type>.md`, with front matter for `--issue` and `--epic`, and prints its path | person; Claude Code (`/submit`) |
 | `knowledge/search.py` | Lists or searches `KNOWLEDGE.md` frontmatter across the repository | person; Claude Code (`/knowledge`) |
 
 ## Commit and push
@@ -38,23 +39,22 @@ current, see `AGENTS.md` in this directory.
 | Script | What it does | Called by |
 |---|---|---|
 | `pre-commit` | Hook stub copied into `.git/hooks/` that calls `pre-commit.sh` | auto: git, installed by `install-dev.sh` |
-| `pre-commit.sh` | Runs `pants fmt` and `pants lint` over the changed files | auto: `pre-commit` |
+| `pre-commit.sh` | Runs `ruff format` and `ruff check` over the staged Python files, with the ruff version from `pants.toml` | auto: `pre-commit` |
 | `pre-push` | Hook stub copied into `.git/hooks/` that calls `pre-push.sh` | auto: git, installed by `install-dev.sh` |
-| `pre-push.sh` | Runs `pants lint`, `pants check` and `pants test` against the PR's base branch | auto: `pre-push` |
-| `plan-push-targets.sh` | Writes the changed targets and their direct dependents to a file and prints its path, cached by a hash of the base commit, HEAD's tree and the uncommitted changes | auto: `pre-push.sh` |
-| `hooks/auto-format.sh` | Runs `pants fmt` on the files an AI agent touched | auto: Claude Code hook (per-user settings) |
-| `hooks/auto-fix.sh` | Runs `pants fix` on the files an AI agent touched | auto: Claude Code hook (per-user settings) |
+| `pre-push.sh` | Runs `knowledge/check_words.py` against the PR's base branch. CI runs the pants checks | auto: `pre-push` |
 
 ## Pull-request CI
 
 | Script | What it does | Called by |
 |---|---|---|
+| `validate-changelog-fragments.py` | Checks the names, types, front matter and epic file pairs in `changes/` | auto: `ci.yml` (`check-build-and-lint`) |
 | `check-multiple-alembic-heads.py` | Fails the build when the migration graph has more than one head | auto: `ci.yml`, `.github/scripts/merge-alembic-heads.sh` |
 | `check-alembic-revision.py` | Rejects a migration whose `upgrade()` / `downgrade()` is empty | auto: `ci.yml` |
 | `check-init-imports.py` | Fails when an `__init__.py` under the given directories imports anything, apart from the files it allows | auto: `ci.yml` (`check-build-and-lint`) |
 | `knowledge/check.py` | Validates `KNOWLEDGE.md` frontmatter, paths, and body links | auto: `knowledge-check.yml`; person |
 | `knowledge/check_bilingual.py` | Validates `.md` and `.ko.md` pairs and rejects Korean added to a `.md` file | auto: `knowledge-check.yml`; person |
-| `knowledge/check_words.py` | Finds the words the glossary rejects in added document lines or given files | auto: `knowledge-check.yml`; person |
+| `knowledge/check_words.py` | Finds the words the glossary rejects in added document lines or given files | auto: `knowledge-check.yml`, `pre-push.sh`; person |
+| `knowledge/check_bep_length.py` | Checks the length limits of BEP-1080 and later BEPs: lines, list items, design subsections | auto: `knowledge-check.yml`; person |
 | `get-platform-suffix.py` | Prints the `<os>-<arch>` suffix used in artifact names | auto: `ci.yml`, `build-test.yml` |
 | `.github/scripts/decide-backport-targets.sh` | Reads `.github/maintained-versions.yml` and the `Backport:` trailer to decide the target branches | auto: `backport.yml` |
 | `.github/scripts/check-backport-migration.sh` | Warns when a pull request both carries a `Backport:` trailer and changes the database schema, since both migrations then have to be idempotent | auto: `backport-migration-check.yml` |
@@ -76,7 +76,9 @@ current, see `AGENTS.md` in this directory.
 | `release.sh` | Cuts a release branch and produces the whole release commit | person |
 | `download-external-tools.sh` | Refreshes the bundled external binaries (bssh, all-smi, …) | auto: `release.sh` |
 | `freeze_release_version.py` | Replaces `NEXT_RELEASE_VERSION` placeholders with the version being released (skipped for pre-releases) | auto: `release.sh`, `.github/scripts/bump-next-release-on-main.sh` |
+| `rename-changelog-fragments.py` | Renames each new-style changelog fragment to `<PR-number>.<type>.md` with `git mv` and drops its front matter, taking the PR number from the commit that added the file; stops the release on a file that breaks the rules or has no PR number | auto: `release.sh` |
 | `run-towncrier.py` | Runs towncrier against the version-branch changelog file | auto: `release.sh` |
+| `changelog_fragments.py` | Module, not a command: the rules for the files in `changes/` (names, types, front matter, epic files) | auto: imported by `new-changelog.py`, `rename-changelog-fragments.py`, `validate-changelog-fragments.py`, `run-towncrier.py` |
 | `changelog_files.py` | Module, not a command: maps a version to its `CHANGELOG/<version>.md` | auto: imported by `run-towncrier.py`, `extract-release-changelog.py` |
 | `bump_next_release_version.py` | Rewrites or prints `NEXT_RELEASE_VERSION` in `meta.py` | auto: `.github/scripts/bump-next-release-on-main.sh` |
 | `.github/scripts/update-maintained-versions.sh` | Registers a newly cut release line in `.github/maintained-versions.yml` and retires the due ones | auto: `release.sh` |
@@ -88,6 +90,7 @@ current, see `AGENTS.md` in this directory.
 | `check-bake-targets.sh` | Fails when `docker-bake.hcl`'s default group and the `list-dockerfiles.sh --service` registry drift apart | auto: `docker-images.yml` |
 | `determine-release-type.py` | Prints `RELEASE_AUDIENCE` and `IS_PRERELEASE` for the `VERSION` file; rejects a version that is neither an alpha, a release candidate nor a final release | auto: `ci.yml` (`determine-release-grade`) |
 | `test_determine_release_type.py` | Checks `determine-release-type.py` against every classified and rejected version | auto: `ci.yml` (`check-build-and-lint`) |
+| `test_freeze_release_version.py` | Checks `freeze_release_version.py` against standalone, one-line and multi-line imports | auto: `ci.yml` (`check-build-and-lint`) |
 | `normalize-version.py` | Prints the PEP 440-normalized version used for docker image tags, rejecting local segments (`+` is not a legal docker tag character) | auto: `docker-images.yml` |
 | `build-wheels.sh` | Builds the platform-specific and generic wheels | auto: `ci.yml` (release job) |
 | `build-scies.sh` | Builds the scie executables locally (CI runs the equivalent pants commands inline) | person |
@@ -97,9 +100,9 @@ current, see `AGENTS.md` in this directory.
 
 | Script | What it does | Called by |
 |---|---|---|
-| `pyscript.sh` | Runs a PEP 723 script with uv-managed dependencies | person; `install-dev.sh`, `pre-commit.sh` |
+| `pyscript.sh` | Runs a PEP 723 script with uv-managed dependencies | person; `install-dev.sh`, `pre-commit.sh`, `release.sh` |
 | `python.sh` | Runs a plain Python command through the uv-managed interpreter | person; `install-dev.sh` |
-| `tomltool.py` | Gets or sets a key in a TOML file or stream | person; `pre-commit.sh` |
+| `tomltool.py` | Gets or sets a key in a TOML file or stream | person; `pre-commit.sh`, `release.sh` |
 | `add_future_annotations.py` | Adds the missing `from __future__ import annotations` imports | person |
 | `validate_ann_compliance.py` | Reports the ANN (flake8-annotations) violations of a path | person |
 | `run_mypy_subset.sh` | Runs `pants check` over a subset of paths | person |
@@ -116,5 +119,4 @@ current, see `AGENTS.md` in this directory.
 | `agent/` | Cross-build recipes for the static binaries bundled into the kernel runner (dropbear, ttyd, tmux, sftp-server, socket-relay, suexec) and agent-side deployment helpers |
 | `e2e-model-store/` | Numbered end-to-end model-store scenarios, run in order by `run-all.sh` against a live local stack |
 | `storage-proxy/` | `upgrade.sh` (storage migration entry point) and the Ceph test-cluster provisioning under `ceph/` |
-| `hooks/` | AI-agent hooks; see the "Commit and push" table |
-| `knowledge/` | `KNOWLEDGE.md` tooling: shared frontmatter parser, `search.py`, `check.py`, `check_bilingual.py`, `check_words.py` |
+| `knowledge/` | `KNOWLEDGE.md` tooling: shared frontmatter parser, `search.py`, `check.py`, `check_bilingual.py`, `check_words.py`, `check_bep_length.py` |

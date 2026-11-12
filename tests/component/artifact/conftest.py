@@ -41,8 +41,12 @@ from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.artifact_registry.provider import (
     ArtifactRegistryOpsProvider,
 )
+from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
+from ai.backend.manager.repositories.rbac.permission_check_repository import (
+    RbacPermissionCheckRepository,
+)
 from ai.backend.manager.repositories.reservoir_registry.repository import (
     ReservoirRegistryRepository,
 )
@@ -153,6 +157,9 @@ def artifact_revision_processors(
         huggingface_registry_repository=huggingface_repository,
         reservoir_registry_repository=reservoir_repository,
         vfolder_repository=vfolder_repository,
+        permission_check=RbacPermissionCheckRepository(
+            PermissionOpsProvider(database_engine), config_provider
+        ),
         storage_manager=storage_manager,
         config_provider=config_provider,
         valkey_artifact_client=valkey_clients.artifact,

@@ -23,7 +23,7 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
 from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
-from ai.backend.common.types import AccessKey, VFolderID
+from ai.backend.common.types import AccessKey, SSHPublicKey, VFolderID
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.bootstrap_script.types import BootstrapScriptRevisionData
@@ -90,6 +90,7 @@ from ai.backend.manager.models.keypair.row import (
 )
 from ai.backend.manager.models.keypair.searchable_fields import KeyPairSearchableFields
 from ai.backend.manager.models.project.lookups import PersonalProjectOfUserLookup
+from ai.backend.manager.models.project.updaters import PersonalProjectSoftDeleteUpdater
 from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
 from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
@@ -488,9 +489,10 @@ class UserDBSource:
     async def purge_user_by_uuid(self, user_uuid: UUID) -> None:
         """Completely purge user and all associated data by UUID.
 
-        The user's personal project is not among it. Its creator column is nulled by
-        the foreign key, leaving the project dangling for the retention sweep — the
-        resources it holds outlive the account rather than going with it.
+        The user's personal project is not among it. It is marked deleted and its
+        creator column is nulled by the foreign key, leaving the project dangling for
+        the retention sweep — the resources it holds outlive the account rather than
+        going with it.
         """
         user_id = UserID(user_uuid)
         await self._revoke_shared_vfolders(user_uuid)
@@ -505,6 +507,10 @@ class UserDBSource:
             await w.batch_purge_entities_in_global(UserSessionGroupPurger(user_id=user_id))
             # TODO: scope this purge. A user operation must not use in_global.
             await w.batch_purge_entities_in_global(UserVFolderAutoMountPurger(user_id=user_id))
+            # Marked before the user row goes: the FK nulls the creator column on delete,
+            # after which no statement can name the project by it.
+            # TODO: scope this update. A user operation must not use in_global.
+            await w.batch_update_in_global(PersonalProjectSoftDeleteUpdater(user_id=user_id))
             # Finally the user itself as a scope: the row and the RBAC graph it left.
             await w.purge_entity(UserPurger(user_id=user_id))
 
@@ -1134,13 +1140,12 @@ class UserDBSource:
                 raise KeyPairNotFound(f"Keypair {access_key} not found")
             return KeyPairSearchableFields.own.to_data(kp_row)
 
-    async def admin_update_ssh_keypair(
+    async def admin_update_ssh_public_key(
         self,
-        access_key: str,
-        ssh_public_key: str,
-        ssh_private_key: str,
+        access_key: AccessKey,
+        ssh_public_key: SSHPublicKey,
     ) -> None:
-        """Admin registers (overwrites) a user's SSH keypair."""
+        """Admin registers (overwrites) a user's SSH public key."""
         async with self._db.begin_session() as session:
             exists = (
                 await session.scalars(
@@ -1152,10 +1157,7 @@ class UserDBSource:
             await session.execute(
                 sa.update(keypairs)
                 .where(keypairs.c.access_key == access_key)
-                .values(
-                    ssh_public_key=ssh_public_key,
-                    ssh_private_key=ssh_private_key,
-                )
+                .values(ssh_public_key=ssh_public_key)
             )
 
     async def admin_clear_ssh_keypair(self, access_key: str) -> None:

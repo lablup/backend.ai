@@ -13,6 +13,7 @@ Which ops path writes a row follows from the spec's type, so no scenario names a
     EntityUpserter                  -> upsert_entity
     GlobalEntityUpserter            -> upsert_global_entity
     GuardedDataUpdater              -> update_data
+    DataBatchUpdater                -> batch_update_in_global
     TestSeedRegistryPair            -> create_registry
 
 A field row is written under an owner, so it has its own entry, ``adding``. A
@@ -47,12 +48,14 @@ from ai.backend.manager.models.specs.creator import (
     GlobalEntityCreator,
     GuardedEntityCreator,
     NestedFieldCreator,
+    NestedFieldToCreate,
     RoleManagedEntityCreator,
     RoleManagedGlobalEntityCreator,
 )
 from ai.backend.manager.models.specs.relation import RelationCreator
-from ai.backend.manager.models.specs.updater import GuardedDataUpdater
+from ai.backend.manager.models.specs.updater import DataBatchUpdater, GuardedDataUpdater
 from ai.backend.manager.models.specs.upserter import (
+    DanglingFieldUpserter,
     EntityUpserter,
     FieldUpserter,
     GlobalEntityUpserter,
@@ -146,6 +149,21 @@ class TestSeedRowFromThree[A, B, C, D](TestSeed, ABC):
 
     @abstractmethod
     def seed(self, name: str, first: A, second: B, third: C) -> WriteSpec[D]:
+        raise NotImplementedError
+
+
+class TestSeedBatchUpdate[A, D](TestSeed, ABC):
+    """A row the manager stamps in one batch across the table.
+
+    A retention boundary is written this way: the spec selects the rows, the batch
+    update answers with the rows it changed.
+    """
+
+    __test__ = False
+
+    @abstractmethod
+    def updater(self, source: A) -> DataBatchUpdater[Any, D]:
+        """The update spec, built from the row laid before it."""
         raise NotImplementedError
 
 
@@ -256,6 +274,39 @@ class TestSeedFieldUpserter[A, D: FieldData](TestSeedField[A, D]):
     @override
     async def write(self, ops: TestSeedOps, owner_id: Any) -> D:
         return await ops.upsert_field_entity(owner_id, self.seed())
+
+
+class TestSeedDanglingFieldUpserter[A, D: FieldData](TestSeedField[A, D]):
+    """A field row the manager upserts whose owner is a value on the row, such as a fair
+    share keyed by a resource group."""
+
+    @abstractmethod
+    def seed(self, owner_id: Any) -> DanglingFieldUpserter[Any, D]:
+        raise NotImplementedError
+
+    @override
+    async def write(self, ops: TestSeedOps, owner_id: Any) -> D:
+        return await ops.upsert_dangling_field(self.seed(owner_id))
+
+
+class TestSeedNestedFieldCreator[A, D: FieldData](TestSeedField[A, D]):
+    """A field row another field row owns, such as a kernel group's environ rows.
+
+    The manager writes these under the owner's settled id with
+    ``atomic_create_nested_fields``; laying one takes that same write.
+    """
+
+    @abstractmethod
+    def seed(self) -> NestedFieldCreator[Any, Any, D]:
+        raise NotImplementedError
+
+    @override
+    async def write(self, ops: TestSeedOps, owner_id: Any) -> D:
+        return (
+            await ops.atomic_create_nested_fields([
+                NestedFieldToCreate(owner_id=owner_id, creator=self.seed())
+            ])
+        )[0]
 
 
 class TestSeedLink[S, T](ABC):
@@ -454,11 +505,15 @@ class TestSeeder:
 
         return self._remember(self._given(seed, name, (), write, _there_is(seed, name)))
 
-    def creating_from[A, D](self, seed: TestSeedRowFrom[A, D], a: Laid[A], /) -> Laid[D]:
+    def creating_from[A, D](
+        self, seed: TestSeedRowFrom[A, D] | TestSeedBatchUpdate[A, D], a: Laid[A], /
+    ) -> Laid[D]:
         """Lay a row that reads one row laid before it."""
         name = seed.name(self.name)
 
         async def write(ops: TestSeedOps, values: Sequence[Any]) -> Any:
+            if isinstance(seed, TestSeedBatchUpdate):
+                return (await ops.batch_update_in_global(seed.updater(values[0])))[0]
             return await _write(ops, seed.seed(name, values[0]))
 
         return self._remember(self._given(seed, name, (a,), write, _there_is(seed, name)))

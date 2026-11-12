@@ -13,104 +13,54 @@ Target-Version:
 Implemented-Version:
 ---
 
-# Title
+# <Title>
 
-## Related Issues
+<!-- 300 lines per document. List items are one level and at most 120 characters. -->
 
-- JIRA: BA-XXXX
-- GitHub: #XXXX
+## Goals
 
-## Motivation
+<One or two lines on what this BEP achieves. Do not write the problem or the background>
 
-Why is this change needed? What problem does it solve?
+<!-- At most 7 rows. One line per cell. -->
 
-Example:
-> Currently, `StringFilter` only supports 4 out of 10 defined filter fields.
-> Users expect all filter fields to work, but `starts_with`, `ends_with`, and `not_equals` are silently ignored.
-> This causes confusion and unexpected query results.
+| Goal | Current | Done when | Related issue |
+|---|---|---|---|
+| <Capability required> | <Current implementation or state, with the path that shows it> | <How to check> | <Issue key> |
 
-## Current Design
+## Non-goals
 
-Describe the current state or design that this proposal aims to change.
+<!-- At most 7 items. -->
 
-Example:
-> ```python
-> def build_query_condition(
->     self,
->     contains_factory: Callable[[str, bool], QueryCondition],
->     equals_factory: Callable[[str, bool], QueryCondition],
-> ) -> Optional[QueryCondition]:
->     # Only 4 fields are handled, others are ignored
-> ```
+- <Item not covered, and where it is covered>
 
-## Proposed Design
+## Design
 
-Describe the new design or changes being proposed.
+<!-- At most 4 subsections. Each has one SVG, at most 2 tables (7 rows each, one line per cell) and at most 3 sentences. The rejected alternative line is counted separately. Do not list every component. -->
 
-Example:
-> ```python
-> @dataclass
-> class StringMatchSpec:
->     value: str
->     case_insensitive: bool = False
->     negated: bool = False
->
-> def build_query_condition(
->     self,
->     contains_factory: Callable[[StringMatchSpec], QueryCondition],
->     equals_factory: Callable[[StringMatchSpec], QueryCondition],
->     starts_with_factory: Callable[[StringMatchSpec], QueryCondition],
->     ends_with_factory: Callable[[StringMatchSpec], QueryCondition],
-> ) -> Optional[QueryCondition]:
->     # All fields are now handled
-> ```
+### <Component that resolves a goal>
 
-## Migration / Compatibility
+![<Diagram description>](BEP-XXXX/<diagram-name>.svg)
 
-Describe backward compatibility considerations and migration plan if applicable.
+<At most 3 sentences>
 
-Example:
-> ### Backward Compatibility
-> - Existing `build_query_condition()` calls will require updates
-> - New factory parameters are required (no default values)
->
-> ### Breaking Changes
-> - Factory signature changed from `Callable[[str, bool], QueryCondition]` to `Callable[[StringMatchSpec], QueryCondition]`
->
-> ### Migration Steps
-> 1. Update all adapter implementations to use new `StringMatchSpec`
-> 2. Add `starts_with_factory` and `ends_with_factory` to all callers
-> 3. Test all filter combinations
+| <Contract item: type, API, state transition> | <Meaning> |
+|---|---|
+| <Item> | <One-line meaning> |
 
-## Implementation Plan
+Rejected: <Alternative and the reason in one line. Only when the review disputes it>
 
-Outline the implementation steps and priorities.
+## Impact
 
-Example:
-> 1. **Phase 1**: Core changes
->    - Add `StringMatchSpec` dataclass
->    - Update `StringFilter.build_query_condition()` signature
->
-> 2. **Phase 2**: Adapter updates
->    - Update `ScalingGroupFilterGQL` adapter
->    - Update other adapters using `StringFilter`
->
-> 3. **Phase 3**: Testing
->    - Add unit tests for all filter field combinations
->    - Add integration tests for GraphQL queries
+<!-- Only when it applies. At most 7 items: compatibility, permission, performance, metrics. -->
 
-## Open Questions
+- <Affected target>: <Change and response>
 
-List any unresolved questions or items that need further discussion.
+## Implementation Order
 
-Example:
-> - Should we add `not_contains`, `not_starts_with`, `not_ends_with` fields to `StringFilter`?
-> - Should factory parameters be optional with default `None` for backward compatibility?
+<!-- At most 7 items. One step is one issue. Write the goal or result a step resolves, not a task list. -->
+
+1. <Step name>: <Goal or result it resolves>
 
 ## References
 
-- Link to related documents, discussions, or external resources
-
-Example:
-> - [BEP-1010: New GQL](BEP-1010-new-gql.md)
-> - [Strawberry GraphQL Documentation](https://strawberry.rocks/)
+- <Related BEP, document>

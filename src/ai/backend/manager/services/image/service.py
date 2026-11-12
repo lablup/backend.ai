@@ -12,6 +12,7 @@ from ai.backend.manager.data.image.types import (
     ImageIdentifier,
     ImageStatus,
 )
+from ai.backend.manager.errors.api import NotImplementedAPI
 from ai.backend.manager.errors.image import ImageAccessForbiddenError, ImageNotFound
 from ai.backend.manager.models.image.creators import ImageAliasCreator
 from ai.backend.manager.models.image.scopes import ImageTarget
@@ -361,13 +362,13 @@ class ImageService:
         """
         Preloads images by their IDs to specified agents.
         """
-        raise NotImplementedError
+        raise NotImplementedAPI()
 
     async def unload_image(self, action: UnloadImageAction) -> UnloadImageActionResult:
         """
         Unloads images by their IDs from specified agents.
         """
-        raise NotImplementedError
+        raise NotImplementedAPI()
 
     async def clear_image_custom_resource_limit_by_id(
         self, action: ClearImageCustomResourceLimitByIdAction

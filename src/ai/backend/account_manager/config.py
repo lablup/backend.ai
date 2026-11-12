@@ -22,6 +22,7 @@ from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import PydanticUndefined, core_schema
 
 from ai.backend.common import config
+from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.types import BackendAISchema
 from ai.backend.logging import LogLevel
 
@@ -219,19 +220,6 @@ class GroupID:
         )
 
 
-class EtcdConfig(BaseSchema):
-    namespace: Annotated[str, Field(description="etcd namespace.", examples=["local"])]
-    addr: Annotated[
-        HostPortPair,
-        Field(
-            description="Address to access the etcd.",
-            examples=[HostPortPair(host="127.0.0.1", port=8121)],
-        ),
-    ]
-    user: Annotated[str, Field(description="etcd user.", examples=[""])]
-    password: Annotated[str, Field(description="etcd password.", examples=[""])]
-
-
 class DBConfig(BaseSchema):
     type: Annotated[
         DBType,
@@ -414,9 +402,6 @@ def load(config_path: Path | None = None, log_level: LogLevel = LogLevel.NOTSET)
     try:
         raw_cfg = config_key_to_snake_case(raw_cfg)
         server_config = ServerConfig(**raw_cfg)
-        if server_config.debug.enabled:
-            print("== Account Manager configuration ==", file=sys.stderr)
-            print(pformat(server_config.model_dump()), file=sys.stderr)
     except ValidationError as e:
         print(
             "ConfigurationError: Could not read or validate the account manager local config:",

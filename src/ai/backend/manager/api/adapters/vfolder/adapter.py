@@ -87,6 +87,7 @@ from ai.backend.common.dto.manager.v2.vfolder.types import (
 from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderUsageInfo as VFolderUsageInfoDTO,
 )
+from ai.backend.common.dto.manager.v2.vfolder_auto_mount.request import VFolderAutoMountFilter
 from ai.backend.common.exception import BackendAIError, UnreachableError
 from ai.backend.common.schema.deployment import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.common.types import (
@@ -139,6 +140,9 @@ from ai.backend.manager.models.vfolder.scopes import (
 from ai.backend.manager.models.vfolder.searchable_fields import VFolderSearchableFields
 from ai.backend.manager.models.vfolder.searchers import VFolderSearcher
 from ai.backend.manager.models.vfolder.updaters import VFolderAttributeUpdater
+from ai.backend.manager.models.vfolder_auto_mount.searchable_fields import (
+    VFolderAutoMountSearchableFields,
+)
 from ai.backend.manager.services.deployment.actions.create_deployment import CreateDeploymentAction
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.vfolder.actions.admin_search_vfolders import (
@@ -985,6 +989,11 @@ class VFolderAdapter(BaseAdapter):
                 VFolderSearchableFields.nested.labels.correlation,
                 self._convert_entity_label_filter,
             ),
+            *self.apply_to_many_filter(
+                f.auto_mounts,
+                VFolderSearchableFields.nested.auto_mounts.correlation,
+                self._convert_vfolder_auto_mount_filter,
+            ),
         ]
         if f.AND:
             for sub in f.AND:
@@ -1000,6 +1009,37 @@ class VFolderAdapter(BaseAdapter):
         if f.NOT:
             for sub in f.NOT:
                 sub_conditions = self._convert_vfolder_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
+        return conditions
+
+    def _convert_vfolder_auto_mount_filter(self, f: VFolderAutoMountFilter) -> list[QueryCondition]:
+        fields = VFolderAutoMountSearchableFields.own
+        conditions = [
+            *self.apply_uuid_filter(f.entity_id, fields.id.filter),
+            *self.apply_enum_filter(f.scope_type, fields.scope_type.filter),
+            *self.apply_uuid_filter(f.scope_id, fields.scope_id.filter),
+            *self.apply_uuid_filter(f.vfolder_id, fields.vfolder_id.filter),
+            *self.apply_string_filter(f.mount_destination, fields.mount_destination.filter),
+            *self.apply_enum_filter(f.mount_permission, fields.mount_permission.filter),
+            *self.apply_datetime_filter(f.created_at, fields.created_at.filter),
+            *self.apply_datetime_filter(f.updated_at, fields.updated_at.filter),
+            *self.apply_nullable_datetime_filter(f.deleted_at, fields.deleted_at.filter),
+        ]
+        if f.AND:
+            for sub in f.AND:
+                conditions.extend(self._convert_vfolder_auto_mount_filter(sub))
+        if f.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub in f.OR:
+                sub_conditions = self._convert_vfolder_auto_mount_filter(sub)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+        if f.NOT:
+            for sub in f.NOT:
+                sub_conditions = self._convert_vfolder_auto_mount_filter(sub)
                 if sub_conditions:
                     conditions.append(negate_conditions(sub_conditions))
         return conditions

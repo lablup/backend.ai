@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import functools
 import hashlib
 import logging
@@ -58,6 +59,7 @@ from ai.backend.agent.resources import (
 )
 from ai.backend.agent.scratch.utils import RestartStateStore
 from ai.backend.agent.types import Container, KernelOwnershipData, MountInfo, Port
+from ai.backend.agent.utils import SECRET_MASK
 from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.cgroup import CgroupController
 from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
@@ -472,9 +474,10 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                 # in image importer kernels.
                 if vfolder.name != ".logs":
                     continue
+            source = await self._resolve_vfolder_mount_source(vfolder)
             mount = Mount(
                 MountTypes.K8S_HOSTPATH,
-                Path(vfolder.host_path),
+                source,
                 Path(vfolder.kernel_path),
                 vfolder.mount_perm,
                 opts={
@@ -485,7 +488,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                 KubernetesHostPathVolume(
                     name=f"kernel-{self.kernel_id}-hostPath-{idx}",
                     hostPath={
-                        "path": vfolder.host_path.as_posix(),
+                        "path": source.as_posix(),
                         "type": "Directory",
                     },
                 ),
@@ -727,7 +730,12 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         )
 
         if self.local_config.debug.log_kernel_config:
-            log.debug("initial container config built", container_config=str(deployment))
+            # env carries the session's environ, so only the variable names are logged.
+            dumped = copy.deepcopy(deployment)
+            for container in dumped["spec"]["template"]["spec"]["containers"]:
+                for env in container.get("env", []):
+                    env["value"] = SECRET_MASK
+            log.debug("initial container config built", container_config=str(dumped))
 
         expose_service = Service(
             str(self.kernel_id),

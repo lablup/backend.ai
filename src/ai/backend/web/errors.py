@@ -18,6 +18,19 @@ from ai.backend.common.exception import (
 from ai.backend.common.json import dump_json
 
 
+class UnauthenticatedError(BackendAIError, web.HTTPUnauthorized):
+    error_type = "https://api.backend.ai/probs/auth-failed"
+    error_title = "Unauthorized access"
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AUTH,
+            operation=ErrorOperation.AUTH,
+            error_detail=ErrorDetail.UNAUTHORIZED,
+        )
+
+
 class AlreadyLoggedInError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/generic-bad-request"
     error_title = "You have already logged in."
@@ -58,6 +71,19 @@ class InvalidTemplateValueError(BackendAIError, web.HTTPBadRequest):
             domain=ErrorDomain.API,
             operation=ErrorOperation.PARSING,
             error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
+class LoginBlockedError(BackendAIError, web.HTTPTooManyRequests):
+    error_type = "https://api.backend.ai/probs/too-many-requests"
+    error_title = "Too many failed login attempts"
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AUTH,
+            operation=ErrorOperation.AUTH,
+            error_detail=ErrorDetail.FORBIDDEN,
         )
 
 

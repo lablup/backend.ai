@@ -54,6 +54,7 @@ from ai.backend.manager.api.gql.deployment.types.scopes import (
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
+from ai.backend.manager.errors.api import NotImplementedAPI
 from ai.backend.manager.errors.user import UserNotFound
 
 # Query resolvers
@@ -424,5 +425,5 @@ async def deployment_status_changed(
 ) -> AsyncGenerator[DeploymentStatusChangedPayload, None]:
     """Subscribe to deployment status changes."""
     # TODO: Implement actual subscription logic using pub/sub system
-    raise NotImplementedError("Subscription not implemented")
+    raise NotImplementedAPI("Subscription not implemented")
     yield  # type: ignore[unreachable]  # Makes this an async generator

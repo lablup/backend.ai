@@ -28,6 +28,7 @@ def plugin() -> Rebel100Plugin:
     plugin._rbln_stat_path = "/usr/bin/rbln-smi"
     plugin._all_devices = None
     plugin._enable_rsd = False
+    plugin._host_ipc = True
     plugin._unknown_device_names = set()
     plugin.atom_config = {
         "general": {"enforce_singular_numa_affinity": False, "enable_rsd": False},

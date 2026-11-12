@@ -94,8 +94,10 @@ The foreign key is `ON DELETE SET NULL`. A user purge does not take the project.
 - Deleting a project means clearing out the resources in it, which is asynchronous work.
   It does not belong in a synchronous purge transaction.
 - So a personal project holding a NULL creator is **dangling**, and the retention sweep
-  collects it. A delete request that wants the project gone too says so through an API
-  option; the deletion itself stays asynchronous.
+  collects it once its deletion is older than the `projects` policy period. The user
+  purge marks it `deleted` before the user row goes, since the FK is what empties the
+  creator column. A delete request that wants the project gone too says so through an
+  API option; the deletion itself stays asynchronous.
 
 On a general project `creator_id` is plain audit information and an empty one means
 nothing. That is why the key is not `RESTRICT`: a team project someone created long ago

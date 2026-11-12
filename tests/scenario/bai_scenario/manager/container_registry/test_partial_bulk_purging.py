@@ -28,7 +28,7 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
     When,
 )
-from bai_scenario.components.answers import MissingResponse
+from bai_scenario.components.answers import MissingResponse, TheFailedItemIsRefused
 from bai_scenario.components.container_registry import (
     MISSING_ENTITY_ID,
     ManyRegistriesAndACaller,
@@ -121,6 +121,17 @@ class EveryRegistryIsPurged(Then[ManyRegistriesAndACaller, Purged]):
                         ),
                     ),
                 ),
+                Held[UUID](
+                    f"{at}entity_id",
+                    node.entity_id,
+                    SameAs(
+                        registry.id,
+                        Says(
+                            "미리 저장한 컨테이너 레지스트리의 id",
+                            english="the id of the container registry seeded in advance",
+                        ),
+                    ),
+                ),
                 Same(f"{at}url", node.url, registry.url),
                 Same(f"{at}registry_name", node.registry_name, registry.registry_name),
                 Same(f"{at}type", node.type, registry.type),
@@ -184,7 +195,7 @@ class NoRegistryIsPurged(Then[ManyRegistriesAndACaller, Purged]):
                         ),
                     ),
                 ),
-                Held(f"failed[{i}].message", failure.message, Mentions(self.reason)),
+                TheFailedItemIsRefused(f"failed[{i}]", failure.message, self.reason),
             ]
         return verdicts
 

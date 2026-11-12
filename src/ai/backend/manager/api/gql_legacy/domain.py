@@ -265,7 +265,9 @@ class DomainNode(graphene.ObjectType):  # type: ignore[misc]
             cond = permission_ctx.query_condition
             if cond is None:
                 return None
-            row = await db_session.scalar(sa.select(DomainRow).where(DomainRow.name == domain_name))
+            row = await db_session.scalar(
+                sa.select(DomainRow).where(cond, DomainRow.name == domain_name)
+            )
             if row is None:
                 return None
             permissions = await permission_ctx.calculate_final_permission(row)

@@ -21,6 +21,7 @@ from ai.backend.common.data.idle_checker.types import (
 from ai.backend.common.exception import PrometheusQueryPresetInvalidLabel
 from ai.backend.common.types import SessionId, SessionTypes
 from ai.backend.manager.data.prometheus_query_preset.types import PrometheusQueryPresetData
+from ai.backend.manager.errors.metric import InvalidContainerMetricName
 from ai.backend.manager.models.idle_checker.creators import IdleCheckerCreator
 from ai.backend.manager.models.idle_checker.updaters import IdleCheckerUpdater
 from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
@@ -149,6 +150,19 @@ class TestIdleCheckerSpecLabelValidation:
         spec: IdleCheckerSpec,
     ) -> None:
         with pytest.raises(PrometheusQueryPresetInvalidLabel):
+            await service.create(_create_action(spec))
+        ops_repository.create_entity.assert_not_awaited()
+
+    async def test_create_with_an_invalid_container_metric_name_rejected(
+        self,
+        service: IdleCheckerService,
+        ops_repository: MagicMock,
+    ) -> None:
+        spec = _utilization_spec(
+            filter_labels={"container_metric_name": 'cpu_util"} or vector(1) #'}
+        )
+
+        with pytest.raises(InvalidContainerMetricName):
             await service.create(_create_action(spec))
         ops_repository.create_entity.assert_not_awaited()
 

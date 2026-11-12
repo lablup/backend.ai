@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Any, override
 
 import pytest
@@ -11,6 +12,7 @@ import pytest
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.resource_group.request import (
+    ResourceWeightEntryInput,
     UpdateResourceGroupFairShareSpecInput,
 )
 from ai.backend.common.dto.manager.v2.resource_group.response import (
@@ -19,6 +21,7 @@ from ai.backend.common.dto.manager.v2.resource_group.response import (
 )
 from ai.backend.manager.api.adapters.resource_group.adapter import ResourceGroupAdapter
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.errors.fair_share import InvalidResourceWeightError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
@@ -37,7 +40,9 @@ from bai_scenario.runner.steps import run_scenario
 type FairShareStep = Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, Any]
 
 UNKNOWN = "no-such-group"
+ABSENT_RESOURCE = "no-such-slot"
 HALF_LIFE = 14
+WEIGHT = Decimal("2")
 
 
 @dataclass(frozen=True)
@@ -96,6 +101,40 @@ class EditingTheSpec(When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupD
         asked = UpdateResourceGroupFairShareSpecInput(
             resource_group_name=UNKNOWN if self.unknown else laid.group.name,
             half_life_days=HALF_LIFE,
+        )
+        with ActingAs(laid.caller):
+            payload = await adapter.update_fair_share_spec(asked)
+        return payload.resource_group
+
+
+@dataclass(frozen=True)
+class AssigningAResourceWeight(
+    When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+):
+    """슬롯 종류 하나에 가중치를 지정한다. ``absent``면 보고된 적 없는 이름에 지정한다."""
+
+    absent: bool = False
+
+    @override
+    def operation(self) -> str:
+        return "update_fair_share_spec"
+
+    @override
+    def describe(self, laid: AGroupAndACaller) -> str:
+        named = ABSENT_RESOURCE if self.absent else laid.slot_name
+        return Says(
+            f"{laid.caller.username}이 {laid.group.name}의 {named} 가중치를 지정합니다",
+            english=(f"{laid.caller.username} assigns a weight to {named} on {laid.group.name}"),
+        )
+
+    @override
+    async def call(
+        self, adapter: ResourceGroupAdapter, laid: AGroupAndACaller
+    ) -> ResourceGroupDetailNode:
+        named = ABSENT_RESOURCE if self.absent else laid.slot_name
+        asked = UpdateResourceGroupFairShareSpecInput(
+            resource_group_name=laid.group.name,
+            resource_weights=[ResourceWeightEntryInput(resource_type=named, weight=WEIGHT)],
         )
         with ActingAs(laid.caller):
             payload = await adapter.update_fair_share_spec(asked)
@@ -369,12 +408,80 @@ class ChangingTheSpecOfAnUnknownNameIsNotFound(
         return TheCallIsRefused(EntityNotFoundError)
 
 
+@dataclass(frozen=True)
+class AUserGrantedUpdateAssignsAResourceWeight(
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "a-user-granted-update-assigns-a-resource-weight"
+
+    @override
+    def describe(self) -> Says:
+        return Says(
+            "그룹 범위에서 수정 권한을 받은 사용자가 슬롯 종류 하나의 가중치를 지정하면 그룹 "
+            "전체가 반환됩니다. 반환되는 노드에는 이 설정이 담기지 않습니다",
+            english=(
+                "when a user granted update in the group scope assigns a weight to one resource "
+                "type, the whole group comes back. the returned node does not carry this config"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
+        return AGroupAndSomeone(granted=Permission.UPDATE, reports_a_slot=True)
+
+    @override
+    def when(self) -> When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]:
+        return AssigningAResourceWeight()
+
+    @override
+    def then(self) -> Then[AGroupAndACaller, ResourceGroupDetailNode]:
+        return TheGroupNode(GroupLook(started=self.started))
+
+
+@dataclass(frozen=True)
+class AWeightOnAnUnreportedResourceIsRejected(
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+):
+    @override
+    def summary(self) -> str:
+        return "a-weight-on-a-resource-no-agent-reports-is-rejected"
+
+    @override
+    def describe(self) -> Says:
+        return Says(
+            "에이전트가 보고하지 않은 슬롯 종류에 가중치를 지정하면 입력이 잘못되었다는 것으로 "
+            "거부됩니다",
+            english=(
+                "assigning a weight to a resource type no agent reports is rejected as an invalid "
+                "input"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
+        return AGroupAndSomeone(granted=Permission.UPDATE, reports_a_slot=True)
+
+    @override
+    def when(self) -> When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]:
+        return AssigningAResourceWeight(absent=True)
+
+    @override
+    def then(self) -> Then[AGroupAndACaller, ResourceGroupDetailNode]:
+        return TheCallIsRefused(InvalidResourceWeightError)
+
+
 SCENARIOS: list[FairShareStep] = [
     TheSuperadminReadsTheDefaults(),
     AUserGrantedReadOnTheGroupReadsTheSpec(),
     AUserGrantedNothingMayNotReadTheSpec(),
     ReadingTheSpecOfAnUnknownNameIsNotFound(),
     TheSuperadminChangesTheHalfLife(started=datetime.now(UTC)),
+    AUserGrantedUpdateAssignsAResourceWeight(started=datetime.now(UTC)),
+    AWeightOnAnUnreportedResourceIsRejected(),
     AUserGrantedUpdateOnTheGroupChangesTheSpec(started=datetime.now(UTC)),
     AUserGrantedNothingMayNotChangeTheSpec(),
     ChangingTheSpecOfAnUnknownNameIsNotFound(),

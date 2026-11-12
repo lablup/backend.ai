@@ -255,17 +255,14 @@ type AdminRefreshDeploymentRevisionsPayload {
 }
 
 """
-Added in 26.4.2. Admin input for registering (overwriting) a user's SSH keypair.
+Added in 26.4.2. Admin input for registering (overwriting) a user's SSH public key. `sshPrivateKey` was removed in 26.10.0.
 """
 input AdminRegisterSSHKeypairInput {
-  """Access key whose SSH keypair will be replaced."""
+  """Access key whose SSH public key will be replaced."""
   accessKey: String!
 
   """PEM-encoded SSH public key."""
   sshPublicKey: String!
-
-  """PEM-encoded SSH private key."""
-  sshPrivateKey: String!
 }
 
 """
@@ -6750,6 +6747,10 @@ type HuggingFaceRegistry implements Node {
   entityId: UUID!
   url: String!
   name: String!
+
+  """
+  Access token for the registry. Masked unless the caller is a superadmin.
+  """
   token: String
 }
 
@@ -10859,7 +10860,7 @@ type Mutation {
   adminUpdateUserV2(userId: UUID!, input: UpdateUserV2Input!): UpdateUserV2Payload
 
   """
-  Added in 26.2.0. Update the current user's information. Users can only update their own profile. Non-superadmins can set only fullName, password and allowedClientIp
+  Added in 26.2.0. Update the current user's information. Users can only update their own profile. Non-superadmins can set only fullName, password and allowedClientIp. Password changes require oldPassword
   """
   updateUserV2(input: UpdateUserV2Input!): UpdateUserV2Payload
 
@@ -10923,7 +10924,7 @@ type Mutation {
   """
   adminDeleteKeypairV2(accessKey: String!): AdminDeleteKeypairPayload
 
-  """Added in 26.4.2. Admin registers (overwrites) a user's SSH keypair."""
+  """Added in 26.4.2. Admin registers (overwrites) a user's SSH public key."""
   adminRegisterSshKeypairV2(input: AdminRegisterSSHKeypairInput!): AdminRegisterSSHKeypairPayload
 
   """Added in 26.4.2. Admin clears a user's SSH keypair."""
@@ -12075,6 +12076,10 @@ type ObjectStorage implements Node {
   name: String!
   host: String!
   accessKey: String!
+
+  """
+  Secret key for authentication. Masked unless the caller is a superadmin.
+  """
   secretKey: String!
   endpoint: String!
   region: String!
@@ -17344,6 +17349,10 @@ type ReservoirRegistry implements Node {
   name: String!
   endpoint: String!
   accessKey: String!
+
+  """
+  Secret key for authentication. Masked unless the caller is a superadmin.
+  """
   secretKey: String!
   apiVersion: String!
 
@@ -18082,6 +18091,7 @@ enum RetentionCategory {
   SESSIONS
   USAGE_RECORDS
   USAGE_BUCKETS
+  PROJECTS
 }
 
 """
@@ -23037,6 +23047,11 @@ input UpdateUserV2Input {
   """New password."""
   password: String
 
+  """
+  Added in 26.10.0. Current password, required when changing your own password.
+  """
+  oldPassword: String
+
   """New full display name."""
   fullName: String
 
@@ -24438,6 +24453,25 @@ input VFolderAutoMountFilter {
   NOT: [VFolderAutoMountFilter!] = null
 }
 
+"""
+Added in 26.10.0. Filter selecting vfolders by the auto-mounts set on them. Each relation matches one auto-mount at a time.
+"""
+input VFolderAutoMountNestedFilter {
+  """
+  True for a vfolder that has at least one auto-mount, false for one that has none.
+  """
+  exists: Boolean = null
+
+  """At least one auto-mount matches."""
+  some: VFolderAutoMountFilter = null
+
+  """Every auto-mount matches; true when there is none."""
+  every: VFolderAutoMountFilter = null
+
+  """No auto-mount matches."""
+  none: VFolderAutoMountFilter = null
+}
+
 """Added in 26.10.0. One ordering rule for a vfolder auto-mount search."""
 input VFolderAutoMountOrderBy {
   """Field to order by."""
@@ -24586,6 +24620,9 @@ input VFolderFilter {
 
   """Added in 26.10.0. Filter by vfolder ID."""
   entityId: UUIDFilter = null
+
+  """Added in 26.10.0. Select vfolders by the auto-mounts set on them."""
+  autoMounts: VFolderAutoMountNestedFilter = null
   AND: [VFolderFilter!] = null
   OR: [VFolderFilter!] = null
   NOT: [VFolderFilter!] = null

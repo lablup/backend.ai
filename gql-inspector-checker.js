@@ -12,6 +12,8 @@ const SERVICE_CATALOG_ENDPOINTS =
 const ACCEPTED_REMOVALS = {
   "AccessTokenFilter.token":
     "The token value is the credential itself, so no search condition may take it: a partial match narrows the value one character at a time even when the response never carries it.",
+  "AdminRegisterSSHKeypairInput.sshPrivateKey":
+    "The server keeps no SSH private key a client sends: registering takes only the public key and leaves the stored private key as it is.",
   "DeploymentUsedBy": USAGE_RENAME,
   "ModelCardUsedBy": USAGE_RENAME,
   "RoleUsedBy": USAGE_RENAME,
@@ -40,6 +42,8 @@ const ACCEPTED_REMOVALS = {
   "SessionUsedBy.resourceGroup": USAGE_RENAME,
   "ServiceCatalogEndpoint": SERVICE_CATALOG_ENDPOINTS,
   "ServiceCatalog.endpoints": SERVICE_CATALOG_ENDPOINTS,
+  "ScalingGroupNode.wsproxy_api_token":
+    "The token is the App Proxy API credential, and every domain member could read it through `domain_nodes { scaling_groups }`. Superadmins still read it on `ScalingGroup`.",
 };
 
 // Type changes decided deliberately, keyed and dropped the same way as ACCEPTED_REMOVALS.

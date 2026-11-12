@@ -33,7 +33,7 @@ class BaseFrontend[TBackend: BaseBackend, TCircuitKeyType: (int, str)](metaclass
         self.root_context = root_context
         self.backends = {}
 
-    async def register_circuit(self, circuit: Circuit, routes: list[RouteInfo]) -> None:
+    async def register_circuit(self, circuit: Circuit, routes: list[RouteInfo]) -> bool:
         metrics = self.root_context.metrics
 
         key = self.get_circuit_key(circuit)
@@ -41,6 +41,7 @@ class BaseFrontend[TBackend: BaseBackend, TCircuitKeyType: (int, str)](metaclass
             self.backends[key] = await self.initialize_backend(circuit, routes)
             log.debug("circuit registered (app: {}, mode: {})", circuit.app, circuit.app_mode)
         metrics.circuit.observe_circuit_creation(protocol=circuit.protocol.name)
+        return True
 
     async def update_circuit_route_info(
         self, circuit: Circuit, new_routes: list[RouteInfo]

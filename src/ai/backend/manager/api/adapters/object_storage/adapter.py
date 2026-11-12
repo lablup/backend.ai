@@ -7,6 +7,7 @@ from collections.abc import Sequence
 from typing import assert_never
 from uuid import UUID
 
+from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
 from ai.backend.common.data.entity.object_storage import ObjectStorageID
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT
@@ -36,6 +37,7 @@ from ai.backend.common.dto.manager.v2.object_storage.types import (
 from ai.backend.manager.actions.v2.bulk.result import PartialBulkResult
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
+from ai.backend.manager.defs import SECRET_KEY_PLACEHOLDER
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.object_storage.creators import ObjectStorageCreator
 from ai.backend.manager.models.object_storage.searchable_fields import (
@@ -287,14 +289,19 @@ class ObjectStorageAdapter(BaseAdapter):
 
     @staticmethod
     def _data_to_dto(data: ObjectStorageData) -> ObjectStorageNode:
-        """Convert data layer type to Pydantic DTO."""
+        """Convert data layer type to Pydantic DTO; only a superadmin gets the secret key."""
+        user = current_user()
         return ObjectStorageNode(
             id=data.id,
             entity_id=data.entity_id(),
             name=data.name,
             host=data.host,
             access_key=data.access_key,
-            secret_key=data.secret_key,
+            secret_key=(
+                data.secret_key
+                if user is not None and user.is_superadmin
+                else SECRET_KEY_PLACEHOLDER
+            ),
             endpoint=data.endpoint,
             region=data.region,
         )

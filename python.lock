@@ -898,13 +898,13 @@ wheels = [
 
 [[package]]
 name = "etcd-client-py"
-version = "0.5.1"
+version = "0.6.1"
 source = { registry = "https://pypi.org/simple/" }
-sdist = { url = "https://files.pythonhosted.org/packages/bb/d2/c79d349cd668a24a3647b17db2396c59393ba6b368279abbe1169ba39bc7/etcd_client_py-0.5.1.tar.gz", hash = "sha256:7809b1adfa58c0e84cbaac166c7e76ce5987558426acaa8651075dd2315a9212", size = 143545, upload-time = "2026-01-09T14:58:45.192Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/da/b5/40a8704c0e7da758b214170401d138e6ccec720a058249cd0f089c928c80/etcd_client_py-0.6.1.tar.gz", hash = "sha256:a499fb207275fc33f4c713f54b3b8ec305605481f354a70bd5b12a8ca472ebf7", size = 184335, upload-time = "2026-11-11T03:27:42.337Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ab/92/2f21e778b884729d412613713d33eda98c644fbfb03bca4bb0ded94298ec/etcd_client_py-0.5.1-cp313-cp313-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl", hash = "sha256:dee52d29cd2d441ecebbc84b80c3c08370b0b5859dc5b165bf9133bd209e2565", size = 3566152, upload-time = "2026-01-09T14:58:30.231Z" },
-    { url = "https://files.pythonhosted.org/packages/a2/d1/6aad26b2f0581db64650f640c0d7968bbe25cc6a2fc35f7d66d4c0347f6b/etcd_client_py-0.5.1-cp313-cp313-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:c8bc311f225147e3260c6416d4c66146dd291e5af5c6b8120d0b410cce89a8d1", size = 1977332, upload-time = "2026-01-09T14:58:31.857Z" },
-    { url = "https://files.pythonhosted.org/packages/3f/6c/e6b2cf73127561e9c9bae8a41c017be346deeb54d0f8128109c2581beae6/etcd_client_py-0.5.1-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:63d245dcecdf845aa76b4da4f73d00919f07eb35788e683ee4f809e188c53375", size = 1916910, upload-time = "2026-01-09T14:58:33.747Z" },
+    { url = "https://files.pythonhosted.org/packages/55/9b/0d451dd55b3b941e7608c32801fd1eee22a7736fda288ff914874d4ba159/etcd_client_py-0.6.1-cp313-cp313-macosx_10_12_universal2.macosx_10_12_x86_64.macosx_11_0_arm64.whl", hash = "sha256:5940ee7a3cc744c93a3291d91b13f63d74663a9b4d9ebbc5edb01ca5242befbc", size = 5057377, upload-time = "2026-11-11T03:27:26.695Z" },
+    { url = "https://files.pythonhosted.org/packages/d3/3b/1064245afa6ab5a6c4af04e3cc23d45957d5c4b8f28dcadc348b501b7301/etcd_client_py-0.6.1-cp313-cp313-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:67d204b2ad711898c0541e3e920fda52e2841dc96cc13efbb771f036efdf2323", size = 2922799, upload-time = "2026-11-11T03:27:28.3Z" },
+    { url = "https://files.pythonhosted.org/packages/42/34/3f10944a593edd11d3a7f2843c75db73041b95a84aa60fb963104664ca84/etcd_client_py-0.6.1-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:44661cfbf88ca7664884c9a0b6b0a255611d1d34d56d87352f0a319c3350cd99", size = 2781078, upload-time = "2026-11-11T03:27:30.114Z" },
 ]
 
 [[package]]
@@ -1664,11 +1664,11 @@ wheels = [
 
 [[package]]
 name = "oauthlib"
-version = "4.0.0"
+version = "4.0.1"
 source = { registry = "https://pypi.org/simple/" }
-sdist = { url = "https://files.pythonhosted.org/packages/7a/d8/a1bcc8ba112a627f8ffbdc212a78ce18d3ac07e91a5ca65d27918eee25a1/oauthlib-4.0.0.tar.gz", hash = "sha256:efb274799819440f95b4ab3b818869f1ce9ae26c5beacba0201d1a1b76b54f86", size = 187232, upload-time = "2026-09-28T06:01:18.77Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/33/17/2bb072de0b990303c985f26869fd47bb179024a051f47e7f9d208eb92f8e/oauthlib-4.0.1.tar.gz", hash = "sha256:3d73febdb6faa00f277c81fb04be7b7586fb96fc3b7f0b9c772dada69a25ede7", size = 191219, upload-time = "2026-10-31T09:52:58.008Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d9/f4/78229a1066068ca14fc60fb26cf7381cabe4382261392b90e5f9552722d4/oauthlib-4.0.0-py3-none-any.whl", hash = "sha256:624c28c13a0a59cabf9747dfa52af63be3e512a7f2714df16e91b5b3a145e6cd", size = 159715, upload-time = "2026-09-28T06:01:17.008Z" },
+    { url = "https://files.pythonhosted.org/packages/df/ef/3b8adde1b32a6f540758bff734d3442c621734c83708e5f02b0ba2f43b84/oauthlib-4.0.1-py3-none-any.whl", hash = "sha256:498a298876e996301950a5b053d12c31628bb7b895db03666430c69ce182eb61", size = 161934, upload-time = "2026-10-31T09:52:56.206Z" },
 ]
 
 [[package]]
@@ -1945,6 +1945,7 @@ dependencies = [
     { name = "mypy" },
     { name = "namedlist" },
     { name = "networkx" },
+    { name = "oauthlib" },
     { name = "opentelemetry-api" },
     { name = "opentelemetry-exporter-otlp-proto-grpc" },
     { name = "opentelemetry-instrumentation-aiohttp-client" },
@@ -2052,7 +2053,7 @@ requires-dist = [
     { name = "coloredlogs", specifier = "~=15.0" },
     { name = "cryptography", specifier = ">=44.0.2" },
     { name = "dataclasses-json", specifier = "~=0.6.7" },
-    { name = "etcd-client-py", specifier = "~=0.5.1" },
+    { name = "etcd-client-py", specifier = "~=0.6.1" },
     { name = "faker", specifier = "~=24.7.1" },
     { name = "graphene", specifier = "~=3.3.0" },
     { name = "graphene-federation", specifier = "~=3.2.0" },
@@ -2079,6 +2080,7 @@ requires-dist = [
     { name = "mypy", specifier = "==1.18.2" },
     { name = "namedlist", specifier = "~=1.8" },
     { name = "networkx", specifier = "~=3.3.0" },
+    { name = "oauthlib", specifier = ">=4.0.1" },
     { name = "opentelemetry-api", specifier = "~=1.45.1" },
     { name = "opentelemetry-exporter-otlp-proto-grpc", specifier = "~=1.45.1" },
     { name = "opentelemetry-instrumentation-aiohttp-client", specifier = "~=0.66b1" },

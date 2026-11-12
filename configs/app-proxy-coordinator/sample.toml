@@ -293,7 +293,7 @@
     # Configuration for the etcd connection used by Traefik integration. Traefik
     # uses etcd as its configuration backend to dynamically update routing
     # rules. The namespace should be set to 'traefik' to isolate Traefik's
-    # configuration keys.
+    # configuration keys. Required when enable_traefik is enabled.
     # Added in 25.9.0
     [proxy_coordinator.traefik.etcd]
       # Namespace prefix for etcd keys used by Backend.AI. Allows multiple
@@ -301,16 +301,14 @@
       # related keys will be stored under this namespace.
       # Added in 22.03.0
       namespace = "backend"
-      # Username for authenticating with etcd. Optional if etcd doesn't require
-      # authentication. Should be set along with password for secure
-      # deployments.
+      # Username for authenticating with etcd. Set together with the password
+      # field. Required since 26.10.0.
       # Added in 22.03.0
-      ## user = "backend"
-      # Password for authenticating with etcd. Should be kept secret in
-      # production environments. Set together with the user field for
-      # authentication.
+      user = "backend"
+      # Password for authenticating with etcd. Set together with the user field.
+      # Required since 26.10.0.
       # Added in 22.03.0
-      ## password = "ETCD_PASSWORD"
+      password = "ETCD_PASSWORD"
       # Seconds without a frame from an etcd member before a keep-alive ping is
       # sent on a connection with requests in flight. Must not be below the
       # server's --grpc-keepalive-min-time (5 seconds by default).
@@ -320,6 +318,32 @@
       # that etcd member is closed and its requests go to the other members.
       # Added in 26.10.0
       keep-alive-timeout = 3.0
+
+      # TLS settings for the connection to etcd.
+      # Added in 26.10.0
+      [proxy_coordinator.traefik.etcd.tls]
+        # Connect to etcd over TLS.
+        # Added in 26.10.0
+        enabled = false
+
+        # PEM file of the CA certificate that signed the etcd server
+        # certificate. Required if TLS is enabled.
+        # Added in 26.10.0
+        ## ca-cert = "/etc/backend.ai/etcd/ca.pem"
+
+        # PEM file of the client certificate, for an etcd started with --client-
+        # cert-auth. Set together with client-key.
+        # Added in 26.10.0
+        ## client-cert = "/etc/backend.ai/etcd/client.pem"
+
+        # PEM file of the client private key. Set together with client-cert.
+        # Added in 26.10.0
+        ## client-key = "/etc/backend.ai/etcd/client-key.pem"
+
+        # Seconds to wait for the TLS handshake with an etcd member. When not
+        # set, the handshake has no limit: request timeouts do not end it.
+        # Added in 26.10.0
+        ## handshake-timeout = 10.0
 
       # Addresses of the etcd cluster members. List every member of an etcd
       # cluster, or a single address of a standalone server.
@@ -623,48 +647,6 @@
     # Added in 26.3.0
     # Replace <name> with your actual key (e.g., 'default', 'local')
     [service_discovery.endpoints.metadata.<name>]
-
-# etcd connection configuration for distributed coordination and configuration
-# management. Used for service discovery (if etcd-based) and Traefik
-# integration.
-# Added in 25.9.0
-[etcd]
-  # Namespace prefix for etcd keys used by Backend.AI. Allows multiple
-  # Backend.AI clusters to share the same etcd cluster. All Backend.AI related
-  # keys will be stored under this namespace.
-  # Added in 22.03.0
-  namespace = "backend"
-  # Username for authenticating with etcd. Optional if etcd doesn't require
-  # authentication. Should be set along with password for secure deployments.
-  # Added in 22.03.0
-  ## user = "backend"
-  # Password for authenticating with etcd. Should be kept secret in production
-  # environments. Set together with the user field for authentication.
-  # Added in 22.03.0
-  ## password = "ETCD_PASSWORD"
-  # Seconds without a frame from an etcd member before a keep-alive ping is sent
-  # on a connection with requests in flight. Must not be below the server's
-  # --grpc-keepalive-min-time (5 seconds by default).
-  # Added in 26.10.0
-  keep-alive-interval = 5.0
-  # Seconds to wait for a keep-alive ping reply before the connection to that
-  # etcd member is closed and its requests go to the other members.
-  # Added in 26.10.0
-  keep-alive-timeout = 3.0
-
-  # Addresses of the etcd cluster members. List every member of an etcd cluster,
-  # or a single address of a standalone server.
-  # Added in 26.10.0
-  [[etcd.addrs]]
-  # Add multiple [[etcd.addrs]] sections as needed
-    # Host address of the service. Can be a hostname, IP address, or special
-    # addresses like 0.0.0.0 to bind to all interfaces.
-    # Added in 22.03.0
-    host = "etcd1.example.com"
-    # Port number of the service. Must be between 1 and 65535. Ports below 1024
-    # require root/admin privileges.
-    # Added in 22.03.0
-    port = 2379
 
 # Pyroscope continuous profiling configuration for production performance
 # analysis. Sends CPU and memory profiling data to a Pyroscope server for flame

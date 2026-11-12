@@ -533,13 +533,17 @@ async def worker_registration_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             root_ctx.proxy_frontend.apply_content_encoding_config(registration.content_encoding)
 
     circuits = await list_worker_circuits(root_ctx, str(uuid.uuid4()))
+    registered_circuits: list[Circuit] = []
     for circuit in circuits:
-        await root_ctx.proxy_frontend.register_circuit(circuit, circuit.route_info)
+        if await root_ctx.proxy_frontend.register_circuit(circuit, circuit.route_info):
+            registered_circuits.append(circuit)
     # Applied rather than replaced, so circuits from events handled meanwhile are kept.
     ingress_writer = root_ctx.ingress_state.writer
     if ingress_writer is not None:
         ingress_authority = IngressAuthority(root_ctx.local_config.proxy_worker.authority)
-        await ingress_writer.apply([circuit.to_ingress(ingress_authority) for circuit in circuits])
+        await ingress_writer.apply([
+            circuit.to_ingress(ingress_authority) for circuit in registered_circuits
+        ])
 
     cron = LocalCron([WorkerHeartbeatTask(root_ctx)])
     await cron.start()
@@ -691,7 +695,6 @@ def _build_worker_health_response(connectivity: ConnectivityCheckResponse) -> we
     DEGRADED in the body but not surfaced via HTTP status."""
     response = HealthResponse(
         status=HealthStatus.OK if connectivity.overall_healthy else HealthStatus.DEGRADED,
-        version=__version__,
         component="appproxy-worker",
         connectivity=connectivity,
     )
@@ -703,7 +706,6 @@ def _build_worker_probe_response(connectivity: ConnectivityCheckResponse) -> web
     is_healthy = connectivity.overall_healthy
     response = HealthResponse(
         status=HealthStatus.OK if is_healthy else HealthStatus.ERROR,
-        version=__version__,
         component="appproxy-worker",
         connectivity=connectivity,
     )
@@ -758,13 +760,15 @@ async def handle_proxy_route_event(
         case AppProxyCircuitCreatedEvent():
             log.debug("circuits created: {}", [str(c.id) for c in event.circuits])
             created_circuits = [Circuit.from_serialized_circuit(c) for c in event.circuits]
+            registered_circuits: list[Circuit] = []
             for created_circuit in created_circuits:
-                await context.proxy_frontend.register_circuit(
+                if await context.proxy_frontend.register_circuit(
                     created_circuit, created_circuit.route_info
-                )
+                ):
+                    registered_circuits.append(created_circuit)
             if ingress_writer is not None:
                 await ingress_writer.apply([
-                    circuit.to_ingress(ingress_authority) for circuit in created_circuits
+                    circuit.to_ingress(ingress_authority) for circuit in registered_circuits
                 ])
             await context.event_producer.broadcast_event(
                 AppProxyWorkerCircuitAddedEvent(

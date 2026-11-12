@@ -21,8 +21,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from aiohttp import web
+from multidict import CIMultiDict, CIMultiDictProxy
 
-from ai.backend.common.api_handlers import BodyParam, QueryParam
+from ai.backend.common.api_handlers import BodyParam, HeaderParam, QueryParam
 from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.user import UserID
@@ -38,13 +39,16 @@ from ai.backend.common.dto.manager.auth.request import (
     UploadSSHKeypairRequest,
     VerifyAuthRequest,
 )
-from ai.backend.common.types import AccessKey, SecretKey
+from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.types import AccessKey, SecretKey, SSHPublicKey
+from ai.backend.manager.api.adapters.auth.adapter import AuthAdapter
 from ai.backend.manager.api.rest.auth.handler import AuthHandler
 from ai.backend.manager.api.rest.middleware.auth import (
     TRUSTED_PROXY_NETWORKS_KEY,
     parse_trusted_proxy_networks,
 )
 from ai.backend.manager.data.auth.types import AuthorizationResult, SSHKeypair
+from ai.backend.manager.dto.auth import SignupHeader
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.models.user.row import UserRole, UserStatus
 from ai.backend.manager.services.auth.actions.authorize import AuthorizeActionResult
@@ -76,7 +80,7 @@ def mock_processors() -> MagicMock:
 @pytest.fixture
 def handler(mock_processors: MagicMock) -> AuthHandler:
     """AuthHandler instance with mock processors."""
-    return AuthHandler(auth=mock_processors.auth)
+    return AuthHandler(auth=mock_processors.auth, adapter=AuthAdapter(mock_processors.auth))
 
 
 @pytest.fixture
@@ -374,10 +378,14 @@ class TestSignup:
             secret_key="NEWSECRET",
         )
 
+    @pytest.fixture
+    def signup_header(self) -> HeaderParam[SignupHeader]:
+        return HeaderParam(SignupHeader).from_header(CIMultiDictProxy(CIMultiDict()))
+
     async def test_calls_processor_and_returns_created(
         self,
         handler: AuthHandler,
-        request_ctx: RequestCtx,
+        signup_header: HeaderParam[SignupHeader],
         mock_processors: MagicMock,
         signup_result: SignupActionResult,
     ) -> None:
@@ -390,7 +398,7 @@ class TestSignup:
         })
         mock_processors.auth.signup.run = AsyncMock(return_value=signup_result)
 
-        response = await handler.signup(body, request_ctx)
+        response = await handler.signup(body, signup_header)
 
         mock_processors.auth.signup.run.assert_called_once()
         assert response.status_code == HTTPStatus.CREATED
@@ -403,7 +411,7 @@ class TestSignup:
     async def test_passes_optional_params_to_action(
         self,
         handler: AuthHandler,
-        request_ctx: RequestCtx,
+        signup_header: HeaderParam[SignupHeader],
         mock_processors: MagicMock,
         signup_result: SignupActionResult,
     ) -> None:
@@ -423,13 +431,42 @@ class TestSignup:
         })
         mock_processors.auth.signup.run = AsyncMock(return_value=signup_result)
 
-        await handler.signup(body, request_ctx)
+        await handler.signup(body, signup_header)
 
         action = mock_processors.auth.signup.run.call_args[0][0]
         assert action.domain_name == domain
         assert action.email == email
         assert action.username == username
         assert action.full_name == full_name
+
+    @pytest.mark.parametrize(
+        ("headers", "expected_lang"),
+        [
+            ({}, "en-us"),
+            ({"Accept-Language": "ko-KR,ko;q=0.9,en;q=0.8"}, "ko-kr"),
+        ],
+    )
+    async def test_passes_first_accept_language_as_lang(
+        self,
+        handler: AuthHandler,
+        mock_processors: MagicMock,
+        signup_result: SignupActionResult,
+        headers: dict[str, str],
+        expected_lang: str,
+    ) -> None:
+        header = HeaderParam(SignupHeader).from_header(CIMultiDictProxy(CIMultiDict(headers)))
+        body: BodyParam[SignupRequest] = BodyParam(SignupRequest)
+        body.from_body({
+            "domain": "default",
+            "email": "newuser@example.com",
+            "password": "securepassword",
+        })
+        mock_processors.auth.signup.run = AsyncMock(return_value=signup_result)
+
+        await handler.signup(body, header)
+
+        action = mock_processors.auth.signup.run.call_args[0][0]
+        assert action.lang == expected_lang
 
 
 class TestSignout:
@@ -523,7 +560,6 @@ class TestUpdatePassword:
         self,
         handler: AuthHandler,
         user_context: UserContext,
-        request_ctx: RequestCtx,
         mock_processors: MagicMock,
     ) -> None:
         """Verify processor is called and OK is returned on success."""
@@ -537,32 +573,20 @@ class TestUpdatePassword:
             return_value=UpdatePasswordActionResult(success=True, message="OK")
         )
 
-        response = await handler.update_password(body, user_context, request_ctx)
+        response = await handler.update_password(body, user_context)
 
         mock_processors.auth.update_password.run.assert_called_once()
         assert response.status_code == HTTPStatus.OK
 
-    async def test_returns_bad_request_on_failure(
-        self,
-        handler: AuthHandler,
-        user_context: UserContext,
-        request_ctx: RequestCtx,
-        mock_processors: MagicMock,
-    ) -> None:
-        """Verify BAD_REQUEST is returned when password update fails."""
+    async def test_rejects_mismatched_confirmation(self) -> None:
+        """Verify a mismatched new_password2 is rejected while parsing the body."""
         body: BodyParam[UpdatePasswordRequest] = BodyParam(UpdatePasswordRequest)
-        body.from_body({
-            "old_password": "oldpass",
-            "new_password": "newpass",
-            "new_password2": "differentpass",
-        })
-        mock_processors.auth.update_password.run = AsyncMock(
-            return_value=UpdatePasswordActionResult(success=False, message="mismatch")
-        )
-
-        response = await handler.update_password(body, user_context, request_ctx)
-
-        assert response.status_code == HTTPStatus.BAD_REQUEST
+        with pytest.raises(InvalidAPIParameters, match="new password mismatch"):
+            body.from_body({
+                "old_password": "oldpass",
+                "new_password": "newpass",
+                "new_password2": "differentpass",
+            })
 
 
 class TestUpdatePasswordNoAuth:
@@ -571,7 +595,6 @@ class TestUpdatePasswordNoAuth:
     async def test_calls_processor_and_returns_created(
         self,
         handler: AuthHandler,
-        request_ctx: RequestCtx,
         mock_processors: MagicMock,
     ) -> None:
         """Verify processor is called and HTTP 201 CREATED is returned."""
@@ -590,7 +613,7 @@ class TestUpdatePasswordNoAuth:
             )
         )
 
-        response = await handler.update_password_no_auth(body, request_ctx)
+        response = await handler.update_password_no_auth(body)
 
         mock_processors.auth.update_password_no_auth.run.assert_called_once()
         assert response.status_code == HTTPStatus.CREATED
@@ -688,24 +711,18 @@ class TestGenerateSSHKeypair:
 class TestUploadSSHKeypair:
     """Tests for upload_ssh_keypair handler."""
 
-    async def test_calls_processor_and_returns_keypair(
+    async def test_calls_processor_and_returns_public_key(
         self,
         handler: AuthHandler,
         user_context: UserContext,
         mock_processors: MagicMock,
     ) -> None:
-        """Verify processor is called and keypair is returned."""
+        """Verify processor is called and only the public key is returned."""
         body: BodyParam[UploadSSHKeypairRequest] = BodyParam(UploadSSHKeypairRequest)
-        body.from_body({
-            "pubkey": "ssh-rsa AAAAB3...",
-            "privkey": "-----BEGIN RSA PRIVATE KEY-----\n...",
-        })
+        body.from_body({"pubkey": "ssh-rsa AAAAB3..."})
         mock_processors.auth.upload_ssh_keypair.run = AsyncMock(
             return_value=UploadSSHKeypairActionResult(
-                ssh_keypair=SSHKeypair(
-                    ssh_public_key="ssh-rsa AAAAB3...\n",
-                    ssh_private_key="-----BEGIN RSA PRIVATE KEY-----\n...\n",
-                ),
+                public_key=SSHPublicKey("ssh-rsa AAAAB3...\n")
             )
         )
 
@@ -713,7 +730,4 @@ class TestUploadSSHKeypair:
 
         mock_processors.auth.upload_ssh_keypair.run.assert_called_once()
         assert response.status_code == HTTPStatus.OK
-        data = response.to_json
-        assert data is not None
-        assert "ssh_public_key" in data
-        assert "ssh_private_key" in data
+        assert response.to_json == {"ssh_public_key": "ssh-rsa AAAAB3...\n"}

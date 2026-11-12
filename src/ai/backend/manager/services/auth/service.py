@@ -22,6 +22,7 @@ from ai.backend.common.clients.valkey_client.valkey_session.types import (
 from ai.backend.common.contexts.client_ip import current_client_ip
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.bootstrap_script import BootstrapScript
+from ai.backend.common.data.entity.domain import DomainName
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserData
 from ai.backend.common.dto.manager.auth.types import AuthTokenType
@@ -30,7 +31,7 @@ from ai.backend.common.exception import (
     UnreachableError,
 )
 from ai.backend.common.plugin.hook import ALL_COMPLETED, FIRST_COMPLETED, PASSED, HookPluginContext
-from ai.backend.common.types import AccessKey, SecretKey, SSHPrivateKey, SSHPublicKey
+from ai.backend.common.types import AccessKey, SecretKey
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import AuthConfig
@@ -44,6 +45,7 @@ from ai.backend.manager.errors.auth import (
     EmailAlreadyExistsError,
     GroupMembershipNotFoundError,
     PasswordExpired,
+    PasswordMismatch,
     TooManyConcurrentLoginSessions,
 )
 from ai.backend.manager.errors.common import (
@@ -60,6 +62,11 @@ from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.row import (
     UserRole,
     UserStatus,
+)
+from ai.backend.manager.plugin.hook_args import (
+    PostSignupHookArgs,
+    PreSignupHookArgs,
+    VerifyPasswordFormatHookArgs,
 )
 from ai.backend.manager.repositories.auth.db_source.db_source import ActiveSessionInfo
 from ai.backend.manager.repositories.auth.repository import AuthRepository
@@ -250,7 +257,15 @@ class AuthService:
             raise InvalidAPIParameters("Unsupported authorization type")
         auth_config = self._config_provider.config.auth
         login_client_type_id = action.client_type_id
-        user, active_sessions = await self._verify_user(action, auth_config, login_client_type_id)
+        try:
+            user, active_sessions = await self._verify_user(
+                action, auth_config, login_client_type_id
+            )
+        except PasswordMismatch as e:
+            await self._record_login_failure(
+                e.user_id, action.domain_name, LoginAttemptResult.FAILED_INVALID_CREDENTIALS
+            )
+            raise
 
         try:
             post_result = await self._post_check(action, user, active_sessions, auth_config)
@@ -505,10 +520,19 @@ class AuthService:
             log.exception("login history record failed", login_result=result, user_id=user_uuid)
 
     async def signup(self, action: SignupAction) -> SignupActionResult:
-        params = action.hook_params
         hook_result = await self._hook_plugin_ctx.dispatch(
             "PRE_SIGNUP",
-            (params,),
+            (
+                PreSignupHookArgs(
+                    domain_name=DomainName(action.domain_name),
+                    email=action.email,
+                    password=action.password,
+                    username=action.username,
+                    full_name=action.full_name,
+                    description=action.description,
+                    token=action.token,
+                ),
+            ),
             return_when=ALL_COMPLETED,
         )
         if hook_result.status != PASSED:
@@ -520,13 +544,15 @@ class AuthService:
             dict(result) for result in hook_results
         ])
 
-        # [Hooking point for VERIFY_PASSWORD_FORMAT with the ALL_COMPLETED requirement]
-        # The hook handlers should accept the request and whole ``params` dict.
-        # They should return None if the validation is successful and raise the
-        # Reject error otherwise.
         hook_result = await self._hook_plugin_ctx.dispatch(
             "VERIFY_PASSWORD_FORMAT",
-            (action.request, params),
+            (
+                VerifyPasswordFormatHookArgs(
+                    email=action.email,
+                    username=action.username,
+                    password=action.password,
+                ),
+            ),
             return_when=ALL_COMPLETED,
         )
         if hook_result.status != PASSED:
@@ -590,15 +616,9 @@ class AuthService:
         user = creation.user
         keypair = creation.keypair
 
-        # [Hooking point for POST_SIGNUP as one-way notification]
-        # The hook handlers should accept a tuple of the user email,
-        # the new user's UUID, and a dict with initial user's preferences.
-        initial_user_prefs = {
-            "lang": action.request.headers.get("Accept-Language", "en-us").split(",")[0].lower(),
-        }
         await self._hook_plugin_ctx.notify(
             "POST_SIGNUP",
-            (action.email, user.uuid, initial_user_prefs),
+            (PostSignupHookArgs(email=action.email, user_id=UserID(user.uuid), lang=action.lang),),
         )
         return SignupActionResult(
             user_id=user.uuid,
@@ -607,8 +627,11 @@ class AuthService:
         )
 
     async def logout(self, action: LogoutAction) -> LogoutActionResult:
-        await self._auth_repository.delete_login_session_by_token(
-            action.session_token, LoginAttemptResult.LOGOUT, await self._recorded_client_ip()
+        await self._auth_repository.delete_owned_login_session_by_token(
+            action.session_token,
+            action.user_id,
+            LoginAttemptResult.LOGOUT,
+            await self._recorded_client_ip(),
         )
         await self._valkey_session_client.delete_login_session(action.session_token)
         return LogoutActionResult(success=True)
@@ -664,6 +687,15 @@ class AuthService:
 
         return SignoutActionResult(success=True)
 
+    async def _revoke_user_login_sessions(self, user_id: UserID, domain_name: str) -> None:
+        deleted_tokens = await self._auth_repository.delete_user_login_sessions(
+            user_id,
+            domain_name,
+            LoginAttemptResult.REVOKED_BY_USER,
+            await self._recorded_client_ip(),
+        )
+        await self._valkey_session_client.delete_login_sessions(deleted_tokens)
+
     async def update_full_name(self, action: UpdateFullNameAction) -> UpdateFullNameActionResult:
         await self._auth_repository.update_user_full_name(
             action.email, action.domain_name, action.full_name
@@ -673,19 +705,9 @@ class AuthService:
     async def update_password(self, action: UpdatePasswordAction) -> UpdatePasswordActionResult:
         domain_name = action.domain_name
         email = action.email
-        if action.new_password != action.new_password_confirm:
-            log.trace(
-                "password update rejected, new password mismatch",
-                domain_name=domain_name,
-                user_email=email,
-            )
-            return UpdatePasswordActionResult(
-                success=False,
-                message="new password mismatch",
-            )
         auth_config = self._config_provider.config.auth
         try:
-            await self._auth_repository.check_credential_without_migration(
+            credential = await self._auth_repository.check_credential_without_migration(
                 domain_name,
                 email,
                 PasswordInfo(
@@ -698,13 +720,15 @@ class AuthService:
         except AuthorizationFailed as e:
             raise AuthorizationFailed("Old password mismatch") from e
 
-        # [Hooking point for VERIFY_PASSWORD_FORMAT with the ALL_COMPLETED requirement]
-        # The hook handlers should accept the request and whole ``params` dict.
-        # They should return None if the validation is successful and raise the
-        # Reject error otherwise.
         hook_result = await self._hook_plugin_ctx.dispatch(
             "VERIFY_PASSWORD_FORMAT",
-            (action.request, action.hook_params),
+            (
+                VerifyPasswordFormatHookArgs(
+                    email=email,
+                    username=credential.username,
+                    password=action.new_password,
+                ),
+            ),
             return_when=ALL_COMPLETED,
         )
         if hook_result.status != PASSED:
@@ -720,6 +744,7 @@ class AuthService:
             salt_size=auth_config.password_hash_salt_size,
         )
         await self._auth_repository.update_user_password(email, password_info)
+        await self._revoke_user_login_sessions(action.user_id, domain_name)
 
         return UpdatePasswordActionResult(
             success=True,
@@ -746,13 +771,15 @@ class AuthService:
         if compare_to_hashed_password(new_password, checked_user.hashed_password):
             raise AuthorizationFailed("Cannot update to the same password as an existing password.")
 
-        # [Hooking point for VERIFY_PASSWORD_FORMAT with the ALL_COMPLETED requirement]
-        # The hook handlers should accept the request and whole ``params` dict.
-        # They should return None if the validation is successful and raise the
-        # Reject error otherwise.
         hook_result = await self._hook_plugin_ctx.dispatch(
             "VERIFY_PASSWORD_FORMAT",
-            (action.request, action.hook_params),
+            (
+                VerifyPasswordFormatHookArgs(
+                    email=action.email,
+                    username=checked_user.username,
+                    password=new_password,
+                ),
+            ),
             return_when=ALL_COMPLETED,
         )
         if hook_result.status != PASSED:
@@ -768,6 +795,7 @@ class AuthService:
         changed_at = await self._auth_repository.update_user_password_by_uuid(
             checked_user.user_id, password_info
         )
+        await self._revoke_user_login_sessions(checked_user.user_id, action.domain_name)
 
         return UpdatePasswordNoAuthActionResult(
             user_id=checked_user.user_id,
@@ -794,18 +822,10 @@ class AuthService:
     async def upload_ssh_keypair(
         self, action: UploadSSHKeypairAction
     ) -> UploadSSHKeypairActionResult:
-        privkey = action.private_key
-        pubkey = action.public_key
-        self._ssh_key_validator.validate(SSHPrivateKey(privkey), SSHPublicKey(pubkey))
+        self._ssh_key_validator.validate(action.public_key)
 
-        await self._auth_repository.update_ssh_keypair(action.access_key, pubkey, privkey)
-
-        return UploadSSHKeypairActionResult(
-            ssh_keypair=SSHKeypair(
-                ssh_public_key=pubkey,
-                ssh_private_key=privkey,
-            ),
-        )
+        await self._auth_repository.update_ssh_public_key(action.access_key, action.public_key)
+        return UploadSSHKeypairActionResult(public_key=action.public_key)
 
     async def resolve_access_key_scope(
         self, action: PublicResolveAccessKeyScopeAction
