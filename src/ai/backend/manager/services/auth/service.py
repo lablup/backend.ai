@@ -58,7 +58,6 @@ from ai.backend.manager.errors.user import KeyPairNotFound, UserResourcePolicyNo
 from ai.backend.manager.models.hasher.factory import compare_to_hashed_password
 from ai.backend.manager.models.keypair.row import KEYPAIR_SECRET_KEY_CONTEXT
 from ai.backend.manager.models.keypair.ssh_key_validator import SSHKeyValidator
-from ai.backend.manager.models.ssh_keypair.row import SSH_KEYPAIR_PRIVATE_KEY_CONTEXT
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.row import (
     UserRole,
@@ -229,16 +228,6 @@ class AuthService:
         auto_generated_files = await self._user_repository.get_default_auto_generated_files(
             UserID(keypair.user_id)
         )
-        ssh_keypair = await self._user_repository.default_ssh_keypair(UserID(keypair.user_id))
-        ssh_public_key: str | None = None
-        ssh_private_key: str | None = None
-        if ssh_keypair is not None:
-            ssh_public_key = ssh_keypair.public_key
-            if ssh_keypair.private_key is not None:
-                ssh_private_key = await self._key_provider_pool.decrypt(
-                    ssh_keypair.private_key, SSH_KEYPAIR_PRIVATE_KEY_CONTEXT
-                )
-
         return {
             "access_key": keypair.access_key,
             "secret_key": await self._secret_key_of(keypair),
@@ -249,8 +238,6 @@ class AuthService:
             "last_used": keypair.last_used,
             "rate_limit": keypair.rate_limit,
             "num_queries": keypair.num_queries,
-            "ssh_public_key": ssh_public_key,
-            "ssh_private_key": ssh_private_key,
             "user": keypair.user_id,
             "resource_policy": keypair.resource_policy_name,
             # Rows carry no aggregate size limit, so pack without DotfileEntries.pack()'s.
