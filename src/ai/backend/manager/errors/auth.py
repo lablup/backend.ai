@@ -6,13 +6,6 @@ from __future__ import annotations
 
 from aiohttp import web
 
-<<<<<<< HEAD
-=======
-from ai.backend.common.data.entity.keypair import KeyPairFieldType
-from ai.backend.common.data.entity.login_client_type import LoginClientTypeEntityType
-from ai.backend.common.data.entity.login_session import LoginSessionFieldType
-from ai.backend.common.data.entity.user import UserEntityType, UserID
->>>>>>> 0fb099e14 (fix(BA-9007): cost one hash on every rejected login and record a wrong password (#16850))
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -20,6 +13,7 @@ from ai.backend.common.exception import (
     ErrorDomain,
     ErrorOperation,
 )
+from ai.backend.common.identifier.user import UserID
 
 from .common import ObjectNotFound
 
@@ -72,8 +66,6 @@ class AuthorizationFailed(BackendAIError, web.HTTPUnauthorized):
         )
 
 
-<<<<<<< HEAD
-=======
 class PasswordMismatch(AuthorizationFailed):
     """Raised when the user exists and the password does not match its hash.
 
@@ -87,33 +79,6 @@ class PasswordMismatch(AuthorizationFailed):
         self.user_id = user_id
 
 
-class SuperadminRequired(BackendAIError, web.HTTPForbidden):
-    error_type = "https://api.backend.ai/probs/superadmin-required"
-    error_title = "Superadmin privilege is required."
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.USER,
-            operation=ErrorOperation.ACCESS,
-            error_detail=ErrorDetail.FORBIDDEN,
-        )
-
-
-class AuthenticationRequired(BackendAIError, web.HTTPUnauthorized):
-    error_type = "https://api.backend.ai/probs/authentication-required"
-    error_title = "Authentication is required."
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.USER,
-            operation=ErrorOperation.ACCESS,
-            error_detail=ErrorDetail.UNAUTHORIZED,
-        )
-
-
->>>>>>> 0fb099e14 (fix(BA-9007): cost one hash on every rejected login and record a wrong password (#16850))
 class PasswordExpired(BackendAIError, web.HTTPUnauthorized):
     error_type = "https://api.backend.ai/probs/password-expired"
     error_title = "Password has expired."

@@ -6,29 +6,17 @@ import pytest
 from aiohttp import web
 
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
-<<<<<<< HEAD
-=======
-from ai.backend.common.data.entity.resource_policy import (
-    UserResourcePolicyUUID,
-)
-from ai.backend.common.data.entity.user import UserID
->>>>>>> 0fb099e14 (fix(BA-9007): cost one hash on every rejected login and record a wrong password (#16850))
 from ai.backend.common.dto.manager.auth.types import AuthTokenType
 from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.plugin.hook import HookPluginContext, HookResult, HookResults
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import AuthConfig, ManagerConfig
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
-<<<<<<< HEAD
-from ai.backend.manager.errors.auth import AuthorizationFailed, PasswordExpired
+from ai.backend.manager.errors.auth import AuthorizationFailed, PasswordExpired, PasswordMismatch
 from ai.backend.manager.models.login_session.enums import LoginAttemptResult
 from ai.backend.manager.models.user import UserRole, UserStatus
-=======
-from ai.backend.manager.data.secret.types import KeyProviderType
-from ai.backend.manager.errors.auth import AuthorizationFailed, PasswordExpired, PasswordMismatch
-from ai.backend.manager.models.user.row import UserRole, UserStatus
->>>>>>> 0fb099e14 (fix(BA-9007): cost one hash on every rejected login and record a wrong password (#16850))
 from ai.backend.manager.repositories.auth.db_source.db_source import (
     ActiveSessionInfo,
     CredentialVerificationResult,
