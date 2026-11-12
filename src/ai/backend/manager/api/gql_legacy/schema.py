@@ -126,8 +126,29 @@ from ai.backend.manager.models.rbac.permission_defs import (
 from ai.backend.manager.models.rbac.permission_defs import (
     VFolderPermission as VFolderRBACPermission,
 )
+<<<<<<< HEAD
 from ai.backend.manager.models.scaling_group.row import (
     ScalingGroupRow,
+=======
+from ai.backend.manager.data.project.types import ProjectType
+from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.data.user.types import UserStatus
+from ai.backend.manager.errors.agent import AgentNotFound
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.auth import InsufficientPrivilege
+from ai.backend.manager.errors.common import InternalServerError
+from ai.backend.manager.errors.image import ImageNotFound
+from ai.backend.manager.errors.kernel import TooManyKernelsFound
+from ai.backend.manager.errors.repository import RepositoryIntegrityError
+from ai.backend.manager.errors.resource import DomainNotFound
+from ai.backend.manager.models.image.row import (
+    ImageLoadFilter,
+    PublicImageLoadFilter,
+)
+from ai.backend.manager.models.rbac import ProjectScope, ScopeType, SystemScope
+from ai.backend.manager.models.resource_group.row import (
+    ResourceGroupRow,
+>>>>>>> f09541fb8 (fix(BA-8880): keep SQL and PostgreSQL diagnostics out of GQL error responses (#16463))
     and_names,
     query_allowed_sgroups,
 )
@@ -3367,10 +3388,12 @@ class GQLExceptionMiddleware:
             res = next(root, info, **args)
         except GraphQLError:
             raise
+        except RepositoryIntegrityError as e:
+            raise self._wrap_integrity_error(e) from e
         except BackendAIError as e:
             raise self._wrap_backend_error(e) from e
         except Exception as e:
-            raise self._wrap_unexpected_error(e) from e
+            raise self._wrap_backend_error(InternalServerError()) from e
         if asyncio.iscoroutine(res):
             # Async resolvers raise while being awaited by graphql-core,
             # outside this try block; wrap the coroutine to catch them.
@@ -3382,12 +3405,20 @@ class GQLExceptionMiddleware:
             return await coro
         except GraphQLError:
             raise
+        except RepositoryIntegrityError as e:
+            raise self._wrap_integrity_error(e) from e
         except BackendAIError as e:
             raise self._wrap_backend_error(e) from e
         except BaseException as e:
-            raise self._wrap_unexpected_error(e) from e
+            raise self._wrap_backend_error(InternalServerError()) from e
+
+    def _wrap_integrity_error(self, e: RepositoryIntegrityError) -> GraphQLError:
+        # Its message carries the PostgreSQL diagnostic; answer with the title only.
+        log.trace("graphql client error", error_code=str(e.error_code()), error_message=str(e))
+        return GraphQLError(message=e.error_title, extensions={"code": str(e.error_code())})
 
     def _wrap_backend_error(self, e: BackendAIError) -> GraphQLError:
+<<<<<<< HEAD
         if e.status_code // 100 == 4:
             log.debug("GraphQL client error: {}", e)
         elif e.status_code // 100 == 5:
@@ -3407,6 +3438,13 @@ class GQLExceptionMiddleware:
                 "code": str(ErrorCode.default()),
             },
         )
+=======
+        if e.is_client_error():
+            log.trace("graphql client error", error_code=str(e.error_code()), error_message=str(e))
+            return GraphQLError(message=str(e), extensions={"code": str(e.error_code())})
+        log.exception("graphql server error", error_code=str(e.error_code()))
+        return GraphQLError(message=e.error_title, extensions={"code": str(e.error_code())})
+>>>>>>> f09541fb8 (fix(BA-8880): keep SQL and PostgreSQL diagnostics out of GQL error responses (#16463))
 
 
 class GQLMetricMiddleware:
