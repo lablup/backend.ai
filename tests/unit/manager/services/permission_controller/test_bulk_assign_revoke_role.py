@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.permission.role import (
@@ -18,6 +19,7 @@ from ai.backend.manager.data.permission.role import (
     BulkRoleRevocationResultData,
     BulkUserRoleRevocationInput,
 )
+from ai.backend.manager.errors.permission import RoleNotFound
 from ai.backend.manager.services.rbac.actions.role.bulk_assign import (
     BulkAssignRoleAction,
 )
@@ -30,6 +32,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.repositories.permission_controller.repository import (
         PermissionControllerRepository,
     )
+    from ai.backend.manager.repositories.rbac.roster_repository import RbacRosterRepository
 
 
 class TestBulkAssignRole:
@@ -40,8 +43,18 @@ class TestBulkAssignRole:
         return repository
 
     @pytest.fixture
-    def service(self, mock_repository: PermissionControllerRepository) -> RbacRoleService:
-        return RbacRoleService(mock_repository, MagicMock())
+    def mock_roster_repository(self) -> MagicMock:
+        roster_repository = MagicMock()
+        roster_repository.join_each = AsyncMock()
+        return roster_repository
+
+    @pytest.fixture
+    def service(
+        self,
+        mock_repository: PermissionControllerRepository,
+        mock_roster_repository: RbacRosterRepository,
+    ) -> RbacRoleService:
+        return RbacRoleService(mock_repository, mock_roster_repository)
 
     async def test_bulk_assign_all_succeed(
         self,
@@ -94,6 +107,26 @@ class TestBulkAssignRole:
 
         assert len(result.data.successes) == 0
         assert len(result.data.failures) == 0
+
+    async def test_unknown_role_with_a_project_is_refused_before_anyone_joins(
+        self,
+        service: RbacRoleService,
+        mock_repository: MagicMock,
+        mock_roster_repository: MagicMock,
+    ) -> None:
+        mock_repository.get_role = AsyncMock(return_value=None)
+
+        action = BulkAssignRoleAction(
+            role_id=RoleID(uuid.uuid4()),
+            user_ids=[UserID(uuid.uuid4())],
+            granted_by=UserID(uuid.uuid4()),
+            project_id=ProjectID(uuid.uuid4()),
+        )
+        with pytest.raises(RoleNotFound):
+            await service.bulk_assign_role(action)
+
+        mock_roster_repository.join_each.assert_not_called()
+        mock_repository.bulk_assign_role.assert_not_called()
 
 
 class TestBulkRevokeRole:

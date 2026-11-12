@@ -13,6 +13,7 @@ from ai.backend.manager.data.permission.role import (
     BulkRoleAssignmentFailure,
     BulkRoleAssignmentResultData,
 )
+from ai.backend.manager.errors.permission import RoleNotFound
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
@@ -190,10 +191,12 @@ class RbacRoleService:
     async def bulk_assign_role(self, action: BulkAssignRoleAction) -> BulkAssignRoleActionResult:
         """Assigns a role to multiple users. When project_id is provided, also binds
         each user to the project; a user who cannot join is reported as a failure and
-        not granted the role."""
+        not granted the role. An unknown role is refused before anyone joins."""
         user_ids = list(action.user_ids)
         join_failures: list[BulkRoleAssignmentFailure] = []
         if action.project_id is not None:
+            if await self._repository.get_role(action.role_id) is None:
+                raise RoleNotFound(f"Role with ID {action.role_id} does not exist.")
             joined = await self._roster_repository.join_each(action.project_id, action.user_ids)
             user_ids = joined.joined
             join_failures = [
