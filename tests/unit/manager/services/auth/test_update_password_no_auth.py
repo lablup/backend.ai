@@ -13,12 +13,8 @@ from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.auth import AuthorizationFailed, PasswordNotExpired
 from ai.backend.manager.errors.common import GenericBadRequest, RejectedByHook
-<<<<<<< HEAD
-from ai.backend.manager.models.user import UserRole, UserStatus
-=======
 from ai.backend.manager.errors.user import UserNotActive
-from ai.backend.manager.plugin.hook_args import VerifyPasswordFormatHookArgs
->>>>>>> 5eb92247 (fix(BA-8805): count TOTP failures toward the login block and open update-password-no-auth only to expired passwords (#16477))
+from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.repositories.user_resource_policy.repository import (
     UserResourcePolicyRepository,

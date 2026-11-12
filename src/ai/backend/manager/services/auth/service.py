@@ -47,11 +47,7 @@ from ai.backend.manager.errors.auth import (
     GroupMembershipNotFoundError,
     LoginRejectedByHook,
     PasswordExpired,
-<<<<<<< HEAD
-=======
-    PasswordMismatch,
     PasswordNotExpired,
->>>>>>> 5eb92247 (fix(BA-8805): count TOTP failures toward the login block and open update-password-no-auth only to expired passwords (#16477))
     TooManyConcurrentLoginSessions,
 )
 from ai.backend.manager.errors.common import (
@@ -60,22 +56,16 @@ from ai.backend.manager.errors.common import (
     ObjectNotFound,
     RejectedByHook,
 )
-<<<<<<< HEAD
-from ai.backend.manager.errors.user import KeyPairNotFound, UserResourcePolicyNotFound
-from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.keypair.row import (
-    KEYPAIR_SECRET_KEY_CONTEXT,
-    generate_ssh_keypair,
-)
-=======
 from ai.backend.manager.errors.user import (
     KeyPairNotFound,
     UserNotActive,
     UserResourcePolicyNotFound,
 )
-from ai.backend.manager.models.hasher.factory import compare_to_hashed_password
-from ai.backend.manager.models.keypair.row import KEYPAIR_SECRET_KEY_CONTEXT
->>>>>>> 5eb92247 (fix(BA-8805): count TOTP failures toward the login block and open update-password-no-auth only to expired passwords (#16477))
+from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.keypair.row import (
+    KEYPAIR_SECRET_KEY_CONTEXT,
+    generate_ssh_keypair,
+)
 from ai.backend.manager.models.keypair.ssh_key_validator import SSHKeyValidator
 from ai.backend.manager.models.user import (
     INACTIVE_USER_STATUSES,

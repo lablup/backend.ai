@@ -79,47 +79,6 @@ class AuthorizationFailed(BackendAIError, web.HTTPUnauthorized):
         )
 
 
-<<<<<<< HEAD
-=======
-class PasswordMismatch(AuthorizationFailed):
-    """Raised when the user exists and the password does not match its hash.
-
-    Answers the client as :class:`AuthorizationFailed` does; carries the user so the
-    failure can be recorded against them."""
-
-    user_id: UserID
-
-    def __init__(self, user_id: UserID) -> None:
-        super().__init__("User credential mismatch.")
-        self.user_id = user_id
-
-
-class SuperadminRequired(BackendAIError, web.HTTPForbidden):
-    error_type = "https://api.backend.ai/probs/superadmin-required"
-    error_title = "Superadmin privilege is required."
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.USER,
-            operation=ErrorOperation.ACCESS,
-            error_detail=ErrorDetail.FORBIDDEN,
-        )
-
-
-class AuthenticationRequired(BackendAIError, web.HTTPUnauthorized):
-    error_type = "https://api.backend.ai/probs/authentication-required"
-    error_title = "Authentication is required."
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.USER,
-            operation=ErrorOperation.ACCESS,
-            error_detail=ErrorDetail.UNAUTHORIZED,
-        )
-
-
 class LoginRejectedByHook(BackendAIError, web.HTTPUnauthorized):
     """Raised when a POST_AUTHORIZE hook plugin refuses a login whose password matched."""
 
@@ -154,7 +113,6 @@ class PasswordNotExpired(BackendAIError, web.HTTPBadRequest):
         )
 
 
->>>>>>> 5eb92247 (fix(BA-8805): count TOTP failures toward the login block and open update-password-no-auth only to expired passwords (#16477))
 class PasswordExpired(BackendAIError, web.HTTPUnauthorized):
     error_type = "https://api.backend.ai/probs/password-expired"
     error_title = "Password has expired."
