@@ -311,7 +311,7 @@ Scenario: incomplete 3 / 44
 
 | scenario | verdict |
 |---|---|
-| [when a user granted READ and UPDATE in the target scope gives a public key and a private key, they overwrite the stored one without a format check and the access key comes back](#managing_keypairs-a-granted-user-registering-another-users-ssh-key-gets-the-access-key) | answered |
+| [when a user granted READ and UPDATE in the target scope gives a public key, it overwrites the stored public key without a format check and the access key comes back](#managing_keypairs-a-granted-user-registering-another-users-ssh-key-gets-the-access-key) | answered |
 | [a user holding no role who tries to register an SSH key is rejected at the owner lookup step](#managing_keypairs-a-user-granted-nothing-may-not-register-another-users-ssh-key) | rejected |
 | [a user holding only READ who tries to register an SSH key is rejected by the entity permission gate](#managing_keypairs-a-user-granted-only-read-may-not-register-another-users-ssh-key) | rejected |
 
@@ -3956,7 +3956,7 @@ Then
 
 #### [a-granted-user-registering-another-users-ssh-key-gets-the-access-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
 
-when a user granted READ and UPDATE in the target scope gives a public key and a private key, they overwrite the stored one without a format check and the access key comes back
+when a user granted READ and UPDATE in the target scope gives a public key, it overwrites the stored public key without a format check and the access key comes back
 
 Given
 

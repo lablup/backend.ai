@@ -40,7 +40,7 @@ from ai.backend.common.dto.manager.auth.request import (
     VerifyAuthRequest,
 )
 from ai.backend.common.exception import InvalidAPIParameters
-from ai.backend.common.types import AccessKey, SecretKey
+from ai.backend.common.types import AccessKey, SecretKey, SSHPublicKey
 from ai.backend.manager.api.adapters.auth.adapter import AuthAdapter
 from ai.backend.manager.api.rest.auth.handler import AuthHandler
 from ai.backend.manager.api.rest.middleware.auth import (
@@ -711,24 +711,18 @@ class TestGenerateSSHKeypair:
 class TestUploadSSHKeypair:
     """Tests for upload_ssh_keypair handler."""
 
-    async def test_calls_processor_and_returns_keypair(
+    async def test_calls_processor_and_returns_public_key(
         self,
         handler: AuthHandler,
         user_context: UserContext,
         mock_processors: MagicMock,
     ) -> None:
-        """Verify processor is called and keypair is returned."""
+        """Verify processor is called and only the public key is returned."""
         body: BodyParam[UploadSSHKeypairRequest] = BodyParam(UploadSSHKeypairRequest)
-        body.from_body({
-            "pubkey": "ssh-rsa AAAAB3...",
-            "privkey": "-----BEGIN RSA PRIVATE KEY-----\n...",
-        })
+        body.from_body({"pubkey": "ssh-rsa AAAAB3..."})
         mock_processors.auth.upload_ssh_keypair.run = AsyncMock(
             return_value=UploadSSHKeypairActionResult(
-                ssh_keypair=SSHKeypair(
-                    ssh_public_key="ssh-rsa AAAAB3...\n",
-                    ssh_private_key="-----BEGIN RSA PRIVATE KEY-----\n...\n",
-                ),
+                public_key=SSHPublicKey("ssh-rsa AAAAB3...\n")
             )
         )
 
@@ -736,7 +730,4 @@ class TestUploadSSHKeypair:
 
         mock_processors.auth.upload_ssh_keypair.run.assert_called_once()
         assert response.status_code == HTTPStatus.OK
-        data = response.to_json
-        assert data is not None
-        assert "ssh_public_key" in data
-        assert "ssh_private_key" in data
+        assert response.to_json == {"ssh_public_key": "ssh-rsa AAAAB3...\n"}

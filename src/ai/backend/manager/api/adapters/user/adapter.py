@@ -96,7 +96,7 @@ from ai.backend.common.dto.manager.v2.user.types import (
 )
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.tristate.unset import UNSET, Unset
-from ai.backend.common.types import AccessKey, SecretKey
+from ai.backend.common.types import AccessKey, SecretKey, SSHPublicKey
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairData
 from ai.backend.manager.data.user.types import UserData, UserStatus
@@ -1048,13 +1048,12 @@ class UserAdapter(BaseAdapter):
     async def admin_register_ssh_keypair(
         self, input: AdminRegisterSSHKeypairInput
     ) -> AdminRegisterSSHKeypairPayload:
-        """Admin registers (overwrites) a user's SSH keypair."""
+        """Admin registers (overwrites) a user's SSH public key."""
         result = await self._user.admin_register_ssh_keypair.run(
             AdminRegisterSSHKeypairAction(
                 user_id=await self._resolve_keypair_owner(input.access_key),
-                access_key=input.access_key,
-                ssh_public_key=input.ssh_public_key,
-                ssh_private_key=input.ssh_private_key,
+                access_key=AccessKey(input.access_key),
+                ssh_public_key=SSHPublicKey(input.ssh_public_key),
             )
         )
         return AdminRegisterSSHKeypairPayload(access_key=result.access_key)
