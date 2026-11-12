@@ -765,6 +765,12 @@ async def query_accessible_vfolders(
             .set_label_style(sa.LABEL_STYLE_TABLENAME_PLUS_COL)
             .select_from(j)
         )
+        if allowed_status_set is not None:
+            query = query.where(vfolders.c.status.in_(vfolder_status_map[allowed_status_set]))
+        else:
+            query = query.where(
+                vfolders.c.status.not_in(vfolder_status_map[VFolderStatusSet.INACCESSIBLE])
+            )
         if user_role != UserRole.SUPERADMIN and user_role != "superadmin":
             query = query.where(vfolders.c.group.in_(group_ids))
         if extra_vf_group_conds is not None:
