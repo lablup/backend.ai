@@ -60,7 +60,7 @@ class GQLExceptionHandlerExtension(SchemaExtension):
                 message=e.error_title, extensions={"code": str(e.error_code())}
             ) from e
         except BackendAIError as e:
-            if e.is_client_error():
+            if e.status_code // 100 == 4:
                 log.trace(
                     "graphql client error", error_code=str(e.error_code()), error_message=str(e)
                 )
@@ -87,7 +87,7 @@ class GQLExceptionHandlerExtension(SchemaExtension):
                 message=e.error_title, extensions={"code": str(e.error_code())}
             ) from e
         except BackendAIError as e:
-            if e.is_client_error():
+            if e.status_code // 100 == 4:
                 log.trace(
                     "graphql client error", error_code=str(e.error_code()), error_message=str(e)
                 )
@@ -99,7 +99,7 @@ class GQLExceptionHandlerExtension(SchemaExtension):
             raise self._wrap_backend_error(InternalServerError()) from e
 
     def _wrap_backend_error(self, e: BackendAIError) -> GraphQLError:
-        if e.is_client_error():
+        if e.status_code // 100 == 4:
             return GraphQLError(message=str(e), extensions={"code": str(e.error_code())})
         return GraphQLError(message=e.error_title, extensions={"code": str(e.error_code())})
 
@@ -134,7 +134,7 @@ class GQLExceptionHandlerExtension(SchemaExtension):
                         converted = GraphQLError(
                             e.error_title, extensions={"code": str(e.error_code())}
                         )
-                    case BackendAIError() as e if e.is_client_error():
+                    case BackendAIError() as e if e.status_code // 100 == 4:
                         log.trace(
                             "graphql client error",
                             error_code=str(e.error_code()),

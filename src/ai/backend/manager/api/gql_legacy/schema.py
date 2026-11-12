@@ -3426,7 +3426,7 @@ class GQLExceptionMiddleware:
         return GraphQLError(message=e.error_title, extensions={"code": str(e.error_code())})
 
     def _wrap_backend_error(self, e: BackendAIError) -> GraphQLError:
-        if e.is_client_error():
+        if e.status_code // 100 == 4:
             log.trace("graphql client error", error_code=str(e.error_code()), error_message=str(e))
             return GraphQLError(message=str(e), extensions={"code": str(e.error_code())})
         log.exception("graphql server error", error_code=str(e.error_code()))
