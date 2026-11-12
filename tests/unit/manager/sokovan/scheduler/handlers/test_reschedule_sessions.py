@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.sokovan.scheduler.handlers.lifecycle.reschedule_sessions import (
     RescheduleSessionsLifecycleHandler,
@@ -69,19 +70,58 @@ class TestRescheduleSessionsLifecycleHandler:
         """With every kernel terminal the session is re-enqueued and the schedule
         pass is requested."""
         session_id = rescheduling_session_terminated_kernels.session_info.identity.id
-        mock_scheduling_controller.mark_sessions_status.return_value = [session_id]
+        mock_repository.requeue_sessions_to_pending.return_value = [session_id]
 
         result = await handler.execute(
             ResourceGroupID(uuid.uuid4()), [rescheduling_session_terminated_kernels]
         )
 
         assert result.successes == []
-        mock_repository.reset_kernels_to_pending_for_sessions.assert_awaited_once()
-        call = mock_scheduling_controller.mark_sessions_status.await_args
-        assert call.args[0] == [session_id]
-        assert call.args[1] == SessionStatus.PENDING
+        mock_repository.requeue_sessions_to_pending.assert_awaited_once_with(
+            [session_id], KernelLifecycleEventReason.RESCHEDULED
+        )
+        mock_scheduling_controller.mark_sessions_status.assert_not_awaited()
         mock_scheduling_controller.mark_scheduling_needed.assert_any_await([ScheduleType.SCHEDULE])
         mock_terminator.terminate_sessions_for_handler.assert_not_awaited()
+
+    async def test_requeue_broadcasts_pending_for_requeued_sessions_only(
+        self,
+        handler: RescheduleSessionsLifecycleHandler,
+        mock_repository: AsyncMock,
+        mock_scheduling_controller: AsyncMock,
+        rescheduling_session_terminated_kernels: SessionWithKernels,
+    ) -> None:
+        """The RESCHEDULING -> PENDING move is announced, but only for the sessions
+        the repository actually requeued."""
+        session_id = rescheduling_session_terminated_kernels.session_info.identity.id
+        mock_repository.requeue_sessions_to_pending.return_value = [session_id]
+
+        await handler.execute(
+            ResourceGroupID(uuid.uuid4()), [rescheduling_session_terminated_kernels]
+        )
+
+        mock_scheduling_controller.broadcast_status_transitions.assert_awaited_once_with(
+            [session_id], SessionStatus.PENDING, KernelLifecycleEventReason.RESCHEDULED
+        )
+
+    async def test_requeue_broadcasts_nothing_when_no_session_moved(
+        self,
+        handler: RescheduleSessionsLifecycleHandler,
+        mock_repository: AsyncMock,
+        mock_scheduling_controller: AsyncMock,
+        rescheduling_session_terminated_kernels: SessionWithKernels,
+    ) -> None:
+        """A session that left RESCHEDULING meanwhile is not requeued, so nothing
+        announces it as PENDING."""
+        mock_repository.requeue_sessions_to_pending.return_value = []
+
+        await handler.execute(
+            ResourceGroupID(uuid.uuid4()), [rescheduling_session_terminated_kernels]
+        )
+
+        mock_scheduling_controller.broadcast_status_transitions.assert_awaited_once_with(
+            [], SessionStatus.PENDING, KernelLifecycleEventReason.RESCHEDULED
+        )
 
     async def test_batch_splits_by_teardown_progress(
         self,
@@ -99,6 +139,7 @@ class TestRescheduleSessionsLifecycleHandler:
         ready = rescheduling_session_terminated_kernels
         terminating_data = terminating_session_data_factory([live])
         mock_repository.get_terminating_sessions_by_ids.return_value = terminating_data
+        mock_repository.requeue_sessions_to_pending.return_value = [ready.session_info.identity.id]
 
         await handler.execute(ResourceGroupID(uuid.uuid4()), [live, ready])
 
@@ -106,9 +147,9 @@ class TestRescheduleSessionsLifecycleHandler:
             live.session_info.identity.id
         ])
         mock_terminator.terminate_sessions_for_handler.assert_awaited_once_with(terminating_data)
-        call = mock_scheduling_controller.mark_sessions_status.await_args
-        assert call.args[0] == [ready.session_info.identity.id]
-        assert call.args[1] == SessionStatus.PENDING
+        mock_repository.requeue_sessions_to_pending.assert_awaited_once_with(
+            [ready.session_info.identity.id], KernelLifecycleEventReason.RESCHEDULED
+        )
 
     async def test_empty_session_list_is_a_noop(
         self,

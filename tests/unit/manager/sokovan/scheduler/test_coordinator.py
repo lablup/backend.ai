@@ -983,39 +983,39 @@ class TestScheduleCoordinatorStatusTransition:
         mock_coordinator._record_history_without_transition.assert_not_awaited()
         assert classified is None
 
-    async def test_kernel_reset_on_pending_transition(
-        self,
-        mock_coordinator: MagicMock,
-    ) -> None:
-        """SC-CO-018: Kernel status reset when session transitions to PENDING.
+    async def test_kernel_reset_on_pending_transition(self) -> None:
+        """SC-CO-018: A session sent back to PENDING is requeued with its kernels in one write,
+        after its current agents are recorded as failed placements."""
+        coordinator = object.__new__(ScheduleCoordinator)
+        coordinator._repository = AsyncMock()
+        coordinator._valkey_schedule = AsyncMock()
+        session_id = SessionId(uuid4())
+        coordinator._repository.get_agent_ids_for_sessions.return_value = {session_id: ["a1"]}
+        coordinator._repository.requeue_sessions_with_history.return_value = (1, 1)
 
-        Given: Session transitioning to PENDING with kernel=PENDING
-        When: Apply transition is called
-        Then: Kernels are reset to PENDING
-        """
-        # Arrange
-        session_info = _create_session_transition_info(session_id=SessionId(uuid4()))
-        transition = TransitionStatus(
-            session=SessionStatus.PENDING,
-            kernel=KernelStatus.PENDING,
-        )
-
-        mock_coordinator._repository.update_with_history = AsyncMock(return_value=1)
-        mock_coordinator._apply_kernel_pending_resets = AsyncMock()
-
-        # Act
-        await ScheduleCoordinator._apply_transition(
-            mock_coordinator,
+        await coordinator._apply_transition(
             handler_name="test_handler",
-            session_infos=[session_info],
-            transition=transition,
+            session_infos=[
+                _create_session_transition_info(
+                    session_id=session_id, from_status=SessionStatus.PREPARED
+                )
+            ],
+            transition=TransitionStatus(session=SessionStatus.PENDING, kernel=KernelStatus.PENDING),
             scheduling_result=SchedulingResult.NEED_RETRY,
             records={},
             status_changed_at=datetime.now(tzutc()),
         )
 
-        # Assert
-        mock_coordinator._apply_kernel_pending_resets.assert_awaited_once()
+        coordinator._valkey_schedule.record_session_failed_agents.assert_awaited_once_with(
+            session_id, ["a1"]
+        )
+        requeue = coordinator._repository.requeue_sessions_with_history.await_args
+        assert requeue is not None
+        assert requeue.args[0].to_status == SessionStatus.PENDING
+        assert requeue.kwargs["kernel_reason"] == KernelLifecycleEventReason.EXCEEDED_MAX_RETRIES
+        # The requeue is guarded by the status each session was classified in.
+        assert requeue.kwargs["expected_statuses"] == {session_id: SessionStatus.PREPARED}
+        coordinator._repository.update_with_history.assert_not_awaited()
 
     async def test_no_kernel_reset_for_non_pending_transition(
         self,
@@ -1025,7 +1025,7 @@ class TestScheduleCoordinatorStatusTransition:
 
         Given: Session transitioning to SCHEDULED
         When: Apply transition is called
-        Then: Kernels are not reset
+        Then: The plain status update runs and kernels are not reset
         """
         # Arrange
         session_info = _create_session_transition_info(session_id=SessionId(uuid4()))
@@ -1035,7 +1035,6 @@ class TestScheduleCoordinatorStatusTransition:
         )
 
         mock_coordinator._repository.update_with_history = AsyncMock(return_value=1)
-        mock_coordinator._apply_kernel_pending_resets = AsyncMock()
 
         # Act
         await ScheduleCoordinator._apply_transition(
@@ -1049,7 +1048,8 @@ class TestScheduleCoordinatorStatusTransition:
         )
 
         # Assert
-        mock_coordinator._apply_kernel_pending_resets.assert_not_awaited()
+        mock_coordinator._repository.update_with_history.assert_awaited_once()
+        mock_coordinator._repository.requeue_sessions_with_history.assert_not_awaited()
 
     async def test_running_transition_clears_status_info(
         self,
@@ -1076,7 +1076,6 @@ class TestScheduleCoordinatorStatusTransition:
             return 1
 
         mock_coordinator._repository.update_with_history = capture_update_with_history
-        mock_coordinator._apply_kernel_pending_resets = AsyncMock()
 
         # Act
         await ScheduleCoordinator._apply_transition(
