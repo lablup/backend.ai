@@ -42,6 +42,10 @@ class _OpenIDSToken(metaclass=ABCMeta):
 
     @abstractmethod
     def decode_to_claims(self, secret: str) -> _OpenIDSTokenClaims | None:
+        """
+        Returns None when this token fails verification but must not reject the login,
+        so that openid leaves the login unhandled and it goes on to password verification.
+        """
         raise NotImplementedError
 
     def _decode_claims(self, secret: str) -> _OpenIDSTokenClaims:
