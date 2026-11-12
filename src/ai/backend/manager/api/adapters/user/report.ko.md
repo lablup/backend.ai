@@ -311,7 +311,7 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [대상 스코프에서 READ 와 UPDATE 를 받은 사용자가 공개키와 개인키를 주면, 형식 검사 없이 덮어쓰고 access key 가 응답으로 옵니다](#managing_keypairs-a-granted-user-registering-another-users-ssh-key-gets-the-access-key) | 성공 |
+| [대상 스코프에서 READ 와 UPDATE 를 받은 사용자가 공개키를 주면, 형식 검사 없이 공개키를 덮어쓰고 access key 가 응답으로 옵니다](#managing_keypairs-a-granted-user-registering-another-users-ssh-key-gets-the-access-key) | 성공 |
 | [역할 없이 등록하려 하면, 소유자 조회 단계가 막습니다](#managing_keypairs-a-user-granted-nothing-may-not-register-another-users-ssh-key) | 거부 |
 | [READ 만 받고 등록하려 하면, 엔티티 권한 문이 막습니다](#managing_keypairs-a-user-granted-only-read-may-not-register-another-users-ssh-key) | 거부 |
 
@@ -3956,7 +3956,7 @@ Then
 
 #### [a-granted-user-registering-another-users-ssh-key-gets-the-access-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
 
-대상 스코프에서 READ 와 UPDATE 를 받은 사용자가 공개키와 개인키를 주면, 형식 검사 없이 덮어쓰고 access key 가 응답으로 옵니다
+대상 스코프에서 READ 와 UPDATE 를 받은 사용자가 공개키를 주면, 형식 검사 없이 공개키를 덮어쓰고 access key 가 응답으로 옵니다
 
 Given
 

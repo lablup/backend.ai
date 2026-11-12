@@ -2523,10 +2523,12 @@ class ScheduleDBSource:
             DotfileEntry(entry.path, entry.perm, entry.data) for entry in user_auto_generated_files
         ]
         ssh_keypair: SSHKeypair | None = None
-        if row.ssh_public_key and row.ssh_private_key:
+        if row.ssh_public_key:
+            # TODO(BA-8467): Drop the private key once keypairs stop storing it. Until then a
+            # missing one goes as "", since agents write it out with `.encode()`.
             ssh_keypair = SSHKeypair(
                 public_key=row.ssh_public_key,
-                private_key=row.ssh_private_key,
+                private_key=row.ssh_private_key or "",
             )
         seen_paths = {entry.path for entry in ordered_entries}
 

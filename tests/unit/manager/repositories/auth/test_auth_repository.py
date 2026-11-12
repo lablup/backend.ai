@@ -16,7 +16,7 @@ import sqlalchemy as sa
 from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.exception import UserNotFound
-from ai.backend.common.types import AccessKey, ResourceSlot, VFolderHostPermissionMap
+from ai.backend.common.types import AccessKey, ResourceSlot, SSHPublicKey, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.types import UserData
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.secret.types import KeyProviderType
@@ -572,6 +572,27 @@ class TestAuthRepository:
             assert keypair is not None
             assert keypair.ssh_public_key == update_public_key
             assert keypair.ssh_private_key == update_private_key
+
+    async def test_update_ssh_public_key_keeps_the_private_key(
+        self,
+        auth_repository: AuthRepository,
+        sample_user_data: UserTestData,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> None:
+        """Replacing the SSH public key leaves the stored private key as it was"""
+        update_public_key = SSHPublicKey("ssh-rsa AAAAB3NzaC1yc2EUPDATED...")
+
+        await auth_repository.update_ssh_public_key(
+            AccessKey(sample_user_data.access_key), update_public_key
+        )
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            keypair = await db_sess.scalar(
+                sa.select(KeyPairRow).where(KeyPairRow.access_key == sample_user_data.access_key)
+            )
+            assert keypair is not None
+            assert keypair.ssh_public_key == update_public_key
+            assert keypair.ssh_private_key == sample_user_data.ssh_private_key
 
     async def test_default_keypair(
         self, auth_repository: AuthRepository, sample_user_data: UserTestData

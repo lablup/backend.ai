@@ -317,19 +317,16 @@ type AdminRefreshDeploymentRevisionsPayload
 }
 
 """
-Added in 26.4.2. Admin input for registering (overwriting) a user's SSH keypair.
+Added in 26.4.2. Admin input for registering (overwriting) a user's SSH public key. `sshPrivateKey` was removed in 26.10.0.
 """
 input AdminRegisterSSHKeypairInput
   @join__type(graph: STRAWBERRY)
 {
-  """Access key whose SSH keypair will be replaced."""
+  """Access key whose SSH public key will be replaced."""
   accessKey: String!
 
   """PEM-encoded SSH public key."""
   sshPublicKey: String!
-
-  """PEM-encoded SSH private key."""
-  sshPrivateKey: String!
 }
 
 """
@@ -15353,7 +15350,7 @@ type Mutation
   adminUpdateUserV2(userId: UUID!, input: UpdateUserV2Input!): UpdateUserV2Payload @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.2.0. Update the current user's information. Users can only update their own profile. Non-superadmins can set only fullName, password and allowedClientIp
+  Added in 26.2.0. Update the current user's information. Users can only update their own profile. Non-superadmins can set only fullName, password and allowedClientIp. Password changes require oldPassword
   """
   updateUserV2(input: UpdateUserV2Input!): UpdateUserV2Payload @join__field(graph: STRAWBERRY)
 
@@ -15417,7 +15414,7 @@ type Mutation
   """
   adminDeleteKeypairV2(accessKey: String!): AdminDeleteKeypairPayload @join__field(graph: STRAWBERRY)
 
-  """Added in 26.4.2. Admin registers (overwrites) a user's SSH keypair."""
+  """Added in 26.4.2. Admin registers (overwrites) a user's SSH public key."""
   adminRegisterSshKeypairV2(input: AdminRegisterSSHKeypairInput!): AdminRegisterSSHKeypairPayload @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Admin clears a user's SSH keypair."""
@@ -30006,6 +30003,11 @@ input UpdateUserV2Input
   """New password."""
   password: String
 
+  """
+  Added in 26.10.0. Current password, required when changing your own password.
+  """
+  oldPassword: String
+
   """New full display name."""
   fullName: String
 
@@ -31829,6 +31831,27 @@ input VFolderAutoMountFilter
   NOT: [VFolderAutoMountFilter!] = null
 }
 
+"""
+Added in 26.10.0. Filter selecting vfolders by the auto-mounts set on them. Each relation matches one auto-mount at a time.
+"""
+input VFolderAutoMountNestedFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  True for a vfolder that has at least one auto-mount, false for one that has none.
+  """
+  exists: Boolean = null
+
+  """At least one auto-mount matches."""
+  some: VFolderAutoMountFilter = null
+
+  """Every auto-mount matches; true when there is none."""
+  every: VFolderAutoMountFilter = null
+
+  """No auto-mount matches."""
+  none: VFolderAutoMountFilter = null
+}
+
 """Added in 26.10.0. One ordering rule for a vfolder auto-mount search."""
 input VFolderAutoMountOrderBy
   @join__type(graph: STRAWBERRY)
@@ -31999,6 +32022,9 @@ input VFolderFilter
 
   """Added in 26.10.0. Filter by vfolder ID."""
   entityId: UUIDFilter = null
+
+  """Added in 26.10.0. Select vfolders by the auto-mounts set on them."""
+  autoMounts: VFolderAutoMountNestedFilter = null
   AND: [VFolderFilter!] = null
   OR: [VFolderFilter!] = null
   NOT: [VFolderFilter!] = null

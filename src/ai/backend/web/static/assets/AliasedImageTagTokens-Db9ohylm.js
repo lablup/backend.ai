@@ -1,0 +1,6 @@
+import{t as e}from"./compiler-runtime-CZQb2eIb.js";/* empty css            */import{t}from"./jsx-runtime-BapUIyWk.js";import{I as n}from"./helper-BWFKT_2Y.js";import{t as r}from"./react-relay-BfoHYpUf.js";import{n as i}from"./BAIImageNodeSimpleTagV2-2UAD4hKM.js";import{n as a}from"./ImageTags-WFz2rgH6.js";var o=e(),s=(function(){var e=[{alias:null,args:null,kind:`ScalarField`,name:`key`,storageKey:null},{alias:null,args:null,kind:`ScalarField`,name:`value`,storageKey:null}];return{argumentDefinitions:[],kind:`Fragment`,metadata:null,name:`AliasedImageTagTokensFragment`,selections:[{alias:null,args:null,concreteType:`KVPair`,kind:`LinkedField`,name:`labels`,plural:!0,selections:e,storageKey:null},{alias:null,args:null,concreteType:`KVPair`,kind:`LinkedField`,name:`tags`,plural:!0,selections:e,storageKey:null}],type:`ImageNode`,abstractKey:null}})();s.hash=`944b22aafddeca28e0228e9b937d392f`;
+/**
+@license
+Copyright (c) 2015-2026 Lablup Inc. All rights reserved.
+*/
+var c=r(),l=t(),u=e=>{"use memo";let t=(0,o.c)(7),{imageFrgmt:r,highlightKeyword:u}=e,d=(0,c.useFragment)(s,r),[,f]=n(),{tagAlias:p}=f,m=d==null?void 0:d.tags,h=d==null?void 0:d.labels,g;t[0]!==m||t[1]!==h||t[2]!==p?(g=i(m,h,p),t[0]=m,t[1]=h,t[2]=p,t[3]=g):g=t[3];let _;return t[4]!==u||t[5]!==g?(_=(0,l.jsx)(a,{facts:g,highlightKeyword:u}),t[4]=u,t[5]=g,t[6]=_):_=t[6],_};export{u as t};

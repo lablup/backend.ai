@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 
@@ -30,6 +31,10 @@ from .actions.get_task_template import (
     GetTaskTemplateAction,
     GetTaskTemplateActionResult,
 )
+from .actions.global_list_task_templates import (
+    GlobalListTaskTemplatesAction,
+    GlobalListTaskTemplatesActionResult,
+)
 from .actions.list_cluster_templates import (
     ListClusterTemplatesAction,
     ListClusterTemplatesActionResult,
@@ -56,6 +61,9 @@ class TemplateProcessors:
 
     create_task: ScopeActionProcessor[CreateTaskTemplateAction, CreateTaskTemplateActionResult]
     list_task: ScopeActionProcessor[ListTaskTemplatesAction, ListTaskTemplatesActionResult]
+    global_list_task: GlobalActionProcessor[
+        GlobalListTaskTemplatesAction, GlobalListTaskTemplatesActionResult
+    ]
     get_task: SingleEntityActionProcessor[GetTaskTemplateAction, GetTaskTemplateActionResult]
     update_task: SingleEntityActionProcessor[
         UpdateTaskTemplateAction, UpdateTaskTemplateActionResult
@@ -81,6 +89,9 @@ class TemplateProcessors:
     def __init__(self, group: ProcessorGroup[Any], service: TemplateService) -> None:
         self.create_task = group.scope(CreateTaskTemplateAction, service.create_task_template)
         self.list_task = group.scope(ListTaskTemplatesAction, service.list_task_templates)
+        self.global_list_task = group.global_scope(
+            GlobalListTaskTemplatesAction, service.global_list_task_templates
+        )
         self.get_task = group.single_entity(GetTaskTemplateAction, service.get_task_template)
         self.update_task = group.single_entity(
             UpdateTaskTemplateAction, service.update_task_template

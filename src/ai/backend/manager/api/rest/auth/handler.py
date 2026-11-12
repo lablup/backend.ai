@@ -41,6 +41,7 @@ from ai.backend.common.dto.manager.auth.response import (
     UpdateFullNameResponse,
     UpdatePasswordNoAuthResponse,
     UpdatePasswordResponse,
+    UploadSSHKeypairResponse,
     VerifyAuthResponse,
 )
 from ai.backend.common.dto.manager.auth.types import (
@@ -48,8 +49,11 @@ from ai.backend.common.dto.manager.auth.types import (
     AuthSuccessResponse,
     AuthTokenType,
 )
+from ai.backend.common.dto.manager.v2.user.request import UpdatePasswordInput
 from ai.backend.common.exception import UnreachableError
+from ai.backend.common.types import AccessKey, SSHPublicKey
 from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.api.adapters.auth.adapter import AuthAdapter
 from ai.backend.manager.api.rest.middleware.auth import extract_client_ip
 from ai.backend.manager.dto.auth import SignupHeader
 from ai.backend.manager.dto.context import RequestCtx, UserContext
@@ -62,7 +66,6 @@ from ai.backend.manager.services.auth.actions.logout import LogoutAction
 from ai.backend.manager.services.auth.actions.signout import SignoutAction
 from ai.backend.manager.services.auth.actions.signup import SignupAction
 from ai.backend.manager.services.auth.actions.update_full_name import UpdateFullNameAction
-from ai.backend.manager.services.auth.actions.update_password import UpdatePasswordAction
 from ai.backend.manager.services.auth.actions.update_password_no_auth import (
     UpdatePasswordNoAuthAction,
 )
@@ -75,8 +78,12 @@ log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 class AuthHandler:
     """Auth API handler with constructor-injected dependencies."""
 
-    def __init__(self, *, auth: AuthProcessors) -> None:
+    _auth: AuthProcessors
+    _auth_adapter: AuthAdapter
+
+    def __init__(self, *, auth: AuthProcessors, adapter: AuthAdapter) -> None:
         self._auth = auth
+        self._auth_adapter = adapter
 
     # ------------------------------------------------------------------
     # test_get (GET /auth, /auth/test)
@@ -243,18 +250,15 @@ class AuthHandler:
         ctx: UserContext,
     ) -> APIResponse:
         params = body.parsed
-        action = UpdatePasswordAction(
+        await self._auth_adapter.update_password(
             user_id=UserID(ctx.user_uuid),
             domain_name=ctx.user_domain,
             email=ctx.user_email,
-            old_password=params.old_password,
-            new_password=params.new_password,
-            new_password_confirm=params.new_password2,
+            input=UpdatePasswordInput(
+                old_password=params.old_password,
+                new_password=params.new_password,
+            ),
         )
-        result = await self._auth.update_password.run(action)
-        if not result.success:
-            resp = UpdatePasswordResponse(error_msg="new password mismatch")
-            return APIResponse.build(HTTPStatus.BAD_REQUEST, resp)
         return APIResponse.build(HTTPStatus.OK, UpdatePasswordResponse())
 
     # ------------------------------------------------------------------
@@ -317,17 +321,12 @@ class AuthHandler:
     ) -> APIResponse:
         params = body.parsed
         pubkey = f"{params.pubkey.rstrip()}\n"
-        privkey = f"{params.privkey.rstrip()}\n"
         result = await self._auth.upload_ssh_keypair.run(
             UploadSSHKeypairAction(
                 user_id=UserID(ctx.user_uuid),
-                public_key=pubkey,
-                private_key=privkey,
-                access_key=ctx.access_key,
+                public_key=SSHPublicKey(pubkey),
+                access_key=AccessKey(ctx.access_key),
             )
         )
-        resp = SSHKeypairResponse(
-            ssh_public_key=result.ssh_keypair.ssh_public_key,
-            ssh_private_key=result.ssh_keypair.ssh_private_key,
-        )
+        resp = UploadSSHKeypairResponse(ssh_public_key=result.public_key)
         return APIResponse.build(HTTPStatus.OK, resp)

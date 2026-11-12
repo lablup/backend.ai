@@ -15,6 +15,7 @@ from ai.backend.common.dto.manager.auth.response import (
     UpdateFullNameResponse,
     UpdatePasswordNoAuthResponse,
     UpdatePasswordResponse,
+    UploadSSHKeypairResponse,
     VerifyAuthResponse,
 )
 from ai.backend.common.dto.manager.auth.types import (
@@ -131,6 +132,7 @@ def test_response_models_have_field_descriptions() -> None:
         UpdatePasswordNoAuthResponse,
         GetSSHKeypairResponse,
         SSHKeypairResponse,
+        UploadSSHKeypairResponse,
         VerifyAuthResponse,
     ]
     for model in models_with_fields:

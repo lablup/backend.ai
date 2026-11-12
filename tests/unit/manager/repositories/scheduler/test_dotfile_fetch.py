@@ -11,7 +11,7 @@ from ai.backend.common.data.entity.domain import DomainName
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.types import AccessKey, SecretKey
-from ai.backend.manager.data.dotfile.types import DotfileEntries, DotfileEntry
+from ai.backend.manager.data.dotfile.types import DotfileEntries, DotfileEntry, SSHKeypair
 from ai.backend.manager.data.session.draft import (
     SessionIdentityDraft,
     SessionResourceSpecDraft,
@@ -124,6 +124,21 @@ async def second_access_key(
     return key
 
 
+@pytest.fixture
+async def access_key_holding_only_a_public_key(
+    db_with_cleanup: ExtendedAsyncSAEngine,
+    dotfile_scope: UserScope,
+    test_access_key: AccessKey,
+) -> AccessKey:
+    async with db_with_cleanup.begin_session() as session:
+        await session.execute(
+            sa.update(KeyPairRow)
+            .where(KeyPairRow.access_key == test_access_key)
+            .values(ssh_private_key=None)
+        )
+    return test_access_key
+
+
 class TestFetchDotfiles:
     @pytest.mark.parametrize("has_default", [True, False])
     @pytest.mark.parametrize("key_kind", ["default", "non_default", "none"])
@@ -184,6 +199,19 @@ class TestFetchDotfiles:
         assert result.ssh_keypair is not None
         assert result.ssh_keypair.public_key == "public"
         assert result.ssh_keypair.private_key == "private"
+
+    async def test_passes_a_public_key_stored_without_a_private_key(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        dotfile_scope: UserScope,
+        access_key_holding_only_a_public_key: AccessKey,
+    ) -> None:
+        source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        async with db_with_cleanup.begin_readonly_session() as session:
+            result = await source._fetch_dotfile_data(
+                session, dotfile_scope, access_key_holding_only_a_public_key
+            )
+        assert result.ssh_keypair == SSHKeypair(public_key="public", private_key="")
 
     @pytest.mark.parametrize(
         "path", ["/etc/stored", "/home/config/kconfig.dat", "../config/x", "kconfig.dat"]

@@ -37,7 +37,7 @@ from ai.backend.common.plugin.hook import (
     REJECTED,
     HookPluginContext,
 )
-from ai.backend.common.types import AccessKey, SecretKey, SSHPrivateKey, SSHPublicKey
+from ai.backend.common.types import AccessKey, SecretKey
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import AuthConfig
@@ -52,6 +52,7 @@ from ai.backend.manager.errors.auth import (
     GroupMembershipNotFoundError,
     LoginRejectedByHook,
     PasswordExpired,
+    PasswordMismatch,
     PasswordNotExpired,
     TooManyConcurrentLoginSessions,
 )
@@ -269,7 +270,15 @@ class AuthService:
             raise InvalidAPIParameters("Unsupported authorization type")
         auth_config = self._config_provider.config.auth
         login_client_type_id = action.client_type_id
-        user, active_sessions = await self._verify_user(action, auth_config, login_client_type_id)
+        try:
+            user, active_sessions = await self._verify_user(
+                action, auth_config, login_client_type_id
+            )
+        except PasswordMismatch as e:
+            await self._record_login_failure(
+                e.user_id, action.domain_name, LoginAttemptResult.FAILED_INVALID_CREDENTIALS
+            )
+            raise
 
         try:
             post_result = await self._post_check(action, user, active_sessions, auth_config)
@@ -714,16 +723,6 @@ class AuthService:
     async def update_password(self, action: UpdatePasswordAction) -> UpdatePasswordActionResult:
         domain_name = action.domain_name
         email = action.email
-        if action.new_password != action.new_password_confirm:
-            log.trace(
-                "password update rejected, new password mismatch",
-                domain_name=domain_name,
-                user_email=email,
-            )
-            return UpdatePasswordActionResult(
-                success=False,
-                message="new password mismatch",
-            )
         auth_config = self._config_provider.config.auth
         try:
             credential = await self._auth_repository.check_credential_without_migration(
@@ -849,18 +848,10 @@ class AuthService:
     async def upload_ssh_keypair(
         self, action: UploadSSHKeypairAction
     ) -> UploadSSHKeypairActionResult:
-        privkey = action.private_key
-        pubkey = action.public_key
-        self._ssh_key_validator.validate(SSHPrivateKey(privkey), SSHPublicKey(pubkey))
+        self._ssh_key_validator.validate(action.public_key)
 
-        await self._auth_repository.update_ssh_keypair(action.access_key, pubkey, privkey)
-
-        return UploadSSHKeypairActionResult(
-            ssh_keypair=SSHKeypair(
-                ssh_public_key=pubkey,
-                ssh_private_key=privkey,
-            ),
-        )
+        await self._auth_repository.update_ssh_public_key(action.access_key, action.public_key)
+        return UploadSSHKeypairActionResult(public_key=action.public_key)
 
     async def resolve_access_key_scope(
         self, action: PublicResolveAccessKeyScopeAction

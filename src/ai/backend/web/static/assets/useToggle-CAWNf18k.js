@@ -1,0 +1,1 @@
+import{a as e}from"./rolldown-runtime-BWaJ3C7D.js";import{Zn as t}from"./icons-Btg1s2wy.js";var n=e(t(),1);function r(e=!1,t){let[r,i]=(0,n.useState)(e),[a]=(0,n.useState)(()=>{let n=t===void 0?!e:t;return{toggle:()=>i(t=>t===e?n:e),set:e=>i(()=>e),setLeft:()=>i(()=>e),setRight:()=>i(()=>n)}});return[r,a]}export{r as t};

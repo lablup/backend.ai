@@ -1,0 +1,1 @@
+import{a as e}from"./rolldown-runtime-BWaJ3C7D.js";import{Zn as t}from"./icons-Btg1s2wy.js";import{i as n}from"./FieldStatus-B8nLKvfH.js";var r=e(t(),1);function i({isRequired:e=!1,isOptional:t=!1}){let{defaultOptionality:i}=(0,r.use)(n);return!t&&(e||i===`required`)}export{i as t};

@@ -17,11 +17,12 @@ _LOG_LEVELS = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "NOTSET"]
 @click.pass_context
 def main(
     _ctx: click.Context,
-    _log_level: str,
+    log_level: str,
 ) -> None:
     """
     Backend.AI Account Manager CLI
     """
+    _ = log_level
     setproctitle("backend.ai: account-manager.cli")
 
 
@@ -30,7 +31,7 @@ def main(
     "--output",
     "-o",
     default=None,
-    type=click.Path(dir_okay=False, writable=True),
+    type=click.Path(dir_okay=False, writable=True, path_type=Path),
     help="Output file path (default: stdout)",
 )
 def generate_example_configuration(output: Path | None) -> None:
