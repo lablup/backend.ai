@@ -5,6 +5,7 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, TypeVar, cast
 from uuid import UUID
+from warnings import deprecated
 
 import aiohttp
 import janus
@@ -271,6 +272,10 @@ class VFolderByName(BaseFunction):
             return {}
 
     @api_function
+    @deprecated(
+        "Deprecated since 26.9.9. A name does not resolve to a "
+        "`delete-complete` folder; use `V2VFolderClient.purge()` with the vfolder ID."
+    )
     async def purge(self) -> Mapping[str, Any]:
         await self.update_id_by_name()
         rqst = Request("POST", "/folders/purge")
