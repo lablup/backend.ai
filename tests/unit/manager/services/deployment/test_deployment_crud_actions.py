@@ -46,6 +46,7 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.errors.deployment import DesignatedAgentOutsideResourceGroup
 from ai.backend.manager.models.endpoint.updaters import DeploymentUpdater
 from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.services.deployment.actions.create_deployment import (
@@ -98,6 +99,10 @@ class DeploymentCRUDBaseFixtures:
         return MagicMock(spec=DeploymentRepository)
 
     @pytest.fixture
+    def mock_agent_repository(self) -> MagicMock:
+        return MagicMock(spec=AgentRepository)
+
+    @pytest.fixture
     def mock_deployment_controller(self) -> MagicMock:
         return MagicMock(spec=DeploymentController)
 
@@ -110,11 +115,13 @@ class DeploymentCRUDBaseFixtures:
         self,
         mock_deployment_controller: MagicMock,
         mock_deployment_repository: MagicMock,
+        mock_agent_repository: MagicMock,
         mock_appproxy_client_pool: MagicMock,
     ) -> DeploymentService:
         return DeploymentService(
             deployment_controller=mock_deployment_controller,
             deployment_repository=mock_deployment_repository,
+            agent_repository=mock_agent_repository,
             appproxy_client_pool=mock_appproxy_client_pool,
         )
 
@@ -433,11 +440,12 @@ class TestDesignatedAgentsOnCreate(DeploymentCRUDBaseFixtures):
         self,
         deployment_service: DeploymentService,
         mock_deployment_repository: MagicMock,
+        mock_agent_repository: MagicMock,
         endpoint_info: DeploymentInfo,
         agent_uuid: AgentUUID,
         create_action: CreateDeploymentAction,
     ) -> None:
-        mock_deployment_repository.search_agents_in_resource_group = AsyncMock(
+        mock_agent_repository.search_agents_in_resource_group = AsyncMock(
             return_value=[_agent_in(endpoint_info.metadata.resource_group, agent_uuid)]
         )
 
@@ -452,9 +460,10 @@ class TestDesignatedAgentsOnCreate(DeploymentCRUDBaseFixtures):
         deployment_service: DeploymentService,
         mock_deployment_controller: MagicMock,
         mock_deployment_repository: MagicMock,
+        mock_agent_repository: MagicMock,
         create_action: CreateDeploymentAction,
     ) -> None:
-        mock_deployment_repository.search_agents_in_resource_group = AsyncMock(return_value=[])
+        mock_agent_repository.search_agents_in_resource_group = AsyncMock(return_value=[])
 
         with pytest.raises(DesignatedAgentOutsideResourceGroup) as raised:
             await deployment_service.create_deployment(create_action)
@@ -475,12 +484,13 @@ class TestDesignatedAgentsOnUpdate(DeploymentCRUDBaseFixtures):
         self,
         mock_deployment_controller: MagicMock,
         mock_deployment_repository: MagicMock,
+        mock_agent_repository: MagicMock,
         endpoint_info: DeploymentInfo,
     ) -> None:
         mock_deployment_controller.update_deployment = AsyncMock(return_value=endpoint_info)
         mock_deployment_repository.get_endpoint_info = AsyncMock(return_value=endpoint_info)
         mock_deployment_repository.set_designated_agents = AsyncMock()
-        mock_deployment_repository.search_agents_in_resource_group = AsyncMock(return_value=[])
+        mock_agent_repository.search_agents_in_resource_group = AsyncMock(return_value=[])
 
     def _update_action(
         self, endpoint_info: DeploymentInfo, designated_agents: frozenset[AgentUUID] | None
@@ -497,10 +507,11 @@ class TestDesignatedAgentsOnUpdate(DeploymentCRUDBaseFixtures):
         self,
         deployment_service: DeploymentService,
         mock_deployment_repository: MagicMock,
+        mock_agent_repository: MagicMock,
         endpoint_info: DeploymentInfo,
         agent_uuid: AgentUUID,
     ) -> None:
-        mock_deployment_repository.search_agents_in_resource_group = AsyncMock(
+        mock_agent_repository.search_agents_in_resource_group = AsyncMock(
             return_value=[_agent_in(endpoint_info.metadata.resource_group, agent_uuid)]
         )
 

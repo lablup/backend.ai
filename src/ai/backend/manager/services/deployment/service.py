@@ -59,6 +59,7 @@ from ai.backend.manager.models.endpoint.creators import EndpointTokenCreator
 from ai.backend.manager.models.endpoint.searchable_fields import DeploymentSearchableFields
 from ai.backend.manager.models.endpoint.searchers import DeploymentIDSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.repositories.deployment_revision_preset.repository import (
     DeploymentPresetRepository,
@@ -312,6 +313,7 @@ class DeploymentService:
 
     _deployment_controller: DeploymentController
     _deployment_repository: DeploymentRepository
+    _agent_repository: AgentRepository
     _appproxy_client_pool: AppProxyClientPool
     _deployment_revision_preset_repository: DeploymentPresetRepository | None
     _runtime_variant_preset_repository: RuntimeVariantPresetRepository | None
@@ -320,6 +322,7 @@ class DeploymentService:
         self,
         deployment_controller: DeploymentController,
         deployment_repository: DeploymentRepository,
+        agent_repository: AgentRepository,
         appproxy_client_pool: AppProxyClientPool,
         deployment_revision_preset_repository: DeploymentPresetRepository | None = None,
         runtime_variant_preset_repository: RuntimeVariantPresetRepository | None = None,
@@ -327,6 +330,7 @@ class DeploymentService:
         """Initialize deployment service with controller and repository."""
         self._deployment_controller = deployment_controller
         self._deployment_repository = deployment_repository
+        self._agent_repository = agent_repository
         self._appproxy_client_pool = appproxy_client_pool
         self._deployment_revision_preset_repository = deployment_revision_preset_repository
         self._runtime_variant_preset_repository = runtime_variant_preset_repository
@@ -439,7 +443,7 @@ class DeploymentService:
         operation: ActionOperationType,
     ) -> None:
         """Refuse agents that do not belong to the deployment's resource group."""
-        agents = await self._deployment_repository.search_agents_in_resource_group(
+        agents = await self._agent_repository.search_agents_in_resource_group(
             resource_group_name,
             AgentSearcher(
                 pagination=NoPagination(),
