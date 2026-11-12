@@ -582,7 +582,9 @@ class TestAuthRepository:
         """Replacing the SSH public key leaves the stored private key as it was"""
         update_public_key = "ssh-rsa AAAAB3NzaC1yc2EUPDATED..."
 
-        await auth_repository.update_ssh_public_key(sample_user_data.access_key, update_public_key)
+        await auth_repository.update_ssh_public_key(
+            AccessKey(sample_user_data.access_key), update_public_key
+        )
 
         async with db_with_cleanup.begin_session() as db_sess:
             keypair = await db_sess.scalar(

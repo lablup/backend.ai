@@ -11,6 +11,7 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.resilience import Resilience
+from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.auth.login_session_types import LoginAttemptResult
 from ai.backend.manager.data.auth.types import (
     GroupMembershipData,
@@ -107,7 +108,7 @@ class AuthRepository:
         await self._db_source.modify_ssh_keypair(access_key, public_key, private_key)
 
     @auth_repository_resilience.apply()
-    async def update_ssh_public_key(self, access_key: str, public_key: str) -> None:
+    async def update_ssh_public_key(self, access_key: AccessKey, public_key: str) -> None:
         await self._db_source.modify_ssh_public_key(access_key, public_key)
 
     @auth_repository_resilience.apply()

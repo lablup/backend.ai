@@ -1142,7 +1142,7 @@ class UserDBSource:
 
     async def admin_update_ssh_public_key(
         self,
-        access_key: str,
+        access_key: AccessKey,
         ssh_public_key: str,
     ) -> None:
         """Admin registers (overwrites) a user's SSH public key."""

@@ -10,7 +10,7 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import AccessKey, ResourceSlot
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.keypair.row import KeyPairRow
@@ -37,7 +37,7 @@ from ai.backend.testutils.db import with_tables
 
 @dataclass(frozen=True)
 class _KeypairWithSSHKeys:
-    access_key: str
+    access_key: AccessKey
     ssh_private_key: str
 
 
@@ -79,7 +79,7 @@ class TestAdminUpdateSSHPublicKey:
         domain_name = f"domain-{domain_id.hex[:8]}"
         user_policy_name = f"user-policy-{user_id.hex[:8]}"
         keypair_policy_name = f"keypair-policy-{user_id.hex[:8]}"
-        access_key = f"AKIATEST{user_id.hex[:10]}"
+        access_key = AccessKey(f"AKIATEST{user_id.hex[:10]}")
         ssh_private_key = "-----BEGIN RSA PRIVATE KEY-----\nSTORED\n-----END RSA PRIVATE KEY-----"
         async with db.begin_session() as session:
             session.add(

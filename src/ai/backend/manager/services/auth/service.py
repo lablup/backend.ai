@@ -818,7 +818,9 @@ class AuthService:
     async def upload_ssh_keypair(
         self, action: UploadSSHKeypairAction
     ) -> UploadSSHKeypairActionResult:
-        await self._auth_repository.update_ssh_public_key(action.access_key, action.public_key)
+        await self._auth_repository.update_ssh_public_key(
+            AccessKey(action.access_key), action.public_key
+        )
         return UploadSSHKeypairActionResult(public_key=action.public_key)
 
     async def resolve_access_key_scope(

@@ -8,7 +8,7 @@ from ai.backend.common.data.entity.bootstrap_script import BootstrapScript
 from ai.backend.common.dotfile import DotfilePath
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.exception import BackendAIError
-from ai.backend.common.types import SessionId
+from ai.backend.common.types import AccessKey, SessionId
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.dotfile.types import MAXIMUM_DOTFILE_COUNT
@@ -348,7 +348,7 @@ class UserService:
     ) -> AdminRegisterSSHKeypairActionResult:
         """Admin registers (overwrites) a user's SSH public key."""
         await self._user_repository.admin_update_ssh_public_key(
-            access_key=action.access_key,
+            access_key=AccessKey(action.access_key),
             ssh_public_key=action.ssh_public_key,
         )
         return AdminRegisterSSHKeypairActionResult(access_key=action.access_key)

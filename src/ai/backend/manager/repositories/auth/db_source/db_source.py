@@ -24,6 +24,7 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
+from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.auth.login_session_types import (
     LoginAttemptResult,
     LoginSessionStatus,
@@ -271,7 +272,7 @@ class AuthDBSource:
             await conn.execute(query)
 
     @auth_db_source_resilience.apply()
-    async def modify_ssh_public_key(self, access_key: str, public_key: str) -> None:
+    async def modify_ssh_public_key(self, access_key: AccessKey, public_key: str) -> None:
         """Modify the SSH public key for an access key in database."""
         async with self._db.begin() as conn:
             query = (
