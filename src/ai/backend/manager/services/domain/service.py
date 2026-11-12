@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 
-from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.dotfile import DotfilePath
 from ai.backend.logging.structured import StructuredLogger
@@ -11,10 +10,6 @@ from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.dotfile.types import DotfileEntries
 from ai.backend.manager.models.domain.updaters import DomainDotfilesUpdater
 from ai.backend.manager.repositories.domain.repository import DomainRepository
-from ai.backend.manager.services.domain.actions.create_container_registry_relations import (
-    CreateDomainContainerRegistryRelationsAction,
-    CreateDomainContainerRegistryRelationsActionResult,
-)
 from ai.backend.manager.services.domain.actions.create_domain import CreateDomainAction
 from ai.backend.manager.services.domain.actions.create_domain_dotfile import (
     CreateDomainDotfileAction,
@@ -24,10 +19,6 @@ from ai.backend.manager.services.domain.actions.delete_domain_dotfile import (
     DeleteDomainDotfileAction,
     DeleteDomainDotfileActionResult,
 )
-from ai.backend.manager.services.domain.actions.purge_container_registry_relations import (
-    PurgeDomainContainerRegistryRelationsAction,
-    PurgeDomainContainerRegistryRelationsActionResult,
-)
 from ai.backend.manager.services.domain.actions.purge_domain import (
     PurgeDomainAction,
     PurgeDomainActionResult,
@@ -36,14 +27,13 @@ from ai.backend.manager.services.domain.actions.search_container_registry_relati
     SearchDomainContainerRegistryRelationsAction,
     SearchDomainContainerRegistryRelationsActionResult,
 )
+from ai.backend.manager.services.domain.actions.update_container_registry_relations import (
+    UpdateDomainContainerRegistryRelationsAction,
+    UpdateDomainContainerRegistryRelationsActionResult,
+)
 from ai.backend.manager.services.domain.actions.update_domain_dotfile import (
     UpdateDomainDotfileAction,
     UpdateDomainDotfileActionResult,
-)
-from ai.backend.manager.services.rbac.actions.relation.base import (
-    RelationLinkResult,
-    RelationPair,
-    RelationUnlinkResult,
 )
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
@@ -62,29 +52,15 @@ class DomainService:
             data=await self._repository.create_domain(action.to_creator())
         )
 
-    async def create_container_registry_relations(
-        self, action: CreateDomainContainerRegistryRelationsAction
-    ) -> CreateDomainContainerRegistryRelationsActionResult:
-        written = await self._repository.create_container_registry_relations([
-            (action.domain_id, registry_id) for registry_id in action.registry_ids
-        ])
-        results: list[RelationLinkResult[DomainID, ContainerRegistryID]] = []
-        for registry_id, linked in zip(action.registry_ids, written, strict=True):
-            pair = RelationPair(scope=action.domain_id, target=registry_id)
-            results.append(RelationLinkResult(pair=pair, linked=linked))
-        return CreateDomainContainerRegistryRelationsActionResult(results=results)
-
-    async def purge_container_registry_relations(
-        self, action: PurgeDomainContainerRegistryRelationsAction
-    ) -> PurgeDomainContainerRegistryRelationsActionResult:
-        purged = await self._repository.purge_container_registry_relations([
-            (action.domain_id, registry_id) for registry_id in action.registry_ids
-        ])
-        results: list[RelationUnlinkResult[DomainID, ContainerRegistryID]] = []
-        for registry_id, was_linked in zip(action.registry_ids, purged, strict=True):
-            pair = RelationPair(scope=action.domain_id, target=registry_id)
-            results.append(RelationUnlinkResult(pair=pair, unlinked=was_linked))
-        return PurgeDomainContainerRegistryRelationsActionResult(results=results)
+    async def update_container_registry_relations(
+        self, action: UpdateDomainContainerRegistryRelationsAction
+    ) -> UpdateDomainContainerRegistryRelationsActionResult:
+        change = await self._repository.update_container_registry_relations(
+            action.domain_id, action.registry_ids
+        )
+        return UpdateDomainContainerRegistryRelationsActionResult(
+            linked=change.linked, unlinked=change.unlinked
+        )
 
     async def search_container_registry_relations(
         self, action: SearchDomainContainerRegistryRelationsAction

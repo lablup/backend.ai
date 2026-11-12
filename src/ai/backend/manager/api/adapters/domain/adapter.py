@@ -79,9 +79,6 @@ from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearc
 from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
 from ai.backend.manager.services.domain.actions.bulk_get import BulkGetDomainsAction
 from ai.backend.manager.services.domain.actions.bulk_lookup import BulkLookupDomainsAction
-from ai.backend.manager.services.domain.actions.create_container_registry_relations import (
-    CreateDomainContainerRegistryRelationsAction,
-)
 from ai.backend.manager.services.domain.actions.create_domain import CreateDomainAction
 from ai.backend.manager.services.domain.actions.delete_domain import DeleteDomainAction
 from ai.backend.manager.services.domain.actions.get import GetDomainAction
@@ -95,9 +92,6 @@ from ai.backend.manager.services.domain.actions.partial_bulk_restore_domains imp
 from ai.backend.manager.services.domain.actions.partial_bulk_update_domains import (
     PartialBulkUpdateDomainsAction,
 )
-from ai.backend.manager.services.domain.actions.purge_container_registry_relations import (
-    PurgeDomainContainerRegistryRelationsAction,
-)
 from ai.backend.manager.services.domain.actions.purge_domain import PurgeDomainAction
 from ai.backend.manager.services.domain.actions.restore_domain import RestoreDomainAction
 from ai.backend.manager.services.domain.actions.scoped_search import (
@@ -107,6 +101,9 @@ from ai.backend.manager.services.domain.actions.search_container_registry_relati
     SearchDomainContainerRegistryRelationsAction,
 )
 from ai.backend.manager.services.domain.actions.search_domains import GlobalSearchDomainsAction
+from ai.backend.manager.services.domain.actions.update_container_registry_relations import (
+    UpdateDomainContainerRegistryRelationsAction,
+)
 from ai.backend.manager.services.domain.actions.update_domain import UpdateDomainAction
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.types import OptionalState, TriState
@@ -334,21 +331,15 @@ class DomainAdapter(BaseAdapter):
         self, domain_id: DomainID, registry_ids: Sequence[ContainerRegistryID]
     ) -> None:
         """Link the domain to every given registry and unlink it from the rest."""
-        linked: list[ContainerRegistryID] = []
-        for relation in await self._search_registry_relations(domain_id):
-            linked.append(relation.container_registry_id)
-        to_link: list[ContainerRegistryID] = []
-        for registry_id in registry_ids:
-            if registry_id in linked:
-                continue
-            to_link.append(registry_id)
-        to_unlink: list[ContainerRegistryID] = []
-        for registry_id in linked:
-            if registry_id in registry_ids:
-                continue
-            to_unlink.append(registry_id)
-        await self._create_registry_relations(domain_id, to_link)
-        await self._purge_registry_relations(domain_id, to_unlink)
+        linked = [
+            relation.container_registry_id
+            for relation in await self._search_registry_relations(domain_id)
+        ]
+        await self._domain.update_container_registry_relations.run(
+            UpdateDomainContainerRegistryRelationsAction(
+                domain_id=domain_id, registry_ids=registry_ids, linked_registry_ids=linked
+            )
+        )
 
     async def _search_registry_relations(
         self, domain_id: DomainID
@@ -361,30 +352,6 @@ class DomainAdapter(BaseAdapter):
             )
         )
         return result.items
-
-    async def _create_registry_relations(
-        self, domain_id: DomainID, registry_ids: Sequence[ContainerRegistryID]
-    ) -> None:
-        """Link the domain to each registry; a registry already linked is left as it stands."""
-        if not registry_ids:
-            return
-        await self._domain.create_container_registry_relations.run(
-            CreateDomainContainerRegistryRelationsAction(
-                domain_id=domain_id, registry_ids=registry_ids
-            )
-        )
-
-    async def _purge_registry_relations(
-        self, domain_id: DomainID, registry_ids: Sequence[ContainerRegistryID]
-    ) -> None:
-        """Unlink the domain from each registry; a registry not linked is skipped."""
-        if not registry_ids:
-            return
-        await self._domain.purge_container_registry_relations.run(
-            PurgeDomainContainerRegistryRelationsAction(
-                domain_id=domain_id, registry_ids=registry_ids
-            )
-        )
 
     async def _apply_deprecated_is_active(
         self, data: DomainData, is_active: bool | None | Unset

@@ -17,11 +17,10 @@
   - restore: 대표 성공 ✓ · 대표 거부 ✓
   - scoped_search: 대표 성공 ✓ · 대표 거부 ✓
   - update: 대표 성공 ✓ · 대표 거부 ✓
-- ops + 직접 구현 (1)
-  - sync_registry_relations: 성공 있음 3 · 거부 있음 1 (global_searcher_ops, relation, scope)
-- 직접 구현 (2)
+- 직접 구현 (3)
   - create: 성공 있음 2 · 거부 있음 4 (global_scope)
   - purge: 성공 있음 1 · 거부 있음 4 (single_entity)
+  - sync_registry_relations: 성공 있음 2 · 거부 있음 1 (relation, scope)
 
 **bulk_get_ids**
 
@@ -123,15 +122,6 @@
 | [아무 권한도 받지 않은 사용자가 도메인을 수정하려 하면 권한 부족으로 거부됩니다](#editing-a-user-granted-nothing-may-not-edit-a-domain) | 거부 |
 | [아무 도메인도 갖지 않은 이름을 수정하려 하면 대상이 없다는 것으로 거부됩니다](#editing-editing-a-name-nothing-answers-to-is-not-found) | 거부 |
 
-**sync_registry_relations**
-
-| 시나리오 | 판정 |
-|---|---|
-| [어떤 레지스트리와도 맞지 않는 이름으로 맞추면 오류 없이 relation 이 생기지 않습니다 (이름으로 레지스트리를 찾는 일은 전역 역할로 막혀 있어 슈퍼관리자가 호출합니다)](#syncing_registry_relations-a-name-no-registry-carries-links-nothing) | 성공 |
-| [relation 이 있는 레지스트리를 빼고 빈 목록으로 맞추면 그 relation 이 지워집니다 (이름으로 레지스트리를 찾는 일은 전역 역할로 막혀 있어 슈퍼관리자가 호출합니다)](#syncing_registry_relations-leaving-a-linked-registry-out-unlinks-it) | 성공 |
-| [슈퍼관리자가 레지스트리의 이름으로 맞추면 도메인과 그 레지스트리 사이에 relation 이 생깁니다 (이름으로 레지스트리를 찾는 일은 전역 역할로 막혀 있어 슈퍼관리자가 호출합니다)](#syncing_registry_relations-naming-a-registry-links-the-domain-to-it) | 성공 |
-| [슈퍼관리자가 아닌 사용자가 relation 을 맞추려 하면 거부됩니다. 이름으로 레지스트리를 찾는 일은 슈퍼관리자 역할이 있어야만 실행됩니다](#syncing_registry_relations-a-user-granted-nothing-may-not-sync-registry-relations) | 거부 |
-
 **create**
 
 | 시나리오 | 판정 |
@@ -152,6 +142,14 @@
 | [사용자가 딸린 도메인은 superadmin 이라도 purge 할 수 없습니다](#deleting-a-domain-holding-a-user-is-not-purged) | 거부 |
 | [아무 권한도 받지 않은 사용자는 아무것도 딸리지 않은 도메인이라도 purge 할 수 없습니다](#deleting-a-user-granted-nothing-may-not-purge-a-domain) | 거부 |
 | [아무 도메인도 갖지 않은 이름을 purge 하려 하면 대상이 없다는 것으로 거부됩니다](#deleting-purging-a-name-nothing-answers-to-is-not-found) | 거부 |
+
+**sync_registry_relations**
+
+| 시나리오 | 판정 |
+|---|---|
+| [슈퍼관리자가 레지스트리를 넘겨 맞추면 도메인과 그 레지스트리 사이에 relation 이 생깁니다](#syncing_registry_relations-giving-a-registry-links-the-domain-to-it) | 성공 |
+| [relation 이 있는 레지스트리를 빼고 빈 목록으로 맞추면 그 relation 이 지워집니다](#syncing_registry_relations-leaving-a-linked-registry-out-unlinks-it) | 성공 |
+| [도메인에 아무 권한이 없는 사용자가 relation 을 맞추려 하면 거부됩니다](#syncing_registry_relations-a-user-granted-nothing-may-not-sync-registry-relations) | 거부 |
 
 ### bulk_get_ids
 
@@ -1488,113 +1486,6 @@ Then
 - 거부됩니다
   - 거부: EntityNotFoundError
 
-### sync_registry_relations
-
-<a id="syncing_registry_relations-a-name-no-registry-carries-links-nothing"></a>
-
-#### [a-name-no-registry-carries-links-nothing](/tests/scenario/bai_scenario/manager/domain/test_syncing_registry_relations.py): pass
-
-어떤 레지스트리와도 맞지 않는 이름으로 맞추면 오류 없이 relation 이 생기지 않습니다 (이름으로 레지스트리를 찾는 일은 전역 역할로 막혀 있어 슈퍼관리자가 호출합니다)
-
-Given
-
-- 도메인 하나와 레지스트리 하나, 그 도메인에 속한 superadmin 한 명이 있습니다
-  - 도메인 allowing-1
-  - 컨테이너 레지스트리 allowed-1: 이미지를 가져오는 곳
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-
-When
-
-- DomainAdapter.sync_registry_relations: user-1이 allowing-1의 relation 을 어떤 레지스트리와도 맞지 않는 이름에 맞춥니다
-
-Then
-
-- 반환값이 없고 예외도 발생하지 않습니다
-  - response = None
-
-<a id="syncing_registry_relations-leaving-a-linked-registry-out-unlinks-it"></a>
-
-#### [leaving-a-linked-registry-out-unlinks-it](/tests/scenario/bai_scenario/manager/domain/test_syncing_registry_relations.py): pass
-
-relation 이 있는 레지스트리를 빼고 빈 목록으로 맞추면 그 relation 이 지워집니다 (이름으로 레지스트리를 찾는 일은 전역 역할로 막혀 있어 슈퍼관리자가 호출합니다)
-
-Given
-
-- 도메인 하나와 레지스트리 하나, 둘 사이에 relation 이 이미 있고, 그 도메인에 속한 superadmin 한 명이 있습니다
-  - 도메인 allowing-1
-  - 컨테이너 레지스트리 allowed-1: 이미지를 가져오는 곳
-  - 도메인 allowing-1 가 허용한 컨테이너 레지스트리 allowed-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-
-When
-
-- DomainAdapter.sync_registry_relations: user-1이 allowing-1의 relation 을 빈 목록에 맞춥니다
-
-Then
-
-- 반환값이 없고 예외도 발생하지 않습니다
-  - response = None
-
-<a id="syncing_registry_relations-naming-a-registry-links-the-domain-to-it"></a>
-
-#### [naming-a-registry-links-the-domain-to-it](/tests/scenario/bai_scenario/manager/domain/test_syncing_registry_relations.py): pass
-
-슈퍼관리자가 레지스트리의 이름으로 맞추면 도메인과 그 레지스트리 사이에 relation 이 생깁니다 (이름으로 레지스트리를 찾는 일은 전역 역할로 막혀 있어 슈퍼관리자가 호출합니다)
-
-Given
-
-- 도메인 하나와 레지스트리 하나, 그 도메인에 속한 superadmin 한 명이 있습니다
-  - 도메인 allowing-1
-  - 컨테이너 레지스트리 allowed-1: 이미지를 가져오는 곳
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-
-When
-
-- DomainAdapter.sync_registry_relations: user-1이 allowing-1의 relation 을 그 레지스트리의 이름에 맞춥니다
-
-Then
-
-- 반환값이 없고 예외도 발생하지 않습니다
-  - response = None
-
-<a id="syncing_registry_relations-a-user-granted-nothing-may-not-sync-registry-relations"></a>
-
-#### [a-user-granted-nothing-may-not-sync-registry-relations](/tests/scenario/bai_scenario/manager/domain/test_syncing_registry_relations.py): pass
-
-슈퍼관리자가 아닌 사용자가 relation 을 맞추려 하면 거부됩니다. 이름으로 레지스트리를 찾는 일은 슈퍼관리자 역할이 있어야만 실행됩니다
-
-Given
-
-- 도메인 하나와 레지스트리 하나, 그 도메인에 속한 user 한 명이 있습니다
-  - 도메인 allowing-1
-  - 컨테이너 레지스트리 allowed-1: 이미지를 가져오는 곳
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-
-When
-
-- DomainAdapter.sync_registry_relations: user-1이 allowing-1의 relation 을 그 레지스트리의 이름에 맞춥니다
-
-Then
-
-- 거부됩니다
-  - 거부: InsufficientPrivilege
-
 ### create
 
 <a id="creating-creating-a-domain-also-creates-its-model-store-project"></a>
@@ -1898,4 +1789,85 @@ Then
 
 - 거부됩니다
   - 거부: EntityNotFoundError
+
+### sync_registry_relations
+
+<a id="syncing_registry_relations-giving-a-registry-links-the-domain-to-it"></a>
+
+#### [giving-a-registry-links-the-domain-to-it](/tests/scenario/bai_scenario/manager/domain/test_syncing_registry_relations.py): pass
+
+슈퍼관리자가 레지스트리를 넘겨 맞추면 도메인과 그 레지스트리 사이에 relation 이 생깁니다
+
+Given
+
+- 도메인 하나와 레지스트리 하나, 그 도메인에 속한 superadmin 한 명이 있습니다
+  - 도메인 allowing-1
+  - 컨테이너 레지스트리 allowed-1: 이미지를 가져오는 곳
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- DomainAdapter.sync_registry_relations: user-1이 allowing-1의 relation 을 그 레지스트리에 맞춥니다
+
+Then
+
+- 반환값이 없고 예외도 발생하지 않습니다
+  - response = None
+
+<a id="syncing_registry_relations-leaving-a-linked-registry-out-unlinks-it"></a>
+
+#### [leaving-a-linked-registry-out-unlinks-it](/tests/scenario/bai_scenario/manager/domain/test_syncing_registry_relations.py): pass
+
+relation 이 있는 레지스트리를 빼고 빈 목록으로 맞추면 그 relation 이 지워집니다
+
+Given
+
+- 도메인 하나와 레지스트리 하나, 둘 사이에 relation 이 이미 있고, 그 도메인에 속한 superadmin 한 명이 있습니다
+  - 도메인 allowing-1
+  - 컨테이너 레지스트리 allowed-1: 이미지를 가져오는 곳
+  - 도메인 allowing-1 가 허용한 컨테이너 레지스트리 allowed-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- DomainAdapter.sync_registry_relations: user-1이 allowing-1의 relation 을 빈 목록에 맞춥니다
+
+Then
+
+- 반환값이 없고 예외도 발생하지 않습니다
+  - response = None
+
+<a id="syncing_registry_relations-a-user-granted-nothing-may-not-sync-registry-relations"></a>
+
+#### [a-user-granted-nothing-may-not-sync-registry-relations](/tests/scenario/bai_scenario/manager/domain/test_syncing_registry_relations.py): pass
+
+도메인에 아무 권한이 없는 사용자가 relation 을 맞추려 하면 거부됩니다
+
+Given
+
+- 도메인 하나와 레지스트리 하나, 그 도메인에 속한 user 한 명이 있습니다
+  - 도메인 allowing-1
+  - 컨테이너 레지스트리 allowed-1: 이미지를 가져오는 곳
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- DomainAdapter.sync_registry_relations: user-1이 allowing-1의 relation 을 그 레지스트리에 맞춥니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
 

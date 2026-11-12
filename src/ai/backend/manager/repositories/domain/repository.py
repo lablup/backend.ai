@@ -28,9 +28,11 @@ from ai.backend.manager.models.domain_container_registry_relation.scopes import 
 from ai.backend.manager.models.domain_container_registry_relation.searchers import (
     DomainContainerRegistryRelationSearcher,
 )
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.domain.db_source.db_source import DomainDBSource
 from ai.backend.manager.repositories.ops.v2.domain.provider import DomainOpsProvider
+from ai.backend.manager.views.container_registry import DomainContainerRegistryRelationChange
 
 domain_repository_resilience = Resilience(
     policies=[
@@ -83,21 +85,28 @@ class DomainRepository:
             return data
 
     @domain_repository_resilience.apply()
-    async def create_container_registry_relations(
-        self, pairs: Sequence[tuple[DomainID, ContainerRegistryID]]
-    ) -> list[bool]:
-        """Link each domain to its registry. Answers per pair whether the link was written;
-        one already standing is left alone."""
+    async def update_container_registry_relations(
+        self, domain_id: DomainID, registry_ids: Sequence[ContainerRegistryID]
+    ) -> DomainContainerRegistryRelationChange:
+        """Set the domain's registries to ``registry_ids`` in one transaction. An unchanged
+        relation keeps its row."""
         async with self._v2_ops.write_ops() as w:
-            return await w.create_relations(DomainContainerRegistryRelationCreator(), pairs)
-
-    @domain_repository_resilience.apply()
-    async def purge_container_registry_relations(
-        self, pairs: Sequence[tuple[DomainID, ContainerRegistryID]]
-    ) -> list[bool]:
-        """Unlink each domain from its registry. Answers per pair whether it was linked."""
-        async with self._v2_ops.write_ops() as w:
-            return await w.purge_relations(DomainContainerRegistryRelationPurger(), pairs)
+            current = await w.search_with_scopes(
+                [DomainContainerRegistryRelationTarget(domain_id)],
+                DomainContainerRegistryRelationSearcher(pagination=NoPagination()),
+            )
+            linked = {item.container_registry_id for item in current.items}
+            to_unlink = [registry_id for registry_id in linked if registry_id not in registry_ids]
+            to_link = [registry_id for registry_id in registry_ids if registry_id not in linked]
+            await w.purge_relations(
+                DomainContainerRegistryRelationPurger(),
+                [(domain_id, registry_id) for registry_id in to_unlink],
+            )
+            await w.create_relations(
+                DomainContainerRegistryRelationCreator(),
+                [(domain_id, registry_id) for registry_id in to_link],
+            )
+        return DomainContainerRegistryRelationChange(linked=to_link, unlinked=to_unlink)
 
     @domain_repository_resilience.apply()
     async def search_container_registry_relations(
