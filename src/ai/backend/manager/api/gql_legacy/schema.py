@@ -3426,33 +3426,11 @@ class GQLExceptionMiddleware:
         return GraphQLError(message=e.error_title, extensions={"code": str(e.error_code())})
 
     def _wrap_backend_error(self, e: BackendAIError) -> GraphQLError:
-<<<<<<< HEAD
-        if e.status_code // 100 == 4:
-            log.debug("GraphQL client error: {}", e)
-        elif e.status_code // 100 == 5:
-            log.exception("GraphQL Server error: {}", e)
-        return GraphQLError(
-            message=str(e),
-            extensions={
-                "code": str(e.error_code()),
-            },
-        )
-
-    def _wrap_unexpected_error(self, e: BaseException) -> GraphQLError:
-        log.exception("GraphQL unexpected error: {}", e)
-        return GraphQLError(
-            message=str(e),
-            extensions={
-                "code": str(ErrorCode.default()),
-            },
-        )
-=======
         if e.is_client_error():
             log.trace("graphql client error", error_code=str(e.error_code()), error_message=str(e))
             return GraphQLError(message=str(e), extensions={"code": str(e.error_code())})
         log.exception("graphql server error", error_code=str(e.error_code()))
         return GraphQLError(message=e.error_title, extensions={"code": str(e.error_code())})
->>>>>>> f09541fb (fix(BA-8880): keep SQL and PostgreSQL diagnostics out of GQL error responses (#16463))
 
 
 class GQLMetricMiddleware:

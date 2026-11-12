@@ -17,15 +17,11 @@ from ai.backend.common.exception import (
     BackendAIError,
     BackendAISchemaValidationFailed,
 )
-<<<<<<< HEAD
-from ai.backend.logging.utils import BraceStyleAdapter
-=======
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.errors.repository import RepositoryIntegrityError
->>>>>>> f09541fb (fix(BA-8880): keep SQL and PostgreSQL diagnostics out of GQL error responses (#16463))
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 def _to_graphql_validation_error(e: ValidationError) -> GraphQLError:
@@ -54,18 +50,6 @@ class GQLExceptionHandlerExtension(SchemaExtension):
     ) -> AwaitableOrValue[object]:
         try:
             result: object = _next(root, info, *args, **kwargs)
-<<<<<<< HEAD
-        except BackendAIError as e:
-            if e.status_code // 100 == 4:
-                log.debug("GraphQL client error: {}", e)
-            elif e.status_code // 100 == 5:
-                log.exception("GraphQL server error: {}", e)
-            raise GraphQLError(
-                message=str(e),
-                extensions={"code": str(e.error_code())},
-            ) from e
-=======
->>>>>>> f09541fb (fix(BA-8880): keep SQL and PostgreSQL diagnostics out of GQL error responses (#16463))
         except ValidationError as e:
             log.debug("GraphQL input validation error: {}", e)
             raise _to_graphql_validation_error(e) from e
@@ -84,16 +68,8 @@ class GQLExceptionHandlerExtension(SchemaExtension):
                 log.exception("graphql server error", error_code=str(e.error_code()))
             raise self._wrap_backend_error(e) from e
         except Exception as e:
-<<<<<<< HEAD
-            log.exception("GraphQL unexpected error: {}", e)
-            raise GraphQLError(
-                message=str(e),
-                extensions={"code": str(ErrorCode.default())},
-            ) from e
-=======
             log.exception("graphql unexpected error")
             raise self._wrap_backend_error(InternalServerError()) from e
->>>>>>> f09541fb (fix(BA-8880): keep SQL and PostgreSQL diagnostics out of GQL error responses (#16463))
         if asyncio.iscoroutine(result):
             return self._handle_async(result)
         return result
@@ -101,18 +77,6 @@ class GQLExceptionHandlerExtension(SchemaExtension):
     async def _handle_async(self, coro: Awaitable[object]) -> object:
         try:
             return await coro
-<<<<<<< HEAD
-        except BackendAIError as e:
-            if e.status_code // 100 == 4:
-                log.debug("GraphQL client error: {}", e)
-            elif e.status_code // 100 == 5:
-                log.exception("GraphQL server error: {}", e)
-            raise GraphQLError(
-                message=str(e),
-                extensions={"code": str(e.error_code())},
-            ) from e
-=======
->>>>>>> f09541fb (fix(BA-8880): keep SQL and PostgreSQL diagnostics out of GQL error responses (#16463))
         except ValidationError as e:
             log.debug("GraphQL input validation error: {}", e)
             raise _to_graphql_validation_error(e) from e
@@ -131,13 +95,6 @@ class GQLExceptionHandlerExtension(SchemaExtension):
                 log.exception("graphql server error", error_code=str(e.error_code()))
             raise self._wrap_backend_error(e) from e
         except Exception as e:
-<<<<<<< HEAD
-            log.exception("GraphQL unexpected error: {}", e)
-            raise GraphQLError(
-                message=str(e),
-                extensions={"code": str(ErrorCode.default())},
-            ) from e
-=======
             log.exception("graphql unexpected error")
             raise self._wrap_backend_error(InternalServerError()) from e
 
@@ -202,4 +159,3 @@ class GQLExceptionHandlerExtension(SchemaExtension):
                 )
             result.errors = masked
         yield
->>>>>>> f09541fb (fix(BA-8880): keep SQL and PostgreSQL diagnostics out of GQL error responses (#16463))
