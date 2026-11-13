@@ -13,7 +13,7 @@
 - 직접 구현 (6)
   - admin_create: 성공 있음 2 · 거부 있음 2 (global_scope, relation)
   - admin_purge: 성공 있음 2 · 거부 있음 2 (global_scope)
-  - admin_update: 성공 있음 3 · 거부 있음 4 (global_scope, membership, relation)
+  - admin_update: 성공 있음 3 · 거부 있음 3 (global_scope, membership, relation)
   - apply_allowed_groups: 성공 있음 8 · 거부 있음 6 (relation)
   - apply_global: 성공 있음 2 · 거부 있음 3 (membership)
   - link_project_as_default: 성공 있음 1 · 거부 있음 3 (relation)
@@ -83,7 +83,6 @@
 | [superadmin 이 주소만 수정하면 주소만 새 값이 되고 나머지 필드는 그대로입니다](#editing-changing-only-the-address-leaves-every-other-field-alone) | 성공 |
 | [superadmin 이 컨테이너 레지스트리를 수정하며 프로젝트를 허용하면 그 관계가 생성됩니다](#editing-editing-a-registry-can-add-an-allowed-project) | 성공 |
 | [superadmin 이 아닌 사용자가 컨테이너 레지스트리를 수정하려 하면 권한 부족으로 거부됩니다. 이 호출은 호출자가 superadmin 인지만 검사하고 부여된 권한은 보지 않습니다](#editing-a-user-who-is-not-the-superadmin-may-not-edit-a-registry) | 거부 |
-| [superadmin 이 호스트가 없는 주소로 수정하려 하면, 수정 후의 row 를 검사하는 단계에서 주소 형식 에러로 거부됩니다](#editing-an-address-whose-host-is-empty-is-refused-on-update) | 거부 |
 | [존재하지 않는 id 를 수정하려 하면 대상을 찾을 수 없어 거부됩니다](#editing-editing-an-id-that-holds-no-registry-is-refused) | 거부 |
 | [프로젝트가 비어 있는 컨테이너 레지스트리를 harbor 종류로 수정하려 하면, harbor 는 프로젝트를 요구하므로 거부됩니다](#editing-turning-a-registry-into-harbor-without-a-project-is-refused) | 거부 |
 
@@ -988,32 +987,6 @@ Then
 
 - 거부됩니다
   - 거부: InsufficientPrivilege
-
-<a id="editing-an-address-whose-host-is-empty-is-refused-on-update"></a>
-
-#### [an-address-whose-host-is-empty-is-refused-on-update](/tests/scenario/bai_scenario/manager/container_registry/test_editing.py): pass
-
-superadmin 이 호스트가 없는 주소로 수정하려 하면, 수정 후의 row 를 검사하는 단계에서 주소 형식 에러로 거부됩니다
-
-Given
-
-- 레지스트리 하나, superadmin 한 명
-  - 도메인 home-1
-  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-
-When
-
-- ContainerRegistryAdapter.admin_update: user-1이 주소를 http://로 수정합니다
-
-Then
-
-- 거부됩니다
-  - 거부: InvalidContainerRegistryURL
 
 <a id="editing-editing-an-id-that-holds-no-registry-is-refused"></a>
 

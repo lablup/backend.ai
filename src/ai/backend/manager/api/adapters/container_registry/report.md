@@ -13,7 +13,7 @@ Scenario: complete
 - direct implementation (6)
   - admin_create: success present 2 · rejection present 2 (global_scope, relation)
   - admin_purge: success present 2 · rejection present 2 (global_scope)
-  - admin_update: success present 3 · rejection present 4 (global_scope, membership, relation)
+  - admin_update: success present 3 · rejection present 3 (global_scope, membership, relation)
   - apply_allowed_groups: success present 8 · rejection present 6 (relation)
   - apply_global: success present 2 · rejection present 3 (membership)
   - link_project_as_default: success present 1 · rejection present 3 (relation)
@@ -83,7 +83,6 @@ Scenario: complete
 | [when the superadmin changes only the address, only the address takes the new value and every other field stays as it is](#editing-changing-only-the-address-leaves-every-other-field-alone) | answered |
 | [when the superadmin updates a container registry and allows a project, that relation is created](#editing-editing-a-registry-can-add-an-allowed-project) | answered |
 | [when a user who is not the superadmin tries to edit a container registry, it is rejected for lack of permission. This call checks only whether the caller is the superadmin and does not look at the permissions granted](#editing-a-user-who-is-not-the-superadmin-may-not-edit-a-registry) | rejected |
-| [when the superadmin tries to change the address to one without a host, the step that validates the updated row rejects it as a malformed address](#editing-an-address-whose-host-is-empty-is-refused-on-update) | rejected |
 | [when an id that does not exist is updated, it is rejected because the target cannot be found](#editing-editing-an-id-that-holds-no-registry-is-refused) | rejected |
 | [when a container registry with an empty project is changed to the harbor type, it is rejected because harbor requires a project](#editing-turning-a-registry-into-harbor-without-a-project-is-refused) | rejected |
 
@@ -988,32 +987,6 @@ Then
 
 - the call is rejected
   - rejected: InsufficientPrivilege
-
-<a id="editing-an-address-whose-host-is-empty-is-refused-on-update"></a>
-
-#### [an-address-whose-host-is-empty-is-refused-on-update](/tests/scenario/bai_scenario/manager/container_registry/test_editing.py): pass
-
-when the superadmin tries to change the address to one without a host, the step that validates the updated row rejects it as a malformed address
-
-Given
-
-- one registry, and one superadmin
-  - Domain home-1
-  - Container registry host-1: image source
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
-
-When
-
-- ContainerRegistryAdapter.admin_update: user-1 changes the address to http://
-
-Then
-
-- the call is rejected
-  - rejected: InvalidContainerRegistryURL
 
 <a id="editing-editing-an-id-that-holds-no-registry-is-refused"></a>
 
