@@ -1,6 +1,7 @@
 import sys
 import textwrap
 from collections import defaultdict
+from collections.abc import Sequence
 from typing import Any, Union, get_args, get_origin, get_type_hints
 
 from aiohttp import web
@@ -132,7 +133,7 @@ def generate_openapi(
             route_def["description"] = "\n".join(description)
             type_hints = get_type_hints(route.handler)
 
-            def _parse_schema(model_cls: type[BackendAISchema]) -> dict[str, Any]:
+            def _register_model_schema(model_cls: type[BackendAISchema]) -> dict[str, Any]:
                 if not issubclass(model_cls, BaseModel):
                     raise RuntimeError(f"{model_cls} not considered as a valid response type")
 
@@ -144,13 +145,20 @@ def generate_openapi(
                 if additional_definitions := response_schema.pop("$defs", None):
                     openapi["components"]["schemas"].update(additional_definitions)
                 openapi["components"]["schemas"][schema_name] = response_schema
+                return {"$ref": f"#/components/schemas/{schema_name}"}
+
+            def _build_json_response_def(response_type: Any) -> dict[str, Any]:
+                schema: dict[str, Any]
+                if (origin := get_origin(response_type)) and issubclass(origin, Sequence):
+                    schema = {
+                        "type": "array",
+                        "items": _register_model_schema(get_args(response_type)[0]),
+                    }
+                else:
+                    schema = _register_model_schema(response_type)
                 return {
                     "description": "",
-                    "content": {
-                        "application/json": {
-                            "schema": {"$ref": f"#/components/schemas/{schema_name}"}
-                        }
-                    },
+                    "content": {"application/json": {"schema": schema}},
                 }
 
             if (ret_type := type_hints.get("return")) and (ret_type_origin := get_origin(ret_type)):
@@ -166,7 +174,7 @@ def generate_openapi(
                                 raise RuntimeError(
                                     "Cannot specify multiple response types for a single API handler"
                                 )
-                            responses["200"] = _parse_schema(get_args(cls)[0])
+                            responses["200"] = _build_json_response_def(get_args(cls)[0])
                         elif issubclass(cls, web.HTTPTemporaryRedirect):
                             responses["301"] = {"Description": "Redirection"}
                         elif issubclass(cls, web.HTTPPermanentRedirect):
@@ -174,7 +182,9 @@ def generate_openapi(
 
                     route_def["responses"] = responses
                 elif issubclass(ret_type_origin, PydanticResponse):
-                    route_def["responses"] = {"200": _parse_schema(get_args(ret_type)[0])}
+                    route_def["responses"] = {
+                        "200": _build_json_response_def(get_args(ret_type)[0])
+                    }
 
             openapi["paths"][path][method.lower()] = route_def
     return openapi
