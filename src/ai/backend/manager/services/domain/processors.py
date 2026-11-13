@@ -1,3 +1,5 @@
+from typing import Any
+
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.registry.relation import RelationGroup
@@ -113,17 +115,18 @@ class DomainProcessors:
         self,
         group: ProcessorGroup[DomainData],
         relation_group: RelationGroup,
+        container_registry_group: ProcessorGroup[Any],
         service: DomainService,
     ) -> None:
         self.update_container_registry_relations = relation_group.relation(
             UpdateDomainContainerRegistryRelationsAction,
             service.update_container_registry_relations,
         )
-        self.scoped_search_container_registry_relations = group.scope(
+        self.scoped_search_container_registry_relations = container_registry_group.scope(
             ScopedSearchDomainContainerRegistryRelationsAction,
             service.scoped_search_container_registry_relations,
         )
-        self.global_search_container_registry_relations = group.global_scope(
+        self.global_search_container_registry_relations = container_registry_group.global_scope(
             GlobalSearchDomainContainerRegistryRelationsAction,
             service.global_search_container_registry_relations,
         )

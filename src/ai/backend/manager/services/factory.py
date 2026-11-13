@@ -662,6 +662,7 @@ def create_processors(
         domain=DomainProcessors(
             organization_groups.group(GroupMeta(DomainEntityType())),
             organization_groups.relation_group(),
+            container_registry_groups.group(GroupMeta(ContainerRegistryEntityType())),
             services.domain,
         ),
         etcd_config=EtcdConfigProcessors(

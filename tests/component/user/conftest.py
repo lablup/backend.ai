@@ -15,6 +15,7 @@ from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
+from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
 from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.dto.manager.user import (
@@ -103,6 +104,7 @@ def domain_processors(
     return DomainProcessors(
         processor_registry.group(GroupMeta(DomainEntityType())),
         processor_registry.concern(ConcernMeta(Concern.ORGANIZATION)).relation_group(),
+        processor_registry.group(GroupMeta(ContainerRegistryEntityType())),
         service,
     )
 

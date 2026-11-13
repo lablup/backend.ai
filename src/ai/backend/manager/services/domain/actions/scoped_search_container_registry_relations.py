@@ -41,4 +41,5 @@ class ScopedSearchDomainContainerRegistryRelationsActionResult(BaseScopeActionRe
 
     @override
     def entity_ids(self) -> Sequence[EntityIdentifier]:
-        return [item.container_registry_id for item in self.items]
+        """None: a relation row is not an entity. The read is recorded against its domains."""
+        return []

@@ -638,6 +638,7 @@ def test_resource_domain_and_agent_reads_keep_their_judged_gates() -> None:
     DomainProcessors(
         registry.group(GroupMeta(DomainEntityType())),
         registry.concern(ConcernMeta(Concern.ORGANIZATION)).relation_group(),
+        registry.group(GroupMeta(ContainerRegistryEntityType())),
         MagicMock(),
     )
     SessionProcessors(
@@ -764,6 +765,7 @@ def test_rg_domain_read_is_a_scoped_permission_read() -> None:
     DomainProcessors(
         registry.group(GroupMeta(DomainEntityType())),
         registry.concern(ConcernMeta(Concern.ORGANIZATION)).relation_group(),
+        registry.group(GroupMeta(ContainerRegistryEntityType())),
         MagicMock(),
     )
 
@@ -930,6 +932,7 @@ def test_entity_data_loader_reads_are_checked_per_entity() -> None:
     DomainProcessors(
         registry.group(GroupMeta(DomainEntityType())),
         registry.concern(ConcernMeta(Concern.ORGANIZATION)).relation_group(),
+        registry.group(GroupMeta(ContainerRegistryEntityType())),
         MagicMock(),
     )
     UserProcessors(registry.group(GroupMeta(UserEntityType())), MagicMock())

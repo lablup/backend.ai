@@ -15,6 +15,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from ai.backend.common.contexts.user import with_user_context
+from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
 from ai.backend.common.data.entity.deployment import DeploymentEntityType, DeploymentID
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
 from ai.backend.common.data.entity.object_storage import ObjectStorageID
@@ -172,6 +173,7 @@ async def test_rg_domain_search_is_answered_for_the_resource_group(
     processors = DomainProcessors(
         registry.group(GroupMeta(DomainEntityType())),
         registry.concern(ConcernMeta(Concern.ORGANIZATION)).relation_group(),
+        registry.group(GroupMeta(ContainerRegistryEntityType())),
         MagicMock(),
     )
     resource_group_id = ResourceGroupID(uuid.uuid4())
