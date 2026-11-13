@@ -15,14 +15,19 @@ from ai.backend.common.data.entity.container_registry import (
     ContainerRegistryEntityType,
     ContainerRegistryID,
 )
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, GlobalEntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.container_registry.request import AllowedGroupsInput
-from ai.backend.common.dto.manager.v2.container_registry.response import ContainerRegistryNode
+from ai.backend.common.dto.manager.v2.container_registry.response import (
+    ContainerRegistryNode,
+    ScopedSearchContainerRegistriesPayload,
+)
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
+from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.project.types import ProjectData
@@ -47,6 +52,7 @@ from bai_scenario.components.domain import SomeoneOf
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.seeds.domain.domain import TestSeedDomain
 from bai_scenario.seeds.image.registry import (
+    AllowDomain,
     AllowProject,
     AllowProjectAsDefault,
     TestSeedContainerRegistry,
@@ -407,6 +413,84 @@ class SomeoneAllowingIn[ScopeData](TestSeedNest[Laid[None]]):
         )
 
 
+@dataclass(frozen=True)
+class RelationsAndACaller:
+    """`home`과 `wanted` 사이의 relation이 검색이 찾는 행이다.
+
+    `outside`는 `home`과 relation이 없어, `home`에서 받은 권한으로는 읽히지 않는다.
+    """
+
+    home: DomainData
+    other_domain: DomainData
+    wanted: ContainerRegistryData
+    other_registry: ContainerRegistryData
+    outside: ContainerRegistryData
+    caller: UserData
+
+
+@dataclass(frozen=True)
+class RelationsInTwoDomains(Given[TestSeedingSession, RelationsAndACaller]):
+    """도메인 둘과 레지스트리 셋 사이에 relation 넷.
+
+    relation은 도메인이 그 레지스트리를 READ로 govern하게 하므로, 검색할 도메인에서 레지스트리
+    조회 권한을 받은 사용자는 그 도메인과 relation이 있는 레지스트리만 읽는다.
+    """
+
+    role: UserRole = UserRole.USER
+    reads_in_domain: bool = True
+
+    @override
+    def describe(self) -> str:
+        if self.reads_in_domain:
+            holds_ko = "그 도메인에서 레지스트리 조회 권한을 받은"
+            holds_en = "granted permission to read registries in that domain"
+        else:
+            holds_ko = "아무 권한도 받지 않은"
+            holds_en = "granted nothing"
+        return Says(
+            "도메인 둘과 레지스트리 셋 사이에 relation 넷이 있고, 한 도메인에 속해 "
+            f"{holds_ko} {self.role.value} 한 명이 있습니다. 레지스트리 하나는 그 도메인과 "
+            "relation이 없습니다",
+            english=(
+                "four relations between two domains and three registries, and one "
+                f"{self.role.value} in one of the domains {holds_en}. One registry is not "
+                "related to that domain"
+            ),
+        )
+
+    @override
+    async def lay(self, seeding: TestSeedingSession) -> RelationsAndACaller:
+        home = await seeding.creating(TestSeedDomain(name_hint="home"))
+        other_domain = await seeding.creating(TestSeedDomain(name_hint="other"))
+        wanted = await seeding.creating(TestSeedContainerRegistry(name_hint="wanted"))
+        other_registry = await seeding.creating(TestSeedContainerRegistry(name_hint="other"))
+        outside = await seeding.creating(TestSeedContainerRegistry(name_hint="outside"))
+        await seeding.linking(AllowDomain(), home, wanted)
+        await seeding.linking(AllowDomain(), home, other_registry)
+        await seeding.linking(AllowDomain(), other_domain, wanted)
+        await seeding.linking(AllowDomain(), other_domain, outside)
+        caller = await seeding.within(SomeoneOf(home, role=self.role))
+        if self.reads_in_domain:
+            await seeding.within(
+                SomeoneAllowingIn(
+                    home,
+                    caller,
+                    scope_of=lambda one: DomainID(one.id),
+                    entity_type=ContainerRegistryEntityType(),
+                    name_hint="read-registries-in-domain",
+                    permissions=(Permission.READ,),
+                )
+            )
+        return RelationsAndACaller(
+            home=seeding.made(home),
+            other_domain=seeding.made(other_domain),
+            wanted=seeding.made(wanted),
+            other_registry=seeding.made(other_registry),
+            outside=seeding.made(outside),
+            caller=seeding.made(caller),
+        )
+
+
 async def allowed_project_count(engine: ExtendedAsyncSAEngine) -> int:
     async with engine.begin_readonly_session() as session:
         query = sa.select(sa.func.count()).select_from(AssociationContainerRegistriesGroupsRow)
@@ -657,3 +741,71 @@ class AddMissingProject(AllowedProjectChange):
     @override
     def of(self, laid: ARegistryToAllowAndACaller) -> AllowedGroupsModel:
         return AllowedGroupsModel(add=[str(MISSING_ENTITY_ID)], remove=[])
+
+
+@dataclass(frozen=True)
+class OnlyTheWantedRegistryIsListed(
+    Then[RelationsAndACaller, ScopedSearchContainerRegistriesPayload]
+):
+    """검색할 도메인과 relation이 있는 레지스트리 가운데 필터에 맞는 것만 온다."""
+
+    @override
+    def says(self) -> str:
+        return Says(
+            "검색할 도메인과 relation이 있는 레지스트리 가운데 찾는 레지스트리 하나만 전체가 "
+            "반환되고, 필터에 맞지 않는 레지스트리와 검색할 도메인과 relation이 없는 레지스트리는 "
+            "반환되지 않습니다",
+            english=(
+                "only the wanted registry among those related to the domain to search comes "
+                "back whole, and neither the registry the filter excludes nor the registry not "
+                "related to the domain to search does"
+            ),
+        )
+
+    @override
+    def look(
+        self,
+        laid: RelationsAndACaller,
+        answered: Answered[ScopedSearchContainerRegistriesPayload],
+    ) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [MissingResponse(answered.raised)]
+        seen: list[Verdict] = [
+            Same("total_count", payload.total_count, 1),
+            Same("items count", len(payload.items), 1),
+            Same("has_next_page", payload.has_next_page, False),
+            Same("has_previous_page", payload.has_previous_page, False),
+        ]
+        if not payload.items:
+            return seen
+        node = payload.items[0]
+        registry = laid.wanted
+        came_from = Says("찾는 레지스트리의 id", english="the id of the wanted registry")
+        return [
+            *seen,
+            Held[uuid.UUID]("items[0].id", node.id, SameAs(registry.id, came_from)),
+            Held[uuid.UUID]("items[0].entity_id", node.entity_id, SameAs(registry.id, came_from)),
+            Held[str](
+                "items[0].url",
+                node.url,
+                SameAs(
+                    registry.url,
+                    Says("찾는 레지스트리의 url", english="the url of the wanted registry"),
+                ),
+            ),
+            Held[str](
+                "items[0].registry_name",
+                node.registry_name,
+                SameAs(
+                    registry.registry_name,
+                    Says("찾는 레지스트리의 이름", english="the name of the wanted registry"),
+                ),
+            ),
+            Same("items[0].type", node.type, registry.type),
+            Same("items[0].project", node.project, registry.project),
+            Same("items[0].username", node.username, registry.username),
+            Same("items[0].ssl_verify", node.ssl_verify, registry.ssl_verify),
+            Same("items[0].is_global", node.is_global, registry.is_global),
+            Same("items[0].extra", node.extra, registry.extra),
+        ]

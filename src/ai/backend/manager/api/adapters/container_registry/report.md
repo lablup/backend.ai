@@ -4,11 +4,12 @@
 
 Scenario: complete
 
-- built from ops (4)
+- built from ops (5)
   - admin_partial_bulk_purge: representative success ✓ · representative rejection ✓
   - admin_search: representative success ✓ · representative rejection ✓
   - batch_load_by_ids: representative success ✓ · representative rejection ✓
   - lookup_by_name_and_registry_project: representative success ✓ · representative rejection ✓
+  - scoped_search: representative success ✓ · representative rejection ✓
 - direct implementation (6)
   - admin_create: success present 2 · rejection present 2 (global_scope, relation)
   - admin_purge: success present 2 · rejection present 2 (global_scope)
@@ -48,6 +49,13 @@ Scenario: complete
 | [a user with read permission can turn the name of a container registry that has no inner project name into its identifier](#looking_up-readable-registry-key-resolves) | answered |
 | [a name that does not exist is rejected with the same error as when the caller lacks read permission](#looking_up-missing-registry-key-is-unresolvable) | rejected |
 | [a name lookup by a user without read permission is rejected without revealing whether the target exists](#looking_up-unreadable-registry-key-is-unresolvable) | rejected |
+
+**scoped_search**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted permission to read registries in the domain to search searches scoped to that domain, with a name as the filter, an order and a page size in one request, only the registries related to that domain that match the filter come back](#scoped_searching-a-user-reading-registries-in-the-domain-scoped-searches-its-registries) | answered |
+| [when a user not granted permission to read registries in the domain to search searches scoped to that domain, it is rejected for lack of permission](#scoped_searching-a-user-not-reading-registries-in-the-domain-is-refused) | rejected |
 
 **admin_create**
 
@@ -499,6 +507,91 @@ Then
 
 - the call is rejected
   - rejected: GenericBadRequest
+
+### scoped_search
+
+<a id="scoped_searching-a-user-reading-registries-in-the-domain-scoped-searches-its-registries"></a>
+
+#### [a-user-reading-registries-in-the-domain-scoped-searches-its-registries](/tests/scenario/bai_scenario/manager/container_registry/test_scoped_searching.py): pass
+
+when a user granted permission to read registries in the domain to search searches scoped to that domain, with a name as the filter, an order and a page size in one request, only the registries related to that domain that match the filter come back
+
+Given
+
+- four relations between two domains and three registries, and one user in one of the domains granted permission to read registries in that domain. One registry is not related to that domain
+  - Domain home-1
+  - Domain other-1
+  - Container registry wanted-1: image source
+  - Container registry other-2: image source
+  - Container registry outside-1: image source
+  - Domain home-1 allows Container registry wanted-1
+  - Domain home-1 allows Container registry other-2
+  - Domain other-1 allows Container registry wanted-1
+  - Domain other-1 allows Container registry outside-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted the read-registries-in-domain permission
+    - Role read-registries-in-domain-1: applies only within the scope it is granted in
+    - Role read-registries-in-domain-1: READ allowed on every container_registry
+    - regular user user-1: holds Role read-registries-in-domain-1
+
+When
+
+- ContainerRegistryAdapter.scoped_search: user-1 reads scoped to the domain to search, with the name of the wanted registry as the filter, the name order and a page size in one request
+
+Then
+
+- only the wanted registry among those related to the domain to search comes back whole, and neither the registry the filter excludes nor the registry not related to the domain to search does
+  - total_count = 1
+  - items count = 1
+  - has_next_page = False
+  - has_previous_page = False
+  - items[0].id: same as the id of the wanted registry
+  - items[0].entity_id: same as the id of the wanted registry
+  - items[0].url: same as the url of the wanted registry
+  - items[0].registry_name: same as the name of the wanted registry
+  - items[0].type = <ContainerRegistryType.DOCKER: 'docker'>
+  - items[0].project = None
+  - items[0].username = None
+  - items[0].ssl_verify = True
+  - items[0].is_global = True
+  - items[0].extra = None
+
+<a id="scoped_searching-a-user-not-reading-registries-in-the-domain-is-refused"></a>
+
+#### [a-user-not-reading-registries-in-the-domain-is-refused](/tests/scenario/bai_scenario/manager/container_registry/test_scoped_searching.py): pass
+
+when a user not granted permission to read registries in the domain to search searches scoped to that domain, it is rejected for lack of permission
+
+Given
+
+- four relations between two domains and three registries, and one user in one of the domains granted nothing. One registry is not related to that domain
+  - Domain home-1
+  - Domain other-1
+  - Container registry wanted-1: image source
+  - Container registry other-2: image source
+  - Container registry outside-1: image source
+  - Domain home-1 allows Container registry wanted-1
+  - Domain home-1 allows Container registry other-2
+  - Domain other-1 allows Container registry wanted-1
+  - Domain other-1 allows Container registry outside-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- ContainerRegistryAdapter.scoped_search: user-1 reads scoped to the domain to search, with the name of the wanted registry as the filter, the name order and a page size in one request
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 ### admin_create
 

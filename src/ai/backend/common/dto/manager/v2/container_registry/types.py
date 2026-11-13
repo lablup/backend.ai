@@ -9,9 +9,11 @@ from pydantic import Field
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 
 __all__ = (
     "ContainerRegistryOrderField",
+    "ContainerRegistryScope",
     "ContainerRegistryType",
     "ContainerRegistryTypeFilter",
     "OrderDirection",
@@ -44,4 +46,12 @@ class ContainerRegistryTypeFilter(BaseRequestModel):
     )
     not_in: list[ContainerRegistryType] | None = Field(
         default=None, description="Exclude any of the provided types."
+    )
+
+
+class ContainerRegistryScope(BaseRequestModel):
+    """Scope for the scoped container registry query. The domains are OR'd."""
+
+    domain: list[UUIDScope] = Field(
+        min_length=1, description="Domains whose related container registries are being read"
     )
