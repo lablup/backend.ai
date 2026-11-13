@@ -15,8 +15,8 @@ from uuid import UUID
 from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.project import ProjectEntityType
-from ai.backend.common.data.entity.role_preset import RolePresetEntityType
-from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.role_preset import RolePresetEntityType, RolePresetScopeID
+from ai.backend.common.data.entity.types import EntityType, GlobalEntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
@@ -148,6 +148,15 @@ class APresetWithEntriesAndACaller:
 
     preset: RolePresetData
     entries: tuple[RolePermissionPresetData, ...]
+    caller: UserData
+
+
+@dataclass(frozen=True)
+class PresetsForPublicAndEveryProjectAndACaller:
+    """public 하나에만 역할을 만드는 프리셋, 모든 프로젝트에 역할을 만드는 프리셋, 호출할 사용자."""
+
+    for_public: RolePresetData
+    for_every_project: RolePresetData
     caller: UserData
 
 
@@ -309,11 +318,53 @@ class APresetWithEntriesAndSomeone(Given[Any, APresetWithEntriesAndACaller]):
 
 
 @dataclass(frozen=True)
+class PresetsForPublicAndEveryProjectAndSomeone(
+    Given[Any, PresetsForPublicAndEveryProjectAndACaller]
+):
+    """public 하나에만 역할을 만드는 프리셋과 모든 프로젝트에 역할을 만드는 프리셋, 호출자 한 명."""
+
+    role: UserRole = UserRole.USER
+
+    @override
+    def describe(self) -> str:
+        public = GlobalEntityName.PUBLIC
+        role = self.role.value
+        return Says(
+            f"{public} 하나에만 역할을 만드는 프리셋 하나와 모든 프로젝트에 역할을 만드는 "
+            f"프리셋 하나, 그리고 {role} 한 명",
+            english=(
+                f"one preset creating its role in {public} alone, one preset creating its role "
+                f"in every project, and one {role}"
+            ),
+        )
+
+    @override
+    async def lay(self, seeding: Any) -> PresetsForPublicAndEveryProjectAndACaller:
+        for_public = await seeding.creating(
+            TestSeedRolePreset(
+                name_hint="for-public",
+                scope_type=GlobalEntityType(),
+                scope_id=RolePresetScopeID(global_entity_id(GlobalEntityName.PUBLIC)),
+            )
+        )
+        for_every_project = await seeding.creating(
+            TestSeedRolePreset(name_hint="for-every-project")
+        )
+        caller = await lay_a_caller_granted(seeding, self.role, None)
+        return PresetsForPublicAndEveryProjectAndACaller(
+            for_public=seeding.made(for_public),
+            for_every_project=seeding.made(for_every_project),
+            caller=seeding.made(caller),
+        )
+
+
+@dataclass(frozen=True)
 class PresetLook:
     """노드 하나를 미리 만든 프리셋과 맞춰 본다. 바뀌어야 하는 값만 인자로 받는다."""
 
     started: datetime
     named: str | None = None
+    shown_scope_type: str | None = None
     auto_assign: bool | None = None
     auto_assign_to_owner: bool | None = None
     deleted: bool = False
@@ -349,7 +400,28 @@ class PresetLook:
                 ),
             ),
             Same(f"{at}name", node.name, self.named if self.named is not None else seeded.name),
-            Same(f"{at}scope_type", str(node.scope_type), str(seeded.scope_type)),
+            Same(
+                f"{at}scope_type",
+                str(node.scope_type),
+                self.shown_scope_type
+                if self.shown_scope_type is not None
+                else str(seeded.scope_type),
+            ),
+            (
+                Same(f"{at}scope_id", node.scope_id, None)
+                if seeded.scope_id is None
+                else Held[UUID | None](
+                    f"{at}scope_id",
+                    node.scope_id,
+                    SameAs[UUID | None](
+                        seeded.scope_id,
+                        Says(
+                            "미리 저장한 프리셋이 지정한 스코프의 id",
+                            english="the id of the scope the preset seeded in advance names",
+                        ),
+                    ),
+                )
+            ),
             Same(
                 f"{at}auto_assign",
                 node.auto_assign,
@@ -406,6 +478,43 @@ class ThePresetComesBack(Then[APresetAndACaller, RolePresetNode]):
         if node is None:
             return [Refused(NotEnoughPermission, answered.raised)]
         return self.expected.verdicts("", node, laid.preset)
+
+
+@dataclass(frozen=True)
+class OnlyThePresetForPublicComesBack(
+    Then[PresetsForPublicAndEveryProjectAndACaller, SearchRolePresetsPayload]
+):
+    """미리 만든 두 프리셋 중 public 하나에만 역할을 만드는 것만 통째로 반환된다."""
+
+    started: datetime
+
+    @override
+    def says(self) -> str:
+        public = GlobalEntityName.PUBLIC
+        return Says(
+            f"{public} 하나에만 역할을 만드는 프리셋만 반환됩니다",
+            english=f"only the preset creating its role in {public} alone comes back",
+        )
+
+    @override
+    def look(
+        self,
+        laid: PresetsForPublicAndEveryProjectAndACaller,
+        answered: Answered[SearchRolePresetsPayload],
+    ) -> list[Verdict]:
+        page = answered.response
+        if page is None:
+            return [MissingResponse(answered.raised)]
+        expected = PresetLook(self.started, shown_scope_type=str(GlobalEntityName.PUBLIC))
+        verdicts: list[Verdict] = [Same("items count", len(page.items), 1)]
+        for i, node in enumerate(page.items):
+            verdicts += expected.verdicts(f"items[{i}].", node, laid.for_public)
+        return [
+            *verdicts,
+            Same("total_count", page.total_count, 1),
+            Same("has_next_page", page.has_next_page, False),
+            Same("has_previous_page", page.has_previous_page, False),
+        ]
 
 
 @dataclass(frozen=True)
@@ -899,6 +1008,7 @@ def preset_read_verdicts(at: str, node: RolePresetNode, seeded: RolePresetData) 
         Held[UUID](f"{at}entity_id", node.entity_id, SameAs(seeded.id, preset_id)),
         Same(f"{at}name", node.name, seeded.name),
         Same(f"{at}scope_type", node.scope_type, str(seeded.scope_type)),
+        Same(f"{at}scope_id", node.scope_id, seeded.scope_id),
         Same(f"{at}role_name_template", node.role_name_template, seeded.role_name_template),
         Same(f"{at}auto_assign", node.auto_assign, seeded.auto_assign),
         Same(f"{at}auto_assign_to_owner", node.auto_assign_to_owner, seeded.auto_assign_to_owner),

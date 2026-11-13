@@ -116,6 +116,7 @@
 
 | 시나리오 | 판정 |
 |---|---|
+| [superadmin 이 스코프 타입 global 로 프리셋을 검색하면, public 하나에만 역할을 만드는 프리셋만 반환됩니다](#searching-a-global-scope-type-finds-the-preset-for-public) | 성공 |
 | [superadmin 이 프로젝트 스코프 필터, 이름 정렬, 한 페이지 크기로 검색하면, 맞는 프리셋 가운데 정렬상 첫 하나만 오고 나머지는 오지 않습니다. 이 호출은 global 역할이 막습니다](#searching-the-superadmin-finds-one-page-of-matching-presets) | 성공 |
 | [global 역할이 없는 사용자가 프리셋을 검색하려 하면, 권한 부족으로 거부됩니다](#searching-a-user-who-is-not-the-superadmin-may-not-search-presets) | 거부 |
 
@@ -217,6 +218,7 @@ Then
   - [0].entity_id: 미리 저장한 프리셋의 id 와 같다
   - [0].name = 'preset-1'
   - [0].scope_type = 'project'
+  - [0].scope_id = None
   - [0].role_name_template = None
   - [0].auto_assign = False
   - [0].auto_assign_to_owner = False
@@ -228,6 +230,7 @@ Then
   - [1].entity_id: 미리 저장한 프리셋의 id 와 같다
   - [1].name = 'preset-2'
   - [1].scope_type = 'project'
+  - [1].scope_id = None
   - [1].role_name_template = None
   - [1].auto_assign = False
   - [1].auto_assign_to_owner = False
@@ -409,6 +412,7 @@ Then
   - items[0].entity_id: 미리 저장한 프리셋의 id 와 같다
   - items[0].name = 'preset-1'
   - items[0].scope_type = 'project'
+  - items[0].scope_id = None
   - items[0].auto_assign = False
   - items[0].role_name_template = None
   - items[0].auto_assign_to_owner = False
@@ -420,6 +424,7 @@ Then
   - items[1].entity_id: 미리 저장한 프리셋의 id 와 같다
   - items[1].name = 'preset-2'
   - items[1].scope_type = 'project'
+  - items[1].scope_id = None
   - items[1].auto_assign = False
   - items[1].role_name_template = None
   - items[1].auto_assign_to_owner = False
@@ -465,6 +470,7 @@ Then
   - items[0].entity_id: 미리 저장한 프리셋의 id 와 같다
   - items[0].name = 'preset-1'
   - items[0].scope_type = 'project'
+  - items[0].scope_id = None
   - items[0].auto_assign = False
   - items[0].role_name_template = None
   - items[0].auto_assign_to_owner = False
@@ -476,6 +482,7 @@ Then
   - items[1].entity_id: 미리 저장한 프리셋의 id 와 같다
   - items[1].name = 'preset-2'
   - items[1].scope_type = 'project'
+  - items[1].scope_id = None
   - items[1].auto_assign = False
   - items[1].role_name_template = None
   - items[1].auto_assign_to_owner = False
@@ -585,6 +592,7 @@ Then
   - items[0].entity_id: 미리 저장한 프리셋의 id 와 같다
   - items[0].name = 'preset-1'
   - items[0].scope_type = 'project'
+  - items[0].scope_id = None
   - items[0].auto_assign = False
   - items[0].role_name_template = None
   - items[0].auto_assign_to_owner = False
@@ -596,6 +604,7 @@ Then
   - items[1].entity_id: 미리 저장한 프리셋의 id 와 같다
   - items[1].name = 'preset-2'
   - items[1].scope_type = 'project'
+  - items[1].scope_id = None
   - items[1].auto_assign = False
   - items[1].role_name_template = None
   - items[1].auto_assign_to_owner = False
@@ -635,6 +644,7 @@ Then
   - entity_id: 미리 저장한 프리셋의 id 와 같다
   - name = 'preset-1'
   - scope_type = 'project'
+  - scope_id = None
   - auto_assign = False
   - role_name_template = None
   - auto_assign_to_owner = False
@@ -703,6 +713,7 @@ Then
   - entity_id: 미리 저장한 프리셋의 id 와 같다
   - name = 'preset-1'
   - scope_type = 'project'
+  - scope_id = None
   - role_name_template = 'team-member'
   - auto_assign = True
   - auto_assign_to_owner = True
@@ -801,6 +812,7 @@ Then
   - successes[0].entity_id: 미리 저장한 프리셋의 id 와 같다
   - successes[0].name = 'preset-1'
   - successes[0].scope_type = 'project'
+  - successes[0].scope_id = None
   - successes[0].auto_assign = False
   - successes[0].role_name_template = None
   - successes[0].auto_assign_to_owner = False
@@ -812,6 +824,7 @@ Then
   - successes[1].entity_id: 미리 저장한 프리셋의 id 와 같다
   - successes[1].name = 'preset-2'
   - successes[1].scope_type = 'project'
+  - successes[1].scope_id = None
   - successes[1].auto_assign = False
   - successes[1].role_name_template = None
   - successes[1].auto_assign_to_owner = False
@@ -887,6 +900,7 @@ Then
   - successes[0].entity_id: 미리 저장한 프리셋의 id 와 같다
   - successes[0].name = 'preset-1'
   - successes[0].scope_type = 'project'
+  - successes[0].scope_id = None
   - successes[0].auto_assign = False
   - successes[0].role_name_template = None
   - successes[0].auto_assign_to_owner = False
@@ -898,6 +912,7 @@ Then
   - successes[1].entity_id: 미리 저장한 프리셋의 id 와 같다
   - successes[1].name = 'preset-2'
   - successes[1].scope_type = 'project'
+  - successes[1].scope_id = None
   - successes[1].auto_assign = False
   - successes[1].role_name_template = None
   - successes[1].auto_assign_to_owner = False
@@ -973,6 +988,7 @@ Then
   - successes[0].entity_id: 미리 저장한 프리셋의 id 와 같다
   - successes[0].name = 'preset-1'
   - successes[0].scope_type = 'project'
+  - successes[0].scope_id = None
   - successes[0].auto_assign = False
   - successes[0].role_name_template = None
   - successes[0].auto_assign_to_owner = False
@@ -984,6 +1000,7 @@ Then
   - successes[1].entity_id: 미리 저장한 프리셋의 id 와 같다
   - successes[1].name = 'preset-2'
   - successes[1].scope_type = 'project'
+  - successes[1].scope_id = None
   - successes[1].auto_assign = False
   - successes[1].role_name_template = None
   - successes[1].auto_assign_to_owner = False
@@ -1023,6 +1040,7 @@ Then
   - entity_id: 미리 저장한 프리셋의 id 와 같다
   - name = 'preset-1'
   - scope_type = 'project'
+  - scope_id = None
   - auto_assign = False
   - role_name_template = None
   - auto_assign_to_owner = False
@@ -1087,6 +1105,7 @@ Then
   - entity_id: 미리 저장한 프리셋의 id 와 같다
   - name = 'preset-1'
   - scope_type = 'project'
+  - scope_id = None
   - auto_assign = False
   - role_name_template = None
   - auto_assign_to_owner = False
@@ -1123,6 +1142,48 @@ Then
 
 ### search
 
+<a id="searching-a-global-scope-type-finds-the-preset-for-public"></a>
+
+#### [a-global-scope-type-finds-the-preset-for-public](/tests/scenario/bai_scenario/manager/role_preset/test_searching.py): pass
+
+superadmin 이 스코프 타입 global 로 프리셋을 검색하면, public 하나에만 역할을 만드는 프리셋만 반환됩니다
+
+Given
+
+- public 하나에만 역할을 만드는 프리셋 하나와 모든 프로젝트에 역할을 만드는 프리셋 하나, 그리고 superadmin 한 명
+  - 역할 프리셋 for-public-1: global 스코프 하나용이고 자동 부여는 비활성입니다
+  - 역할 프리셋 for-every-project-1: 프로젝트 스코프용이고 자동 부여는 비활성입니다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- RolePresetAdapter.search: user-1이 스코프 타입이 global 인 프리셋을 검색합니다
+
+Then
+
+- public 하나에만 역할을 만드는 프리셋만 반환됩니다
+  - items count = 1
+  - items[0].id: 미리 저장한 프리셋의 id 와 같다
+  - items[0].entity_id: 미리 저장한 프리셋의 id 와 같다
+  - items[0].name = 'for-public-1'
+  - items[0].scope_type = 'public'
+  - items[0].scope_id: 미리 저장한 프리셋이 지정한 스코프의 id 와 같다
+  - items[0].auto_assign = False
+  - items[0].role_name_template = None
+  - items[0].auto_assign_to_owner = False
+  - items[0].deleted = False
+  - items[0].deleted_at = None
+  - items[0].created_at: 이 실행이 쓴 시각
+  - items[0].updated_at: 이 실행이 쓴 시각
+  - total_count = 1
+  - has_next_page = False
+  - has_previous_page = False
+
 <a id="searching-the-superadmin-finds-one-page-of-matching-presets"></a>
 
 #### [the-superadmin-finds-one-page-of-matching-presets](/tests/scenario/bai_scenario/manager/role_preset/test_searching.py): pass
@@ -1154,6 +1215,7 @@ Then
   - items[0].entity_id: 미리 저장한 프리셋의 id 와 같다
   - items[0].name = 'preset-1'
   - items[0].scope_type = 'project'
+  - items[0].scope_id = None
   - items[0].role_name_template = None
   - items[0].auto_assign = False
   - items[0].auto_assign_to_owner = False
@@ -1783,6 +1845,7 @@ Then
   - successes[0].entity_id: 미리 저장한 프리셋의 id 와 같다
   - successes[0].name = 'preset-1'
   - successes[0].scope_type = 'project'
+  - successes[0].scope_id = None
   - successes[0].auto_assign = True
   - successes[0].role_name_template = None
   - successes[0].auto_assign_to_owner = False
@@ -1794,6 +1857,7 @@ Then
   - successes[1].entity_id: 미리 저장한 프리셋의 id 와 같다
   - successes[1].name = 'preset-2'
   - successes[1].scope_type = 'project'
+  - successes[1].scope_id = None
   - successes[1].auto_assign = True
   - successes[1].role_name_template = None
   - successes[1].auto_assign_to_owner = False
@@ -1874,6 +1938,7 @@ Then
   - successes[0].entity_id: 미리 저장한 프리셋의 id 와 같다
   - successes[0].name = 'preset-1'
   - successes[0].scope_type = 'project'
+  - successes[0].scope_id = None
   - successes[0].auto_assign = False
   - successes[0].role_name_template = None
   - successes[0].auto_assign_to_owner = True
@@ -1914,6 +1979,7 @@ Then
   - entity_id: 미리 저장한 프리셋의 id 와 같다
   - name = 'preset-1'
   - scope_type = 'project'
+  - scope_id = None
   - auto_assign = False
   - role_name_template = None
   - auto_assign_to_owner = True
@@ -1950,6 +2016,7 @@ Then
   - entity_id: 미리 저장한 프리셋의 id 와 같다
   - name = 'renamed-preset'
   - scope_type = 'project'
+  - scope_id = None
   - auto_assign = False
   - role_name_template = None
   - auto_assign_to_owner = False
