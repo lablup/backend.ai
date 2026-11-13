@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.domain import DomainName
 from ai.backend.common.data.entity.entity_share import EntityShareID
 from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
@@ -281,7 +282,7 @@ class VfolderRepository:
                     raise ProjectNotFound(f"Project with {group_uuid} not found.")
                 if group_row.type != ProjectType.PERSONAL:
                     domain_allowed_hosts = await self._fetch_domain_allowed_vfolder_hosts(
-                        db_session, group_row.domain_name
+                        db_session, DomainName(group_row.domain_name)
                     )
                     return VFolderHostPermissionMap(
                         domain_allowed_hosts | group_row.allowed_vfolder_hosts
@@ -295,13 +296,15 @@ class VfolderRepository:
             user_domain_name = await db_session.scalar(
                 sa.select(UserRow.domain_name).where(UserRow.uuid == user_uuid)
             )
+            if user_domain_name is None:
+                raise UserNotFound(f"User with UUID {user_uuid} not found.")
             domain_allowed_hosts = await self._fetch_domain_allowed_vfolder_hosts(
-                db_session, user_domain_name
+                db_session, DomainName(user_domain_name)
             )
             return VFolderHostPermissionMap(domain_allowed_hosts | keypair_allowed_hosts)
 
     async def _fetch_domain_allowed_vfolder_hosts(
-        self, db_session: SASession, domain_name: str | None
+        self, db_session: SASession, domain_name: DomainName
     ) -> VFolderHostPermissionMap:
         domain_allowed_hosts: VFolderHostPermissionMap | None = await db_session.scalar(
             sa.select(DomainRow.allowed_vfolder_hosts).where(
