@@ -3,7 +3,7 @@ name: rbac-graph-write-boundary
 type: decision-table
 description: rbac service knowledge: why the relations, the project roster and the role grants are wired here rather than in the domains they are about, what shape each takes, and where the counting and the tolerating live
 scope: src/ai/backend/manager/services/rbac
-keywords: [RbacRelationService, RbacRoleService, RbacRosterService, CreateRelationAction, PurgeRelationAction, DeleteRelationAction, RestoreRelationAction, BaseEntityRelationAction, ProjectRosterAction, JoinProjectAction, LeaveProjectAction, AssignRoleAction, RevokeRoleAction, RbacRelationRepository, RbacRosterRepository, V2RosterWriteOps]
+keywords: [RbacRelationService, RbacRoleService, RbacRosterService, CreateRelationAction, PurgeRelationAction, UpdateRelationAction, DeleteRelationAction, RestoreRelationAction, BaseEntityRelationAction, ProjectRosterAction, JoinProjectAction, LeaveProjectAction, AssignRoleAction, RevokeRoleAction, RbacRelationRepository, RbacRosterRepository, V2RosterWriteOps]
 sources:
   - src/ai/backend/manager/services/rbac
   - src/ai/backend/manager/repositories/rbac
@@ -41,12 +41,17 @@ entity type, shape, operation, gate and backing.
   row beside the mapping row. The relation ops write the graph instead: the scope
   governs the target under READ, the target holds the scope under a READ share.
 
-## Four actions cover every relation
+## Five actions cover every relation
 
 - `CreateRelationAction`, `PurgeRelationAction`, `DeleteRelationAction` and
   `RestoreRelationAction` carry the pairs and the spec that says which relation they
   are, so one wiring per direction serves the registry, the resource group, the idle
   checker bindings and whatever comes next.
+- `UpdateRelationAction` purges one list of pairs and creates another in one
+  transaction, so a request carrying both an add and a remove list lands whole or not
+  at all. It holds a transaction lock on every entity it names, so two runs sharing an
+  entity go one after another. It asks UPDATE of every entity named, rejects a pair
+  named in both lists, and rejects a creator and a purger of different relations.
 - The two lifecycle directions exist for the relations carrying a lifecycle column.
   Switching one off leaves the row and what each side reads of the other, so a relation
   switched off is still listed on both sides and can be switched back on.
@@ -61,7 +66,7 @@ entity type, shape, operation, gate and backing.
   The registration is idempotent, so a pair whose row survived without its graph rows is
   filled in when it is created again.
 - The audit row records the direction (`create_relation`, `purge_relation`,
-  `delete_relation`, `restore_relation`) and the scopes it named. The pair is what
+  `update_relation`, `delete_relation`, `restore_relation`) and the scopes it named. The pair is what
   tells one relation from another, not the name.
 - What a run of several pairs *means* is still the caller's: the registry's "removing
   where nothing was linked raises" counts what came back.

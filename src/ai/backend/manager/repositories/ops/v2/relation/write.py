@@ -10,7 +10,7 @@ the pair stays listed on both sides until it is purged.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -204,6 +204,14 @@ class V2RelationWriteOps(V2WriteOps):
                     RelationWriteResult(scope=scope, target=target, written=False, error=e)
                 )
         return BulkRelationResult(results=results)
+
+    async def lock_entities(self, entities: Iterable[EntityIdentifier]) -> None:
+        """Hold a transaction lock on each entity, so runs naming a shared one go one
+        after another. Taken in sorted order so two runs cannot wait on each other."""
+        for entity_id in sorted({str(entity) for entity in entities}):
+            await self._sess.execute(
+                sa.select(sa.func.pg_advisory_xact_lock(sa.func.hashtextextended(entity_id, 0)))
+            )
 
     async def purge_relations[TScope: EntityIdentifier, TTarget: EntityIdentifier, TRow: Base](
         self,

@@ -13,6 +13,7 @@ from ai.backend.manager.data.permission.role import (
     BulkRoleAssignmentFailure,
     BulkRoleAssignmentResultData,
 )
+from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
@@ -36,6 +37,10 @@ from ai.backend.manager.services.rbac.actions.relation.switch import (
     DeleteRelationActionResult,
     RestoreRelationAction,
     RestoreRelationActionResult,
+)
+from ai.backend.manager.services.rbac.actions.relation.update import (
+    UpdateRelationAction,
+    UpdateRelationActionResult,
 )
 from ai.backend.manager.services.rbac.actions.role.assign import (
     AssignRoleAction,
@@ -68,8 +73,8 @@ __all__ = ("RbacRelationService", "RbacRoleService", "RbacRosterService")
 class RbacRelationService:
     """Linking two entities and unlinking them.
 
-    One method per direction: which relation a run is about travels on the action's
-    spec, so every kind goes through the same two.
+    One method per direction, and ``update`` for both in one transaction: which relation
+    a run is about travels on the action's spec, so every kind goes through the same ones.
     """
 
     _repository: RbacRelationRepository
@@ -101,6 +106,30 @@ class RbacRelationService:
                 RelationUnlinkResult(pair=pair, unlinked=was_linked)
                 for pair, was_linked in zip(action.pairs, unlinked, strict=True)
             ]
+        )
+
+    async def update(
+        self, action: UpdateRelationAction[Any, Any, Any]
+    ) -> UpdateRelationActionResult[Any, Any]:
+        """Reject a pair named in both lists here, inside the run, so the audit row
+        records the rejection."""
+        if both := set(action.create_pairs) & set(action.purge_pairs):
+            raise InvalidAPIParameters(f"Pairs named to both create and purge: {both}")
+        written, unlinked = await self._repository.update(
+            [(pair.scope, pair.target) for pair in action.create_pairs],
+            action.creator,
+            [(pair.scope, pair.target) for pair in action.purge_pairs],
+            action.purger,
+        )
+        return UpdateRelationActionResult(
+            linked=[
+                RelationLinkResult(pair=pair, linked=linked)
+                for pair, linked in zip(action.create_pairs, written, strict=True)
+            ],
+            unlinked=[
+                RelationUnlinkResult(pair=pair, unlinked=was_linked)
+                for pair, was_linked in zip(action.purge_pairs, unlinked, strict=True)
+            ],
         )
 
     async def delete(

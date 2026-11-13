@@ -22,12 +22,17 @@
   있었다. relation ops 는 대신 그래프에 기록한다. 스코프가 READ 로 대상을 govern 하고,
   대상이 READ share 로 스코프를 보유한다.
 
-## action 네 개가 모든 relation 을 처리한다
+## action 다섯 개가 모든 relation 을 처리한다
 
 - `CreateRelationAction`, `PurgeRelationAction`, `DeleteRelationAction`,
   `RestoreRelationAction` 은 짝과 어떤 relation 인지 나타내는 spec 을 갖는다. 그래서
   방향마다 action 하나가 registry, 자원 그룹, 유휴 검사기 할당, 그리고 앞으로 추가될 relation
   을 처리한다.
+- `UpdateRelationAction` 은 짝 목록 하나를 purge 하고 다른 목록을 create 하는 일을 트랜잭션
+  하나에서 한다. 그래서 add 목록과 remove 목록을 함께 담은 요청은 전부 적용되거나 전혀 적용되지
+  않는다. 지정한 엔티티마다 트랜잭션 잠금을 걸어, 엔티티를 공유하는 두 실행은 차례로 실행된다.
+  지정한 엔티티마다 UPDATE 를 요구하고, 두 목록에 모두 있는 짝과 서로 다른 relation 의
+  creator 와 purger 는 거부한다.
 - lifecycle 방향 둘은 lifecycle column 을 가진 relation 을 위해 있다. 하나를 비활성화하면 row 와
   양쪽이 서로 읽는 내용이 남으므로, 비활성화된 relation 도 양쪽 목록에 남고 다시 활성화할 수 있다.
 - spec 은 요청을 읽는 곳에서 고른다. adapter 는 registry 의 프로젝트나 자원 그룹의 허용
@@ -38,8 +43,8 @@
   호출자가 피할 필요가 없으므로, 중복을 따로 처리하는 호출부는 없다.
 - 이미 연결된 짝도 그래프 읽기(govern 과 share)를 다시 등록한다. 등록은 idempotent
   하므로, 그래프 row 없이 row 만 남은 짝은 다시 생성할 때 채워진다.
-- 감사 로그 row 는 방향(`create_relation`, `purge_relation`, `delete_relation`,
-  `restore_relation`)과 지정한 스코프를 기록한다. relation 을 구분하는 것은 이름이 아니라
+- 감사 로그 row 는 방향(`create_relation`, `purge_relation`, `update_relation`,
+  `delete_relation`, `restore_relation`)과 지정한 스코프를 기록한다. relation 을 구분하는 것은 이름이 아니라
   짝이다.
 - 여러 짝에 대한 실행이 무엇을 *의미*하는지는 여전히 호출자가 정한다. registry 의 "연결된
   것이 없는데 제거하면 에러가 난다"는 반환된 결과를 센다.

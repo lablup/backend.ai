@@ -20,6 +20,7 @@ What these tests pin down:
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from collections.abc import AsyncGenerator, Sequence
 from typing import Any, override
@@ -58,6 +59,7 @@ from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingR
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
+from ai.backend.manager.repositories.rbac.relation_repository import RbacRelationRepository
 from ai.backend.testutils.db import with_tables
 
 _SCOPE_TYPE = ProjectEntityType()
@@ -644,3 +646,99 @@ class TestAtomicInsertRelationsIfAbsent:
                 sa.select(RelationTestRow.off).where(RelationTestRow.target_id == target)
             )
         assert kept is True
+
+
+class _AlwaysRefusingCreator(_Creator):
+    @override
+    def precondition_checks(
+        self, scope: _ScopeID, target: _TargetID
+    ) -> Sequence[PreconditionCheck]:
+        return (
+            PreconditionCheck(
+                finder=sa.select(sa.literal(1)), error=ObjectNotFound(object_name="refused")
+            ),
+        )
+
+
+@pytest.fixture
+def repository(provider: RelationOpsProvider) -> RbacRelationRepository:
+    return RbacRelationRepository(provider)
+
+
+@pytest.fixture
+async def linked_pair(
+    pair: tuple[_ScopeID, _TargetID], repository: RbacRelationRepository
+) -> tuple[_ScopeID, _TargetID]:
+    await repository.create([pair], _Creator())
+    return pair
+
+
+class TestUpdateRelations:
+    async def test_purges_and_creates_in_one_run(
+        self,
+        database: ExtendedAsyncSAEngine,
+        repository: RbacRelationRepository,
+        linked_pair: tuple[_ScopeID, _TargetID],
+        other_target: _TargetID,
+    ) -> None:
+        scope, target = linked_pair
+
+        result = await repository.update(
+            [(scope, other_target)], _Creator(), [(scope, target)], _Purger()
+        )
+
+        assert result == ([True], [True])
+        assert await _row_count(database) == 1
+        assert await _govern_cap(database, scope, target) is False
+        assert await _govern_cap(database, scope, other_target) == Permission.READ
+
+    async def test_create_only_answers_an_empty_purge(
+        self,
+        database: ExtendedAsyncSAEngine,
+        repository: RbacRelationRepository,
+        pair: tuple[_ScopeID, _TargetID],
+    ) -> None:
+        assert await repository.update([pair], _Creator(), [], _Purger()) == ([True], [])
+        assert await _row_count(database) == 1
+
+    async def test_purge_only_answers_an_empty_create(
+        self,
+        database: ExtendedAsyncSAEngine,
+        repository: RbacRelationRepository,
+        linked_pair: tuple[_ScopeID, _TargetID],
+    ) -> None:
+        assert await repository.update([], _Creator(), [linked_pair], _Purger()) == ([], [True])
+        assert await _row_count(database) == 0
+
+    async def test_a_failed_create_takes_the_purge_back(
+        self,
+        database: ExtendedAsyncSAEngine,
+        repository: RbacRelationRepository,
+        linked_pair: tuple[_ScopeID, _TargetID],
+        other_target: _TargetID,
+    ) -> None:
+        scope, target = linked_pair
+
+        with pytest.raises(ObjectNotFound):
+            await repository.update(
+                [(scope, other_target)], _AlwaysRefusingCreator(), [(scope, target)], _Purger()
+            )
+
+        assert await _row_count(database) == 1
+        assert await _govern_cap(database, scope, target) == Permission.READ
+
+    async def test_waits_while_another_transaction_holds_a_named_entity(
+        self,
+        provider: RelationOpsProvider,
+        repository: RbacRelationRepository,
+        linked_pair: tuple[_ScopeID, _TargetID],
+    ) -> None:
+        scope, target = linked_pair
+
+        async with provider.write_ops() as holder:
+            await holder.lock_entities([target])
+            run = asyncio.create_task(repository.update([], _Creator(), [linked_pair], _Purger()))
+            done, _ = await asyncio.wait({run}, timeout=0.5)
+            assert not done
+
+        assert await run == ([], [True])
