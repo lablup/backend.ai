@@ -2,7 +2,7 @@
 
 [배경](/src/ai/backend/manager/api/adapters/project/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/project/adapter.py)
 
-시나리오: 미완성 15 / 17
+시나리오: 미완성 14 / 17
 
 - ops 구성 (10)
   - admin_search: 대표 성공 ✗ · 대표 거부 ✗: SCENARIO-GAP
@@ -16,7 +16,7 @@
   - search_by_domain_name: 대표 성공 ✗ · 대표 거부 ✗: SCENARIO-GAP
   - search_by_user: 대표 성공 ✗ · 대표 거부 ✗: SCENARIO-GAP
 - ops + 직접 구현 (4)
-  - assign_users: 성공 있음 1 · 거부 없음 (atomic_bulk_get_ops, scope): SCENARIO-GAP
+  - assign_users: 성공 있음 1 · 거부 있음 1 (atomic_bulk_get_ops, partial_bulk_get_ops, relation)
   - partial_bulk_update: 성공 있음 3 · 거부 없음 (partial_bulk, partial_bulk_delete_ops, partial_bulk_restore_ops): SCENARIO-GAP
   - unassign_users: 성공 없음 · 거부 없음 (atomic_bulk_get_ops, scope): SCENARIO-GAP
   - update: 성공 있음 2 · 거부 없음 (single_delete_ops, single_entity, single_restore_ops): SCENARIO-GAP
@@ -42,7 +42,8 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [프로젝트와 그 프로젝트 스코프의 역할이 있을 때 사용자를 배정하면, 그 사용자가 멤버 목록에 오릅니다](#project-assigning-a-user-to-a-project-puts-them-on-its-roster) | 성공 |
+| [사용자를 만들 권한과 지정한 역할을 부여할 권한을 모두 받은 호출자가 그 역할로 사용자를 배정하면, 그 사용자가 멤버 목록에 오릅니다](#project-assigning-a-user-to-a-project-puts-them-on-its-roster) | 성공 |
+| [배정은 지정한 역할을 부여할 권한까지 요구하므로, 사용자를 만들 권한만 받은 호출자는 권한 부족으로 거부됩니다](#project-a-caller-who-may-not-grant-the-role-may-not-assign-a-user-with-it) | 거부 |
 
 **partial_bulk_update**
 
@@ -226,11 +227,11 @@ Then
 
 #### [assigning-a-user-to-a-project-puts-them-on-its-roster](/tests/scenario/bai_scenario/manager/project/test_project.py): pass
 
-프로젝트와 그 프로젝트 스코프의 역할이 있을 때 사용자를 배정하면, 그 사용자가 멤버 목록에 오릅니다
+사용자를 만들 권한과 지정한 역할을 부여할 권한을 모두 받은 호출자가 그 역할로 사용자를 배정하면, 그 사용자가 멤버 목록에 오릅니다
 
 Given
 
-- 프로젝트 하나와 그 프로젝트 스코프의 역할, 배정할 사용자, 그리고 superadmin
+- 프로젝트 하나와 그 프로젝트 스코프의 역할, 배정할 사용자, 그리고 도메인 스코프의 사용자 READ 와 CREATE 를 받은 호출자. 호출자는 역할 CREATE 를 받았습니다
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 research-1
@@ -240,8 +241,16 @@ Given
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
     - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - superadmin user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
   - 역할 project-member-1: 부여된 스코프 안에서만 적용됩니다
+  - 사용자 READ, CREATE 권한을 부여한 역할 배정
+    - 역할 user-role-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 역할 user-role-1: user 전체에 CREATE 허용
+    - 일반 사용자 user-2: 역할 user-role-1 보유
+  - 역할 role-granter-1: 부여된 스코프 안에서만 적용됩니다
+  - 역할 role-granter-1: role 전체에 CREATE 허용
+  - 일반 사용자 user-2: 역할 role-granter-1 보유
 
 When
 
@@ -251,6 +260,41 @@ Then
 
 - 멤버 목록에 배정한 사람만 올라 있습니다
   - items: 배정한 사람 하나와 같다
+
+<a id="project-a-caller-who-may-not-grant-the-role-may-not-assign-a-user-with-it"></a>
+
+#### [a-caller-who-may-not-grant-the-role-may-not-assign-a-user-with-it](/tests/scenario/bai_scenario/manager/project/test_project.py): pass
+
+배정은 지정한 역할을 부여할 권한까지 요구하므로, 사용자를 만들 권한만 받은 호출자는 권한 부족으로 거부됩니다
+
+Given
+
+- 프로젝트 하나와 그 프로젝트 스코프의 역할, 배정할 사용자, 그리고 도메인 스코프의 사용자 READ 와 CREATE 를 받은 호출자. 호출자는 역할 CREATE 를 받지 않았습니다
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 research-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 역할 project-member-1: 부여된 스코프 안에서만 적용됩니다
+  - 사용자 READ, CREATE 권한을 부여한 역할 배정
+    - 역할 user-role-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 역할 user-role-1: user 전체에 CREATE 허용
+    - 일반 사용자 user-2: 역할 user-role-1 보유
+
+When
+
+- ProjectAdapter.assign_users: user-2이 user-1을 research-1에 배정합니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
 
 ### partial_bulk_update
 

@@ -9,6 +9,8 @@ from typing import Any, override
 import pytest
 
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.role import RoleEntityType
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.group.request import (
     AssignUsersToProjectInput,
@@ -21,6 +23,7 @@ from ai.backend.common.dto.manager.v2.group.response import (
 from ai.backend.manager.api.adapters.project.adapter import ProjectAdapter
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.permission.role import RoleData
+from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.resource.types import ProjectResourcePolicyData
 from ai.backend.manager.data.user.types import UserData
@@ -46,12 +49,13 @@ from bai_scenario.components.domain import (
     SomeoneOf,
     WrittenByThisRun,
 )
+from bai_scenario.components.user import AGrant
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 from bai_scenario.seeds.domain.domain import TestSeedDomain
 from bai_scenario.seeds.project.project import TestSeedProject
-from bai_scenario.seeds.rbac.role import TestSeedRole
+from bai_scenario.seeds.rbac.role import TestSeedPermission, TestSeedRole
 from bai_scenario.seeds.resource_policy.project import TestSeedProjectPolicy
 
 MADE = "research"
@@ -102,14 +106,25 @@ class ADomainAndAPolicy(Given[Any, ADomainAPolicyAndACaller]):
 
 
 @dataclass(frozen=True)
-class AProjectAndAMember(Given[Any, AProjectAMemberAndACaller]):
-    """프로젝트 하나와 그 스코프의 역할, 올릴 사람, 그리고 슈퍼관리자."""
+class AProjectAMemberAndAnAssigner(Given[Any, AProjectAMemberAndACaller]):
+    """프로젝트 하나와 그 스코프의 역할, 올릴 사람, 그리고 도메인의 사용자 권한을 받은 사람."""
+
+    may_grant_role: bool
 
     @override
     def describe(self) -> str:
+        if self.may_grant_role:
+            held_ko, held_en = "받았습니다", "holds"
+        else:
+            held_ko, held_en = "받지 않았습니다", "does not hold"
         return Says(
-            "프로젝트 하나와 그 프로젝트 스코프의 역할, 배정할 사용자, 그리고 superadmin",
-            english="one project, the role in its scope, the user to assign, and the superadmin",
+            "프로젝트 하나와 그 프로젝트 스코프의 역할, 배정할 사용자, 그리고 도메인 스코프의 "
+            f"사용자 READ 와 CREATE 를 받은 호출자. 호출자는 역할 CREATE 를 {held_ko}",
+            english=(
+                "one project, the role in its scope, the user to assign, and a caller holding "
+                "the user READ and CREATE permissions in the domain scope. The caller "
+                f"{held_en} the role CREATE permission"
+            ),
         )
 
     @override
@@ -121,7 +136,16 @@ class AProjectAndAMember(Given[Any, AProjectAMemberAndACaller]):
         role = await seeding.creating_from(
             TestSeedRole(lambda one: ProjectID(one.id), name_hint="project-member"), project
         )
-        caller = await seeding.within(SomeoneOf(domain, role=UserRole.SUPERADMIN))
+        caller = await seeding.within(SomeoneOf(domain))
+        await seeding.within(AGrant.on_domain(domain, caller, Permission.READ, Permission.CREATE))
+        if self.may_grant_role:
+            granter = await seeding.creating_from(
+                TestSeedRole(lambda one: ProjectID(one.id), name_hint="role-granter"), project
+            )
+            await seeding.adding(TestSeedPermission(RoleEntityType(), Permission.CREATE), granter)
+            await seeding.granting(
+                granter, caller, role_id=lambda one: one.id, user_id=lambda one: UserID(one.id)
+            )
         return AProjectAMemberAndACaller(
             seeding.made(project),
             seeding.made(role),
@@ -183,6 +207,7 @@ class AssigningTheMember(When[AProjectAMemberAndACaller, ProjectAdapter, Answer]
             return await adapter.assign_users(
                 laid.project.id,
                 AssignUsersToProjectInput(user_ids=[laid.member.id], role_id=laid.role.id),
+                granted_by=laid.caller.id,
             )
 
 
@@ -328,17 +353,17 @@ class AssigningAUserPutsThemOnTheRoster(
     @override
     def describe(self) -> str:
         return Says(
-            "프로젝트와 그 프로젝트 스코프의 역할이 있을 때 사용자를 배정하면, 그 사용자가 "
-            "멤버 목록에 오릅니다",
+            "사용자를 만들 권한과 지정한 역할을 부여할 권한을 모두 받은 호출자가 그 역할로 "
+            "사용자를 배정하면, 그 사용자가 멤버 목록에 오릅니다",
             english=(
-                "when a project and a role in its scope are in place and a user is assigned, "
-                "the user is put on the roster"
+                "when a caller permitted both to create users and to grant the named role "
+                "assigns a user with that role, the user is put on the roster"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, AProjectAMemberAndACaller]:
-        return AProjectAndAMember()
+        return AProjectAMemberAndAnAssigner(may_grant_role=True)
 
     @override
     def when(self) -> When[AProjectAMemberAndACaller, ProjectAdapter, Answer]:
@@ -349,10 +374,43 @@ class AssigningAUserPutsThemOnTheRoster(
         return TheRosterHoldsTheMember()
 
 
+@dataclass(frozen=True)
+class ACallerWhoMayNotGrantTheRoleMayNotAssignWithIt(
+    Scenario[TestSeedingSession, AProjectAMemberAndACaller, ProjectAdapter, Answer]
+):
+    @override
+    def summary(self) -> str:
+        return "a-caller-who-may-not-grant-the-role-may-not-assign-a-user-with-it"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "배정은 지정한 역할을 부여할 권한까지 요구하므로, 사용자를 만들 권한만 받은 "
+            "호출자는 권한 부족으로 거부됩니다",
+            english=(
+                "an assignment also asks for the permission to grant the named role, so a "
+                "caller permitted only to create users is rejected for lack of permission"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, AProjectAMemberAndACaller]:
+        return AProjectAMemberAndAnAssigner(may_grant_role=False)
+
+    @override
+    def when(self) -> When[AProjectAMemberAndACaller, ProjectAdapter, Answer]:
+        return AssigningTheMember()
+
+    @override
+    def then(self) -> Then[AProjectAMemberAndACaller, Answer]:
+        return TheCallIsRefused(NotEnoughPermission)
+
+
 SCENARIOS: list[Scenario[TestSeedingSession, Any, ProjectAdapter, Answer]] = [
     TheSuperadminMakesAProject(started=datetime.now(UTC)),
     AUserGrantedNothingMayNotMakeAProject(),
     AssigningAUserPutsThemOnTheRoster(),
+    ACallerWhoMayNotGrantTheRoleMayNotAssignWithIt(),
 ]
 
 

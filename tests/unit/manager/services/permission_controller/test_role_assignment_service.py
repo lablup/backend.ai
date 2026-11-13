@@ -37,6 +37,7 @@ def mock_repository() -> MagicMock:
     repo.assign_role = AsyncMock()
     repo.revoke_role = AsyncMock()
     repo.bulk_assign_role = AsyncMock()
+    repo.get_role = AsyncMock(return_value=MagicMock())
     return repo
 
 
