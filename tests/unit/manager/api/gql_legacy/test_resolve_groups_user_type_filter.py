@@ -12,6 +12,7 @@ from pytest_mock import MockerFixture
 from ai.backend.manager.api.gql_legacy.group import Group
 from ai.backend.manager.api.gql_legacy.schema import Query
 from ai.backend.manager.data.project.types import ProjectType
+from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.models.user.row import UserRole
 
 
@@ -49,3 +50,13 @@ class TestResolveGroupsForUser:
         call = batch_load_by_user.await_args
         assert call is not None
         assert call.kwargs["type"] == expected
+
+    async def test_an_unknown_type_is_refused_as_an_invalid_request(
+        self,
+        info: graphene.ResolveInfo,
+        batch_load_by_user: AsyncMock,
+    ) -> None:
+        with pytest.raises(InvalidAPIParameters):
+            await Query.resolve_groups(None, info, is_active=True, type=["NOPE"])
+
+        batch_load_by_user.assert_not_awaited()
