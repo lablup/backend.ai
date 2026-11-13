@@ -69,14 +69,15 @@ class VFolderOwnershipType(CIStrEnum):
         return VFolderOwnershipTypeField(self)
 
 
-class PersonalVFolderHostGrantSources(enum.StrEnum):
+class VFolderCreationHostGrantRule(enum.StrEnum):
     """
-    The host grants a personal folder creation checks. REST v1 creation unions the
-    domain, the user's projects and the keypair resource policy; v2 reads the policy alone.
+    The grants a vfolder creation's host check unions. Legacy REST v1 unions the domain, the
+    project (or the user's projects) and the keypair policy. v2 unions the domain with the
+    project for a project folder, and with the keypair policy for a personal folder.
     """
 
-    KEYPAIR_RESOURCE_POLICY = "keypair_resource_policy"
-    DOMAIN_PROJECTS_AND_KEYPAIR_RESOURCE_POLICY = "domain_projects_and_keypair_resource_policy"
+    LEGACY_REST_V1 = "legacy_rest_v1"
+    V2 = "v2"
 
 
 class VFolderMountPermission(enum.StrEnum):

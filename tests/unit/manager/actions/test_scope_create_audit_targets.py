@@ -25,7 +25,7 @@ from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.monitor.audit_log import ScopeActionAuditLogMonitor
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
-from ai.backend.manager.data.vfolder.types import PersonalVFolderHostGrantSources
+from ai.backend.manager.data.vfolder.types import VFolderCreationHostGrantRule
 from ai.backend.manager.models.audit_log.creators import AuditLogScopeCreator
 from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.repositories.client_ip_masking.repository import ClientIPMaskingRepository
@@ -184,7 +184,7 @@ _CASES: dict[str, _Case] = {
     "create_vfolder": _Case(
         action=CreateVFolderAction(
             creator=_vfolder_creator(),
-            personal_folder_host_grant_sources=PersonalVFolderHostGrantSources.KEYPAIR_RESOURCE_POLICY,
+            host_grant_rule=VFolderCreationHostGrantRule.V2,
         ),
         result=CreateVFolderActionResult(vfolder=MagicMock(id=_VFOLDER_ID)),
         expected_entity_ids=(_VFOLDER_ID,),

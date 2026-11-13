@@ -110,7 +110,7 @@ from ai.backend.common.exception import UnreachableError
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderID, VFolderMountPolicy
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.vfolder.types import (
-    PersonalVFolderHostGrantSources,
+    VFolderCreationHostGrantRule,
     VFolderOwnershipType,
     VFolderStatusSet,
     vfolder_status_map,
@@ -331,7 +331,7 @@ class VFolderHandler:
             result = await self._vfolder.create_vfolder.run(
                 CreateVFolderAction(
                     creator=creator,
-                    personal_folder_host_grant_sources=PersonalVFolderHostGrantSources.DOMAIN_PROJECTS_AND_KEYPAIR_RESOURCE_POLICY,
+                    host_grant_rule=VFolderCreationHostGrantRule.LEGACY_REST_V1,
                 )
             )
         except (VFolderInvalidParameter, VFolderAlreadyExists) as e:

@@ -36,9 +36,9 @@ from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.project.types import ProjectResourceInfo
 from ai.backend.manager.data.vfolder.dto import UserIdentity
 from ai.backend.manager.data.vfolder.types import (
-    PersonalVFolderHostGrantSources,
     VFolderCloneInfo,
     VFolderCreation,
+    VFolderCreationHostGrantRule,
     VFolderData,
     VFolderInvitationData,
     VFolderMountPolicyData,
@@ -69,6 +69,7 @@ from ai.backend.manager.errors.storage import (
 )
 from ai.backend.manager.errors.user import KeyPairNotFound, UserNotFound
 from ai.backend.manager.models.agent.row import agents
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.entity_share.creators import EntityShareCreator
 from ai.backend.manager.models.entity_share.lookups import HeldShareLookup
 from ai.backend.manager.models.entity_share.purgers import EntitySharePendingOfferBatchPurger
@@ -269,8 +270,8 @@ class VfolderRepository:
         """
         Get the allowed VFolder hosts for a user.
 
-        A non-personal project unions its domain's, its own and the user's keypair policy
-        hosts. A personal project carries no hosts of its own; the keypair policy answers.
+        A non-personal project unions its domain's hosts with its own. Otherwise the
+        user's domain's hosts are unioned with the default keypair policy's.
         """
         async with self._db.begin_readonly_session_read_committed() as db_session:
             if group_uuid:
@@ -280,23 +281,31 @@ class VfolderRepository:
                 if group_row is None:
                     raise ProjectNotFound(f"Project with {group_uuid} not found.")
                 if group_row.type != ProjectType.PERSONAL:
-                    keypair_hosts = await self._fetch_default_keypair_vfolder_hosts(
-                        db_session, user_uuid
+                    project_domain_hosts = await self._fetch_domain_vfolder_hosts(
+                        db_session, group_row.domain_name
                     )
-                    keypair_resource_policy = {
-                        "allowed_vfolder_hosts": keypair_hosts or VFolderHostPermissionMap()
-                    }
-                    return await get_allowed_vfolder_hosts_by_group(
-                        await db_session.connection(),
-                        keypair_resource_policy,
-                        group_row.domain_name,
-                        group_uuid,
+                    return VFolderHostPermissionMap(
+                        project_domain_hosts | group_row.allowed_vfolder_hosts
                     )
 
-            allowed_hosts = await self._fetch_default_keypair_vfolder_hosts(db_session, user_uuid)
-            if allowed_hosts is None:
+            keypair_hosts = await self._fetch_default_keypair_vfolder_hosts(db_session, user_uuid)
+            if keypair_hosts is None:
                 raise KeyPairNotFound("The user has no default keypair.")
-            return allowed_hosts
+            user_domain_name = await db_session.scalar(
+                sa.select(UserRow.domain_name).where(UserRow.uuid == user_uuid)
+            )
+            user_domain_hosts = await self._fetch_domain_vfolder_hosts(db_session, user_domain_name)
+            return VFolderHostPermissionMap(user_domain_hosts | keypair_hosts)
+
+    async def _fetch_domain_vfolder_hosts(
+        self, db_session: SASession, domain_name: str | None
+    ) -> VFolderHostPermissionMap:
+        domain_hosts: VFolderHostPermissionMap | None = await db_session.scalar(
+            sa.select(DomainRow.allowed_vfolder_hosts).where(
+                DomainRow.name == domain_name, DomainRow.is_active
+            )
+        )
+        return domain_hosts or VFolderHostPermissionMap()
 
     async def _fetch_default_keypair_vfolder_hosts(
         self, db_session: SASession, user_uuid: uuid.UUID
@@ -408,46 +417,57 @@ class VfolderRepository:
                 raise PersonalProjectNotFound(f"User '{user_id}' has no personal project.")
             return ProjectID(project_id)
 
+    async def _legacy_rest_v1_creation_vfolder_hosts(
+        self, creator: VFolderBaseCreator
+    ) -> VFolderHostPermissionMap:
+        if not isinstance(creator, ProjectVFolderCreator):
+            return await self.get_user_storage_host_permissions(
+                creator.creator_id, creator.domain_name
+            )
+        async with self._db.begin_readonly_session_read_committed() as db_session:
+            keypair_hosts = await self._fetch_default_keypair_vfolder_hosts(
+                db_session, creator.creator_id
+            )
+            return await get_allowed_vfolder_hosts_by_group(
+                await db_session.connection(),
+                {"allowed_vfolder_hosts": keypair_hosts or VFolderHostPermissionMap()},
+                creator.domain_name,
+                creator.project,
+            )
+
     @vfolder_repository_resilience.apply()
     async def create_vfolder_with_permission(
         self,
         creator: VFolderBaseCreator,
         *,
-        personal_folder_host_grant_sources: PersonalVFolderHostGrantSources,
+        host_grant_rule: VFolderCreationHostGrantRule,
     ) -> VFolderCreation:
         """Write the vfolder row and answer with what making its storage folder needs.
 
         The host the folder asks for is checked here rather than by the caller, so a
         request that may not reach that host writes nothing.
         """
-        if isinstance(creator, ProjectVFolderCreator):
-            await self.ensure_host_permission_allowed_by_user(
-                creator.host,
-                permission=VFolderHostPermission.CREATE,
-                user_uuid=creator.creator_id,
-                group_id=creator.project,
-            )
-        else:
-            match personal_folder_host_grant_sources:
-                case PersonalVFolderHostGrantSources.KEYPAIR_RESOURCE_POLICY:
-                    # v2 (REST v2, GQL): the keypair resource policy alone.
-                    await self.ensure_host_permission_allowed_by_user(
-                        creator.host,
-                        permission=VFolderHostPermission.CREATE,
-                        user_uuid=creator.creator_id,
+        match host_grant_rule:
+            case VFolderCreationHostGrantRule.LEGACY_REST_V1:
+                # The domain, the project or the user's projects, and the keypair policy.
+                allowed_hosts = await self._legacy_rest_v1_creation_vfolder_hosts(creator)
+                if (
+                    creator.host not in allowed_hosts
+                    or VFolderHostPermission.CREATE not in allowed_hosts[creator.host]
+                ):
+                    raise InsufficientStoragePermission(
+                        f"`{VFolderHostPermission.CREATE}` Not allowed in vfolder host(`{creator.host}`)"
                     )
-                case PersonalVFolderHostGrantSources.DOMAIN_PROJECTS_AND_KEYPAIR_RESOURCE_POLICY:
-                    # Legacy REST v1: the domain, the user's projects and the keypair policy.
-                    allowed_hosts = await self.get_user_storage_host_permissions(
-                        creator.creator_id, creator.domain_name
-                    )
-                    if (
-                        creator.host not in allowed_hosts
-                        or VFolderHostPermission.CREATE not in allowed_hosts[creator.host]
-                    ):
-                        raise InsufficientStoragePermission(
-                            f"`{VFolderHostPermission.CREATE}` Not allowed in vfolder host(`{creator.host}`)"
-                        )
+            case VFolderCreationHostGrantRule.V2:
+                # The domain, with the project or with the keypair policy.
+                await self.ensure_host_permission_allowed_by_user(
+                    creator.host,
+                    permission=VFolderHostPermission.CREATE,
+                    user_uuid=creator.creator_id,
+                    group_id=creator.project
+                    if isinstance(creator, ProjectVFolderCreator)
+                    else None,
+                )
         limits = await self._storage_limits(creator)
         async with self._v2_ops.write_ops() as w:
             created = await w.create_entity(creator)
