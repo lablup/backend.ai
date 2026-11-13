@@ -361,9 +361,9 @@ async def _run_proxy_request(
                         await frontend_resp.write_eof()
                 except ConnectionResetError as e:
                     # Not raised, so the endpoint pool does not count a client disconnect.
-                    if not is_client_disconnect(frontend_rqst, e):
-                        raise
-                    return client_closed_response()
+                    if is_client_disconnect(frontend_rqst, e):
+                        return client_closed_response()
+                    raise
                 return frontend_resp
 
     try:
@@ -596,9 +596,9 @@ async def web_plugin_handler(
                         await frontend_resp.write_eof()
                 except ConnectionResetError as e:
                     # Not raised, so the endpoint pool does not count a client disconnect.
-                    if not is_client_disconnect(frontend_rqst, e):
-                        raise
-                    return client_closed_response()
+                    if is_client_disconnect(frontend_rqst, e):
+                        return client_closed_response()
+                    raise
                 return frontend_resp
 
     try:
