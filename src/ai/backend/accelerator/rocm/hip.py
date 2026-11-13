@@ -13,6 +13,8 @@ from .exception import LibraryError
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
+RSMI_STATUS_NOT_SUPPORTED = 2
+
 
 class hipDeviceArch_t(ctypes.Structure):
     _fields_ = [
@@ -161,6 +163,11 @@ class rsmiVersionProp(ctypes.Structure):
     ]
 
 
+def _decode_hip_version(raw_ver: int) -> tuple[int, int]:
+    # HIP encodes versions as major * 10_000_000 + minor * 100_000 + patch.
+    return (raw_ver // 10_000_000, (raw_ver // 100_000) % 100)
+
+
 def _load_library(name: str) -> ctypes.CDLL | None:
     try:
         if platform.system() == "Windows":
@@ -229,7 +236,7 @@ class libhip(LibraryBase):
             raw_ver = ctypes.c_int()
             cls.invoke("hipRuntimeGetVersion", ctypes.byref(raw_ver))
             log.debug("HIP runtime version: {}", raw_ver.value)
-            cls._runtime_version = (raw_ver.value // 1000, (raw_ver.value % 100) // 10)
+            cls._runtime_version = _decode_hip_version(raw_ver.value)
         return cls._runtime_version
 
     @classmethod
@@ -237,7 +244,7 @@ class libhip(LibraryBase):
         if cls._driver_version == (0, 0):
             raw_ver = ctypes.c_int()
             cls.invoke("hipDriverGetVersion", ctypes.byref(raw_ver))
-            cls._driver_version = (raw_ver.value // 1000, (raw_ver.value % 100) // 10)
+            cls._driver_version = _decode_hip_version(raw_ver.value)
         return cls._driver_version
 
     @classmethod
@@ -249,7 +256,11 @@ class libhip(LibraryBase):
     @classmethod
     def get_device_props(cls, device_idx: int) -> MutableMapping[str, Any]:
         props_struct = hipDeviceProp()
-        cls.invoke("hipGetDeviceProperties", ctypes.byref(props_struct), device_idx)
+        # From HIP 6, the exported hipGetDeviceProperties keeps the pre-6 struct layout;
+        # hipDeviceProp follows the R0600 layout that the HIP 6 headers map to.
+        (major, _) = cls.get_version()
+        func_name = "hipGetDevicePropertiesR0600" if major >= 6 else "hipGetDeviceProperties"
+        cls.invoke(func_name, ctypes.byref(props_struct), device_idx)
         props: MutableMapping[str, Any] = {
             field[0]: getattr(props_struct, field[0]) for field in hipDeviceProp._fields_
         }
@@ -305,15 +316,21 @@ class librocm_smi(LibraryBase):
             raise RuntimeError(f"Error while shutting down ROCm-SMI: {return_code}")
 
     @classmethod
-    def get_serial_number(cls, device_idx: int) -> str:
+    def get_serial_number(cls, device_idx: int) -> str | None:
+        """Return None when the device does not expose a serial number (e.g., SR-IOV VFs)."""
         sbuf = (ctypes.c_char * 256)()
-        ret = cls.invoke("rsmi_dev_serial_number_get", device_idx, sbuf, 256)
+        ret = cls.invoke("rsmi_dev_serial_number_get", device_idx, sbuf, 256, check_rc=False)
+        if ret == RSMI_STATUS_NOT_SUPPORTED:
+            return None
         if ret != 0:
-            raise RuntimeError(
-                f"get_serial_number({device_idx}): error while executing"
-                f" rsmi_dev_serial_number_get(): unexpected exit code: {ret}"
-            )
+            raise LibraryError(cls.name, "rsmi_dev_serial_number_get", ret)
         return sbuf.value.decode()
+
+    @classmethod
+    def get_drm_render_minor(cls, device_idx: int) -> int:
+        minor = ctypes.c_uint32()
+        cls.invoke("rsmi_dev_drm_render_minor_get", device_idx, ctypes.byref(minor))
+        return minor.value
 
     @classmethod
     def get_memory_info(cls, device_idx: int) -> tuple[int, int]:
