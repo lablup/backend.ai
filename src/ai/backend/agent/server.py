@@ -591,9 +591,13 @@ class AgentRPCServer(aobject):
 
         # Fill up vfolder configs from etcd and store as separate attributes
         # TODO: Integrate vfolder_config into local_config
-        self._vfolder_config = config.vfolder_config_iv.check(
-            await self.etcd.get_prefix("volumes"),
-        )
+        # Read only the keys the agent uses; "volumes/" also holds proxy secrets.
+        vfolder_etcd_config = {
+            key: value
+            for key in ("_mount", "_fsprefix")
+            if (value := await self.etcd.get(f"volumes/{key}")) is not None
+        }
+        self._vfolder_config = config.vfolder_config_iv.check(vfolder_etcd_config)
         if self._vfolder_config["mount"] is None:
             log.info("vfolder mount path not configured, assuming storage-proxy")
         else:
