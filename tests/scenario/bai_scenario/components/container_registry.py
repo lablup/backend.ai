@@ -417,12 +417,14 @@ class SomeoneAllowingIn[ScopeData](TestSeedNest[Laid[None]]):
 class RelationsAndACaller:
     """`home`과 `wanted` 사이의 relation이 검색이 찾는 행이다.
 
+    `wanted`는 만든 순서와 이름순이 어긋나게 심어, 이름순이 id의 어느 방향과도 다르다.
+
     `outside`는 `home`과 relation이 없어, `home`에서 받은 권한으로는 읽히지 않는다.
     """
 
     home: DomainData
     other_domain: DomainData
-    wanted: ContainerRegistryData
+    wanted: tuple[ContainerRegistryData, ...]
     other_registry: ContainerRegistryData
     outside: ContainerRegistryData
     caller: UserData
@@ -430,7 +432,7 @@ class RelationsAndACaller:
 
 @dataclass(frozen=True)
 class RelationsInTwoDomains(Given[TestSeedingSession, RelationsAndACaller]):
-    """도메인 둘과 레지스트리 셋 사이에 relation 넷.
+    """도메인 둘과 레지스트리 다섯 사이에 relation 여섯.
 
     relation은 도메인이 그 레지스트리를 READ로 govern하게 하므로, 검색할 도메인에서 레지스트리
     조회 권한을 받은 사용자는 그 도메인과 relation이 있는 레지스트리만 읽는다.
@@ -448,11 +450,11 @@ class RelationsInTwoDomains(Given[TestSeedingSession, RelationsAndACaller]):
             holds_ko = "아무 권한도 받지 않은"
             holds_en = "granted nothing"
         return Says(
-            "도메인 둘과 레지스트리 셋 사이에 relation 넷이 있고, 한 도메인에 속해 "
+            "도메인 둘과 레지스트리 다섯 사이에 relation 여섯이 있고, 한 도메인에 속해 "
             f"{holds_ko} {self.role.value} 한 명이 있습니다. 레지스트리 하나는 그 도메인과 "
             "relation이 없습니다",
             english=(
-                "four relations between two domains and three registries, and one "
+                "six relations between two domains and five registries, and one "
                 f"{self.role.value} in one of the domains {holds_en}. One registry is not "
                 "related to that domain"
             ),
@@ -462,12 +464,16 @@ class RelationsInTwoDomains(Given[TestSeedingSession, RelationsAndACaller]):
     async def lay(self, seeding: TestSeedingSession) -> RelationsAndACaller:
         home = await seeding.creating(TestSeedDomain(name_hint="home"))
         other_domain = await seeding.creating(TestSeedDomain(name_hint="other"))
-        wanted = await seeding.creating(TestSeedContainerRegistry(name_hint="wanted"))
+        wanted = [
+            await seeding.creating(TestSeedContainerRegistry(name_hint=hint))
+            for hint in ("beta", "alpha", "gamma")
+        ]
         other_registry = await seeding.creating(TestSeedContainerRegistry(name_hint="other"))
         outside = await seeding.creating(TestSeedContainerRegistry(name_hint="outside"))
-        await seeding.linking(AllowDomain(), home, wanted)
+        for registry in wanted:
+            await seeding.linking(AllowDomain(), home, registry)
         await seeding.linking(AllowDomain(), home, other_registry)
-        await seeding.linking(AllowDomain(), other_domain, wanted)
+        await seeding.linking(AllowDomain(), other_domain, wanted[0])
         await seeding.linking(AllowDomain(), other_domain, outside)
         caller = await seeding.within(SomeoneOf(home, role=self.role))
         if self.reads_in_domain:
@@ -484,7 +490,7 @@ class RelationsInTwoDomains(Given[TestSeedingSession, RelationsAndACaller]):
         return RelationsAndACaller(
             home=seeding.made(home),
             other_domain=seeding.made(other_domain),
-            wanted=seeding.made(wanted),
+            wanted=tuple(seeding.made(registry) for registry in wanted),
             other_registry=seeding.made(other_registry),
             outside=seeding.made(outside),
             caller=seeding.made(caller),
@@ -744,21 +750,21 @@ class AddMissingProject(AllowedProjectChange):
 
 
 @dataclass(frozen=True)
-class OnlyTheWantedRegistryIsListed(
+class TheWantedRegistriesAreListedByName(
     Then[RelationsAndACaller, ScopedSearchContainerRegistriesPayload]
 ):
-    """검색할 도메인과 relation이 있는 레지스트리 가운데 필터에 맞는 것만 온다."""
+    """검색할 도메인과 relation이 있는 레지스트리 가운데 필터에 맞는 셋이 이름순으로 온다."""
 
     @override
     def says(self) -> str:
         return Says(
-            "검색할 도메인과 relation이 있는 레지스트리 가운데 찾는 레지스트리 하나만 전체가 "
-            "반환되고, 필터에 맞지 않는 레지스트리와 검색할 도메인과 relation이 없는 레지스트리는 "
-            "반환되지 않습니다",
+            "검색할 도메인과 relation이 있는 레지스트리 가운데 필터에 맞는 셋이 이름순으로 각각 "
+            "전체가 반환되고, 필터에 맞지 않는 레지스트리와 검색할 도메인과 relation이 없는 "
+            "레지스트리는 반환되지 않습니다",
             english=(
-                "only the wanted registry among those related to the domain to search comes "
-                "back whole, and neither the registry the filter excludes nor the registry not "
-                "related to the domain to search does"
+                "the three registries related to the domain to search that match the filter come "
+                "back whole in name order, and neither the registry the filter excludes nor the "
+                "registry not related to the domain to search does"
             ),
         )
 
@@ -771,41 +777,33 @@ class OnlyTheWantedRegistryIsListed(
         payload = answered.response
         if payload is None:
             return [MissingResponse(answered.raised)]
+        expected = sorted(laid.wanted, key=lambda one: one.registry_name)
         seen: list[Verdict] = [
-            Same("total_count", payload.total_count, 1),
-            Same("items count", len(payload.items), 1),
+            Same("total_count", payload.total_count, len(expected)),
+            Same("items count", len(payload.items), len(expected)),
             Same("has_next_page", payload.has_next_page, False),
             Same("has_previous_page", payload.has_previous_page, False),
         ]
-        if not payload.items:
-            return seen
-        node = payload.items[0]
-        registry = laid.wanted
-        came_from = Says("찾는 레지스트리의 id", english="the id of the wanted registry")
-        return [
-            *seen,
-            Held[uuid.UUID]("items[0].id", node.id, SameAs(registry.id, came_from)),
-            Held[uuid.UUID]("items[0].entity_id", node.entity_id, SameAs(registry.id, came_from)),
-            Held[str](
-                "items[0].url",
-                node.url,
-                SameAs(
-                    registry.url,
-                    Says("찾는 레지스트리의 url", english="the url of the wanted registry"),
+        came_from = Says(
+            "이름순으로 읽은 찾는 레지스트리", english="the wanted registry in name order"
+        )
+        for i, (node, registry) in enumerate(zip(payload.items, expected, strict=False)):
+            seen += [
+                Held[uuid.UUID](f"items[{i}].id", node.id, SameAs(registry.id, came_from)),
+                Held[uuid.UUID](
+                    f"items[{i}].entity_id", node.entity_id, SameAs(registry.id, came_from)
                 ),
-            ),
-            Held[str](
-                "items[0].registry_name",
-                node.registry_name,
-                SameAs(
-                    registry.registry_name,
-                    Says("찾는 레지스트리의 이름", english="the name of the wanted registry"),
+                Held[str](f"items[{i}].url", node.url, SameAs(registry.url, came_from)),
+                Held[str](
+                    f"items[{i}].registry_name",
+                    node.registry_name,
+                    SameAs(registry.registry_name, came_from),
                 ),
-            ),
-            Same("items[0].type", node.type, registry.type),
-            Same("items[0].project", node.project, registry.project),
-            Same("items[0].username", node.username, registry.username),
-            Same("items[0].ssl_verify", node.ssl_verify, registry.ssl_verify),
-            Same("items[0].is_global", node.is_global, registry.is_global),
-            Same("items[0].extra", node.extra, registry.extra),
-        ]
+                Same(f"items[{i}].type", node.type, registry.type),
+                Same(f"items[{i}].project", node.project, registry.project),
+                Same(f"items[{i}].username", node.username, registry.username),
+                Same(f"items[{i}].ssl_verify", node.ssl_verify, registry.ssl_verify),
+                Same(f"items[{i}].is_global", node.is_global, registry.is_global),
+                Same(f"items[{i}].extra", node.extra, registry.extra),
+            ]
+        return seen

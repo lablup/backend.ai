@@ -27,9 +27,9 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.container_registry import (
-    OnlyTheWantedRegistryIsListed,
     RelationsAndACaller,
     RelationsInTwoDomains,
+    TheWantedRegistriesAreListedByName,
 )
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
@@ -43,7 +43,7 @@ type SearchingStep = Scenario[
 
 @dataclass(frozen=True)
 class SearchingInTheDomain(When[RelationsAndACaller, ContainerRegistryAdapter, Searched]):
-    """검색할 도메인을 스코프로, 찾는 레지스트리의 이름을 필터로 검색한다."""
+    """검색할 도메인을 스코프로, 다른 레지스트리를 빼는 이름 필터와 이름순 정렬로 검색한다."""
 
     @override
     def operation(self) -> str:
@@ -52,11 +52,12 @@ class SearchingInTheDomain(When[RelationsAndACaller, ContainerRegistryAdapter, S
     @override
     def describe(self, laid: RelationsAndACaller) -> str:
         return Says(
-            f"{laid.caller.username}이 검색할 도메인을 스코프로, 찾는 레지스트리의 이름을 필터로, "
-            "이름순 정렬과 페이지 크기를 한 번에 조회합니다",
+            f"{laid.caller.username}이 검색할 도메인을 스코프로, 다른 레지스트리를 빼는 이름 "
+            "필터와 이름순 정렬, 페이지 크기를 한 번에 조회합니다",
             english=(
-                f"{laid.caller.username} reads scoped to the domain to search, with the name of "
-                "the wanted registry as the filter, the name order and a page size in one request"
+                f"{laid.caller.username} reads scoped to the domain to search, with a name "
+                "filter leaving out the other registry, the name order and a page size in one "
+                "request"
             ),
         )
 
@@ -67,10 +68,10 @@ class SearchingInTheDomain(When[RelationsAndACaller, ContainerRegistryAdapter, S
                 ScopedSearchContainerRegistriesInput(
                     scope=ContainerRegistryScope(domain=[UUIDScope(value=laid.home.id)]),
                     filter=ContainerRegistryFilter(
-                        registry_name=StringFilter(equals=laid.wanted.registry_name)
+                        registry_name=StringFilter(not_equals=laid.other_registry.registry_name)
                     ),
                     order=[ContainerRegistryOrder(field=ContainerRegistryOrderField.REGISTRY_NAME)],
-                    first=10,
+                    limit=10,
                 )
             )
 
@@ -87,13 +88,13 @@ class AUserReadingRegistriesInTheDomainSearchesThem(
     def describe(self) -> str:
         return Says(
             "검색할 도메인에서 레지스트리 조회 권한을 받은 사용자가 그 도메인을 스코프로, 이름을 "
-            "필터로, 정렬과 페이지 크기를 한 번에 검색하면, 그 도메인과 relation이 있는 레지스트리 "
-            "가운데 필터에 맞는 것만 반환됩니다",
+            "필터로, 이름순 정렬과 페이지 크기를 한 번에 검색하면, 그 도메인과 relation이 있는 "
+            "레지스트리 가운데 필터에 맞는 것만 이름순으로 반환됩니다",
             english=(
                 "when a user granted permission to read registries in the domain to search "
-                "searches scoped to that domain, with a name as the filter, an order and a page "
-                "size in one request, only the registries related to that domain that match the "
-                "filter come back"
+                "searches scoped to that domain, with a name as the filter, the name order and a "
+                "page size in one request, only the registries related to that domain that match "
+                "the filter come back in name order"
             ),
         )
 
@@ -107,7 +108,7 @@ class AUserReadingRegistriesInTheDomainSearchesThem(
 
     @override
     def then(self) -> Then[RelationsAndACaller, Searched]:
-        return OnlyTheWantedRegistryIsListed()
+        return TheWantedRegistriesAreListedByName()
 
 
 @dataclass(frozen=True)
