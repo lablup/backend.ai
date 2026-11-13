@@ -69,7 +69,7 @@ class TestUserDotfileCreate:
                 )
             )
 
-    async def test_create_variant_preserves_existing_default(
+    async def test_created_variant_takes_the_default(
         self,
         admin_registry: BackendAIClientRegistry,
         user_dotfile_factory: UserDotfileFactory,
@@ -81,7 +81,7 @@ class TestUserDotfileCreate:
             CreateUserDotfileRequest(path=path, data="second", permission="644")
         )
         result = await admin_registry.config.get_user_dotfile(GetUserDotfileRequest(path=path))
-        assert result.data == "first"
+        assert result.data == "second"
 
     async def test_regular_user_creates_own_dotfile(
         self,
@@ -93,14 +93,12 @@ class TestUserDotfileCreate:
             CreateUserDotfileRequest(path=path, data="user content", permission="644")
         )
         assert isinstance(result, CreateDotfileResponse)
-        with pytest.raises(NotFoundError):
-            await user_registry.config.get_user_dotfile(GetUserDotfileRequest(path=path))
-        with pytest.raises(NotFoundError):
-            await user_registry.config.update_user_dotfile(
-                UpdateUserDotfileRequest(path=path, permission="644", data="changed")
-            )
-        with pytest.raises(NotFoundError):
-            await user_registry.config.delete_user_dotfile(DeleteUserDotfileRequest(path=path))
+        created = await user_registry.config.get_user_dotfile(GetUserDotfileRequest(path=path))
+        assert created.data == "user content"
+        await user_registry.config.update_user_dotfile(
+            UpdateUserDotfileRequest(path=path, permission="644", data="changed")
+        )
+        await user_registry.config.delete_user_dotfile(DeleteUserDotfileRequest(path=path))
 
 
 class TestUserDotfileGet:
@@ -665,8 +663,10 @@ class TestUserDotfilesAcrossKeypairs:
                 data="new",
             )
         )
-        with pytest.raises(NotFoundError):
-            await user_registry.config.get_user_dotfile(GetUserDotfileRequest(path=".new-user"))
+        created = await user_registry.config.get_user_dotfile(
+            GetUserDotfileRequest(path=".new-user")
+        )
+        assert created.data == "new"
 
     async def test_non_default_key_deletes_from_user_configuration(
         self,
