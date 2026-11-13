@@ -2,7 +2,7 @@ import asyncio
 import logging
 import math
 import uuid
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Sequence
 from dataclasses import replace
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -305,48 +305,57 @@ class VFolderService:
         return LookupVFolderActionResult(vfolder_uuid=VFolderUUID(vfolder_id))
 
     async def create(self, action: CreateVFolderAction) -> CreateVFolderActionResult:
-        """Create the vfolder the action's insert spec describes."""
-        return CreateVFolderActionResult(
-            vfolder=await self._create_vfolder(
-                action.creator, self._vfolder_repository.create_vfolder_with_permission
-            )
-        )
-
-    async def legacy_create(
-        self, action: LegacyCreateVFolderAction
-    ) -> LegacyCreateVFolderActionResult:
-        """Create the vfolder REST v1 ``POST /folders`` asks for."""
-        return LegacyCreateVFolderActionResult(
-            vfolder=await self._create_vfolder(
-                action.creator, self._vfolder_repository.legacy_create_vfolder_with_permission
-            )
-        )
-
-    async def _create_vfolder(
-        self,
-        creator_host_unsettled: VFolderBaseCreator,
-        write_vfolder_row: Callable[[VFolderBaseCreator], Awaitable[VFolderCreation]],
-    ) -> VFolderData:
-        """Create the vfolder the insert spec describes.
+        """Create the vfolder the action's insert spec describes.
 
         What the folder becomes and what stands in its way are the spec's to say. What
         is left here is the order: the row lands unusable, its storage folder is made,
         and the row is made ready — or taken back when the storage host refuses.
         """
         creator = replace(
-            creator_host_unsettled,
-            host=await self._resolve_host(creator_host_unsettled.host),
+            creator_host_settled := action.creator,
+            host=await self._resolve_host(creator_host_settled.host),
         )
         await self._check_ownership_allowed(
             "user" if isinstance(creator, PersonalVFolderCreator) else "group"
         )
 
-        creation = await write_vfolder_row(creator)
+        creation = await self._vfolder_repository.create_vfolder_with_permission(creator)
         try:
             # An unmanaged folder points at a path the manager did not make.
             if not isinstance(creator, UnmanagedVFolderMixin):
                 await self._create_storage_folder(creator, creation)
-            return await self._vfolder_repository.mark_vfolder_ready(creation.vfolder.id)
+            return CreateVFolderActionResult(
+                vfolder=await self._vfolder_repository.mark_vfolder_ready(creation.vfolder.id)
+            )
+        except Exception:
+            await self._vfolder_repository.purge_vfolder(creation.vfolder.id)
+            raise
+
+    async def legacy_create(
+        self, action: LegacyCreateVFolderAction
+    ) -> LegacyCreateVFolderActionResult:
+        """Create the vfolder REST v1 ``POST /folders`` asks for, as ``create`` does.
+
+        What the folder becomes and what stands in its way are the spec's to say. What
+        is left here is the order: the row lands unusable, its storage folder is made,
+        and the row is made ready — or taken back when the storage host refuses.
+        """
+        creator = replace(
+            creator_host_settled := action.creator,
+            host=await self._resolve_host(creator_host_settled.host),
+        )
+        await self._check_ownership_allowed(
+            "user" if isinstance(creator, PersonalVFolderCreator) else "group"
+        )
+
+        creation = await self._vfolder_repository.legacy_create_vfolder_with_permission(creator)
+        try:
+            # An unmanaged folder points at a path the manager did not make.
+            if not isinstance(creator, UnmanagedVFolderMixin):
+                await self._create_storage_folder(creator, creation)
+            return LegacyCreateVFolderActionResult(
+                vfolder=await self._vfolder_repository.mark_vfolder_ready(creation.vfolder.id)
+            )
         except Exception:
             await self._vfolder_repository.purge_vfolder(creation.vfolder.id)
             raise

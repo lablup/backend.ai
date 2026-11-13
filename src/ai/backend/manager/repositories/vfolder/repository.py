@@ -427,7 +427,24 @@ class VfolderRepository:
             user_uuid=creator.creator_id,
             group_id=creator.project if isinstance(creator, ProjectVFolderCreator) else None,
         )
-        return await self._write_vfolder_row_and_read_storage_limits(creator)
+        limits = await self._storage_limits(creator)
+        async with self._v2_ops.write_ops() as w:
+            created = await w.create_entity(creator)
+            if isinstance(creator, ProjectVFolderCreator):
+                # A project folder has no owner; its maker mounts it read-write through a
+                # policy row the project may later change or take back.
+                await w.upsert_field_entity(
+                    created.id,
+                    VFolderUserMountPolicyUpserter(
+                        user_id=UserID(creator.creator_id),
+                        permission=VFolderMountPolicy.READ_WRITE,
+                    ),
+                )
+            return VFolderCreation(
+                vfolder=created,
+                max_quota_scope_size=limits[0],
+                container_uid=limits[1],
+            )
 
     @vfolder_repository_resilience.apply()
     async def legacy_create_vfolder_with_permission(
@@ -459,11 +476,6 @@ class VfolderRepository:
             raise InsufficientStoragePermission(
                 f"`{VFolderHostPermission.CREATE}` Not allowed in vfolder host(`{creator.host}`)"
             )
-        return await self._write_vfolder_row_and_read_storage_limits(creator)
-
-    async def _write_vfolder_row_and_read_storage_limits(
-        self, creator: VFolderBaseCreator
-    ) -> VFolderCreation:
         limits = await self._storage_limits(creator)
         async with self._v2_ops.write_ops() as w:
             created = await w.create_entity(creator)
