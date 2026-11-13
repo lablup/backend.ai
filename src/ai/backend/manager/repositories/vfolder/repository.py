@@ -420,6 +420,11 @@ class VfolderRepository:
     async def _legacy_rest_v1_creation_vfolder_hosts(
         self, creator: VFolderBaseCreator
     ) -> VFolderHostPermissionMap:
+        """
+        REST v1 creation keeps the union it checked before v2, so existing v1 clients are not
+        refused: the domain, the project or the user's projects, and the keypair policy.
+        v2 creation reads ``get_allowed_vfolder_hosts`` instead.
+        """
         if not isinstance(creator, ProjectVFolderCreator):
             return await self.get_user_storage_host_permissions(
                 creator.creator_id, creator.domain_name
