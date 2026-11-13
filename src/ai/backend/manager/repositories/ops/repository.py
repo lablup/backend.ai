@@ -31,7 +31,6 @@ from ai.backend.manager.models.specs.creator import (
     FieldToCreate,
     GlobalEntityCreator,
     GuardedDanglingFieldCreator,
-    GuardedEntityCreator,
     NestedFieldCreator,
     RoleManagedEntityCreator,
     RoleManagedGlobalEntityCreator,
@@ -355,7 +354,7 @@ class OpsRepository[TData]:
             return EntityWithFieldsResult(data=data, fields=fields)
 
     @_ops_repository_resilience.apply()
-    async def create_entity(self, creator: GuardedEntityCreator[Any, TData]) -> TData:
+    async def create_entity(self, creator: EntityCreator[Any, TData]) -> TData:
         """Insert one entity row; the write provisions its virtual entity and joins
         the declared memberships. No roles are involved on this path."""
         async with self._ops.write_ops() as w:
