@@ -75,15 +75,9 @@ from ai.backend.manager.models.utils import (
 )
 
 __all__ = (
-    "DEAD_KERNEL_STATUSES",
     "LIVE_STATUS",
     "KernelRow",
     "kernels",
-)
-
-DEAD_KERNEL_STATUSES = (
-    KernelStatus.CANCELLED,
-    KernelStatus.TERMINATED,
 )
 
 LIVE_STATUS = (KernelStatus.RUNNING,)
@@ -464,7 +458,7 @@ class KernelRow(CreatedAtMixin, Base):
                     cand = [
                         k
                         for k in result
-                        if (k.status not in DEAD_KERNEL_STATUSES)
+                        if (k.status not in KernelStatus.terminal_statuses())
                         and (k.agent_row is not None and k.agent_row.status == AgentStatus.ALIVE)
                     ]
                 if not cand:

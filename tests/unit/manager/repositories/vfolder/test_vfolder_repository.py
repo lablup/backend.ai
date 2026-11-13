@@ -38,6 +38,7 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.manager.data.image.types import ImageType
+from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.permission.types import RoleSource
 from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.data.session.types import SessionStatus
@@ -2100,7 +2101,7 @@ class TestVfolderRepositoryDeleteForever:
             await db_sess.flush()
             return endpoint.id
 
-    async def _create_live_kernel_mounting(
+    async def _create_kernel_mounting(
         self,
         db: ExtendedAsyncSAEngine,
         *,
@@ -2112,8 +2113,9 @@ class TestVfolderRepositoryDeleteForever:
         user_id: uuid.UUID,
         sgroup_id: uuid.UUID,
         sgroup_name: str,
+        kernel_status: KernelStatus = KernelStatus.PENDING,
     ) -> uuid.UUID:
-        # A live kernel mounts the vfolder while its parent session does NOT,
+        # A kernel mounts the vfolder while its parent session does NOT,
         # isolating the kernel-level mount guard from the session-level one.
         session_id = uuid.uuid4()
         kernel_id = uuid.uuid4()
@@ -2156,6 +2158,7 @@ class TestVfolderRepositoryDeleteForever:
                     scaling_group=sgroup_name,
                     resource_group_id=sgroup_id,
                     cluster_role=DEFAULT_ROLE,
+                    status=kernel_status,
                     repl_in_port=0,
                     repl_out_port=0,
                     stdin_port=0,
@@ -2431,7 +2434,7 @@ class TestVfolderRepositoryDeleteForever:
             db_with_cleanup, domain_name=test_domain.domain_name, user_id=test_user
         )
         sgroup_id, sgroup_name = test_scaling_group
-        await self._create_live_kernel_mounting(
+        await self._create_kernel_mounting(
             db_with_cleanup,
             vfolder_id=vfolder_id,
             quota_scope_id=f"user:{test_user}",
@@ -2452,6 +2455,37 @@ class TestVfolderRepositoryDeleteForever:
             await self._vfolder_status(db_with_cleanup, vfolder_id)
             == VFolderOperationStatus.DELETE_PENDING
         )
+
+    async def test_mounted_by_errored_kernel_succeeds(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        vfolder_repository: VfolderRepository,
+        test_domain: DomainFixtureData,
+        test_user: uuid.UUID,
+        test_project_id: uuid.UUID,
+        test_scaling_group: tuple[uuid.UUID, str],
+    ) -> None:
+        vfolder_id = await self._create_vfolder(
+            db_with_cleanup, domain_name=test_domain.domain_name, user_id=test_user
+        )
+        sgroup_id, sgroup_name = test_scaling_group
+        await self._create_kernel_mounting(
+            db_with_cleanup,
+            vfolder_id=vfolder_id,
+            quota_scope_id=f"user:{test_user}",
+            domain_name=test_domain.domain_name,
+            domain_id=await self._domain_id(db_with_cleanup, test_domain.domain_name),
+            group_id=test_project_id,
+            user_id=test_user,
+            sgroup_id=sgroup_id,
+            sgroup_name=sgroup_name,
+            kernel_status=KernelStatus.ERROR,
+        )
+
+        result = await vfolder_repository.delete_vfolders_forever([vfolder_id])
+
+        assert result.failures == []
+        assert [d.id for d in result.succeeded] == [vfolder_id]
 
 
 class TestVFolderRepositoryTrashAndRestore:
