@@ -16,10 +16,7 @@ from ai.backend.common.dto.manager.v2.container_registry.request import (
 from ai.backend.common.dto.manager.v2.container_registry.response import ContainerRegistryNode
 from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
 from ai.backend.manager.errors.auth import InsufficientPrivilege
-from ai.backend.manager.errors.container_registry import (
-    InvalidContainerRegistryProject,
-    InvalidContainerRegistryURL,
-)
+from ai.backend.manager.errors.container_registry import InvalidContainerRegistryProject
 from ai.backend.manager.errors.image import ContainerRegistryNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
@@ -216,40 +213,6 @@ class AddingAllowedProjectWhileEditing(
 
 
 @dataclass(frozen=True)
-class AnAddressWithoutAHostIsRefused(
-    Scenario[
-        TestSeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode
-    ]
-):
-    @override
-    def summary(self) -> str:
-        return "an-address-whose-host-is-empty-is-refused-on-update"
-
-    @override
-    def describe(self) -> str:
-        return Says(
-            "superadmin 이 호스트가 없는 주소로 수정하려 하면, 수정 후의 row 를 검사하는 단계에서 "
-            "주소 형식 에러로 거부됩니다",
-            english=(
-                "when the superadmin tries to change the address to one without a host, the "
-                "step that validates the updated row rejects it as a malformed address"
-            ),
-        )
-
-    @override
-    def given(self) -> Given[TestSeedingSession, ARegistryAndACaller]:
-        return ARegistryAndSomeone(role=UserRole.SUPERADMIN)
-
-    @override
-    def when(self) -> When[ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode]:
-        return Editing(url="http://")
-
-    @override
-    def then(self) -> Then[ARegistryAndACaller, ContainerRegistryNode]:
-        return TheCallIsRefused(InvalidContainerRegistryURL)
-
-
-@dataclass(frozen=True)
 class HarborWithoutAProjectIsRefused(
     Scenario[
         TestSeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryNode
@@ -352,7 +315,6 @@ SCENARIOS: list[EditingScenario] = [
     ChangingOnlyTheAddress(),
     AnEmptyEditChangesNothing(),
     AddingAllowedProjectWhileEditing(),
-    AnAddressWithoutAHostIsRefused(),
     HarborWithoutAProjectIsRefused(),
     MissingRegistryIsRefused(),
     APlainUserMayNotEdit(),

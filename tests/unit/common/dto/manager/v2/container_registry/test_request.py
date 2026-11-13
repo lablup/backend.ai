@@ -14,7 +14,10 @@ from ai.backend.common.dto.manager.v2.container_registry.request import (
     UpdateContainerRegistryInput,
 )
 from ai.backend.common.dto.manager.v2.container_registry.types import ContainerRegistryType
-from ai.backend.common.exception import BackendAISchemaValidationFailed
+from ai.backend.common.exception import (
+    BackendAISchemaValidationFailed,
+    InvalidContainerRegistryURL,
+)
 
 
 class TestAllowedGroupsInput:
@@ -132,21 +135,42 @@ class TestCreateContainerRegistryInput:
 class TestCreateContainerRegistryInputValidationFailures:
     """Tests for CreateContainerRegistryInput validation failures."""
 
-    def test_blank_url_raises_validation_error(self) -> None:
-        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+    def test_blank_url_is_rejected(self) -> None:
+        with pytest.raises(InvalidContainerRegistryURL):
             CreateContainerRegistryInput(
                 url="",
                 registry_name="my-registry",
                 type=ContainerRegistryType.DOCKER,
             )
 
-    def test_whitespace_only_url_raises_validation_error(self) -> None:
-        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+    def test_whitespace_only_url_is_rejected(self) -> None:
+        with pytest.raises(InvalidContainerRegistryURL):
             CreateContainerRegistryInput(
                 url="   ",
                 registry_name="my-registry",
                 type=ContainerRegistryType.DOCKER,
             )
+
+    @pytest.mark.parametrize(
+        "url",
+        ["http://", "https://", "http://[::1"],
+        ids=["http-without-host", "https-without-host", "unclosed-ipv6-host"],
+    )
+    def test_url_without_a_host_is_rejected(self, url: str) -> None:
+        with pytest.raises(InvalidContainerRegistryURL):
+            CreateContainerRegistryInput(
+                url=url,
+                registry_name="my-registry",
+                type=ContainerRegistryType.DOCKER,
+            )
+
+    def test_url_without_a_scheme_is_accepted_as_given(self) -> None:
+        req = CreateContainerRegistryInput(
+            url="registry.example.com:5000",
+            registry_name="my-registry",
+            type=ContainerRegistryType.DOCKER,
+        )
+        assert req.url == "registry.example.com:5000"
 
     def test_blank_registry_name_raises_validation_error(self) -> None:
         with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
@@ -244,15 +268,28 @@ class TestUpdateContainerRegistryInput:
 class TestUpdateContainerRegistryInputValidationFailures:
     """Tests for UpdateContainerRegistryInput validation failures."""
 
-    def test_blank_url_raises_validation_error(self) -> None:
+    def test_blank_url_is_rejected(self) -> None:
         reg_id = uuid.uuid4()
-        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+        with pytest.raises(InvalidContainerRegistryURL):
             UpdateContainerRegistryInput(id=reg_id, url="")
 
-    def test_whitespace_only_url_raises_validation_error(self) -> None:
+    def test_whitespace_only_url_is_rejected(self) -> None:
         reg_id = uuid.uuid4()
-        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+        with pytest.raises(InvalidContainerRegistryURL):
             UpdateContainerRegistryInput(id=reg_id, url="   ")
+
+    @pytest.mark.parametrize(
+        "url",
+        ["http://", "https://", "http://[::1"],
+        ids=["http-without-host", "https-without-host", "unclosed-ipv6-host"],
+    )
+    def test_url_without_a_host_is_rejected(self, url: str) -> None:
+        with pytest.raises(InvalidContainerRegistryURL):
+            UpdateContainerRegistryInput(id=uuid.uuid4(), url=url)
+
+    def test_url_without_a_scheme_is_accepted_as_given(self) -> None:
+        req = UpdateContainerRegistryInput(id=uuid.uuid4(), url="registry.example.com:5000")
+        assert req.url == "registry.example.com:5000"
 
     def test_blank_registry_name_raises_validation_error(self) -> None:
         reg_id = uuid.uuid4()

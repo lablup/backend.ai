@@ -1224,6 +1224,16 @@ class ContainerRegistryGroupsAlreadyAssociated(BackendAIError, web.HTTPConflict)
         )
 
 
+class InvalidContainerRegistryURL(BackendAIError, web.HTTPBadRequest):
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.CONTAINER_REGISTRY,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.BAD_REQUEST,
+        )
+
+
 class InvalidNotificationChannelSpec(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-channel-spec"
     error_title = "Invalid Notification Channel Specification."
