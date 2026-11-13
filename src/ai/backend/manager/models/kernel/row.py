@@ -394,6 +394,8 @@ class KernelRow(CreatedAtMixin, Base):
     )
 
     session: Mapped[SessionRow] = relationship("SessionRow", back_populates="kernels")
+    # image_row, group_row and user_row are read only by gql_legacy (kernel.py). Delete them
+    # together with the gql_legacy cleanup.
     image_row: Mapped[ImageRow | None] = relationship(
         "ImageRow",
         foreign_keys="KernelRow.image_id",
@@ -561,6 +563,7 @@ class KernelRow(CreatedAtMixin, Base):
 # For compatibility
 kernels = KernelRow.__table__
 
+# Read only by gql_legacy (kernel.py). Delete it together with the gql_legacy cleanup.
 DEFAULT_KERNEL_ORDERING = [
     sa.desc(
         sa.func.greatest(
