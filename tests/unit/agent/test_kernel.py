@@ -6,15 +6,21 @@ from decimal import Decimal
 from typing import Any, cast, override
 
 import pytest
+import zmq
 
 from ai.backend.agent import kernel as kernel_mod
 from ai.backend.agent.docker.kernel import DockerKernel
-from ai.backend.agent.errors.agent import UnsupportedBaseDistroError
+from ai.backend.agent.errors.agent import InvalidSocket, UnsupportedBaseDistroError
 from ai.backend.agent.errors.kernel import (
     KernelRunnerInvalidReplyError,
     KernelRunnerReplyTimeoutError,
 )
-from ai.backend.agent.kernel import AbstractCodeRunner, match_distro_data
+from ai.backend.agent.kernel import (
+    AbstractCodeRunner,
+    RobustSocket,
+    SocketPair,
+    match_distro_data,
+)
 from ai.backend.common import msgpack
 
 
@@ -341,3 +347,32 @@ class TestLateStatusRepliesNeverBlockOutput:
             task.cancel()
             await asyncio.gather(task, return_exceptions=True)
         assert [runner.status_queue.get_nowait() for _ in range(2)] == [b"stale-2", b"fresh"]
+
+
+def _unanswered_socket_pair() -> SocketPair:
+    return SocketPair(
+        RobustSocket(zmq.PUSH, "tcp://127.0.0.1:1"),
+        RobustSocket(zmq.PULL, "tcp://127.0.0.1:2"),
+    )
+
+
+class TestAClosedRunnerStaysClosed:
+    """A destroy closes the runner while its create may still be polling it; a socket made after
+    that is closed by no one and reconnects to the next kernel on the container's address."""
+
+    async def test_a_send_after_close_fails_without_reconnecting(self) -> None:
+        sockets = _unanswered_socket_pair()
+        sockets.close()
+        with pytest.raises(InvalidSocket):
+            await sockets.send_multipart([b"status", b""])
+        assert sockets.input_sock.socket.closed
+        assert sockets.output_sock.socket.closed
+
+    async def test_a_socket_lost_while_open_is_still_recreated(self) -> None:
+        sockets = _unanswered_socket_pair()
+        sockets.input_sock.socket.close()
+        try:
+            await sockets.send_multipart([b"status", b""])
+            assert not sockets.input_sock.socket.closed
+        finally:
+            sockets.close()
