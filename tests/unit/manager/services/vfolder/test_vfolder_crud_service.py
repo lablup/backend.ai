@@ -23,6 +23,7 @@ from ai.backend.common.types import (
 from ai.backend.manager.data.project.types import ProjectResourceInfo
 from ai.backend.manager.data.vfolder.dto import UserIdentity
 from ai.backend.manager.data.vfolder.types import (
+    PersonalVFolderHostGrantSources,
     VFolderData,
     VFolderOperationStatus,
     VFolderOwnershipType,
@@ -227,6 +228,7 @@ class TestCreateVFolderAction:
                 default_mount_permission=VFolderMountPolicy.READ_WRITE,
                 cloneable=False,
             ),
+            personal_folder_host_grant_sources=PersonalVFolderHostGrantSources.KEYPAIR_RESOURCE_POLICY,
         )
 
     @staticmethod
@@ -249,6 +251,7 @@ class TestCreateVFolderAction:
                 default_mount_permission=VFolderMountPolicy.READ_WRITE,
                 cloneable=False,
             ),
+            personal_folder_host_grant_sources=PersonalVFolderHostGrantSources.KEYPAIR_RESOURCE_POLICY,
         )
 
     async def test_no_project_makes_a_personally_owned_folder(

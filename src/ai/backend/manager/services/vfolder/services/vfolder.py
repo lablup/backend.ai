@@ -317,7 +317,10 @@ class VFolderService:
             "user" if isinstance(creator, PersonalVFolderCreator) else "group"
         )
 
-        creation = await self._vfolder_repository.create_vfolder_with_permission(creator)
+        creation = await self._vfolder_repository.create_vfolder_with_permission(
+            creator,
+            personal_folder_host_grant_sources=action.personal_folder_host_grant_sources,
+        )
         try:
             # An unmanaged folder points at a path the manager did not make.
             if not isinstance(creator, UnmanagedVFolderMixin):

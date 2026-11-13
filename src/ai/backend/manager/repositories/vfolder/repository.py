@@ -36,6 +36,7 @@ from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.project.types import ProjectResourceInfo
 from ai.backend.manager.data.vfolder.dto import UserIdentity
 from ai.backend.manager.data.vfolder.types import (
+    PersonalVFolderHostGrantSources,
     VFolderCloneInfo,
     VFolderCreation,
     VFolderData,
@@ -408,18 +409,43 @@ class VfolderRepository:
             return ProjectID(project_id)
 
     @vfolder_repository_resilience.apply()
-    async def create_vfolder_with_permission(self, creator: VFolderBaseCreator) -> VFolderCreation:
+    async def create_vfolder_with_permission(
+        self,
+        creator: VFolderBaseCreator,
+        *,
+        personal_folder_host_grant_sources: PersonalVFolderHostGrantSources,
+    ) -> VFolderCreation:
         """Write the vfolder row and answer with what making its storage folder needs.
 
         The host the folder asks for is checked here rather than by the caller, so a
         request that may not reach that host writes nothing.
         """
-        await self.ensure_host_permission_allowed_by_user(
-            creator.host,
-            permission=VFolderHostPermission.CREATE,
-            user_uuid=creator.creator_id,
-            group_id=creator.project if isinstance(creator, ProjectVFolderCreator) else None,
-        )
+        if isinstance(creator, ProjectVFolderCreator):
+            await self.ensure_host_permission_allowed_by_user(
+                creator.host,
+                permission=VFolderHostPermission.CREATE,
+                user_uuid=creator.creator_id,
+                group_id=creator.project,
+            )
+        else:
+            match personal_folder_host_grant_sources:
+                case PersonalVFolderHostGrantSources.KEYPAIR_RESOURCE_POLICY:
+                    await self.ensure_host_permission_allowed_by_user(
+                        creator.host,
+                        permission=VFolderHostPermission.CREATE,
+                        user_uuid=creator.creator_id,
+                    )
+                case PersonalVFolderHostGrantSources.DOMAIN_PROJECTS_AND_KEYPAIR_RESOURCE_POLICY:
+                    allowed_hosts = await self.get_user_storage_host_permissions(
+                        creator.creator_id, creator.domain_name
+                    )
+                    if (
+                        creator.host not in allowed_hosts
+                        or VFolderHostPermission.CREATE not in allowed_hosts[creator.host]
+                    ):
+                        raise InsufficientStoragePermission(
+                            f"`{VFolderHostPermission.CREATE}` Not allowed in vfolder host(`{creator.host}`)"
+                        )
         limits = await self._storage_limits(creator)
         async with self._v2_ops.write_ops() as w:
             created = await w.create_entity(creator)

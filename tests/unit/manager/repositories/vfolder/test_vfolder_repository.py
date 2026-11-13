@@ -42,12 +42,14 @@ from ai.backend.manager.data.permission.types import RoleSource
 from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.vfolder.types import (
+    PersonalVFolderHostGrantSources,
     VFolderOperationStatus,
     VFolderOwnershipType,
 )
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.errors.storage import (
+    InsufficientStoragePermission,
     VFolderAlreadyExists,
     VFolderDeletionNotAllowed,
     VFolderFilterStatusFailed,
@@ -406,7 +408,10 @@ class TestVfolderRepository:
             usage_mode=VFolderUsageMode.MODEL,
         )
 
-        creation = await vfolder_repository.create_vfolder_with_permission(creator)
+        creation = await vfolder_repository.create_vfolder_with_permission(
+            creator,
+            personal_folder_host_grant_sources=PersonalVFolderHostGrantSources.KEYPAIR_RESOURCE_POLICY,
+        )
 
         vfolder_data = creation.vfolder
         assert vfolder_data.name == creator.name
@@ -426,7 +431,10 @@ class TestVfolderRepository:
             domain_name=test_domain.domain_name, group_id=test_model_store_group, user_id=test_user
         )
 
-        creation = await vfolder_repository.create_vfolder_with_permission(creator)
+        creation = await vfolder_repository.create_vfolder_with_permission(
+            creator,
+            personal_folder_host_grant_sources=PersonalVFolderHostGrantSources.KEYPAIR_RESOURCE_POLICY,
+        )
 
         policies = await vfolder_repository.list_user_mount_policies(creation.vfolder.id)
         assert [(p.user_id, p.permission) for p in policies] == [
@@ -443,7 +451,10 @@ class TestVfolderRepository:
         creator = self._make_project_vfolder_creator(
             domain_name=test_domain.domain_name, group_id=test_model_store_group, user_id=test_user
         )
-        creation = await vfolder_repository.create_vfolder_with_permission(creator)
+        creation = await vfolder_repository.create_vfolder_with_permission(
+            creator,
+            personal_folder_host_grant_sources=PersonalVFolderHostGrantSources.KEYPAIR_RESOURCE_POLICY,
+        )
         folder_id = creation.vfolder.id
 
         await vfolder_repository.set_user_mount_policy(
@@ -464,7 +475,10 @@ class TestVfolderRepository:
         creator = self._make_project_vfolder_creator(
             domain_name=test_domain.domain_name, group_id=test_model_store_group, user_id=test_user
         )
-        creation = await vfolder_repository.create_vfolder_with_permission(creator)
+        creation = await vfolder_repository.create_vfolder_with_permission(
+            creator,
+            personal_folder_host_grant_sources=PersonalVFolderHostGrantSources.KEYPAIR_RESOURCE_POLICY,
+        )
         folder_id = creation.vfolder.id
 
         assert await vfolder_repository.unset_user_mount_policy(folder_id, UserID(test_user))
@@ -485,7 +499,10 @@ class TestVfolderRepository:
             group_id=test_model_store_group,
             user_id=test_user,
         )
-        await vfolder_repository.create_vfolder_with_permission(creator)
+        await vfolder_repository.create_vfolder_with_permission(
+            creator,
+            personal_folder_host_grant_sources=PersonalVFolderHostGrantSources.KEYPAIR_RESOURCE_POLICY,
+        )
 
         with pytest.raises(VFolderAlreadyExists):
             await vfolder_repository.create_vfolder_with_permission(
@@ -494,7 +511,8 @@ class TestVfolderRepository:
                     group_id=test_model_store_group,
                     user_id=test_user,
                     name=creator.name,
-                )
+                ),
+                personal_folder_host_grant_sources=PersonalVFolderHostGrantSources.KEYPAIR_RESOURCE_POLICY,
             )
 
     async def test_naming_a_personal_project_makes_a_project_folder_there(
@@ -516,7 +534,8 @@ class TestVfolderRepository:
                 domain_name=test_domain.domain_name,
                 group_id=personal_project,
                 user_id=test_user,
-            )
+            ),
+            personal_folder_host_grant_sources=PersonalVFolderHostGrantSources.KEYPAIR_RESOURCE_POLICY,
         )
 
         assert creation.vfolder.ownership_type == VFolderOwnershipType.GROUP
@@ -539,7 +558,8 @@ class TestVfolderRepository:
                     domain_name=test_domain.domain_name,
                     group_id=test_model_store_group,
                     user_id=test_user,
-                )
+                ),
+                personal_folder_host_grant_sources=PersonalVFolderHostGrantSources.KEYPAIR_RESOURCE_POLICY,
             )
 
         with pytest.raises(VFolderInvalidParameter):
@@ -548,7 +568,8 @@ class TestVfolderRepository:
                     domain_name=test_domain.domain_name,
                     group_id=test_model_store_group,
                     user_id=test_user,
-                )
+                ),
+                personal_folder_host_grant_sources=PersonalVFolderHostGrantSources.KEYPAIR_RESOURCE_POLICY,
             )
 
     async def test_no_allowance_lets_the_folder_through(
@@ -568,7 +589,103 @@ class TestVfolderRepository:
                     domain_name=test_domain.domain_name,
                     group_id=test_model_store_group,
                     user_id=test_user,
+                ),
+                personal_folder_host_grant_sources=PersonalVFolderHostGrantSources.KEYPAIR_RESOURCE_POLICY,
+            )
+
+    @pytest.fixture
+    async def personal_folder_on_a_host_only_the_domain_grants(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: DomainFixtureData,
+        test_user: uuid.UUID,
+        test_project_resource_policy_name: str,
+    ) -> PersonalVFolderCreator:
+        personal_project_id = uuid.uuid4()
+        keypair_policy_name = f"test-kp-policy-{uuid.uuid4().hex[:8]}"
+        async with db_with_cleanup.begin_session() as session:
+            await session.execute(
+                sa.update(DomainRow)
+                .where(DomainRow.name == test_domain.domain_name)
+                .values(allowed_vfolder_hosts={"local": ["create-vfolder"]})
+            )
+            session.add(
+                ProjectRow(
+                    id=personal_project_id,
+                    name=f"personal-{personal_project_id.hex[:8]}",
+                    domain_name=test_domain.domain_name,
+                    is_active=True,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts={},
+                    resource_policy=test_project_resource_policy_name,
+                    type=ProjectType.PERSONAL,
+                    creator_id=UserID(test_user),
                 )
+            )
+            session.add(
+                KeyPairResourcePolicyRow(
+                    name=keypair_policy_name,
+                    default_for_unspecified=DefaultForUnspecified.LIMITED,
+                    total_resource_slots=ResourceSlot(),
+                    max_session_lifetime=0,
+                    max_concurrent_sessions=10,
+                    max_concurrent_sftp_sessions=1,
+                    max_containers_per_session=1,
+                    idle_timeout=0,
+                    allowed_vfolder_hosts=VFolderHostPermissionMap(),
+                )
+            )
+            await session.flush()
+            session.add(
+                VirtualEntityRow(
+                    id=uuid.uuid4(),
+                    entity_type=ProjectEntityType(),
+                    entity_id=ProjectID(personal_project_id),
+                )
+            )
+            session.add(
+                KeyPairRow(
+                    user=test_user,
+                    access_key=f"DK{test_user.hex[:14]}",
+                    secret_key=SecretValue("test-secret"),
+                    is_active=True,
+                    is_admin=False,
+                    is_default=True,
+                    resource_policy=keypair_policy_name,
+                    rate_limit=1000,
+                )
+            )
+        return PersonalVFolderCreator(
+            name=f"personal-{uuid.uuid4().hex[:8]}",
+            domain_name=test_domain.domain_name,
+            quota_scope_id=f"user:{test_user}",
+            host="local",
+            creator_id=test_user,
+            user=UserID(test_user),
+            status=VFolderOperationStatus.READY,
+        )
+
+    async def test_a_personal_folder_checked_with_the_domain_takes_a_domain_grant(
+        self,
+        vfolder_repository: VfolderRepository,
+        personal_folder_on_a_host_only_the_domain_grants: PersonalVFolderCreator,
+    ) -> None:
+        creation = await vfolder_repository.create_vfolder_with_permission(
+            personal_folder_on_a_host_only_the_domain_grants,
+            personal_folder_host_grant_sources=PersonalVFolderHostGrantSources.DOMAIN_PROJECTS_AND_KEYPAIR_RESOURCE_POLICY,
+        )
+
+        assert creation.vfolder.ownership_type == VFolderOwnershipType.USER
+
+    async def test_a_personal_folder_checked_with_the_keypair_policy_alone_refuses_a_domain_grant(
+        self,
+        vfolder_repository: VfolderRepository,
+        personal_folder_on_a_host_only_the_domain_grants: PersonalVFolderCreator,
+    ) -> None:
+        with pytest.raises(InsufficientStoragePermission):
+            await vfolder_repository.create_vfolder_with_permission(
+                personal_folder_on_a_host_only_the_domain_grants,
+                personal_folder_host_grant_sources=PersonalVFolderHostGrantSources.KEYPAIR_RESOURCE_POLICY,
             )
 
     def test_a_personal_folder_made_without_a_level_defaults_to_none(self) -> None:
@@ -605,7 +722,10 @@ class TestVfolderRepository:
             default_mount_permission=None,
         )
 
-        creation = await vfolder_repository.create_vfolder_with_permission(creator)
+        creation = await vfolder_repository.create_vfolder_with_permission(
+            creator,
+            personal_folder_host_grant_sources=PersonalVFolderHostGrantSources.KEYPAIR_RESOURCE_POLICY,
+        )
 
         assert creation.vfolder.default_mount_permission == VFolderMountPolicy.READ_WRITE
 
@@ -625,7 +745,10 @@ class TestVfolderRepository:
             default_mount_permission=None,
         )
 
-        creation = await vfolder_repository.create_vfolder_with_permission(creator)
+        creation = await vfolder_repository.create_vfolder_with_permission(
+            creator,
+            personal_folder_host_grant_sources=PersonalVFolderHostGrantSources.KEYPAIR_RESOURCE_POLICY,
+        )
 
         assert creation.vfolder.default_mount_permission == VFolderMountPolicy.READ_ONLY
 
@@ -648,7 +771,8 @@ class TestVfolderRepository:
                 user_id=test_user,
                 usage_mode=VFolderUsageMode.GENERAL,
                 permission=VFolderMountPolicy.READ_ONLY,
-            )
+            ),
+            personal_folder_host_grant_sources=PersonalVFolderHostGrantSources.KEYPAIR_RESOURCE_POLICY,
         )
 
         assert creation.vfolder.default_mount_permission == VFolderMountPolicy.READ_ONLY

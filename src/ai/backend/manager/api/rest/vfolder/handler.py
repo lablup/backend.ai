@@ -110,6 +110,7 @@ from ai.backend.common.exception import UnreachableError
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderID, VFolderMountPolicy
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.vfolder.types import (
+    PersonalVFolderHostGrantSources,
     VFolderOwnershipType,
     VFolderStatusSet,
     vfolder_status_map,
@@ -327,7 +328,12 @@ class VFolderHandler:
                 )
 
         try:
-            result = await self._vfolder.create_vfolder.run(CreateVFolderAction(creator=creator))
+            result = await self._vfolder.create_vfolder.run(
+                CreateVFolderAction(
+                    creator=creator,
+                    personal_folder_host_grant_sources=PersonalVFolderHostGrantSources.DOMAIN_PROJECTS_AND_KEYPAIR_RESOURCE_POLICY,
+                )
+            )
         except (VFolderInvalidParameter, VFolderAlreadyExists) as e:
             raise InvalidAPIParameters(str(e)) from e
         # Every other BackendAIError carries its own HTTP status (Forbidden ->

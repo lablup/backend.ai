@@ -69,6 +69,16 @@ class VFolderOwnershipType(CIStrEnum):
         return VFolderOwnershipTypeField(self)
 
 
+class PersonalVFolderHostGrantSources(enum.StrEnum):
+    """
+    The host grants a personal folder creation checks. REST v1 creation unions the
+    domain, the user's projects and the keypair resource policy; v2 reads the policy alone.
+    """
+
+    KEYPAIR_RESOURCE_POLICY = "keypair_resource_policy"
+    DOMAIN_PROJECTS_AND_KEYPAIR_RESOURCE_POLICY = "domain_projects_and_keypair_resource_policy"
+
+
 class VFolderMountPermission(enum.StrEnum):
     # TODO: Replace this class with VFolderRBACPermission
     # Or rename this class to VFolderMountPermission

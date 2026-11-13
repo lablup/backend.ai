@@ -6,7 +6,7 @@ from typing import override
 
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.vfolder.types import VFolderData
+from ai.backend.manager.data.vfolder.types import PersonalVFolderHostGrantSources, VFolderData
 from ai.backend.manager.models.vfolder.creators import VFolderBaseCreator
 from ai.backend.manager.services.vfolder.actions.base import (
     VFolderScopeAction,
@@ -24,6 +24,7 @@ class CreateVFolderAction(VFolderScopeAction):
     """
 
     creator: VFolderBaseCreator
+    personal_folder_host_grant_sources: PersonalVFolderHostGrantSources
 
     @override
     def scope_targets(self) -> Sequence[EntityIdentifier]:
