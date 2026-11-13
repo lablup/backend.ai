@@ -281,12 +281,10 @@ class VfolderRepository:
                 if group_row is None:
                     raise ProjectNotFound(f"Project with {group_uuid} not found.")
                 if group_row.type != ProjectType.PERSONAL:
-                    project_domain_hosts = await self._fetch_domain_vfolder_hosts(
+                    domain_hosts = await self._fetch_domain_vfolder_hosts(
                         db_session, group_row.domain_name
                     )
-                    return VFolderHostPermissionMap(
-                        project_domain_hosts | group_row.allowed_vfolder_hosts
-                    )
+                    return VFolderHostPermissionMap(domain_hosts | group_row.allowed_vfolder_hosts)
 
             keypair_hosts = await self._fetch_default_keypair_vfolder_hosts(db_session, user_uuid)
             if keypair_hosts is None:
@@ -294,8 +292,8 @@ class VfolderRepository:
             user_domain_name = await db_session.scalar(
                 sa.select(UserRow.domain_name).where(UserRow.uuid == user_uuid)
             )
-            user_domain_hosts = await self._fetch_domain_vfolder_hosts(db_session, user_domain_name)
-            return VFolderHostPermissionMap(user_domain_hosts | keypair_hosts)
+            domain_hosts = await self._fetch_domain_vfolder_hosts(db_session, user_domain_name)
+            return VFolderHostPermissionMap(domain_hosts | keypair_hosts)
 
     async def _fetch_domain_vfolder_hosts(
         self, db_session: SASession, domain_name: str | None
