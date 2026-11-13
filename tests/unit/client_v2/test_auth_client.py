@@ -27,6 +27,7 @@ from ai.backend.common.dto.manager.auth.response import (
     UpdateFullNameResponse,
     UpdatePasswordNoAuthResponse,
     UpdatePasswordResponse,
+    UploadSSHKeypairResponse,
     VerifyAuthResponse,
 )
 from ai.backend.common.dto.manager.auth.types import AuthResponseType, AuthTokenType
@@ -333,30 +334,22 @@ class TestAuthClient:
     async def test_upload_ssh_keypair(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
-        mock_resp.json = AsyncMock(
-            return_value={
-                "ssh_public_key": "ssh-rsa AAAA... uploaded",
-                "ssh_private_key": "-----BEGIN RSA PRIVATE KEY-----\nuploaded",
-            }
-        )
+        mock_resp.json = AsyncMock(return_value={"ssh_public_key": "ssh-rsa AAAA... uploaded"})
 
         mock_session = _make_request_session(mock_resp)
         client = _make_client(mock_session)
         auth_client = AuthClient(client, _make_anon_client())
 
-        request = UploadSSHKeypairRequest(
-            pubkey="ssh-rsa AAAA... uploaded",
-            privkey="-----BEGIN RSA PRIVATE KEY-----\nuploaded",
-        )
+        request = UploadSSHKeypairRequest(pubkey="ssh-rsa AAAA... uploaded")
         result = await auth_client.upload_ssh_keypair(request)
 
-        assert isinstance(result, SSHKeypairResponse)
+        assert isinstance(result, UploadSSHKeypairResponse)
         assert result.ssh_public_key == "ssh-rsa AAAA... uploaded"
 
         call_args = mock_session.request.call_args
         assert call_args.args[0] == "POST"
         assert "/auth/ssh-keypair" in str(call_args.args[1])
-        assert call_args.kwargs["json"]["pubkey"] == "ssh-rsa AAAA... uploaded"
+        assert call_args.kwargs["json"] == {"pubkey": "ssh-rsa AAAA... uploaded"}
 
     async def test_verify_auth(self) -> None:
         mock_resp = AsyncMock()

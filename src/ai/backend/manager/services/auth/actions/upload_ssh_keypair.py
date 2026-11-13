@@ -3,8 +3,8 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.permission.types import RBACElementType, ScopeType
+from ai.backend.common.types import AccessKey, SSHPublicKey
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.auth.types import SSHKeypair
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.services.auth.actions.base import (
     KeypairScopeAction,
@@ -15,9 +15,8 @@ from ai.backend.manager.services.auth.actions.base import (
 @dataclass
 class UploadSSHKeypairAction(KeypairScopeAction):
     user_id: uuid.UUID
-    public_key: str
-    private_key: str
-    access_key: str
+    public_key: SSHPublicKey
+    access_key: AccessKey
 
     @override
     @classmethod
@@ -39,7 +38,7 @@ class UploadSSHKeypairAction(KeypairScopeAction):
 
 @dataclass
 class UploadSSHKeypairActionResult(KeypairScopeActionResult):
-    ssh_keypair: SSHKeypair
+    public_key: SSHPublicKey
     user_id: uuid.UUID
 
     @override

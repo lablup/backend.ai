@@ -226,15 +226,11 @@ class UpdatePasswordNoAuthInput(BaseRequestModel):
 
 
 class UploadSSHKeypairInput(BaseRequestModel):
-    """Input for uploading an SSH keypair. The pair is validated for consistency."""
+    """Input for uploading an SSH public key."""
 
     pubkey: str = Field(
         min_length=1,
         description="SSH public key in standard format (e.g., 'ssh-rsa AAAA...')",
-    )
-    privkey: str = Field(
-        min_length=1,
-        description="SSH private key in PEM format",
     )
 
     @field_validator("pubkey")
@@ -243,12 +239,4 @@ class UploadSSHKeypairInput(BaseRequestModel):
         stripped = v.strip()
         if not stripped:
             raise ValueError("pubkey must not be blank or whitespace-only")
-        return stripped
-
-    @field_validator("privkey")
-    @classmethod
-    def privkey_must_not_be_blank(cls, v: str) -> str:
-        stripped = v.strip()
-        if not stripped:
-            raise ValueError("privkey must not be blank or whitespace-only")
         return stripped

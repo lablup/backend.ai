@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
+from dataclasses import dataclass
 
 import pytest
 import sqlalchemy as sa
@@ -21,7 +22,15 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.group.types import ProjectType
-from ai.backend.manager.data.permission.types import RoleSource
+from ai.backend.manager.data.permission.types import (
+    EntityType as PermissionEntityType,
+)
+from ai.backend.manager.data.permission.types import (
+    RoleSource,
+)
+from ai.backend.manager.data.permission.types import (
+    ScopeType as PermissionScopeType,
+)
 from ai.backend.manager.data.vfolder.types import (
     VFolderCreateParams,
     VFolderMountPermission,
@@ -79,8 +88,11 @@ from ai.backend.manager.models.user import (
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import (
     VFolderInvitationRow,
+    VFolderPermission,
     VFolderPermissionRow,
+    VFolderPermissionSetAlias,
     VFolderRow,
+    VFolderStatusSet,
 )
 from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurger
 from ai.backend.manager.repositories.base.updater import Updater
@@ -88,6 +100,14 @@ from ai.backend.manager.repositories.vfolder.purgers import VFolderPurgerSpec
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.repositories.vfolder.updaters import VFolderTrashUpdaterSpec
 from ai.backend.testutils.db import with_tables
+
+_REUSED_VFOLDER_NAME = "reused-name"
+
+
+@dataclass(frozen=True)
+class _NameResolutionCase:
+    allowed_status_set: VFolderStatusSet | None
+    expected_status: VFolderOperationStatus
 
 
 class TestVfolderRepository:
@@ -349,6 +369,94 @@ class TestVfolderRepository:
         assert vfolder_data.usage_mode == VFolderUsageMode.MODEL
         assert vfolder_data.ownership_type == VFolderOwnershipType.GROUP
         assert vfolder_data.group == test_model_store_group
+
+    @pytest.fixture
+    async def project_holding_deleted_and_live_vfolder_of_same_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_user: uuid.UUID,
+        test_project_resource_policy_name: str,
+    ) -> None:
+        project_id = uuid.uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                GroupRow(
+                    id=project_id,
+                    name=f"test-project-{project_id.hex[:8]}",
+                    domain_name=test_domain_name,
+                    description="",
+                    is_active=True,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts={},
+                    resource_policy=test_project_resource_policy_name,
+                    type=ProjectType.GENERAL,
+                )
+            )
+            await db_sess.flush()
+            db_sess.add(
+                AssociationScopesEntitiesRow(
+                    scope_type=PermissionScopeType.PROJECT,
+                    scope_id=str(project_id),
+                    entity_type=PermissionEntityType.USER,
+                    entity_id=str(test_user),
+                )
+            )
+            for status in (VFolderOperationStatus.DELETE_COMPLETE, VFolderOperationStatus.READY):
+                db_sess.add(
+                    VFolderRow(
+                        id=uuid.uuid4(),
+                        name=_REUSED_VFOLDER_NAME,
+                        host="local",
+                        domain_name=test_domain_name,
+                        quota_scope_id=f"project:{project_id}",
+                        permission=VFolderPermission.READ_WRITE,
+                        ownership_type=VFolderOwnershipType.GROUP,
+                        user=None,
+                        group=project_id,
+                        creator=f"test-{test_user.hex[:8]}@example.com",
+                        creator_id=test_user,
+                        unmanaged_path=None,
+                        cloneable=False,
+                        status=status,
+                    )
+                )
+            await db_sess.flush()
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _NameResolutionCase(
+                allowed_status_set=None,
+                expected_status=VFolderOperationStatus.READY,
+            ),
+            _NameResolutionCase(
+                allowed_status_set=VFolderStatusSet.PURGABLE,
+                expected_status=VFolderOperationStatus.DELETE_COMPLETE,
+            ),
+        ],
+        ids=lambda case: case.expected_status.value,
+    )
+    @pytest.mark.usefixtures("project_holding_deleted_and_live_vfolder_of_same_name")
+    async def test_project_vfolder_name_resolves_within_allowed_status_set(
+        self,
+        vfolder_repository: VfolderRepository,
+        test_domain_name: str,
+        test_user: uuid.UUID,
+        case: _NameResolutionCase,
+    ) -> None:
+        rows = await vfolder_repository.get_accessible_rows(
+            user_uuid=test_user,
+            user_role=UserRole.USER,
+            domain_name=test_domain_name,
+            is_admin=False,
+            allowed_vfolder_types=["user", "group"],
+            perm=VFolderPermissionSetAlias.READABLE,
+            folder_id_or_name=_REUSED_VFOLDER_NAME,
+            allowed_status_set=case.allowed_status_set,
+        )
+
+        assert [row["status"] for row in rows] == [case.expected_status]
 
 
 class TestVfolderRepositoryAllowedVfolderHosts:

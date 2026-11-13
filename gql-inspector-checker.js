@@ -2,6 +2,8 @@
 // so an element taken out on purpose needs an entry here naming why it went.
 // Drop an entry once the removal is on this branch: the base schema no longer carries it.
 const ACCEPTED_REMOVALS = {
+  "AdminRegisterSSHKeypairInput.sshPrivateKey":
+    "The server keeps no SSH private key a client sends: registering takes only the public key and leaves the stored private key as it is.",
   "ScalingGroupNode.wsproxy_api_token":
     "The token is the App Proxy API credential, and every domain member could read it through `domain_nodes { scaling_groups }`. Superadmins still read it on `ScalingGroup`.",
 };

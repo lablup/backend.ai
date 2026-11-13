@@ -16,6 +16,24 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 26.4.20 (2026-11-12)
+
+### Breaking Changes
+* Take only the public key in `POST /auth/ssh-keypair`, `adminRegisterSshKeypairV2` and `POST /v2/keypairs/ssh`, return only the public key from `POST /auth/ssh-keypair`, drop the SSH keypair match check, and keep the stored private key when the public key is replaced ([#16975](https://github.com/lablup/backend.ai/issues/16975))
+
+### Deprecations
+* Deprecate purging a vfolder by name with `backend.ai vfolder purge NAME` and the SDK `VFolder.purge()`, since a name does not resolve to a `delete-complete` folder; purge it by ID with `backend.ai v2 vfolder purge VFOLDER_ID` instead ([#16960](https://github.com/lablup/backend.ai/issues/16960))
+
+### Fixes
+* Create the v2 CLI `credentials.toml` readable only by its owner (`0600`) ([#16406](https://github.com/lablup/backend.ai/issues/16406))
+* Fix resolving a project vfolder by name failing with "Multiple vfolders found" when a deleted folder of the same name remains in `delete-complete` status ([#16838](https://github.com/lablup/backend.ai/issues/16838))
+* Compare the storage-proxy and App Proxy coordinator shared secrets in constant time ([#16849](https://github.com/lablup/backend.ai/issues/16849))
+* Refresh the etcd authentication token when it expires, so components connected to etcd with a user keep working past the token TTL instead of failing with `invalid auth token` ([#16940](https://github.com/lablup/backend.ai/issues/16940))
+* Fix the kernel scratch directory being left on the host when a vfolder is mounted below `/home/work` at more than one level and the agent runs as a non-root user ([#16957](https://github.com/lablup/backend.ai/issues/16957))
+* Keep running the remaining hook plugins when a plugin returns None under `FIRST_COMPLETED`, so that `openid` is no longer skipped when `auth_keypair` returns None, and let the login continue to password verification when the `sToken` cookie read by `openid` is expired or invalid. ([#16982](https://github.com/lablup/backend.ai/issues/16982))
+* Fix `app-proxy-coordinator schema` subcommands such as `schema oneshot` failing with a TypeError, which stopped the installer at the app-proxy schema step. ([#16985](https://github.com/lablup/backend.ai/issues/16985))
+
+
 ## 26.4.19 (2026-11-10)
 
 ### Breaking Changes

@@ -7,6 +7,7 @@ from typing import override
 from uuid import UUID
 
 from ai.backend.common.data.permission.types import EntityType, RBACElementType, ScopeType
+from ai.backend.common.types import AccessKey, SSHPublicKey
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.action.scope import BaseScopeAction, BaseScopeActionResult
 from ai.backend.manager.actions.types import ActionOperationType
@@ -340,11 +341,10 @@ class AdminGetKeypairActionResult(BaseActionResult):
 
 @dataclass
 class AdminRegisterSSHKeypairAction(UserAction):
-    """Admin action to register (overwrite) a user's SSH keypair."""
+    """Admin action to register (overwrite) a user's SSH public key."""
 
-    access_key: str
-    ssh_public_key: str
-    ssh_private_key: str
+    access_key: AccessKey
+    ssh_public_key: SSHPublicKey
 
     @override
     def entity_id(self) -> str | None:
