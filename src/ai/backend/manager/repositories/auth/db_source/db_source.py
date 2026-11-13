@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import uuid as uuid_mod
 from dataclasses import dataclass
 from datetime import datetime
@@ -18,6 +19,7 @@ from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPoli
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import AccessKey, SSHPublicKey
+from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.auth.login_session_types import LoginHistoryData, LoginSessionData
 from ai.backend.manager.data.auth.types import GroupMembershipData, UserData
 from ai.backend.manager.data.common.types import SearchResult
@@ -27,9 +29,11 @@ from ai.backend.manager.errors.auth import (
     AuthorizationFailed,
     GroupMembershipNotFoundError,
     LoginSessionNotFoundError,
+    PasswordMismatch,
     UserCreationError,
 )
 from ai.backend.manager.errors.common import InternalServerError
+from ai.backend.manager.models.hasher.factory import PasswordHasherFactory
 from ai.backend.manager.models.hasher.types import HashInfo, PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs
 from ai.backend.manager.models.login_session.enums import LoginAttemptResult, LoginSessionStatus
@@ -43,7 +47,6 @@ from ai.backend.manager.models.user import (
     UserRow,
     UserStatus,
     check_credential,
-    compare_to_hashed_password,
     users,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -351,20 +354,39 @@ class AuthDBSource:
                 .where((users.c.email == email) & (users.c.domain_name == domain_name))
             )
 
-    async def _check_password(
+    async def _password_matched_row(
         self,
-        conn: sa.ext.asyncio.AsyncConnection,
-        row: sa.Row[Any],
+        row: sa.Row[Any] | None,
         target_password_info: PasswordInfo,
-    ) -> None:
-        """Verify password against stored hash. Raises AuthorizationFailed on mismatch."""
-        if row.password is None:
+    ) -> sa.Row[Any]:
+        """The user row whose stored hash the password matches. Every refusal costs at least
+        one hash at the configured cost, so the answer time does not tell whether the account
+        exists, even when its stored hash is older and cheaper."""
+        configured_hasher = PasswordHasherFactory.get_hasher(target_password_info.algorithm)
+        if row is None or row.password is None:
+            await asyncio.to_thread(configured_hasher.generate_new_hash, target_password_info)
             raise AuthorizationFailed("User credential mismatch.")
         try:
-            if not compare_to_hashed_password(target_password_info.password, row.password):
-                raise AuthorizationFailed("User credential mismatch.")
+            stored = HashInfo.from_hash_string(row.password)
+            matched = await asyncio.to_thread(
+                PasswordHasherFactory.get_hasher(stored.algorithm).verify,
+                target_password_info.password,
+                stored,
+            )
         except ValueError:
+            await asyncio.to_thread(configured_hasher.generate_new_hash, target_password_info)
             raise AuthorizationFailed("User credential mismatch.") from None
+        if not matched:
+            # A stored hash cheaper than the configured one is topped up to that cost. Rounds
+            # compare only within one algorithm; SHA256 is cheaper than any other.
+            if stored.algorithm == target_password_info.algorithm:
+                cheaper = stored.rounds < target_password_info.rounds
+            else:
+                cheaper = stored.algorithm == PasswordHashAlgorithm.SHA256
+            if cheaper:
+                await asyncio.to_thread(configured_hasher.generate_new_hash, target_password_info)
+            raise PasswordMismatch(UserID(row.uuid))
+        return row
 
     async def _migrate_password_hash(
         self,
@@ -444,12 +466,7 @@ class AuthDBSource:
                 .select_from(users)
                 .where((users.c.email == email) & (users.c.domain_name == domain_name)),
             )
-            row = result.first()
-
-            if row is None:
-                raise AuthorizationFailed("User credential mismatch.")
-
-            await self._check_password(conn, row, target_password_info)
+            row = await self._password_matched_row(result.first(), target_password_info)
             await self._migrate_password_hash(conn, row, domain_name, email, target_password_info)
 
             # Fetch active sessions for the user within the same connection

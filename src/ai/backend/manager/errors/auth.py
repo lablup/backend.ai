@@ -13,6 +13,7 @@ from ai.backend.common.exception import (
     ErrorDomain,
     ErrorOperation,
 )
+from ai.backend.common.identifier.user import UserID
 
 from .common import ObjectNotFound
 
@@ -63,6 +64,19 @@ class AuthorizationFailed(BackendAIError, web.HTTPUnauthorized):
             operation=ErrorOperation.AUTH,
             error_detail=ErrorDetail.UNAUTHORIZED,
         )
+
+
+class PasswordMismatch(AuthorizationFailed):
+    """Raised when the user exists and the password does not match its hash.
+
+    Answers the client as :class:`AuthorizationFailed` does; carries the user so the
+    failure can be recorded against them."""
+
+    user_id: UserID
+
+    def __init__(self, user_id: UserID) -> None:
+        super().__init__("User credential mismatch.")
+        self.user_id = user_id
 
 
 class PasswordExpired(BackendAIError, web.HTTPUnauthorized):

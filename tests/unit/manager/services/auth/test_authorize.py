@@ -8,12 +8,13 @@ from aiohttp import web
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
 from ai.backend.common.dto.manager.auth.types import AuthTokenType
 from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.plugin.hook import HookPluginContext, HookResult, HookResults
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import AuthConfig, ManagerConfig
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
-from ai.backend.manager.errors.auth import AuthorizationFailed, PasswordExpired
+from ai.backend.manager.errors.auth import AuthorizationFailed, PasswordExpired, PasswordMismatch
 from ai.backend.manager.models.login_session.enums import LoginAttemptResult
 from ai.backend.manager.models.user import UserRole, UserStatus
 from ai.backend.manager.repositories.auth.db_source.db_source import (
@@ -246,6 +247,42 @@ async def test_authorize_invalid_credentials(
 
     with pytest.raises(AuthorizationFailed):
         await auth_service.authorize(action)
+
+    mock_auth_repository.record_login_history.assert_not_awaited()
+
+
+async def test_authorize_records_a_wrong_password_against_the_user(
+    auth_service: AuthService,
+    mock_hook_plugin_ctx: MagicMock,
+    mock_auth_repository: AsyncMock,
+) -> None:
+    mock_hook_plugin_ctx.dispatch.return_value = HookResult(
+        status=HookResults.PASSED, result=None, reason=None
+    )
+    mock_auth_repository.verify_credential.side_effect = PasswordMismatch(
+        UserID(_DEFAULT_USER_UUID)
+    )
+    action = AuthorizeAction(
+        type=AuthTokenType.KEYPAIR,
+        domain_name="default",
+        email="test@example.com",
+        password="wrong_password",
+        request=MagicMock(),
+        stoken=None,
+        client_type_id=uuid4(),
+        otp=None,
+    )
+
+    with pytest.raises(PasswordMismatch):
+        await auth_service.authorize(action)
+
+    mock_auth_repository.record_login_history.assert_awaited_once()
+    user_id, domain_name, result = mock_auth_repository.record_login_history.await_args.args
+    assert (user_id, domain_name, result) == (
+        _DEFAULT_USER_UUID,
+        "default",
+        LoginAttemptResult.FAILED_INVALID_CREDENTIALS,
+    )
 
 
 async def test_authorize_with_hook_authorization(
