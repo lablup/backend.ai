@@ -6,9 +6,6 @@ import logging
 from abc import ABCMeta, abstractmethod
 
 from ai.backend.appproxy.common.config import ContentEncodingConfig
-from ai.backend.appproxy.common.types import (
-    RouteInfo,
-)
 from ai.backend.appproxy.worker.errors.ingress import (
     IngressFrontendNotRegisteredError,
     IngressNotRegisteredError,
@@ -18,6 +15,7 @@ from ai.backend.appproxy.worker.types import Circuit, RootContext
 from ai.backend.common.dto.appproxy.v2.ingress.types import (
     Ingress,
     IngressAccess,
+    IngressFrontend,
     IngressFrontendKey,
 )
 from ai.backend.logging.structured import StructuredLogger, with_log_context
@@ -25,54 +23,54 @@ from ai.backend.logging.structured import StructuredLogger, with_log_context
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
-class BaseFrontend[TBackend: BaseBackend, TCircuitKeyType: (int, str)](metaclass=ABCMeta):
+class BaseFrontend[TBackend: BaseBackend](metaclass=ABCMeta):
     root_context: RootContext
-    backends: dict[TCircuitKeyType, TBackend]
+    backends: dict[IngressFrontendKey, TBackend]
 
     def __init__(self, root_context: RootContext) -> None:
         self.root_context = root_context
         self.backends = {}
 
-    async def register_circuit(self, circuit: Circuit, routes: list[RouteInfo]) -> bool:
+    # TODO: Drop the circuit once an ingress carries the values the backends read from it.
+    async def register_ingress(self, ingress: Ingress, circuit: Circuit | None = None) -> bool:
         metrics = self.root_context.metrics
-
-        key = self.get_circuit_key(circuit)
-        with with_log_context(circuit_id=circuit.id):
-            self.backends[key] = await self.initialize_backend(circuit, routes)
-            log.debug("circuit registered (app: {}, mode: {})", circuit.app, circuit.app_mode)
-        metrics.circuit.observe_circuit_creation(protocol=circuit.protocol.name)
+        frontend_key = ingress.frontend.key()
+        backend = await self.initialize_backend(ingress, circuit)
+        self.backends[frontend_key] = backend
+        # TODO: Use the ingress id once ingresses are stored as their own entity.
+        with with_log_context(circuit_id=backend.circuit_id):
+            log.debug("registered the ingress of frontend {}", frontend_key)
+        metrics.circuit.observe_circuit_creation(protocol=ingress.frontend.protocol.name)
         return True
 
-    async def update_circuit_route_info(
-        self, circuit: Circuit, new_routes: list[RouteInfo]
-    ) -> None:
-        key = self.get_circuit_key(circuit)
-        backend = self.backends.get(key)
+    async def update_ingress(self, ingress: Ingress) -> None:
+        frontend_key = ingress.frontend.key()
+        backend = self.backends.get(frontend_key)
         if backend is None:
-            log.debug("skipped a route update for an inactive slot {}", key)
+            log.debug("skipped an ingress update for unregistered frontend {}", frontend_key)
             return
-        await self.update_backend(backend, new_routes)
-        backend.circuit.route_info = new_routes
+        await backend.update_ingress(ingress)
 
-    async def break_circuit(self, circuit: Circuit) -> None:
+    async def remove_ingress(self, frontend: IngressFrontend) -> None:
         metrics = self.root_context.metrics
-        key = self.get_circuit_key(circuit)
-        backend = self.backends.get(key)
+        frontend_key = frontend.key()
+        backend = self.backends.get(frontend_key)
         if backend is None:
-            log.debug("skipped breaking an inactive slot {}", key)
+            log.debug("skipped removing unregistered frontend {}", frontend_key)
             return
         try:
             await self.terminate_backend(backend)
         except Exception:
-            log.exception("failed to terminate the circuit backend", circuit_id=circuit.id)
+            # TODO: Use the ingress id once ingresses are stored as their own entity.
+            log.exception("failed to terminate the backend", circuit_id=backend.circuit_id)
         finally:
-            del self.backends[key]
-            metrics.circuit.observe_circuit_removal(protocol=circuit.protocol.name)
+            del self.backends[frontend_key]
+            metrics.circuit.observe_circuit_removal(protocol=frontend.protocol.name)
 
-    async def terminate_all_circuits(self) -> None:
+    async def remove_all_ingresses(self) -> None:
         async with asyncio.TaskGroup() as tg:
             for backend in list(self.backends.values()):
-                tg.create_task(self.break_circuit(backend.circuit))
+                tg.create_task(self.remove_ingress(backend.ingress.frontend))
 
     async def _read_registered_ingress(self, frontend_key: IngressFrontendKey) -> Ingress:
         try:
@@ -106,11 +104,9 @@ class BaseFrontend[TBackend: BaseBackend, TCircuitKeyType: (int, str)](metaclass
         raise NotImplementedError
 
     @abstractmethod
-    async def initialize_backend(self, circuit: Circuit, routes: list[RouteInfo]) -> TBackend:
-        raise NotImplementedError
-
-    @abstractmethod
-    async def update_backend(self, backend: TBackend, routes: list[RouteInfo]) -> TBackend:
+    async def initialize_backend(
+        self, ingress: Ingress, circuit: Circuit | None = None
+    ) -> TBackend:
         raise NotImplementedError
 
     @abstractmethod
@@ -118,13 +114,5 @@ class BaseFrontend[TBackend: BaseBackend, TCircuitKeyType: (int, str)](metaclass
         raise NotImplementedError
 
     @abstractmethod
-    async def list_inactive_circuits(self, threshold: int) -> list[Circuit]:
-        raise NotImplementedError
-
-    @abstractmethod
     def apply_content_encoding_config(self, config: ContentEncodingConfig) -> None:
-        raise NotImplementedError
-
-    @abstractmethod
-    def get_circuit_key(self, circuit: Circuit) -> TCircuitKeyType:
         raise NotImplementedError

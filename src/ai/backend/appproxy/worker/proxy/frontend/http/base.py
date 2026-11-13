@@ -16,9 +16,9 @@ from ai.backend.appproxy.common.defs import (
 )
 from ai.backend.appproxy.common.errors import ClientIPNotAllowed, InvalidCredentials
 from ai.backend.appproxy.common.errors.http import ContentEncodingNotAllowed
-from ai.backend.appproxy.common.types import RouteInfo, WebRequestHandler
+from ai.backend.appproxy.common.types import WebRequestHandler
 from ai.backend.appproxy.common.utils import ensure_json_serializable, is_permit_valid, mime_match
-from ai.backend.appproxy.worker.proxy.backend.http import HTTPBackend
+from ai.backend.appproxy.worker.proxy.backend.http import HTTPBackend, HTTPBackendArgs
 from ai.backend.appproxy.worker.proxy.frontend.base import BaseFrontend
 from ai.backend.appproxy.worker.types import (
     Circuit,
@@ -26,14 +26,14 @@ from ai.backend.appproxy.worker.types import (
     InteractiveAppInfo,
     RootContext,
 )
-from ai.backend.common.dto.appproxy.v2.ingress.types import IngressAccess
+from ai.backend.common.dto.appproxy.v2.ingress.types import Ingress, IngressAccess
 from ai.backend.common.exception import BackendAIError
 from ai.backend.logging.structured import StructuredLogger
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
-class BaseHTTPFrontend[TCircuitKeyType: (int, str)](BaseFrontend[HTTPBackend, TCircuitKeyType]):
+class BaseHTTPFrontend(BaseFrontend[HTTPBackend]):
     root_context: RootContext
     _xff_strict: XForwardedStrict | None
     _content_encoding: ContentEncodingConfig
@@ -52,7 +52,23 @@ class BaseHTTPFrontend[TCircuitKeyType: (int, str)](BaseFrontend[HTTPBackend, TC
             log.trace("rejecting client {} (not in allowed_client_ips)", client_ip)
             raise ClientIPNotAllowed("E20011: Client address not allowed")
 
-    def ensure_credential(self, request: web.Request, circuit: Circuit) -> None:
+    def ensure_credential(
+        self, request: web.Request, ingress: Ingress, backend: HTTPBackend
+    ) -> None:
+        match backend.circuit:
+            case Circuit() as circuit:
+                self._ensure_circuit_credential(request, circuit)
+            case None:
+                self._ensure_ingress_credential(request, ingress.access)
+
+    # TODO: Judge the credential by the ingress access once an ingress carries the id its tokens
+    # name. Until then a backend registered without a circuit passes every request.
+    def _ensure_ingress_credential(self, request: web.Request, access: IngressAccess) -> None:
+        pass
+
+    # TODO: Legacy credential check by the circuit's settings. Remove it once ensure_credential
+    # judges the ingress access.
+    def _ensure_circuit_credential(self, request: web.Request, circuit: Circuit) -> None:
         if circuit.open_to_public or request.method == "OPTIONS":
             return
 
@@ -92,26 +108,23 @@ class BaseHTTPFrontend[TCircuitKeyType: (int, str)](BaseFrontend[HTTPBackend, TC
                     raise InvalidCredentials("E20009: Authorization token mismatch")
 
     @override
-    async def initialize_backend(self, circuit: Circuit, routes: list[RouteInfo]) -> HTTPBackend:
-        return HTTPBackend(routes, self.root_context, circuit)
-
-    @override
-    async def update_backend(self, backend: HTTPBackend, routes: list[RouteInfo]) -> HTTPBackend:
-        await backend.update_routes(routes)
-        return backend
+    async def initialize_backend(
+        self, ingress: Ingress, circuit: Circuit | None = None
+    ) -> HTTPBackend:
+        return HTTPBackend(
+            HTTPBackendArgs(
+                last_used_time_mark_queue=self.root_context.last_used_time_mark_queue,
+                request_counter_key_queue=self.root_context.request_counter_key_queue,
+                worker_config=self.root_context.local_config.proxy_worker,
+                metrics=self.root_context.metrics,
+                ingress=ingress,
+                circuit=circuit,
+            )
+        )
 
     @override
     async def terminate_backend(self, backend: HTTPBackend) -> None:
         await backend.close()
-
-    @override
-    async def list_inactive_circuits(self, threshold: int) -> list[Circuit]:
-        now = time.time()
-        return [
-            backend.circuit
-            for backend in self.backends.values()
-            if (backend.last_used - now) >= threshold
-        ]
 
     def _is_websocket_request(self, request: web.Request) -> bool:
         return (

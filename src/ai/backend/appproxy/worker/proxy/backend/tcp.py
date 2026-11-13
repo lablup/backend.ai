@@ -1,15 +1,16 @@
 import asyncio
 import logging
 import socket
-from typing import Any, Final, override
+from dataclasses import dataclass
+from typing import Final, override
 
-from ai.backend.appproxy.common.types import RouteInfo
-from ai.backend.appproxy.worker.types import Circuit
+from ai.backend.appproxy.worker.types import WorkerMetricRegistry
 from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.cron import LocalCron
+from ai.backend.common.dto.appproxy.v2.ingress.types import Ingress
 from ai.backend.logging.structured import StructuredLogger
 
-from .base import BaseBackend
+from .base import BaseBackend, BaseBackendArgs
 from .last_access_marker import LastAccessMarkerTask
 from .pool import RoutePool
 
@@ -18,20 +19,28 @@ log = StructuredLogger(logging.getLogger(__spec__.name))
 MAX_BUFFER_SIZE: Final[int] = 1 * 1024 * 1024
 
 
+@dataclass(frozen=True)
+class TCPBackendArgs(BaseBackendArgs):
+    metrics: WorkerMetricRegistry
+
+
 class TCPBackend(BaseBackend):
     """TCP proxy backend that keeps the targets of its Ingress backend in a health-checked pool,
     so that targets with repeated connect failures are excluded from traffic.
     """
 
+    _metrics: WorkerMetricRegistry
     _pool: RoutePool
 
-    def __init__(self, routes: list[RouteInfo], *args: Any, **kwargs: Any) -> None:
-        super().__init__(*args, **kwargs)
-        self._pool = RoutePool(Circuit.ingress_backend_of_routes(routes))
+    def __init__(self, args: TCPBackendArgs) -> None:
+        super().__init__(args)
+        self._metrics = args.metrics
+        self._pool = RoutePool(args.ingress.backend)
 
     @override
-    async def update_routes(self, routes: list[RouteInfo]) -> None:
-        await self._pool.update(Circuit.ingress_backend_of_routes(routes))
+    async def update_ingress(self, ingress: Ingress) -> None:
+        await super().update_ingress(ingress)
+        await self._pool.update(ingress.backend)
 
     @override
     async def close(self) -> None:
@@ -40,7 +49,7 @@ class TCPBackend(BaseBackend):
     async def bind(
         self, down_reader: asyncio.StreamReader, down_writer: asyncio.StreamWriter
     ) -> None:
-        metrics = self.root_context.metrics
+        metrics = self._metrics
         total_bytes = 0
         stop_event = asyncio.Event()
 

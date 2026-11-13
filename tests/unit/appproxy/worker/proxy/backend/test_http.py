@@ -12,9 +12,52 @@ import pytest_mock
 from aiohttp import web
 from aiohttp.test_utils import make_mocked_request
 
-from ai.backend.appproxy.common.types import ProxyProtocol, RouteInfo
-from ai.backend.appproxy.worker.proxy.backend.http import HTTPBackend
+from ai.backend.appproxy.worker.proxy.backend.http import HTTPBackend, HTTPBackendArgs
+from ai.backend.common.dto.appproxy.v2.ingress.types import (
+    Ingress,
+    IngressAccess,
+    IngressAccessMode,
+    IngressAuthority,
+    IngressBackend,
+    IngressBackendID,
+    IngressFrontend,
+    IngressFrontendKind,
+    IngressID,
+    IngressProtocol,
+    IngressTargetGroup,
+    IngressTargetGroupID,
+    PortFrontend,
+    SessionIngressTarget,
+)
+from ai.backend.common.types import SessionId
 
+_INGRESS = Ingress(
+    id=IngressID("00000000-0000-0000-0000-000000000000"),
+    authority=IngressAuthority("worker-1"),
+    revision=0,
+    frontend=IngressFrontend(
+        kind=IngressFrontendKind.PORT,
+        protocol=IngressProtocol.HTTP,
+        port=PortFrontend(number=10200),
+    ),
+    access=IngressAccess(mode=IngressAccessMode.PUBLIC, allowed_client_ips=[]),
+    backend=IngressBackend(
+        id=IngressBackendID("00000000-0000-0000-0000-000000000000"),
+        target_groups=[
+            IngressTargetGroup(
+                id=IngressTargetGroupID("00000000-0000-0000-0000-000000000000"),
+                weight=1,
+                targets=[
+                    SessionIngressTarget(
+                        host="10.0.0.1",
+                        port=8000,
+                        session_id=SessionId(UUID("f5cd34ba-ae53-4537-a813-09f38496443d")),
+                    )
+                ],
+            )
+        ],
+    ),
+)
 _FORGED_HEADERS = {
     "Forwarded": "host=forged.example.com;proto=https",
     "X-Forwarded-For": "192.0.2.1",
@@ -59,23 +102,20 @@ class TestProxyHttpForwardedHeaders:
             "ai.backend.appproxy.worker.proxy.backend.http.ClientPool",
             return_value=mocker.MagicMock(close=mocker.AsyncMock()),
         )
-        root_context = MagicMock()
-        root_context.last_used_time_marker_redis_queue = asyncio.Queue()
-        root_context.request_counter_redis_queue = asyncio.Queue()
-        worker_config = root_context.local_config.proxy_worker
+        worker_config = MagicMock()
         worker_config.trusted_proxies = case.trusted_proxies
         worker_config.tls_advertised = case.tls_advertised
         worker_config.tls_listen = False
-        route = RouteInfo(
-            route_id=UUID("4eeb260b-6cc5-4362-baf3-ea978388becd"),
-            session_id=UUID("f5cd34ba-ae53-4537-a813-09f38496443d"),
-            session_name=None,
-            kernel_host="10.0.0.1",
-            kernel_port=8000,
-            protocol=ProxyProtocol.HTTP,
-            traffic_ratio=1.0,
+        backend = HTTPBackend(
+            HTTPBackendArgs(
+                ingress=_INGRESS,
+                circuit=MagicMock(app=case.app),
+                last_used_time_mark_queue=asyncio.Queue(),
+                request_counter_key_queue=asyncio.Queue(),
+                worker_config=worker_config,
+                metrics=MagicMock(),
+            )
         )
-        backend = HTTPBackend([route], root_context, MagicMock(app=case.app))
         mocker.patch.object(backend, "request_http", side_effect=_BackendRequestCaptured)
         try:
             yield backend

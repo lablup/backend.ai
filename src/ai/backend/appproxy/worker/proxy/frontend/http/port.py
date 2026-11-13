@@ -9,9 +9,13 @@ from aiohttp import web
 from aiohttp.typedefs import Handler
 
 from ai.backend.appproxy.common.errors import ServerMisconfiguredError
-from ai.backend.appproxy.worker.errors import InvalidFrontendTypeError
 from ai.backend.appproxy.worker.errors.ingress import IngressFrontendNotRegisteredError
-from ai.backend.appproxy.worker.types import Circuit, PortFrontendInfo
+from ai.backend.common.dto.appproxy.v2.ingress.types import (
+    IngressFrontend,
+    IngressFrontendKind,
+    IngressProtocol,
+)
+from ai.backend.common.dto.appproxy.v2.ingress.types import PortFrontend as IngressPortFrontend
 from ai.backend.logging.structured import StructuredLogger, with_log_context
 
 from .base import BaseHTTPFrontend
@@ -19,7 +23,7 @@ from .base import BaseHTTPFrontend
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
-class PortFrontend(BaseHTTPFrontend[int]):
+class PortFrontend(BaseHTTPFrontend):
     sites: list[web.TCPSite]
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
@@ -45,9 +49,8 @@ class PortFrontend(BaseHTTPFrontend[int]):
             app = web.Application()
             app["port"] = port
             app.on_response_prepare.append(self.append_cors_headers)
-            # ensure_slot middleware should be placed before exception_middleware and metric_collector_middleware
-            # so that metric_collector_middleware can properly assess circuit variable
-            # Keep in mind that implementation of ensure_slot_middleware should manually handle exception and respond with
+            # ensure_ingress_middleware should be placed before exception_middleware and metric_collector_middleware
+            # Keep in mind that implementation of ensure_ingress_middleware should manually handle exception and respond with
             # appropriate HTTP response, which usually is automatically covered by exception_middleware
             # That can be achieved by wraping whole execution block with AbstractHTTPFrontend.exception_safe_handler_wrapper()
             # Resolve the real client IP from X-Forwarded-For first (only when
@@ -56,7 +59,7 @@ class PortFrontend(BaseHTTPFrontend[int]):
             if self._xff_strict is not None:
                 app.middlewares.append(self._xff_strict.middleware)
             app.middlewares.extend([
-                self.ensure_slot_middleware,
+                self.ensure_ingress_middleware,
                 self.metric_collector_middleware,
                 self.exception_middleware,
             ])
@@ -99,28 +102,22 @@ class PortFrontend(BaseHTTPFrontend[int]):
             await site.stop()
 
     @web.middleware
-    async def ensure_slot_middleware(
+    async def ensure_ingress_middleware(
         self, request: web.Request, handler: Handler
     ) -> web.StreamResponse:
         port: int = request.app["port"]
-        backend = self.backends.get(port)
+        frontend_key = IngressFrontend(
+            kind=IngressFrontendKind.PORT,
+            protocol=IngressProtocol.HTTP,
+            port=IngressPortFrontend(number=port),
+        ).key()
+        ingress = await self._read_registered_ingress(frontend_key)
+        backend = self.backends.get(frontend_key)
         if backend is None:
             raise IngressFrontendNotRegisteredError(f"Unregistered slot {port}")
-        circuit = backend.circuit
-        with with_log_context(circuit_id=circuit.id):
-            ingress = await self._read_registered_ingress(circuit.to_ingress_frontend().key())
+        # TODO: Use the ingress id once ingresses are stored as their own entity.
+        with with_log_context(circuit_id=backend.circuit_id):
             self.ensure_allowed_ip(request, ingress.access)
-            # TODO: Check the credential against ingress.access once an ingress carries the id
-            # its tokens name.
-            self.ensure_credential(request, circuit)
-            request["circuit"] = circuit
+            self.ensure_credential(request, ingress, backend)
             request["backend"] = backend
             return await handler(request)
-
-    @override
-    def get_circuit_key(self, circuit: Circuit) -> int:
-        if not isinstance(circuit.frontend, PortFrontendInfo):
-            raise InvalidFrontendTypeError(
-                f"Expected PortFrontendInfo, got {type(circuit.frontend).__name__}"
-            )
-        return circuit.frontend.port

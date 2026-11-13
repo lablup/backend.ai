@@ -54,7 +54,8 @@ class _RouteTargetCase:
     name: str
     route_id: UUID | None
     traffic_ratio: float
-    expected_targets: list[SessionIngressTarget]
+    expected_targets_with_traffic: list[SessionIngressTarget]
+    expected_targets_without_traffic: list[SessionIngressTarget]
 
 
 @dataclass(frozen=True)
@@ -227,8 +228,15 @@ class TestCircuit:
                 frontend_key=IngressFrontendKey("wildcard-notebook"),
                 kind=IngressFrontendKind.WILDCARD,
             ),
+            _FrontendCase(
+                frontend_mode=FrontendMode.WILDCARD_DOMAIN,
+                port=None,
+                subdomain="NoteBook",
+                frontend_key=IngressFrontendKey("wildcard-notebook"),
+                kind=IngressFrontendKind.WILDCARD,
+            ),
         ],
-        ids=lambda case: case.frontend_mode.value,
+        ids=lambda case: f"{case.frontend_mode.value}-{case.port or case.subdomain}",
     )
     def test_to_ingress_frontend_keys_by_the_circuit_frontend(
         self, frontend_case: _FrontendCase, frontend_case_circuit: Circuit
@@ -280,41 +288,50 @@ class TestCircuit:
                 name="model-service-route",
                 route_id=ROUTE_ID,
                 traffic_ratio=1.0,
-                expected_targets=[ROUTE_TARGET],
+                expected_targets_with_traffic=[ROUTE_TARGET],
+                expected_targets_without_traffic=[],
             ),
             _RouteTargetCase(
                 name="interactive-app-route",
                 route_id=None,
                 traffic_ratio=1.0,
-                expected_targets=[ROUTE_TARGET],
+                expected_targets_with_traffic=[ROUTE_TARGET],
+                expected_targets_without_traffic=[],
             ),
             _RouteTargetCase(
                 name="half-traffic-route",
                 route_id=ROUTE_ID,
                 traffic_ratio=0.5,
-                expected_targets=[ROUTE_TARGET],
+                expected_targets_with_traffic=[ROUTE_TARGET],
+                expected_targets_without_traffic=[],
             ),
             _RouteTargetCase(
                 name="no-traffic-route",
                 route_id=ROUTE_ID,
                 traffic_ratio=0.0,
-                expected_targets=[],
+                expected_targets_with_traffic=[],
+                expected_targets_without_traffic=[ROUTE_TARGET],
             ),
         ],
         ids=lambda case: case.name,
     )
-    def test_to_ingress_makes_a_route_with_traffic_a_session_target_of_one_group(
+    def test_to_ingress_groups_a_route_by_whether_it_has_traffic(
         self, route_target_case: _RouteTargetCase, route_target_case_circuit: Circuit
     ) -> None:
         assert route_target_case_circuit.to_ingress(AUTHORITY).backend.target_groups == [
             IngressTargetGroup(
                 id=IngressTargetGroupID(str(UUID(int=0))),
                 weight=1,
-                targets=route_target_case.expected_targets,
-            )
+                targets=route_target_case.expected_targets_with_traffic,
+            ),
+            IngressTargetGroup(
+                id=IngressTargetGroupID(str(UUID(int=0))),
+                weight=0,
+                targets=route_target_case.expected_targets_without_traffic,
+            ),
         ]
 
-    def test_to_ingress_puts_every_route_in_one_group(
+    def test_to_ingress_puts_every_route_with_traffic_in_one_group(
         self, circuit_with_two_routes: Circuit
     ) -> None:
         assert circuit_with_two_routes.to_ingress(AUTHORITY).backend.target_groups == [
@@ -327,14 +344,15 @@ class TestCircuit:
                         host="10.0.0.6", port=8000, session_id=SessionId(OTHER_SESSION_ID)
                     ),
                 ],
-            )
+            ),
+            IngressTargetGroup(id=IngressTargetGroupID(str(UUID(int=0))), weight=0, targets=[]),
         ]
 
-    def test_to_ingress_without_routes_holds_a_group_with_no_targets(
+    def test_to_ingress_without_routes_holds_groups_with_no_targets(
         self, routeless_circuit: Circuit
     ) -> None:
         target_groups = routeless_circuit.to_ingress(AUTHORITY).backend.target_groups
-        assert [group.targets for group in target_groups] == [[]]
+        assert [group.targets for group in target_groups] == [[], []]
 
     def test_to_ingress_key_pairs_the_authority_with_the_frontend_key(
         self, circuit: Circuit
