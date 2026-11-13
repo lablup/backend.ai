@@ -6,7 +6,7 @@ permissions on the new type. Write the grants to the presets and to every role m
 them.
 
 Revision ID: 592dedb4a39c
-Revises: ece8800e945c
+Revises: ba3e3ab0d354
 Create Date: 2026-11-03
 
 """
@@ -23,7 +23,7 @@ from ai.backend.manager.cli.role_fixture import _identify
 
 # revision identifiers, used by Alembic.
 revision = "592dedb4a39c"  # Part of: NEXT_RELEASE_VERSION
-down_revision = "ece8800e945c"
+down_revision = "ba3e3ab0d354"
 branch_labels = None
 depends_on = None
 
