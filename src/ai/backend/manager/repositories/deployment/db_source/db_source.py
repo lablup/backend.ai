@@ -398,7 +398,7 @@ class DeploymentDBSource:
             )
 
         async with self._reconcile_ops.read_ops() as r:
-            return await self._read_deployment_info(r, deployment_id)
+            return await self._get_deployment_info(r, deployment_id)
 
     async def _check_group_exists(
         self,
@@ -421,7 +421,7 @@ class DeploymentDBSource:
         if result.first() is None:
             raise ProjectNotFound(f"Project {group_id} not found in domain {domain_name}")
 
-    async def _read_deployment_infos(
+    async def _search_deployment_infos(
         self, r: V2ReadOps, conditions: list[QueryCondition]
     ) -> list[DeploymentInfo]:
         """The deployments matching ``conditions``, with their revisions and policy."""
@@ -430,11 +430,11 @@ class DeploymentDBSource:
         )
         return await self._attach_revisions_and_policy(r, result.items)
 
-    async def _read_deployment_info(
+    async def _get_deployment_info(
         self, r: V2ReadOps, deployment_id: DeploymentID
     ) -> DeploymentInfo:
         """The deployment ``deployment_id``, with its revisions and policy."""
-        infos = await self._read_deployment_infos(
+        infos = await self._search_deployment_infos(
             r,
             [
                 DeploymentSearchableFields.own.entity_id.filter.equals(
@@ -544,7 +544,7 @@ class DeploymentDBSource:
             EndpointNotFound: If the endpoint does not exist
         """
         async with self._reconcile_ops.read_ops() as r:
-            return await self._read_deployment_info(r, endpoint_id)
+            return await self._get_deployment_info(r, endpoint_id)
 
     async def get_legacy_endpoint(
         self,
@@ -556,7 +556,7 @@ class DeploymentDBSource:
             EndpointNotFound: If the endpoint does not exist
         """
         async with self._reconcile_ops.read_ops() as r:
-            return await self._read_deployment_info(r, endpoint_id)
+            return await self._get_deployment_info(r, endpoint_id)
 
     async def get_deployments_by_ids(
         self,
@@ -568,7 +568,7 @@ class DeploymentDBSource:
 
         deployment_fields = DeploymentSearchableFields.own
         async with self._reconcile_ops.read_ops() as r:
-            return await self._read_deployment_infos(
+            return await self._search_deployment_infos(
                 r,
                 [
                     deployment_fields.entity_id.filter.in_(
@@ -721,7 +721,7 @@ class DeploymentDBSource:
             EndpointNotFound: If the endpoint does not exist
         """
         async with self._reconcile_ops.read_ops() as r:
-            loaded = await self._read_deployment_info(r, endpoint_id)
+            loaded = await self._get_deployment_info(r, endpoint_id)
         async with self._begin_readonly_session_read_committed() as db_sess:
             query = sa.select(EndpointRow).where(EndpointRow.id == endpoint_id)
             result = await db_sess.execute(query)
@@ -761,7 +761,7 @@ class DeploymentDBSource:
         if result is None:
             raise EndpointNotFound(f"Endpoint {updater.deployment_id} not found")
         async with self._reconcile_ops.read_ops() as r:
-            return await self._read_deployment_info(r, updater.deployment_id)
+            return await self._get_deployment_info(r, updater.deployment_id)
 
     async def update_endpoint_lifecycle_bulk(
         self,
@@ -1380,7 +1380,7 @@ class DeploymentDBSource:
                 rules_by_endpoint[rule_row.endpoint].append(rule_row.to_autoscaling_rule())
 
         async with self._reconcile_ops.read_ops() as r:
-            deployment_infos = await self._read_deployment_infos(
+            deployment_infos = await self._search_deployment_infos(
                 r,
                 [
                     DeploymentSearchableFields.own.entity_id.filter.in_(
@@ -2738,7 +2738,7 @@ class DeploymentDBSource:
         if result is None:
             raise EndpointNotFound(f"Endpoint {updater.deployment_id} not found")
         async with self._reconcile_ops.read_ops() as r:
-            return await self._read_deployment_info(r, updater.deployment_id)
+            return await self._get_deployment_info(r, updater.deployment_id)
 
     async def replace_deployment_options(
         self,
