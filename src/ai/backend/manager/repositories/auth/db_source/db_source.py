@@ -29,8 +29,8 @@ from ai.backend.manager.errors.auth import (
     AuthorizationFailed,
     GroupMembershipNotFoundError,
     LoginSessionNotFoundError,
-    UserCreationError,
     PasswordMismatch,
+    UserCreationError,
 )
 from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.models.hasher.factory import PasswordHasherFactory
@@ -562,23 +562,11 @@ class AuthDBSource:
         password: str,
     ) -> sa.RowMapping:
         """Verify credentials without password migration (for signout, etc.)"""
-<<<<<<< HEAD
         return await check_credential(
             db=self._db,
             domain=domain_name,
             email=email,
             password=password,
-=======
-        async with self._db.begin_readonly_read_committed() as conn:
-            result = await conn.execute(
-                sa.select(users.c.uuid, users.c.username, users.c.password).where(
-                    (users.c.email == email) & (users.c.domain_name == domain_name)
-                ),
-            )
-            row = await self._password_matched_row(result.first(), target_password_info)
-        return UserCredential(
-            user_id=UserID(row.uuid), username=row.username, hashed_password=row.password
->>>>>>> 0fb099e14 (fix(BA-9007): cost one hash on every rejected login and record a wrong password (#16850))
         )
 
     @auth_db_source_resilience.apply()
