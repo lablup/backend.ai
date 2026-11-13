@@ -8,7 +8,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.entity.agent import AgentUUID
-from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.types import AgentId, ImageID, ResourceSlot
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.agent.types import (
@@ -23,12 +23,15 @@ from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.agent import AgentHasConflictingSessions, AgentNotFound
 from ai.backend.manager.errors.resource import ResourceGroupNotFound, UnresolvableResourceGroup
 from ai.backend.manager.models.agent.row import AgentRow, agents
+from ai.backend.manager.models.agent.scopes import ResourceGroupAgentTarget
 from ai.backend.manager.models.agent.searchable_fields import AgentSearchableFields
+from ai.backend.manager.models.agent.searchers import AgentSearcher
 from ai.backend.manager.models.agent.upserters import AgentHeartbeatUpserter
 from ai.backend.manager.models.deployment_designated_agent.row import DeploymentDesignatedAgentRow
 from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.resource_group.lookups import ResourceGroupNameLookup
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.resource_slot.row import AgentResourceRow
 from ai.backend.manager.models.resource_slot.upserters import AgentResourceUpserter
@@ -330,3 +333,21 @@ class AgentDBSource:
                 )
             )
         return len(written)
+
+    async def search_agents_in_resource_group(
+        self, resource_group_name: ResourceGroupName, searcher: AgentSearcher
+    ) -> list[AgentData]:
+        """The agents of the named resource group matching ``searcher``.
+
+        Raises ``ResourceGroupNotFound`` if no resource group has the name.
+        """
+        async with self._v2_ops.read_ops() as r:
+            resource_group_id = await r.lookup_entity_id(
+                ResourceGroupNameLookup(name=resource_group_name)
+            )
+            if resource_group_id is None:
+                raise ResourceGroupNotFound(f"Resource group {resource_group_name!r} not found")
+            result = await r.search_with_scopes(
+                [ResourceGroupAgentTarget(resource_group_id=resource_group_id)], searcher
+            )
+        return list(result.items)
