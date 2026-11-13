@@ -1502,7 +1502,7 @@ Then
 
 #### [a-granted-user-registering-another-users-ssh-key-gets-the-access-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py) — pass
 
-대상 스코프에서 READ와 UPDATE를 받은 사용자가 공개키와 개인키를 주면, 형식 검사 없이 덮어쓰고 access key가 답으로 온다
+대상 스코프에서 READ와 UPDATE를 받은 사용자가 공개키를 주면, 형식 검사 없이 공개키를 덮어쓰고 access key가 답으로 온다
 
 Given
 

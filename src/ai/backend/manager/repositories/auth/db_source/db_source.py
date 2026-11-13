@@ -23,6 +23,7 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
+from ai.backend.common.types import AccessKey, SSHPublicKey
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.auth.login_session_types import (
     LoginAttemptResult,
@@ -269,6 +270,17 @@ class AuthDBSource:
                 "ssh_private_key": private_key,
             }
             query = keypairs.update().values(data).where(keypairs.c.access_key == access_key)
+            await conn.execute(query)
+
+    @auth_db_source_resilience.apply()
+    async def modify_ssh_public_key(self, access_key: AccessKey, public_key: SSHPublicKey) -> None:
+        """Modify the SSH public key for an access key in database."""
+        async with self._db.begin() as conn:
+            query = (
+                keypairs.update()
+                .values(ssh_public_key=public_key)
+                .where(keypairs.c.access_key == access_key)
+            )
             await conn.execute(query)
 
     @auth_db_source_resilience.apply()

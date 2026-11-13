@@ -26,7 +26,7 @@ from ai.backend.common.exception import (
     UnreachableError,
 )
 from ai.backend.common.plugin.hook import ALL_COMPLETED, FIRST_COMPLETED, PASSED, HookPluginContext
-from ai.backend.common.types import AccessKey, SecretKey, SSHPrivateKey, SSHPublicKey
+from ai.backend.common.types import AccessKey, SecretKey
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import AuthConfig
@@ -789,18 +789,10 @@ class AuthService:
     async def upload_ssh_keypair(
         self, action: UploadSSHKeypairAction
     ) -> UploadSSHKeypairActionResult:
-        privkey = action.private_key
-        pubkey = action.public_key
-        self._ssh_key_validator.validate(SSHPrivateKey(privkey), SSHPublicKey(pubkey))
+        self._ssh_key_validator.validate(action.public_key)
 
-        await self._auth_repository.update_ssh_keypair(action.access_key, pubkey, privkey)
-
-        return UploadSSHKeypairActionResult(
-            ssh_keypair=SSHKeypair(
-                ssh_public_key=pubkey,
-                ssh_private_key=privkey,
-            ),
-        )
+        await self._auth_repository.update_ssh_public_key(action.access_key, action.public_key)
+        return UploadSSHKeypairActionResult(public_key=action.public_key)
 
     async def resolve_access_key_scope(
         self, action: PublicResolveAccessKeyScopeAction
