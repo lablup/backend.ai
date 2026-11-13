@@ -9,8 +9,10 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from ai.backend.common.data.artifact.types import VerificationStepResult
+from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
 from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.manager.data.artifact.types import (
+    ARTIFACT_IMPORT_IN_PROGRESS_STATUSES,
     ArtifactAvailability,
     ArtifactData,
     ArtifactRemoteStatus,
@@ -22,6 +24,7 @@ from ai.backend.manager.errors.artifact import (
     ArtifactAssociationDeletionError,
     ArtifactAssociationNotFoundError,
     ArtifactNotFoundError,
+    ArtifactRevisionImportInProgressError,
     ArtifactRevisionNotFoundError,
     ArtifactRevisionNotVerified,
     ArtifactRevisionUpdateError,
@@ -244,6 +247,29 @@ class ArtifactDBSource:
             )
             await db_sess.execute(stmt)
             return artifact_revision_id
+
+    async def mark_artifact_revision_pulling(
+        self, artifact_revision_id: ArtifactRevisionID
+    ) -> None:
+        async with self._db.begin_session() as db_sess:
+            status = await db_sess.scalar(
+                sa.select(ArtifactRevisionRow.status)
+                .where(ArtifactRevisionRow.id == artifact_revision_id)
+                .with_for_update()
+            )
+            if status is None:
+                raise ArtifactRevisionNotFoundError(
+                    f"Artifact revision {artifact_revision_id} not found"
+                )
+            if status in ARTIFACT_IMPORT_IN_PROGRESS_STATUSES:
+                raise ArtifactRevisionImportInProgressError(
+                    f"Artifact revision {artifact_revision_id} is already being imported"
+                )
+            await db_sess.execute(
+                sa.update(ArtifactRevisionRow)
+                .where(ArtifactRevisionRow.id == artifact_revision_id)
+                .values(status=ArtifactStatus.PULLING)
+            )
 
     async def update_artifact_revision_remote_status(
         self, artifact_revision_id: uuid.UUID, remote_status: ArtifactRemoteStatus
