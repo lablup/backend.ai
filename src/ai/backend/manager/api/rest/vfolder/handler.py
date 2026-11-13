@@ -110,7 +110,6 @@ from ai.backend.common.exception import UnreachableError
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderID, VFolderMountPolicy
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.vfolder.types import (
-    VFolderCreationHostGrantRule,
     VFolderOwnershipType,
     VFolderStatusSet,
     vfolder_status_map,
@@ -169,7 +168,7 @@ from ai.backend.manager.services.vfolder.actions.bulk_load_mount_levels import (
 from ai.backend.manager.services.vfolder.actions.bulk_load_permissions import (
     BulkLoadVFolderPermissionsAction,
 )
-from ai.backend.manager.services.vfolder.actions.create import CreateVFolderAction
+from ai.backend.manager.services.vfolder.actions.create import LegacyCreateVFolderAction
 from ai.backend.manager.services.vfolder.actions.file import (
     CreateArchiveDownloadSessionAction,
     CreateDownloadSessionAction,
@@ -328,11 +327,8 @@ class VFolderHandler:
                 )
 
         try:
-            result = await self._vfolder.create_vfolder.run(
-                CreateVFolderAction(
-                    creator=creator,
-                    host_grant_rule=VFolderCreationHostGrantRule.LEGACY_REST_V1,
-                )
+            result = await self._vfolder.legacy_create_vfolder.run(
+                LegacyCreateVFolderAction(creator=creator)
             )
         except (VFolderInvalidParameter, VFolderAlreadyExists) as e:
             raise InvalidAPIParameters(str(e)) from e

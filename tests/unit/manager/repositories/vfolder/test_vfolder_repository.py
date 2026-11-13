@@ -42,7 +42,6 @@ from ai.backend.manager.data.permission.types import RoleSource
 from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.vfolder.types import (
-    VFolderCreationHostGrantRule,
     VFolderOperationStatus,
     VFolderOwnershipType,
 )
@@ -410,7 +409,6 @@ class TestVfolderRepository:
 
         creation = await vfolder_repository.create_vfolder_with_permission(
             creator,
-            host_grant_rule=VFolderCreationHostGrantRule.V2,
         )
 
         vfolder_data = creation.vfolder
@@ -433,7 +431,6 @@ class TestVfolderRepository:
 
         creation = await vfolder_repository.create_vfolder_with_permission(
             creator,
-            host_grant_rule=VFolderCreationHostGrantRule.V2,
         )
 
         policies = await vfolder_repository.list_user_mount_policies(creation.vfolder.id)
@@ -453,7 +450,6 @@ class TestVfolderRepository:
         )
         creation = await vfolder_repository.create_vfolder_with_permission(
             creator,
-            host_grant_rule=VFolderCreationHostGrantRule.V2,
         )
         folder_id = creation.vfolder.id
 
@@ -477,7 +473,6 @@ class TestVfolderRepository:
         )
         creation = await vfolder_repository.create_vfolder_with_permission(
             creator,
-            host_grant_rule=VFolderCreationHostGrantRule.V2,
         )
         folder_id = creation.vfolder.id
 
@@ -501,7 +496,6 @@ class TestVfolderRepository:
         )
         await vfolder_repository.create_vfolder_with_permission(
             creator,
-            host_grant_rule=VFolderCreationHostGrantRule.V2,
         )
 
         with pytest.raises(VFolderAlreadyExists):
@@ -512,7 +506,6 @@ class TestVfolderRepository:
                     user_id=test_user,
                     name=creator.name,
                 ),
-                host_grant_rule=VFolderCreationHostGrantRule.V2,
             )
 
     async def test_naming_a_personal_project_makes_a_project_folder_there(
@@ -535,7 +528,6 @@ class TestVfolderRepository:
                 group_id=personal_project,
                 user_id=test_user,
             ),
-            host_grant_rule=VFolderCreationHostGrantRule.V2,
         )
 
         assert creation.vfolder.ownership_type == VFolderOwnershipType.GROUP
@@ -559,7 +551,6 @@ class TestVfolderRepository:
                     group_id=test_model_store_group,
                     user_id=test_user,
                 ),
-                host_grant_rule=VFolderCreationHostGrantRule.V2,
             )
 
         with pytest.raises(VFolderInvalidParameter):
@@ -569,7 +560,6 @@ class TestVfolderRepository:
                     group_id=test_model_store_group,
                     user_id=test_user,
                 ),
-                host_grant_rule=VFolderCreationHostGrantRule.V2,
             )
 
     async def test_no_allowance_lets_the_folder_through(
@@ -590,7 +580,6 @@ class TestVfolderRepository:
                     group_id=test_model_store_group,
                     user_id=test_user,
                 ),
-                host_grant_rule=VFolderCreationHostGrantRule.V2,
             )
 
     @pytest.fixture
@@ -665,18 +654,24 @@ class TestVfolderRepository:
             status=VFolderOperationStatus.READY,
         )
 
-    @pytest.mark.parametrize(
-        "host_grant_rule", list(VFolderCreationHostGrantRule), ids=lambda rule: rule.value
-    )
-    async def test_a_personal_folder_takes_a_host_the_domain_grants(
+    async def test_a_v2_personal_folder_takes_a_host_the_domain_grants(
         self,
         vfolder_repository: VfolderRepository,
         personal_folder_on_a_host_only_the_domain_grants: PersonalVFolderCreator,
-        host_grant_rule: VFolderCreationHostGrantRule,
     ) -> None:
         creation = await vfolder_repository.create_vfolder_with_permission(
-            personal_folder_on_a_host_only_the_domain_grants,
-            host_grant_rule=host_grant_rule,
+            personal_folder_on_a_host_only_the_domain_grants
+        )
+
+        assert creation.vfolder.ownership_type == VFolderOwnershipType.USER
+
+    async def test_a_legacy_rest_v1_personal_folder_takes_a_host_the_domain_grants(
+        self,
+        vfolder_repository: VfolderRepository,
+        personal_folder_on_a_host_only_the_domain_grants: PersonalVFolderCreator,
+    ) -> None:
+        creation = await vfolder_repository.legacy_create_vfolder_with_permission(
+            personal_folder_on_a_host_only_the_domain_grants
         )
 
         assert creation.vfolder.ownership_type == VFolderOwnershipType.USER
@@ -751,9 +746,8 @@ class TestVfolderRepository:
         vfolder_repository: VfolderRepository,
         project_folder_on_a_host_only_the_keypair_policy_grants: ProjectVFolderCreator,
     ) -> None:
-        creation = await vfolder_repository.create_vfolder_with_permission(
+        creation = await vfolder_repository.legacy_create_vfolder_with_permission(
             project_folder_on_a_host_only_the_keypair_policy_grants,
-            host_grant_rule=VFolderCreationHostGrantRule.LEGACY_REST_V1,
         )
 
         assert creation.vfolder.ownership_type == VFolderOwnershipType.GROUP
@@ -766,7 +760,6 @@ class TestVfolderRepository:
         with pytest.raises(InsufficientStoragePermission):
             await vfolder_repository.create_vfolder_with_permission(
                 project_folder_on_a_host_only_the_keypair_policy_grants,
-                host_grant_rule=VFolderCreationHostGrantRule.V2,
             )
 
     def test_a_personal_folder_made_without_a_level_defaults_to_none(self) -> None:
@@ -805,7 +798,6 @@ class TestVfolderRepository:
 
         creation = await vfolder_repository.create_vfolder_with_permission(
             creator,
-            host_grant_rule=VFolderCreationHostGrantRule.V2,
         )
 
         assert creation.vfolder.default_mount_permission == VFolderMountPolicy.READ_WRITE
@@ -828,7 +820,6 @@ class TestVfolderRepository:
 
         creation = await vfolder_repository.create_vfolder_with_permission(
             creator,
-            host_grant_rule=VFolderCreationHostGrantRule.V2,
         )
 
         assert creation.vfolder.default_mount_permission == VFolderMountPolicy.READ_ONLY
@@ -853,7 +844,6 @@ class TestVfolderRepository:
                 usage_mode=VFolderUsageMode.GENERAL,
                 permission=VFolderMountPolicy.READ_ONLY,
             ),
-            host_grant_rule=VFolderCreationHostGrantRule.V2,
         )
 
         assert creation.vfolder.default_mount_permission == VFolderMountPolicy.READ_ONLY

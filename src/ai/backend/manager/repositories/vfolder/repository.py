@@ -38,7 +38,6 @@ from ai.backend.manager.data.vfolder.dto import UserIdentity
 from ai.backend.manager.data.vfolder.types import (
     VFolderCloneInfo,
     VFolderCreation,
-    VFolderCreationHostGrantRule,
     VFolderData,
     VFolderInvitationData,
     VFolderMountPolicyData,
@@ -415,62 +414,56 @@ class VfolderRepository:
                 raise PersonalProjectNotFound(f"User '{user_id}' has no personal project.")
             return ProjectID(project_id)
 
-    async def _legacy_rest_v1_creation_vfolder_hosts(
-        self, creator: VFolderBaseCreator
-    ) -> VFolderHostPermissionMap:
-        """
-        REST v1 creation keeps the union it checked before v2, so existing v1 clients are not
-        refused: the domain, the project or the user's projects, and the keypair policy.
-        v2 creation reads ``get_allowed_vfolder_hosts`` instead.
-        """
-        if not isinstance(creator, ProjectVFolderCreator):
-            return await self.get_user_storage_host_permissions(
-                creator.creator_id, creator.domain_name
-            )
-        async with self._db.begin_readonly_session_read_committed() as db_session:
-            keypair_hosts = await self._fetch_default_keypair_vfolder_hosts(
-                db_session, creator.creator_id
-            )
-            return await get_allowed_vfolder_hosts_by_group(
-                await db_session.connection(),
-                {"allowed_vfolder_hosts": keypair_hosts or VFolderHostPermissionMap()},
-                creator.domain_name,
-                creator.project,
-            )
-
     @vfolder_repository_resilience.apply()
-    async def create_vfolder_with_permission(
-        self,
-        creator: VFolderBaseCreator,
-        *,
-        host_grant_rule: VFolderCreationHostGrantRule,
-    ) -> VFolderCreation:
+    async def create_vfolder_with_permission(self, creator: VFolderBaseCreator) -> VFolderCreation:
         """Write the vfolder row and answer with what making its storage folder needs.
 
         The host the folder asks for is checked here rather than by the caller, so a
         request that may not reach that host writes nothing.
         """
-        match host_grant_rule:
-            case VFolderCreationHostGrantRule.LEGACY_REST_V1:
-                # The domain, the project or the user's projects, and the keypair policy.
-                allowed_hosts = await self._legacy_rest_v1_creation_vfolder_hosts(creator)
-                if (
-                    creator.host not in allowed_hosts
-                    or VFolderHostPermission.CREATE not in allowed_hosts[creator.host]
-                ):
-                    raise InsufficientStoragePermission(
-                        f"`{VFolderHostPermission.CREATE}` Not allowed in vfolder host(`{creator.host}`)"
-                    )
-            case VFolderCreationHostGrantRule.V2:
-                # The domain, with the project or with the keypair policy.
-                await self.ensure_host_permission_allowed_by_user(
-                    creator.host,
-                    permission=VFolderHostPermission.CREATE,
-                    user_uuid=creator.creator_id,
-                    group_id=creator.project
-                    if isinstance(creator, ProjectVFolderCreator)
-                    else None,
+        await self.ensure_host_permission_allowed_by_user(
+            creator.host,
+            permission=VFolderHostPermission.CREATE,
+            user_uuid=creator.creator_id,
+            group_id=creator.project if isinstance(creator, ProjectVFolderCreator) else None,
+        )
+        return await self._write_vfolder_row_and_read_storage_limits(creator)
+
+    @vfolder_repository_resilience.apply()
+    async def legacy_create_vfolder_with_permission(
+        self, creator: VFolderBaseCreator
+    ) -> VFolderCreation:
+        """
+        REST v1 creation keeps the union it checked before v2, so existing v1 clients are not
+        refused: the domain, the project or the user's projects, and the keypair policy.
+        """
+        if isinstance(creator, ProjectVFolderCreator):
+            async with self._db.begin_readonly_session_read_committed() as db_session:
+                keypair_hosts = await self._fetch_default_keypair_vfolder_hosts(
+                    db_session, creator.creator_id
                 )
+                allowed_hosts = await get_allowed_vfolder_hosts_by_group(
+                    await db_session.connection(),
+                    {"allowed_vfolder_hosts": keypair_hosts or VFolderHostPermissionMap()},
+                    creator.domain_name,
+                    creator.project,
+                )
+        else:
+            allowed_hosts = await self.get_user_storage_host_permissions(
+                creator.creator_id, creator.domain_name
+            )
+        if (
+            creator.host not in allowed_hosts
+            or VFolderHostPermission.CREATE not in allowed_hosts[creator.host]
+        ):
+            raise InsufficientStoragePermission(
+                f"`{VFolderHostPermission.CREATE}` Not allowed in vfolder host(`{creator.host}`)"
+            )
+        return await self._write_vfolder_row_and_read_storage_limits(creator)
+
+    async def _write_vfolder_row_and_read_storage_limits(
+        self, creator: VFolderBaseCreator
+    ) -> VFolderCreation:
         limits = await self._storage_limits(creator)
         async with self._v2_ops.write_ops() as w:
             created = await w.create_entity(creator)

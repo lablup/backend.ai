@@ -43,6 +43,8 @@ from ai.backend.manager.services.vfolder.actions.bulk_load_permissions import (
 from ai.backend.manager.services.vfolder.actions.create import (
     CreateVFolderAction,
     CreateVFolderActionResult,
+    LegacyCreateVFolderAction,
+    LegacyCreateVFolderActionResult,
 )
 from ai.backend.manager.services.vfolder.actions.file_v2 import (
     CloneVFolderV2Action,
@@ -123,6 +125,9 @@ from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
 
 class VFolderProcessors:
     create_vfolder: ScopeActionProcessor[CreateVFolderAction, CreateVFolderActionResult]
+    legacy_create_vfolder: ScopeActionProcessor[
+        LegacyCreateVFolderAction, LegacyCreateVFolderActionResult
+    ]
     get_vfolder: SingleEntityActionProcessor[GetVFolderAction, GetVFolderActionResult]
     scoped_search: ScopeActionProcessor[
         ScopedSearchVFoldersAction, ScopedBatchOpsResult[VFolderData]
@@ -202,6 +207,7 @@ class VFolderProcessors:
     def __init__(self, group: ProcessorGroup[VFolderData], service: VFolderService) -> None:
         # Scope actions with RBAC validation
         self.create_vfolder = group.scope(CreateVFolderAction, service.create)
+        self.legacy_create_vfolder = group.scope(LegacyCreateVFolderAction, service.legacy_create)
         self.scoped_search = group.scoped_search_ops(ScopedSearchVFoldersAction)
 
         # Single entity actions with RBAC validation

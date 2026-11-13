@@ -25,7 +25,6 @@ from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.monitor.audit_log import ScopeActionAuditLogMonitor
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
-from ai.backend.manager.data.vfolder.types import VFolderCreationHostGrantRule
 from ai.backend.manager.models.audit_log.creators import AuditLogScopeCreator
 from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.repositories.client_ip_masking.repository import ClientIPMaskingRepository
@@ -66,6 +65,8 @@ from ai.backend.manager.services.template.actions.create_task_template import (
 from ai.backend.manager.services.vfolder.actions.create import (
     CreateVFolderAction,
     CreateVFolderActionResult,
+    LegacyCreateVFolderAction,
+    LegacyCreateVFolderActionResult,
 )
 
 _PROJECT_ID = ProjectID(uuid.uuid4())
@@ -182,11 +183,13 @@ _CASES: dict[str, _Case] = {
         expected_entity_ids=tuple(SessionTemplateID(u) for u in _TEMPLATE_UUIDS),
     ),
     "create_vfolder": _Case(
-        action=CreateVFolderAction(
-            creator=_vfolder_creator(),
-            host_grant_rule=VFolderCreationHostGrantRule.V2,
-        ),
+        action=CreateVFolderAction(creator=_vfolder_creator()),
         result=CreateVFolderActionResult(vfolder=MagicMock(id=_VFOLDER_ID)),
+        expected_entity_ids=(_VFOLDER_ID,),
+    ),
+    "legacy_create_vfolder": _Case(
+        action=LegacyCreateVFolderAction(creator=_vfolder_creator()),
+        result=LegacyCreateVFolderActionResult(vfolder=MagicMock(id=_VFOLDER_ID)),
         expected_entity_ids=(_VFOLDER_ID,),
     ),
 }

@@ -69,17 +69,6 @@ class VFolderOwnershipType(CIStrEnum):
         return VFolderOwnershipTypeField(self)
 
 
-class VFolderCreationHostGrantRule(enum.StrEnum):
-    """
-    The grants a vfolder creation's host check unions. Legacy REST v1 unions the domain, the
-    project (or the user's projects) and the keypair policy. v2 unions the domain with the
-    project for a project folder, and with the keypair policy for a personal folder.
-    """
-
-    LEGACY_REST_V1 = "legacy_rest_v1"
-    V2 = "v2"
-
-
 class VFolderMountPermission(enum.StrEnum):
     # TODO: Replace this class with VFolderRBACPermission
     # Or rename this class to VFolderMountPermission

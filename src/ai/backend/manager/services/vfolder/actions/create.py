@@ -6,7 +6,7 @@ from typing import override
 
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.vfolder.types import VFolderCreationHostGrantRule, VFolderData
+from ai.backend.manager.data.vfolder.types import VFolderData
 from ai.backend.manager.models.vfolder.creators import VFolderBaseCreator
 from ai.backend.manager.services.vfolder.actions.base import (
     VFolderScopeAction,
@@ -24,7 +24,6 @@ class CreateVFolderAction(VFolderScopeAction):
     """
 
     creator: VFolderBaseCreator
-    host_grant_rule: VFolderCreationHostGrantRule
 
     @override
     def scope_targets(self) -> Sequence[EntityIdentifier]:
@@ -43,6 +42,40 @@ class CreateVFolderAction(VFolderScopeAction):
 
 @dataclass
 class CreateVFolderActionResult(VFolderScopeActionResult):
+    vfolder: VFolderData
+
+    @override
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
+        return (self.vfolder.id,)
+
+
+@dataclass
+class LegacyCreateVFolderAction(VFolderScopeAction):
+    """Create the vfolder the insert spec describes, for REST v1 ``POST /folders``.
+
+    The host check unions the grants REST v1 has always checked; see
+    ``VfolderRepository.legacy_create_vfolder_with_permission``.
+    """
+
+    creator: VFolderBaseCreator
+
+    @override
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return self.creator.scope_targets()
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "legacy_create_vfolder"
+
+
+@dataclass
+class LegacyCreateVFolderActionResult(VFolderScopeActionResult):
     vfolder: VFolderData
 
     @override

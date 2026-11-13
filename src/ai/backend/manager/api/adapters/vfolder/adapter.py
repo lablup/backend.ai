@@ -112,7 +112,6 @@ from ai.backend.manager.data.deployment.types import (
     ReplicaSpec,
 )
 from ai.backend.manager.data.vfolder.types import (
-    VFolderCreationHostGrantRule,
     VFolderData,
     VFolderMountPolicyData,
 )
@@ -505,12 +504,7 @@ class VFolderAdapter(BaseAdapter):
         return await self._create(self._project_creator(me, ProjectID(project_id), input))
 
     async def _create(self, creator: VFolderBaseCreator) -> CreateVFolderPayload:
-        result = await self._vfolder.create_vfolder.run(
-            CreateVFolderAction(
-                creator=creator,
-                host_grant_rule=VFolderCreationHostGrantRule.V2,
-            )
-        )
+        result = await self._vfolder.create_vfolder.run(CreateVFolderAction(creator=creator))
         return CreateVFolderPayload(vfolder=self._vfolder_data_to_node(result.vfolder))
 
     def _personal_creator(
