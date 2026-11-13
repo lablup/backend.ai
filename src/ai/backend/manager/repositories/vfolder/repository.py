@@ -282,9 +282,12 @@ class VfolderRepository:
                     keypair_hosts = await self._fetch_default_keypair_vfolder_hosts(
                         db_session, user_uuid
                     )
+                    keypair_resource_policy = {
+                        "allowed_vfolder_hosts": keypair_hosts or VFolderHostPermissionMap()
+                    }
                     return await get_allowed_vfolder_hosts_by_group(
                         await db_session.connection(),
-                        {"allowed_vfolder_hosts": keypair_hosts or VFolderHostPermissionMap()},
+                        keypair_resource_policy,
                         group_row.domain_name,
                         group_uuid,
                     )
