@@ -2113,7 +2113,7 @@ class TestVfolderRepositoryDeleteForever:
         user_id: uuid.UUID,
         sgroup_id: uuid.UUID,
         sgroup_name: str,
-        kernel_status: KernelStatus = KernelStatus.PENDING,
+        kernel_status: KernelStatus = KernelStatus.RUNNING,
     ) -> uuid.UUID:
         # A kernel mounts the vfolder while its parent session does NOT,
         # isolating the kernel-level mount guard from the session-level one.
