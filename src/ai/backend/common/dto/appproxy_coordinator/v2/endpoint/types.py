@@ -16,6 +16,9 @@ from pydantic import AliasChoices, AnyUrl, Field
 from ai.backend.common.api_handlers import BaseFieldModel
 from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.domain import DomainName
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserID
 
 
 class SessionTagsModel(BaseFieldModel):
@@ -25,21 +28,21 @@ class SessionTagsModel(BaseFieldModel):
     project, domain) so the proxy can authorize and scope traffic.
     """
 
-    user_uuid: str = Field(
+    user_uuid: UserID = Field(
         ...,
-        description="UUID of the session-owning user, encoded as a string.",
+        description="The session-owning user.",
     )
-    project_id: str = Field(
+    project_id: ProjectID = Field(
         ...,
         description=(
-            "UUID of the session-owning project, encoded as a string. "
+            "The session-owning project. "
             "Formerly transmitted as ``group_id``; ``group_id`` remains a "
             "validation alias for backward compatibility."
         ),
         validation_alias=AliasChoices("project_id", "group_id"),
         serialization_alias="project_id",
     )
-    domain_name: str = Field(
+    domain_name: DomainName = Field(
         ...,
         description="Name of the domain that owns the session / endpoint.",
     )
@@ -52,10 +55,10 @@ class EndpointTagsModel(BaseFieldModel):
     model service attached to this endpoint.
     """
 
-    id: str = Field(
+    id: DeploymentID = Field(
         ...,
         description=(
-            "Deployment UUID encoded as a string. Mirrors the outer "
+            "The deployment of the endpoint. Mirrors the outer "
             "``deployment_id`` and is kept as a tag for observability."
         ),
     )
