@@ -245,9 +245,11 @@ from ai.backend.manager.services.domain.actions.bulk_get import BulkGetDomainsAc
 from ai.backend.manager.services.domain.actions.bulk_lookup import BulkLookupDomainsAction
 from ai.backend.manager.services.domain.actions.create_domain import CreateDomainAction
 from ai.backend.manager.services.domain.actions.get import GetDomainAction
-from ai.backend.manager.services.domain.actions.scoped_search import ScopedSearchDomainsAction
-from ai.backend.manager.services.domain.actions.search_container_registry_relations import (
+from ai.backend.manager.services.domain.actions.global_search_container_registry_relations import (
     GlobalSearchDomainContainerRegistryRelationsAction,
+)
+from ai.backend.manager.services.domain.actions.scoped_search import ScopedSearchDomainsAction
+from ai.backend.manager.services.domain.actions.scoped_search_container_registry_relations import (
     ScopedSearchDomainContainerRegistryRelationsAction,
 )
 from ai.backend.manager.services.domain.processors import DomainProcessors

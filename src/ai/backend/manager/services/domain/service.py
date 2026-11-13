@@ -19,14 +19,17 @@ from ai.backend.manager.services.domain.actions.delete_domain_dotfile import (
     DeleteDomainDotfileAction,
     DeleteDomainDotfileActionResult,
 )
+from ai.backend.manager.services.domain.actions.global_search_container_registry_relations import (
+    GlobalSearchDomainContainerRegistryRelationsAction,
+    GlobalSearchDomainContainerRegistryRelationsActionResult,
+)
 from ai.backend.manager.services.domain.actions.purge_domain import (
     PurgeDomainAction,
     PurgeDomainActionResult,
 )
-from ai.backend.manager.services.domain.actions.search_container_registry_relations import (
-    GlobalSearchDomainContainerRegistryRelationsAction,
+from ai.backend.manager.services.domain.actions.scoped_search_container_registry_relations import (
     ScopedSearchDomainContainerRegistryRelationsAction,
-    SearchDomainContainerRegistryRelationsActionResult,
+    ScopedSearchDomainContainerRegistryRelationsActionResult,
 )
 from ai.backend.manager.services.domain.actions.update_container_registry_relations import (
     UpdateDomainContainerRegistryRelationsAction,
@@ -65,9 +68,9 @@ class DomainService:
 
     async def scoped_search_container_registry_relations(
         self, action: ScopedSearchDomainContainerRegistryRelationsAction
-    ) -> SearchDomainContainerRegistryRelationsActionResult:
+    ) -> ScopedSearchDomainContainerRegistryRelationsActionResult:
         result = await self._repository.scoped_search_container_registry_relations(action.searcher)
-        return SearchDomainContainerRegistryRelationsActionResult(
+        return ScopedSearchDomainContainerRegistryRelationsActionResult(
             items=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,
@@ -76,9 +79,9 @@ class DomainService:
 
     async def global_search_container_registry_relations(
         self, action: GlobalSearchDomainContainerRegistryRelationsAction
-    ) -> SearchDomainContainerRegistryRelationsActionResult:
+    ) -> GlobalSearchDomainContainerRegistryRelationsActionResult:
         result = await self._repository.global_search_container_registry_relations(action.searcher)
-        return SearchDomainContainerRegistryRelationsActionResult(
+        return GlobalSearchDomainContainerRegistryRelationsActionResult(
             items=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,

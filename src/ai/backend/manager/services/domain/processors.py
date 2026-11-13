@@ -32,6 +32,10 @@ from ai.backend.manager.services.domain.actions.delete_domain_dotfile import (
     DeleteDomainDotfileActionResult,
 )
 from ai.backend.manager.services.domain.actions.get import GetDomainAction
+from ai.backend.manager.services.domain.actions.global_search_container_registry_relations import (
+    GlobalSearchDomainContainerRegistryRelationsAction,
+    GlobalSearchDomainContainerRegistryRelationsActionResult,
+)
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.domain.actions.partial_bulk_delete_domains import (
     PartialBulkDeleteDomainsAction,
@@ -48,10 +52,9 @@ from ai.backend.manager.services.domain.actions.purge_domain import (
 )
 from ai.backend.manager.services.domain.actions.restore_domain import RestoreDomainAction
 from ai.backend.manager.services.domain.actions.scoped_search import ScopedSearchDomainsAction
-from ai.backend.manager.services.domain.actions.search_container_registry_relations import (
-    GlobalSearchDomainContainerRegistryRelationsAction,
+from ai.backend.manager.services.domain.actions.scoped_search_container_registry_relations import (
     ScopedSearchDomainContainerRegistryRelationsAction,
-    SearchDomainContainerRegistryRelationsActionResult,
+    ScopedSearchDomainContainerRegistryRelationsActionResult,
 )
 from ai.backend.manager.services.domain.actions.search_domains import GlobalSearchDomainsAction
 from ai.backend.manager.services.domain.actions.update_container_registry_relations import (
@@ -90,11 +93,11 @@ class DomainProcessors:
     ]
     scoped_search_container_registry_relations: ScopeActionProcessor[
         ScopedSearchDomainContainerRegistryRelationsAction,
-        SearchDomainContainerRegistryRelationsActionResult,
+        ScopedSearchDomainContainerRegistryRelationsActionResult,
     ]
     global_search_container_registry_relations: GlobalActionProcessor[
         GlobalSearchDomainContainerRegistryRelationsAction,
-        SearchDomainContainerRegistryRelationsActionResult,
+        GlobalSearchDomainContainerRegistryRelationsActionResult,
     ]
     create_dotfile: SingleEntityActionProcessor[
         CreateDomainDotfileAction, CreateDomainDotfileActionResult
