@@ -870,9 +870,8 @@ class DeploymentInfo:
     target_replica_group_id: ReplicaGroupID | None = None
     current_revision_id: DeploymentRevisionID | None = None
     deploying_revision_id: DeploymentRevisionID | None = None
-    # Full revision data, populated only by the legacy (REST v1) / engine
-    # read paths that eagerly load the revision rows. ``None`` on the modern
-    # read path even when ``current_revision_id`` is set.
+    # Full revision data. The DeploymentDBSource reads fill it; a bare DeploymentInfoSearcher
+    # result and the write-path results leave it None even when the id is set.
     current_revision: ModelRevisionData | None = None
     policy: DeploymentPolicyData | None = None
     deploying_revision: ModelRevisionData | None = None
