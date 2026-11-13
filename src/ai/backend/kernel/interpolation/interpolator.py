@@ -13,7 +13,7 @@ LEGACY_DELIMITERS: Final[Sequence[InterpolationDelimiter]] = (
 )
 
 
-class ServiceInterpolator:
+class ServiceArgumentInterpolator:
     """Fills the variables of one service start into its command, envs and pre-start action args."""
 
     _variables: Mapping[str, Any]

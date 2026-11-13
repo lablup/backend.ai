@@ -3,7 +3,10 @@ from collections.abc import Sequence
 import pytest
 
 from ai.backend.kernel.exception import InvalidServiceDefinition
-from ai.backend.kernel.interpolation.interpolator import LEGACY_DELIMITERS, ServiceInterpolator
+from ai.backend.kernel.interpolation.interpolator import (
+    LEGACY_DELIMITERS,
+    ServiceArgumentInterpolator,
+)
 from ai.backend.kernel.interpolation.types import InterpolationDelimiter
 
 _LEGACY = LEGACY_DELIMITERS
@@ -15,7 +18,7 @@ _JINJA_AND_ERB: list[InterpolationDelimiter] = [
 _VARIABLES = {"host": "99.99.99.99", "ports": [11001, 11002], "port": "8000"}
 
 
-class TestServiceInterpolator:
+class TestServiceArgumentInterpolator:
     @pytest.mark.parametrize(
         ("delimiters", "part", "expected"),
         [
@@ -72,7 +75,7 @@ class TestServiceInterpolator:
     def test_apply(
         self, delimiters: Sequence[InterpolationDelimiter], part: str, expected: str
     ) -> None:
-        assert ServiceInterpolator(_VARIABLES, delimiters).apply([part]) == [expected]
+        assert ServiceArgumentInterpolator(_VARIABLES, delimiters).apply([part]) == [expected]
 
     @pytest.mark.parametrize(
         ("delimiters", "mentions_literal_braces"),
@@ -85,6 +88,6 @@ class TestServiceInterpolator:
         self, delimiters: Sequence[InterpolationDelimiter], mentions_literal_braces: bool
     ) -> None:
         with pytest.raises(InvalidServiceDefinition) as exc_info:
-            ServiceInterpolator(_VARIABLES, delimiters).apply(["{{ ports[0 }}"])
+            ServiceArgumentInterpolator(_VARIABLES, delimiters).apply(["{{ ports[0 }}"])
 
         assert ("Literal braces" in str(exc_info.value)) is mentions_literal_braces

@@ -25,7 +25,7 @@ import attrs
 
 from . import service_actions
 from .exception import DisallowedArgument, DisallowedEnvironment, InvalidServiceDefinition
-from .interpolation.interpolator import LEGACY_DELIMITERS, ServiceInterpolator
+from .interpolation.interpolator import LEGACY_DELIMITERS, ServiceArgumentInterpolator
 from .interpolation.types import InterpolationDelimiter, InterpolationOption
 from .logging import BraceStyleAdapter
 
@@ -115,7 +115,7 @@ class ServiceParser:
             )
             delimiters = None
         legacy = delimiters is None
-        interpolator = ServiceInterpolator(
+        interpolator = ServiceArgumentInterpolator(
             self.variables, LEGACY_DELIMITERS if delimiters is None else delimiters
         )
 
@@ -182,7 +182,7 @@ class ServiceParser:
         return bool(delimiters) and all(d["start"] and d["end"] for d in delimiters)
 
     def _render_action_arg(
-        self, value: Any, interpolator: ServiceInterpolator, *, legacy: bool
+        self, value: Any, interpolator: ServiceArgumentInterpolator, *, legacy: bool
     ) -> Any:
         match value:
             case str() if legacy:
