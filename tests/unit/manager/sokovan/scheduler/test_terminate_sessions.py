@@ -28,7 +28,6 @@ from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
-from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
 from ai.backend.manager.sokovan.scheduler.terminator.terminator import (
     SessionTerminator,
     SessionTerminatorArgs,
@@ -108,11 +107,10 @@ class TestTerminateSessions:
 
         # Execute - wrap in RecorderContext scope with entity_ids
         with RecorderContext[SessionId].scope("terminate", []):
-            result = await terminator._terminate_sessions_internal(terminating_sessions)
+            confirmed = await terminator.terminate_sessions_for_handler(terminating_sessions)
 
         # Verify
-        assert isinstance(result, ScheduleResult)
-        assert len(result.scheduled_session_ids) == 0
+        assert confirmed == set()
 
     async def test_terminate_sessions_single_success(
         self,
@@ -153,12 +151,10 @@ class TestTerminateSessions:
 
         # Execute - wrap in RecorderContext scope with entity_ids
         with RecorderContext[SessionId].scope("terminate", [session_id]):
-            result = await terminator._terminate_sessions_internal([terminating_session])
+            confirmed = await terminator.terminate_sessions_for_handler([terminating_session])
 
         # Verify
-        # Returns empty result (status updates handled by events/sweep)
-        assert isinstance(result, ScheduleResult)
-        assert len(result.scheduled_session_ids) == 0
+        assert confirmed == {session_id}
 
         # Verify agent destroy_kernel was called with correct parameters
         # Note: AgentClient.destroy_kernel accepts SessionId type and converts to str internally
@@ -203,12 +199,10 @@ class TestTerminateSessions:
 
         # Execute - wrap in RecorderContext scope with entity_ids
         with RecorderContext[SessionId].scope("terminate", [session_id]):
-            result = await terminator._terminate_sessions_internal([terminating_session])
+            confirmed = await terminator.terminate_sessions_for_handler([terminating_session])
 
         # Verify
-        # Returns empty result (status updates handled by events/sweep)
-        assert isinstance(result, ScheduleResult)
-        assert len(result.scheduled_session_ids) == 0
+        assert confirmed == {session_id}
 
         # Verify all kernels had RPC calls made
         # Note: AgentClient.destroy_kernel accepts SessionId type and converts to str internally
@@ -271,11 +265,11 @@ class TestTerminateSessions:
 
         # Execute - wrap in RecorderContext scope with entity_ids
         with RecorderContext[SessionId].scope("terminate", [session_id]):
-            result = await terminator._terminate_sessions_internal([terminating_session])
+            confirmed = await terminator.terminate_sessions_for_handler([terminating_session])
 
         # Verify
-        # Session should not be counted as terminated due to partial failure
-        assert len(result.scheduled_session_ids) == 0
+        # One refused kernel leaves the session unconfirmed
+        assert confirmed == set()
 
     async def test_terminate_sessions_concurrent_execution(
         self,
@@ -338,13 +332,11 @@ class TestTerminateSessions:
         # Execute - wrap in RecorderContext scope with entity_ids
         start_time = time.time()
         with RecorderContext[SessionId].scope("terminate", session_ids):
-            result = await terminator._terminate_sessions_internal(sessions)
+            confirmed = await terminator.terminate_sessions_for_handler(sessions)
         elapsed = time.time() - start_time
 
         # Verify
-        # Returns empty result (status updates handled by events/sweep)
-        assert isinstance(result, ScheduleResult)
-        assert len(result.scheduled_session_ids) == 0
+        assert confirmed == set(session_ids)
 
         # Verify all RPC calls were made
         for i, agent_id in enumerate(all_agent_ids):
@@ -376,8 +368,8 @@ class TestTerminateSessions:
 
         # Execute - wrap in RecorderContext scope with entity_ids
         with RecorderContext[SessionId].scope("terminate", [session_id]):
-            result = await terminator._terminate_sessions_internal([terminating_session])
+            confirmed = await terminator.terminate_sessions_for_handler([terminating_session])
 
         # Verify
-        # Session without kernels cannot be terminated
-        assert len(result.scheduled_session_ids) == 0
+        # Nothing to destroy, so nothing left to retry
+        assert confirmed == {session_id}

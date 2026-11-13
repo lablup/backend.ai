@@ -17,7 +17,6 @@ from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.data.kernel.types import KernelInfo
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
-from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
 from ai.backend.manager.views.sokovan.session import (
     KernelTerminationResult,
     TerminatingSessionData,
@@ -50,7 +49,7 @@ class SessionTerminator:
     async def terminate_sessions_for_handler(
         self,
         terminating_sessions: list[TerminatingSessionData],
-    ) -> None:
+    ) -> set[SessionId]:
         """
         Send termination requests for the given sessions.
 
@@ -58,30 +57,15 @@ class SessionTerminator:
         Used by TerminateSessionsLifecycleHandler.
 
         :param terminating_sessions: List of sessions to terminate with kernel details
-        """
-        await self._terminate_sessions_internal(terminating_sessions)
-
-    async def _terminate_sessions_internal(
-        self,
-        terminating_sessions: list[TerminatingSessionData],
-    ) -> ScheduleResult:
-        """
-        Internal implementation for terminating sessions.
-
-        :param terminating_sessions: List of sessions to terminate
-        :return: Empty ScheduleResult (no status updates performed here)
+        :return: The sessions whose every kernel with an agent had its destroy request accepted
         """
         if not terminating_sessions:
             log.debug("no sessions to terminate")
-            return ScheduleResult(
-                scheduled_session_ids=[],
-                scheduling_failures=[],
-                reserved_session_ids=[],
-                preemption_plan=[],
-            )
+            return set()
 
         # Collect all termination tasks from all sessions
         all_tasks: list[Awaitable[KernelTerminationResult]] = []
+        task_session_ids: list[SessionId] = []
         skipped_kernels = 0
 
         for session in terminating_sessions:
@@ -96,6 +80,7 @@ class SessionTerminator:
                         kernel.occupied_slots,
                     )
                     all_tasks.append(task)
+                    task_session_ids.append(session.session_id)
                 else:
                     # Kernel has no agent assigned - needs sweep
                     skipped_kernels += 1
@@ -104,15 +89,11 @@ class SessionTerminator:
         if skipped_kernels > 0:
             log.debug("kernels without agents left to retry", kernel_count=skipped_kernels)
 
-        # Execute all termination tasks concurrently across all sessions
+        # A kernel without an agent has no container to destroy.
+        confirmed = {session.session_id for session in terminating_sessions}
         if not all_tasks:
             log.debug("no kernels with agents to terminate")
-            return ScheduleResult(
-                scheduled_session_ids=[],
-                scheduling_failures=[],
-                reserved_session_ids=[],
-                preemption_plan=[],
-            )
+            return confirmed
 
         # Use gather with return_exceptions to ensure partial failures don't block others
         with RecorderContext[SessionId].shared_phase(
@@ -128,12 +109,10 @@ class SessionTerminator:
         # Log results but don't update DB (handled by events and sweep)
         success_count = 0
         failed_count = 0
-        for r in results:
-            if isinstance(r, BaseException):
+        for session_id, r in zip(task_session_ids, results, strict=True):
+            if isinstance(r, BaseException) or not r.success:
                 failed_count += 1
-                continue
-            if not r.success:
-                failed_count += 1
+                confirmed.discard(session_id)
                 continue
             success_count += 1
 
@@ -143,13 +122,7 @@ class SessionTerminator:
             success_count=success_count,
             failure_count=failed_count,
         )
-
-        return ScheduleResult(
-            scheduled_session_ids=[],
-            scheduling_failures=[],
-            reserved_session_ids=[],
-            preemption_plan=[],
-        )
+        return confirmed
 
     async def _terminate_kernel(
         self,
