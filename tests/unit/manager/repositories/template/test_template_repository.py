@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
+from dataclasses import dataclass
 
 import pytest
 import sqlalchemy as sa
@@ -14,8 +15,11 @@ import sqlalchemy as sa
 from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
-from ai.backend.common.data.entity.session_template import SessionTemplateEntityType
-from ai.backend.common.data.entity.user import UserEntityType
+from ai.backend.common.data.entity.session_template import (
+    SessionTemplateEntityType,
+    SessionTemplateID,
+)
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.session_template.types import TemplateType
 from ai.backend.manager.errors.api import InvalidAPIParameters
@@ -34,6 +38,10 @@ from ai.backend.manager.models.resource_policy.row import (
 )
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.session_template.row import SessionTemplateRow
+from ai.backend.manager.models.session_template.scopes import (
+    ProjectSessionTemplateTarget,
+    UserSessionTemplateTarget,
+)
 from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
@@ -48,7 +56,18 @@ from ai.backend.testutils.fixtures import DomainFixtureData
 from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
 
-async def _owning_scopes(db: ExtendedAsyncSAEngine, template_id: str) -> set[tuple[str, uuid.UUID]]:
+@dataclass(frozen=True)
+class _TaskTemplatesAroundAProjectMember:
+    member_id: UserID
+    joined_project_id: ProjectID
+    unjoined_project_id: ProjectID
+    own_template_id: SessionTemplateID
+    project_mates_template_id: SessionTemplateID
+
+
+async def _owning_scopes(
+    db: ExtendedAsyncSAEngine, template_id: SessionTemplateID
+) -> set[tuple[str, uuid.UUID]]:
     """The (entity type, id) of every scope that both owns and governs the template."""
     template_node = VirtualEntityRow.__table__.alias("template_node")
     scope_node = VirtualEntityRow.__table__.alias("scope_node")
@@ -76,7 +95,7 @@ async def _owning_scopes(db: ExtendedAsyncSAEngine, template_id: str) -> set[tup
             )
             .where(
                 template_node.c.entity_type == SessionTemplateEntityType(),
-                template_node.c.entity_id == uuid.UUID(template_id),
+                template_node.c.entity_id == template_id,
             )
         )
         return {(str(row.entity_type), row.entity_id) for row in rows}
@@ -198,8 +217,8 @@ class TestTemplateRepository:
         test_domain: DomainFixtureData,
         default_user_resource_policy: str,
         test_password_info: PasswordInfo,
-    ) -> uuid.UUID:
-        user_uuid = uuid.uuid4()
+    ) -> UserID:
+        user_uuid = UserID(uuid.uuid4())
         async with db_with_cleanup.begin_session() as session:
             user = UserRow(
                 uuid=user_uuid,
@@ -228,8 +247,8 @@ class TestTemplateRepository:
         test_domain: DomainFixtureData,
         default_user_resource_policy: str,
         test_password_info: PasswordInfo,
-    ) -> uuid.UUID:
-        user_uuid = uuid.uuid4()
+    ) -> UserID:
+        user_uuid = UserID(uuid.uuid4())
         async with db_with_cleanup.begin_session() as session:
             user = UserRow(
                 uuid=user_uuid,
@@ -255,7 +274,7 @@ class TestTemplateRepository:
     async def test_keypair(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_user: uuid.UUID,
+        test_user: UserID,
         default_keypair_resource_policy: str,
     ) -> str:
         access_key = f"AKIATEST{uuid.uuid4().hex[:12].upper()}"
@@ -295,8 +314,8 @@ class TestTemplateRepository:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainFixtureData,
         test_project_resource_policy: str,
-    ) -> tuple[uuid.UUID, str]:
-        group_id = uuid.uuid4()
+    ) -> tuple[ProjectID, str]:
+        group_id = ProjectID(uuid.uuid4())
         group_name = f"test-group-{group_id.hex[:8]}"
         async with db_with_cleanup.begin_session() as session:
             group = ProjectRow(
@@ -320,8 +339,8 @@ class TestTemplateRepository:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainFixtureData,
         test_project_resource_policy: str,
-    ) -> uuid.UUID:
-        group_id = uuid.uuid4()
+    ) -> ProjectID:
+        group_id = ProjectID(uuid.uuid4())
         async with db_with_cleanup.begin_session() as session:
             session.add(
                 ProjectRow(
@@ -345,8 +364,8 @@ class TestTemplateRepository:
     async def test_user_in_group(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_user: uuid.UUID,
-        test_group: tuple[uuid.UUID, str],
+        test_user: UserID,
+        test_group: tuple[ProjectID, str],
     ) -> None:
         group_id, _ = test_group
         async with db_with_cleanup.begin_session() as session:
@@ -370,11 +389,11 @@ class TestTemplateRepository:
         self,
         template_repository: TemplateRepository,
         test_domain: DomainFixtureData,
-        test_user: uuid.UUID,
-        test_group: tuple[uuid.UUID, str],
+        test_user: UserID,
+        test_group: tuple[ProjectID, str],
     ) -> None:
         group_id, _ = test_group
-        template_id = uuid.uuid4().hex
+        template_id = SessionTemplateID(uuid.uuid4())
         items = [
             {
                 "id": template_id,
@@ -385,47 +404,45 @@ class TestTemplateRepository:
             }
         ]
 
-        results = await template_repository.create_task_templates(test_domain.domain_name, items)
+        await template_repository.create_task_templates(test_domain.domain_name, items)
 
-        assert len(results) == 1
-        assert results[0]["id"] == template_id
-        assert results[0]["user"] == str(test_user)
+        assert await template_repository.task_template_exists(template_id) is True
 
     async def test_create_task_templates_batch(
         self,
         template_repository: TemplateRepository,
         test_domain: DomainFixtureData,
-        test_user: uuid.UUID,
-        test_group: tuple[uuid.UUID, str],
+        test_user: UserID,
+        test_group: tuple[ProjectID, str],
     ) -> None:
         group_id, _ = test_group
+        template_ids = [SessionTemplateID(uuid.uuid4()) for _ in range(3)]
         items = [
             {
-                "id": uuid.uuid4().hex,
+                "id": template_id,
                 "user_uuid": test_user,
                 "group_id": group_id,
-                "name": f"task-template-{i}",
+                "name": f"task-template-{template_id.hex[:8]}",
                 "template": {"apiVersion": "v1", "kind": "taskTemplate"},
             }
-            for i in range(3)
+            for template_id in template_ids
         ]
 
-        results = await template_repository.create_task_templates(test_domain.domain_name, items)
+        await template_repository.create_task_templates(test_domain.domain_name, items)
 
-        assert len(results) == 3
-        for result in results:
-            assert result["user"] == str(test_user)
+        for template_id in template_ids:
+            assert await template_repository.task_template_exists(template_id) is True
 
     async def test_create_task_templates_is_created_in_owner_and_project(
         self,
         template_repository: TemplateRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainFixtureData,
-        test_user: uuid.UUID,
-        test_group: tuple[uuid.UUID, str],
+        test_user: UserID,
+        test_group: tuple[ProjectID, str],
     ) -> None:
         group_id, _ = test_group
-        template_id = uuid.uuid4().hex
+        template_id = SessionTemplateID(uuid.uuid4())
         items = [
             {
                 "id": template_id,
@@ -448,8 +465,8 @@ class TestTemplateRepository:
         template_repository: TemplateRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainFixtureData,
-        test_user: uuid.UUID,
-        test_group: tuple[uuid.UUID, str],
+        test_user: UserID,
+        test_group: tuple[ProjectID, str],
     ) -> None:
         group_id, _ = test_group
 
@@ -466,11 +483,11 @@ class TestTemplateRepository:
         self,
         template_repository: TemplateRepository,
         test_domain: DomainFixtureData,
-        test_user: uuid.UUID,
-        test_group: tuple[uuid.UUID, str],
+        test_user: UserID,
+        test_group: tuple[ProjectID, str],
     ) -> None:
         group_id, _ = test_group
-        template_id = uuid.uuid4().hex
+        template_id = SessionTemplateID(uuid.uuid4())
         template_data = {"apiVersion": "v1", "kind": "taskTemplate", "spec": {"image": "python"}}
         items = [
             {
@@ -486,27 +503,27 @@ class TestTemplateRepository:
         result = await template_repository.get_task_template(template_id)
 
         assert result is not None
-        assert result["name"] == "my-template"
-        assert result["user_uuid"] == test_user
-        assert result["group_id"] == group_id
-        assert result["template"] == template_data
+        assert result.name == "my-template"
+        assert result.user_uuid == test_user
+        assert result.group_id == group_id
+        assert result.template == template_data
 
     async def test_get_task_template_not_found(
         self,
         template_repository: TemplateRepository,
     ) -> None:
-        result = await template_repository.get_task_template(uuid.uuid4().hex)
+        result = await template_repository.get_task_template(SessionTemplateID(uuid.uuid4()))
         assert result is None
 
     async def test_task_template_exists_true(
         self,
         template_repository: TemplateRepository,
         test_domain: DomainFixtureData,
-        test_user: uuid.UUID,
-        test_group: tuple[uuid.UUID, str],
+        test_user: UserID,
+        test_group: tuple[ProjectID, str],
     ) -> None:
         group_id, _ = test_group
-        template_id = uuid.uuid4().hex
+        template_id = SessionTemplateID(uuid.uuid4())
         items = [
             {
                 "id": template_id,
@@ -524,19 +541,21 @@ class TestTemplateRepository:
         self,
         template_repository: TemplateRepository,
     ) -> None:
-        assert await template_repository.task_template_exists(uuid.uuid4().hex) is False
+        assert (
+            await template_repository.task_template_exists(SessionTemplateID(uuid.uuid4())) is False
+        )
 
-    async def test_list_task_templates(
+    async def test_list_templates_in_global_holds_task_templates(
         self,
         template_repository: TemplateRepository,
         test_domain: DomainFixtureData,
-        test_user: uuid.UUID,
-        test_group: tuple[uuid.UUID, str],
+        test_user: UserID,
+        test_group: tuple[ProjectID, str],
     ) -> None:
         group_id, group_name = test_group
         items = [
             {
-                "id": uuid.uuid4().hex,
+                "id": SessionTemplateID(uuid.uuid4()),
                 "user_uuid": test_user,
                 "group_id": group_id,
                 "name": f"list-task-{i}",
@@ -546,32 +565,32 @@ class TestTemplateRepository:
         ]
         await template_repository.create_task_templates(test_domain.domain_name, items)
 
-        entries = await template_repository.list_task_templates(test_user)
+        entries = await template_repository.list_templates_in_global(TemplateType.TASK)
 
         assert len(entries) == 2
         for entry in entries:
-            assert entry["is_owner"] is True
-            assert entry["user"] == str(test_user)
-            assert entry["group"] == str(group_id)
-            assert entry["group_name"] == group_name
+            assert entry.template.user_uuid == test_user
+            assert entry.template.group_id == group_id
+            assert entry.owner_email == f"test-{test_user.hex[:8]}@example.com"
+            assert entry.project_name == group_name
 
-    async def test_list_task_templates_empty(
+    async def test_list_templates_in_global_without_task_templates(
         self,
         template_repository: TemplateRepository,
     ) -> None:
-        entries = await template_repository.list_task_templates(uuid.uuid4())
+        entries = await template_repository.list_templates_in_global(TemplateType.TASK)
         assert entries == []
 
-    async def test_list_task_templates_only_active(
+    async def test_list_templates_in_global_leaves_out_deleted_ones(
         self,
         template_repository: TemplateRepository,
         test_domain: DomainFixtureData,
-        test_user: uuid.UUID,
-        test_group: tuple[uuid.UUID, str],
+        test_user: UserID,
+        test_group: tuple[ProjectID, str],
     ) -> None:
         group_id, _ = test_group
-        active_id = uuid.uuid4().hex
-        deleted_id = uuid.uuid4().hex
+        active_id = SessionTemplateID(uuid.uuid4())
+        deleted_id = SessionTemplateID(uuid.uuid4())
         items = [
             {
                 "id": active_id,
@@ -591,20 +610,19 @@ class TestTemplateRepository:
         await template_repository.create_task_templates(test_domain.domain_name, items)
         await template_repository.soft_delete_template(deleted_id, TemplateType.TASK)
 
-        entries = await template_repository.list_task_templates(test_user)
+        entries = await template_repository.list_templates_in_global(TemplateType.TASK)
 
-        assert len(entries) == 1
-        assert entries[0]["id"].hex == active_id
+        assert [entry.template.id for entry in entries] == [active_id]
 
     async def test_update_task_template(
         self,
         template_repository: TemplateRepository,
         test_domain: DomainFixtureData,
-        test_user: uuid.UUID,
-        test_group: tuple[uuid.UUID, str],
+        test_user: UserID,
+        test_group: tuple[ProjectID, str],
     ) -> None:
         group_id, _ = test_group
-        template_id = uuid.uuid4().hex
+        template_id = SessionTemplateID(uuid.uuid4())
         items = [
             {
                 "id": template_id,
@@ -624,20 +642,20 @@ class TestTemplateRepository:
         assert rowcount == 1
         result = await template_repository.get_task_template(template_id)
         assert result is not None
-        assert result["name"] == "updated-name"
-        assert result["template"] == new_template
+        assert result.name == "updated-name"
+        assert result.template == new_template
 
     async def test_update_task_template_moves_to_new_project(
         self,
         template_repository: TemplateRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainFixtureData,
-        test_user: uuid.UUID,
-        test_group: tuple[uuid.UUID, str],
-        other_group: uuid.UUID,
+        test_user: UserID,
+        test_group: tuple[ProjectID, str],
+        other_group: ProjectID,
     ) -> None:
         group_id, _ = test_group
-        template_id = uuid.uuid4().hex
+        template_id = SessionTemplateID(uuid.uuid4())
         items = [
             {
                 "id": template_id,
@@ -661,12 +679,12 @@ class TestTemplateRepository:
     async def test_update_task_template_nonexistent(
         self,
         template_repository: TemplateRepository,
-        test_user: uuid.UUID,
-        test_group: tuple[uuid.UUID, str],
+        test_user: UserID,
+        test_group: tuple[ProjectID, str],
     ) -> None:
         group_id, _ = test_group
         rowcount = await template_repository.update_task_template(
-            uuid.uuid4().hex, group_id, test_user, "name", {"data": True}
+            SessionTemplateID(uuid.uuid4()), group_id, test_user, "name", {"data": True}
         )
         assert rowcount == 0
 
@@ -678,11 +696,11 @@ class TestTemplateRepository:
         self,
         template_repository: TemplateRepository,
         test_domain: DomainFixtureData,
-        test_user: uuid.UUID,
-        test_group: tuple[uuid.UUID, str],
+        test_user: UserID,
+        test_group: tuple[ProjectID, str],
     ) -> None:
         group_id, _ = test_group
-        template_id = uuid.uuid4().hex
+        template_id = SessionTemplateID(uuid.uuid4())
         items = [
             {
                 "id": template_id,
@@ -704,7 +722,7 @@ class TestTemplateRepository:
         template_repository: TemplateRepository,
     ) -> None:
         rowcount = await template_repository.soft_delete_template(
-            uuid.uuid4().hex, TemplateType.TASK
+            SessionTemplateID(uuid.uuid4()), TemplateType.TASK
         )
         assert rowcount == 0
 
@@ -716,8 +734,8 @@ class TestTemplateRepository:
         self,
         template_repository: TemplateRepository,
         test_domain: DomainFixtureData,
-        test_user: uuid.UUID,
-        test_group: tuple[uuid.UUID, str],
+        test_user: UserID,
+        test_group: tuple[ProjectID, str],
     ) -> None:
         group_id, _ = test_group
         template_data = {"apiVersion": "v1", "kind": "clusterTemplate", "spec": {"nodes": []}}
@@ -726,15 +744,14 @@ class TestTemplateRepository:
             test_domain.domain_name, group_id, test_user, "cluster-1", template_data
         )
 
-        assert isinstance(template_id, str)
-        assert len(template_id) == 32  # hex UUID
+        assert await template_repository.cluster_template_exists(template_id) is True
 
     async def test_get_cluster_template_exists(
         self,
         template_repository: TemplateRepository,
         test_domain: DomainFixtureData,
-        test_user: uuid.UUID,
-        test_group: tuple[uuid.UUID, str],
+        test_user: UserID,
+        test_group: tuple[ProjectID, str],
     ) -> None:
         group_id, _ = test_group
         template_data = {"apiVersion": "v1", "kind": "clusterTemplate", "nodes": ["master"]}
@@ -745,21 +762,22 @@ class TestTemplateRepository:
         result = await template_repository.get_cluster_template(template_id)
 
         assert result is not None
-        assert result == template_data
+        assert result.name == "cluster-get"
+        assert result.template == template_data
 
     async def test_get_cluster_template_not_found(
         self,
         template_repository: TemplateRepository,
     ) -> None:
-        result = await template_repository.get_cluster_template(uuid.uuid4().hex)
+        result = await template_repository.get_cluster_template(SessionTemplateID(uuid.uuid4()))
         assert result is None
 
     async def test_cluster_template_exists_true(
         self,
         template_repository: TemplateRepository,
         test_domain: DomainFixtureData,
-        test_user: uuid.UUID,
-        test_group: tuple[uuid.UUID, str],
+        test_user: UserID,
+        test_group: tuple[ProjectID, str],
     ) -> None:
         group_id, _ = test_group
         template_id = await template_repository.create_cluster_template(
@@ -772,14 +790,17 @@ class TestTemplateRepository:
         self,
         template_repository: TemplateRepository,
     ) -> None:
-        assert await template_repository.cluster_template_exists(uuid.uuid4().hex) is False
+        assert (
+            await template_repository.cluster_template_exists(SessionTemplateID(uuid.uuid4()))
+            is False
+        )
 
-    async def test_list_cluster_templates_all(
+    async def test_list_templates_in_global_holds_cluster_templates(
         self,
         template_repository: TemplateRepository,
         test_domain: DomainFixtureData,
-        test_user: uuid.UUID,
-        test_group: tuple[uuid.UUID, str],
+        test_user: UserID,
+        test_group: tuple[ProjectID, str],
     ) -> None:
         group_id, group_name = test_group
         for i in range(2):
@@ -787,28 +808,28 @@ class TestTemplateRepository:
                 test_domain.domain_name, group_id, test_user, f"cluster-{i}", {"data": i}
             )
 
-        entries = await template_repository.list_cluster_templates_all(test_user)
+        entries = await template_repository.list_templates_in_global(TemplateType.CLUSTER)
 
         assert len(entries) == 2
         for entry in entries:
-            assert entry["is_owner"] is True
-            assert entry["user"] == str(test_user)
-            assert entry["group"] == str(group_id)
-            assert entry["group_name"] == group_name
+            assert entry.template.user_uuid == test_user
+            assert entry.template.group_id == group_id
+            assert entry.owner_email == f"test-{test_user.hex[:8]}@example.com"
+            assert entry.project_name == group_name
 
-    async def test_list_cluster_templates_all_empty(
+    async def test_list_templates_in_global_without_cluster_templates(
         self,
         template_repository: TemplateRepository,
     ) -> None:
-        entries = await template_repository.list_cluster_templates_all(uuid.uuid4())
+        entries = await template_repository.list_templates_in_global(TemplateType.CLUSTER)
         assert entries == []
 
     async def test_update_cluster_template(
         self,
         template_repository: TemplateRepository,
         test_domain: DomainFixtureData,
-        test_user: uuid.UUID,
-        test_group: tuple[uuid.UUID, str],
+        test_user: UserID,
+        test_group: tuple[ProjectID, str],
     ) -> None:
         group_id, _ = test_group
         template_id = await template_repository.create_cluster_template(
@@ -822,14 +843,15 @@ class TestTemplateRepository:
 
         assert rowcount == 1
         result = await template_repository.get_cluster_template(template_id)
-        assert result == new_data
+        assert result is not None
+        assert result.template == new_data
 
     async def test_update_cluster_template_nonexistent(
         self,
         template_repository: TemplateRepository,
     ) -> None:
         rowcount = await template_repository.update_cluster_template(
-            uuid.uuid4().hex, {"v": 1}, "name"
+            SessionTemplateID(uuid.uuid4()), {"v": 1}, "name"
         )
         assert rowcount == 0
 
@@ -837,8 +859,8 @@ class TestTemplateRepository:
         self,
         template_repository: TemplateRepository,
         test_domain: DomainFixtureData,
-        test_user: uuid.UUID,
-        test_group: tuple[uuid.UUID, str],
+        test_user: UserID,
+        test_group: tuple[ProjectID, str],
     ) -> None:
         group_id, _ = test_group
         template_id = await template_repository.create_cluster_template(
@@ -851,167 +873,112 @@ class TestTemplateRepository:
         assert await template_repository.cluster_template_exists(template_id) is False
 
     # =========================================================================
-    # list_accessible_templates Tests
+    # list_templates_in_scopes Tests
     # =========================================================================
 
-    async def test_list_accessible_task_templates_leave_out_what_the_user_cannot_see(
+    @pytest.fixture
+    async def task_templates_around_a_project_member(
         self,
         template_repository: TemplateRepository,
         test_domain: DomainFixtureData,
-        test_user: uuid.UUID,
-        test_superadmin: uuid.UUID,
-        test_group: tuple[uuid.UUID, str],
-    ) -> None:
-        group_id, _ = test_group
-        own_template = {"apiVersion": "v1", "kind": "taskTemplate"}
-        own_template_id = uuid.uuid4().hex
+        test_user: UserID,
+        test_superadmin: UserID,
+        test_group: tuple[ProjectID, str],
+        other_group: ProjectID,
+        test_user_in_group: None,
+    ) -> _TaskTemplatesAroundAProjectMember:
+        joined_project_id, _ = test_group
+        own_template_id = SessionTemplateID(uuid.uuid4())
+        project_mates_template_id = SessionTemplateID(uuid.uuid4())
+        own_deleted_template_id = SessionTemplateID(uuid.uuid4())
+        task_template = {"apiVersion": "v1", "kind": "taskTemplate"}
         await template_repository.create_task_templates(
             test_domain.domain_name,
             [
                 {
                     "id": own_template_id,
                     "user_uuid": test_user,
-                    "group_id": group_id,
-                    "name": "own-task",
-                    "template": own_template,
+                    "group_id": other_group,
+                    "name": "own-task-in-a-project-the-user-is-not-in",
+                    "template": task_template,
                 },
                 {
-                    "id": uuid.uuid4().hex,
+                    "id": project_mates_template_id,
                     "user_uuid": test_superadmin,
-                    "group_id": group_id,
+                    "group_id": joined_project_id,
+                    "name": "task-of-a-project-mate",
+                    "template": task_template,
+                },
+                {
+                    "id": SessionTemplateID(uuid.uuid4()),
+                    "user_uuid": test_superadmin,
+                    "group_id": other_group,
                     "name": "task-of-a-project-the-user-is-not-in",
-                    "template": {"apiVersion": "v1", "kind": "taskTemplate"},
+                    "template": task_template,
                 },
-            ],
-        )
-        await template_repository.create_cluster_template(
-            test_domain.domain_name, group_id, test_user, "own-cluster", {"data": True}
-        )
-
-        entries = await template_repository.list_accessible_templates(
-            TemplateType.TASK, test_user, UserRole.USER, test_domain.domain_name, ["user", "group"]
-        )
-
-        assert [entry["id"].hex for entry in entries] == [own_template_id]
-        assert entries[0]["type"] == TemplateType.TASK
-        assert entries[0]["template"] == own_template
-
-    async def test_list_accessible_task_templates_include_a_project_the_user_is_in(
-        self,
-        template_repository: TemplateRepository,
-        test_domain: DomainFixtureData,
-        test_user: uuid.UUID,
-        test_superadmin: uuid.UUID,
-        test_group: tuple[uuid.UUID, str],
-        test_user_in_group: None,
-    ) -> None:
-        group_id, group_name = test_group
-        project_template = {"apiVersion": "v1", "kind": "taskTemplate"}
-        await template_repository.create_task_templates(
-            test_domain.domain_name,
-            [
                 {
-                    "id": uuid.uuid4().hex,
-                    "user_uuid": test_superadmin,
-                    "group_id": group_id,
-                    "name": "task-of-the-project",
-                    "template": project_template,
+                    "id": own_deleted_template_id,
+                    "user_uuid": test_user,
+                    "group_id": joined_project_id,
+                    "name": "own-deleted-task",
+                    "template": task_template,
                 },
             ],
         )
-
-        entries = await template_repository.list_accessible_templates(
-            TemplateType.TASK, test_user, UserRole.USER, test_domain.domain_name, ["user", "group"]
+        await template_repository.soft_delete_template(own_deleted_template_id, TemplateType.TASK)
+        await template_repository.create_cluster_template(
+            test_domain.domain_name, joined_project_id, test_user, "own-cluster", {"data": True}
+        )
+        return _TaskTemplatesAroundAProjectMember(
+            member_id=test_user,
+            joined_project_id=joined_project_id,
+            unjoined_project_id=other_group,
+            own_template_id=own_template_id,
+            project_mates_template_id=project_mates_template_id,
         )
 
-        assert len(entries) == 1
-        assert entries[0]["group_name"] == group_name
-        assert entries[0]["is_owner"] is False
-        assert entries[0]["type"] == TemplateType.TASK
-        assert entries[0]["template"] == project_template
-
-    async def test_list_accessible_user_templates(
+    async def test_list_templates_in_scopes_holds_what_any_scope_holds(
         self,
         template_repository: TemplateRepository,
-        test_domain: DomainFixtureData,
-        test_user: uuid.UUID,
-        test_group: tuple[uuid.UUID, str],
+        task_templates_around_a_project_member: _TaskTemplatesAroundAProjectMember,
     ) -> None:
-        """User-type templates are owned by the user."""
-        group_id, _ = test_group
-        await template_repository.create_cluster_template(
-            test_domain.domain_name, group_id, test_user, "my-cluster", {"data": True}
+        member_id = task_templates_around_a_project_member.member_id
+        entries = await template_repository.list_templates_in_scopes(
+            TemplateType.TASK,
+            [
+                UserSessionTemplateTarget(user_id=member_id),
+                ProjectSessionTemplateTarget(
+                    project_id=task_templates_around_a_project_member.joined_project_id
+                ),
+            ],
+            None,
         )
 
-        entries = await template_repository.list_accessible_templates(
-            TemplateType.CLUSTER, test_user, UserRole.USER, test_domain.domain_name, ["user"]
-        )
+        assert {entry.template.id for entry in entries} == {
+            task_templates_around_a_project_member.own_template_id,
+            task_templates_around_a_project_member.project_mates_template_id,
+        }
 
-        assert len(entries) == 1
-        assert entries[0]["is_owner"] is True
-        assert entries[0]["name"] == "my-cluster"
-
-    async def test_list_accessible_group_templates(
+    async def test_list_templates_in_scopes_narrowed_to_a_project(
         self,
         template_repository: TemplateRepository,
-        test_domain: DomainFixtureData,
-        test_user: uuid.UUID,
-        test_superadmin: uuid.UUID,
-        test_group: tuple[uuid.UUID, str],
-        test_user_in_group: None,
+        task_templates_around_a_project_member: _TaskTemplatesAroundAProjectMember,
     ) -> None:
-        """Group-type templates from groups the user belongs to (excluding own)."""
-        group_id, group_name = test_group
-        # Create a template owned by superadmin, visible via group
-        await template_repository.create_cluster_template(
-            test_domain.domain_name, group_id, test_superadmin, "admin-cluster", {"data": True}
+        member_id = task_templates_around_a_project_member.member_id
+        entries = await template_repository.list_templates_in_scopes(
+            TemplateType.TASK,
+            [
+                UserSessionTemplateTarget(user_id=member_id),
+                ProjectSessionTemplateTarget(
+                    project_id=task_templates_around_a_project_member.joined_project_id
+                ),
+            ],
+            task_templates_around_a_project_member.unjoined_project_id,
         )
 
-        entries = await template_repository.list_accessible_templates(
-            TemplateType.CLUSTER,
-            test_user,
-            UserRole.USER,
-            test_domain.domain_name,
-            ["user", "group"],
-        )
-
-        group_entries = [e for e in entries if e["group_name"] == group_name]
-        assert len(group_entries) == 1
-        assert group_entries[0]["is_owner"] is False
-
-    async def test_list_accessible_with_group_id_filter(
-        self,
-        template_repository: TemplateRepository,
-        test_domain: DomainFixtureData,
-        test_user: uuid.UUID,
-        test_group: tuple[uuid.UUID, str],
-    ) -> None:
-        group_id, _ = test_group
-        await template_repository.create_cluster_template(
-            test_domain.domain_name, group_id, test_user, "filtered", {"data": True}
-        )
-
-        # Filter by the correct group
-        entries = await template_repository.list_accessible_templates(
-            TemplateType.CLUSTER,
-            test_user,
-            UserRole.USER,
-            test_domain.domain_name,
-            ["user"],
-            group_id_filter=group_id,
-        )
-        assert len(entries) == 1
-
-        # Filter by a different group
-        entries = await template_repository.list_accessible_templates(
-            TemplateType.CLUSTER,
-            test_user,
-            UserRole.USER,
-            test_domain.domain_name,
-            ["user"],
-            group_id_filter=uuid.uuid4(),
-        )
-        assert len(entries) == 0
+        assert [entry.template.id for entry in entries] == [
+            task_templates_around_a_project_member.own_template_id
+        ]
 
     # =========================================================================
     # resolve_owner Tests
@@ -1021,9 +988,9 @@ class TestTemplateRepository:
         self,
         template_repository: TemplateRepository,
         test_domain: DomainFixtureData,
-        test_user: uuid.UUID,
+        test_user: UserID,
         test_keypair: str,
-        test_group: tuple[uuid.UUID, str],
+        test_group: tuple[ProjectID, str],
         test_user_in_group: None,
     ) -> None:
         """When no owner_access_key override, resolves to the requester."""
@@ -1044,9 +1011,9 @@ class TestTemplateRepository:
         self,
         template_repository: TemplateRepository,
         test_domain: DomainFixtureData,
-        test_user: uuid.UUID,
+        test_user: UserID,
         test_keypair: str,
-        test_group: tuple[uuid.UUID, str],
+        test_group: tuple[ProjectID, str],
         test_user_in_group: None,
     ) -> None:
         """Regular user cannot set domain different from their own."""
@@ -1065,7 +1032,7 @@ class TestTemplateRepository:
         self,
         template_repository: TemplateRepository,
         test_domain: DomainFixtureData,
-        test_user: uuid.UUID,
+        test_user: UserID,
         test_keypair: str,
     ) -> None:
         """Project the user has no membership in raises InvalidAPIParameters."""

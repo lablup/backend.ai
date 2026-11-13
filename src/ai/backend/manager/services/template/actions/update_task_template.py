@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import uuid
 from dataclasses import dataclass, field
 from typing import override
 
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.models.user.row import UserRole
 
@@ -18,7 +18,7 @@ class UpdateTaskTemplateAction(TemplateAction):
 
     domain_name: str
     requesting_project: ProjectID
-    requester_uuid: uuid.UUID
+    requester_uuid: UserID
     requester_access_key: str
     requester_role: UserRole
     requester_domain: str

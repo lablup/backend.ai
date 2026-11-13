@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, override
 
 from ai.backend.common.data.entity.session_template import SessionTemplateID
 from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.models.user.row import UserRole
 
@@ -18,7 +18,7 @@ class CreateClusterTemplateAction(TemplateProjectScopeAction):
     """Action to create a cluster template."""
 
     domain_name: str
-    requester_uuid: uuid.UUID
+    requester_uuid: UserID
     requester_access_key: str
     requester_role: UserRole
     requester_domain: str
@@ -40,9 +40,9 @@ class CreateClusterTemplateAction(TemplateProjectScopeAction):
 class CreateClusterTemplateActionResult(TemplateScopeActionResult):
     """Result of creating a cluster template."""
 
-    id: str
-    user: str
+    id: SessionTemplateID
+    user: UserID
 
     @override
     def entity_ids(self) -> Sequence[EntityIdentifier]:
-        return (SessionTemplateID(uuid.UUID(self.id)),)
+        return (self.id,)
