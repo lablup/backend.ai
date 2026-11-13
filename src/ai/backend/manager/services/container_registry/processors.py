@@ -7,7 +7,12 @@ from ai.backend.manager.actions.v2.global_scope.processor import (
 )
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.membership.processor import MembershipActionProcessor
-from ai.backend.manager.actions.v2.ops.result import BatchOpsResult, LookupOpsResult
+from ai.backend.manager.actions.v2.ops.result import (
+    BatchOpsResult,
+    LookupOpsResult,
+    ScopedBatchOpsResult,
+)
+from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.services.container_registry.actions.bulk_get import (
     BulkGetContainerRegistriesAction,
@@ -62,6 +67,9 @@ from ai.backend.manager.services.container_registry.actions.rescan_images import
     RescanImagesAction,
     RescanImagesActionResult,
 )
+from ai.backend.manager.services.container_registry.actions.scoped_search_container_registries import (
+    ScopedSearchContainerRegistriesAction,
+)
 from ai.backend.manager.services.container_registry.actions.search_container_registries import (
     SearchContainerRegistriesAction,
 )
@@ -114,6 +122,9 @@ class ContainerRegistryProcessors:
     search_container_registries: GlobalActionProcessor[
         SearchContainerRegistriesAction, BatchOpsResult[ContainerRegistryData]
     ]
+    scoped_search_container_registries: ScopeActionProcessor[
+        ScopedSearchContainerRegistriesAction, ScopedBatchOpsResult[ContainerRegistryData]
+    ]
     # What the DataLoader reads: checked per registry.
     bulk_get: PartialBulkActionProcessor[BulkGetContainerRegistriesAction, ContainerRegistryData]
     handle_harbor_webhook: AnonymousGlobalActionProcessor[
@@ -164,6 +175,9 @@ class ContainerRegistryProcessors:
         )
         self.search_container_registries = group.global_searcher_ops(
             SearchContainerRegistriesAction
+        )
+        self.scoped_search_container_registries = group.scoped_search_ops(
+            ScopedSearchContainerRegistriesAction
         )
         self.bulk_get = group.partial_bulk_get_ops(BulkGetContainerRegistriesAction)
         # Harbor holds no keypair; the service checks its webhook secret instead.

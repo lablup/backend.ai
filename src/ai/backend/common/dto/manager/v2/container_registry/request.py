@@ -16,6 +16,7 @@ from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 from .types import (
     ContainerRegistryOrderField,
+    ContainerRegistryScope,
     ContainerRegistryType,
     ContainerRegistryTypeFilter,
     OrderDirection,
@@ -28,6 +29,7 @@ __all__ = (
     "CreateContainerRegistryInput",
     "DeleteContainerRegistryInput",
     "PartialBulkPurgeContainerRegistriesInput",
+    "ScopedSearchContainerRegistriesInput",
     "AdminSearchContainerRegistriesInput",
     "UpdateContainerRegistryInput",
 )
@@ -200,5 +202,21 @@ class AdminSearchContainerRegistriesInput(BaseRequestModel):
     last: int | None = Field(default=None, ge=1, description="Number of items from the end.")
     before: str | None = Field(default=None, description="Cursor to paginate backward from.")
     # Offset-based pagination
+    limit: int | None = Field(default=None, ge=1, description="Maximum number of items to return.")
+    offset: int | None = Field(default=None, ge=0, description="Number of items to skip.")
+
+
+class ScopedSearchContainerRegistriesInput(BaseRequestModel):
+    """Input for searching the container registries the named scopes reach."""
+
+    scope: ContainerRegistryScope = Field(description="Scope (OR across all items).")
+    filter: ContainerRegistryFilter | None = Field(default=None, description="Filter conditions.")
+    order: list[ContainerRegistryOrder] | None = Field(
+        default=None, description="Order specifications."
+    )
+    first: int | None = Field(default=None, ge=1, description="Number of items from the start.")
+    after: str | None = Field(default=None, description="Cursor to paginate forward from.")
+    last: int | None = Field(default=None, ge=1, description="Number of items from the end.")
+    before: str | None = Field(default=None, description="Cursor to paginate backward from.")
     limit: int | None = Field(default=None, ge=1, description="Maximum number of items to return.")
     offset: int | None = Field(default=None, ge=0, description="Number of items to skip.")

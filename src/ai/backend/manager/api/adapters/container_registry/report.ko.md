@@ -4,11 +4,12 @@
 
 시나리오: 완성
 
-- ops 구성 (4)
+- ops 구성 (5)
   - admin_partial_bulk_purge: 대표 성공 ✓ · 대표 거부 ✓
   - admin_search: 대표 성공 ✓ · 대표 거부 ✓
   - batch_load_by_ids: 대표 성공 ✓ · 대표 거부 ✓
   - lookup_by_name_and_registry_project: 대표 성공 ✓ · 대표 거부 ✓
+  - scoped_search: 대표 성공 ✓ · 대표 거부 ✓
 - 직접 구현 (6)
   - admin_create: 성공 있음 2 · 거부 있음 2 (global_scope, relation)
   - admin_purge: 성공 있음 2 · 거부 있음 2 (global_scope)
@@ -48,6 +49,13 @@
 | [읽기 권한이 있는 사용자는 컨테이너 레지스트리 내부 프로젝트명이 없는 컨테이너 레지스트리의 이름을 식별자로 변환할 수 있습니다](#looking_up-readable-registry-key-resolves) | 성공 |
 | [존재하지 않는 이름은 읽기 권한이 없을 때와 같은 에러로 거부됩니다](#looking_up-missing-registry-key-is-unresolvable) | 거부 |
 | [읽기 권한이 없는 사용자의 이름 조회는 대상의 존재 여부를 드러내지 않고 거부됩니다](#looking_up-unreadable-registry-key-is-unresolvable) | 거부 |
+
+**scoped_search**
+
+| 시나리오 | 판정 |
+|---|---|
+| [검색할 도메인에서 레지스트리 조회 권한을 받은 사용자가 그 도메인을 스코프로, 이름을 필터로, 이름순 정렬과 페이지 크기를 한 번에 검색하면, 그 도메인과 relation 이 있는 레지스트리 가운데 필터에 맞는 것만 이름순으로 반환됩니다](#scoped_searching-a-user-reading-registries-in-the-domain-scoped-searches-its-registries) | 성공 |
+| [검색할 도메인에서 레지스트리 조회 권한을 받지 않은 사용자가 그 도메인을 스코프로 검색하면 권한 부족으로 거부됩니다](#scoped_searching-a-user-not-reading-registries-in-the-domain-is-refused) | 거부 |
 
 **admin_create**
 
@@ -499,6 +507,119 @@ Then
 
 - 거부됩니다
   - 거부: GenericBadRequest
+
+### scoped_search
+
+<a id="scoped_searching-a-user-reading-registries-in-the-domain-scoped-searches-its-registries"></a>
+
+#### [a-user-reading-registries-in-the-domain-scoped-searches-its-registries](/tests/scenario/bai_scenario/manager/container_registry/test_scoped_searching.py): pass
+
+검색할 도메인에서 레지스트리 조회 권한을 받은 사용자가 그 도메인을 스코프로, 이름을 필터로, 이름순 정렬과 페이지 크기를 한 번에 검색하면, 그 도메인과 relation 이 있는 레지스트리 가운데 필터에 맞는 것만 이름순으로 반환됩니다
+
+Given
+
+- 도메인 둘과 레지스트리 다섯 사이에 relation 여섯이 있고, 한 도메인에 속해 그 도메인에서 레지스트리 조회 권한을 받은 user 한 명이 있습니다. 레지스트리 하나는 그 도메인과 relation 이 없습니다
+  - 도메인 home-1
+  - 도메인 other-1
+  - 컨테이너 레지스트리 beta-1: 이미지를 가져오는 곳
+  - 컨테이너 레지스트리 alpha-1: 이미지를 가져오는 곳
+  - 컨테이너 레지스트리 gamma-1: 이미지를 가져오는 곳
+  - 컨테이너 레지스트리 other-2: 이미지를 가져오는 곳
+  - 컨테이너 레지스트리 outside-1: 이미지를 가져오는 곳
+  - 도메인 home-1 가 허용한 컨테이너 레지스트리 beta-1
+  - 도메인 home-1 가 허용한 컨테이너 레지스트리 alpha-1
+  - 도메인 home-1 가 허용한 컨테이너 레지스트리 gamma-1
+  - 도메인 home-1 가 허용한 컨테이너 레지스트리 other-2
+  - 도메인 other-1 가 허용한 컨테이너 레지스트리 beta-1
+  - 도메인 other-1 가 허용한 컨테이너 레지스트리 outside-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - read-registries-in-domain 권한을 받은 사용자 준비
+    - 역할 read-registries-in-domain-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 read-registries-in-domain-1: container_registry 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 read-registries-in-domain-1 보유
+
+When
+
+- ContainerRegistryAdapter.scoped_search: user-1이 검색할 도메인을 스코프로, 다른 레지스트리를 빼는 이름 필터와 이름순 정렬, 페이지 크기를 한 번에 조회합니다
+
+Then
+
+- 검색할 도메인과 relation 이 있는 레지스트리 가운데 필터에 맞는 셋이 이름순으로 각각 전체가 반환되고, 필터에 맞지 않는 레지스트리와 검색할 도메인과 relation 이 없는 레지스트리는 반환되지 않습니다
+  - total_count = 3
+  - items count = 3
+  - has_next_page = False
+  - has_previous_page = False
+  - items[0].id: 이름순으로 읽은 찾는 레지스트리와 같다
+  - items[0].entity_id: 이름순으로 읽은 찾는 레지스트리와 같다
+  - items[0].url: 이름순으로 읽은 찾는 레지스트리와 같다
+  - items[0].registry_name: 이름순으로 읽은 찾는 레지스트리와 같다
+  - items[0].type = <ContainerRegistryType.DOCKER: 'docker'>
+  - items[0].project = None
+  - items[0].username = None
+  - items[0].ssl_verify = True
+  - items[0].is_global = True
+  - items[0].extra = None
+  - items[1].id: 이름순으로 읽은 찾는 레지스트리와 같다
+  - items[1].entity_id: 이름순으로 읽은 찾는 레지스트리와 같다
+  - items[1].url: 이름순으로 읽은 찾는 레지스트리와 같다
+  - items[1].registry_name: 이름순으로 읽은 찾는 레지스트리와 같다
+  - items[1].type = <ContainerRegistryType.DOCKER: 'docker'>
+  - items[1].project = None
+  - items[1].username = None
+  - items[1].ssl_verify = True
+  - items[1].is_global = True
+  - items[1].extra = None
+  - items[2].id: 이름순으로 읽은 찾는 레지스트리와 같다
+  - items[2].entity_id: 이름순으로 읽은 찾는 레지스트리와 같다
+  - items[2].url: 이름순으로 읽은 찾는 레지스트리와 같다
+  - items[2].registry_name: 이름순으로 읽은 찾는 레지스트리와 같다
+  - items[2].type = <ContainerRegistryType.DOCKER: 'docker'>
+  - items[2].project = None
+  - items[2].username = None
+  - items[2].ssl_verify = True
+  - items[2].is_global = True
+  - items[2].extra = None
+
+<a id="scoped_searching-a-user-not-reading-registries-in-the-domain-is-refused"></a>
+
+#### [a-user-not-reading-registries-in-the-domain-is-refused](/tests/scenario/bai_scenario/manager/container_registry/test_scoped_searching.py): pass
+
+검색할 도메인에서 레지스트리 조회 권한을 받지 않은 사용자가 그 도메인을 스코프로 검색하면 권한 부족으로 거부됩니다
+
+Given
+
+- 도메인 둘과 레지스트리 다섯 사이에 relation 여섯이 있고, 한 도메인에 속해 아무 권한도 받지 않은 user 한 명이 있습니다. 레지스트리 하나는 그 도메인과 relation 이 없습니다
+  - 도메인 home-1
+  - 도메인 other-1
+  - 컨테이너 레지스트리 beta-1: 이미지를 가져오는 곳
+  - 컨테이너 레지스트리 alpha-1: 이미지를 가져오는 곳
+  - 컨테이너 레지스트리 gamma-1: 이미지를 가져오는 곳
+  - 컨테이너 레지스트리 other-2: 이미지를 가져오는 곳
+  - 컨테이너 레지스트리 outside-1: 이미지를 가져오는 곳
+  - 도메인 home-1 가 허용한 컨테이너 레지스트리 beta-1
+  - 도메인 home-1 가 허용한 컨테이너 레지스트리 alpha-1
+  - 도메인 home-1 가 허용한 컨테이너 레지스트리 gamma-1
+  - 도메인 home-1 가 허용한 컨테이너 레지스트리 other-2
+  - 도메인 other-1 가 허용한 컨테이너 레지스트리 beta-1
+  - 도메인 other-1 가 허용한 컨테이너 레지스트리 outside-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- ContainerRegistryAdapter.scoped_search: user-1이 검색할 도메인을 스코프로, 다른 레지스트리를 빼는 이름 필터와 이름순 정렬, 페이지 크기를 한 번에 조회합니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
 
 ### admin_create
 
