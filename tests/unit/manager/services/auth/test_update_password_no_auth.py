@@ -10,11 +10,10 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import AuthConfig, ManagerConfig
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.secret.types import KeyProviderType
-from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.auth import AuthorizationFailed, PasswordNotExpired
 from ai.backend.manager.errors.common import GenericBadRequest, RejectedByHook
 from ai.backend.manager.errors.user import UserNotActive
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user import UserRole, UserStatus
 from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.repositories.user_resource_policy.repository import (
     UserResourcePolicyRepository,
@@ -99,23 +98,14 @@ async def test_update_password_no_auth_successful(
     )
 
     # Setup successful credential check
-<<<<<<< HEAD
     mock_auth_repository.check_credential_without_migration.return_value = {
         "uuid": UUID("12345678-1234-5678-1234-567812345678"),
         "email": action.email,
         "password": "hashed_current_pass",
         "role": UserRole.USER,
         "status": UserStatus.ACTIVE,
+        "password_changed_at": _EXPIRED_CHANGED_AT,
     }
-=======
-    mock_auth_repository.check_credential_without_migration.return_value = UserCredential(
-        user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
-        hashed_password="hashed_current_pass",
-        username="test-user",
-        status=UserStatus.ACTIVE,
-        password_changed_at=_EXPIRED_CHANGED_AT,
-    )
->>>>>>> 5eb92247 (fix(BA-8805): count TOTP failures toward the login block and open update-password-no-auth only to expired passwords (#16477))
 
     new_timestamp = datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC)  # Fixed timestamp for comparison
     mock_auth_repository.update_user_password_by_uuid.return_value = new_timestamp
@@ -217,23 +207,14 @@ async def test_update_password_no_auth_fails_when_new_password_same_as_current(
     )
 
     # Setup credential check for same password
-<<<<<<< HEAD
     mock_auth_repository.check_credential_without_migration.return_value = {
         "uuid": UUID("12345678-1234-5678-1234-567812345678"),
         "email": action.email,
         "password": "hashed_same_password",
         "role": UserRole.USER,
         "status": UserStatus.ACTIVE,
+        "password_changed_at": _EXPIRED_CHANGED_AT,
     }
-=======
-    mock_auth_repository.check_credential_without_migration.return_value = UserCredential(
-        user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
-        hashed_password="hashed_same_password",
-        username="test-user",
-        status=UserStatus.ACTIVE,
-        password_changed_at=_EXPIRED_CHANGED_AT,
-    )
->>>>>>> 5eb92247 (fix(BA-8805): count TOTP failures toward the login block and open update-password-no-auth only to expired passwords (#16477))
 
     mocker.patch(
         "ai.backend.manager.services.auth.service.compare_to_hashed_password", return_value=True
@@ -257,23 +238,14 @@ async def test_update_password_no_auth_with_retry(
         request=MagicMock(),
     )
 
-<<<<<<< HEAD
     mock_auth_repository.check_credential_without_migration.return_value = {
         "uuid": UUID("12345678-1234-5678-1234-567812345678"),
         "email": action.email,
         "password": "hashed_current",
         "role": UserRole.USER,
         "status": UserStatus.ACTIVE,
+        "password_changed_at": _EXPIRED_CHANGED_AT,
     }
-=======
-    mock_auth_repository.check_credential_without_migration.return_value = UserCredential(
-        user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
-        hashed_password="hashed_current",
-        username="test-user",
-        status=UserStatus.ACTIVE,
-        password_changed_at=_EXPIRED_CHANGED_AT,
-    )
->>>>>>> 5eb92247 (fix(BA-8805): count TOTP failures toward the login block and open update-password-no-auth only to expired passwords (#16477))
 
     changed_at = datetime.now(tz=UTC)
     mock_auth_repository.update_user_password_by_uuid.return_value = changed_at
@@ -309,23 +281,14 @@ async def test_update_password_no_auth_hook_rejection(
         request=MagicMock(),
     )
 
-<<<<<<< HEAD
     mock_auth_repository.check_credential_without_migration.return_value = {
         "uuid": UUID("12345678-1234-5678-1234-567812345678"),
         "email": action.email,
         "password": "hashed_current",
         "role": UserRole.USER,
         "status": UserStatus.ACTIVE,
+        "password_changed_at": _EXPIRED_CHANGED_AT,
     }
-=======
-    mock_auth_repository.check_credential_without_migration.return_value = UserCredential(
-        user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
-        hashed_password="hashed_current",
-        username="test-user",
-        status=UserStatus.ACTIVE,
-        password_changed_at=_EXPIRED_CHANGED_AT,
-    )
->>>>>>> 5eb92247 (fix(BA-8805): count TOTP failures toward the login block and open update-password-no-auth only to expired passwords (#16477))
 
     # Hook rejects the password
     mock_hook_plugin_ctx.dispatch.return_value = HookResult(
@@ -350,6 +313,7 @@ def no_auth_action() -> UpdatePasswordNoAuthAction:
         email="user@example.com",
         current_password="current_pass",
         new_password="new_secure_password",
+        request=MagicMock(),
     )
 
 
@@ -366,13 +330,14 @@ class TestUpdatePasswordNoAuthEligibility:
         no_auth_action: UpdatePasswordNoAuthAction,
         status: UserStatus,
     ) -> None:
-        mock_auth_repository.check_credential_without_migration.return_value = UserCredential(
-            user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
-            hashed_password="hashed_current_pass",
-            username="test-user",
-            status=status,
-            password_changed_at=_EXPIRED_CHANGED_AT,
-        )
+        mock_auth_repository.check_credential_without_migration.return_value = {
+            "uuid": UUID("12345678-1234-5678-1234-567812345678"),
+            "email": no_auth_action.email,
+            "password": "hashed_current_pass",
+            "role": UserRole.USER,
+            "status": status,
+            "password_changed_at": _EXPIRED_CHANGED_AT,
+        }
 
         with pytest.raises(UserNotActive):
             await auth_service.update_password_no_auth(no_auth_action)
@@ -385,13 +350,14 @@ class TestUpdatePasswordNoAuthEligibility:
         mock_auth_repository: AsyncMock,
         no_auth_action: UpdatePasswordNoAuthAction,
     ) -> None:
-        mock_auth_repository.check_credential_without_migration.return_value = UserCredential(
-            user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
-            hashed_password="hashed_current_pass",
-            username="test-user",
-            status=UserStatus.ACTIVE,
-            password_changed_at=_NOW - timedelta(days=1),
-        )
+        mock_auth_repository.check_credential_without_migration.return_value = {
+            "uuid": UUID("12345678-1234-5678-1234-567812345678"),
+            "email": no_auth_action.email,
+            "password": "hashed_current_pass",
+            "role": UserRole.USER,
+            "status": UserStatus.ACTIVE,
+            "password_changed_at": _NOW - timedelta(days=1),
+        }
 
         with pytest.raises(PasswordNotExpired):
             await auth_service.update_password_no_auth(no_auth_action)

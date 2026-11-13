@@ -748,9 +748,9 @@ class AuthService:
         )
         # This path skips the login, so it stays open only to an active user whose
         # password the login refuses as expired.
-        if checked_user.status != UserStatus.ACTIVE:
-            raise UserNotActive(f"User status is {checked_user.status}.")
-        expires_at = checked_user.password_changed_at + max_password_age
+        if checked_user["status"] != UserStatus.ACTIVE:
+            raise UserNotActive(f"User status is {checked_user['status']}.")
+        expires_at = checked_user["password_changed_at"] + max_password_age
         if expires_at >= await self._auth_repository.get_current_time():
             raise PasswordNotExpired("Change the password after logging in.")
         new_password = action.new_password

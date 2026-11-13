@@ -17,19 +17,13 @@ from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.auth.login_session_types import LoginAttemptResult
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.data.secret.types import KeyProviderType
-<<<<<<< HEAD
-from ai.backend.manager.errors.auth import AuthorizationFailed, PasswordExpired
-from ai.backend.manager.models.user import UserRole, UserStatus
-=======
 from ai.backend.manager.errors.auth import (
     AuthorizationFailed,
     LoginRejectedByHook,
     PasswordExpired,
-    PasswordMismatch,
 )
 from ai.backend.manager.errors.common import RejectedByHook
-from ai.backend.manager.models.user.row import UserRole, UserStatus
->>>>>>> 5eb92247 (fix(BA-8805): count TOTP failures toward the login block and open update-password-no-auth only to expired passwords (#16477))
+from ai.backend.manager.models.user import UserRole, UserStatus
 from ai.backend.manager.repositories.auth.db_source.db_source import (
     ActiveSessionInfo,
     CredentialVerificationResult,
