@@ -15,6 +15,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
 from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.kernel import KernelFieldType
 from ai.backend.common.data.entity.kernel_group import KernelGroupFieldType
@@ -243,6 +244,7 @@ async def adapter(
         DomainProcessors(
             registry.group(GroupMeta(DomainEntityType())),
             registry.concern(ConcernMeta(Concern.ORGANIZATION)).relation_group(),
+            registry.group(GroupMeta(ContainerRegistryEntityType())),
             DomainService(DomainRepository(engine, DomainOpsProvider(engine))),
         ),
         config,

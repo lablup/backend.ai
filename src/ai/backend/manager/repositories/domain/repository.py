@@ -9,6 +9,7 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
+from ai.backend.manager.data.container_registry.types import DomainContainerRegistryRelationData
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.errors.resource import DomainDeletionFailed
 from ai.backend.manager.models.domain.creators import DomainCreator
@@ -20,6 +21,9 @@ from ai.backend.manager.models.domain_container_registry_relation.creators impor
 from ai.backend.manager.models.domain_container_registry_relation.purgers import (
     DomainContainerRegistryRelationPurger,
 )
+from ai.backend.manager.models.domain_container_registry_relation.row import (
+    DomainContainerRegistryRelationRow,
+)
 from ai.backend.manager.models.domain_container_registry_relation.scopes import (
     DomainContainerRegistryRelationTarget,
 )
@@ -27,6 +31,7 @@ from ai.backend.manager.models.domain_container_registry_relation.searchers impo
     DomainContainerRegistryRelationSearcher,
 )
 from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher, SearcherResult
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.domain.db_source.db_source import DomainDBSource
 from ai.backend.manager.repositories.ops.v2.domain.provider import DomainOpsProvider
@@ -105,6 +110,28 @@ class DomainRepository:
                 [(domain_id, registry_id) for registry_id in to_link],
             )
         return DomainContainerRegistryRelationChange(linked=to_link, unlinked=to_unlink)
+
+    @domain_repository_resilience.apply()
+    async def scoped_search_container_registry_relations(
+        self,
+        searcher: ScopedSearcher[
+            DomainContainerRegistryRelationRow, DomainContainerRegistryRelationData
+        ],
+    ) -> SearcherResult[DomainContainerRegistryRelationData]:
+        """Search the relations the searcher's scopes reach, narrowed by its uses."""
+        async with self._v2_ops.read_ops() as r:
+            return await r.scoped_search(searcher)
+
+    @domain_repository_resilience.apply()
+    async def global_search_container_registry_relations(
+        self,
+        searcher: GlobalSearcher[
+            DomainContainerRegistryRelationRow, DomainContainerRegistryRelationData
+        ],
+    ) -> SearcherResult[DomainContainerRegistryRelationData]:
+        """Search the relations of every domain, narrowed by the searcher's uses."""
+        async with self._v2_ops.read_ops() as r:
+            return await r.global_search(searcher)
 
     @domain_repository_resilience.apply()
     async def get_domain_id_by_name(self, name: DomainName) -> DomainID:

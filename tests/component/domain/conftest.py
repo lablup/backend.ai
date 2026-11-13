@@ -11,6 +11,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
 from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.dto.manager.domain import (
     CreateDomainRequest,
@@ -46,6 +47,7 @@ def domain_processors(
     return DomainProcessors(
         processor_registry.group(GroupMeta(DomainEntityType())),
         processor_registry.concern(ConcernMeta(Concern.ORGANIZATION)).relation_group(),
+        processor_registry.group(GroupMeta(ContainerRegistryEntityType())),
         service,
     )
 

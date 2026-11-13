@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.data.entity.audit_log import AuditLogFieldType
+from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
 from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.session import SessionEntityType
@@ -64,6 +65,7 @@ def server_module_registries(
                 domain=DomainProcessors(
                     processor_registry.group(GroupMeta(DomainEntityType())),
                     processor_registry.concern(ConcernMeta(Concern.ORGANIZATION)).relation_group(),
+                    processor_registry.group(GroupMeta(ContainerRegistryEntityType())),
                     AsyncMock(),
                 ),
                 export_config=MagicMock(),

@@ -19,9 +19,17 @@ from ai.backend.manager.services.domain.actions.delete_domain_dotfile import (
     DeleteDomainDotfileAction,
     DeleteDomainDotfileActionResult,
 )
+from ai.backend.manager.services.domain.actions.global_search_container_registry_relations import (
+    GlobalSearchDomainContainerRegistryRelationsAction,
+    GlobalSearchDomainContainerRegistryRelationsActionResult,
+)
 from ai.backend.manager.services.domain.actions.purge_domain import (
     PurgeDomainAction,
     PurgeDomainActionResult,
+)
+from ai.backend.manager.services.domain.actions.scoped_search_container_registry_relations import (
+    ScopedSearchDomainContainerRegistryRelationsAction,
+    ScopedSearchDomainContainerRegistryRelationsActionResult,
 )
 from ai.backend.manager.services.domain.actions.update_container_registry_relations import (
     UpdateDomainContainerRegistryRelationsAction,
@@ -56,6 +64,28 @@ class DomainService:
         )
         return UpdateDomainContainerRegistryRelationsActionResult(
             linked=change.linked, unlinked=change.unlinked
+        )
+
+    async def scoped_search_container_registry_relations(
+        self, action: ScopedSearchDomainContainerRegistryRelationsAction
+    ) -> ScopedSearchDomainContainerRegistryRelationsActionResult:
+        result = await self._repository.scoped_search_container_registry_relations(action.searcher)
+        return ScopedSearchDomainContainerRegistryRelationsActionResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+    async def global_search_container_registry_relations(
+        self, action: GlobalSearchDomainContainerRegistryRelationsAction
+    ) -> GlobalSearchDomainContainerRegistryRelationsActionResult:
+        result = await self._repository.global_search_container_registry_relations(action.searcher)
+        return GlobalSearchDomainContainerRegistryRelationsActionResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
         )
 
     async def purge(self, action: PurgeDomainAction) -> PurgeDomainActionResult:

@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
 from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
@@ -56,6 +57,7 @@ def domain_processors(
     return DomainProcessors(
         processor_registry.group(GroupMeta(DomainEntityType())),
         processor_registry.concern(ConcernMeta(Concern.ORGANIZATION)).relation_group(),
+        processor_registry.group(GroupMeta(ContainerRegistryEntityType())),
         service,
     )
 

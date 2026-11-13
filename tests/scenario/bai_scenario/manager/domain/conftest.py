@@ -11,6 +11,7 @@ from typing import Any
 
 import pytest
 
+from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
 from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
@@ -47,6 +48,7 @@ async def adapter(
     domain = DomainProcessors(
         registry.group(GroupMeta(DomainEntityType())),
         registry.concern(ConcernMeta(Concern.ORGANIZATION)).relation_group(),
+        registry.group(GroupMeta(ContainerRegistryEntityType())),
         DomainService(DomainRepository(engine, DomainOpsProvider(engine))),
     )
     return DomainAdapter(domain)
