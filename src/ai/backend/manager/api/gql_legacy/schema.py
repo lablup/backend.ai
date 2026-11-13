@@ -41,6 +41,7 @@ from ai.backend.manager.services.keypair_resource_policy.actions.lookup import (
     LookupKeypairResourcePolicyAction,
 )
 from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.project.actions.search_projects import GetProjectAction
 from ai.backend.manager.services.project_resource_policy.actions.lookup import (
     LookupProjectResourcePolicyAction,
 )
@@ -2324,6 +2325,11 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         domain_name = domain_name or ctx.user["domain_name"]
         owner = await ctx.processors.user.lookup_keypair_owner.run(
             LookupKeypairOwnerByAccessKeyAction(access_key=access_key)
+        )
+        # `scoped_query()` pins the domain and the access key but not the project, so the
+        # read permission on the project answers for it.
+        await ctx.processors.project.get_project.run(
+            GetProjectAction(project_id=ProjectID(project_id))
         )
         domain_id = await ctx.scheduler_repository.get_domain_id_by_name(DomainName(domain_name))
         allowed = await ctx.scheduler_repository.query_allowed_resource_groups(

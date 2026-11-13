@@ -4,12 +4,20 @@ import uuid
 from collections.abc import Callable, Generator
 from datetime import UTC, datetime
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import graphene
 import pytest
+import sqlalchemy as sa
+from graphql_relay import to_global_id
 
 from ai.backend.common.config import ModelDefinition
 from ai.backend.manager.api.gql_legacy.vfolder import ModelCard
+from ai.backend.manager.models.resource_group.row import ResourceGroupForProjectRow
+from ai.backend.manager.models.user.row import UserRole
+
+# Reachable only through string relationships of the vfolder row's eager loads.
+_ORM_CLUSTER = (ResourceGroupForProjectRow,)
 
 
 class TestModelCardParseModelModifiedAt:
@@ -95,3 +103,42 @@ class TestModelCardParseModelModifiedAt:
         card = ModelCard.parse_model(graph_ctx, vfolder_row, model_def=model_def)
 
         assert card.modified_at is None
+
+
+class TestModelCardGetNode:
+    """modelCard(id:) reads a vfolder of the model store projects in the requester's
+    domain, as modelCards lists them."""
+
+    @pytest.fixture
+    def db_session(self) -> MagicMock:
+        session = MagicMock()
+        session.scalar = AsyncMock(return_value=None)
+        return session
+
+    @pytest.fixture
+    def info(self, db_session: MagicMock) -> graphene.ResolveInfo:
+        ctx = MagicMock()
+        ctx.user = {"role": UserRole.USER, "domain_name": "default", "uuid": uuid.uuid4()}
+        ctx.db.begin_readonly_session = MagicMock(
+            return_value=AsyncMock(
+                __aenter__=AsyncMock(return_value=db_session),
+                __aexit__=AsyncMock(return_value=None),
+            )
+        )
+        info = MagicMock(spec=graphene.ResolveInfo)
+        info.context = ctx
+        return info
+
+    @pytest.fixture
+    def model_card_id(self) -> str:
+        return to_global_id("ModelCard", str(uuid.uuid4()))
+
+    async def test_the_read_is_bounded_by_the_model_store_projects_of_the_domain(
+        self, info: graphene.ResolveInfo, db_session: MagicMock, model_card_id: str
+    ) -> None:
+        assert await ModelCard.get_node(info, model_card_id) is None
+        stmt: sa.Select[tuple[object]] = db_session.scalar.await_args.args[0]
+        where = str(stmt.whereclause)
+        assert "groups.type" in where
+        assert "groups.domain_name" in where
+        assert "vfolders.id" in where
