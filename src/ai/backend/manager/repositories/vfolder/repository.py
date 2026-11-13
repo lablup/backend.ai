@@ -287,8 +287,10 @@ class VfolderRepository:
                         domain_allowed_hosts | group_row.allowed_vfolder_hosts
                     )
 
-            keypair_hosts = await self._fetch_default_keypair_vfolder_hosts(db_session, user_uuid)
-            if keypair_hosts is None:
+            keypair_allowed_hosts = await self._fetch_default_keypair_vfolder_hosts(
+                db_session, user_uuid
+            )
+            if keypair_allowed_hosts is None:
                 raise KeyPairNotFound("The user has no default keypair.")
             user_domain_name = await db_session.scalar(
                 sa.select(UserRow.domain_name).where(UserRow.uuid == user_uuid)
@@ -296,7 +298,7 @@ class VfolderRepository:
             domain_allowed_hosts = await self._fetch_domain_allowed_vfolder_hosts(
                 db_session, user_domain_name
             )
-            return VFolderHostPermissionMap(domain_allowed_hosts | keypair_hosts)
+            return VFolderHostPermissionMap(domain_allowed_hosts | keypair_allowed_hosts)
 
     async def _fetch_domain_allowed_vfolder_hosts(
         self, db_session: SASession, domain_name: str | None
@@ -460,12 +462,12 @@ class VfolderRepository:
         """
         if isinstance(creator, ProjectVFolderCreator):
             async with self._db.begin_readonly_session_read_committed() as db_session:
-                keypair_hosts = await self._fetch_default_keypair_vfolder_hosts(
+                keypair_allowed_hosts = await self._fetch_default_keypair_vfolder_hosts(
                     db_session, creator.creator_id
                 )
                 allowed_hosts = await get_allowed_vfolder_hosts_by_group(
                     await db_session.connection(),
-                    {"allowed_vfolder_hosts": keypair_hosts or VFolderHostPermissionMap()},
+                    {"allowed_vfolder_hosts": keypair_allowed_hosts or VFolderHostPermissionMap()},
                     creator.domain_name,
                     creator.project,
                 )
