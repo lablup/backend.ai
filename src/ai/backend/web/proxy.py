@@ -19,7 +19,7 @@ from trafaret import DataError
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.request import Request, RequestContent, SessionMode
 from ai.backend.common.exception import InvalidAPIParameters
-from ai.backend.common.middlewares.exception import is_client_disconnect
+from ai.backend.common.middlewares.exception import client_closed_response, is_client_disconnect
 from ai.backend.common.web.session import STORAGE_KEY, extra_config_headers, get_session
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.web.clients.endpoint_pool import AcquiredEndpoint, HealthyEndpointPool
@@ -304,15 +304,21 @@ async def _run_proxy_request(
                         reason=backend_resp.reason,
                         headers=frontend_resp_hdrs,
                     )
-                    await frontend_resp.prepare(frontend_rqst)
                     try:
-                        while True:
-                            chunk = await backend_resp.read(CHUNK_SIZE)
-                            if not chunk:
-                                break
-                            await frontend_resp.write(chunk)
-                    finally:
-                        await frontend_resp.write_eof()
+                        await frontend_resp.prepare(frontend_rqst)
+                        try:
+                            while True:
+                                chunk = await backend_resp.read(CHUNK_SIZE)
+                                if not chunk:
+                                    break
+                                await frontend_resp.write(chunk)
+                        finally:
+                            await frontend_resp.write_eof()
+                    except ConnectionResetError as e:
+                        # Not raised, so the endpoint pool does not count a client disconnect.
+                        if is_client_disconnect(frontend_rqst, e):
+                            return client_closed_response()
+                        raise
                     return frontend_resp
     except asyncio.CancelledError:
         raise
@@ -500,15 +506,21 @@ async def web_handler_with_jwt(
                         reason=backend_resp.reason,
                         headers=frontend_resp_hdrs,
                     )
-                    await frontend_resp.prepare(frontend_rqst)
                     try:
-                        while True:
-                            chunk = await backend_resp.read(CHUNK_SIZE)
-                            if not chunk:
-                                break
-                            await frontend_resp.write(chunk)
-                    finally:
-                        await frontend_resp.write_eof()
+                        await frontend_resp.prepare(frontend_rqst)
+                        try:
+                            while True:
+                                chunk = await backend_resp.read(CHUNK_SIZE)
+                                if not chunk:
+                                    break
+                                await frontend_resp.write(chunk)
+                        finally:
+                            await frontend_resp.write_eof()
+                    except ConnectionResetError as e:
+                        # Not raised, so the endpoint pool does not count a client disconnect.
+                        if is_client_disconnect(frontend_rqst, e):
+                            return client_closed_response()
+                        raise
                     return frontend_resp
     except asyncio.CancelledError:
         raise
@@ -633,15 +645,21 @@ async def web_plugin_handler(
                         reason=backend_resp.reason,
                         headers=frontend_resp_hdrs,
                     )
-                    await frontend_resp.prepare(frontend_rqst)
                     try:
-                        while True:
-                            chunk = await backend_resp.read(CHUNK_SIZE)
-                            if not chunk:
-                                break
-                            await frontend_resp.write(chunk)
-                    finally:
-                        await frontend_resp.write_eof()
+                        await frontend_resp.prepare(frontend_rqst)
+                        try:
+                            while True:
+                                chunk = await backend_resp.read(CHUNK_SIZE)
+                                if not chunk:
+                                    break
+                                await frontend_resp.write(chunk)
+                        finally:
+                            await frontend_resp.write_eof()
+                    except ConnectionResetError as e:
+                        # Not raised, so the endpoint pool does not count a client disconnect.
+                        if is_client_disconnect(frontend_rqst, e):
+                            return client_closed_response()
+                        raise
                     return frontend_resp
     except asyncio.CancelledError:
         raise

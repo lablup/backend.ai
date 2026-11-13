@@ -1,7 +1,9 @@
+import asyncio
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from functools import partial
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import aiohttp
 import pytest
@@ -12,6 +14,11 @@ from multidict import CIMultiDict, CIMultiDictProxy
 
 from ai.backend.common.clients.http_client.client_pool import ClientPool, tcp_client_session_factory
 from ai.backend.common.web.session import SESSION_KEY, Session
+from ai.backend.web.clients.endpoint_pool import (
+    EndpointPoolSpec,
+    HealthyEndpointPool,
+    RoundRobinStrategy,
+)
 from ai.backend.web.proxy import (
     _direct_acquire,
     _run_proxy_request,
@@ -19,6 +26,20 @@ from ai.backend.web.proxy import (
     web_plugin_handler,
 )
 from ai.backend.web.server import client_ctx
+
+
+@asynccontextmanager
+async def _endpoint_pool(endpoints: list[str]) -> AsyncIterator[HealthyEndpointPool]:
+    pool = HealthyEndpointPool(
+        endpoints=endpoints,
+        spec=EndpointPoolSpec("/readyz", 3600, 3, 60, 1),
+        strategy=RoundRobinStrategy(),
+        probe_session_factory=lambda _endpoint: MagicMock(close=AsyncMock()),
+    )
+    try:
+        yield pool
+    finally:
+        await pool.close()
 
 
 @pytest.fixture
@@ -297,3 +318,60 @@ class TestDotSegmentPath:
 
         assert resp.status == 200
         assert len(received) == 1
+
+
+@pytest.fixture
+async def streaming_upstream(aiohttp_server: Any) -> str:
+    """An upstream that keeps streaming the response body until its peer closes."""
+
+    async def handler(request: web.Request) -> web.StreamResponse:
+        resp = web.StreamResponse()
+        await resp.prepare(request)
+        while True:
+            await resp.write(b"x" * 1024)
+            await asyncio.sleep(0.01)
+
+    app = web.Application()
+    app.router.add_route("*", "/{path:.*}", handler)
+    server = await aiohttp_server(app)
+    return str(server.make_url("/"))
+
+
+class TestClientDisconnect:
+    async def test_client_disconnect_is_not_counted_against_upstream(
+        self,
+        aiohttp_client: Any,
+        server_client_pool: ClientPool,
+        streaming_upstream: str,
+    ) -> None:
+        finished: asyncio.Queue[None] = asyncio.Queue()
+
+        @web.middleware
+        async def notify_finished(request: web.Request, handler: Handler) -> web.StreamResponse:
+            try:
+                return await handler(request)
+            finally:
+                finished.put_nowait(None)
+
+        async with _endpoint_pool([streaming_upstream]) as endpoint_pool:
+            app = web.Application(middlewares=[notify_finished])
+            app["config"] = MagicMock(
+                api=MagicMock(domain="default", ssl_verify=False),
+                service=MagicMock(enable_signup=True),
+            )
+            app["client_pool"] = server_client_pool
+            app.router.add_route(
+                "*",
+                "/func/{path:.*$}",
+                partial(web_handler, endpoint_pool=endpoint_pool, is_anonymous=True),
+            )
+            client = await aiohttp_client(app)
+
+            # The failure threshold is 3, so 3 disconnects would mark the endpoint unhealthy.
+            for _ in range(3):
+                resp = await client.get("/func/folders")
+                await resp.content.readany()
+                resp.close()
+                await asyncio.wait_for(finished.get(), timeout=5)
+
+            assert endpoint_pool.is_healthy(streaming_upstream)
