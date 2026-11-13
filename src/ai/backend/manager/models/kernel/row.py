@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import uuid
 from collections.abc import Sequence
 from datetime import datetime, tzinfo
@@ -35,7 +34,6 @@ from ai.backend.common.types import (
     SessionTypes,
     VFolderMount,
 )
-from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.kernel.types import (
     ClusterConfig,
@@ -85,9 +83,6 @@ __all__ = (
     "KernelRow",
     "kernels",
 )
-
-log = StructuredLogger(logging.getLogger("ai.backend.manager.models.kernel"))
-
 
 # statuses to consider when calculating current resource usage
 AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES = tuple(
