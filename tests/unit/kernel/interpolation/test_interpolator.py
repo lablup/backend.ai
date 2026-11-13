@@ -70,6 +70,12 @@ class TestServiceArgumentInterpolator:
                 "8000 99.99.99.99 {port}",
                 id="delimiter-multiple",
             ),
+            pytest.param(
+                [{"start": "{", "end": "}"}, {"start": "{{", "end": "}}"}],
+                "{{ port }} {host}",
+                "8000 99.99.99.99",
+                id="delimiter-shorter-start-listed-first",
+            ),
         ],
     )
     def test_apply(

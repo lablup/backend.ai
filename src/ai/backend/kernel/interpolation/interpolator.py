@@ -23,7 +23,8 @@ class ServiceArgumentInterpolator:
         self, variables: Mapping[str, Any], delimiters: Sequence[InterpolationDelimiter]
     ) -> None:
         self._variables = variables
-        self._delimiters = tuple(delimiters)
+        # Longer starts first, so ``{`` does not take the head of ``{{ var }}``.
+        self._delimiters = tuple(sorted(delimiters, key=lambda d: len(d["start"]), reverse=True))
 
     def apply(self, parts: list[str]) -> list[str]:
         pattern = self._compile(tuple((d["start"], d["end"]) for d in self._delimiters))
