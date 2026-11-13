@@ -82,7 +82,7 @@ type DeviceAllocation = Mapping[SlotName, Mapping[DeviceId, Decimal]]
 type DeviceCapacityMap = Mapping[tuple[SlotName, DeviceId], Decimal]
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
-known_slot_types: Mapping[SlotName, SlotTypes] = {}
+known_slot_types: MutableMapping[SlotName, SlotTypes] = {}
 _GPU_ALLOC_RATIO_PRECISION = Decimal("0.0001")
 
 
