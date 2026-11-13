@@ -1089,6 +1089,10 @@ def _ssh_cmd(docs: str | None = None) -> Callable[..., None]:
         SESSION_REF: The user-provided name or the unique ID of a running compute session.
 
         All remaining options and arguments not listed here are passed to the ssh command as-is.
+
+        The command signs in with the session's SSH key. A session holds none when you uploaded
+        only a public key; ssh then uses your own keys (~/.ssh/id_*, ssh-agent), or pass
+        "-i <your private key>".
         """
         try:
             with container_ssh_ctx(session_ref, port) as key_path:
@@ -1101,8 +1105,7 @@ def _ssh_cmd(docs: str | None = None) -> Callable[..., None]:
                         "UserKnownHostsFile=/dev/null",
                         "-o",
                         "NoHostAuthenticationForLocalhost=yes",
-                        "-i",
-                        key_path,
+                        *(["-i", str(key_path)] if key_path is not None else []),
                         "work@localhost",
                         "-p",
                         str(port),
@@ -1173,6 +1176,10 @@ def _scp_cmd(docs: str | None = None) -> Callable[..., None]:
 
         All remaining options and arguments not listed here are passed to the ssh command as-is.
 
+        The command signs in with the session's SSH key. A session holds none when you uploaded
+        only a public key; ssh then uses your own keys (~/.ssh/id_*, ssh-agent), or pass
+        "-i <your private key>".
+
         Examples:
 
         * Uploading a local directory to the session:
@@ -1197,14 +1204,14 @@ def _scp_cmd(docs: str | None = None) -> Callable[..., None]:
                         "UserKnownHostsFile=/dev/null",
                         "-o",
                         "NoHostAuthenticationForLocalhost=yes",
-                        "-i",
-                        key_path,
+                        *(["-i", str(key_path)] if key_path is not None else []),
                         "-P",
                         str(port),
                         *recursive_args,
+                        # scp reads options only before the paths.
+                        *ctx.args,
                         src,
                         dst,
-                        *ctx.args,
                     ],
                     shell=False,
                     check=False,  # be transparent against the main command
