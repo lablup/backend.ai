@@ -33,7 +33,6 @@ from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggreg
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel.row import (
-    AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     DEFAULT_KERNEL_ORDERING,
     LIVE_STATUS,
     KernelRow,
@@ -523,7 +522,7 @@ class ComputeContainer(graphene.ObjectType):  # type: ignore[misc]
         if status is not None:
             kernel_status = (status,)
         else:
-            kernel_status = AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES
+            kernel_status = tuple(KernelStatus.current_resource_usage_statuses())
         query_stmt = query_stmt.where(KernelRow.status.in_(kernel_status))
         async with ctx.db.begin_readonly_session() as db_session:
             return await batch_multiresult_in_scalar_stream(

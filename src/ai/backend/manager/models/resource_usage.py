@@ -22,7 +22,6 @@ if TYPE_CHECKING:
 
 from ai.backend.manager.models.kernel.row import (
     LIVE_STATUS,
-    RESOURCE_USAGE_KERNEL_STATUSES,
     KernelRow,
 )
 from ai.backend.manager.models.project.row import ProjectRow
@@ -645,7 +644,7 @@ async def fetch_resource_usage(
             (
                 (KernelRow.terminated_at >= start_date)
                 & (KernelRow.created_at < end_date)
-                & (KernelRow.status.in_(RESOURCE_USAGE_KERNEL_STATUSES))
+                & (KernelRow.status.in_(KernelStatus.historical_resource_usage_statuses()))
             )
             |
             # Or, filter running sessions which created before requested end_date
