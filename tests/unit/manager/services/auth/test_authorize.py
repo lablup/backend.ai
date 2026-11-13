@@ -18,13 +18,8 @@ from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.auth.login_session_types import LoginAttemptResult
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.data.secret.types import KeyProviderType
-<<<<<<< HEAD
-from ai.backend.manager.errors.auth import AuthorizationFailed, PasswordExpired
-from ai.backend.manager.models.user import UserRole, UserStatus
-=======
 from ai.backend.manager.errors.auth import AuthorizationFailed, PasswordExpired, PasswordMismatch
-from ai.backend.manager.models.user.row import UserRole, UserStatus
->>>>>>> 0fb099e1 (fix(BA-9007): cost one hash on every rejected login and record a wrong password (#16850))
+from ai.backend.manager.models.user import UserRole, UserStatus
 from ai.backend.manager.repositories.auth.db_source.db_source import (
     ActiveSessionInfo,
     CredentialVerificationResult,
