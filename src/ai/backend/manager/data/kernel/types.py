@@ -98,6 +98,23 @@ class KernelStatus(CIStrEnum):
 
     @classmethod
     @lru_cache(maxsize=1)
+    def current_resource_usage_statuses(cls) -> frozenset[KernelStatus]:
+        """Return statuses counted toward the current resource usage of agents and users."""
+        return frozenset(
+            status for status in cls if status not in (cls.PENDING, cls.TERMINATED, cls.CANCELLED)
+        )
+
+    @classmethod
+    @lru_cache(maxsize=1)
+    def historical_resource_usage_statuses(cls) -> frozenset[KernelStatus]:
+        """Return statuses counted toward the historical resource usage."""
+        return frozenset((
+            cls.RUNNING,
+            cls.TERMINATED,
+        ))
+
+    @classmethod
+    @lru_cache(maxsize=1)
     def terminatable_statuses(cls) -> frozenset[KernelStatus]:
         """Return statuses that can transition to TERMINATING."""
         return frozenset(
