@@ -1705,7 +1705,13 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
     ) -> Sequence[Group]:
         if type is None:
             type = [ProjectType.GENERAL.name]
-        project_types = [ProjectType(t) for t in type]
+        try:
+            project_types = [ProjectType(t) for t in type]
+        except ValueError as e:
+            allowed_types = ", ".join(t.name for t in ProjectType)
+            raise InvalidAPIParameters(
+                f"{e}. All elements of `type` should be one of ({allowed_types})"
+            ) from e
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
         client_domain = ctx.user["domain_name"]
