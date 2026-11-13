@@ -1,4 +1,10 @@
+<<<<<<< HEAD
 from collections.abc import AsyncIterator
+=======
+import asyncio
+import socket
+from collections.abc import AsyncIterator, Sequence
+>>>>>>> db4e47a2d (fix(BA-9020): do not count client disconnects as manager failures (#16995))
 from contextlib import asynccontextmanager
 from functools import partial
 from typing import Any
@@ -8,7 +14,12 @@ import aiohttp
 import pytest
 import yarl
 from aiohttp import web
+<<<<<<< HEAD
 from aiohttp.typedefs import Handler
+=======
+from aiohttp.typedefs import Handler, Middleware
+from multidict import CIMultiDict, CIMultiDictProxy
+>>>>>>> db4e47a2d (fix(BA-9020): do not count client disconnects as manager failures (#16995))
 
 from ai.backend.common.clients.http_client.client_pool import ClientPool
 from ai.backend.common.web.session import SESSION_KEY, Session
@@ -35,6 +46,241 @@ async def _endpoint_pool(endpoints: list[str]) -> AsyncIterator[HealthyEndpointP
         await pool.close()
 
 
+<<<<<<< HEAD
+=======
+async def _proxy_client(
+    aiohttp_client: Any,
+    client_pool: ClientPool,
+    endpoint_pool: HealthyEndpointPool,
+    middlewares: Sequence[Middleware] = (),
+) -> Any:
+    app = web.Application(middlewares=middlewares)
+    app["config"] = MagicMock(
+        api=MagicMock(domain="default", ssl_verify=False),
+        service=MagicMock(enable_signup=True),
+    )
+    app["client_pool"] = client_pool
+    app.router.add_route(
+        "*",
+        "/func/{path:.*$}",
+        partial(web_handler, endpoint_pool=endpoint_pool, is_anonymous=True),
+    )
+    return await aiohttp_client(app)
+
+
+class TestResendToAnotherEndpoint:
+    async def test_refused_request_is_resent_with_its_body(
+        self,
+        aiohttp_client: Any,
+        client_pool: ClientPool,
+        refused_endpoint: str,
+        ok_upstream: _Upstream,
+    ) -> None:
+        body = b"x" * (256 * 1024)
+        async with _endpoint_pool([refused_endpoint, ok_upstream.url]) as endpoint_pool:
+            client = await _proxy_client(aiohttp_client, client_pool, endpoint_pool)
+
+            resp = await client.post("/func/folders", data=body)
+
+            assert resp.status == 200
+            assert ok_upstream.received == [body]
+            assert not endpoint_pool.is_healthy(refused_endpoint)
+
+    async def test_refused_request_without_another_endpoint_is_unreachable(
+        self, aiohttp_client: Any, client_pool: ClientPool, refused_endpoint: str
+    ) -> None:
+        async with _endpoint_pool([refused_endpoint]) as endpoint_pool:
+            client = await _proxy_client(aiohttp_client, client_pool, endpoint_pool)
+
+            resp = await client.get("/func/folders")
+
+            assert resp.status == 502
+
+    async def test_error_response_is_passed_through_without_resend(
+        self,
+        aiohttp_client: Any,
+        client_pool: ClientPool,
+        failing_upstreams: tuple[list[str], list[bytes]],
+    ) -> None:
+        urls, received = failing_upstreams
+        async with _endpoint_pool(urls) as endpoint_pool:
+            client = await _proxy_client(aiohttp_client, client_pool, endpoint_pool)
+
+            resp = await client.post("/func/folders", data=b"payload")
+
+            assert resp.status == 500
+            assert received == [b"payload"]
+
+    async def test_disconnect_after_connect_is_not_resent(
+        self,
+        aiohttp_client: Any,
+        client_pool: ClientPool,
+        disconnecting_upstreams: tuple[list[str], list[bytes]],
+    ) -> None:
+        urls, received = disconnecting_upstreams
+        async with _endpoint_pool(urls) as endpoint_pool:
+            client = await _proxy_client(aiohttp_client, client_pool, endpoint_pool)
+
+            resp = await client.post("/func/folders", data=b"payload")
+
+            assert resp.status == 502
+            assert len(received) == 1
+
+
+@pytest.fixture
+async def streaming_upstream(aiohttp_server: Any) -> _Upstream:
+    """An upstream that keeps streaming the response body until its peer closes."""
+
+    async def handler(request: web.Request) -> web.StreamResponse:
+        resp = web.StreamResponse()
+        await resp.prepare(request)
+        while True:
+            await resp.write(b"x" * 1024)
+            await asyncio.sleep(0.01)
+
+    app = web.Application()
+    app.router.add_route("*", "/{path:.*}", handler)
+    server = await aiohttp_server(app)
+    return _Upstream(url=str(server.make_url("/")))
+
+
+class TestClientDisconnect:
+    async def test_client_disconnect_is_not_counted_against_upstream(
+        self,
+        aiohttp_client: Any,
+        client_pool: ClientPool,
+        streaming_upstream: _Upstream,
+    ) -> None:
+        finished: asyncio.Queue[None] = asyncio.Queue()
+
+        @web.middleware
+        async def notify_finished(request: web.Request, handler: Handler) -> web.StreamResponse:
+            try:
+                return await handler(request)
+            finally:
+                finished.put_nowait(None)
+
+        async with _endpoint_pool([streaming_upstream.url]) as endpoint_pool:
+            client = await _proxy_client(
+                aiohttp_client, client_pool, endpoint_pool, middlewares=[notify_finished]
+            )
+
+            # The failure threshold is 3, so 3 disconnects would mark the endpoint unhealthy.
+            for _ in range(3):
+                resp = await client.get("/func/folders")
+                await resp.content.readany()
+                resp.close()
+                await asyncio.wait_for(finished.get(), timeout=5)
+
+            assert endpoint_pool.is_healthy(streaming_upstream.url)
+
+
+@dataclass
+class _SessionStore:
+    session: Session
+    saved: asyncio.Event
+
+
+@pytest.fixture
+async def ws_upstream(aiohttp_server: Any) -> _Upstream:
+    """Echoes each websocket text message back once."""
+    upstream = _Upstream(url="")
+
+    async def handler(request: web.Request) -> web.WebSocketResponse:
+        ws = web.WebSocketResponse()
+        await ws.prepare(request)
+        async for msg in ws:
+            if msg.type == aiohttp.WSMsgType.TEXT:
+                upstream.received.append(msg.data.encode())
+                await ws.send_str(msg.data)
+        return ws
+
+    app = web.Application()
+    app.router.add_route("GET", "/{path:.*}", handler)
+    server = await aiohttp_server(app)
+    upstream.url = str(server.make_url("/"))
+    return upstream
+
+
+async def _ws_proxy_client(
+    aiohttp_client: Any,
+    client_pool: ClientPool,
+    endpoint_pool: HealthyEndpointPool,
+    store: _SessionStore,
+) -> Any:
+    storage = MagicMock()
+    storage.save_session = AsyncMock(side_effect=lambda *_args: store.saved.set())
+
+    @web.middleware
+    async def session_middleware(request: web.Request, handler: Handler) -> web.StreamResponse:
+        request[SESSION_KEY] = store.session
+        request[STORAGE_KEY] = storage
+        return await handler(request)
+
+    app = web.Application(middlewares=[session_middleware])
+    app["config"] = MagicMock(
+        api=MagicMock(domain="default", ssl_verify=False),
+        service=MagicMock(enable_signup=True),
+        session=MagicMock(login_session_extension_sec=None),
+    )
+    app["client_pool"] = client_pool
+    app.router.add_route(
+        "*",
+        "/func/{path:.*$}",
+        partial(web_handler, endpoint_pool=endpoint_pool, is_anonymous=True),
+    )
+    return await aiohttp_client(app)
+
+
+class TestStickyWebsocket:
+    async def test_refused_saved_endpoint_reconnects_to_another_and_saves_it(
+        self,
+        aiohttp_client: Any,
+        client_pool: ClientPool,
+        refused_endpoint: str,
+        ws_upstream: _Upstream,
+    ) -> None:
+        session = Session(None, data=None, new=True)
+        session["api_endpoints"] = {"app1": refused_endpoint}
+        store = _SessionStore(session=session, saved=asyncio.Event())
+        async with _endpoint_pool([refused_endpoint, ws_upstream.url]) as endpoint_pool:
+            client = await _ws_proxy_client(aiohttp_client, client_pool, endpoint_pool, store)
+
+            async with client.ws_connect("/func/stream?app=app1") as ws:
+                await ws.send_str("ping")
+                reply = await ws.receive_str()
+            async with asyncio.timeout(5):
+                await store.saved.wait()
+
+            assert reply == "ping"
+            assert ws_upstream.received == [b"ping"]
+            assert session["api_endpoints"]["app1"] == ws_upstream.url
+            assert not endpoint_pool.is_healthy(refused_endpoint)
+
+    async def test_healthy_saved_endpoint_is_kept(
+        self,
+        aiohttp_client: Any,
+        client_pool: ClientPool,
+        refused_endpoint: str,
+        ws_upstream: _Upstream,
+    ) -> None:
+        session = Session(None, data=None, new=True)
+        session["api_endpoints"] = {"app1": ws_upstream.url}
+        store = _SessionStore(session=session, saved=asyncio.Event())
+        async with _endpoint_pool([refused_endpoint, ws_upstream.url]) as endpoint_pool:
+            client = await _ws_proxy_client(aiohttp_client, client_pool, endpoint_pool, store)
+
+            async with client.ws_connect("/func/stream?app=app1") as ws:
+                await ws.send_str("ping")
+                reply = await ws.receive_str()
+
+            assert reply == "ping"
+            assert ws_upstream.received == [b"ping"]
+            assert not store.saved.is_set()
+            assert endpoint_pool.is_healthy(refused_endpoint)
+
+
+>>>>>>> db4e47a2d (fix(BA-9020): do not count client disconnects as manager failures (#16995))
 @pytest.fixture
 async def server_client_pool() -> AsyncIterator[ClientPool]:
     config = MagicMock(api=MagicMock(ssl_verify=False, connection_limit=10))

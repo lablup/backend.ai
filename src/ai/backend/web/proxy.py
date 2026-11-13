@@ -18,8 +18,16 @@ from trafaret import DataError
 
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.request import Request, RequestContent, SessionMode
+<<<<<<< HEAD
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.middlewares.exception import is_client_disconnect
+=======
+from ai.backend.common.endpoint_pool.exceptions import NoHealthyEndpointError
+from ai.backend.common.endpoint_pool.pool import HealthyEndpointPool
+from ai.backend.common.endpoint_pool.types import AcquiredEndpoint
+from ai.backend.common.exception import InvalidAPIParameters, MalformedRequestBody
+from ai.backend.common.middlewares.exception import client_closed_response, is_client_disconnect
+>>>>>>> db4e47a2d (fix(BA-9020): do not count client disconnects as manager failures (#16995))
 from ai.backend.common.web.session import STORAGE_KEY, extra_config_headers, get_session
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.web.clients.endpoint_pool import AcquiredEndpoint, HealthyEndpointPool
@@ -239,6 +247,85 @@ async def _run_proxy_request(
     :func:`_direct_acquire` for the pipeline case.
     """
     open_session = get_anonymous_session if is_anonymous else get_api_session
+<<<<<<< HEAD
+=======
+    http_headers_to_forward_extra = http_headers_to_forward_extra or []
+
+    async def send(acquired: AcquiredEndpoint) -> web.StreamResponse:
+        api_session = await asyncio.shield(open_session(frontend_rqst, acquired))
+        async with api_session:
+            # We perform request signing by ourselves using the HTTP session
+            # data, but need to keep the client's version header so that
+            # the final clients may perform its own API versioning support.
+            backend_rqst_hdrs = extra_config_headers.check(frontend_rqst.headers)
+            request_api_version = backend_rqst_hdrs.get("X-BackendAI-Version", None)
+            secure_context = backend_rqst_hdrs.get("X-BackendAI-Encoded", None)
+            decrypted_payload_length = 0
+            content: RequestContent = None
+            if frontend_rqst.body_exists:
+                if secure_context:
+                    # Use the decrypted payload as request content
+                    content = cast(bytes, frontend_rqst["payload"])
+                    decrypted_payload_length = len(content)
+                else:
+                    # Passthrough the streamed content
+                    content = frontend_rqst.content
+            fill_forwarding_hdrs_to_api_session(frontend_rqst, api_session)
+            backend_rqst = Request(
+                frontend_rqst.method,
+                path,
+                content,
+                params=frontend_rqst.query,
+                override_api_version=request_api_version,
+                session_mode=(SessionMode.PROXY if api_session.proxy_mode else SessionMode.CLIENT),
+            )
+            if jwt_token is not None:
+                backend_rqst.headers["X-BackendAI-Token"] = jwt_token
+            if "Content-Type" in frontend_rqst.headers:
+                backend_rqst.content_type = frontend_rqst.content_type  # set for signing
+                backend_rqst.headers["Content-Type"] = frontend_rqst.headers[
+                    "Content-Type"
+                ]  # preserve raw value
+            if "Content-Length" in frontend_rqst.headers and not secure_context:
+                backend_rqst.headers["Content-Length"] = frontend_rqst.headers["Content-Length"]
+            if "Content-Length" in frontend_rqst.headers and secure_context:
+                backend_rqst.headers["Content-Length"] = str(decrypted_payload_length)
+            for key in {*HTTP_HEADERS_TO_FORWARD, *http_headers_to_forward_extra}:
+                # Prevent malicious or accidental modification of critical
+                # headers.
+                if key in backend_rqst.headers:
+                    continue
+                if (value := frontend_rqst.headers.get(key)) is not None:
+                    backend_rqst.headers[key] = value
+            async with backend_rqst.fetch() as backend_resp:
+                frontend_resp_hdrs = {
+                    key: value
+                    for key, value in backend_resp.headers.items()
+                    if key not in HOP_ONLY_HEADERS
+                }
+                frontend_resp = web.StreamResponse(
+                    status=backend_resp.status,
+                    reason=backend_resp.reason,
+                    headers=frontend_resp_hdrs,
+                )
+                try:
+                    await frontend_resp.prepare(frontend_rqst)
+                    try:
+                        while True:
+                            chunk = await backend_resp.read(CHUNK_SIZE)
+                            if not chunk:
+                                break
+                            await frontend_resp.write(chunk)
+                    finally:
+                        await frontend_resp.write_eof()
+                except ConnectionResetError as e:
+                    # Not raised, so the endpoint pool does not count a client disconnect.
+                    if is_client_disconnect(frontend_rqst, e):
+                        return client_closed_response()
+                    raise
+                return frontend_resp
+
+>>>>>>> db4e47a2d (fix(BA-9020): do not count client disconnects as manager failures (#16995))
     try:
         async with acquire_ctx as acquired:
             api_session = await asyncio.shield(open_session(frontend_rqst, acquired))
@@ -574,6 +661,55 @@ async def web_plugin_handler(
     _reject_disabled_signup(frontend_rqst, path)
     config: WebServerUnifiedConfig = frontend_rqst.app["config"]
     open_session = get_anonymous_session if is_anonymous else get_api_session
+<<<<<<< HEAD
+=======
+
+    async def send(acquired: AcquiredEndpoint, content: RequestContent) -> web.StreamResponse:
+        api_session = await asyncio.shield(open_session(frontend_rqst, acquired))
+        async with api_session:
+            request_api_version = frontend_rqst.headers.get("X-BackendAI-Version", None)
+            fill_forwarding_hdrs_to_api_session(frontend_rqst, api_session)
+            backend_rqst = Request(
+                frontend_rqst.method,
+                path,
+                content,
+                params=frontend_rqst.query,
+                content_type=frontend_rqst.content_type,
+                override_api_version=request_api_version,
+                session_mode=(SessionMode.PROXY if api_session.proxy_mode else SessionMode.CLIENT),
+            )
+            for key in HTTP_HEADERS_TO_FORWARD:
+                if (value := frontend_rqst.headers.get(key)) is not None:
+                    backend_rqst.headers[key] = value
+            async with backend_rqst.fetch() as backend_resp:
+                frontend_resp_hdrs = {
+                    key: value
+                    for key, value in backend_resp.headers.items()
+                    if key not in HOP_ONLY_HEADERS
+                }
+                frontend_resp = web.StreamResponse(
+                    status=backend_resp.status,
+                    reason=backend_resp.reason,
+                    headers=frontend_resp_hdrs,
+                )
+                try:
+                    await frontend_resp.prepare(frontend_rqst)
+                    try:
+                        while True:
+                            chunk = await backend_resp.read(CHUNK_SIZE)
+                            if not chunk:
+                                break
+                            await frontend_resp.write(chunk)
+                    finally:
+                        await frontend_resp.write_eof()
+                except ConnectionResetError as e:
+                    # Not raised, so the endpoint pool does not count a client disconnect.
+                    if is_client_disconnect(frontend_rqst, e):
+                        return client_closed_response()
+                    raise
+                return frontend_resp
+
+>>>>>>> db4e47a2d (fix(BA-9020): do not count client disconnects as manager failures (#16995))
     try:
         async with endpoint_pool.acquire() as acquired:
             api_session = await asyncio.shield(open_session(frontend_rqst, acquired))
