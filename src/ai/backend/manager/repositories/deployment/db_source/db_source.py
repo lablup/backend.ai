@@ -538,45 +538,19 @@ class DeploymentDBSource:
         self,
         endpoint_id: DeploymentID,
     ) -> DeploymentInfo:
-        """Get endpoint by ID (modern, light: revision *ids* only).
-
-        Loads the replica groups for the revision ids but not the full
-        revision rows. For the full revision data (REST v1) use
-        :meth:`get_legacy_endpoint`.
+        """Get endpoint by ID with its revisions and policy.
 
         Raises:
             EndpointNotFound: If the endpoint does not exist
         """
         async with self._reconcile_ops.read_ops() as r:
-            result = await r.search_in_global(
-                DeploymentInfoSearcher(
-                    pagination=NoPagination(),
-                    conditions=[
-                        DeploymentSearchableFields.own.entity_id.filter.equals(
-                            UUIDEqualMatchSpec(value=endpoint_id, negated=False)
-                        )
-                    ],
-                )
-            )
-            if not result.items:
-                raise EndpointNotFound(f"Endpoint {endpoint_id} not found")
-            info = result.items[0]
-            policies = await self._read_policies(r, [endpoint_id])
-        return info.with_revisions_and_policy(
-            current_revision_id=info.current_revision_id,
-            deploying_revision_id=info.deploying_revision_id,
-            current_revision=None,
-            deploying_revision=None,
-            policy=policies.get(endpoint_id),
-        )
+            return await self._read_deployment_info(r, endpoint_id)
 
     async def get_legacy_endpoint(
         self,
         endpoint_id: DeploymentID,
     ) -> DeploymentInfo:
-        """Get endpoint by ID (legacy, full: includes the current/deploying
-        revision rows). DO NOT USE in new code — the REST v1 surface needs the
-        embedded revision; v2 uses :meth:`get_endpoint`.
+        """Get endpoint by ID with its revisions and policy, for the REST v1 surface.
 
         Raises:
             EndpointNotFound: If the endpoint does not exist

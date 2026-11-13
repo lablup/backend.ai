@@ -1,7 +1,6 @@
 """The revisions and the policy a deployment read fills in.
 
-A revision whose row is missing leaves its id ``None``. ``get_endpoint_info`` carries the
-revision ids and the policy only.
+A revision whose row is missing leaves its id ``None``.
 """
 
 from __future__ import annotations
@@ -494,17 +493,17 @@ class TestGetDeploymentsByIds:
 
 
 class TestGetEndpointInfo:
-    async def test_carries_the_revision_ids_and_the_policy_only(
+    async def test_fills_the_revisions_and_the_policy(
         self, deployment_repository: DeploymentRepository, seeder: DeploymentSeeder
     ) -> None:
         seeded = await seeder.seed(deploying_revision_exists=True)
 
         info = await deployment_repository.get_endpoint_info(seeded.endpoint_id)
 
-        assert info.current_revision_id == seeded.current_revision_id
-        assert info.deploying_revision_id == seeded.deploying_revision_id
-        assert info.current_revision is None
-        assert info.deploying_revision is None
+        assert info.current_revision is not None
+        assert info.current_revision.id == seeded.current_revision_id
+        assert info.deploying_revision is not None
+        assert info.deploying_revision.id == seeded.deploying_revision_id
         assert info.policy is not None
         assert info.policy.strategy == DeploymentStrategy.ROLLING
 
