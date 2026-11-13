@@ -447,7 +447,7 @@
   secret = "PERMIT_HASH_SECRET"
   # Hash digest method to use.
   # Added in 25.13.0
-  digest_mod = "SHA256"
+  digest_mod = "sha256"
 
 # Logging configuration including log levels, output formats, and destinations.
 # Supports console, file, and external log aggregation systems.

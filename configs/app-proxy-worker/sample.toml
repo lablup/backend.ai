@@ -156,7 +156,7 @@
   # endpoints. Separate workers for each traffic type enables specialized
   # scaling.
   # Added in 25.9.0
-  accepted_traffics = "interactive,inference"
+  accepted_traffics = ["interactive", "inference"]
   # When enabled, this worker only proxies applications that match the defined
   # app_filters. When disabled (default), the worker accepts all traffic
   # matching accepted_traffics. Use with app_filters to create dedicated workers
@@ -429,7 +429,7 @@
   secret = "PERMIT_HASH_SECRET"
   # Hash digest method to use.
   # Added in 25.13.0
-  digest_mod = "SHA256"
+  digest_mod = "sha256"
 
 # Logging configuration including log levels, output formats, and destinations.
 # Supports console, file, and external log aggregation systems.
