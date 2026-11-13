@@ -31,6 +31,17 @@ class UserPurgeInProgress(EntityError, web.HTTPConflict):
         return EntityErrorCode(UserEntityType(), ActionOperationType.UPDATE, ErrorDetail.CONFLICT)
 
 
+class UserNotActive(EntityError, web.HTTPForbidden):
+    """Raised when a user whose password matched is refused for not being active."""
+
+    error_type = "https://api.backend.ai/probs/user-not-active"
+    error_title = "The user is not active."
+
+    @override
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(UserEntityType(), ActionOperationType.UPDATE, ErrorDetail.FORBIDDEN)
+
+
 class UserConflict(EntityError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/user-conflict"
     error_title = "The user already exists."
