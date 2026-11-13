@@ -47,37 +47,3 @@ class CreateVFolderActionResult(VFolderScopeActionResult):
     @override
     def entity_ids(self) -> Sequence[EntityIdentifier]:
         return (self.vfolder.id,)
-
-
-@dataclass
-class LegacyCreateVFolderAction(VFolderScopeAction):
-    """Create the vfolder the insert spec describes, for REST v1 ``POST /folders``.
-
-    The host check unions the grants REST v1 has always checked; see
-    ``VfolderRepository.legacy_create_vfolder_with_permission``.
-    """
-
-    creator: VFolderBaseCreator
-
-    @override
-    def scope_targets(self) -> Sequence[EntityIdentifier]:
-        return self.creator.scope_targets()
-
-    @override
-    @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.CREATE
-
-    @override
-    @classmethod
-    def action_name(cls) -> str:
-        return "legacy_create_vfolder"
-
-
-@dataclass
-class LegacyCreateVFolderActionResult(VFolderScopeActionResult):
-    vfolder: VFolderData
-
-    @override
-    def entity_ids(self) -> Sequence[EntityIdentifier]:
-        return (self.vfolder.id,)

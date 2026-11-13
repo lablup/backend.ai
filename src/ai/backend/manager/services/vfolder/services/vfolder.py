@@ -112,8 +112,6 @@ from ai.backend.manager.services.vfolder.actions.bulk_load_permissions import (
 from ai.backend.manager.services.vfolder.actions.create import (
     CreateVFolderAction,
     CreateVFolderActionResult,
-    LegacyCreateVFolderAction,
-    LegacyCreateVFolderActionResult,
 )
 from ai.backend.manager.services.vfolder.actions.file_v2 import (
     CloneVFolderV2Action,
@@ -325,35 +323,6 @@ class VFolderService:
             if not isinstance(creator, UnmanagedVFolderMixin):
                 await self._create_storage_folder(creator, creation)
             return CreateVFolderActionResult(
-                vfolder=await self._vfolder_repository.mark_vfolder_ready(creation.vfolder.id)
-            )
-        except Exception:
-            await self._vfolder_repository.purge_vfolder(creation.vfolder.id)
-            raise
-
-    async def legacy_create(
-        self, action: LegacyCreateVFolderAction
-    ) -> LegacyCreateVFolderActionResult:
-        """Create the vfolder REST v1 ``POST /folders`` asks for, as ``create`` does.
-
-        What the folder becomes and what stands in its way are the spec's to say. What
-        is left here is the order: the row lands unusable, its storage folder is made,
-        and the row is made ready — or taken back when the storage host refuses.
-        """
-        creator = replace(
-            creator_host_settled := action.creator,
-            host=await self._resolve_host(creator_host_settled.host),
-        )
-        await self._check_ownership_allowed(
-            "user" if isinstance(creator, PersonalVFolderCreator) else "group"
-        )
-
-        creation = await self._vfolder_repository.legacy_create_vfolder_with_permission(creator)
-        try:
-            # An unmanaged folder points at a path the manager did not make.
-            if not isinstance(creator, UnmanagedVFolderMixin):
-                await self._create_storage_folder(creator, creation)
-            return LegacyCreateVFolderActionResult(
                 vfolder=await self._vfolder_repository.mark_vfolder_ready(creation.vfolder.id)
             )
         except Exception:

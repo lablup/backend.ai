@@ -452,55 +452,6 @@ class VfolderRepository:
                 container_uid=limits[1],
             )
 
-    @vfolder_repository_resilience.apply()
-    async def legacy_create_vfolder_with_permission(
-        self, creator: VFolderBaseCreator
-    ) -> VFolderCreation:
-        """
-        REST v1 creation keeps the union it checked before v2, so existing v1 clients are not
-        refused: the domain, the project or the user's projects, and the keypair policy.
-        """
-        if isinstance(creator, ProjectVFolderCreator):
-            async with self._db.begin_readonly_session_read_committed() as db_session:
-                keypair_allowed_hosts = await self._fetch_default_keypair_vfolder_hosts(
-                    db_session, creator.creator_id
-                )
-                allowed_hosts = await get_allowed_vfolder_hosts_by_group(
-                    await db_session.connection(),
-                    {"allowed_vfolder_hosts": keypair_allowed_hosts or VFolderHostPermissionMap()},
-                    creator.domain_name,
-                    creator.project,
-                )
-        else:
-            allowed_hosts = await self.get_user_storage_host_permissions(
-                creator.creator_id, creator.domain_name
-            )
-        if (
-            creator.host not in allowed_hosts
-            or VFolderHostPermission.CREATE not in allowed_hosts[creator.host]
-        ):
-            raise InsufficientStoragePermission(
-                f"`{VFolderHostPermission.CREATE}` Not allowed in vfolder host(`{creator.host}`)"
-            )
-        limits = await self._storage_limits(creator)
-        async with self._v2_ops.write_ops() as w:
-            created = await w.create_entity(creator)
-            if isinstance(creator, ProjectVFolderCreator):
-                # A project folder has no owner; its maker mounts it read-write through a
-                # policy row the project may later change or take back.
-                await w.upsert_field_entity(
-                    created.id,
-                    VFolderUserMountPolicyUpserter(
-                        user_id=UserID(creator.creator_id),
-                        permission=VFolderMountPolicy.READ_WRITE,
-                    ),
-                )
-            return VFolderCreation(
-                vfolder=created,
-                max_quota_scope_size=limits[0],
-                container_uid=limits[1],
-            )
-
     async def _storage_limits(self, creator: VFolderBaseCreator) -> tuple[int, int | None]:
         """The quota scope size the folder is made with, and the uid its files take."""
         if isinstance(creator, ProjectVFolderCreator):

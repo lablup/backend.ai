@@ -168,7 +168,7 @@ from ai.backend.manager.services.vfolder.actions.bulk_load_mount_levels import (
 from ai.backend.manager.services.vfolder.actions.bulk_load_permissions import (
     BulkLoadVFolderPermissionsAction,
 )
-from ai.backend.manager.services.vfolder.actions.create import LegacyCreateVFolderAction
+from ai.backend.manager.services.vfolder.actions.create import CreateVFolderAction
 from ai.backend.manager.services.vfolder.actions.file import (
     CreateArchiveDownloadSessionAction,
     CreateDownloadSessionAction,
@@ -327,9 +327,7 @@ class VFolderHandler:
                 )
 
         try:
-            result = await self._vfolder.legacy_create_vfolder.run(
-                LegacyCreateVFolderAction(creator=creator)
-            )
+            result = await self._vfolder.create_vfolder.run(CreateVFolderAction(creator=creator))
         except (VFolderInvalidParameter, VFolderAlreadyExists) as e:
             raise InvalidAPIParameters(str(e)) from e
         # Every other BackendAIError carries its own HTTP status (Forbidden ->

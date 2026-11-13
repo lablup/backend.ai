@@ -65,8 +65,6 @@ from ai.backend.manager.services.template.actions.create_task_template import (
 from ai.backend.manager.services.vfolder.actions.create import (
     CreateVFolderAction,
     CreateVFolderActionResult,
-    LegacyCreateVFolderAction,
-    LegacyCreateVFolderActionResult,
 )
 
 _PROJECT_ID = ProjectID(uuid.uuid4())
@@ -185,11 +183,6 @@ _CASES: dict[str, _Case] = {
     "create_vfolder": _Case(
         action=CreateVFolderAction(creator=_vfolder_creator()),
         result=CreateVFolderActionResult(vfolder=MagicMock(id=_VFOLDER_ID)),
-        expected_entity_ids=(_VFOLDER_ID,),
-    ),
-    "legacy_create_vfolder": _Case(
-        action=LegacyCreateVFolderAction(creator=_vfolder_creator()),
-        result=LegacyCreateVFolderActionResult(vfolder=MagicMock(id=_VFOLDER_ID)),
         expected_entity_ids=(_VFOLDER_ID,),
     ),
 }
