@@ -446,13 +446,10 @@ def redis_addr(
 def etcd_fixture(
     test_id: str,
     bootstrap_config: BootstrapConfig,
-    redis_container: tuple[str, HostPortPairModel],  # noqa: F811
     vfolder_mount: Path,
     vfolder_fsprefix: Path,
     vfolder_host: str,
 ) -> Iterator[None]:
-    redis_addr = redis_container[1]
-
     cli_ctx = CLIContext(log_level=LogLevel.DEBUG)
     cli_ctx._bootstrap_config = bootstrap_config
     with tempfile.NamedTemporaryFile(mode="w", suffix=".etcd.json") as f:
@@ -474,9 +471,6 @@ def etcd_fixture(
             "nodes": {},
             "config": {
                 "docker": {},
-                "redis": {
-                    "addr": f"{redis_addr.host}:{redis_addr.port}",
-                },
                 "plugins": {
                     "cloudia": {
                         "base_url": "127.0.0.1:8090",

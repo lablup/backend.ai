@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import urllib
 from collections.abc import AsyncGenerator, Mapping, Sequence
 from contextvars import ContextVar
@@ -12,9 +13,12 @@ from ai.backend.common.configs.loader.types import AbstractConfigLoader
 from ai.backend.common.etcd import AsyncEtcd, Event, GetPrefixValue
 from ai.backend.common.identity import get_instance_id
 from ai.backend.common.types import QueueSentinel, SlotName, SlotTypes, current_resource_slots
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.manager_status.types import ManagerStatus
 from ai.backend.manager.defs import INTRINSIC_SLOTS
 from ai.backend.manager.errors.common import ServerMisconfiguredError
+
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 current_vfolder_types: ContextVar[list[str]] = ContextVar("current_vfolder_types")
 
@@ -40,7 +44,11 @@ class LegacyEtcdLoader(AbstractConfigLoader):
 
     @override
     async def load(self) -> Mapping[str, Any]:
-        return await self._etcd.get_prefix(self._config_prefix)
+        config = dict(await self._etcd.get_prefix(self._config_prefix))
+        # The Redis config is read only from manager.toml.
+        if config.pop("redis", None) is not None:
+            log.warning("config keys in etcd are ignored", config_keys="redis")
+        return config
 
     @override
     def __hash__(self) -> int:

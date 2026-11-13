@@ -1,49 +1,31 @@
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from unittest.mock import MagicMock
 
 import pytest
 
+from ai.backend.agent.config.unified import AgentUnifiedConfig
 from ai.backend.agent.dependencies.bootstrap.redis_config import RedisConfigDependency
-from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+from ai.backend.common.configs.redis import RedisConfig
+from ai.backend.common.exception import ConfigurationError
 
 
 class TestRedisConfigDependency:
-    @pytest.fixture
-    async def etcd_with_redis_config(self, etcd: AsyncEtcd) -> AsyncIterator[AsyncEtcd]:
-        """Etcd fixture with redis config set up."""
-        await etcd.put_prefix(
-            "config/redis",
-            {
-                "addr": {"host": "127.0.0.1", "port": "6379"},
-            },
-            scope=ConfigScopes.GLOBAL,
-        )
-        yield etcd
+    async def test_provides_redis_config_from_local_config(self) -> None:
+        local_redis = RedisConfig.model_validate({
+            "addr": "192.168.1.100:6380",
+            "password": "local-password",
+        })
+        config = MagicMock(spec=AgentUnifiedConfig)
+        config.redis = local_redis
 
-    async def test_redis_config_reads_from_etcd(self, etcd_with_redis_config: AsyncEtcd) -> None:
-        """Test that redis config is read from etcd successfully."""
-        dependency = RedisConfigDependency()
+        async with RedisConfigDependency().provide(config) as redis_config:
+            assert redis_config is local_redis
 
-        async with dependency.provide(etcd_with_redis_config) as redis_config:
-            assert redis_config is not None
-            assert redis_config.addr is not None
+    async def test_raises_when_redis_config_is_missing(self) -> None:
+        config = MagicMock(spec=AgentUnifiedConfig)
+        config.redis = None
 
-    async def test_redis_config_converts_host_port_pair(self, etcd: AsyncEtcd) -> None:
-        """Test that HostPortPair dict is parsed into HostPortPair model."""
-        # Set up redis config in etcd with HostPortPair format
-        await etcd.put_prefix(
-            "config/redis",
-            {
-                "addr": {"host": "192.168.1.100", "port": "6380"},
-                "password": "test-password",
-            },
-            scope=ConfigScopes.GLOBAL,
-        )
-
-        dependency = RedisConfigDependency()
-
-        async with dependency.provide(etcd) as redis_config:
-            assert redis_config.addr is not None
-            assert redis_config.addr.address == "192.168.1.100:6380"
-            assert redis_config.password == "test-password"
+        with pytest.raises(ConfigurationError):
+            async with RedisConfigDependency().provide(config):
+                pass

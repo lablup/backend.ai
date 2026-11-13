@@ -20,6 +20,7 @@ from ai.backend.common.configs import (
     PyroscopeConfig,
     ServiceDiscoveryConfig,
 )
+from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.configs.storage_status_report import StorageStatusReportConfig
 from ai.backend.common.configs.volume_status_check import VolumeStatusCheckConfig
 from ai.backend.common.configs.wheelhouse import WheelhouseConfig
@@ -1771,6 +1772,15 @@ class StorageProxyUnifiedConfig(BaseConfigSchema):
                 "Backend.AI. Required for multi-node deployments."
             ),
             added_version="25.12.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
+    redis: Annotated[
+        RedisConfig | None,
+        Field(default=None),
+        BackendAIConfigMeta(
+            description="Redis configuration. The storage proxy reads it only from this file.",
+            added_version=NEXT_RELEASE_VERSION,
             composite=CompositeType.FIELD,
         ),
     ]
