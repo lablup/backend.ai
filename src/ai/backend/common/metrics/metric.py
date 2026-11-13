@@ -536,6 +536,7 @@ class LayerType(enum.StrEnum):
     VALKEY_BGTASK = "valkey_bgtask"
     VALKEY_VOLUME_STATS = "valkey_volume_stats"
     VALKEY_TUS = "valkey_tus"
+    VALKEY_STORAGE_VOLUME = "valkey_storage_volume"
     VALKEY_LOCK = "valkey_lock"
 
     # Client layers
