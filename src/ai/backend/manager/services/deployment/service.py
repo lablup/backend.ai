@@ -175,8 +175,8 @@ def _deployment_desired_replica_count(info: DeploymentInfo) -> int:
 def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentData:
     """Convert DeploymentInfo to the modern (v2 / GraphQL) ModelDeploymentData.
 
-    Uses the revision *ids* only — the modern read path does not load the full
-    revision rows. Note: some fields default as DeploymentInfo lacks the data.
+    Uses the revision *ids* only. Note: some fields default as DeploymentInfo lacks
+    the data.
     """
     return ModelDeploymentData(
         id=info.id,

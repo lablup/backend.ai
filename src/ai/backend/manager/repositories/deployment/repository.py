@@ -371,7 +371,7 @@ class DeploymentRepository:
         self,
         endpoint_id: DeploymentID,
     ) -> DeploymentInfo:
-        """Get endpoint information (modern, light: revision *ids* only).
+        """Get endpoint information with its revisions and policy.
 
         Raises:
             EndpointNotFound: If the endpoint does not exist
@@ -383,8 +383,7 @@ class DeploymentRepository:
         self,
         endpoint_id: DeploymentID,
     ) -> DeploymentInfo:
-        """Get endpoint information (legacy, full: includes the current/deploying
-        revision data). DO NOT USE in new code — for the REST v1 surface only.
+        """Get endpoint information with its revisions and policy, for the REST v1 surface.
 
         Raises:
             EndpointNotFound: If the endpoint does not exist
