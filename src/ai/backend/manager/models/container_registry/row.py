@@ -16,11 +16,9 @@ from sqlalchemy.sql.expression import SQLColumnExpression
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
+from ai.backend.common.exception import InvalidContainerRegistryURL
 from ai.backend.logging.structured import StructuredLogger
-from ai.backend.manager.errors.container_registry import (
-    InvalidContainerRegistryProject,
-    InvalidContainerRegistryURL,
-)
+from ai.backend.manager.errors.container_registry import InvalidContainerRegistryProject
 from ai.backend.manager.models.base import (
     GUID,
     Base,

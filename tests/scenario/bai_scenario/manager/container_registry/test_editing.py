@@ -14,12 +14,10 @@ from ai.backend.common.dto.manager.v2.container_registry.request import (
     UpdateContainerRegistryInput,
 )
 from ai.backend.common.dto.manager.v2.container_registry.response import ContainerRegistryNode
+from ai.backend.common.exception import InvalidContainerRegistryURL
 from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
 from ai.backend.manager.errors.auth import InsufficientPrivilege
-from ai.backend.manager.errors.container_registry import (
-    InvalidContainerRegistryProject,
-    InvalidContainerRegistryURL,
-)
+from ai.backend.manager.errors.container_registry import InvalidContainerRegistryProject
 from ai.backend.manager.errors.image import ContainerRegistryNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
