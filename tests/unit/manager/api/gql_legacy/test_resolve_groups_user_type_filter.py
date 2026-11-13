@@ -51,7 +51,7 @@ class TestResolveGroupsForUser:
         assert call is not None
         assert call.kwargs["type"] == expected
 
-    async def test_an_unknown_type_is_refused_as_an_invalid_request(
+    async def test_an_unknown_type_is_rejected_as_an_invalid_request(
         self,
         info: graphene.ResolveInfo,
         batch_load_by_user: AsyncMock,
