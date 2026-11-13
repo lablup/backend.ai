@@ -1705,6 +1705,13 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
     ) -> Sequence[Group]:
         if type is None:
             type = [ProjectType.GENERAL.name]
+        try:
+            project_types = [ProjectType(t) for t in type]
+        except ValueError as e:
+            allowed_types = ", ".join(t.name for t in ProjectType)
+            raise InvalidAPIParameters(
+                f"{e}. All elements of `type` should be one of ({allowed_types})"
+            ) from e
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
         client_domain = ctx.user["domain_name"]
@@ -1716,19 +1723,20 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
                 raise InsufficientPrivilege
             domain_name = client_domain
         elif client_role == UserRole.USER:
-            loader = ctx.dataloader_manager.get_loader(
+            (user_groups,) = await Group.batch_load_by_user(
                 ctx,
-                "Group.by_user",
+                [client_user_id],
+                type=project_types,
                 is_active=is_active,
             )
-            return cast(Sequence[Group], await loader.load(client_user_id))
+            return cast(Sequence[Group], user_groups)
         else:
             raise InvalidAPIParameters("Unknown client role")
         return await Group.load_all(
             info.context,
             domain_name=domain_name,
             is_active=is_active,
-            type=[ProjectType(t) for t in type],
+            type=project_types,
         )
 
     @staticmethod
