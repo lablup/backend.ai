@@ -38,7 +38,6 @@ from ai.backend.manager.errors.resource import (
 )
 from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.kernel.row import (
-    LIVE_STATUS,
     KernelRow,
     kernels,
 )
@@ -147,7 +146,10 @@ class ProjectDBSource:
                     )
                     |
                     # Or, filter running sessions which created before requested end_date
-                    ((kernels.c.created_at < end_date) & (kernels.c.status.in_(LIVE_STATUS))),
+                    (
+                        (kernels.c.created_at < end_date)
+                        & (kernels.c.status == KernelStatus.RUNNING)
+                    ),
                 )
                 .order_by(sa.asc(kernels.c.terminated_at))
             )

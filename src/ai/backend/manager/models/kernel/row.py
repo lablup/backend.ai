@@ -75,12 +75,9 @@ from ai.backend.manager.models.utils import (
 )
 
 __all__ = (
-    "LIVE_STATUS",
     "KernelRow",
     "kernels",
 )
-
-LIVE_STATUS = (KernelStatus.RUNNING,)
 
 
 def default_hostname(context: Any) -> str:

@@ -34,7 +34,6 @@ from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel.row import (
     DEFAULT_KERNEL_ORDERING,
-    LIVE_STATUS,
     KernelRow,
     kernels,
 )
@@ -701,7 +700,7 @@ class LegacyComputeSession(graphene.ObjectType):  # type: ignore[misc]
         if not hasattr(self, "status"):
             return None
         graph_ctx: GraphQueryContext = info.context
-        if KernelStatus[self.status] not in LIVE_STATUS:
+        if KernelStatus[self.status] != KernelStatus.RUNNING:
             if self.last_stat is None:
                 return convert_type(0)
             metric = self.last_stat.get(metric_key)
