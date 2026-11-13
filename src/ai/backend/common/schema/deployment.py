@@ -64,8 +64,8 @@ class IntOrPercent(BackendAISchema):
 
 
 class ReplicaGroupRolloutSpec(BackendAISchema):
-    """Per-group rollout step config snapshot from the deployment strategy at
-    DEPLOYING_INITIALIZING; bounds how fast routes move toward the group's desired counts."""
+    """Per-group rollout step config, snapshotted from the deployment strategy at each rollout's
+    DEPLOYING_PROVISIONING; bounds how fast routes move toward the group's desired counts."""
 
     max_surge: IntOrPercent
     max_unavailable: IntOrPercent
