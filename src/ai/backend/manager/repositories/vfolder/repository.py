@@ -430,12 +430,14 @@ class VfolderRepository:
         else:
             match personal_folder_host_grant_sources:
                 case PersonalVFolderHostGrantSources.KEYPAIR_RESOURCE_POLICY:
+                    # v2 (REST v2, GQL): the keypair resource policy alone.
                     await self.ensure_host_permission_allowed_by_user(
                         creator.host,
                         permission=VFolderHostPermission.CREATE,
                         user_uuid=creator.creator_id,
                     )
                 case PersonalVFolderHostGrantSources.DOMAIN_PROJECTS_AND_KEYPAIR_RESOURCE_POLICY:
+                    # Legacy REST v1: the domain, the user's projects and the keypair policy.
                     allowed_hosts = await self.get_user_storage_host_permissions(
                         creator.creator_id, creator.domain_name
                     )
