@@ -86,6 +86,7 @@ from ai.backend.manager.actions.registry.types import (
     ProcessorDependencies,
 )
 from ai.backend.manager.actions.v2.bulk.validator.rbac import BulkOwnCheck
+from ai.backend.manager.actions.v2.ops.aggregate import AggregateLimits
 from ai.backend.manager.clients.prometheus.preset import PromQLTemplateRenderer
 from ai.backend.manager.data.artifact.types import ArtifactRevisionData
 from ai.backend.manager.data.audit_log.types import AuditLogData, AuditLogScopeData
@@ -611,6 +612,7 @@ def create_processors(
     monitors: ActionMonitors,
 ) -> ProcessorsBundle:
     repositories = args.service_args.repositories
+    aggregate_config = args.service_args.config_provider.config.api.aggregate
     # One registry shared by every v2-wired package: each package wires through its
     # own group, and the registry's wired_specs() is the catalog of every
     # registered action. Built before the services because the permission controller
@@ -620,6 +622,11 @@ def create_processors(
             monitors=monitors,
             validators=args.validators,
             repository=OpsRepository(repositories.v2_ops_provider),
+            aggregate_limits=AggregateLimits(
+                max_scopes=aggregate_config.max_scopes,
+                max_group_by_fields=aggregate_config.max_group_by_fields,
+                max_limit=aggregate_config.max_limit,
+            ),
         )
     )
     services = create_services(args.service_args, registry)

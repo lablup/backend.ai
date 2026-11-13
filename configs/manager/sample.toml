@@ -643,6 +643,20 @@
   # Added in 25.8.0
   ## max-gql-connection-page-size = 100
 
+  # Limits on the aggregate queries.
+  # Added in 26.10.0
+  [api.aggregate]
+    # Maximum number of scopes one scoped aggregate request may name.
+    # Added in 26.10.0
+    max-scopes = 100
+    # Maximum number of groupBy fields in one aggregate request.
+    # Added in 26.10.0
+    max-group-by-fields = 4
+    # Maximum number of groups an aggregate returns per scope. Also the limit
+    # applied when a request gives none.
+    # Added in 26.10.0
+    max-limit = 1000
+
   # Resource visibility and sharing settings for the API. Controls how resource
   # information is exposed to different user roles.
   # Added in 25.8.0

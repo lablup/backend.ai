@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import enum
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from ai.backend.common.data.entity.types import EntityData, EntityType, FieldType
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.types import ActionBacking, ActionGate, ActionKind
+from ai.backend.manager.actions.v2.ops.aggregate import AggregateLimits
 from ai.backend.manager.actions.v2.validators import ActionValidators
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 
@@ -18,6 +19,7 @@ class ProcessorDependencies[TData: EntityData]:
     monitors: ActionMonitors
     validators: ActionValidators
     repository: OpsRepository[TData]
+    aggregate_limits: AggregateLimits = field(default_factory=AggregateLimits)
 
 
 class Concern(enum.StrEnum):
