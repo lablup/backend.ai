@@ -75,7 +75,7 @@ pants test tests/integration/::
 
 # Run specific component
 pants test tests/unit/manager/::
-pants test tests/component/agent/::
+pants test tests/component/vfolder/::
 
 # Run changed tests only
 pants test --changed-since=HEAD~1
@@ -108,7 +108,7 @@ test must clean up what its fixtures wrote.
 
 | Rule | |
 |---|---|
-| A tag names an infrastructure set | `component` = postgres + etcd + redis; `component-agent` = pulled docker images |
+| A tag names an infrastructure set | `component` = postgres + etcd + redis |
 | Set it once, in the subtree's top `__defaults__` | Do not set it on an individual `python_tests` target |
 | A new tag needs a different infrastructure set | Write the reason in that BUILD file |
 | State leaking between files is a fixture bug | Fix the fixture; do not split the tag or pull the file out of the batch |
