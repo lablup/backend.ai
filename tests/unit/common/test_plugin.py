@@ -95,6 +95,16 @@ def mock_entrypoints_with_class(
         )
 
 
+@pytest.fixture
+def allow_and_block_list() -> tuple[set[str], ...]:
+    return {"cuda"}, {"cuda_mock"}
+
+
+@pytest.fixture
+def allow_and_block_list_has_union() -> tuple[set[str], ...]:
+    return {"cuda"}, {"cuda"}
+
+
 async def test_plugin_context_init_cleanup(etcd: AsyncEtcd, mocker: MockerFixture) -> None:
     print("test plugin context init cleanup")
     mocked_plugin = AsyncMock(DummyPlugin)
