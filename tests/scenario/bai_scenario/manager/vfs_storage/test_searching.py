@@ -30,7 +30,8 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
     When,
 )
-from bai_scenario.components.answers import MissingResponse, OneOfTheSeeded, TheCallIsRefused
+from bai_scenario.components.answers import MissingResponse, TheCallIsRefused
+from bai_scenario.components.one_of_the_seeded import OneOfTheSeeded
 from bai_scenario.components.vfs_storage import (
     ManyStoragesAndACaller,
     ManyStoragesAndSomeone,

@@ -33,7 +33,8 @@ from bai_scenario.components.agent_resource import (
     TheFirstReportedSlots,
     TheReportedSlots,
 )
-from bai_scenario.components.answers import NothingIsFound, TheCallIsRefused
+from bai_scenario.components.answers import TheCallIsRefused
+from bai_scenario.components.nothing_is_found import NothingIsFound
 from bai_scenario.components.system import ENFORCEMENT
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession

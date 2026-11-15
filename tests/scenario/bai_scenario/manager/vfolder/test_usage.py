@@ -23,7 +23,8 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
     When,
 )
-from bai_scenario.components.answers import NothingComesBack, TheCallIsRefused
+from bai_scenario.components.answers import TheCallIsRefused
+from bai_scenario.components.nothing_comes_back import NothingComesBack
 from bai_scenario.components.vfolder import (
     AFolderAndPeople,
     SomeoneWithAFolder,
