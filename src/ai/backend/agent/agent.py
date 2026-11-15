@@ -187,6 +187,7 @@ from ai.backend.common.json import (
     dump_json_str,
     load_json,
 )
+from ai.backend.common.kernel_creation_config import KernelCreationConfig
 from ai.backend.common.lock import FileLock
 from ai.backend.common.log.types import (
     ContainerLogData,
@@ -216,7 +217,6 @@ from ai.backend.common.types import (
     ImageCanonical,
     ImageConfig,
     ImageRegistry,
-    KernelCreationConfig,
     KernelCreationResult,
     KernelId,
     MountPermission,

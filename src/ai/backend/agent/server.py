@@ -109,6 +109,7 @@ from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
 from ai.backend.common.health_checker.probe import HealthProbe, HealthProbeOptions
 from ai.backend.common.health_checker.types import ComponentId
 from ai.backend.common.json import pretty_json
+from ai.backend.common.kernel_creation_config import KernelCreationConfig
 from ai.backend.common.metrics.http import (
     build_api_metric_middleware,
 )
@@ -142,7 +143,6 @@ from ai.backend.common.types import (
     HostPortPair,
     ImageConfig,
     ImageRegistry,
-    KernelCreationConfig,
     KernelCreationResult,
     KernelId,
     QueueSentinel,
