@@ -281,10 +281,10 @@ class EndpointRepository:
                         route_id=entry.route_id,
                         kernel_host=entry.kernel_host,
                         kernel_port=entry.kernel_port,
-                        # Inference circuits are always HTTP; manager does
+                        # Routes follow the circuit's protocol; manager does
                         # not push traffic_ratio yet (planned), so the
                         # legacy default keeps every route equal-weighted.
-                        protocol=ProxyProtocol.HTTP,
+                        protocol=circuit.protocol,
                         traffic_ratio=1.0,
                     )
                     for entry in item.routes
@@ -388,10 +388,10 @@ class EndpointRepository:
                             route_id=entry.route_id,
                             kernel_host=entry.kernel_host,
                             kernel_port=entry.kernel_port,
-                            # Inference circuits are always HTTP; manager does
+                            # Routes follow the circuit's protocol; manager does
                             # not push traffic_ratio yet (planned), so the
                             # legacy default keeps every route equal-weighted.
-                            protocol=ProxyProtocol.HTTP,
+                            protocol=circuit.protocol,
                             traffic_ratio=1.0,
                         )
                     )
@@ -622,7 +622,9 @@ class EndpointRepository:
                 worker_id,
                 preferred_port,
                 preferred_subdomain,
-            ) = await self._match_worker_for_existing_url(sess, url)
+            ) = await self._match_worker_for_existing_url(
+                sess, url, ProxyProtocol(item.protocol.value)
+            )
 
         # Translate common-DTO tag shapes into coordinator-internal
         # ones expected by ``add_circuit`` (they differ only in field
@@ -636,7 +638,9 @@ class EndpointRepository:
             session_cfg,
             endpoint_cfg,
             item.service_name,
-            ProxyProtocol.HTTP,
+            # A ``tcp`` endpoint needs a ``(tcp, port)`` worker that lists
+            # ``inference`` in its accepted_traffics.
+            ProxyProtocol(item.protocol.value),
             AppMode.INFERENCE,
             [],
             open_to_public=item.open_to_public,
@@ -660,6 +664,7 @@ class EndpointRepository:
         self,
         sess: SASession,
         existing_url: URL,
+        protocol: ProxyProtocol,
     ) -> tuple[UUID | None, int | None, str | None]:
         """Resolve ``existing_url`` to ``(worker_id, preferred_port, preferred_subdomain)``.
 
@@ -673,6 +678,7 @@ class EndpointRepository:
             Worker.accepted_traffics.contains([AppMode.INFERENCE])
             & (Worker.frontend_mode == FrontendMode.WILDCARD_DOMAIN)
             & (Worker.wildcard_domain == domain)
+            & (Worker.protocol == protocol)
         )
         result = await sess.execute(query)
         wildcard_match = result.scalar()
@@ -686,6 +692,7 @@ class EndpointRepository:
             Worker.accepted_traffics.contains([AppMode.INFERENCE])
             & (Worker.frontend_mode == FrontendMode.PORT)
             & (Worker.hostname == existing_url.host)
+            & (Worker.protocol == protocol)
         )
         result = await sess.execute(query)
         worker_candidates = result.scalars().all()

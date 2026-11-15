@@ -11,10 +11,14 @@ Test Scenarios:
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+from typing import cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from ai.backend.common.config import ModelDefinition
+from ai.backend.common.types import EndpointProtocol
 from ai.backend.manager.data.resource.types import ResourceGroupProxyTarget
 from ai.backend.manager.sokovan.deployment.executor import DeploymentExecutor
 from ai.backend.manager.sokovan.deployment.recorder.context import DeploymentRecorderContext
@@ -305,3 +309,32 @@ class TestCalculateDesiredReplicas:
         # Critical: no desired-replica write. That is what was previously
         # flipping the deployment into SCALING and wedging it.
         mock_deployment_repo.update_desired_replicas_bulk.assert_not_awaited()
+
+
+class TestBuildEndpointItem:
+    """``_build_endpoint_item`` carries ``service.protocol`` to the coordinator item."""
+
+    @pytest.mark.parametrize(
+        ("service", "expected"),
+        [({}, EndpointProtocol.HTTP), ({"protocol": "tcp"}, EndpointProtocol.TCP)],
+    )
+    async def test_protocol_from_model_definition(
+        self,
+        deployment_executor: DeploymentExecutor,
+        ready_deployment: DeploymentWithHistory,
+        service: dict[str, object],
+        expected: EndpointProtocol,
+    ) -> None:
+        deployment = ready_deployment.deployment_info
+        assert deployment.current_revision is not None
+        revision = cast(MagicMock, deployment.current_revision)
+        revision.model_definition = ModelDefinition.model_validate({
+            "models": [{"name": "m", "model_path": "/m", "service": {"port": 8080, **service}}]
+        })
+        cast(
+            AsyncMock, deployment_executor._runtime_variant_repo
+        ).get_by_id.return_value = SimpleNamespace(name="custom")
+
+        item = await deployment_executor._build_endpoint_item(deployment, revision.id)
+
+        assert item.protocol is expected

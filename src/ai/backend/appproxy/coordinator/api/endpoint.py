@@ -48,7 +48,8 @@ from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.types import (
     SessionTagsModel,
     TagsModel,
 )
-from ai.backend.common.types import BackendAISchema
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.common.types import BackendAISchema, EndpointProtocol
 
 from .types import StubResponseModel
 from .utils import auth_required
@@ -101,6 +102,19 @@ class EndpointCreationRequestModel(BackendAISchema):
         ),
     ] = None
 
+    protocol: Annotated[
+        EndpointProtocol,
+        Field(
+            default=EndpointProtocol.HTTP,
+            description=(
+                f"Added in {NEXT_RELEASE_VERSION}. Proxy protocol of the endpoint's circuit. "
+                "`tcp` passes bytes through (TLS terminates inside the replica) and needs a "
+                "`(tcp, port)` worker with `inference` in its accepted_traffics. "
+                "Applied when the circuit is created; an existing circuit keeps its protocol."
+            ),
+        ),
+    ] = EndpointProtocol.HTTP
+
 
 class EndpointCreationResponseModel(BackendAISchema):
     success: bool
@@ -122,6 +136,7 @@ def _request_model_to_item(
         ),
         open_to_public=params.open_to_public,
         health_check=params.health_check,
+        protocol=params.protocol,
     )
 
 
