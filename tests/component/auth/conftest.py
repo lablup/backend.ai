@@ -17,6 +17,13 @@ from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.data.user.types import UserRole
+<<<<<<< HEAD
+=======
+from ai.backend.common.plugin.hook_context import HookPluginContext
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import GroupMeta
+from ai.backend.manager.api.adapters.auth.adapter import AuthAdapter
+>>>>>>> 3832f8c8 (fix(BAI-654): import HookPluginContext from hook_context in component conftests (#17100))
 from ai.backend.manager.api.rest.auth.handler import AuthHandler
 from ai.backend.manager.api.rest.auth.registry import register_auth_routes
 

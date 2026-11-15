@@ -8,6 +8,10 @@ import pytest
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.data.entity.deployment import DeploymentEntityType
 from ai.backend.common.events.hub.hub import EventHub
+<<<<<<< HEAD
+=======
+from ai.backend.common.plugin.hook_context import HookPluginContext
+>>>>>>> 3832f8c8 (fix(BAI-654): import HookPluginContext from hook_context in component conftests (#17100))
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.api.rest.routing import RouteRegistry

@@ -22,6 +22,10 @@ from ai.backend.common.dto.manager.config import (
     DeleteGroupDotfileRequest,
     DeleteUserDotfileRequest,
 )
+<<<<<<< HEAD
+=======
+from ai.backend.common.plugin.hook_context import HookPluginContext
+>>>>>>> 3832f8c8 (fix(BAI-654): import HookPluginContext from hook_context in component conftests (#17100))
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (

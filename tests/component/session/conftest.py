@@ -27,6 +27,10 @@ from ai.backend.common.data.entity.resource_preset import ResourcePresetEntityTy
 from ai.backend.common.data.entity.session import SessionEntityType, SessionID
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
+<<<<<<< HEAD
+=======
+from ai.backend.common.plugin.hook_context import HookPluginContext
+>>>>>>> 3832f8c8 (fix(BAI-654): import HookPluginContext from hook_context in component conftests (#17100))
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import AgentId, SessionTypes
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
