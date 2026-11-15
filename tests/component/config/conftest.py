@@ -19,7 +19,22 @@ from ai.backend.common.dto.manager.config import (
     DeleteGroupDotfileRequest,
     DeleteUserDotfileRequest,
 )
+<<<<<<< HEAD
 from ai.backend.manager.actions.validators import ActionValidators
+=======
+from ai.backend.common.plugin.hook_context import HookPluginContext
+from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import (
+    Concern,
+    ConcernMeta,
+    FieldGroupMeta,
+    GroupMeta,
+    ProcessorDependencies,
+)
+from ai.backend.manager.actions.validators.build import build_action_validators
+from ai.backend.manager.api.adapters.user.config import UserConfigAdapter
+>>>>>>> 3832f8c87 (fix(BAI-654): import HookPluginContext from hook_context in component conftests (#17100))
 from ai.backend.manager.api.rest.domainconfig.handler import DomainConfigHandler
 from ai.backend.manager.api.rest.domainconfig.registry import register_domainconfig_routes
 from ai.backend.manager.api.rest.groupconfig.handler import GroupConfigHandler

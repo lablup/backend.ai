@@ -21,8 +21,14 @@ from ai.backend.common.dto.manager.user import (
     PurgeUserRequest,
     UserStatus,
 )
+<<<<<<< HEAD
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
+=======
+from ai.backend.common.plugin.hook_context import HookPluginContext
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import Concern, ConcernMeta, GroupMeta
+>>>>>>> 3832f8c87 (fix(BAI-654): import HookPluginContext from hook_context in component conftests (#17100))
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
 from ai.backend.manager.api.rest.admin.handler import AdminHandler
 from ai.backend.manager.api.rest.admin.registry import register_admin_routes

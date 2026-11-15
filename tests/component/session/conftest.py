@@ -14,6 +14,29 @@ from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+<<<<<<< HEAD
+=======
+from ai.backend.common.data.entity.agent import AgentEntityType
+from ai.backend.common.data.entity.domain import DomainEntityType
+from ai.backend.common.data.entity.kernel import KernelFieldType
+from ai.backend.common.data.entity.kernel_group import KernelGroupFieldType
+from ai.backend.common.data.entity.kernel_group_environ import KernelGroupEnvironFieldType
+from ai.backend.common.data.entity.kernel_group_resource_slot import (
+    KernelGroupResourceSlotFieldType,
+)
+from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.resource_group import (
+    ResourceGroupEntityType,
+    ResourceGroupID,
+    ResourceGroupName,
+)
+from ai.backend.common.data.entity.resource_preset import ResourcePresetEntityType
+from ai.backend.common.data.entity.session import SessionEntityType, SessionID
+from ai.backend.common.data.entity.types import GlobalEntityType
+from ai.backend.common.data.entity.user import UserEntityType
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
+from ai.backend.common.plugin.hook_context import HookPluginContext
+>>>>>>> 3832f8c87 (fix(BAI-654): import HookPluginContext from hook_context in component conftests (#17100))
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import AgentId, ResourceSlot, SessionId, SessionTypes
 from ai.backend.manager.actions.validators import ActionValidators

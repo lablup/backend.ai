@@ -20,6 +20,10 @@ from ai.backend.common.data.permission.types import (
     ScopeType,
 )
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+<<<<<<< HEAD
+=======
+from ai.backend.common.plugin.hook_context import HookPluginContext
+>>>>>>> 3832f8c87 (fix(BAI-654): import HookPluginContext from hook_context in component conftests (#17100))
 from ai.backend.common.types import (
     HostPortPair,
     QuotaScopeID,
