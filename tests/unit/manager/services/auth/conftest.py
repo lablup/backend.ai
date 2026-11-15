@@ -2,7 +2,6 @@
 
 from datetime import timedelta
 from unittest.mock import AsyncMock, MagicMock
-from uuid import UUID, uuid4
 
 import pytest
 
@@ -55,11 +54,6 @@ def mock_group_repository() -> AsyncMock:
     repo = AsyncMock(spec=ProjectRepository)
     repo.project_id_by_name_in_domain.return_value = None
     return repo
-
-
-@pytest.fixture
-def sample_client_type_id() -> UUID:
-    return uuid4()
 
 
 @pytest.fixture
