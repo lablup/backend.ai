@@ -10,6 +10,7 @@ from sqlalchemy.orm import selectinload
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.domain import DomainName
 from ai.backend.common.data.entity.entity_share import EntityShareID
 from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
@@ -64,6 +65,7 @@ from ai.backend.manager.errors.storage import (
 )
 from ai.backend.manager.errors.user import KeyPairNotFound, UserNotFound
 from ai.backend.manager.models.agent import agents
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.entity_share.creators import EntityShareCreator
 from ai.backend.manager.models.entity_share.lookups import HeldShareLookup
 from ai.backend.manager.models.entity_share.purgers import EntitySharePendingOfferBatchPurger
@@ -259,6 +261,9 @@ class VfolderRepository:
     ) -> VFolderHostPermissionMap:
         """
         Get the allowed VFolder hosts for a user.
+
+        A project unions its domain's hosts with its own. Otherwise the user's
+        domain's hosts are unioned with the default keypair policy's.
         """
         async with self._db.begin_readonly_session_read_committed() as db_session:
             if group_uuid:
@@ -267,13 +272,37 @@ class VfolderRepository:
                 )
                 if group_row is None:
                     raise ProjectNotFound(f"Project with {group_uuid} not found.")
+                domain_allowed_hosts = await self._fetch_domain_allowed_vfolder_hosts(
+                    db_session, DomainName(group_row.domain_name)
+                )
+                return VFolderHostPermissionMap(
+                    domain_allowed_hosts | group_row.allowed_vfolder_hosts
+                )
 
-                return group_row.allowed_vfolder_hosts
-
-            allowed_hosts = await self._fetch_default_keypair_vfolder_hosts(db_session, user_uuid)
-            if allowed_hosts is None:
+            keypair_allowed_hosts = await self._fetch_default_keypair_vfolder_hosts(
+                db_session, user_uuid
+            )
+            if keypair_allowed_hosts is None:
                 raise KeyPairNotFound("The user has no default keypair.")
-            return allowed_hosts
+            user_domain_name = await db_session.scalar(
+                sa.select(UserRow.domain_name).where(UserRow.uuid == user_uuid)
+            )
+            if user_domain_name is None:
+                raise UserNotFound(f"User with UUID {user_uuid} not found.")
+            domain_allowed_hosts = await self._fetch_domain_allowed_vfolder_hosts(
+                db_session, DomainName(user_domain_name)
+            )
+            return VFolderHostPermissionMap(domain_allowed_hosts | keypair_allowed_hosts)
+
+    async def _fetch_domain_allowed_vfolder_hosts(
+        self, db_session: SASession, domain_name: DomainName
+    ) -> VFolderHostPermissionMap:
+        domain_allowed_hosts: VFolderHostPermissionMap | None = await db_session.scalar(
+            sa.select(DomainRow.allowed_vfolder_hosts).where(
+                DomainRow.name == domain_name, DomainRow.is_active
+            )
+        )
+        return domain_allowed_hosts or VFolderHostPermissionMap()
 
     async def _fetch_default_keypair_vfolder_hosts(
         self, db_session: SASession, user_uuid: uuid.UUID
