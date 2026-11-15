@@ -72,6 +72,7 @@ from ai.backend.manager.errors.storage import (
 )
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.agent import agents
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs
@@ -367,6 +368,9 @@ class VfolderRepository:
     ) -> VFolderHostPermissionMap:
         """
         Get the allowed VFolder hosts for a user.
+
+        A project unions its domain's hosts with its own. Otherwise the user's
+        domain's hosts are unioned with the main keypair policy's.
         """
         async with self._db.begin_readonly_session_read_committed() as db_session:
             if group_uuid:
@@ -375,8 +379,12 @@ class VfolderRepository:
                 )
                 if group_row is None:
                     raise ProjectNotFound(f"Project with {group_uuid} not found.")
-
-                return group_row.allowed_vfolder_hosts
+                domain_allowed_hosts = await self._fetch_domain_allowed_vfolder_hosts(
+                    db_session, group_row.domain_name
+                )
+                return VFolderHostPermissionMap(
+                    domain_allowed_hosts | group_row.allowed_vfolder_hosts
+                )
 
             user_row: UserRow | None = await db_session.scalar(
                 sa.select(UserRow)
@@ -391,8 +399,25 @@ class VfolderRepository:
                 raise ObjectNotFound(object_name="User keypair")
             if user_row.main_keypair.resource_policy_row is None:
                 raise ObjectNotFound(object_name="User keypair resource policy")
+            domain_allowed_hosts = await self._fetch_domain_allowed_vfolder_hosts(
+                db_session, user_row.domain_name
+            )
+            return VFolderHostPermissionMap(
+                domain_allowed_hosts
+                | user_row.main_keypair.resource_policy_row.allowed_vfolder_hosts
+            )
 
-            return user_row.main_keypair.resource_policy_row.allowed_vfolder_hosts
+    async def _fetch_domain_allowed_vfolder_hosts(
+        self, db_session: SASession, domain_name: str | None
+    ) -> VFolderHostPermissionMap:
+        if domain_name is None:
+            return VFolderHostPermissionMap()
+        domain_allowed_hosts: VFolderHostPermissionMap | None = await db_session.scalar(
+            sa.select(DomainRow.allowed_vfolder_hosts).where(
+                DomainRow.name == domain_name, DomainRow.is_active
+            )
+        )
+        return domain_allowed_hosts or VFolderHostPermissionMap()
 
     @vfolder_repository_resilience.apply()
     async def get_user_with_keypair_policy_vfolder_hosts(
