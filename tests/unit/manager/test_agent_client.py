@@ -5,11 +5,11 @@ from uuid import uuid4
 import pytest
 
 from ai.backend.common.clients.agent.client import AgentClient
+from ai.backend.common.kernel_creation_config import KernelCreationConfig
 from ai.backend.common.types import (
     AgentId,
     ClusterInfo,
     ImageConfig,
-    KernelCreationConfig,
     KernelId,
     SessionId,
 )
