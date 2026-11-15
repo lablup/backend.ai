@@ -23,11 +23,12 @@ from ai.backend.common.data.entity.notification import (
 )
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.session import SessionEntityType
-from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.types import EntityType, GlobalEntityType
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.permission.types import Permission, RoleStatus
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import (
     QuotaScopeID,
     QuotaScopeType,
@@ -60,6 +61,7 @@ from ai.backend.manager.data.vfolder.types import (
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.domain.row import domains
 from ai.backend.manager.models.entity_share.row import EntityShareRow
+from ai.backend.manager.models.keypair.ssh_key_validator import SSHKeyValidator
 from ai.backend.manager.models.project.row import ProjectRow, ProjectType
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
@@ -70,19 +72,28 @@ from ai.backend.manager.models.vfolder.row import vfolders
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
+from ai.backend.manager.repositories.auth.repository import AuthRepository
+from ai.backend.manager.repositories.client_ip_masking.repository import (
+    ClientIPMaskingRepository,
+)
 from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
     ResourcePolicyOpsProvider,
 )
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
+from ai.backend.manager.repositories.project.repository import ProjectRepository
 from ai.backend.manager.repositories.rbac.permission_check_repository import (
     RbacPermissionCheckRepository,
 )
 from ai.backend.manager.repositories.user.repository import UserRepository
+from ai.backend.manager.repositories.user_resource_policy.repository import (
+    UserResourcePolicyRepository,
+)
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.auth.processors import AuthProcessors
+from ai.backend.manager.services.auth.service import AuthService
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user.service import UserService
 from ai.backend.manager.services.vfolder.processors.file import VFolderFileProcessors
@@ -573,3 +584,53 @@ async def user_system_role(
             UserRoleRow.__table__.delete().where(UserRoleRow.__table__.c.role_id == role_id)
         )
         await conn.execute(RoleRow.__table__.delete().where(RoleRow.__table__.c.id == role_id))
+
+
+@pytest.fixture()
+def auth_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    processor_registry: ProcessorRegistry[Any],
+    config_provider: ManagerConfigProvider,
+    hook_plugin_ctx: HookPluginContext,
+    valkey_clients: ValkeyClients,
+    storage_manager: StorageSessionManager,
+) -> AuthProcessors:
+    """Real AuthProcessors wired with real AuthService and AuthRepository."""
+    repo = AuthRepository(
+        database_engine,
+        V2DBOpsProvider(database_engine),
+        KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+    )
+    user_resource_policy_repository = UserResourcePolicyRepository(database_engine)
+    user_repository = UserRepository(
+        database_engine,
+        V2DBOpsProvider(database_engine),
+        ShareOpsProvider(database_engine),
+        ResourcePolicyOpsProvider(database_engine),
+        KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+    )
+    group_repository = ProjectRepository(
+        database_engine,
+        V2DBOpsProvider(database_engine),
+        ResourcePolicyOpsProvider(database_engine),
+        config_provider,
+        valkey_clients.stat,
+        storage_manager,
+    )
+    service = AuthService(
+        hook_plugin_ctx=hook_plugin_ctx,
+        auth_repository=repo,
+        config_provider=config_provider,
+        valkey_session_client=valkey_clients.session,
+        user_resource_policy_repository=user_resource_policy_repository,
+        user_repository=user_repository,
+        group_repository=group_repository,
+        ssh_key_validator=SSHKeyValidator(),
+        client_ip_masking_repository=ClientIPMaskingRepository(database_engine),
+        key_provider_pool=KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+    )
+    return AuthProcessors(
+        processor_registry.group(GroupMeta(GlobalEntityType())),
+        processor_registry.group(GroupMeta(UserEntityType())),
+        service,
+    )

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import AsyncIterator, Callable, Coroutine
+from collections.abc import AsyncIterator, Callable, Coroutine, Iterator
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
@@ -9,12 +9,15 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.agent import AgentEntityType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
 from ai.backend.common.data.entity.resource_preset import ResourcePresetEntityType
 from ai.backend.common.data.entity.user import UserEntityType
+from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
@@ -305,3 +308,20 @@ async def target_preset(
 @pytest.fixture(autouse=True)
 def _act_as_superadmin(acting_superadmin: None) -> None:
     """These tests drive processors directly, so they supply the caller the gates read."""
+
+
+@pytest.fixture()
+def acting_superadmin() -> Iterator[None]:
+    """Run the test body as a superadmin, the caller the action gates read."""
+    with with_user_context(
+        UserData(
+            user_id=uuid.uuid4(),
+            is_authorized=True,
+            is_admin=True,
+            is_superadmin=True,
+            role=UserRole.SUPERADMIN,
+            domain_name="default",
+            domain_id=DomainID(uuid.uuid4()),
+        )
+    ):
+        yield
