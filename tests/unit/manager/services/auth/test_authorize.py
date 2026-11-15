@@ -13,7 +13,8 @@ from ai.backend.common.data.entity.resource_policy import (
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.auth.types import AuthTokenType
 from ai.backend.common.exception import InvalidAPIParameters
-from ai.backend.common.plugin.hook import HookPluginContext, HookResult, HookResults
+from ai.backend.common.plugin.hook import HookResult, HookResults
+from ai.backend.common.plugin.hook_context import HookPluginContext
 from ai.backend.manager.config.unified import AuthConfig
 from ai.backend.manager.data.auth.login_session_types import LoginAttemptResult
 from ai.backend.manager.data.resource.types import UserResourcePolicyData

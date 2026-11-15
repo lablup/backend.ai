@@ -35,8 +35,8 @@ from ai.backend.common.plugin.hook import (
     FIRST_COMPLETED,
     PASSED,
     REJECTED,
-    HookPluginContext,
 )
+from ai.backend.common.plugin.hook_context import HookPluginContext
 from ai.backend.common.types import AccessKey, SecretKey
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.config.provider import ManagerConfigProvider

@@ -17,7 +17,8 @@ from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEve
 from ai.backend.common.events.event_types.session.broadcast import SchedulingBroadcastEvent
 from ai.backend.common.events.types import AbstractBroadcastEvent
 from ai.backend.common.exception import InvalidAPIParameters
-from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
+from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED
+from ai.backend.common.plugin.hook_context import HookPluginContext
 from ai.backend.common.types import (
     ArchName,
     PreemptionOrder,

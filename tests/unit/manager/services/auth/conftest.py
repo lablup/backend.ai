@@ -8,7 +8,7 @@ import pytest
 
 from ai.backend.common.auth.password import PasswordHashAlgorithm
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
-from ai.backend.common.plugin.hook import HookPluginContext
+from ai.backend.common.plugin.hook_context import HookPluginContext
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import AuthConfig, ManagerConfig
 from ai.backend.manager.data.client_ip.masking import ClientIPMasker, ClientIPMaskingMode

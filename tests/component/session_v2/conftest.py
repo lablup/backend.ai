@@ -152,7 +152,7 @@ if TYPE_CHECKING:
         VirtualEntitySeeder,
     )
 
-    from ai.backend.common.plugin.hook import HookPluginContext
+    from ai.backend.common.plugin.hook_context import HookPluginContext
 
 AgentFactoryFunc = Callable[[dict[str, str]], Coroutine[Any, Any, str]]
 
