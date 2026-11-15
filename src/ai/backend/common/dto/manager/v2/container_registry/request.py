@@ -13,7 +13,7 @@ from pydantic import Field, field_validator
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.common import NonEmptyList
-from ai.backend.common.exception import InvalidContainerRegistryURL
+from ai.backend.common.errors.container_registry import InvalidContainerRegistryURL
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 from .types import (
