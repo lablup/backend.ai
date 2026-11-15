@@ -20,7 +20,7 @@ from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, P
 from ai.backend.manager.actions.v2.ops.result import BatchOpsResult, EntityOpsResult
 from ai.backend.manager.api.adapters.object_storage.adapter import ObjectStorageAdapter
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
-from ai.backend.manager.defs import SECRET_KEY_PLACEHOLDER
+from ai.backend.manager.placeholders import SECRET_KEY_PLACEHOLDER
 
 _SECRET_KEY = "real-secret"
 
