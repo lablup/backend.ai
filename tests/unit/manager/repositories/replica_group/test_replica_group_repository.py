@@ -44,9 +44,7 @@ from ai.backend.manager.data.session_group.types import (
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
-from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow
-from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
 from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
@@ -191,7 +189,6 @@ async def db_with_cleanup(
             EntityMembershipFieldRow,
             ScopeBindingRow,
             EntityLabelRow,
-            PermissionRow,
             DomainRow,
             ResourceGroupRow,
             ResourcePresetRow,
@@ -201,7 +198,6 @@ async def db_with_cleanup(
             RoleRow,
             UserRoleRow,
             UserRow,
-            KeyPairRow,
             ProjectRow,
             EndpointRow,
             SessionGroupRow,
