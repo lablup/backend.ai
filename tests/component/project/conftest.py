@@ -442,60 +442,6 @@ async def target_project_fixture(
 
 
 @pytest.fixture()
-async def other_project_fixture(
-    db_engine: SAEngine,
-    domain_fixture: DomainFixtureData,
-    resource_policy_fixture: str,
-) -> AsyncIterator[uuid.UUID]:
-    """Insert another project for cross-project isolation tests."""
-    project_id = uuid.uuid4()
-    async with db_engine.begin() as conn:
-        await conn.execute(
-            sa.insert(ProjectRow.__table__).values(
-                id=project_id,
-                name=f"other-project-{secrets.token_hex(6)}",
-                description="Secondary test project",
-                is_active=True,
-                domain_name=domain_fixture.domain_name,
-                resource_policy=resource_policy_fixture,
-            )
-        )
-        virtual_entity_id = uuid.uuid4()
-        await conn.execute(
-            sa.insert(VirtualEntityRow.__table__).values(
-                id=virtual_entity_id,
-                entity_type=ProjectEntityType(),
-                entity_id=project_id,
-            )
-        )
-        await conn.execute(
-            sa.insert(EntityMembershipRow.__table__).values(
-                virtual_entity_id=virtual_entity_id,
-                member_entity_id=virtual_entity_id,
-                capped=False,
-            )
-        )
-        await conn.execute(
-            sa.insert(ScopeBindingRow.__table__).values(
-                virtual_entity_id=virtual_entity_id,
-                scope_entity_id=virtual_entity_id,
-                permission_cap=None,
-            )
-        )
-    yield project_id
-    async with db_engine.begin() as conn:
-        await conn.execute(
-            VirtualEntityRow.__table__.delete().where(
-                VirtualEntityRow.__table__.c.entity_type == ProjectEntityType(),
-                VirtualEntityRow.__table__.c.entity_id == project_id,
-            )
-        )
-        await conn.execute(
-            ProjectRow.__table__.delete().where(ProjectRow.__table__.c.id == project_id)
-        )
-
-
-@pytest.fixture()
 async def member_role_fixture(
     db_engine: SAEngine,
     target_project_fixture: uuid.UUID,
