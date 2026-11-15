@@ -101,9 +101,9 @@ instead.
 
 ## Test batches
 
-`tests/component/BUILD` sets `batch_compatibility_tag="component"` for every
-`python_tests` target under it, so Pants runs up to `[test].batch_size` files in one
-pytest process. Files in a batch share one database, etcd namespace and redis, so a
+`tests/component/BUILD` and `tests/unit/common/BUILD` set `batch_compatibility_tag`
+(`component`, `unit-common`) for every `python_tests` target under them, so Pants runs
+up to `[test].batch_size` files in one pytest process. Files in a batch share one database, etcd namespace and redis, so a
 test must clean up what its fixtures wrote.
 
 | Rule | |
