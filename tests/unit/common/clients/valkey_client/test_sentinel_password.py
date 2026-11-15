@@ -123,7 +123,7 @@ class TestValkeySentinelClientPasswordUsage:
             mock_create.return_value = AsyncMock()
             await sentinel_client_with_separate_passwords.connect()
 
-            mock_credentials.assert_called_once_with(password=MASTER_PASSWORD)
+            mock_credentials.assert_called_once_with(password=MASTER_PASSWORD, username=None)
 
 
 class TestSentinelPasswordPropagation:

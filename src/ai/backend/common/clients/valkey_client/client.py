@@ -68,6 +68,7 @@ Logger.init(LogLevel.OFF)  # Disable Glide logging by default
 @dataclass
 class ValkeyStandaloneTarget:
     address: str
+    username: str | None = None
     password: str | None = None
     request_timeout: int | None = None
     use_tls: bool = False
@@ -82,6 +83,7 @@ class ValkeyStandaloneTarget:
             raise ValueError("RedisTarget must have an address for standalone mode")
         return cls(
             address=valkey_target.addr,
+            username=valkey_target.username,
             password=valkey_target.password,
             request_timeout=valkey_target.request_timeout,
             use_tls=valkey_target.use_tls,
@@ -93,6 +95,7 @@ class ValkeyStandaloneTarget:
 class ValkeySentinelTarget:
     sentinel_addresses: Iterable[str]
     service_name: str
+    username: str | None = None
     password: str | None = None
     sentinel_password: str | None = None
     request_timeout: int | None = None
@@ -113,6 +116,7 @@ class ValkeySentinelTarget:
         return cls(
             sentinel_addresses=valkey_target.sentinel,
             service_name=valkey_target.service_name,
+            username=valkey_target.username,
             password=valkey_target.password,
             sentinel_password=valkey_target.sentinel_password,
             request_timeout=valkey_target.request_timeout,
@@ -213,7 +217,9 @@ class ValkeyStandaloneClient(AbstractValkeyClient):
         addresses = [NodeAddress(host=target_host, port=target_port)]
 
         credentials = (
-            ServerCredentials(password=self._target.password) if self._target.password else None
+            ServerCredentials(password=self._target.password, username=self._target.username)
+            if self._target.password
+            else None
         )
 
         config = GlideClientConfiguration(
@@ -331,7 +337,9 @@ class ValkeySentinelClient(AbstractValkeyClient):
         master_address = await self._sentinel_monitor.get_master()
         addresses = [NodeAddress(host=str(master_address.host), port=master_address.port)]
         credentials = (
-            ServerCredentials(password=self._target.password) if self._target.password else None
+            ServerCredentials(password=self._target.password, username=self._target.username)
+            if self._target.password
+            else None
         )
 
         config = GlideClientConfiguration(
@@ -469,6 +477,7 @@ def create_valkey_client(
         addr=valkey_target.addr,
         sentinel=valkey_target.sentinel,
         service_name=valkey_target.service_name,
+        username=valkey_target.username,
         password=valkey_target.password,
         sentinel_password=valkey_target.sentinel_password,
         request_timeout=_MONITOR_REQUEST_TIMEOUT,

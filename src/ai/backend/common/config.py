@@ -129,11 +129,19 @@ redis_default_config = {
     "addr": None,
     "sentinel": None,
     "service_name": None,
+    "username": None,
     "password": None,
     "redis_helper_config": redis_helper_default_config,
     "use_tls": False,
     "tls_skip_verify": False,
 }
+
+
+def _check_username_requires_password(value: dict[str, Any]) -> dict[str, Any]:
+    if value.get("username") and not value.get("password"):
+        raise t.DataError("`username` requires `password` to be set to a non-empty value.")
+    return value
+
 
 redis_config_iv = t.Dict({
     t.Key("addr", default=redis_default_config["addr"]): t.Null | tx.HostPortPair,
@@ -141,6 +149,7 @@ redis_config_iv = t.Dict({
         "sentinel", default=redis_default_config["sentinel"]
     ): t.Null | tx.DelimiterSeperatedList(tx.HostPortPair),
     t.Key("service_name", default=redis_default_config["service_name"]): t.Null | t.String,
+    t.Key("username", default=redis_default_config["username"]): t.Null | t.String,
     t.Key("password", default=redis_default_config["password"]): t.Null | t.String,
     t.Key("use_tls", default=redis_default_config["use_tls"]): t.Bool,
     t.Key("tls_skip_verify", default=redis_default_config["tls_skip_verify"]): t.Bool,
@@ -157,6 +166,7 @@ redis_config_iv = t.Dict({
                 "sentinel", default=redis_default_config["sentinel"]
             ): t.Null | tx.DelimiterSeperatedList(tx.HostPortPair),
             t.Key("service_name", default=redis_default_config["service_name"]): t.Null | t.String,
+            t.Key("username", default=redis_default_config["username"]): t.Null | t.String,
             t.Key("password", default=redis_default_config["password"]): t.Null | t.String,
             t.Key("use_tls", default=redis_default_config["use_tls"]): t.Bool,
             t.Key("tls_skip_verify", default=redis_default_config["tls_skip_verify"]): t.Bool,
@@ -164,9 +174,10 @@ redis_config_iv = t.Dict({
                 "redis_helper_config",
                 default=redis_helper_default_config,
             ): redis_helper_config_iv,
-        }).allow_extra("*"),
+        }).allow_extra("*")
+        & t.Call(_check_username_requires_password),
     ),
-}).allow_extra("*")
+}).allow_extra("*") & t.Call(_check_username_requires_password)
 
 vfolder_config_iv = t.Dict({
     tx.AliasedKey(["mount", "_mount"], default=None): t.Null | tx.Path(type="dir"),
