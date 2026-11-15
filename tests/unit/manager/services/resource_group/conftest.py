@@ -85,7 +85,8 @@ from ai.backend.manager.repositories.rbac.relation_repository import RbacRelatio
 from ai.backend.manager.repositories.resource_group.repository import ResourceGroupRepository
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.services.resource_group.service import ResourceGroupService
-from ai.backend.testutils.db import with_global_entities, with_tables
+from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.db_global import with_global_entities
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 
