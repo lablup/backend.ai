@@ -13,6 +13,8 @@ for attempt in 1 2 3 4 5 6; do
     exit 0
   fi
   echo "get-pants.sh failed (attempt ${attempt}/6)" >&2
-  sleep $((attempt * 10))
+  if [ "$attempt" -lt 6 ]; then
+    sleep $((attempt * 10))
+  fi
 done
 exit 1
