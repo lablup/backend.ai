@@ -70,7 +70,6 @@ from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.specs.searcher import ScopedSearcher
 from ai.backend.manager.models.storage_namespace.scopes import ObjectStorageNamespaceTarget
 from ai.backend.manager.models.storage_namespace.searchers import StorageNamespaceSearcher
-from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.search_auto_scaling_rules import (
     SearchAutoScalingRulesAction,
 )
@@ -141,7 +140,7 @@ def registry(denying_scope: _DenyingScopeValidator) -> ProcessorRegistry[Any]:
                 scope=[denying_scope],
                 global_scope=[RefusingGlobalActionValidator()],
             ),
-            repository=OpsRepository(MagicMock()),
+            repository=MagicMock(),
         )
     )
 
@@ -160,7 +159,7 @@ def bulk_registry(denying_bulk: _DenyingBulkValidator) -> ProcessorRegistry[Any]
                 atomic_bulk=[denying_bulk],
                 global_scope=[RefusingGlobalActionValidator()],
             ),
-            repository=OpsRepository(MagicMock()),
+            repository=MagicMock(),
         )
     )
 

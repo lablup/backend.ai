@@ -100,7 +100,6 @@ from ai.backend.manager.models.audit_log.owner_candidates import (
     AuditLogOwnerCandidates,
     AuditLogScopeOwnerCandidates,
 )
-from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.services.agent.actions.bulk_get import BulkGetAgentsAction
 from ai.backend.manager.services.agent.actions.bulk_load_container_counts import (
     BulkLoadContainerCountsAction,
@@ -468,7 +467,7 @@ def _ops_registry() -> ProcessorRegistry[Any]:
         ProcessorDependencies(
             monitors=ActionMonitors(),
             validators=ActionValidators(global_scope=[RefusingGlobalActionValidator()]),
-            repository=OpsRepository(MagicMock()),
+            repository=MagicMock(),
         )
     )
 
