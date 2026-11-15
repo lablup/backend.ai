@@ -21,6 +21,20 @@ class UserNotFound(BackendAIError, web.HTTPNotFound):
         )
 
 
+class UserNotActive(BackendAIError, web.HTTPForbidden):
+    """Raised when a user whose password matched is refused for not being active."""
+
+    error_type = "https://api.backend.ai/probs/user-not-active"
+    error_title = "The user is not active."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.USER,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.FORBIDDEN,
+        )
+
+
 class UserConflict(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/user-conflict"
     error_title = "The user already exists."
