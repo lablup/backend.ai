@@ -28,13 +28,14 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
     When,
 )
-from bai_scenario.components.answers import MissingResponse, TheFailedItemIsRefused
+from bai_scenario.components.answers import MissingResponse
 from bai_scenario.components.container_registry import (
     MISSING_ENTITY_ID,
     ManyRegistriesAndACaller,
     ManyRegistriesAndSomeone,
 )
 from bai_scenario.components.domain import Mentions
+from bai_scenario.components.the_failed_item_is_refused import TheFailedItemIsRefused
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
