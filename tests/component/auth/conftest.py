@@ -20,7 +20,7 @@ from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.types import GlobalEntityType
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.plugin.hook import HookPluginContext
+from ai.backend.common.plugin.hook_context import HookPluginContext
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.api.adapters.auth.adapter import AuthAdapter

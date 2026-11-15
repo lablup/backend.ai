@@ -25,7 +25,7 @@ from ai.backend.common.dto.manager.user import (
     PurgeUserRequest,
     UserStatus,
 )
-from ai.backend.common.plugin.hook import HookPluginContext
+from ai.backend.common.plugin.hook_context import HookPluginContext
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import Concern, ConcernMeta, GroupMeta
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
