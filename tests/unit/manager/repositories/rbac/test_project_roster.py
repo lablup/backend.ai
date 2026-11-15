@@ -45,7 +45,6 @@ from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
     EntityMembershipCapRow,
@@ -107,7 +106,6 @@ class TestEnrollUsersInProject:
                 ProjectRow,
                 ContainerRegistryRow,
                 ImageRow,
-                VFolderRow,
                 EndpointRow,
                 SessionRow,
                 AgentRow,
@@ -750,7 +748,6 @@ class TestWithdrawUsersFromProject:
                 ProjectRow,
                 ContainerRegistryRow,
                 ImageRow,
-                VFolderRow,
                 EndpointRow,
                 SessionRow,
                 AgentRow,
