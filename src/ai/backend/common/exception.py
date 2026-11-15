@@ -622,58 +622,6 @@ class ParameterNotParsedError(BackendAIError, web.HTTPInternalServerError):
         )
 
 
-class BgtaskNotRegisteredError(BackendAIError, web.HTTPInternalServerError):
-    error_type = "https://api.backend.ai/probs/bgtask-not-registered"
-    error_title = "Background Task Not Registered"
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.BGTASK,
-            operation=ErrorOperation.EXECUTE,
-            error_detail=ErrorDetail.NOT_IMPLEMENTED,
-        )
-
-
-class BgtaskNotFound(BackendAIError, web.HTTPNotFound):
-    error_type = "https://api.backend.ai/probs/bgtask-not-found"
-    error_title = "Background Task Not Found"
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.BGTASK,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
-        )
-
-
-class BgtaskFailedError(BackendAIError, web.HTTPInternalServerError):
-    error_type = "https://api.backend.ai/probs/bgtask-failed"
-    error_title = "Background Task Failed"
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.BGTASK,
-            operation=ErrorOperation.EXECUTE,
-            error_detail=ErrorDetail.INTERNAL_ERROR,
-        )
-
-
-class BgtaskCancelledError(BackendAIError, web.HTTPInternalServerError):
-    error_type = "https://api.backend.ai/probs/bgtask-cancelled"
-    error_title = "Background Task Cancelled"
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.BGTASK,
-            operation=ErrorOperation.EXECUTE,
-            error_detail=ErrorDetail.CANCELED,
-        )
-
-
 class UnreachableError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/unreachable"
     error_title = "Unreachable"
@@ -1221,19 +1169,6 @@ class ContainerRegistryGroupsAlreadyAssociated(BackendAIError, web.HTTPConflict)
             domain=ErrorDomain.CONTAINER_REGISTRY,
             operation=ErrorOperation.UPDATE,
             error_detail=ErrorDetail.ALREADY_EXISTS,
-        )
-
-
-class InvalidNotificationChannelSpec(BackendAIError, web.HTTPBadRequest):
-    error_type = "https://api.backend.ai/probs/invalid-channel-spec"
-    error_title = "Invalid Notification Channel Specification."
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.NOTIFICATION,
-            operation=ErrorOperation.REQUEST,
-            error_detail=ErrorDetail.BAD_REQUEST,
         )
 
 
