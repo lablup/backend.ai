@@ -18,9 +18,9 @@ from ai.backend.common.plugin.hook import (
     PASSED,
     REJECTED,
     HookPlugin,
-    HookPluginContext,
     Reject,
 )
+from ai.backend.common.plugin.hook_context import HookPluginContext
 
 
 class DummyPlugin(AbstractPlugin):

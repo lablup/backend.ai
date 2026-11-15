@@ -11,7 +11,8 @@ import pytest
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.plugin.hook import FIRST_COMPLETED, PASSED, HookPluginContext
+from ai.backend.common.plugin.hook import FIRST_COMPLETED, PASSED
+from ai.backend.common.plugin.hook_context import HookPluginContext
 from ai.backend.manager.data.auth.types import AuthorizingUser
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.plugin.keypair.hook import KeypairAuthHookPlugin

@@ -5,7 +5,8 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import override
 
-from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
+from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED
+from ai.backend.common.plugin.hook_context import HookPluginContext
 from ai.backend.logging.structured import StructuredLogger
 
 from .base import PluginDependency, PluginsInput
