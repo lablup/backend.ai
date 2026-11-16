@@ -30,7 +30,7 @@ class DeploymentError(BackendAIError):
         )
 
 
-class InvalidEndpointState(DeploymentError, web.HTTPBadRequest):
+class InvalidEndpointState(DeploymentError, web.HTTPConflict):
     """Raised when an endpoint is in an invalid state for the requested operation."""
 
     error_type = "https://api.backend.ai/probs/invalid-endpoint-state"
