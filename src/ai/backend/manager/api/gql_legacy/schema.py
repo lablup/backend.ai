@@ -1724,13 +1724,13 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
                 raise InsufficientPrivilege
             domain_name = client_domain
         elif client_role == UserRole.USER:
-            (user_groups,) = await Group.batch_load_by_user(
+            (user_projects,) = await Group.batch_load_by_user(
                 ctx,
                 [client_user_id],
                 type=project_types,
                 is_active=is_active,
             )
-            return cast(Sequence[Group], user_groups)
+            return cast(Sequence[Group], user_projects)
         else:
             raise InvalidAPIParameters("Unknown client role")
         return await Group.load_all(
