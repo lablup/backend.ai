@@ -4,8 +4,7 @@
 
 Scenario: incomplete 12 / 47
 
-- built from ops (22)
-  - admin_search: representative success ✓ · representative rejection ✓
+- built from ops (19)
   - admin_search_replicas: representative success ✓ · representative rejection ✓
   - admin_search_revisions: representative success ✓ · representative rejection ✓
   - batch_load_access_tokens_by_ids: representative success ✓ · representative rejection ✓
@@ -19,8 +18,6 @@ Scenario: incomplete 12 / 47
   - get_access_token: representative success ✓ · representative rejection ✓
   - get_replica: representative success ✓ · representative rejection ✓
   - get_revision: representative success ✓ · representative rejection ✓
-  - project_search: representative success ✓ · representative rejection ✓
-  - scoped_search: representative success ✓ · representative rejection ✓
   - search_access_tokens: representative success ✓ · representative rejection ✓
   - search_policies: representative success ✓ · representative rejection ✓
   - search_replicas: representative success ✓ · representative rejection ✓
@@ -29,10 +26,11 @@ Scenario: incomplete 12 / 47
   - search_rules: representative success ✓ · representative rejection ✓
 - ops + direct implementation (1)
   - get_current_revision: success absent · rejection present 1 (get_ops, single_entity): SCENARIO-GAP
-- direct implementation (24)
+- direct implementation (27)
   - activate_revision: success absent · rejection absent (single_entity): SCENARIO-GAP
   - add_revision: success present 4 · rejection present 7 (single_entity)
   - admin_refresh_deployment_revisions: success absent · rejection absent (global_scope): SCENARIO-GAP
+  - admin_search: success present 1 · rejection present 1 (global_scope)
   - bulk_delete_access_tokens: success present 2 · rejection absent (partial_bulk_field): SCENARIO-GAP
   - bulk_delete_rules: success absent · rejection absent (partial_bulk): SCENARIO-GAP
   - create: success present 3 · rejection present 2 (scope)
@@ -45,22 +43,17 @@ Scenario: incomplete 12 / 47
   - partial_bulk_purge_access_tokens: success present 2 · rejection absent (partial_bulk_field): SCENARIO-GAP
   - partial_bulk_purge_rules: success present 3 · rejection absent (partial_bulk_field): SCENARIO-GAP
   - partial_bulk_update_rules: success present 2 · rejection absent (partial_bulk_field): SCENARIO-GAP
+  - project_search: success present 1 · rejection present 1 (scope)
   - purge_access_token: success present 1 · rejection present 1 (single_field)
   - purge_rule: success present 1 · rejection present 1 (single_entity)
   - replace_options: success present 4 · rejection present 3 (single_entity)
+  - scoped_search: success present 1 · rejection present 1 (scope)
   - search_revision_resource_slots: success present 1 · rejection present 1 (single_field)
   - sync_replicas: success present 1 · rejection present 1 (single_entity)
   - update: success present 5 · rejection present 2 (single_entity)
   - update_route_traffic: success present 1 · rejection present 1 (single_field)
   - update_rule: success present 1 · rejection present 1 (single_entity)
   - upsert_policy: success present 1 · rejection present 1 (single_entity)
-
-**admin_search**
-
-| scenario | verdict |
-|---|---|
-| [when three deployments exist and a superadmin searches everything without a filter, all three are counted](#searching-the-superadmin-counts-every-deployment) | answered |
-| [when a user granted deployment read but not a superadmin searches everything, the role rejects it; the role checks this operation, not the permission graph](#searching-a-user-granted-read-may-not-search-every-deployment) | rejected |
 
 **admin_search_replicas**
 
@@ -140,20 +133,6 @@ Scenario: incomplete 12 / 47
 | [when a user granted deployment read reads a revision by an id nothing answers to, the call is rejected for the same reason as an id the user cannot see](#reading_revisions-a-revision-id-nothing-answers-to-is-refused-as-unresolvable) | rejected |
 | [when a user with no deployment grant reads a revision by id, the call is rejected because the key cannot be decrypted](#reading_revisions-a-user-granted-nothing-may-not-read-a-revision) | rejected |
 
-**project_search**
-
-| scenario | verdict |
-|---|---|
-| [when deployments are split across two projects and a user granted read on only one side searches that project, only that project's deployments come back](#searching-searching-a-project-finds-only-its-own-deployments) | answered |
-| [when a user without read permission on the project searches the project, the call is rejected for lack of permission](#searching-a-user-granted-nothing-may-not-search-a-project) | rejected |
-
-**scoped_search**
-
-| scenario | verdict |
-|---|---|
-| [when two users each created a deployment in the same project and the one granted read in their own scope searches their own, only what they created comes back](#searching-searching-my-own-finds-only-what-i-made) | answered |
-| [when a user not granted read in their own scope searches their own, the call is rejected for lack of permission; here too the permission checks it rather than only narrowing the scope](#searching-a-user-granted-nothing-may-not-search-even-their-own) | rejected |
-
 **search_access_tokens**
 
 | scenario | verdict |
@@ -220,6 +199,13 @@ Scenario: incomplete 12 / 47
 | [adding a revision with a runtime variant that does not read vfolder files, without a model definition and without a preset, is rejected in model definition validation because a model has no name](#adding_revisions-a-revision-with-no-model-definition-from-any-layer-is-refused) | rejected |
 | [adding a revision without a runtime variant and without a preset is rejected because the input is wrong](#adding_revisions-a-revision-with-no-runtime-variant-from-any-layer-is-refused) | rejected |
 | [when a user granted only read on the deployment adds a revision, the call is rejected for lack of permission](#adding_revisions-a-user-granted-only-read-may-not-add-a-revision) | rejected |
+
+**admin_search**
+
+| scenario | verdict |
+|---|---|
+| [when three deployments exist and a superadmin searches everything without a filter, all three are counted](#searching-the-superadmin-counts-every-deployment) | answered |
+| [when a user granted deployment read but not a superadmin searches everything, the role rejects it; the role checks this operation, not the permission graph](#searching-a-user-granted-read-may-not-search-every-deployment) | rejected |
 
 **bulk_delete_access_tokens**
 
@@ -306,6 +292,13 @@ Scenario: incomplete 12 / 47
 | [when a user granted deployment update changes the metric name of several auto-scaling rules at once, every rule comes back with the new name and nothing failed](#partial_bulk_auto_scaling_rules-a-deployment-editor-edits-several-rules-at-once) | answered |
 | [when a user with no grant tries to update several auto-scaling rules at once, nothing is updated and every rule comes back in the failed list because the user lacks permission](#partial_bulk_auto_scaling_rules-a-user-granted-nothing-edits-none-of-several-rules) | answered |
 
+**project_search**
+
+| scenario | verdict |
+|---|---|
+| [when deployments are split across two projects and a user granted read on only one side searches that project, only that project's deployments come back](#searching-searching-a-project-finds-only-its-own-deployments) | answered |
+| [when a user without read permission on the project searches the project, the call is rejected for lack of permission](#searching-a-user-granted-nothing-may-not-search-a-project) | rejected |
+
 **purge_access_token**
 
 | scenario | verdict |
@@ -331,6 +324,13 @@ Scenario: incomplete 12 / 47
 | [when a user granted only read replaces the options, the call is rejected for lack of permission](#options-a-user-granted-only-read-may-not-replace-the-options) | rejected |
 | [replacing the options with the same handler name twice is rejected because the input is wrong](#options-naming-a-handler-twice-is-refused) | rejected |
 | [replacing the options with an unregistered handler name is rejected because the input is wrong](#options-naming-an-unregistered-handler-is-refused) | rejected |
+
+**scoped_search**
+
+| scenario | verdict |
+|---|---|
+| [when two users each created a deployment in the same project and the one granted read in their own scope searches their own, only what they created comes back](#searching-searching-my-own-finds-only-what-i-made) | answered |
+| [when a user not granted read in their own scope searches their own, the call is rejected for lack of permission; here too the permission checks it rather than only narrowing the scope](#searching-a-user-granted-nothing-may-not-search-even-their-own) | rejected |
 
 **search_revision_resource_slots**
 
@@ -378,76 +378,6 @@ Scenario: incomplete 12 / 47
 |---|---|
 | [when a user granted deployment update puts a policy on the deployment, the policy put comes back. The upsert replaces an existing policy, so the call is gated by update](#upserting_policy-a-user-granted-deployment-update-puts-the-policy) | answered |
 | [when a user granted nothing tries to put a policy on the deployment, the upsert is rejected because the user lacks permission](#upserting_policy-a-user-granted-nothing-puts-no-policy) | rejected |
-
-### admin_search
-
-<a id="searching-the-superadmin-counts-every-deployment"></a>
-
-#### [the-superadmin-counts-every-deployment](/tests/scenario/bai_scenario/manager/deployment/test_searching.py): pass
-
-when three deployments exist and a superadmin searches everything without a filter, all three are counted
-
-Given
-
-- 3 deployments in the same project and one user of that project
-  - Domain home-1
-  - Project resource policy default: the personal project created along with a user looks it up by this name
-  - Project team-1
-  - Resource group resource-group-1: uses the fifo scheduler
-  - Prepare a user with no deployment permission
-    - Prepare one user in the domain
-      - User resource policy user-policy-1: up to 10 folders per user
-      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-      - superadmin user-1: has their own keypair and personal project
-  - Deployment wanted-1: replica count 1, has no revision yet
-  - Deployment other-1: replica count 1, has no revision yet
-  - Deployment other-2: replica count 1, has no revision yet
-
-When
-
-- DeploymentAdapter.admin_search: user-1 searches everything without a filter
-
-Then
-
-- every deployment seeded in advance is counted, and nothing else
-  - items = ['other-1', 'other-2', 'wanted-1']
-  - total_count = 3
-  - has_next_page = False
-  - has_previous_page = False
-
-<a id="searching-a-user-granted-read-may-not-search-every-deployment"></a>
-
-#### [a-user-granted-read-may-not-search-every-deployment](/tests/scenario/bai_scenario/manager/deployment/test_searching.py): pass
-
-when a user granted deployment read but not a superadmin searches everything, the role rejects it; the role checks this operation, not the permission graph
-
-Given
-
-- 3 deployments in the same project and one user of that project
-  - Domain home-1
-  - Project resource policy default: the personal project created along with a user looks it up by this name
-  - Project team-1
-  - Resource group resource-group-1: uses the fifo scheduler
-  - Prepare a user granted READ on deployments
-    - Prepare one user in the domain
-      - User resource policy user-policy-1: up to 10 folders per user
-      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-      - regular user user-1: has their own keypair and personal project
-    - Role deployment-user-1: applies only within the scope it is granted in
-    - Role deployment-user-1: READ allowed on every deployment
-    - regular user user-1: holds Role deployment-user-1
-  - Deployment wanted-1: replica count 1, has no revision yet
-  - Deployment other-1: replica count 1, has no revision yet
-  - Deployment other-2: replica count 1, has no revision yet
-
-When
-
-- DeploymentAdapter.admin_search: user-1 searches everything without a filter
-
-Then
-
-- the call is rejected
-  - rejected: InsufficientPrivilege
 
 ### admin_search_replicas
 
@@ -1541,151 +1471,6 @@ Then
 
 - the call is rejected
   - rejected: GenericBadRequest
-
-### project_search
-
-<a id="searching-searching-a-project-finds-only-its-own-deployments"></a>
-
-#### [searching-a-project-finds-only-its-own-deployments](/tests/scenario/bai_scenario/manager/deployment/test_searching.py): pass
-
-when deployments are split across two projects and a user granted read on only one side searches that project, only that project's deployments come back
-
-Given
-
-- deployments split between two projects and one user granted READ on deployments in one project only
-  - Domain home-1
-  - Project resource policy default: the personal project created along with a user looks it up by this name
-  - Project team-1
-  - Resource group resource-group-1: uses the fifo scheduler
-  - Prepare a user granted READ on deployments
-    - Prepare one user in the domain
-      - User resource policy user-policy-1: up to 10 folders per user
-      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-      - regular user user-1: has their own keypair and personal project
-    - Role deployment-user-1: applies only within the scope it is granted in
-    - Role deployment-user-1: READ allowed on every deployment
-    - regular user user-1: holds Role deployment-user-1
-  - Project other-1
-  - Deployment wanted-1: replica count 1, has no revision yet
-  - Deployment beside-1: replica count 1, has no revision yet
-  - Deployment elsewhere-1: replica count 1, has no revision yet
-
-When
-
-- DeploymentAdapter.project_search: user-1 searches inside team-1
-
-Then
-
-- every deployment seeded in advance is counted, and nothing else
-  - items = ['beside-1', 'wanted-1']
-  - total_count = 2
-  - has_next_page = False
-  - has_previous_page = False
-
-<a id="searching-a-user-granted-nothing-may-not-search-a-project"></a>
-
-#### [a-user-granted-nothing-may-not-search-a-project](/tests/scenario/bai_scenario/manager/deployment/test_searching.py): pass
-
-when a user without read permission on the project searches the project, the call is rejected for lack of permission
-
-Given
-
-- 3 deployments in the same project and one user of that project
-  - Domain home-1
-  - Project resource policy default: the personal project created along with a user looks it up by this name
-  - Project team-1
-  - Resource group resource-group-1: uses the fifo scheduler
-  - Prepare a user with no deployment permission
-    - Prepare one user in the domain
-      - User resource policy user-policy-1: up to 10 folders per user
-      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-      - regular user user-1: has their own keypair and personal project
-  - Deployment wanted-1: replica count 1, has no revision yet
-  - Deployment other-1: replica count 1, has no revision yet
-  - Deployment other-2: replica count 1, has no revision yet
-
-When
-
-- DeploymentAdapter.project_search: user-1 searches inside team-1
-
-Then
-
-- the call is rejected
-  - rejected: NotEnoughPermission
-
-### scoped_search
-
-<a id="searching-searching-my-own-finds-only-what-i-made"></a>
-
-#### [searching-my-own-finds-only-what-i-made](/tests/scenario/bai_scenario/manager/deployment/test_searching.py): pass
-
-when two users each created a deployment in the same project and the one granted read in their own scope searches their own, only what they created comes back
-
-Given
-
-- deployments two users each created and one of them granted deployment read permission in their own scope
-  - Domain home-1
-  - Project resource policy default: the personal project created along with a user looks it up by this name
-  - Project team-1
-  - Resource group resource-group-1: uses the fifo scheduler
-  - Prepare a user who can read deployments in their own scope
-    - Prepare one user in the domain
-      - User resource policy user-policy-1: up to 10 folders per user
-      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-      - regular user user-1: has their own keypair and personal project
-    - Role deployment-owner-1: applies only within the scope it is granted in
-    - Role deployment-owner-1: READ allowed on every deployment
-    - regular user user-1: holds Role deployment-owner-1
-  - Prepare one user in the domain
-    - User resource policy user-policy-2: up to 10 folders per user
-    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-    - regular user user-2: has their own keypair and personal project
-  - Deployment mine-1: replica count 1, has no revision yet
-  - Deployment theirs-1: replica count 1, has no revision yet
-
-When
-
-- DeploymentAdapter.scoped_search: user-1 searches their own
-
-Then
-
-- every deployment seeded in advance is counted, and nothing else
-  - items = ['mine-1']
-  - total_count = 1
-  - has_next_page = False
-  - has_previous_page = False
-
-<a id="searching-a-user-granted-nothing-may-not-search-even-their-own"></a>
-
-#### [a-user-granted-nothing-may-not-search-even-their-own](/tests/scenario/bai_scenario/manager/deployment/test_searching.py): pass
-
-when a user not granted read in their own scope searches their own, the call is rejected for lack of permission; here too the permission checks it rather than only narrowing the scope
-
-Given
-
-- deployments two users each created and one of them with no deployment permission
-  - Domain home-1
-  - Project resource policy default: the personal project created along with a user looks it up by this name
-  - Project team-1
-  - Resource group resource-group-1: uses the fifo scheduler
-  - Prepare one user in the domain
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-    - User resource policy user-policy-2: up to 10 folders per user
-    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-    - regular user user-2: has their own keypair and personal project
-  - Deployment mine-1: replica count 1, has no revision yet
-  - Deployment theirs-1: replica count 1, has no revision yet
-
-When
-
-- DeploymentAdapter.scoped_search: user-1 searches their own
-
-Then
-
-- the call is rejected
-  - rejected: NotEnoughPermission
 
 ### search_access_tokens
 
@@ -3015,6 +2800,79 @@ Then
 - the call is rejected
   - rejected: NotEnoughPermission
 
+### admin_search
+
+<a id="searching-the-superadmin-counts-every-deployment"></a>
+
+#### [the-superadmin-counts-every-deployment](/tests/scenario/bai_scenario/manager/deployment/test_searching.py): pass
+
+when three deployments exist and a superadmin searches everything without a filter, all three are counted
+
+Given
+
+- 3 deployments in the same project, one of them with a deployment policy, and one user of that project
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - superadmin user-1: has their own keypair and personal project
+  - Deployment wanted-1: replica count 1, has no revision yet
+  - Deployment wanted-1: has one deployment policy
+  - Deployment other-1: replica count 1, has no revision yet
+  - Deployment other-2: replica count 1, has no revision yet
+
+When
+
+- DeploymentAdapter.admin_search: user-1 searches everything without a filter
+
+Then
+
+- every deployment seeded in advance is counted, and nothing else; the deployment policy comes only with the deployment that has one
+  - items = ['other-1', 'other-2', 'wanted-1']
+  - items[].policy = {'wanted-1': DeploymentPolicyInfo(strategy=<DeploymentStrategy.ROLLING: 'ROLLING'>, rolling_update=RollingUpdateConfigInfo(max_surge=IntOrPercent(count=1, percent=None), max_unavailable=IntOrPercent(count=0, percent=None)), blue_green=None), 'other-1': None, 'other-2': None}
+  - total_count = 3
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="searching-a-user-granted-read-may-not-search-every-deployment"></a>
+
+#### [a-user-granted-read-may-not-search-every-deployment](/tests/scenario/bai_scenario/manager/deployment/test_searching.py): pass
+
+when a user granted deployment read but not a superadmin searches everything, the role rejects it; the role checks this operation, not the permission graph
+
+Given
+
+- 3 deployments in the same project, one of them with a deployment policy, and one user of that project
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment wanted-1: replica count 1, has no revision yet
+  - Deployment wanted-1: has one deployment policy
+  - Deployment other-1: replica count 1, has no revision yet
+  - Deployment other-2: replica count 1, has no revision yet
+
+When
+
+- DeploymentAdapter.admin_search: user-1 searches everything without a filter
+
+Then
+
+- the call is rejected
+  - rejected: InsufficientPrivilege
+
 ### bulk_delete_access_tokens
 
 <a id="retiring_access_tokens-a-user-granted-deployment-purge-purges-tokens-at-once"></a>
@@ -4161,6 +4019,80 @@ Then
   - failed[1].id: same as the id of the rule seeded in advance
   - failed[1].message: a reason containing 'Insufficient permission'
 
+### project_search
+
+<a id="searching-searching-a-project-finds-only-its-own-deployments"></a>
+
+#### [searching-a-project-finds-only-its-own-deployments](/tests/scenario/bai_scenario/manager/deployment/test_searching.py): pass
+
+when deployments are split across two projects and a user granted read on only one side searches that project, only that project's deployments come back
+
+Given
+
+- deployments split between two projects, the one sought with a deployment policy, and one user granted READ on deployments in one project only
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Project other-1
+  - Deployment wanted-1: replica count 1, has no revision yet
+  - Deployment wanted-1: has one deployment policy
+  - Deployment beside-1: replica count 1, has no revision yet
+  - Deployment elsewhere-1: replica count 1, has no revision yet
+
+When
+
+- DeploymentAdapter.project_search: user-1 searches inside team-1
+
+Then
+
+- every deployment seeded in advance is counted, and nothing else; the deployment policy comes only with the deployment that has one
+  - items = ['beside-1', 'wanted-1']
+  - items[].policy = {'wanted-1': DeploymentPolicyInfo(strategy=<DeploymentStrategy.ROLLING: 'ROLLING'>, rolling_update=RollingUpdateConfigInfo(max_surge=IntOrPercent(count=1, percent=None), max_unavailable=IntOrPercent(count=0, percent=None)), blue_green=None), 'beside-1': None}
+  - total_count = 2
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="searching-a-user-granted-nothing-may-not-search-a-project"></a>
+
+#### [a-user-granted-nothing-may-not-search-a-project](/tests/scenario/bai_scenario/manager/deployment/test_searching.py): pass
+
+when a user without read permission on the project searches the project, the call is rejected for lack of permission
+
+Given
+
+- 3 deployments in the same project, one of them with a deployment policy, and one user of that project
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment wanted-1: replica count 1, has no revision yet
+  - Deployment wanted-1: has one deployment policy
+  - Deployment other-1: replica count 1, has no revision yet
+  - Deployment other-2: replica count 1, has no revision yet
+
+When
+
+- DeploymentAdapter.project_search: user-1 searches inside team-1
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
 ### purge_access_token
 
 <a id="retiring_access_tokens-a-user-granted-deployment-purge-purges-a-token"></a>
@@ -4540,6 +4472,83 @@ Then
 
 - the call is rejected
   - rejected: InvalidAPIParameters
+
+### scoped_search
+
+<a id="searching-searching-my-own-finds-only-what-i-made"></a>
+
+#### [searching-my-own-finds-only-what-i-made](/tests/scenario/bai_scenario/manager/deployment/test_searching.py): pass
+
+when two users each created a deployment in the same project and the one granted read in their own scope searches their own, only what they created comes back
+
+Given
+
+- deployments two users each created, the caller's with a deployment policy, and one of them granted deployment read permission in their own scope
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user who can read deployments in their own scope
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-owner-1: applies only within the scope it is granted in
+    - Role deployment-owner-1: READ allowed on every deployment
+    - regular user user-1: holds Role deployment-owner-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Deployment mine-1: replica count 1, has no revision yet
+  - Deployment mine-1: has one deployment policy
+  - Deployment theirs-1: replica count 1, has no revision yet
+
+When
+
+- DeploymentAdapter.scoped_search: user-1 searches their own
+
+Then
+
+- every deployment seeded in advance is counted, and nothing else; the deployment policy comes only with the deployment that has one
+  - items = ['mine-1']
+  - items[].policy = {'mine-1': DeploymentPolicyInfo(strategy=<DeploymentStrategy.ROLLING: 'ROLLING'>, rolling_update=RollingUpdateConfigInfo(max_surge=IntOrPercent(count=1, percent=None), max_unavailable=IntOrPercent(count=0, percent=None)), blue_green=None)}
+  - total_count = 1
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="searching-a-user-granted-nothing-may-not-search-even-their-own"></a>
+
+#### [a-user-granted-nothing-may-not-search-even-their-own](/tests/scenario/bai_scenario/manager/deployment/test_searching.py): pass
+
+when a user not granted read in their own scope searches their own, the call is rejected for lack of permission; here too the permission checks it rather than only narrowing the scope
+
+Given
+
+- deployments two users each created, the caller's with a deployment policy, and one of them with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Deployment mine-1: replica count 1, has no revision yet
+  - Deployment mine-1: has one deployment policy
+  - Deployment theirs-1: replica count 1, has no revision yet
+
+When
+
+- DeploymentAdapter.scoped_search: user-1 searches their own
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 ### search_revision_resource_slots
 

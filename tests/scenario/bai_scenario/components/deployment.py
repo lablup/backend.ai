@@ -54,6 +54,7 @@ from ai.backend.testutils.scenario_steps import (
 )
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf, WrittenByThisRun
 from bai_scenario.seeds.deployment.deployment import TestSeedDeployment
+from bai_scenario.seeds.deployment.policy import TestSeedDeploymentPolicyOf
 from bai_scenario.seeds.domain.domain import TestSeedDomain
 from bai_scenario.seeds.project.project import TestSeedProject
 from bai_scenario.seeds.rbac.role import TestSeedPermission, TestSeedRole
@@ -386,7 +387,7 @@ class AnothersDeploymentAndASuperadmin(Given[Any, ADeploymentAndACaller]):
 
 @dataclass(frozen=True)
 class ManyDeploymentsInThatPlace(Given[Any, ManyDeploymentsAndACaller]):
-    """배포 여럿과, 그 프로젝트 안의 사용자 한 명."""
+    """배포 여럿과, 그 프로젝트 안의 사용자 한 명. 찾을 배포 하나만 배포 정책을 갖는다."""
 
     granted: tuple[Permission, ...] = ()
     role: UserRole = UserRole.USER
@@ -395,9 +396,11 @@ class ManyDeploymentsInThatPlace(Given[Any, ManyDeploymentsAndACaller]):
     @override
     def describe(self) -> str:
         return Says(
-            f"같은 프로젝트의 배포 {self.besides + 1}개와, 그 프로젝트의 사용자 한 명",
+            f"같은 프로젝트의 배포 {self.besides + 1}개 중 하나만 배포 정책을 갖고, "
+            "그 프로젝트의 사용자 한 명",
             english=(
-                f"{self.besides + 1} deployments in the same project and one user of that project"
+                f"{self.besides + 1} deployments in the same project, one of them with a "
+                "deployment policy, and one user of that project"
             ),
         )
 
@@ -405,6 +408,7 @@ class ManyDeploymentsInThatPlace(Given[Any, ManyDeploymentsAndACaller]):
     async def lay(self, seeding: Any) -> ManyDeploymentsAndACaller:
         place = await lay_a_place(seeding, granted=self.granted, role=self.role)
         wanted = await lay_a_deployment(seeding, place, name_hint="wanted")
+        await seeding.adding(TestSeedDeploymentPolicyOf(), wanted)
         others = [
             await lay_a_deployment(seeding, place, name_hint="other") for _ in range(self.besides)
         ]
@@ -429,10 +433,11 @@ class DeploymentsInTwoProjects(Given[Any, ManyDeploymentsAndACaller]):
     def describe(self) -> str:
         names = _names(self.granted)
         return Says(
-            f"두 프로젝트에 나뉜 배포들과, 한쪽 프로젝트에서만 배포에 {names} 권한을 받은 사용자 한 명",
+            f"두 프로젝트에 나뉜 배포들(찾을 배포 하나만 배포 정책을 가짐)과, 한쪽 프로젝트에서만 "
+            f"배포에 {names} 권한을 받은 사용자 한 명",
             english=(
-                f"deployments split between two projects and one user granted {names} on "
-                "deployments in one project only"
+                f"deployments split between two projects, the one sought with a deployment "
+                f"policy, and one user granted {names} on deployments in one project only"
             ),
         )
 
@@ -450,6 +455,7 @@ class DeploymentsInTwoProjects(Given[Any, ManyDeploymentsAndACaller]):
             caller=place.caller,
         )
         wanted = await lay_a_deployment(seeding, place, name_hint="wanted")
+        await seeding.adding(TestSeedDeploymentPolicyOf(), wanted)
         beside = await lay_a_deployment(seeding, place, name_hint="beside")
         await lay_a_deployment(seeding, elsewhere, name_hint="elsewhere")
         return ManyDeploymentsAndACaller(
@@ -473,16 +479,19 @@ class MineBesideAnothers(Given[Any, ManyDeploymentsAndACaller]):
     def describe(self) -> str:
         if self.reads_own:
             return Says(
-                "두 사람이 각자 만든 배포와, 자기 스코프에서 배포 읽기 권한을 받은 그중 한 명",
+                "두 사람이 각자 만든 배포(호출자의 배포는 배포 정책을 가짐)와, 자기 스코프에서 배포 "
+                "읽기 권한을 받은 그중 한 명",
                 english=(
-                    "deployments two users each created and one of them granted deployment "
-                    "read permission in their own scope"
+                    "deployments two users each created, the caller's with a deployment policy, "
+                    "and one of them granted deployment read permission in their own scope"
                 ),
             )
         return Says(
-            "두 사람이 각자 만든 배포와, 아무 배포 권한도 받지 않은 그중 한 명",
+            "두 사람이 각자 만든 배포(호출자의 배포는 배포 정책을 가짐)와, 아무 배포 권한도 받지 "
+            "않은 그중 한 명",
             english=(
-                "deployments two users each created and one of them with no deployment permission"
+                "deployments two users each created, the caller's with a deployment policy, "
+                "and one of them with no deployment permission"
             ),
         )
 
@@ -500,6 +509,7 @@ class MineBesideAnothers(Given[Any, ManyDeploymentsAndACaller]):
         mine = LaidPlace(domain=domain, project=project, resource_group=group, caller=caller)
         theirs = LaidPlace(domain=domain, project=project, resource_group=group, caller=other)
         made = await lay_a_deployment(seeding, mine, name_hint="mine")
+        await seeding.adding(TestSeedDeploymentPolicyOf(), made)
         await lay_a_deployment(seeding, theirs, name_hint="theirs")
         return ManyDeploymentsAndACaller(
             place=mine.made(seeding),
