@@ -26,6 +26,7 @@ __all__ = (
     "NotEnoughPermission",
     "PermissionAlreadyGranted",
     "PermissionNotFound",
+    "RelationSpecMismatch",
     "ReplaceRolePermissionRoleIdMismatch",
     "RoleAlreadyAssigned",
     "RoleNotAssigned",
@@ -153,6 +154,22 @@ class VirtualEntityNotFound(BackendAIError, web.HTTPInternalServerError):
             domain=ErrorDomain.PERMISSION,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class RelationSpecMismatch(BackendAIError, web.HTTPInternalServerError):
+    """Raised when one relation run is given specs of different relations. The specs
+    are chosen in code, so this is a server-side bug — hence 500."""
+
+    error_type = "https://api.backend.ai/probs/relation-spec-mismatch"
+    error_title = "The relation specs of one run name different relations."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.PERMISSION,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.MISMATCH,
         )
 
 

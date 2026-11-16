@@ -41,6 +41,7 @@ from ai.backend.manager.actions.v2.relation.result import (
     RelationActionResultMeta,
 )
 from ai.backend.manager.actions.v2.relation.trigger import RelationActionTriggerMeta
+from ai.backend.manager.errors.permission import RelationSpecMismatch
 from ai.backend.manager.models.audit_log.creators import RelationAuditLogCreator
 from ai.backend.manager.models.container_registry.creators import ContainerRegistryProjectCreator
 from ai.backend.manager.models.container_registry.purgers import ContainerRegistryProjectPurger
@@ -65,6 +66,7 @@ from ai.backend.manager.services.rbac.actions.relation.switch import (
     DeleteRelationAction,
     RestoreRelationAction,
 )
+from ai.backend.manager.services.rbac.actions.relation.update import UpdateRelationAction
 
 _PROJECT_ID = ProjectID(uuid.uuid4())
 _DOMAIN_ID = DomainID(uuid.uuid4())
@@ -217,6 +219,31 @@ class TestEveryPairBecomesTheRunsScopes:
             projects[1],
             projects[2],
         ]
+
+
+class TestUpdateRelationAction:
+    def test_names_both_lists_once_under_update(self) -> None:
+        other_project = ProjectID(uuid.uuid4())
+        action = UpdateRelationAction(
+            create_pairs=[RelationPair(scope=_PROJECT_ID, target=_REGISTRY_ID)],
+            creator=ContainerRegistryProjectCreator(),
+            purge_pairs=[RelationPair(scope=other_project, target=_REGISTRY_ID)],
+            purger=ContainerRegistryProjectPurger(),
+        )
+
+        assert list(action.scope_targets()) == [_PROJECT_ID, _REGISTRY_ID, other_project]
+        assert action.operation_type() is ActionOperationType.UPDATE
+
+    def test_a_purger_of_another_relation_is_refused(self) -> None:
+        purger: Any = ResourceGroupForDomainRelationPurger()
+
+        with pytest.raises(RelationSpecMismatch):
+            UpdateRelationAction(
+                create_pairs=[],
+                creator=ResourceGroupForProjectRelationCreator(),
+                purge_pairs=[],
+                purger=purger,
+            )
 
 
 class TestARelationRunIsRecordedOnItsOwn:

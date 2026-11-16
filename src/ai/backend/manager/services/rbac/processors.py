@@ -21,6 +21,10 @@ from ai.backend.manager.services.rbac.actions.relation.switch import (
     RestoreRelationAction,
     RestoreRelationActionResult,
 )
+from ai.backend.manager.services.rbac.actions.relation.update import (
+    UpdateRelationAction,
+    UpdateRelationActionResult,
+)
 from ai.backend.manager.services.rbac.actions.role.assign import (
     AssignRoleAction,
     AssignRoleActionResult,
@@ -75,6 +79,9 @@ class RbacProcessors:
     purge_relation: RelationActionProcessor[
         PurgeRelationAction[Any, Any, Any], PurgeRelationActionResult[Any, Any]
     ]
+    update_relation: RelationActionProcessor[
+        UpdateRelationAction[Any, Any, Any], UpdateRelationActionResult[Any, Any]
+    ]
     delete_relation: RelationActionProcessor[
         DeleteRelationAction[Any, Any, Any], DeleteRelationActionResult[Any, Any]
     ]
@@ -98,6 +105,7 @@ class RbacProcessors:
     ) -> None:
         self.create_relation = group.relation(CreateRelationAction, service.create)
         self.purge_relation = group.relation(PurgeRelationAction, service.purge)
+        self.update_relation = group.relation(UpdateRelationAction, service.update)
         self.delete_relation = group.relation(DeleteRelationAction, service.delete)
         self.restore_relation = group.relation(RestoreRelationAction, service.restore)
         self.join_project = roster_group.scope(JoinProjectAction, roster_service.join)
