@@ -10,7 +10,8 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.audit_log import AuditLogID
-from ai.backend.manager.actions.types import ActionKind, OperationStatus
+from ai.backend.manager.actions.spec import ActionKind
+from ai.backend.manager.actions.types import OperationStatus
 from ai.backend.manager.models.audit_log.row import AuditLogRow
 from ai.backend.manager.models.audit_log.searchable_fields import AuditLogSearchableFields
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
