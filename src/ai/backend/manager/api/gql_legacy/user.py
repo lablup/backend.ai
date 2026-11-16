@@ -229,7 +229,6 @@ class UserNode(graphene.ObjectType):  # type: ignore[misc]
         "totp_activated": ("totp_activated", None),
         "totp_activated_at": ("totp_activated_at", dtparse),
         "sudo_session_enabled": ("sudo_session_enabled", None),
-        "main_access_key": ("main_access_key", None),
     }
 
     # External table filter specifications
@@ -271,7 +270,6 @@ class UserNode(graphene.ObjectType):  # type: ignore[misc]
         "totp_activated": ("totp_activated", None),
         "totp_activated_at": ("totp_activated_at", None),
         "sudo_session_enabled": ("sudo_session_enabled", None),
-        "main_access_key": ("main_access_key", None),
     }
 
     @staticmethod

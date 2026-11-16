@@ -34,6 +34,7 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.service.base import ServicesContext
+from ai.backend.manager.services.group.actions.search_projects import GetProjectAction
 from ai.backend.manager.services.processors import Processors
 
 from .audit_log import (
@@ -2283,6 +2284,11 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
     ) -> Sequence[ScalingGroup]:
         ctx: GraphQueryContext = info.context
         domain_name = domain_name or ctx.user["domain_name"]
+        # `scoped_query()` pins the domain and the access key but not the project, so the
+        # read permission on the project answers for it.
+        await ctx.processors.group.get_project.wait_for_complete(
+            GetProjectAction(project_id=project_id)
+        )
         async with ctx.db.begin() as db_conn:
             sgroup_rows = await query_allowed_sgroups(
                 db_conn, domain_name, ProjectID(project_id), access_key

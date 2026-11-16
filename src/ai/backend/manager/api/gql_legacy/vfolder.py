@@ -710,13 +710,20 @@ class ModelCard(graphene.ObjectType):  # type: ignore[misc]
 
     @classmethod
     async def get_node(cls, info: graphene.ResolveInfo, id: str) -> Self | None:
+        """The model card of the vfolder, ``None`` when the requester may not read it."""
         graph_ctx: GraphQueryContext = info.context
 
         _, vfolder_row_id = AsyncNode.resolve_global_id(info, id)
+        visible = cls._visible_condition(graph_ctx.user["domain_name"])
+        query = (
+            sa.select(VFolderRow)
+            .where(visible & (VFolderRow.id == parse_uuid(vfolder_row_id)))
+            .options(selectinload(VFolderRow.user_row), selectinload(VFolderRow.group_row))
+        )
         async with graph_ctx.db.begin_readonly_session() as db_session:
-            vfolder_row = await VFolderRow.get(
-                db_session, parse_uuid(vfolder_row_id), load_user=True, load_group=True
-            )
+            vfolder_row = await db_session.scalar(query)
+            if vfolder_row is None:
+                return None
             if vfolder_row.usage_mode != VFolderUsageMode.MODEL:
                 raise ValueError(
                     f"The vfolder is not model. expect: {VFolderUsageMode.MODEL.value}, got:"
@@ -727,6 +734,15 @@ class ModelCard(graphene.ObjectType):  # type: ignore[misc]
                     f"The vfolder is deleted. (id: {vfolder_row_id}, status: {vfolder_row.status})"
                 )
         return await cls.from_row(graph_ctx, vfolder_row)
+
+    @staticmethod
+    def _visible_condition(domain_name: str) -> sa.ColumnElement[bool]:
+        """The vfolders of the model store projects in the requester's domain."""
+        return VFolderRow.group.in_(
+            sa.select(GroupRow.id).where(
+                (GroupRow.type == ProjectType.MODEL_STORE) & (GroupRow.domain_name == domain_name)
+            )
+        )
 
     @classmethod
     async def get_connection(
@@ -771,21 +787,9 @@ class ModelCard(graphene.ObjectType):  # type: ignore[misc]
             last=last,
         )
         async with graph_ctx.db.begin_readonly_session() as db_session:
-            model_store_project_gids = (
-                (
-                    await db_session.execute(
-                        sa.select(GroupRow.id).where(
-                            (GroupRow.type == ProjectType.MODEL_STORE)
-                            & (GroupRow.domain_name == graph_ctx.user["domain_name"])
-                        )
-                    )
-                )
-                .scalars()
-                .all()
-            )
-            additional_cond = (VFolderRow.status.not_in(DEAD_VFOLDER_STATUSES)) & (
-                VFolderRow.group.in_(model_store_project_gids)
-            )
+            additional_cond = (
+                VFolderRow.status.not_in(DEAD_VFOLDER_STATUSES)
+            ) & cls._visible_condition(graph_ctx.user["domain_name"])
             query = query.where(additional_cond)
             cnt_query = cnt_query.where(additional_cond)
             query = query.options(
