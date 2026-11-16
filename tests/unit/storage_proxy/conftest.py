@@ -8,7 +8,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from ai.backend.common.configs.volume_status_check import VolumeStatusCheckConfig
+from ai.backend.common.configs.volume_status_check import (
+    VolumeDeclarationConfig,
+    VolumeStatusCheckConfig,
+)
 from ai.backend.common.data.entity.storage_volume import StorageVolumeName
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.exception import ConfigurationError
@@ -123,7 +126,11 @@ async def volume(
         event_dispatcher=mock_event_dispatcher,
         event_producer=mock_event_producer,
         volume_name=StorageVolumeName("test-volume"),
-        status_check_config=VolumeStatusCheckConfig(check_interval=60.0, initial_delay=5.0),
+        status_check_config=VolumeStatusCheckConfig(
+            check_interval=60.0,
+            initial_delay=5.0,
+            read_declaration=VolumeDeclarationConfig(interval=30.0, initial_delay=0.0),
+        ),
     )
     await volume.init()
     try:
