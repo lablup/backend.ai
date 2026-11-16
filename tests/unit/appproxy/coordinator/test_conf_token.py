@@ -15,6 +15,8 @@ from ai.backend.appproxy.common.types import SessionConfig
 from ai.backend.appproxy.coordinator.api.conf import conf_v2
 from ai.backend.appproxy.coordinator.api.types import ConfRequestModel
 from ai.backend.appproxy.coordinator.server import exception_middleware
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserID
 
 _SECRET = "appproxy-api-secret"
 
@@ -41,8 +43,8 @@ class TestConfToken:
             kernel_port=8080,
             session=SessionConfig(
                 id=None,
-                user_uuid=uuid.uuid4(),
-                project_id=uuid.uuid4(),
+                user_uuid=UserID(uuid.uuid4()),
+                project_id=ProjectID(uuid.uuid4()),
                 access_key=None,
                 domain_name="default",
             ),
