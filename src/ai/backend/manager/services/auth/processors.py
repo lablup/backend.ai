@@ -22,18 +22,6 @@ from ai.backend.manager.services.auth.actions.authorize import (
     AuthorizeAction,
     AuthorizeActionResult,
 )
-<<<<<<< HEAD
-from ai.backend.manager.services.auth.actions.generate_ssh_keypair import (
-    GenerateSSHKeypairAction,
-    GenerateSSHKeypairActionResult,
-=======
-from ai.backend.manager.services.auth.actions.bulk_get_login_history import (
-    BulkGetLoginHistoryAction,
-)
-from ai.backend.manager.services.auth.actions.bulk_get_login_sessions import (
-    BulkGetLoginSessionsAction,
->>>>>>> a35af390 (fix(BA-9041): remove the SSH keypair generation API that returns the private key (#17108))
-)
 from ai.backend.manager.services.auth.actions.get_role import (
     GetRoleAction,
     GetRoleActionResult,

@@ -44,12 +44,7 @@ from ai.backend.manager.api.rest.middleware.auth import (
     TRUSTED_PROXY_NETWORKS_KEY,
     parse_trusted_proxy_networks,
 )
-<<<<<<< HEAD
-from ai.backend.manager.data.auth.types import AuthorizationResult, SSHKeypair
-=======
 from ai.backend.manager.data.auth.types import AuthorizationResult
-from ai.backend.manager.dto.auth import SignupHeader
->>>>>>> a35af390 (fix(BA-9041): remove the SSH keypair generation API that returns the private key (#17108))
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.models.user import UserRole, UserStatus
 from ai.backend.manager.services.auth.actions.authorize import AuthorizeActionResult

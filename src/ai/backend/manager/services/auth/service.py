@@ -10,11 +10,6 @@ from typing import Any, cast
 from aiohttp import web
 from sqlalchemy import RowMapping
 
-<<<<<<< HEAD
-=======
-from ai.backend.common import msgpack
-from ai.backend.common.auth.password import PasswordInfo
->>>>>>> a35af390 (fix(BA-9041): remove the SSH keypair generation API that returns the private key (#17108))
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
 from ai.backend.common.clients.valkey_client.valkey_session.types import (
     LoginSessionData,
@@ -68,10 +63,7 @@ from ai.backend.manager.errors.user import (
     UserResourcePolicyNotFound,
 )
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.keypair.row import (
-    KEYPAIR_SECRET_KEY_CONTEXT,
-    generate_ssh_keypair,
-)
+from ai.backend.manager.models.keypair.row import KEYPAIR_SECRET_KEY_CONTEXT
 from ai.backend.manager.models.keypair.ssh_key_validator import SSHKeyValidator
 from ai.backend.manager.models.user import (
     INACTIVE_USER_STATUSES,
@@ -800,22 +792,6 @@ class AuthService:
         pubkey = await self._auth_repository.get_ssh_public_key(action.access_key)
         return GetSSHKeypairActionResult(public_key=pubkey or "", access_key=action.access_key)
 
-<<<<<<< HEAD
-    async def generate_ssh_keypair(
-        self, action: GenerateSSHKeypairAction
-    ) -> GenerateSSHKeypairActionResult:
-        pubkey, privkey = generate_ssh_keypair()
-        await self._auth_repository.update_ssh_keypair(action.access_key, pubkey, privkey)
-
-        return GenerateSSHKeypairActionResult(
-            ssh_keypair=SSHKeypair(
-                ssh_public_key=pubkey,
-                ssh_private_key=privkey,
-            ),
-        )
-
-=======
->>>>>>> a35af390 (fix(BA-9041): remove the SSH keypair generation API that returns the private key (#17108))
     async def upload_ssh_keypair(
         self, action: UploadSSHKeypairAction
     ) -> UploadSSHKeypairActionResult:

@@ -95,41 +95,6 @@ async def test_get_ssh_keypair_nonexistent_key(
     mock_auth_repository.get_ssh_public_key.assert_called_once_with(action.access_key)
 
 
-<<<<<<< HEAD
-# Test Generate SSH Keypair
-async def test_generate_ssh_keypair(
-    auth_service: AuthService,
-    mock_auth_repository: AsyncMock,
-) -> None:
-    """Test SSH keypair generation"""
-    action = GenerateSSHKeypairAction(
-        user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
-        access_key="AKIA1234567890ABCDEF",
-    )
-
-    # Mock the keypair generation
-    mock_pubkey = "ssh-rsa AAAAB3NzaC1yc2EGENERATED..."
-    mock_privkey = "-----BEGIN RSA PRIVATE KEY-----\nGENERATED...\n-----END RSA PRIVATE KEY-----"
-
-    with patch(
-        "ai.backend.manager.services.auth.service.generate_ssh_keypair",
-        return_value=(mock_pubkey, mock_privkey),
-    ):
-        result = await auth_service.generate_ssh_keypair(action)
-
-    # Verify repository was called with generated keys
-    mock_auth_repository.update_ssh_keypair.assert_called_once_with(
-        "AKIA1234567890ABCDEF",
-        mock_pubkey,
-        mock_privkey,
-    )
-
-    assert result.ssh_keypair.ssh_public_key == mock_pubkey
-    assert result.ssh_keypair.ssh_private_key == mock_privkey
-
-
-=======
->>>>>>> a35af390 (fix(BA-9041): remove the SSH keypair generation API that returns the private key (#17108))
 # Test Upload SSH Keypair
 async def test_upload_ssh_keypair_replaces_only_the_public_key(
     auth_service: AuthService,
