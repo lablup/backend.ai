@@ -574,18 +574,12 @@ class DeploymentDBSource:
 
             cleanup_configs: dict[str, ResourceGroupCleanupConfig] = {}
             for row in result:
-                # Convert str to RouteHealthStatus
-                status_strs = row.scheduler_opts.route_cleanup_target_statuses
-                statuses: list[RouteHealthStatus] = []
-                for status_str in status_strs:
-                    try:
-                        statuses.append(RouteHealthStatus(status_str))
-                    except ValueError:
-                        # Skip invalid status strings
-                        pass
-
                 cleanup_configs[row.name] = ResourceGroupCleanupConfig(
-                    resource_group_name=row.name, cleanup_target_statuses=statuses
+                    resource_group_name=row.name,
+                    cleanup_target_statuses=[
+                        RouteHealthStatus(status.value)
+                        for status in row.scheduler_opts.route_cleanup_target_statuses
+                    ],
                 )
 
             return cleanup_configs

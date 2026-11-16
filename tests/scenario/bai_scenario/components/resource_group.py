@@ -581,10 +581,7 @@ class GroupLook:
                 node.scheduler.options.route_cleanup_target_statuses,
                 _or(
                     self.route_cleanup_target_statuses,
-                    [
-                        RouteHealthStatus(stored_status)
-                        for stored_status in seed.scheduler.options.route_cleanup_target_statuses
-                    ],
+                    seed.scheduler.options.route_cleanup_target_statuses,
                 ),
             ),
             Skipped(

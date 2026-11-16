@@ -20,7 +20,6 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.data.model_deployment.types import RouteHealthStatus
 from ai.backend.common.dto.manager.v2.common import PartialBulkFailure, PartialBulkPayload
 from ai.backend.common.dto.manager.v2.fair_share.types import (
     ResourceSlotEntryInfo,
@@ -1073,20 +1072,6 @@ class ResourceGroupAdapter(BaseAdapter):
         return AllowedProjectsPayload(items=result.items)
 
     @staticmethod
-    def _route_health_statuses_route_eviction_applies(
-        stored_statuses: list[str],
-    ) -> list[RouteHealthStatus]:
-        # Route eviction skips a stored string that names no status, so the
-        # response leaves it out instead of failing the whole read.
-        applied: list[RouteHealthStatus] = []
-        for stored_status in stored_statuses:
-            try:
-                applied.append(RouteHealthStatus(stored_status))
-            except ValueError:
-                continue
-        return applied
-
-    @staticmethod
     def _data_to_detail_node(data: ResourceGroupData) -> ResourceGroupDetailNode:
         """Convert ResourceGroupData to ResourceGroupDetailNode DTO for GQL layer."""
         return ResourceGroupDetailNode(
@@ -1129,9 +1114,7 @@ class ResourceGroupAdapter(BaseAdapter):
                         data.scheduler.options.allow_fractional_resource_fragmentation
                     ),
                     route_cleanup_target_statuses=(
-                        ResourceGroupAdapter._route_health_statuses_route_eviction_applies(
-                            data.scheduler.options.route_cleanup_target_statuses
-                        )
+                        data.scheduler.options.route_cleanup_target_statuses
                     ),
                 ),
             ),
