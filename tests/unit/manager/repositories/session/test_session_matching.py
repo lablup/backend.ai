@@ -18,6 +18,7 @@ from dateutil.tz import tzutc
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
@@ -44,6 +45,9 @@ from ai.backend.manager.models.container_registry.row import ContainerRegistryRo
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.kernel.scopes import SessionKernelTarget
+from ai.backend.manager.models.kernel.searchable_fields import KernelSearchableFields
+from ai.backend.manager.models.kernel.searchers import KernelSearcher
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow, ProjectType
 from ai.backend.manager.models.resource_group.row import (
@@ -478,6 +482,33 @@ class TestUpdateSessionRename:
         with pytest.raises(SessionAlreadyExists):
             await db_source.update_session(self._rename(target, "taken"), session_name="taken")
 
+    async def test_name_equal_to_a_live_session_id_raises_already_exists(
+        self, db_source: SessionDBSource, add_session: _SessionFactory
+    ) -> None:
+        target = await add_session(name="renamed-me", with_main_kernel=True)
+        other = await add_session(name="other")
+
+        with pytest.raises(SessionAlreadyExists):
+            await db_source.update_session(
+                self._rename(target, str(other)), session_name=str(other)
+            )
+
+    async def test_namesake_of_another_key_does_not_block(
+        self,
+        db_source: SessionDBSource,
+        other_access_key: AccessKey,
+        add_session: _SessionFactory,
+    ) -> None:
+        target = await add_session(name="renamed-me", with_main_kernel=True)
+        await add_session(name="theirs", access_key=other_access_key)
+
+        result = await db_source.update_session(
+            self._rename(target, "theirs"), session_name="theirs"
+        )
+
+        assert result is not None
+        assert result.name == "theirs"
+
     async def test_errored_namesake_does_not_block(
         self, db_source: SessionDBSource, add_session: _SessionFactory
     ) -> None:
@@ -565,3 +596,44 @@ class TestLiveSessionsMountingVFolder:
             )
 
         assert result.items == [running]
+
+
+def _main_kernel_searcher() -> KernelSearcher:
+    """The main kernel read the registry and the session repository run."""
+    return KernelSearcher(
+        pagination=NoPagination(),
+        conditions=[
+            KernelSearchableFields.own.cluster_role.filter.equals(
+                StringMatchSpec(value=DEFAULT_ROLE, case_insensitive=False, negated=False)
+            )
+        ],
+    )
+
+
+class TestMainKernelRead:
+    async def test_returns_the_main_kernel_of_the_session(
+        self, db_with_tables: ExtendedAsyncSAEngine, add_session: _SessionFactory
+    ) -> None:
+        target = await add_session(name="with-kernel", with_main_kernel=True)
+        await add_session(name="another", with_main_kernel=True)
+
+        async with V2DBOpsProvider(db_with_tables).read_ops() as r:
+            result = await r.search_with_scopes(
+                [SessionKernelTarget(session_id=SessionID(target))], _main_kernel_searcher()
+            )
+
+        assert [kernel.session.session_id for kernel in result.items] == [str(target)]
+        assert result.items[0].image.identifier is not None
+        assert result.items[0].image.identifier.canonical == "cr.backend.ai/stable/python:latest"
+
+    async def test_returns_nothing_for_a_session_without_kernels(
+        self, db_with_tables: ExtendedAsyncSAEngine, add_session: _SessionFactory
+    ) -> None:
+        target = await add_session(name="no-kernel")
+
+        async with V2DBOpsProvider(db_with_tables).read_ops() as r:
+            result = await r.search_with_scopes(
+                [SessionKernelTarget(session_id=SessionID(target))], _main_kernel_searcher()
+            )
+
+        assert result.items == []
