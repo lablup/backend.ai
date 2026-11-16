@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import StrEnum
 from unittest.mock import AsyncMock
 
 import pytest
@@ -36,6 +37,11 @@ NEGATIVE_TTL = 5.0
 @dataclass(frozen=True)
 class _LayersCase:
     layers: list[str]
+
+
+class _MemoryStateBeforeInvalidation(StrEnum):
+    HOLDING_A_STALE_REVISION = "holding-a-stale-revision"
+    REMEMBERING_THE_KEY_MISSING = "remembering-the-key-missing"
 
 
 @pytest.fixture
@@ -106,6 +112,25 @@ async def key_removed(memory: InMemoryIngressState, ingress: Ingress) -> None:
     await memory.remove([IngressKey(authority=AUTHORITY, frontend_key=FRONTEND_KEY)])
 
 
+@pytest.fixture
+async def layered_with_redis_holding_a_newer_ingress_than_memory(
+    request: pytest.FixtureRequest,
+    layered: LayeredIngressState,
+    memory: InMemoryIngressState,
+    redis: AsyncMock,
+    ingress: Ingress,
+) -> LayeredIngressState:
+    memory_state: _MemoryStateBeforeInvalidation = request.param
+    match memory_state:
+        case _MemoryStateBeforeInvalidation.HOLDING_A_STALE_REVISION:
+            await memory.apply([ingress.model_copy(update={"revision": ingress.revision - 1})])
+        case _MemoryStateBeforeInvalidation.REMEMBERING_THE_KEY_MISSING:
+            await memory.apply([ingress])
+            await memory.remove([IngressKey(authority=AUTHORITY, frontend_key=FRONTEND_KEY)])
+    redis.get.return_value = ingress
+    return layered
+
+
 class TestLayeredIngressState:
     @pytest.mark.usefixtures("ingress_in_memory")
     async def test_get_returns_a_memory_hit_without_reading_redis(
@@ -169,3 +194,19 @@ class TestLayeredIngressState:
         self, layered: LayeredIngressState, ingress: Ingress
     ) -> None:
         assert await layered.get_all() == [ingress]
+
+    @pytest.mark.parametrize(
+        "layered_with_redis_holding_a_newer_ingress_than_memory",
+        list(_MemoryStateBeforeInvalidation),
+        ids=lambda memory_state: memory_state.value,
+        indirect=True,
+    )
+    async def test_invalidated_key_is_read_from_redis_again(
+        self,
+        layered_with_redis_holding_a_newer_ingress_than_memory: LayeredIngressState,
+        ingress: Ingress,
+    ) -> None:
+        layered = layered_with_redis_holding_a_newer_ingress_than_memory
+        await layered.invalidate([FRONTEND_KEY])
+
+        assert await layered.get(FRONTEND_KEY) == ingress

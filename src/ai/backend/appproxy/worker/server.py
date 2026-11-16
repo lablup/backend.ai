@@ -64,6 +64,7 @@ from ai.backend.appproxy.common.events import (
     AppProxyCircuitCreatedEvent,
     AppProxyCircuitRemovedEvent,
     AppProxyCircuitRouteUpdatedEvent,
+    AppProxyIngressInvalidatedEvent,
     AppProxyWorkerCircuitAddedEvent,
 )
 from ai.backend.appproxy.common.types import (
@@ -71,6 +72,7 @@ from ai.backend.appproxy.common.types import (
     EventLoopType,
     FrontendMode,
     FrontendServerMode,
+    IngressDeliveryMode,
     ProxyProtocol,
     WebMiddleware,
     WebRequestHandler,
@@ -451,6 +453,19 @@ async def event_handler_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             AppProxyCircuitRemovedEvent,
         )
     ]
+    match root_ctx.local_config.proxy_worker.ingress.delivery_mode:
+        case IngressDeliveryMode.REDIS:
+            handlers.append(
+                root_ctx.event_dispatcher.subscribe(
+                    AppProxyIngressInvalidatedEvent,
+                    root_ctx,
+                    handle_ingress_invalidated_event,
+                    name="proxy-worker-ingress-invalidation",
+                )
+            )
+        case IngressDeliveryMode.API:
+            # The coordinator pushes ingresses to the in-memory layer, which Redis does not hold.
+            pass
     try:
         yield
     finally:
@@ -742,6 +757,17 @@ async def readyz(request: web.Request) -> web.Response:
 async def status(request: web.Request) -> web.Response:
     request["do_not_print_access_log"] = True
     return web.json_response({"api_version": "v2"})
+
+
+async def handle_ingress_invalidated_event(
+    context: RootContext,
+    _agent_id: AgentId,
+    event: AppProxyIngressInvalidatedEvent,
+) -> None:
+    ingress_authority = IngressAuthority(context.local_config.proxy_worker.authority)
+    await context.ingress_state.reader.invalidate([
+        key.frontend_key for key in event.keys if key.authority == ingress_authority
+    ])
 
 
 async def handle_proxy_route_event(

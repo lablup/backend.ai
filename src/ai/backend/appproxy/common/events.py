@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import override
 
+from ai.backend.common.dto.appproxy.v2.ingress.types import IngressKey
 from ai.backend.common.events.types import AbstractAnycastEvent, AbstractBroadcastEvent, EventDomain
 from ai.backend.common.events.user_event.user_event import UserEvent
 
@@ -45,6 +46,28 @@ class AppProxyCircuitRouteUpdatedEvent(AbstractBroadcastEvent):
     @override
     def domain_id(self) -> str | None:
         return str(self.circuit.id)
+
+    @override
+    def user_event(self) -> UserEvent | None:
+        return None
+
+
+class AppProxyIngressInvalidatedEvent(AbstractBroadcastEvent):
+    keys: list[IngressKey]
+
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "appproxy_ingress_invalidated_event"
+
+    @classmethod
+    @override
+    def event_domain(cls) -> EventDomain:
+        return EventDomain.MODEL_ROUTE
+
+    @override
+    def domain_id(self) -> str | None:
+        return None
 
     @override
     def user_event(self) -> UserEvent | None:

@@ -52,3 +52,7 @@ class LayeredIngressState(IngressReader):
     @override
     async def get_all(self) -> list[Ingress]:
         return await self._layers[-1].get_all()
+
+    async def invalidate(self, frontend_keys: Sequence[IngressFrontendKey]) -> None:
+        if self._in_memory is not None:
+            await self._in_memory.evict(frontend_keys)
