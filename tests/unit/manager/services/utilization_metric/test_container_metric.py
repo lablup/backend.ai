@@ -18,10 +18,12 @@ from ai.backend.common.dto.clients.prometheus.response import (
     PrometheusQueryData,
     PrometheusResponse,
 )
+from ai.backend.common.errors.prometheus import (
+    PrometheusConnectionError,
+)
 from ai.backend.common.exception import (
     FailedToGetMetric,
     InvalidAPIParameters,
-    PrometheusConnectionError,
 )
 from ai.backend.common.types import KernelId
 from ai.backend.manager.clients.prometheus.client import PrometheusClient

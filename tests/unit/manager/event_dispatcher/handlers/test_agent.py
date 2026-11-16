@@ -144,11 +144,7 @@ class TestHeartbeat:
         mock_agent_repository.sync_installed_images.assert_called_once_with(agent_id=agent_id)
         mock_hook_plugin_ctx.notify.assert_called_once_with(
             "POST_AGENT_HEARTBEAT",
-            (
-                agent_id,
-                sample_agent_info.scaling_group,
-                sample_agent_info.available_resource_slots,
-            ),
+            (),
         )
 
     async def test_agent_revival_emits_started_event(
@@ -216,9 +212,6 @@ class TestHeartbeat:
 
         upsert_data = mock_agent_repository.sync_agent_heartbeat.call_args[0][1]
         assert SlotName("cuda.shares") in upsert_data.resource_info.slot_key_and_units
-        hook_args = mock_hook_plugin_ctx.notify.call_args[0]
-        assert hook_args[0] == "POST_AGENT_HEARTBEAT"
-        assert hook_args[1][2] == agent_info.available_resource_slots
 
     async def test_concurrent_heartbeats(
         self,

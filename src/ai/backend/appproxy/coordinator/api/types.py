@@ -31,7 +31,6 @@ class CircuitListResponseModel(BackendAISchema):
 
 
 class ConfRequestModel(BackendAISchema):
-    login_session_token: str | None
     kernel_host: str
     kernel_port: int
     session: SessionConfig

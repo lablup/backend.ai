@@ -284,12 +284,28 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
     async def get_node(cls, info: graphene.ResolveInfo, id: str) -> Self:
         graph_ctx: GraphQueryContext = info.context
         group_id = resolve_entity_id(id, ProjectID)
-        query = sa.select(ProjectRow).where(ProjectRow.id == group_id)
-        async with graph_ctx.db.begin_readonly_session() as db_session:
+        user = graph_ctx.user
+        visible: sa.ColumnElement[bool]
+        match user["role"]:
+            case UserRole.SUPERADMIN:
+                visible = sa.true()
+            case UserRole.ADMIN:
+                visible = ProjectRow.domain_name == user["domain_name"]
+            case UserRole.USER:
+                member_projects = user_scope_membership_query(
+                    ProjectEntityType(), user["uuid"]
+                ).subquery()
+                visible = (ProjectRow.domain_name == user["domain_name"]) & ProjectRow.id.in_(
+                    sa.select(member_projects.c.scope_id)
+                )
+            case _:
+                visible = sa.false()
+        query = sa.select(ProjectRow).where(visible & (ProjectRow.id == group_id))
+        async with graph_ctx.db.begin_readonly_session_read_committed() as db_session:
             group_row = (await db_session.scalars(query)).first()
-            if group_row is None:
-                raise GroupNotFound(f"Group not found: {group_id}")
-            return cls.from_data(ProjectSearchableFields.own.to_data(group_row))
+        if group_row is None:
+            raise GroupNotFound(f"Group not found: {group_id}")
+        return cls.from_data(ProjectSearchableFields.own.to_data(group_row))
 
     @classmethod
     async def get_connection(
@@ -801,6 +817,12 @@ class ModifyGroup(graphene.Mutation):  # type: ignore[misc]
     ) -> ModifyGroup:
         graph_ctx: GraphQueryContext = info.context
         project_id = ProjectID(gid)
+        if (
+            graph_ctx.user["role"] != UserRole.SUPERADMIN
+            and isinstance(props.domain_name, str)
+            and props.domain_name != graph_ctx.user["domain_name"]
+        ):
+            return cls(False, "only a superadmin can move a project to another domain", None)
 
         # Resolved before anything is written, so a registry that is not there changes
         # nothing. The default is set after the edit, as a run of its own.

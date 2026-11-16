@@ -63,6 +63,9 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - /etc/machine-id:/etc/machine-id:ro
       - {{BASE_PATH}}/agent.toml:/etc/backend.ai/agent.toml:ro
+      # RPC auth keys at the host paths agent.toml points at
+      - {{BASE_PATH}}/fixtures/manager/manager.key:{{BASE_PATH}}/fixtures/manager/manager.key:ro
+      - {{BASE_PATH}}/fixtures/agent:{{BASE_PATH}}/fixtures/agent:ro
       # host==container path parity for paths handed to the host Docker daemon
       - /var/lib/backend.ai:/var/lib/backend.ai
       - /tmp/backend.ai:/tmp/backend.ai

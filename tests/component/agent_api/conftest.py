@@ -12,7 +12,6 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from ai.backend.common.data.entity.agent import AgentEntityType
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.types import HostPortPair
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.actions.v2.bulk.validator.rbac import BulkOwnCheck
@@ -22,6 +21,7 @@ from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.agent.types import AgentStatus
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
@@ -33,6 +33,7 @@ from ai.backend.manager.repositories.rbac.permission_check_repository import (
     RbacPermissionCheckRepository,
 )
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.agent.service import AgentService
 
@@ -42,10 +43,9 @@ def async_etcd(
     bootstrap_config: Any,
 ) -> AsyncEtcd:
     etcd_config = bootstrap_config.etcd
-    return AsyncEtcd(
-        addrs=[HostPortPair(host=a.host, port=a.port) for a in etcd_config.addrs],
-        namespace=etcd_config.namespace,
-        scope_prefix_map={
+    return AsyncEtcd.create_from_config(
+        etcd_config.to_dataclass(),
+        {
             ConfigScopes.GLOBAL: "global",
             ConfigScopes.SGROUP: "sgroup/default",
             ConfigScopes.NODE: "node/test",
@@ -80,6 +80,7 @@ def agent_processors(
         permission_check=RbacPermissionCheckRepository(
             PermissionOpsProvider(database_engine), config_provider
         ),
+        key_provider_pool=KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )
     service = AgentService(
         etcd=async_etcd,

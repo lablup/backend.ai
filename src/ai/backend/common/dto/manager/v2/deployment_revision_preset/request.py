@@ -33,6 +33,7 @@ from ai.backend.common.dto.manager.v2.entity_label.request import EntityLabelNes
 from ai.backend.common.dto.manager.v2.resource_slot.types import ResourceOptsEntryDTO
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.tristate.unset import UNSET, Unset
+from ai.backend.common.typed_validators import HealthCheckPath
 
 
 class PresetModelHealthCheckInput(BaseRequestModel):
@@ -42,7 +43,7 @@ class PresetModelHealthCheckInput(BaseRequestModel):
         "immediately and the remaining fields are ignored.",
     )
     interval: float = Field(default=10.0, description="Interval in seconds between health checks.")
-    path: str = Field(default="/health", description="Path to check for health status.")
+    path: HealthCheckPath = Field(default="/health", description="Path to check for health status.")
     max_retries: int = Field(default=10, description="Maximum number of retries for health check.")
     max_wait_time: float = Field(
         default=15.0, description="Maximum time in seconds to wait for a health check response."
@@ -188,7 +189,7 @@ class UpdatePresetModelHealthCheckInput(BaseRequestModel):
 
     enable: bool | None | Unset = Field(default=UNSET)
     interval: float | None | Unset = Field(default=UNSET)
-    path: str | None | Unset = Field(default=UNSET)
+    path: HealthCheckPath | None | Unset = Field(default=UNSET)
     max_retries: int | None | Unset = Field(default=UNSET)
     max_wait_time: float | None | Unset = Field(default=UNSET)
     expected_status_code: Annotated[int, Field(gt=100)] | None | Unset = Field(default=UNSET)

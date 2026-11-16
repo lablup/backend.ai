@@ -101,7 +101,18 @@ class TheDeletedIdComesBack(Then[ARegistryAndACaller, PurgeContainerRegistryPayl
                         english="the id of the container registry seeded in advance",
                     ),
                 ),
-            )
+            ),
+            Held(
+                "entity_id",
+                payload.entity_id,
+                SameAs(
+                    wanted,
+                    Says(
+                        "미리 저장한 컨테이너 레지스트리의 id",
+                        english="the id of the container registry seeded in advance",
+                    ),
+                ),
+            ),
         ]
 
 

@@ -12,7 +12,7 @@ from __future__ import annotations
 import enum
 from collections.abc import Collection
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, override
 from uuid import UUID
 
@@ -56,6 +56,8 @@ from bai_scenario.seeds.session.session import TestSeedSessionInGroup
 from bai_scenario.seeds.session_group.session_group import (
     TestSeedDeploymentSessionGroup,
     TestSeedPrimaryReplicaGroupOf,
+    TestSeedRetiredReplicaGroupOf,
+    TestSeedRetiredSessionGroupOf,
     TestSeedSessionGroup,
 )
 from bai_scenario.seeds.user.fields import TestSeedKeypairOf
@@ -346,6 +348,75 @@ class SessionGroupsInTwoProjects(Given[Any, SessionGroupsAndACaller]):
             deployment_group=seeding.made(deployment_group),
             elsewhere_group=seeding.made(elsewhere_group),
             strangers_group=seeding.made(strangers_group),
+            caller=seeding.made(caller),
+        )
+
+
+@dataclass(frozen=True)
+class SessionGroupsAndARetiredOne:
+    """한 프로젝트의 세션 그룹 둘과, 그 프로젝트를 보는 사람.
+
+    하나는 사용자가 만든 것이고, 다른 하나는 서비스를 마친 배포의 replica group 이 가진
+    세션 그룹이라 삭제 시각이 찍혀 있다.
+    """
+
+    domain: DomainData
+    project: ProjectData
+    owner: UserData
+    live_group: SessionGroupData
+    """사용자가 만든 세션 그룹. 삭제 시각이 없다."""
+    retired_group: SessionGroupData
+    """배포의 replica group 이 서비스를 마쳐 삭제 시각이 찍힌 세션 그룹."""
+    caller: UserData
+
+
+@dataclass(frozen=True)
+class SessionGroupsWithARetiredOne(Given[Any, SessionGroupsAndARetiredOne]):
+    """한 프로젝트에 사용자가 만든 세션 그룹과 서비스를 마친 배포의 replica group 이 가진 세션 그룹, 그리고 그 프로젝트를 보는 사람."""
+
+    role: UserRole = UserRole.SUPERADMIN
+
+    @override
+    def describe(self) -> str:
+        who = "superadmin" if self.role is UserRole.SUPERADMIN else "사용자"
+        return Says(
+            "한 프로젝트에 사용자가 만든 세션 그룹과 서비스를 마친 배포의 replica group 이 가진 "
+            f"세션 그룹, 그리고 그 프로젝트를 보는 {who} 한 명",
+            english=(
+                "the session group a user made in one project and the session group held by a "
+                "replica group that stopped serving, and one "
+                f"{who} looking at that project"
+            ),
+        )
+
+    @override
+    async def lay(self, seeding: Any) -> SessionGroupsAndARetiredOne:
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+        policy = await seeding.once(TestSeedProjectPolicy())
+        project = await seeding.creating_from_two(TestSeedProject(name_hint="team"), domain, policy)
+        resource_group = await seeding.creating(TestSeedResourceGroup())
+        owner = await seeding.within(SomeoneOf(domain))
+
+        live_group = await seeding.creating_from_two(TestSeedSessionGroup(), project, owner)
+        deployment = await seeding.creating_from_three(
+            TestSeedDeployment(), project, resource_group, owner
+        )
+        held_group = await seeding.creating_from(TestSeedDeploymentSessionGroup(), deployment)
+        retired_replica_group = await seeding.adding(
+            TestSeedRetiredReplicaGroupOf(session_group_id=seeding.made(held_group).id),
+            deployment,
+        )
+        retired_group = await seeding.creating_from(
+            TestSeedRetiredSessionGroupOf(deleted_at=datetime.now(UTC)), retired_replica_group
+        )
+        caller = await seeding.within(SomeoneOf(domain, role=self.role))
+
+        return SessionGroupsAndARetiredOne(
+            domain=seeding.made(domain),
+            project=seeding.made(project),
+            owner=seeding.made(owner),
+            live_group=seeding.made(live_group),
+            retired_group=seeding.made(retired_group),
             caller=seeding.made(caller),
         )
 

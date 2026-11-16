@@ -22,7 +22,7 @@ from ai.backend.agent.errors.kernel import KernelRunnerReplyTimeoutError
 from ai.backend.agent.kernel import AbstractCodeRunner, AbstractKernel
 from ai.backend.agent.resources import KernelResourceSpec
 from ai.backend.agent.types import AgentEventData, KernelOwnershipData
-from ai.backend.agent.utils import get_arch_name
+from ai.backend.agent.utils import get_arch_name, write_file_beneath
 from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import CodeCompletionResp
@@ -292,12 +292,10 @@ class KubernetesKernel(AbstractKernel):
         if not host_abspath.is_relative_to(host_work_dir):
             raise PermissionError("Not allowed to upload files outside /home/work")
 
-        def _write_to_disk() -> None:
-            host_abspath.parent.mkdir(parents=True, exist_ok=True)
-            host_abspath.write_bytes(filedata)
-
         try:
-            await run_in_executor_with_context(None, _write_to_disk)
+            await run_in_executor_with_context(
+                None, write_file_beneath, host_work_dir, host_abspath, filedata
+            )
         except OSError as e:
             raise RuntimeError(
                 f"{self.kernel_id}: writing uploaded file failed: {container_path} -> {host_abspath} ({e!r})"

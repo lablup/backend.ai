@@ -19,7 +19,6 @@ from ai.backend.manager.errors.role_preset import (
 )
 from ai.backend.manager.models.base import ensure_all_tables_registered
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission_field import PermissionFieldRow
@@ -85,7 +84,6 @@ async def database(
             ProjectResourcePolicyRow,
             KeyPairResourcePolicyRow,
             UserRow,
-            KeyPairRow,
             ProjectRow,
             VirtualEntityRow,
             EntityMembershipRow,

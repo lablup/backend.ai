@@ -19,7 +19,7 @@ from ai.backend.common.config import (
 )
 from ai.backend.common.events.event_types.session.broadcast import SchedulingBroadcastEvent
 from ai.backend.common.events.types import AbstractEvent
-from ai.backend.common.plugin.hook import HookPluginContext
+from ai.backend.common.plugin.hook_context import HookPluginContext
 from ai.backend.common.types import (
     SessionId,
 )

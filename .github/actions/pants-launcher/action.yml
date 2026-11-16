@@ -1,0 +1,21 @@
+name: pants-launcher
+description: >-
+  Put the Pants launcher on the PATH from the actions cache. On a cache miss,
+  download it with the repository's retrying get-pants.sh; the cache is saved
+  when the job ends. Run it before init-pants, which then finds `pants`.
+runs:
+  using: composite
+  steps:
+    - name: Restore the Pants launcher
+      id: launcher
+      uses: actions/cache@v5
+      with:
+        path: ~/.local/bin/pants
+        key: pants-launcher-${{ runner.os }}-${{ runner.arch }}
+    - name: Download the Pants launcher
+      if: steps.launcher.outputs.cache-hit != 'true'
+      shell: bash
+      run: ${{ github.workspace }}/get-pants.sh
+    - name: Add the Pants launcher to the PATH
+      shell: bash
+      run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"

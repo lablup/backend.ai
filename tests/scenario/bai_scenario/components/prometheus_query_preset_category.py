@@ -12,9 +12,11 @@ from datetime import datetime
 from typing import Any, override
 from uuid import UUID
 
+from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.prometheus_query_preset_category import (
     PrometheusQueryPresetCategoryEntityType,
 )
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.prometheus_query_preset_category.response import (
@@ -22,6 +24,8 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset_category.response 
     DeleteCategoryPayload,
     SearchCategoriesPayload,
 )
+from ai.backend.manager.data.permission.global_entity import global_entity_id
+from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.prometheus_query_preset_category.types import (
     PrometheusQueryPresetCategoryData,
 )
@@ -41,10 +45,12 @@ from ai.backend.testutils.scenario_steps import (
     Then,
     Verdict,
 )
-from bai_scenario.components.domain import Mentions, WrittenByThisRun
+from bai_scenario.components.domain import WAS_HERE, Mentions, SomeoneOf, WrittenByThisRun
 from bai_scenario.components.system import lay_a_public_reader
+from bai_scenario.seeds.domain.domain import TestSeedDomain
 from bai_scenario.seeds.prometheus_query_preset_category.category import TestSeedCategory
-from bai_scenario.seeds.seeder import Laid
+from bai_scenario.seeds.rbac.role import TestSeedPermission, TestSeedRole
+from bai_scenario.seeds.seeder import Laid, TestSeeder, TestSeedNest
 
 type CategoryNodeAnswer = CategoryNode | None
 """The get payload may carry no node, so every step answering a node is typed by this."""
@@ -87,8 +93,51 @@ class ManyCategoriesAndACaller:
     caller: UserData
 
 
-async def lay_someone(seeding: Any, role: UserRole) -> Laid[UserData]:
-    """호출자 한 명. public 에서 읽을 권한을 함께 받는다."""
+@dataclass(frozen=True)
+class SomeoneGrantedOnCategories(TestSeedNest[Laid[UserData]]):
+    """global 에서 카테고리에 대한 권한을 받은 사용자."""
+
+    domain: Laid[Any]
+    granted: tuple[Permission, ...]
+    role: UserRole = UserRole.USER
+
+    @override
+    def kind(self) -> str:
+        return Says(
+            "global 에서 카테고리 권한을 받은 사용자 준비",
+            english="Prepare a user granted permission on categories in global",
+        )
+
+    @override
+    def lay(self, seed: TestSeeder) -> Laid[UserData]:
+        someone = seed.within(SomeoneOf(self.domain, role=self.role))
+        granted_role = seed.creating_from(
+            TestSeedRole(
+                lambda _: global_entity_id(GlobalEntityName.GLOBAL), name_hint="category-keeper"
+            ),
+            someone,
+        )
+        for permission in self.granted:
+            seed.adding(
+                TestSeedPermission(
+                    entity_type=PrometheusQueryPresetCategoryEntityType(), permission=permission
+                ),
+                granted_role,
+            )
+        seed.granting(granted_role, someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id))
+        return someone
+
+
+async def lay_someone(
+    seeding: Any, role: UserRole, granted: tuple[Permission, ...] = ()
+) -> Laid[UserData]:
+    """호출자 한 명. `granted`가 없으면 public 에서 읽을 권한을 함께 받는다."""
+    if granted:
+        home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+        caller: Laid[UserData] = await seeding.within(
+            SomeoneGrantedOnCategories(home, granted, role=role)
+        )
+        return caller
     return await lay_a_public_reader(seeding, PrometheusQueryPresetCategoryEntityType(), role)
 
 
@@ -150,13 +199,24 @@ class ACategoryAndNobody(Given[Any, ACategoryAlone]):
 
 @dataclass(frozen=True)
 class ManyCategoriesAndSomeone(Given[Any, ManyCategoriesAndACaller]):
-    """카테고리 여럿과, 호출자 한 명."""
+    """카테고리 여럿과, 호출자 한 명. `granted`가 있으면 global 에서 그 권한을 받는다."""
 
     role: UserRole = UserRole.USER
     besides: int = 1
+    granted: tuple[Permission, ...] = ()
 
     @override
     def describe(self) -> str:
+        if self.granted:
+            permissions = ", ".join(one.name or str(int(one)) for one in self.granted)
+            return Says(
+                f"카테고리 {self.besides + 1}개와, global 에서 {permissions} 권한을 받은 "
+                "일반 사용자 한 명",
+                english=(
+                    f"{self.besides + 1} categories and one regular user granted "
+                    f"{permissions} in global"
+                ),
+            )
         return Says(
             f"카테고리 {self.besides + 1}개와, {self.role.value} 한 명",
             english=f"{self.besides + 1} categories and one {self.role.value}",
@@ -168,7 +228,7 @@ class ManyCategoriesAndSomeone(Given[Any, ManyCategoriesAndACaller]):
         others = [
             await seeding.creating(TestSeedCategory(name_hint="other")) for _ in range(self.besides)
         ]
-        caller = await lay_someone(seeding, self.role)
+        caller = await lay_someone(seeding, self.role, self.granted)
         return ManyCategoriesAndACaller(
             laid=tuple(seeding.made(one) for one in [wanted, *others]),
             named=seeding.made(wanted),

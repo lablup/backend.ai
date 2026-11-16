@@ -286,11 +286,44 @@ class AnEmptyListAnswersEmpty(
         return NothingComesBack()
 
 
+@dataclass(frozen=True)
+class AUserWithoutReadPermissionIsRefusedOnBatchRead(
+    Scenario[TestSeedingSession, ManyPresetsAndACaller, RuntimeVariantPresetAdapter, Loaded]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-without-read-permission-is-refused-on-batch-read"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "public 에서 런타임 파라미터 조회 권한이 없는 사용자가 ID 로 여럿을 조회하면 조회 "
+            "전체가 거부됩니다",
+            english=(
+                "when a user without read permission on presets in public reads several by id, "
+                "the whole read is refused"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ManyPresetsAndACaller]:
+        return ManyPresetsAndSomeone(reading_in_public=False)
+
+    @override
+    def when(self) -> When[ManyPresetsAndACaller, RuntimeVariantPresetAdapter, Loaded]:
+        return ReadingManyByIds()
+
+    @override
+    def then(self) -> Then[ManyPresetsAndACaller, Loaded]:
+        return TheCallIsRefused(NotEnoughPermission)
+
+
 SCENARIOS: list[ReadingStep] = [
     AUserGrantedNothingReadsById(started=datetime.now(UTC)),
     AnIdNothingAnswersToIsNotFound(),
     MixedIdsComeBackInOrder(started=datetime.now(UTC)),
     AnEmptyListAnswersEmpty(),
+    AUserWithoutReadPermissionIsRefusedOnBatchRead(),
 ]
 
 

@@ -75,7 +75,13 @@ from ai.backend.manager.models.user.row import users
 from ai.backend.manager.models.vfolder.row import vfolders
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.server import webapp_plugin_ctx
-from ai.backend.testutils.bootstrap import POSTGRES_MAINTENANCE_DB, POSTGRES_PASSWORD, POSTGRES_USER
+from ai.backend.testutils.bootstrap import (
+    ETCD_PASSWORD,
+    ETCD_USER,
+    POSTGRES_MAINTENANCE_DB,
+    POSTGRES_PASSWORD,
+    POSTGRES_USER,
+)
 from ai.backend.testutils.pants import get_parallel_slot
 
 # Import testcontainer fixtures (etcd_container, redis_container, postgres_container)
@@ -220,6 +226,8 @@ def bootstrap_config(
         etcd=EtcdConfig.model_validate({
             "namespace": test_id,
             "addr": HostPortPairModel(host=etcd_addr.host, port=etcd_addr.port),
+            "user": ETCD_USER,
+            "password": ETCD_PASSWORD,
         }),
         db=DatabaseConfig.model_validate({
             "addr": postgres_addr,

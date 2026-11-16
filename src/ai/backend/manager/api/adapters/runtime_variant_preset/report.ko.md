@@ -2,15 +2,15 @@
 
 [배경](/src/ai/backend/manager/api/adapters/runtime_variant_preset/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/runtime_variant_preset/adapter.py)
 
-시나리오: 미완성 4 / 8
+시나리오: 미완성 2 / 8
 
 - ops 구성 (6)
-  - batch_load_by_ids: 대표 성공 ✓ · 대표 거부 ✗: SCENARIO-GAP
+  - batch_load_by_ids: 대표 성공 ✓ · 대표 거부 ✓
   - create: 대표 성공 ✓ · 대표 거부 ✓
   - get: 대표 성공 ✓ · 대표 거부 ✓
   - partial_bulk_purge: 대표 성공 ✓ · 대표 거부 ✗: SCENARIO-GAP
   - purge: 대표 성공 ✓ · 대표 거부 ✓
-  - search: 대표 성공 ✓ · 대표 거부 ✗: SCENARIO-GAP
+  - search: 대표 성공 ✓ · 대표 거부 ✓
 - 직접 구현 (2)
   - partial_bulk_update: 성공 있음 2 · 거부 없음 (partial_bulk): SCENARIO-GAP
   - update: 성공 있음 5 · 거부 있음 2 (single_entity)
@@ -21,6 +21,7 @@
 |---|---|
 | [빈 ID 목록으로 조회하면 빈 응답이 반환되며 하위 계층은 호출하지 않습니다](#reading-an-empty-preset-id-list-answers-empty-without-a-call) | 성공 |
 | [존재하는 ID 둘과 존재하지 않는 ID 하나를 함께 조회하면 요청한 순서대로 반환되고, 존재하지 않는 ID 의 위치는 비어 있습니다](#reading-presets-read-by-many-ids-come-back-in-the-order-asked) | 성공 |
+| [public 에서 런타임 파라미터 조회 권한이 없는 사용자가 ID 로 여럿을 조회하면 조회 전체가 거부됩니다](#reading-a-user-without-read-permission-is-refused-on-batch-read) | 거부 |
 
 **create**
 
@@ -66,6 +67,7 @@
 | [런타임 파라미터가 두 인퍼런스 런타임 종류에 나뉘어 있을 때 한 인퍼런스 런타임 종류를 필터로 조회하면 해당 인퍼런스 런타임 종류의 런타임 파라미터만 반환됩니다](#searching-a-variant-filter-narrows-the-answer-to-that-variants-presets) | 성공 |
 | [추가 버전과 폐기 버전이 서로 다른 런타임 파라미터를 버전 필터로 조회하면 추가 버전 이상이고 폐기 버전 미만인 런타임 파라미터만 반환됩니다. 값이 비어 있는 쪽에는 제한이 없습니다](#searching-a-version-filter-keeps-only-the-presets-valid-at-that-version) | 성공 |
 | [런타임 파라미터가 11개 있을 때 페이지 크기를 생략하면 10건을 반환하고 다음 페이지가 있음을 표시합니다](#searching-omitting-the-page-size-answers-ten-presets-and-a-next-page) | 성공 |
+| [public 에서 런타임 파라미터 조회 권한이 없는 사용자가 검색하면 검색 전체가 거부됩니다](#searching-a-user-without-read-permission-is-refused-on-search) | 거부 |
 
 **partial_bulk_update**
 
@@ -181,6 +183,34 @@ Then
   - items[1].created_at: 이 실행이 쓴 시각
   - items[1].updated_at: 이 실행이 쓴 시각
   - items[2] = None
+
+<a id="reading-a-user-without-read-permission-is-refused-on-batch-read"></a>
+
+#### [a-user-without-read-permission-is-refused-on-batch-read](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_reading.py): pass
+
+public 에서 런타임 파라미터 조회 권한이 없는 사용자가 ID 로 여럿을 조회하면 조회 전체가 거부됩니다
+
+Given
+
+- 한 변형의 프리셋 2개와 아무 권한도 없는 일반 사용자 한 명
+  - 인퍼런스 런타임 종류 runtime-1: 기본 모델 정의가 비어 있고, 모델 vfolder 의 설정 파일을 읽지 않습니다
+  - 런타임 파라미터 preset-1: 대상 env, 값 종류 str
+  - 런타임 파라미터 preset-2: 대상 env, 값 종류 str
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- RuntimeVariantPresetAdapter.batch_load_by_ids: user-1이 미리 저장한 런타임 파라미터 2개와 존재하지 않는 ID 하나를 함께 조회합니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
 
 ### create
 
@@ -961,6 +991,34 @@ Then
   - total_count = 11
   - has_next_page = True
   - has_previous_page = False
+
+<a id="searching-a-user-without-read-permission-is-refused-on-search"></a>
+
+#### [a-user-without-read-permission-is-refused-on-search](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_searching.py): pass
+
+public 에서 런타임 파라미터 조회 권한이 없는 사용자가 검색하면 검색 전체가 거부됩니다
+
+Given
+
+- 한 변형의 프리셋 2개와 아무 권한도 없는 일반 사용자 한 명
+  - 인퍼런스 런타임 종류 runtime-1: 기본 모델 정의가 비어 있고, 모델 vfolder 의 설정 파일을 읽지 않습니다
+  - 런타임 파라미터 preset-1: 대상 env, 값 종류 str
+  - 런타임 파라미터 preset-2: 대상 env, 값 종류 str
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- RuntimeVariantPresetAdapter.search: user-1이 필터 없이 전체를 조회합니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
 
 ### partial_bulk_update
 

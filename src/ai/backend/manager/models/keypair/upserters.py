@@ -35,8 +35,6 @@ class KeypairUpserter(FieldUpserter[UserID, KeyPairRow, KeyPairData]):
     is_default: bool
     resource_policy_id: KeyPairResourcePolicyUUID
     rate_limit: int | None
-    ssh_public_key: str | None
-    ssh_private_key: str | None
 
     @override
     def row_class(self) -> type[KeyPairRow]:
@@ -75,8 +73,6 @@ class KeypairUpserter(FieldUpserter[UserID, KeyPairRow, KeyPairData]):
             "resource_policy": sa.select(KeyPairResourcePolicyRow.name)
             .where(KeyPairResourcePolicyRow.uuid == self.resource_policy_id)
             .scalar_subquery(),
-            "ssh_public_key": self.ssh_public_key,
-            "ssh_private_key": self.ssh_private_key,
         }
         if self.rate_limit is not None:
             values["rate_limit"] = self.rate_limit

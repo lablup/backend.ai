@@ -46,7 +46,7 @@ foreign key 는 `ON DELETE SET NULL` 이다. 사용자를 영구 삭제해도 pr
 
 - project 가 보유한 것은 계정보다 오래 남는다. 사용자 row 를 삭제하는 같은 transaction 에서 개인 vfolder 를 삭제하면 데이터를 전달할 방법이 없다.
 - project 삭제는 그 안의 자원을 정리하는 일이고 비동기 작업이다. 동기 purge transaction 에 속하지 않는다.
-- 그래서 creator 가 NULL 인 개인 project 는 **dangling** 이고 retention sweep 이 수집한다. project 도 함께 없애려는 삭제 요청은 API option 으로 이를 알리고, 삭제 자체는 비동기로 남는다.
+- 그래서 creator 가 NULL 인 개인 project 는 **dangling** 이고 삭제된 지 `projects` 정책 기간이 지나면 retention sweep 이 수집한다. 사용자 purge 는 user row 를 삭제하기 전에 project 를 `deleted` 로 표시한다. creator column 을 비우는 것은 FK 다. project 도 함께 없애려는 삭제 요청은 API option 으로 이를 알리고, 삭제 자체는 비동기로 남는다.
 
 일반 project 에서 `creator_id` 는 단순한 audit 정보이고 비어 있어도 의미가 없다. 그래서 이 key 가 `RESTRICT` 가 아니다. 오래전 누군가가 생성한 팀 project 가 그 사용자의 purge 를 방해해서는 안 된다.
 

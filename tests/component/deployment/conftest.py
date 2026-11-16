@@ -16,7 +16,7 @@ from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.common.plugin.hook import HookPluginContext
+from ai.backend.common.plugin.hook_context import HookPluginContext
 from ai.backend.common.types import (
     QuotaScopeID,
     QuotaScopeType,
@@ -34,6 +34,7 @@ from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.data.vfolder.types import (
     VFolderOperationStatus,
     VFolderOwnershipType,
@@ -55,6 +56,7 @@ from ai.backend.manager.repositories.rbac.permission_check_repository import (
     RbacPermissionCheckRepository,
 )
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.deployment.service import DeploymentService
 from ai.backend.manager.sokovan.deployment.deployment_controller import (
@@ -129,6 +131,7 @@ def deployment_processors(
         config_provider,
         storage_manager,
         RbacPermissionCheckRepository(PermissionOpsProvider(database_engine), config_provider),
+        key_provider_pool=KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )
     scheduling_controller = SchedulingController(
         SchedulingControllerArgs(
@@ -160,6 +163,7 @@ def deployment_processors(
     service = DeploymentService(
         deployment_controller,
         repo,
+        agent_repository=MagicMock(),
         appproxy_client_pool=mock_appproxy_client_pool,
     )
     return DeploymentProcessors(

@@ -38,6 +38,11 @@ class AbstractProbeCheck[TID: Hashable](metaclass=ABCMeta):
         """
         raise NotImplementedError
 
+    @abstractmethod
+    def close(self) -> None:
+        """Releases what the check holds; it is not run again after."""
+        raise NotImplementedError
+
 
 class AbstractStatusCheck[TID: Hashable](AbstractProbeCheck[TID]):
     """A probe check that keeps its last observation for whoever reports it to read."""

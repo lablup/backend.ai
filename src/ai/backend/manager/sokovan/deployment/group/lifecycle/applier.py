@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from typing import override
 
+from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.manager.data.deployment.types import (
     ReplicaGroupHandlerCategory,
     ReplicaGroupLifecycle,
@@ -56,22 +57,30 @@ class GroupLifecycleApplier(
 
     @override
     async def apply(self, apply_input: _LifecycleApplyInput) -> None:
-        transitions = [
-            self._build_transition(decision, apply_input)
-            for decision in apply_input.result.lifecycle_decisions
-        ]
+        transitions: list[ReplicaGroupReconcileTransition] = []
+        terminal_group_ids: list[ReplicaGroupID] = []
+        for decision in apply_input.result.lifecycle_decisions:
+            target = apply_input.metadata.transitions.get(
+                apply_input.classified[decision.replica_group_id]
+            )
+            transitions.append(self._build_transition(decision, target, apply_input))
+            if target is not None and target.lifecycle in ReplicaGroupLifecycle.terminal_statuses():
+                terminal_group_ids.append(decision.replica_group_id)
         await self._replica_group_repository.apply_lifecycle_reconcile(
-            ReplicaGroupLifecycleReconcileApply(transitions=transitions)
+            ReplicaGroupLifecycleReconcileApply(
+                transitions=transitions,
+                terminal_group_ids=terminal_group_ids,
+            )
         )
 
     def _build_transition(
         self,
         decision: GroupLifecycleDecision,
+        target: GroupReconcileStatus | None,
         apply_input: _LifecycleApplyInput,
     ) -> ReplicaGroupReconcileTransition:
         metadata = apply_input.metadata
         result = apply_input.classified[decision.replica_group_id]
-        target = metadata.transitions.get(result)
         if target is not None:
             lifecycle_state = OptionalState.update(target.lifecycle)
             scaling_state = OptionalState.update(target.scaling_status)

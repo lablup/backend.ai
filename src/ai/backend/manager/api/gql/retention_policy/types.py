@@ -79,6 +79,7 @@ class RetentionCategoryGQL(StrEnum):
     SESSIONS = "sessions"
     USAGE_RECORDS = "usage_records"
     USAGE_BUCKETS = "usage_buckets"
+    PROJECTS = "projects"
 
 
 @gql_enum(

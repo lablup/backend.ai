@@ -45,15 +45,18 @@ All development commands use `pants` instead of `pip`, `poetry`, or `uv`.
 
 ## Automated Quality Checks
 
-### Claude Code Hooks (`.claude/settings.local.json`, gitignored)
-- **PostToolUse**: Runs `pants fmt` after Edit/Write operations
-- **Stop**: Runs `pants fix` on modified Python files when Claude finishes
-
 ### Git Pre-commit Hook (`scripts/pre-commit.sh`)
 - Runs on every `git commit`
-- Validates: `pants fmt`, `pants lint` on changed files (fast local feedback)
+- Runs `ruff format` and `ruff check` on staged Python files through `uvx`, with the ruff version from `pants.toml`
+- A file that `ruff format` rewrites blocks the commit; stage it and commit again
+- Visibility rules run only in CI (`pants lint`)
 - CI handles type checking and tests (`ci.yml` lint-and-typecheck and test jobs)
 - Bypass with `git commit --no-verify` for work-in-progress commits, but not on main or release branches
+
+### Git Pre-push Hook (`scripts/pre-push.sh`)
+- Runs on every `git push`
+- Runs `scripts/knowledge/check_words.py` against the PR's base branch (`HEAD~1` without `gh`)
+- Does not run pants; CI runs lint, type checking and tests
 
 ## Running Pants Commands
 

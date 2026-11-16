@@ -6,7 +6,7 @@
 
 - ops 구성 (5)
   - admin_search: 대표 성공 ✓ · 대표 거부 ✓
-  - batch_load_by_ids: 대표 성공 ✗ · 대표 거부 ✗: SCENARIO-GAP
+  - batch_load_by_ids: 대표 성공 ✓ · 대표 거부 ✗: SCENARIO-GAP
   - partial_bulk_purge: 대표 성공 ✓ · 대표 거부 ✗: SCENARIO-GAP
   - purge: 대표 성공 ✓ · 대표 거부 ✓
   - upsert: 대표 성공 ✓ · 대표 거부 ✓
@@ -18,6 +18,12 @@
 | [모니터 역할이 필터 없이 조회하면 superadmin 과 같은 응답이 반환됩니다. superadmin 검사는 모니터의 읽기를 허용합니다](#searching-the-monitor-searches-masking-policies-like-the-superadmin) | 성공 |
 | [대상이 다른 정책 둘이 있을 때 superadmin 이 필터 없이 조회하면 둘 다 집계됩니다](#searching-the-superadmin-counts-every-masking-policy-laid) | 성공 |
 | [superadmin 이 아닌 사용자가 전체를 조회하도록 요청하면 역할 부족으로 거부됩니다](#searching-a-user-who-is-not-the-superadmin-may-not-search-masking-policies) | 거부 |
+
+**batch_load_by_ids**
+
+| 시나리오 | 판정 |
+|---|---|
+| [superadmin 이 미리 저장한 정책 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id 에 해당하는 항목은 비어 있습니다](#reading-the-superadmin-batch-load-leaves-a-missing-id-empty) | 성공 |
 
 **partial_bulk_purge**
 
@@ -136,6 +142,52 @@ Then
 
 - 거부됩니다
   - 거부: InsufficientPrivilege
+
+### batch_load_by_ids
+
+<a id="reading-the-superadmin-batch-load-leaves-a-missing-id-empty"></a>
+
+#### [the-superadmin-batch-load-leaves-a-missing-id-empty](/tests/scenario/bai_scenario/manager/client_ip_masking/test_reading.py): pass
+
+superadmin 이 미리 저장한 정책 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id 에 해당하는 항목은 비어 있습니다
+
+Given
+
+- 대상이 다른 클라이언트 IP 마스킹 정책 둘과, superadmin 한 명
+  - 클라이언트 IP 마스킹 정책 default: truncate 모드, 접두 길이 v4 24, v6 48
+  - 클라이언트 IP 마스킹 정책 login_history: truncate 모드, 접두 길이 v4 24, v6 48
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- ClientIPMaskingAdapter.batch_load_by_ids: user-1이 미리 저장한 정책 2개와 없는 id 하나를 한 번에 조회합니다
+
+Then
+
+- 요청한 순서대로 반환되고, 없는 id 에 해당하는 항목은 비어 있습니다
+  - len(items) = 3
+  - items[0].id: 미리 저장한 정책와 같다
+  - items[0].entity_id: 미리 저장한 정책와 같다
+  - items[0].target_type = 'default'
+  - items[0].mode = 'truncate'
+  - items[0].ipv4_prefix = 24
+  - items[0].ipv6_prefix = 48
+  - items[0].created_at: 이 실행이 쓴 시각
+  - items[0].updated_at: 이 실행이 쓴 시각
+  - items[1].id: 미리 저장한 정책와 같다
+  - items[1].entity_id: 미리 저장한 정책와 같다
+  - items[1].target_type = 'login_history'
+  - items[1].mode = 'truncate'
+  - items[1].ipv4_prefix = 24
+  - items[1].ipv6_prefix = 48
+  - items[1].created_at: 이 실행이 쓴 시각
+  - items[1].updated_at: 이 실행이 쓴 시각
+  - items[2] = None
 
 ### partial_bulk_purge
 

@@ -2,18 +2,18 @@
 
 [background](/src/ai/backend/manager/api/adapters/notification/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/notification/adapter.py)
 
-Scenario: incomplete 6 / 18
+Scenario: incomplete 3 / 18
 
 - built from ops (16)
-  - batch_load_channels_by_ids: representative success ✓ · representative rejection ✗: SCENARIO-GAP
-  - batch_load_rules_by_ids: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - batch_load_channels_by_ids: representative success ✓ · representative rejection ✓
+  - batch_load_rules_by_ids: representative success ✓ · representative rejection ✓
   - create_channel: representative success ✓ · representative rejection ✓
   - create_rule: representative success ✓ · representative rejection ✓
   - get_channel: representative success ✓ · representative rejection ✓
   - get_rule: representative success ✓ · representative rejection ✓
   - partial_bulk_purge_channels: representative success ✓ · representative rejection ✗: SCENARIO-GAP
   - partial_bulk_purge_rules: representative success ✓ · representative rejection ✗: SCENARIO-GAP
-  - partial_bulk_update_channels: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - partial_bulk_update_channels: representative success ✓ · representative rejection ✓
   - partial_bulk_update_rules: representative success ✓ · representative rejection ✗: SCENARIO-GAP
   - purge_channel: representative success ✓ · representative rejection ✓
   - purge_rule: representative success ✓ · representative rejection ✓
@@ -30,16 +30,16 @@ Scenario: incomplete 6 / 18
 | scenario | verdict |
 |---|---|
 | [a batch load with an empty id list brings an empty response without calling the lower layer](#reading_channels-a-batch-load-of-no-channel-ids-answers-an-empty-list) | answered |
-| [when a user granted nothing batch-loads two channels, the call is not rejected and each item carries a rejection for not enough permission](#reading_channels-a-user-granted-nothing-batch-loading-channels-is-refused-per-item) | answered |
 | [when the superadmin batch-loads two channels created in advance and one unknown id, they come back in the order asked and the item for the unknown id is empty](#reading_channels-the-superadmin-batch-load-leaves-a-missing-id-empty) | answered |
+| [when a user granted nothing batch-loads two channels, the call is not rejected and each item carries a rejection for not enough permission](#reading_channels-a-user-granted-nothing-batch-loading-channels-is-refused-per-item) | rejected |
 
 **batch_load_rules_by_ids**
 
 | scenario | verdict |
 |---|---|
 | [a batch load with an empty id list brings an empty response without calling the lower layer](#reading_rules-a-batch-load-of-no-rule-ids-answers-an-empty-list) | answered |
-| [when a user granted nothing batch-loads two rules, the call is not rejected and each item carries a rejection for not enough permission](#reading_rules-a-user-granted-nothing-batch-loading-rules-is-refused-per-item) | answered |
 | [when the superadmin batch-loads two rules created in advance and one unknown id, they come back in the order asked and the item for the unknown id is empty](#reading_rules-the-superadmin-batch-load-leaves-a-missing-rule-id-empty) | answered |
+| [when a user granted nothing batch-loads two rules, the call is not rejected and each item carries a rejection for not enough permission](#reading_rules-a-user-granted-nothing-batch-loading-rules-is-refused-per-item) | rejected |
 
 **create_channel**
 
@@ -101,6 +101,7 @@ Scenario: incomplete 6 / 18
 |---|---|
 | [when a user granted nothing edits several channels at once, nothing is edited and every one comes back in the failed list because permission is not enough](#partial_bulk_editing_channels-a-user-granted-nothing-edits-none-of-several-channels) | answered |
 | [when the superadmin changes the description of two channels at once, both come back with the new description and nothing failed](#partial_bulk_editing_channels-the-superadmin-describes-several-channels-at-once) | answered |
+| [when the superadmin edits two channels at once and one carries a spec naming neither webhook nor email, the call is rejected](#partial_bulk_editing_channels-a-spec-naming-neither-webhook-nor-email-refuses-the-bulk-edit) | rejected |
 
 **partial_bulk_update_rules**
 
@@ -220,35 +221,6 @@ Then
 - an empty response comes back
   - items = []
 
-<a id="reading_channels-a-user-granted-nothing-batch-loading-channels-is-refused-per-item"></a>
-
-#### [a-user-granted-nothing-batch-loading-channels-is-refused-per-item](/tests/scenario/bai_scenario/manager/notification/test_reading_channels.py): pass
-
-when a user granted nothing batch-loads two channels, the call is not rejected and each item carries a rejection for not enough permission
-
-Given
-
-- two webhook channels and one regular user
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-  - Webhook channel wanted-1: sends to https://hooks.example.test/notify
-  - Webhook channel other-1: sends to https://hooks.example.test/notify
-
-When
-
-- NotificationAdapter.batch_load_channels_by_ids: user-1 batch-loads the 2 channels created in advance
-
-Then
-
-- each item carries a rejection for not enough permission
-  - len(items) = 2
-  - items[0] = 'NotEnoughPermission'
-  - items[1] = 'NotEnoughPermission'
-
 <a id="reading_channels-the-superadmin-batch-load-leaves-a-missing-id-empty"></a>
 
 #### [the-superadmin-batch-load-leaves-a-missing-id-empty](/tests/scenario/bai_scenario/manager/notification/test_reading_channels.py): pass
@@ -276,6 +248,7 @@ Then
 - they come back in the order asked and the item for an unknown id is empty
   - len(items) = 3
   - items[0].id: skipped: the database generates it
+  - items[0].entity_id: same as the id of the channel created in advance
   - items[0].name = 'wanted-1'
   - items[0].description = None
   - items[0].channel_type = 'webhook'
@@ -286,6 +259,7 @@ Then
   - items[0].created_at: the time this run wrote
   - items[0].updated_at: the time this run wrote
   - items[1].id: skipped: the database generates it
+  - items[1].entity_id: same as the id of the channel created in advance
   - items[1].name = 'other-1'
   - items[1].description = None
   - items[1].channel_type = 'webhook'
@@ -296,6 +270,35 @@ Then
   - items[1].created_at: the time this run wrote
   - items[1].updated_at: the time this run wrote
   - items[2] = None
+
+<a id="reading_channels-a-user-granted-nothing-batch-loading-channels-is-refused-per-item"></a>
+
+#### [a-user-granted-nothing-batch-loading-channels-is-refused-per-item](/tests/scenario/bai_scenario/manager/notification/test_reading_channels.py): pass
+
+when a user granted nothing batch-loads two channels, the call is not rejected and each item carries a rejection for not enough permission
+
+Given
+
+- two webhook channels and one regular user
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Webhook channel wanted-1: sends to https://hooks.example.test/notify
+  - Webhook channel other-1: sends to https://hooks.example.test/notify
+
+When
+
+- NotificationAdapter.batch_load_channels_by_ids: user-1 batch-loads the 2 channels created in advance
+
+Then
+
+- each item carries a rejection for not enough permission
+  - len(items) = 2
+  - rejected: NotEnoughPermission
+  - rejected: NotEnoughPermission
 
 ### batch_load_rules_by_ids
 
@@ -327,36 +330,6 @@ Then
 - an empty response comes back
   - items = []
 
-<a id="reading_rules-a-user-granted-nothing-batch-loading-rules-is-refused-per-item"></a>
-
-#### [a-user-granted-nothing-batch-loading-rules-is-refused-per-item](/tests/scenario/bai_scenario/manager/notification/test_reading_rules.py): pass
-
-when a user granted nothing batch-loads two rules, the call is not rejected and each item carries a rejection for not enough permission
-
-Given
-
-- two rules pointing at the same webhook channel and one regular user
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-  - Webhook channel channel-1: sends to https://hooks.example.test/notify
-  - Rule wanted-1: announces session.started events
-  - Rule other-1: announces session.started events
-
-When
-
-- NotificationAdapter.batch_load_rules_by_ids: user-1 batch-loads the 2 rules created in advance
-
-Then
-
-- each item carries a rejection for not enough permission
-  - len(items) = 2
-  - items[0] = 'NotEnoughPermission'
-  - items[1] = 'NotEnoughPermission'
-
 <a id="reading_rules-the-superadmin-batch-load-leaves-a-missing-rule-id-empty"></a>
 
 #### [the-superadmin-batch-load-leaves-a-missing-rule-id-empty](/tests/scenario/bai_scenario/manager/notification/test_reading_rules.py): pass
@@ -385,6 +358,7 @@ Then
 - they come back in the order asked and the item for an unknown id is empty
   - len(items) = 3
   - items[0].id: skipped: the database generates it
+  - items[0].entity_id: same as the id of the rule created in advance
   - items[0].name = 'wanted-1'
   - items[0].description = None
   - items[0].rule_type = 'session.started'
@@ -395,6 +369,7 @@ Then
   - items[0].created_at: the time this run wrote
   - items[0].updated_at: the time this run wrote
   - items[1].id: skipped: the database generates it
+  - items[1].entity_id: same as the id of the rule created in advance
   - items[1].name = 'other-1'
   - items[1].description = None
   - items[1].rule_type = 'session.started'
@@ -405,6 +380,36 @@ Then
   - items[1].created_at: the time this run wrote
   - items[1].updated_at: the time this run wrote
   - items[2] = None
+
+<a id="reading_rules-a-user-granted-nothing-batch-loading-rules-is-refused-per-item"></a>
+
+#### [a-user-granted-nothing-batch-loading-rules-is-refused-per-item](/tests/scenario/bai_scenario/manager/notification/test_reading_rules.py): pass
+
+when a user granted nothing batch-loads two rules, the call is not rejected and each item carries a rejection for not enough permission
+
+Given
+
+- two rules pointing at the same webhook channel and one regular user
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Webhook channel channel-1: sends to https://hooks.example.test/notify
+  - Rule wanted-1: announces session.started events
+  - Rule other-1: announces session.started events
+
+When
+
+- NotificationAdapter.batch_load_rules_by_ids: user-1 batch-loads the 2 rules created in advance
+
+Then
+
+- each item carries a rejection for not enough permission
+  - len(items) = 2
+  - rejected: NotEnoughPermission
+  - rejected: NotEnoughPermission
 
 ### create_channel
 
@@ -432,6 +437,7 @@ Then
 
 - the whole channel just created comes back
   - id: skipped: the database generates it
+  - entity_id: same as the node's own id
   - name = 'muted'
   - description = None
   - channel_type = 'webhook'
@@ -466,6 +472,7 @@ Then
 
 - the whole channel just created comes back
   - id: skipped: the database generates it
+  - entity_id: same as the node's own id
   - name = 'alerts'
   - description = None
   - channel_type = 'webhook'
@@ -500,6 +507,7 @@ Then
 
 - the whole channel just created comes back
   - id: skipped: the database generates it
+  - entity_id: same as the node's own id
   - name = 'mail'
   - description = None
   - channel_type = 'email'
@@ -645,6 +653,7 @@ Then
 
 - the whole rule just created comes back
   - id: skipped: the database generates it
+  - entity_id: same as the node's own id
   - name = 'muted'
   - description = None
   - rule_type = 'session.started'
@@ -680,6 +689,7 @@ Then
 
 - the whole rule just created comes back
   - id: skipped: the database generates it
+  - entity_id: same as the node's own id
   - name = 'orphan'
   - description = None
   - rule_type = 'session.started'
@@ -715,6 +725,7 @@ Then
 
 - the whole rule just created comes back
   - id: skipped: the database generates it
+  - entity_id: same as the node's own id
   - name = 'on-start'
   - description = None
   - rule_type = 'session.started'
@@ -804,6 +815,7 @@ Then
 
 - the whole channel created in advance comes back
   - id: skipped: the database generates it
+  - entity_id: same as the id of the channel created in advance
   - name = 'channel-1'
   - description = None
   - channel_type = 'webhook'
@@ -946,6 +958,7 @@ Then
 
 - the whole rule created in advance comes back
   - id: skipped: the database generates it
+  - entity_id: same as the id of the rule created in advance
   - name = 'rule-1'
   - description = None
   - rule_type = 'session.started'
@@ -1071,6 +1084,7 @@ Then
 - every channel created in advance comes back in the processed list and an unknown id comes back in the failed list because no target answers to it
   - successes count = 2
   - successes[0].id: skipped: the database generates it
+  - successes[0].entity_id: same as the id of the channel created in advance
   - successes[0].name = 'wanted-1'
   - successes[0].description = None
   - successes[0].channel_type = 'webhook'
@@ -1081,6 +1095,7 @@ Then
   - successes[0].created_at: the time this run wrote
   - successes[0].updated_at: the time this run wrote
   - successes[1].id: skipped: the database generates it
+  - successes[1].entity_id: same as the id of the channel created in advance
   - successes[1].name = 'other-1'
   - successes[1].description = None
   - successes[1].channel_type = 'webhook'
@@ -1157,6 +1172,7 @@ Then
 - every rule created in advance comes back in the processed list and an unknown id comes back in the failed list because no target answers to it
   - successes count = 2
   - successes[0].id: skipped: the database generates it
+  - successes[0].entity_id: same as the id of the rule created in advance
   - successes[0].name = 'wanted-1'
   - successes[0].description = None
   - successes[0].rule_type = 'session.started'
@@ -1167,6 +1183,7 @@ Then
   - successes[0].created_at: the time this run wrote
   - successes[0].updated_at: the time this run wrote
   - successes[1].id: skipped: the database generates it
+  - successes[1].entity_id: same as the id of the rule created in advance
   - successes[1].name = 'other-1'
   - successes[1].description = None
   - successes[1].rule_type = 'session.started'
@@ -1241,6 +1258,7 @@ Then
 - every channel created in advance comes back in the processed list and nothing failed
   - successes count = 2
   - successes[0].id: skipped: the database generates it
+  - successes[0].entity_id: same as the id of the channel created in advance
   - successes[0].name = 'wanted-1'
   - successes[0].description = 'the description changed all at once'
   - successes[0].channel_type = 'webhook'
@@ -1251,6 +1269,7 @@ Then
   - successes[0].created_at: the time this run wrote
   - successes[0].updated_at: the time this run wrote
   - successes[1].id: skipped: the database generates it
+  - successes[1].entity_id: same as the id of the channel created in advance
   - successes[1].name = 'other-1'
   - successes[1].description = 'the description changed all at once'
   - successes[1].channel_type = 'webhook'
@@ -1261,6 +1280,33 @@ Then
   - successes[1].created_at: the time this run wrote
   - successes[1].updated_at: the time this run wrote
   - failed = []
+
+<a id="partial_bulk_editing_channels-a-spec-naming-neither-webhook-nor-email-refuses-the-bulk-edit"></a>
+
+#### [a-spec-naming-neither-webhook-nor-email-refuses-the-bulk-edit](/tests/scenario/bai_scenario/manager/notification/test_partial_bulk_editing_channels.py): pass
+
+when the superadmin edits two channels at once and one carries a spec naming neither webhook nor email, the call is rejected
+
+Given
+
+- two webhook channels and one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Webhook channel wanted-1: sends to https://hooks.example.test/notify
+  - Webhook channel other-1: sends to https://hooks.example.test/notify
+
+When
+
+- NotificationAdapter.partial_bulk_update_channels: user-1 edits 2 channels at once and puts a spec naming neither webhook nor email on the second
+
+Then
+
+- the call is rejected
+  - rejected: InvalidNotificationSpec
 
 ### partial_bulk_update_rules
 
@@ -1325,6 +1371,7 @@ Then
 - every rule created in advance comes back in the processed list and nothing failed
   - successes count = 2
   - successes[0].id: skipped: the database generates it
+  - successes[0].entity_id: same as the id of the rule created in advance
   - successes[0].name = 'wanted-1'
   - successes[0].description = 'the description changed all at once'
   - successes[0].rule_type = 'session.started'
@@ -1335,6 +1382,7 @@ Then
   - successes[0].created_at: the time this run wrote
   - successes[0].updated_at: the time this run wrote
   - successes[1].id: skipped: the database generates it
+  - successes[1].entity_id: same as the id of the rule created in advance
   - successes[1].name = 'other-1'
   - successes[1].description = 'the description changed all at once'
   - successes[1].rule_type = 'session.started'
@@ -1374,6 +1422,7 @@ Then
 
 - the id of the deleted channel comes back
   - id: same as the channel created in advance
+  - entity_id: same as the channel created in advance
 
 <a id="retiring_channels-the-superadmin-deletes-a-channel"></a>
 
@@ -1400,6 +1449,7 @@ Then
 
 - the id of the deleted channel comes back
   - id: same as the channel created in advance
+  - entity_id: same as the channel created in advance
 
 <a id="retiring_channels-a-user-granted-nothing-may-not-delete-a-channel"></a>
 
@@ -1481,6 +1531,7 @@ Then
 
 - the id of the deleted rule comes back
   - id: same as the rule created in advance
+  - entity_id: same as the rule created in advance
 
 <a id="retiring_rules-a-user-granted-nothing-may-not-delete-a-rule"></a>
 
@@ -1957,6 +2008,7 @@ Then
 
 - the whole channel created in advance comes back
   - id: skipped: the database generates it
+  - entity_id: same as the id of the channel created in advance
   - name = 'channel-1'
   - description = None
   - channel_type = 'webhook'
@@ -1992,6 +2044,7 @@ Then
 
 - the whole channel created in advance comes back
   - id: skipped: the database generates it
+  - entity_id: same as the id of the channel created in advance
   - name = 'channel-1'
   - description = None
   - channel_type = 'webhook'
@@ -2027,6 +2080,7 @@ Then
 
 - the whole channel created in advance comes back
   - id: skipped: the database generates it
+  - entity_id: same as the id of the channel created in advance
   - name = 'channel-1'
   - description = None
   - channel_type = 'webhook'
@@ -2062,6 +2116,7 @@ Then
 
 - the whole channel created in advance comes back
   - id: skipped: the database generates it
+  - entity_id: same as the id of the channel created in advance
   - name = 'channel-1'
   - description = None
   - channel_type = 'webhook'
@@ -2097,6 +2152,7 @@ Then
 
 - the whole channel created in advance comes back
   - id: skipped: the database generates it
+  - entity_id: same as the id of the channel created in advance
   - name = 'renamed'
   - description = None
   - channel_type = 'webhook'
@@ -2213,6 +2269,7 @@ Then
 
 - the whole rule created in advance comes back
   - id: skipped: the database generates it
+  - entity_id: same as the id of the rule created in advance
   - name = 'rule-1'
   - description = None
   - rule_type = 'session.started'
@@ -2249,6 +2306,7 @@ Then
 
 - the whole rule created in advance comes back
   - id: skipped: the database generates it
+  - entity_id: same as the id of the rule created in advance
   - name = 'rule-1'
   - description = None
   - rule_type = 'session.started'
@@ -2285,6 +2343,7 @@ Then
 
 - the whole rule created in advance comes back
   - id: skipped: the database generates it
+  - entity_id: same as the id of the rule created in advance
   - name = 'rule-1'
   - description = None
   - rule_type = 'session.started'
@@ -2321,6 +2380,7 @@ Then
 
 - the whole rule created in advance comes back
   - id: skipped: the database generates it
+  - entity_id: same as the id of the rule created in advance
   - name = 'rule-1'
   - description = None
   - rule_type = 'session.started'
@@ -2357,6 +2417,7 @@ Then
 
 - the whole rule created in advance comes back
   - id: skipped: the database generates it
+  - entity_id: same as the id of the rule created in advance
   - name = 'renamed'
   - description = None
   - rule_type = 'session.started'

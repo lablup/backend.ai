@@ -37,6 +37,9 @@ from ai.backend.manager.repositories.huggingface_registry.repository import Hugg
 from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.rbac.permission_check_repository import (
+    RbacPermissionCheckRepository,
+)
 from ai.backend.manager.repositories.reservoir_registry.repository import (
     ReservoirRegistryRepository,
 )
@@ -96,6 +99,7 @@ async def adapter(
                     unwired(HuggingFaceRepository, _SCANNING),
                     unwired(ReservoirRegistryRepository, _SCANNING),
                     unwired(VfolderRepository, _SCANNING),
+                    unwired(RbacPermissionCheckRepository, _SCANNING),
                     unwired(StorageSessionManager, _SCANNING),
                     config,
                     unwired(ValkeyArtifactDownloadTrackingClient, _SCANNING),

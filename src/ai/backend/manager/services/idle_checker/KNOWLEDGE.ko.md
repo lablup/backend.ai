@@ -22,7 +22,7 @@
 
 ## 생성과 변경은 서비스 메서드를 유지한다
 
-- 둘 다 쓰기 전에 다른 엔티티를 읽는다. utilization 스펙이 지정한 prometheus query preset 을 가져오고, 그 preset 이 허용으로 선언하지 않은 filter 와 group label 을 거부한다.
+- 둘 다 쓰기 전에 다른 엔티티를 읽는다. utilization 스펙이 지정한 prometheus query preset 을 가져오고, 그 preset 이 허용으로 선언하지 않은 filter 와 group label 을 거부한다. `container_metric_name` filter label 의 값에 영문·숫자·`_`·`:`·`-` 밖의 문자가 있으면 그 읽기 전에 거부한다.
 - 다른 repository 를 읽는 검사는 action validator 가 감당하는 범위를 넘고, 스펙은 SQL 을 실행할 수 없다. 서비스 메서드를 유지하는 기준이 이것이다.
 - 검사를 지나면 서비스는 action 의 스펙을 변경 없이 ops 에 전달한다. 그 밖의 일은 하지 않는다.
 

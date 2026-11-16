@@ -111,7 +111,8 @@ async def deactivate_totp(request: web.Request) -> web.Response:
     db = root_app["_db"]
     email = request["user"]["email"]
     if "email" in request.query:
-        if not request["is_admin"]:
+        # Only a superadmin deactivates another user's TOTP.
+        if not request["is_superadmin"]:
             raise GenericForbidden
         email = request.query["email"]
 

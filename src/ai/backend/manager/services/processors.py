@@ -29,7 +29,7 @@ if TYPE_CHECKING:
     )
     from ai.backend.common.events.fetcher import EventFetcher
     from ai.backend.common.events.hub.hub import EventHub
-    from ai.backend.common.plugin.hook import HookPluginContext
+    from ai.backend.common.plugin.hook_context import HookPluginContext
     from ai.backend.common.plugin.monitor import ErrorPluginContext
     from ai.backend.manager.agent_cache import AgentRPCCache
     from ai.backend.manager.clients.appproxy.client import AppProxyClientPool

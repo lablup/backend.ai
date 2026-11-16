@@ -26,6 +26,9 @@
 
 | 시나리오 | 판정 |
 |---|---|
+| [superadmin 이 그 프로젝트로 걸러 삭제된 세션 그룹만 요청하면, 삭제 시각이 찍힌 세션 그룹 하나만 옵니다. 이 동작은 역할이라 요청한 사용자가 superadmin 입니다](#searching-a-soft-deleted-group-comes-back-when-the-filter-names-it) | 성공 |
+| [superadmin 이 그 프로젝트로 걸러 전체 검색하면, 삭제 시각이 찍힌 세션 그룹은 빠지고 사용자가 만든 세션 그룹만 옵니다. 이 동작은 역할이라 요청한 사용자가 superadmin 입니다](#searching-a-soft-deleted-group-is-left-out-of-the-search) | 성공 |
+| [superadmin 이 그 프로젝트의 세션 그룹을 방향 오름차순으로 한 건씩 조회하면, 방향이 pack 인 사용자의 세션 그룹이 첫 페이지에 오고 다음 페이지가 있다고 답합니다. 다른 프로젝트의 세션 그룹은 빠집니다. 이 동작은 역할이라 요청한 사용자가 superadmin 입니다](#searching-ordering-by-the-placement-direction-puts-pack-on-the-first-page) | 성공 |
 | [아무 권한도 받지 않은 superadmin 이 한 프로젝트를 필터로 전체 검색하면, 그 프로젝트의 사용자가 생성한 세션 그룹과 배포의 replica group 이 가진 세션 그룹이 모두 옵니다. 이 동작은 역할이라 요청한 사용자가 superadmin 입니다](#searching-the-superadmin-finds-a-users-group-and-a-deployments-group) | 성공 |
 | [그 프로젝트에서 세션 그룹 읽기 권한을 받았어도 superadmin 이 아닌 사용자가 전체 검색하면, 역할로 거부됩니다](#searching-a-user-who-is-not-a-superadmin-may-not-search-every-session-group) | 거부 |
 
@@ -177,6 +180,125 @@ Then
   - 거부: NotEnoughPermission
 
 ### global_search
+
+<a id="searching-a-soft-deleted-group-comes-back-when-the-filter-names-it"></a>
+
+#### [a-soft-deleted-group-comes-back-when-the-filter-names-it](/tests/scenario/bai_scenario/manager/session_group/test_searching.py): pass
+
+superadmin 이 그 프로젝트로 걸러 삭제된 세션 그룹만 요청하면, 삭제 시각이 찍힌 세션 그룹 하나만 옵니다. 이 동작은 역할이라 요청한 사용자가 superadmin 입니다
+
+Given
+
+- 한 프로젝트에 사용자가 만든 세션 그룹과 서비스를 마친 배포의 replica group 이 가진 세션 그룹, 그리고 그 프로젝트를 보는 superadmin 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - superadmin user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 사용자가 만든 세션 그룹 session-group-1: 멤버를 한 에이전트에 모으고, 반드시 지킵니다
+  - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포의 세션 그룹 deployment-session-group-1: 배포가 복제본 그룹과 함께 생성하는 세션 그룹입니다
+  - 배포 deployment-1: 세션 그룹을 가진 복제본 그룹 하나가 서비스를 마쳤습니다
+  - 삭제 시각이 찍힌 세션 그룹 retired-session-group-1: 복제본 그룹이 서비스를 마쳐 유지 기간이 시작됐습니다
+
+When
+
+- SessionGroupAdapter.global_search: user-2 이 team-1 프로젝트를 필터로 두고 삭제된 세션 그룹만 전체 검색합니다
+
+Then
+
+- 삭제 시각이 찍힌 세션 그룹 하나만 옵니다
+  - items: 서비스를 마친 복제본 그룹이 가진 세션 그룹와 같다
+  - total_count = 1
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="searching-a-soft-deleted-group-is-left-out-of-the-search"></a>
+
+#### [a-soft-deleted-group-is-left-out-of-the-search](/tests/scenario/bai_scenario/manager/session_group/test_searching.py): pass
+
+superadmin 이 그 프로젝트로 걸러 전체 검색하면, 삭제 시각이 찍힌 세션 그룹은 빠지고 사용자가 만든 세션 그룹만 옵니다. 이 동작은 역할이라 요청한 사용자가 superadmin 입니다
+
+Given
+
+- 한 프로젝트에 사용자가 만든 세션 그룹과 서비스를 마친 배포의 replica group 이 가진 세션 그룹, 그리고 그 프로젝트를 보는 superadmin 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - superadmin user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 사용자가 만든 세션 그룹 session-group-1: 멤버를 한 에이전트에 모으고, 반드시 지킵니다
+  - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포의 세션 그룹 deployment-session-group-1: 배포가 복제본 그룹과 함께 생성하는 세션 그룹입니다
+  - 배포 deployment-1: 세션 그룹을 가진 복제본 그룹 하나가 서비스를 마쳤습니다
+  - 삭제 시각이 찍힌 세션 그룹 retired-session-group-1: 복제본 그룹이 서비스를 마쳐 유지 기간이 시작됐습니다
+
+When
+
+- SessionGroupAdapter.global_search: user-2 이 team-1 프로젝트를 필터로 전체 검색합니다
+
+Then
+
+- 삭제 시각이 찍힌 세션 그룹은 빠지고 사용자가 만든 세션 그룹 하나만 옵니다
+  - items: 사용자가 만든 세션 그룹와 같다
+  - total_count = 1
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="searching-ordering-by-the-placement-direction-puts-pack-on-the-first-page"></a>
+
+#### [ordering-by-the-placement-direction-puts-pack-on-the-first-page](/tests/scenario/bai_scenario/manager/session_group/test_searching.py): pass
+
+superadmin 이 그 프로젝트의 세션 그룹을 방향 오름차순으로 한 건씩 조회하면, 방향이 pack 인 사용자의 세션 그룹이 첫 페이지에 오고 다음 페이지가 있다고 답합니다. 다른 프로젝트의 세션 그룹은 빠집니다. 이 동작은 역할이라 요청한 사용자가 superadmin 입니다
+
+Given
+
+- 한 프로젝트에 사용자가 만든 세션 그룹과 배포의 replica group 이 가진 세션 그룹, 다른 프로젝트에 같은 사용자가 만든 세션 그룹과 다른 사용자가 만든 세션 그룹, 그리고 아무 권한도 받지 않은 superadmin 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 프로젝트 other-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-3: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - superadmin user-3: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 사용자가 만든 세션 그룹 session-group-1: 멤버를 한 에이전트에 모으고, 반드시 지킵니다
+  - 사용자가 만든 세션 그룹 session-group-2: 멤버를 한 에이전트에 모으고, 반드시 지킵니다
+  - 사용자가 만든 세션 그룹 session-group-3: 멤버를 한 에이전트에 모으고, 반드시 지킵니다
+  - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포의 세션 그룹 deployment-session-group-1: 배포가 복제본 그룹과 함께 생성하는 세션 그룹입니다
+  - 배포 deployment-1: 세션 그룹을 가진 복제본 그룹 하나를 갖습니다
+
+When
+
+- SessionGroupAdapter.global_search: user-3 이 team-1 프로젝트의 세션 그룹을 방향 오름차순으로 한 건씩 조회합니다
+
+Then
+
+- 방향이 pack 인 사용자의 세션 그룹 하나가 첫 페이지에 오고 다음 페이지가 있다고 답합니다. 다른 프로젝트의 세션 그룹은 빠집니다
+  - items: 사용자가 만든 세션 그룹와 같다
+  - total_count = 2
+  - has_next_page = True
+  - has_previous_page = False
 
 <a id="searching-the-superadmin-finds-a-users-group-and-a-deployments-group"></a>
 
