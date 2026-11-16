@@ -9,6 +9,7 @@ import dataclasses
 import uuid
 from collections.abc import AsyncGenerator
 from pathlib import PurePosixPath
+from typing import Literal
 
 import pytest
 import sqlalchemy as sa
@@ -16,13 +17,17 @@ import sqlalchemy as sa
 from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.config import DefaultModelDefinition
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.kernel_group import KernelGroupRole
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
+from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
+from ai.backend.common.data.user.types import UserData
+from ai.backend.common.schema.deployment import IntOrPercent, ReplicaGroupRolloutSpec
 from ai.backend.common.types import (
     BinarySize,
     ClusterMode,
@@ -37,6 +42,7 @@ from ai.backend.common.types import (
     VFolderMountPolicy,
     VFolderUsageMode,
 )
+from ai.backend.manager.data.deployment.types import ReplicaGroupLifecycle
 from ai.backend.manager.data.image.types import ImageType
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.permission.types import RoleSource
@@ -90,6 +96,7 @@ from ai.backend.manager.models.resource_policy.row import (
 )
 from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
 from ai.backend.manager.models.resource_slot.row import (
+    DeploymentRevisionResourceSlotRow,
     ModelCardResourceRequirementRow,
     ResourceSlotTypeRow,
 )
@@ -127,6 +134,15 @@ from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.views.user import UserResourceInfo
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
+
+type _RevisionState = Literal["current", "deploying", "past"]
+
+
+@dataclasses.dataclass(frozen=True)
+class _CreatedEndpoint:
+    endpoint_id: uuid.UUID
+    name: str
+    revision_id: uuid.UUID
 
 
 class TestVfolderRepository:
@@ -1659,6 +1675,7 @@ class TestVfolderRepositoryDeleteForever:
                 RuntimeVariantRow,
                 DeploymentRevisionPresetRow,
                 DeploymentRevisionRow,
+                DeploymentRevisionResourceSlotRow,
                 SessionRow,
                 AgentRow,
                 KernelGroupRow,
@@ -1670,6 +1687,10 @@ class TestVfolderRepositoryDeleteForever:
                 ModelCardResourceRequirementRow,
                 EntityFieldRow,
                 EntityShareRow,
+                PermissionRow,
+                VirtualEntityRow,
+                EntityMembershipRow,
+                VFolderAutoMountRow,
             ],
         ):
             yield database_connection
@@ -2140,7 +2161,9 @@ class TestVfolderRepositoryDeleteForever:
         runtime_variant_id: uuid.UUID,
         lifecycle: EndpointLifecycle,
         extra_mount_vfolder_ids: list[uuid.UUID] | None = None,
-    ) -> uuid.UUID:
+        revision_state: _RevisionState = "current",
+        replica_group_lifecycle: ReplicaGroupLifecycle = ReplicaGroupLifecycle.STABLE,
+    ) -> _CreatedEndpoint:
         extra_mounts = [
             MountInfoEntry(vfolder_id=VFolderUUID(vfid)) for vfid in (extra_mount_vfolder_ids or [])
         ]
@@ -2174,7 +2197,30 @@ class TestVfolderRepositoryDeleteForever:
             )
             db_sess.add(revision)
             await db_sess.flush()
-            return endpoint.id
+            match revision_state:
+                case "current":
+                    group = ReplicaGroupRow(
+                        id=uuid.uuid4(),
+                        deployment_id=endpoint.id,
+                        session_group_id=SessionGroupID(uuid.uuid4()),
+                        current_revision_id=revision.id,
+                        lifecycle=replica_group_lifecycle,
+                        rollout=ReplicaGroupRolloutSpec(
+                            max_surge=IntOrPercent(count=1),
+                            max_unavailable=IntOrPercent(count=0),
+                        ),
+                    )
+                    db_sess.add(group)
+                    await db_sess.flush()
+                    endpoint.primary_replica_group_id = group.id
+                case "deploying":
+                    endpoint.deploying_revision_id = revision.id
+                case "past":
+                    pass
+            await db_sess.flush()
+            return _CreatedEndpoint(
+                endpoint_id=endpoint.id, name=endpoint.name, revision_id=revision.id
+            )
 
     async def _create_kernel_mounting(
         self,
@@ -2495,6 +2541,298 @@ class TestVfolderRepositoryDeleteForever:
             await self._vfolder_status(db_with_cleanup, vfolder_id)
             == VFolderOperationStatus.DELETE_PENDING
         )
+
+    @pytest.mark.parametrize("as_extra_mount", [False, True], ids=["model", "extra_mount"])
+    async def test_past_revision_reference_succeeds(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        vfolder_repository: VfolderRepository,
+        test_domain: DomainFixtureData,
+        test_user: uuid.UUID,
+        test_project_id: uuid.UUID,
+        test_scaling_group: tuple[uuid.UUID, str],
+        test_image_id: uuid.UUID,
+        test_runtime_variant_id: uuid.UUID,
+        as_extra_mount: bool,
+    ) -> None:
+        vfolder_id = await self._create_vfolder(
+            db_with_cleanup, domain_name=test_domain.domain_name, user_id=test_user
+        )
+        _sgroup_id, sgroup_name = test_scaling_group
+        await self._create_endpoint_with_model(
+            db_with_cleanup,
+            model_vfolder_id=None if as_extra_mount else vfolder_id,
+            domain_name=test_domain.domain_name,
+            project_id=test_project_id,
+            user_id=test_user,
+            sgroup_name=sgroup_name,
+            image_id=test_image_id,
+            runtime_variant_id=test_runtime_variant_id,
+            lifecycle=EndpointLifecycle.READY,
+            extra_mount_vfolder_ids=[vfolder_id] if as_extra_mount else None,
+            revision_state="past",
+        )
+
+        result = await vfolder_repository.delete_vfolders_forever([vfolder_id])
+
+        assert result.failures == []
+        assert [d.id for d in result.succeeded] == [vfolder_id]
+
+    async def test_deploying_revision_reference_returns_failure(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        vfolder_repository: VfolderRepository,
+        test_domain: DomainFixtureData,
+        test_user: uuid.UUID,
+        test_project_id: uuid.UUID,
+        test_scaling_group: tuple[uuid.UUID, str],
+        test_image_id: uuid.UUID,
+        test_runtime_variant_id: uuid.UUID,
+    ) -> None:
+        vfolder_id = await self._create_vfolder(
+            db_with_cleanup, domain_name=test_domain.domain_name, user_id=test_user
+        )
+        _sgroup_id, sgroup_name = test_scaling_group
+        endpoint = await self._create_endpoint_with_model(
+            db_with_cleanup,
+            model_vfolder_id=vfolder_id,
+            domain_name=test_domain.domain_name,
+            project_id=test_project_id,
+            user_id=test_user,
+            sgroup_name=sgroup_name,
+            image_id=test_image_id,
+            runtime_variant_id=test_runtime_variant_id,
+            lifecycle=EndpointLifecycle.READY,
+            revision_state="deploying",
+        )
+
+        result = await vfolder_repository.delete_vfolders_forever([vfolder_id])
+
+        assert result.succeeded == []
+        assert len(result.failures) == 1
+        assert isinstance(result.failures[0].exception, VFolderDeletionNotAllowed)
+        assert f"revision #1 (id: {endpoint.revision_id}, deploying)" in str(
+            result.failures[0].exception
+        )
+
+    async def test_revision_of_drained_replica_group_succeeds(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        vfolder_repository: VfolderRepository,
+        test_domain: DomainFixtureData,
+        test_user: uuid.UUID,
+        test_project_id: uuid.UUID,
+        test_scaling_group: tuple[uuid.UUID, str],
+        test_image_id: uuid.UUID,
+        test_runtime_variant_id: uuid.UUID,
+    ) -> None:
+        vfolder_id = await self._create_vfolder(
+            db_with_cleanup, domain_name=test_domain.domain_name, user_id=test_user
+        )
+        _sgroup_id, sgroup_name = test_scaling_group
+        await self._create_endpoint_with_model(
+            db_with_cleanup,
+            model_vfolder_id=vfolder_id,
+            domain_name=test_domain.domain_name,
+            project_id=test_project_id,
+            user_id=test_user,
+            sgroup_name=sgroup_name,
+            image_id=test_image_id,
+            runtime_variant_id=test_runtime_variant_id,
+            lifecycle=EndpointLifecycle.READY,
+            replica_group_lifecycle=ReplicaGroupLifecycle.DRAINED,
+        )
+
+        result = await vfolder_repository.delete_vfolders_forever([vfolder_id])
+
+        assert result.failures == []
+        assert [d.id for d in result.succeeded] == [vfolder_id]
+
+    async def test_in_use_error_names_deployment_and_revision(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        vfolder_repository: VfolderRepository,
+        test_domain: DomainFixtureData,
+        test_user: uuid.UUID,
+        test_project_id: uuid.UUID,
+        test_scaling_group: tuple[uuid.UUID, str],
+        test_image_id: uuid.UUID,
+        test_runtime_variant_id: uuid.UUID,
+    ) -> None:
+        vfolder_id = await self._create_vfolder(
+            db_with_cleanup, domain_name=test_domain.domain_name, user_id=test_user
+        )
+        _sgroup_id, sgroup_name = test_scaling_group
+        endpoint = await self._create_endpoint_with_model(
+            db_with_cleanup,
+            model_vfolder_id=vfolder_id,
+            domain_name=test_domain.domain_name,
+            project_id=test_project_id,
+            user_id=test_user,
+            sgroup_name=sgroup_name,
+            image_id=test_image_id,
+            runtime_variant_id=test_runtime_variant_id,
+            lifecycle=EndpointLifecycle.READY,
+        )
+
+        result = await vfolder_repository.delete_vfolders_forever([vfolder_id])
+
+        message = str(result.failures[0].exception)
+        assert f"deployment '{endpoint.name}' (id: {endpoint.endpoint_id}" in message
+        assert f"project: {test_project_id}" in message
+        assert f"revision #1 (id: {endpoint.revision_id}, current)" in message
+
+    async def test_in_use_error_shows_own_deployment_to_owner(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        vfolder_repository: VfolderRepository,
+        test_domain: DomainFixtureData,
+        test_user: uuid.UUID,
+        test_project_id: uuid.UUID,
+        test_scaling_group: tuple[uuid.UUID, str],
+        test_image_id: uuid.UUID,
+        test_runtime_variant_id: uuid.UUID,
+    ) -> None:
+        vfolder_id = await self._create_vfolder(
+            db_with_cleanup, domain_name=test_domain.domain_name, user_id=test_user
+        )
+        _sgroup_id, sgroup_name = test_scaling_group
+        endpoint = await self._create_endpoint_with_model(
+            db_with_cleanup,
+            model_vfolder_id=vfolder_id,
+            domain_name=test_domain.domain_name,
+            project_id=test_project_id,
+            user_id=test_user,
+            sgroup_name=sgroup_name,
+            image_id=test_image_id,
+            runtime_variant_id=test_runtime_variant_id,
+            lifecycle=EndpointLifecycle.READY,
+        )
+        owner = UserData(
+            user_id=test_user,
+            is_authorized=True,
+            is_admin=False,
+            is_superadmin=False,
+            role=UserRole.USER,
+            domain_name=test_domain.domain_name,
+            domain_id=test_domain.domain_id,
+        )
+
+        with with_user_context(owner):
+            result = await vfolder_repository.delete_vfolders_forever([vfolder_id])
+
+        message = str(result.failures[0].exception)
+        assert f"deployment '{endpoint.name}'" in message
+        assert "you cannot see" not in message
+
+    async def test_in_use_error_counts_deployment_the_viewer_cannot_see(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        vfolder_repository: VfolderRepository,
+        test_domain: DomainFixtureData,
+        test_user: uuid.UUID,
+        test_project_id: uuid.UUID,
+        test_scaling_group: tuple[uuid.UUID, str],
+        test_image_id: uuid.UUID,
+        test_runtime_variant_id: uuid.UUID,
+    ) -> None:
+        vfolder_id = await self._create_vfolder(
+            db_with_cleanup, domain_name=test_domain.domain_name, user_id=test_user
+        )
+        _sgroup_id, sgroup_name = test_scaling_group
+        endpoint = await self._create_endpoint_with_model(
+            db_with_cleanup,
+            model_vfolder_id=vfolder_id,
+            domain_name=test_domain.domain_name,
+            project_id=test_project_id,
+            user_id=test_user,
+            sgroup_name=sgroup_name,
+            image_id=test_image_id,
+            runtime_variant_id=test_runtime_variant_id,
+            lifecycle=EndpointLifecycle.READY,
+        )
+        stranger = UserData(
+            user_id=uuid.uuid4(),
+            is_authorized=True,
+            is_admin=False,
+            is_superadmin=False,
+            role=UserRole.USER,
+            domain_name=test_domain.domain_name,
+            domain_id=test_domain.domain_id,
+        )
+
+        with with_user_context(stranger):
+            result = await vfolder_repository.delete_vfolders_forever([vfolder_id])
+
+        message = str(result.failures[0].exception)
+        assert endpoint.name not in message
+        assert "1 more you cannot see" in message
+
+    async def test_purge_vfolder_in_use_error_names_deployment_and_revision(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        vfolder_repository: VfolderRepository,
+        test_domain: DomainFixtureData,
+        test_user: uuid.UUID,
+        test_project_id: uuid.UUID,
+        test_scaling_group: tuple[uuid.UUID, str],
+        test_image_id: uuid.UUID,
+        test_runtime_variant_id: uuid.UUID,
+    ) -> None:
+        vfolder_id = await self._create_vfolder(
+            db_with_cleanup, domain_name=test_domain.domain_name, user_id=test_user
+        )
+        _sgroup_id, sgroup_name = test_scaling_group
+        endpoint = await self._create_endpoint_with_model(
+            db_with_cleanup,
+            model_vfolder_id=vfolder_id,
+            domain_name=test_domain.domain_name,
+            project_id=test_project_id,
+            user_id=test_user,
+            sgroup_name=sgroup_name,
+            image_id=test_image_id,
+            runtime_variant_id=test_runtime_variant_id,
+            lifecycle=EndpointLifecycle.READY,
+        )
+
+        with pytest.raises(VFolderDeletionNotAllowed) as exc_info:
+            await vfolder_repository.purge_vfolder(VFolderUUID(vfolder_id))
+
+        assert f"revision #1 (id: {endpoint.revision_id}, current)" in str(exc_info.value)
+        assert await self._vfolder_status(db_with_cleanup, vfolder_id) is not None
+
+    async def test_purge_vfolder_with_past_revision_reference_succeeds(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        vfolder_repository: VfolderRepository,
+        test_domain: DomainFixtureData,
+        test_user: uuid.UUID,
+        test_project_id: uuid.UUID,
+        test_scaling_group: tuple[uuid.UUID, str],
+        test_image_id: uuid.UUID,
+        test_runtime_variant_id: uuid.UUID,
+    ) -> None:
+        vfolder_id = await self._create_vfolder(
+            db_with_cleanup, domain_name=test_domain.domain_name, user_id=test_user
+        )
+        _sgroup_id, sgroup_name = test_scaling_group
+        await self._create_endpoint_with_model(
+            db_with_cleanup,
+            model_vfolder_id=vfolder_id,
+            domain_name=test_domain.domain_name,
+            project_id=test_project_id,
+            user_id=test_user,
+            sgroup_name=sgroup_name,
+            image_id=test_image_id,
+            runtime_variant_id=test_runtime_variant_id,
+            lifecycle=EndpointLifecycle.READY,
+            revision_state="past",
+        )
+
+        purged = await vfolder_repository.purge_vfolder(VFolderUUID(vfolder_id))
+
+        assert purged.id == vfolder_id
+        assert await self._vfolder_status(db_with_cleanup, vfolder_id) is None
 
     async def test_mounted_by_live_kernel_returns_failure(
         self,

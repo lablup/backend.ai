@@ -57,7 +57,11 @@ from ai.backend.manager.data.deployment_revision_preset.types import (
 )
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.errors.deployment import EndpointNotFound
+from ai.backend.manager.errors.deployment import (
+    EndpointNotFound,
+    RevisionMissingModelVFolder,
+    RevisionVFolderNotMountable,
+)
 from ai.backend.manager.errors.storage import VFolderPermissionError
 from ai.backend.manager.models.deployment_revision.creators import DeploymentRevisionCreator
 from ai.backend.manager.models.endpoint.creators import (
@@ -563,9 +567,12 @@ class DeploymentController:
         Raises:
             EndpointNotFound: If the deployment does not exist.
             InvalidEndpointState: If the revision is already current.
+            RevisionMissingModelVFolder: If the revision's model vfolder was purged.
+            RevisionVFolderNotMountable: If a vfolder the revision mounts is not mountable.
         """
-        # 1. Validate revision exists
-        _revision = await self._deployment_repository.get_revision(revision_id)
+        # 1. Validate revision exists and its vfolders are still mountable
+        revision = await self._deployment_repository.get_revision(revision_id)
+        await self._ensure_revision_vfolders_mountable(revision)
 
         # 2. Validate deployment state
         deployment_info = await self._deployment_repository.get_endpoint_info(deployment_id)
@@ -604,6 +611,34 @@ class DeploymentController:
             previous_revision_id=previous_revision_id,
             activated_revision_id=revision_id,
             deployment_policy=deployment_policy,
+        )
+
+    async def _ensure_revision_vfolders_mountable(self, revision: ModelRevisionData) -> None:
+        mount_config = revision.model_mount_config
+        if mount_config.vfolder_id is None:
+            raise RevisionMissingModelVFolder(
+                f"Revision #{revision.revision_number} (id: {revision.id}) cannot be "
+                "activated: its model vfolder has been purged."
+            )
+        vfolder_ids = [mount_config.vfolder_id] + [
+            mount.vfolder_id for mount in mount_config.extra_mounts
+        ]
+        availability = await self._deployment_repository.vfolder_mount_availability(vfolder_ids)
+        if availability.all_mountable:
+            return
+        reasons = [
+            f"{reason}: {sorted(str(vfid) for vfid in ids)}"
+            for reason, ids in (
+                ("purged", availability.missing),
+                ("in the trash", availability.trashed),
+                ("deleted", availability.deleted),
+                ("not ready", availability.not_ready),
+            )
+            if ids
+        ]
+        raise RevisionVFolderNotMountable(
+            f"Revision #{revision.revision_number} (id: {revision.id}) cannot be "
+            f"activated: vfolder(s) not mountable ({'; '.join(reasons)})."
         )
 
     async def resolve_legacy_revision_spec(

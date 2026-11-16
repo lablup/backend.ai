@@ -16,9 +16,8 @@ but the DB cannot enforce that for the soft references (and ``SET NULL`` / ``CAS
 FKs are silently nulled or deleted rather than blocked). Both categories are therefore checked
 explicitly through the registry below.
 
-Each check carries one condition, read two ways: as a ``ConflictCheck`` the
-purger spec declares (the delete runs only if no referrer exists), and as a
-SELECT over ``referrer_id_column`` when the caller reports which rows blocked it.
+Each check carries one condition, declared by the purger spec as a
+``ConflictCheck`` (the delete runs only if no referrer exists).
 
 TEMPORARY — the soft references should eventually be normalized into FK junction
 tables; once that lands, the guard can enumerate FKs and this hand-maintained
@@ -31,7 +30,6 @@ silently rot as the schema evolves.
 
 from __future__ import annotations
 
-import uuid
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any
@@ -42,6 +40,7 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.types import SessionId, VFolderID
+from ai.backend.manager.data.deployment.types import ReplicaGroupLifecycle
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.storage import VFolderDeletionNotAllowed
@@ -49,15 +48,13 @@ from ai.backend.manager.models.deployment_revision.row import DeploymentRevision
 from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.kernel_group_vfolder_mount.row import KernelGroupVFolderMountRow
+from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.specs.types import ConflictCheck
-from ai.backend.manager.models.vfolder.row import VFolderRow
 
 __all__ = (
     "VFolderReferenceCheck",
-    "VFolderReferenceHit",
     "VFOLDER_REFERENCE_CHECKS",
-    "find_active_vfolder_references",
     "get_sessions_by_mounted_folder",
     "vfolder_reference_conflict_checks",
 )
@@ -74,7 +71,6 @@ class VFolderReferenceCheck:
 
     source: str
     describe: str
-    referrer_id_column: InstrumentedAttribute[Any]
     build_condition: Callable[[VFolderID], sa.ColumnElement[bool]]
 
     def to_conflict_check(self, vfolder_id: VFolderID) -> ConflictCheck:
@@ -86,13 +82,6 @@ class VFolderReferenceCheck:
                 f"{self.describe}. Remove the reference(s) first or set force=True."
             ),
         )
-
-
-@dataclass(frozen=True)
-class VFolderReferenceHit:
-    source: str
-    describe: str
-    referrer_ids: list[str]
 
 
 def _sessions_mounting(vfolder_id: VFolderID) -> sa.ColumnElement[bool]:
@@ -108,12 +97,27 @@ def _kernels_mounting(vfolder_id: VFolderID) -> sa.ColumnElement[bool]:
     )
 
 
+def _live_replica_group_points_at(
+    revision_column: InstrumentedAttribute[Any],
+) -> sa.ColumnElement[bool]:
+    return sa.exists().where(
+        ReplicaGroupRow.deployment_id == DeploymentRevisionRow.endpoint,
+        ReplicaGroupRow.lifecycle.not_in(ReplicaGroupLifecycle.terminal_statuses()),
+        revision_column == DeploymentRevisionRow.id,
+    )
+
+
 def _active_endpoint_condition(
     where_clause: sa.ColumnElement[bool],
 ) -> sa.ColumnElement[bool]:
     return (
         EndpointRow.lifecycle_stage.in_(EndpointLifecycle.active_states())
         & (DeploymentRevisionRow.endpoint == EndpointRow.id)
+        & sa.or_(
+            EndpointRow.deploying_revision_id == DeploymentRevisionRow.id,
+            _live_replica_group_points_at(ReplicaGroupRow.current_revision_id),
+            _live_replica_group_points_at(ReplicaGroupRow.target_revision_id),
+        )
         & where_clause
     )
 
@@ -135,25 +139,21 @@ VFOLDER_REFERENCE_CHECKS: list[VFolderReferenceCheck] = [
     VFolderReferenceCheck(
         source="sessions.vfolder_mounts",
         describe="mounted on live session(s)",
-        referrer_id_column=SessionRow.id,
         build_condition=_sessions_mounting,
     ),
     VFolderReferenceCheck(
         source="kernel_group_vfolder_mounts.vfolder_id",
         describe="mounted on live kernel(s)",
-        referrer_id_column=KernelRow.id,
         build_condition=_kernels_mounting,
     ),
     VFolderReferenceCheck(
         source="deployment_revisions.model",
         describe="referenced as the model by active endpoint(s)",
-        referrer_id_column=EndpointRow.id,
         build_condition=_active_endpoints_by_model,
     ),
     VFolderReferenceCheck(
         source="deployment_revisions.extra_mounts",
         describe="mounted as an extra mount by active endpoint(s)",
-        referrer_id_column=EndpointRow.id,
         build_condition=_active_endpoints_by_extra_mount,
     ),
 ]
@@ -162,32 +162,6 @@ VFOLDER_REFERENCE_CHECKS: list[VFolderReferenceCheck] = [
 def vfolder_reference_conflict_checks(vfolder_id: VFolderID) -> Sequence[ConflictCheck]:
     """The registry as conflict checks, for a purger spec to declare."""
     return tuple(check.to_conflict_check(vfolder_id) for check in VFOLDER_REFERENCE_CHECKS)
-
-
-async def find_active_vfolder_references(
-    session: SASession, vfolder_row: VFolderRow
-) -> list[VFolderReferenceHit]:
-    """Return every active reference to the vfolder across the registry.
-
-    Empty when nothing actively references it (i.e. purge is safe w.r.t.
-    in-use guards).
-    """
-    vfolder_id = VFolderID.from_row(vfolder_row)
-    hits: list[VFolderReferenceHit] = []
-    for check in VFOLDER_REFERENCE_CHECKS:
-        stmt = (
-            sa.select(check.referrer_id_column).where(check.build_condition(vfolder_id)).distinct()
-        )
-        referrer_ids: Sequence[uuid.UUID] = (await session.scalars(stmt)).all()
-        if referrer_ids:
-            hits.append(
-                VFolderReferenceHit(
-                    source=check.source,
-                    describe=check.describe,
-                    referrer_ids=[str(rid) for rid in referrer_ids],
-                )
-            )
-    return hits
 
 
 async def get_sessions_by_mounted_folder(
