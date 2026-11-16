@@ -7,6 +7,8 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Final, ParamSpec, TypeVar, cast, override
 
+from aiohttp import web
+
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -25,7 +27,7 @@ P = ParamSpec("P")
 R = TypeVar("R")
 
 
-class ResilienceRetryError(BackendAIError):
+class ResilienceRetryError(BackendAIError, web.HTTPInternalServerError):
     """Raised when retry logic encounters an unexpected error."""
 
     error_type = "https://api.backend.ai/probs/resilience-retry-error"
