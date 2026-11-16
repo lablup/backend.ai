@@ -8,10 +8,12 @@ from collections.abc import AsyncGenerator
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.data.permission.types import RoleStatus
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
+from ai.backend.manager.errors.permission import RoleNotFound
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
@@ -250,21 +252,59 @@ class TestAssignUsersToProject:
             db_with_cleanup, other_domain, user_resource_policy, test_password_info
         )
 
-    @pytest.fixture
-    async def test_role(
+    async def _create_role(
         self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
+        db: ExtendedAsyncSAEngine,
+        scope_type: ScopeType,
+        scope_id: str,
+        status: RoleStatus = RoleStatus.ACTIVE,
     ) -> uuid.UUID:
         role_id = uuid.uuid4()
-        async with db_with_cleanup.begin_session() as session:
+        async with db.begin_session() as session:
+            session.add(RoleRow(id=role_id, name=f"test-role-{role_id.hex[:8]}", status=status))
             session.add(
-                RoleRow(
-                    id=role_id,
-                    name=f"test-role-{role_id.hex[:8]}",
+                AssociationScopesEntitiesRow(
+                    scope_type=scope_type,
+                    scope_id=scope_id,
+                    entity_type=EntityType.ROLE,
+                    entity_id=str(role_id),
                 )
             )
             await session.commit()
         return role_id
+
+    @pytest.fixture
+    async def test_role(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_project: uuid.UUID,
+    ) -> uuid.UUID:
+        return await self._create_role(db_with_cleanup, ScopeType.PROJECT, str(test_project))
+
+    @pytest.fixture
+    async def other_project_role(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> uuid.UUID:
+        return await self._create_role(db_with_cleanup, ScopeType.PROJECT, str(uuid.uuid4()))
+
+    @pytest.fixture
+    async def domain_role(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: str,
+    ) -> uuid.UUID:
+        return await self._create_role(db_with_cleanup, ScopeType.DOMAIN, test_domain)
+
+    @pytest.fixture
+    async def inactive_project_role(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_project: uuid.UUID,
+    ) -> uuid.UUID:
+        return await self._create_role(
+            db_with_cleanup, ScopeType.PROJECT, str(test_project), RoleStatus.INACTIVE
+        )
 
     @pytest.fixture
     def group_db_source(
@@ -303,6 +343,98 @@ class TestAssignUsersToProject:
                 )
             )
             assert len(assoc_result.fetchall()) == 2
+
+    async def test_assign_refuses_a_role_of_another_project(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        group_db_source: GroupDBSource,
+        test_project: uuid.UUID,
+        same_domain_user_1: uuid.UUID,
+        other_project_role: uuid.UUID,
+    ) -> None:
+        """A role registered in another project is not granted, and no one joins."""
+        with pytest.raises(RoleNotFound):
+            await group_db_source.assign_users_to_project(
+                test_project, [same_domain_user_1], other_project_role
+            )
+
+        async with db_with_cleanup.begin_readonly_session() as session:
+            joined = await session.scalar(
+                sa.select(AssociationScopesEntitiesRow).where(
+                    AssociationScopesEntitiesRow.scope_id == str(test_project),
+                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                )
+            )
+            granted = await session.scalar(
+                sa.select(UserRoleRow).where(UserRoleRow.role_id == other_project_role)
+            )
+        assert joined is None
+        assert granted is None
+
+    async def test_assign_refuses_a_role_of_the_domain(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        group_db_source: GroupDBSource,
+        test_project: uuid.UUID,
+        same_domain_user_1: uuid.UUID,
+        domain_role: uuid.UUID,
+    ) -> None:
+        """A domain-scoped role, such as the domain admin role, is not granted."""
+        with pytest.raises(RoleNotFound):
+            await group_db_source.assign_users_to_project(
+                test_project, [same_domain_user_1], domain_role
+            )
+
+        async with db_with_cleanup.begin_readonly_session() as session:
+            joined = await session.scalar(
+                sa.select(AssociationScopesEntitiesRow).where(
+                    AssociationScopesEntitiesRow.scope_id == str(test_project),
+                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                )
+            )
+            granted = await session.scalar(
+                sa.select(UserRoleRow).where(UserRoleRow.role_id == domain_role)
+            )
+        assert joined is None
+        assert granted is None
+
+    async def test_assign_refuses_an_inactive_role_of_the_project(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        group_db_source: GroupDBSource,
+        test_project: uuid.UUID,
+        same_domain_user_1: uuid.UUID,
+        inactive_project_role: uuid.UUID,
+    ) -> None:
+        """An inactive role of the project is not granted."""
+        with pytest.raises(RoleNotFound):
+            await group_db_source.assign_users_to_project(
+                test_project, [same_domain_user_1], inactive_project_role
+            )
+
+        async with db_with_cleanup.begin_readonly_session() as session:
+            joined = await session.scalar(
+                sa.select(AssociationScopesEntitiesRow).where(
+                    AssociationScopesEntitiesRow.scope_id == str(test_project),
+                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                )
+            )
+            granted = await session.scalar(
+                sa.select(UserRoleRow).where(UserRoleRow.role_id == inactive_project_role)
+            )
+        assert joined is None
+        assert granted is None
+
+    async def test_assign_refuses_a_role_that_is_not_there(
+        self,
+        group_db_source: GroupDBSource,
+        test_project: uuid.UUID,
+        same_domain_user_1: uuid.UUID,
+    ) -> None:
+        with pytest.raises(RoleNotFound):
+            await group_db_source.assign_users_to_project(
+                test_project, [same_domain_user_1], uuid.uuid4()
+            )
 
     async def test_assign_empty_list_returns_empty(
         self,
