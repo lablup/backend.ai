@@ -14,7 +14,8 @@ from ai.backend.manager.actions.v2.ops.backend import OpsBackendAction
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 from ai.backend.manager.models.base import Base
-from ai.backend.manager.models.scopes import OperationScope
+from ai.backend.manager.models.scopes import AggregateScopeTarget, OperationScope
+from ai.backend.manager.models.specs.aggregate.aggregator import Aggregator
 from ai.backend.manager.models.specs.creator import (
     EntityCreator,
     FieldCreator,
@@ -81,6 +82,8 @@ __all__ = (
     "GetSingleEntityOpsAction",
     "OperationScopeOpsAction",
     "BulkScopedSearchOpsAction",
+    "GlobalAggregateOpsAction",
+    "PartialBulkScopedAggregateOpsAction",
     "SearchGlobalOpsAction",
     "CreateGlobalOpsAction",
     "CreateGlobalWithFieldsOpsAction",
@@ -740,6 +743,50 @@ class BulkScopedSearchOpsAction[TRow: Base, TData](
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.SEARCH
+
+
+class GlobalAggregateOpsAction[TRow](BaseGlobalAction, OpsBackendAction, ABC):
+    """A count across the whole table, in total and per group."""
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
+
+    @abstractmethod
+    def to_aggregator(self) -> Aggregator[TRow]:
+        """Return the aggregate spec this action executes."""
+        raise NotImplementedError
+
+
+class PartialBulkScopedAggregateOpsAction[TRow, TTarget: AggregateScopeTarget](
+    BasePartialBulkAction, OpsBackendAction, ABC
+):
+    """A count within each named scope on its own, in total and per group.
+
+    Partial: a scope the caller may not search is a failed item and the others are
+    answered. Targets naming the same scope are checked once and answered together.
+    """
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
+
+    @abstractmethod
+    def targets(self) -> Sequence[TTarget]:
+        """The scopes to count within, in the order the answer follows."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def to_aggregator(self) -> Aggregator[TRow]:
+        """Return the aggregate spec this action executes."""
+        raise NotImplementedError
+
+    @final
+    @override
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
+        return list(dict.fromkeys(target.scope_id() for target in self.targets()))
 
 
 class BulkGetOwnedFieldOpsAction[TOwnerID: EntityIdentifier, TRow: Base, TData: FieldData](
