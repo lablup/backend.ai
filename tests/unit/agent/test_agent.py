@@ -103,6 +103,59 @@ class TestAgentConfigReading:
         assert agent_rpc_server.local_config.container.kernel_gid.real == expected_gid
         assert agent_rpc_server.local_config.container.kernel_uid.real == expected_uid
 
+    @pytest.fixture
+    def etcd_mocks(
+        self, agent_rpc_server: AgentRPCServer, mocker: Any, tmp_path: Path, request: Any
+    ) -> tuple[AsyncMock, AsyncMock]:
+        """Mock etcd get()/get_prefix(); returns (get, get_prefix). The volumes subtree holds a secret."""
+        values: dict[str, Any] = getattr(
+            request, "param", {"volumes/_mount": str(tmp_path), "volumes/_fsprefix": "prefix"}
+        )
+        prefixes: dict[str, dict[str, Any]] = {
+            "volumes": {
+                "_mount": str(tmp_path),
+                "_fsprefix": "prefix",
+                "proxies": {"local": {"secret": "storage-proxy-secret"}},
+            },
+        }
+        etcd_get = AsyncMock(side_effect=lambda key, **kw: values.get(key))
+        etcd_get_prefix = AsyncMock(side_effect=lambda key, **kw: prefixes.get(key, {}))
+        mocker.patch.object(agent_rpc_server.etcd, "get", new=etcd_get)
+        mocker.patch.object(agent_rpc_server.etcd, "get_prefix", new=etcd_get_prefix)
+        return etcd_get, etcd_get_prefix
+
+    async def test_vfolder_config_does_not_read_volumes_prefix(
+        self,
+        agent_rpc_server: AgentRPCServer,
+        etcd_mocks: tuple[AsyncMock, AsyncMock],
+        tmp_path: Path,
+    ) -> None:
+        """Test that only volumes/_mount and volumes/_fsprefix are read, never the volumes prefix."""
+        etcd_get, etcd_get_prefix = etcd_mocks
+
+        await agent_rpc_server.read_agent_config()
+
+        assert agent_rpc_server._vfolder_config["mount"] == tmp_path.resolve()
+        assert agent_rpc_server._vfolder_config["fsprefix"] == Path("prefix")
+        assert "proxies" not in agent_rpc_server._vfolder_config
+        assert "volumes" not in [call.args[0] for call in etcd_get_prefix.call_args_list]
+        assert sorted(call.args[0] for call in etcd_get.call_args_list) == [
+            "volumes/_fsprefix",
+            "volumes/_mount",
+        ]
+
+    @pytest.mark.parametrize("etcd_mocks", [{}], indirect=True)
+    async def test_vfolder_config_defaults_when_keys_missing(
+        self,
+        agent_rpc_server: AgentRPCServer,
+        etcd_mocks: tuple[AsyncMock, AsyncMock],
+    ) -> None:
+        """Test that a missing mount and fsprefix fall back to the defaults."""
+        await agent_rpc_server.read_agent_config()
+
+        assert agent_rpc_server._vfolder_config["mount"] is None
+        assert agent_rpc_server._vfolder_config["fsprefix"] == Path(".")
+
 
 class TestALifecycleReasonNeverBreaksTheCleanHandler:
     """The manager sends free-text `status_info` as the reason; anything off the enum must reach
