@@ -886,6 +886,11 @@ class StatContext:
         except (KeyError, aiodocker.exceptions.DockerError):
             log.debug("container process list not found", container_id=container_id)
             return return_val
+        if procs is None:
+            # Docker answers `"Processes": null` for a running container it cannot list,
+            # such as one whose only process is stuck in uninterruptible I/O.
+            log.debug("container process list is null", container_id=container_id)
+            return return_val
 
         for proc in procs:
             try:

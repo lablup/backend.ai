@@ -3,11 +3,21 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from decimal import Decimal
-from unittest.mock import patch
+from typing import Any
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import aiodocker
 import pytest
 
-from ai.backend.agent.stats import Measurement, Metric, MetricTypes, MovingStatistics
+from ai.backend.agent.stats import (
+    Measurement,
+    Metric,
+    MetricTypes,
+    MovingStatistics,
+    StatContext,
+    StatModes,
+)
+from ai.backend.common.types import PID, ContainerId
 
 
 class TestMovingStatistics:
@@ -161,3 +171,34 @@ class TestMetric:
 
         assert cpu_util_metric.current == Decimal(500)
         assert cpu_util_metric.to_serializable_dict()["pct"] == "50"
+
+
+class TestGetProcesses:
+    """Tests for StatContext._get_processes, which reads a container's PIDs from Docker."""
+
+    @pytest.fixture
+    def stat_ctx(self) -> StatContext:
+        return StatContext(MagicMock(), MagicMock(), mode=StatModes.DOCKER)
+
+    def _docker_answering(self, top: dict[str, Any]) -> aiodocker.Docker:
+        docker = MagicMock(spec=aiodocker.Docker)
+        docker._query_json = AsyncMock(return_value=top)
+        return docker
+
+    async def test_returns_the_pids_docker_lists(self, stat_ctx: StatContext) -> None:
+        docker = self._docker_answering({
+            "Titles": ["UID", "PID", "CMD"],
+            "Processes": [["root", "1", "/sbin/docker-init"], ["work", "42", "python"]],
+        })
+
+        pids = await stat_ctx._get_processes(ContainerId("c1"), docker)
+
+        assert pids == [PID(1), PID(42)]
+
+    async def test_a_null_process_list_answers_no_pids(self, stat_ctx: StatContext) -> None:
+        """Docker answers `"Processes": null` for a running container it cannot list."""
+        docker = self._docker_answering({"Titles": ["UID", "PID", "CMD"], "Processes": None})
+
+        pids = await stat_ctx._get_processes(ContainerId("c1"), docker)
+
+        assert pids == []
