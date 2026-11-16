@@ -21,14 +21,16 @@ from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.configs.volume_status_check import VolumeStatusCheckConfig
 from ai.backend.common.data.entity.storage_volume import StorageVolumeName
 from ai.backend.common.data.storage.types import (
+    StorageBackendCapabilities,
     StorageBackendCapability,
+    StorageBackendMetadata,
     StorageBackendType,
 )
 from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.storage.probe.volume import AbstractVolumeStatusCheck
-from ai.backend.common.storage.volume.vfs import VfsVolumeStatusCheck
+from ai.backend.common.storage.volume.mount import VolumeMountStatusCheck
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage.errors import (
@@ -42,6 +44,7 @@ from ai.backend.storage.errors import (
     QuotaScopeCreationFailedError,
     QuotaScopeNotFoundError,
 )
+from ai.backend.storage.errors.volume import VolumePerfMetricNotSupportedError
 from ai.backend.storage.subproc import run
 from ai.backend.storage.types import (
     SENTINEL,
@@ -412,7 +415,7 @@ class BaseFSOpModel(AbstractFSOpModel):
 
 class BaseVolume(AbstractVolume):
     name: ClassVar[StorageBackendType] = StorageBackendType("vfs")
-    _status_check: VfsVolumeStatusCheck | None
+    _status_check: VolumeMountStatusCheck | None
 
     def __init__(
         self,
@@ -438,11 +441,7 @@ class BaseVolume(AbstractVolume):
             event_producer=event_producer,
             watcher=watcher,
         )
-        self._status_check = (
-            VfsVolumeStatusCheck.create(volume_name, mount_path, status_check_config)
-            if status_check_config is not None
-            else None
-        )
+        self._status_check = None
 
     @override
     def info(self) -> VolumeInfo:
@@ -466,7 +465,18 @@ class BaseVolume(AbstractVolume):
         )
 
     @override
-    def volume_status_checker(self) -> AbstractVolumeStatusCheck | None:
+    async def volume_status_checker(self) -> AbstractVolumeStatusCheck | None:
+        if self._status_check_config is None:
+            return None
+        if self._status_check is None:
+            supported = await self.get_capabilities()
+            metadata = StorageBackendMetadata(
+                name=self.name,
+                capabilities=StorageBackendCapabilities(supported=supported),
+            )
+            self._status_check = VolumeMountStatusCheck.create(
+                self._volume_name, metadata, self.mount_path, self._status_check_config
+            )
         return self._status_check
 
     @override
@@ -578,7 +588,7 @@ class BaseVolume(AbstractVolume):
 
     @override
     async def get_performance_metric(self) -> FSPerfMetric:
-        raise NotImplementedError
+        raise VolumePerfMetricNotSupportedError
 
     @override
     async def get_fs_usage(self) -> CapacityUsage:

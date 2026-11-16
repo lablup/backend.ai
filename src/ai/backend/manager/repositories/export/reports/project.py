@@ -7,6 +7,7 @@ from decimal import Decimal
 from typing import Any
 
 import sqlalchemy as sa
+from sqlalchemy.dialects.postgresql import JSONB
 
 from ai.backend.manager.models.association_container_registries_groups.row import (
     AssociationContainerRegistriesGroupsRow,
@@ -90,6 +91,31 @@ CONTAINER_REGISTRY_JOIN = JoinDef(
     ),
 )
 
+# The project's default registry, as {"registry", "project"}. Correlated to the project
+# only, so CONTAINER_REGISTRY_JOIN does not leak into it when both are selected.
+DEFAULT_REGISTRY = (
+    sa.select(
+        sa.func.jsonb_build_object(
+            "registry",
+            ContainerRegistryRow.registry_name,
+            "project",
+            ContainerRegistryRow.project,
+            type_=JSONB,
+        )
+    )
+    .join_from(
+        AssociationContainerRegistriesGroupsRow,
+        ContainerRegistryRow,
+        ContainerRegistryRow.id == AssociationContainerRegistriesGroupsRow.registry_id,
+    )
+    .where(
+        AssociationContainerRegistriesGroupsRow.project_id == ProjectRow.id,
+        AssociationContainerRegistriesGroupsRow.is_default,
+    )
+    .correlate(ProjectRow)
+    .scalar_subquery()
+)
+
 # Field definitions for project export
 PROJECT_FIELDS: list[ExportFieldDef] = [
     ExportFieldDef(
@@ -163,14 +189,14 @@ PROJECT_FIELDS: list[ExportFieldDef] = [
         formatter=_serialize_json,
     ),
     # =========================================================================
-    # Container Registry for Image Commit (no JOIN needed, already in ProjectRow as JSONB)
+    # Default Container Registry (the project's default registry association)
     # =========================================================================
     ExportFieldDef(
         key="container_registry",
         name="Container Registry",
         description="Container registry and project for image commit",
         field_type=ExportFieldType.JSON,
-        column=ProjectRow.container_registry,
+        column=DEFAULT_REGISTRY,
         formatter=_serialize_json,
     ),
     # =========================================================================

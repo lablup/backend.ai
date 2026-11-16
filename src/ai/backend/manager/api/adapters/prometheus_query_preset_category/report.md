@@ -16,51 +16,52 @@ Scenario: incomplete 1 / 6
 
 | scenario | verdict |
 |---|---|
-| [카테고리가 있어도 빈 id 목록으로 조회하면, 빈 응답이 반환된다](#loading-loading-an-empty-id-list-answers-an-empty-list) | answered |
-| [카테고리 둘과 없는 id 하나를 섞어 한 번에 조회하면, 있는 둘은 노드로 없는 하나는 거부로 반환되고 순서가 요청한 순서와 같다](#loading-loading-laid-ids-and-an-unknown-one-answers-in-order-with-a-rejection) | rejected |
+| [even when categories exist, loading with an empty id list answers an empty list](#loading-loading-an-empty-id-list-answers-an-empty-list) | answered |
+| [when two categories and one missing id are loaded in one call, the two that exist come back as nodes and the missing one as a rejection, in the order requested](#loading-loading-laid-ids-and-an-unknown-one-answers-in-order-with-a-rejection) | rejected |
 
 **create**
 
 | scenario | verdict |
 |---|---|
-| [슈퍼관리자가 이름과 설명을 함께 지정해 생성하면, 지정한 값이 그대로 담긴 노드가 반환된다](#creating-creating-a-category-with-a-description-carries-it-on-the-node) | answered |
-| [슈퍼관리자가 이름만 지정해 카테고리를 생성하면, 설명이 비어 있는 노드 전체가 반환된다](#creating-creating-a-category-with-a-name-alone-answers-with-the-whole-node) | answered |
-| [이미 다른 카테고리가 사용 중인 이름으로 슈퍼관리자가 다시 생성하면, 이름 중복으로 거부된다. 저장소의 유일 제약이 막는 것이고 도메인 오류로 옮겨져 있지 않다](#creating-a-name-another-category-already-holds-is-refused) | rejected |
-| [슈퍼관리자가 아닌 사용자가 카테고리를 생성하려 하면, 역할 부족으로 거부된다](#creating-a-user-who-is-not-the-superadmin-may-not-create-a-category) | rejected |
-| [권한 검사를 꺼도 카테고리 생성은 여전히 거부된다](#creating-turning-enforcement-off-still-does-not-let-a-user-create-a-category) | rejected |
+| [when the superadmin creates a category with a name and a description, the node comes back carrying the values as given](#creating-creating-a-category-with-a-description-carries-it-on-the-node) | answered |
+| [when the superadmin creates a category with only a name, the whole node comes back with an empty description](#creating-creating-a-category-with-a-name-alone-answers-with-the-whole-node) | answered |
+| [when the superadmin creates a category again with a name another category already holds, it is rejected as a duplicate name. The unique constraint of the repository rejects it and it is not translated into a domain error](#creating-a-name-another-category-already-holds-is-refused) | rejected |
+| [when a user who is not the superadmin tries to create a category, the role rejects it](#creating-a-user-who-is-not-the-superadmin-may-not-create-a-category) | rejected |
+| [turning permission enforcement off still rejects creating a category](#creating-turning-enforcement-off-still-does-not-let-a-user-create-a-category) | rejected |
 
 **get**
 
 | scenario | verdict |
 |---|---|
-| [카테고리 하나가 있고 아무 권한도 없는 사용자가 id로 조회하면, 그 카테고리 전체가 반환된다](#reading-a-user-granted-nothing-reads-a-category-by-id) | answered |
-| [카테고리 하나가 있고 사용자 컨텍스트 없이 id로 조회하면, 호출자를 알 수 없어 거부된다](#reading-a-call-carrying-no-user-may-not-read-a-category) | rejected |
-| [public 에서 읽을 수 있는 사용자가 존재하지 않는 id로 조회하면 거부된다. 권한을 물을 대상이 없으므로, 없는 것인지 닿지 못하는 것인지는 응답으로 드러나지 않는다](#reading-an-id-nothing-answers-to-is-refused) | rejected |
+| [with one category laid, when a user granted nothing reads it by id, the whole category comes back](#reading-a-user-granted-nothing-reads-a-category-by-id) | answered |
+| [with one category laid, when it is read by id with no user context, the call is rejected because the caller is unknown](#reading-a-call-carrying-no-user-may-not-read-a-category) | rejected |
+| [when a user who can read in public reads a missing id, the call is rejected. There is no target to require permission for, so the answer does not reveal whether it does not exist or cannot be accessed](#reading-an-id-nothing-answers-to-is-refused) | rejected |
 
 **partial_bulk_purge**
 
 | scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 카테고리 여럿을 한 번에 purge 하려 하면, 지워진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-categories) | answered |
-| [슈퍼관리자가 카테고리 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 지워지기 전 모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-categories-answers-for-the-missing-one) | answered |
+| [when a user granted hard delete on categories in global purges several categories in one call, every one comes back as it was before deletion and nothing failed](#partial_bulk_purging-a-user-granted-hard-delete-purges-every-category-of-several) | answered |
+| [when a user granted nothing tries to purge several categories in one call, none is deleted and every one comes back in the failed list for lack of permission](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-categories) | answered |
+| [when the superadmin purges two categories and one missing id in one call, the two come back as they were before deletion and the missing id comes back in the failed list because there is no such target](#partial_bulk_purging-purging-several-categories-answers-for-the-missing-one) | answered |
 
 **purge**
 
 | scenario | verdict |
 |---|---|
-| [카테고리 하나가 있고 슈퍼관리자가 삭제하면, 삭제한 id를 담은 응답이 반환된다](#purging-the-superadmin-removes-a-category) | answered |
-| [권한 검사를 끄면 아무 권한도 없는 사용자도 카테고리를 삭제할 수 있다](#purging-turning-enforcement-off-lets-a-user-remove-a-category) | answered |
-| [같은 카테고리가 있고 아무 권한도 없는 사용자가 삭제하면, 권한 부족으로 거부된다](#purging-a-user-granted-nothing-may-not-remove-a-category) | rejected |
-| [슈퍼관리자가 존재하지 않는 id를 삭제하면, 대상을 찾을 수 없다는 이유로 거부된다](#purging-removing-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | rejected |
+| [with one category laid, when the superadmin deletes it, the answer carries the id that was deleted](#purging-the-superadmin-removes-a-category) | answered |
+| [turning permission enforcement off lets a user granted nothing delete a category](#purging-turning-enforcement-off-lets-a-user-remove-a-category) | answered |
+| [with the same category laid, when a user granted nothing deletes it, the call is rejected for lack of permission](#purging-a-user-granted-nothing-may-not-remove-a-category) | rejected |
+| [when the superadmin deletes a missing id, the call is rejected because there is no such target](#purging-removing-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | rejected |
 
 **search**
 
 | scenario | verdict |
 |---|---|
-| [카테고리 둘이 있고 아무 권한도 없는 사용자가 필터 없이 검색하면, 둘 다 집계된다](#searching-a-user-granted-nothing-counts-every-category) | answered |
-| [이름이 다른 카테고리 셋이 있을 때 이름 필터로 검색하면, 그 이름의 카테고리만 반환된다](#searching-filtering-by-name-keeps-only-the-category-of-that-name) | answered |
-| [카테고리 11개가 있을 때 크기 없이 검색하면, 10건까지 반환되고 다음 페이지가 있다고 응답한다](#searching-omitting-the-page-size-answers-ten-and-says-there-is-a-next-page) | answered |
-| [카테고리 하나가 있고 사용자 컨텍스트 없이 검색하면, 인증 실패로 거부된다](#searching-a-call-carrying-no-user-may-not-search-categories) | rejected |
+| [with two categories laid, when a user granted nothing searches without a filter, both are counted](#searching-a-user-granted-nothing-counts-every-category) | answered |
+| [with three categories of different names, when they are searched with a filter on one name, only the category of that name comes back](#searching-filtering-by-name-keeps-only-the-category-of-that-name) | answered |
+| [with 11 categories laid, when they are searched without a page size, ten come back and the answer says there is a next page](#searching-omitting-the-page-size-answers-ten-and-says-there-is-a-next-page) | answered |
+| [with one category laid, when it is searched with no user context, the call is rejected for an authentication failure](#searching-a-call-carrying-no-user-may-not-search-categories) | rejected |
 
 ### batch_load_by_ids
 
@@ -68,65 +69,65 @@ Scenario: incomplete 1 / 6
 
 #### [loading-an-empty-id-list-answers-an-empty-list](/tests/scenario/bai_scenario/manager/prometheus_query_preset_category/test_loading.py): pass
 
-카테고리가 있어도 빈 id 목록으로 조회하면, 빈 응답이 반환된다
+even when categories exist, loading with an empty id list answers an empty list
 
 Given
 
-- 카테고리 1개와, user 한 명
-  - 카테고리 wanted-1
-  - 도메인 home-1
-  - public 에서 prometheus_query_preset_category 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: prometheus_query_preset_category 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 public-reader-1 보유
+- 1 categories and one user
+  - Category wanted-1
+  - Domain home-1
+  - Prepare a user granted read permission on prometheus_query_preset_category in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every prometheus_query_preset_category
+    - regular user user-1: holds Role public-reader-1
 
 When
 
-- PrometheusQueryPresetCategoryAdapter.batch_load_by_ids: user-1이 빈 id 목록으로 조회
+- PrometheusQueryPresetCategoryAdapter.batch_load_by_ids: user-1 loads with an empty id list
 
 Then
 
-- 빈 응답이 반환된다
+- an empty response comes back
   - answer = []
 
 <a id="loading-loading-laid-ids-and-an-unknown-one-answers-in-order-with-a-rejection"></a>
 
 #### [loading-laid-ids-and-an-unknown-one-answers-in-order-with-a-rejection](/tests/scenario/bai_scenario/manager/prometheus_query_preset_category/test_loading.py): pass
 
-카테고리 둘과 없는 id 하나를 섞어 한 번에 조회하면, 있는 둘은 노드로 없는 하나는 거부로 반환되고 순서가 요청한 순서와 같다
+when two categories and one missing id are loaded in one call, the two that exist come back as nodes and the missing one as a rejection, in the order requested
 
 Given
 
-- 카테고리 2개와, user 한 명
-  - 카테고리 wanted-1
-  - 카테고리 other-1
-  - 도메인 home-1
-  - public 에서 prometheus_query_preset_category 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: prometheus_query_preset_category 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 public-reader-1 보유
+- 2 categories and one user
+  - Category wanted-1
+  - Category other-1
+  - Domain home-1
+  - Prepare a user granted read permission on prometheus_query_preset_category in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every prometheus_query_preset_category
+    - regular user user-1: holds Role public-reader-1
 
 When
 
-- PrometheusQueryPresetCategoryAdapter.batch_load_by_ids: user-1이 미리 만들어 둔 카테고리 2개의 id와 없는 id 하나를 한 번에 조회
+- PrometheusQueryPresetCategoryAdapter.batch_load_by_ids: user-1 loads the ids of the 2 categories seeded in advance and one missing id in one call
 
 Then
 
-- 요청한 순서대로 반환되고, 없는 id에 해당하는 항목은 거부가 담긴다
+- the items come back in the order requested and the item for an unknown id carries a denial
   - len = 3
-  - [0]: 1번째로 요청한 id의 카테고리 전체와 같다
-  - [1]: 2번째로 요청한 id의 카테고리 전체와 같다
-  - 거부: NotEnoughPermission
+  - [0]: same as the whole category of the id requested at position 1
+  - [1]: same as the whole category of the id requested at position 2
+  - rejected: NotEnoughPermission
 
 ### create
 
@@ -134,155 +135,155 @@ Then
 
 #### [creating-a-category-with-a-description-carries-it-on-the-node](/tests/scenario/bai_scenario/manager/prometheus_query_preset_category/test_creating.py): pass
 
-슈퍼관리자가 이름과 설명을 함께 지정해 생성하면, 지정한 값이 그대로 담긴 노드가 반환된다
+when the superadmin creates a category with a name and a description, the node comes back carrying the values as given
 
 Given
 
-- 카테고리가 하나도 없고, superadmin 한 명
-  - 도메인 home-1
-  - public 에서 prometheus_query_preset_category 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: prometheus_query_preset_category 전체에 READ 허용
-    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+- no category and one superadmin
+  - Domain home-1
+  - Prepare a user granted read permission on prometheus_query_preset_category in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - superadmin user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every prometheus_query_preset_category
+    - superadmin user-1: holds Role public-reader-1
 
 When
 
-- PrometheusQueryPresetCategoryAdapter.create: user-1이 이름 cpu(으)로 생성
+- PrometheusQueryPresetCategoryAdapter.create: user-1 creates it with the name cpu
 
 Then
 
-- 생성한 카테고리 전체가 반환된다
-  - id: 무시함: 데이터베이스가 만든다
+- the whole category just created comes back
+  - id: skipped: the database generates it
   - name = 'cpu'
-  - description = '새로 만든 카테고리'
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - description = 'a freshly created category'
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
 <a id="creating-creating-a-category-with-a-name-alone-answers-with-the-whole-node"></a>
 
 #### [creating-a-category-with-a-name-alone-answers-with-the-whole-node](/tests/scenario/bai_scenario/manager/prometheus_query_preset_category/test_creating.py): pass
 
-슈퍼관리자가 이름만 지정해 카테고리를 생성하면, 설명이 비어 있는 노드 전체가 반환된다
+when the superadmin creates a category with only a name, the whole node comes back with an empty description
 
 Given
 
-- 카테고리가 하나도 없고, superadmin 한 명
-  - 도메인 home-1
-  - public 에서 prometheus_query_preset_category 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: prometheus_query_preset_category 전체에 READ 허용
-    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+- no category and one superadmin
+  - Domain home-1
+  - Prepare a user granted read permission on prometheus_query_preset_category in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - superadmin user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every prometheus_query_preset_category
+    - superadmin user-1: holds Role public-reader-1
 
 When
 
-- PrometheusQueryPresetCategoryAdapter.create: user-1이 이름 cpu(으)로 생성
+- PrometheusQueryPresetCategoryAdapter.create: user-1 creates it with the name cpu
 
 Then
 
-- 생성한 카테고리 전체가 반환된다
-  - id: 무시함: 데이터베이스가 만든다
+- the whole category just created comes back
+  - id: skipped: the database generates it
   - name = 'cpu'
   - description = None
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
 <a id="creating-a-name-another-category-already-holds-is-refused"></a>
 
 #### [a-name-another-category-already-holds-is-refused](/tests/scenario/bai_scenario/manager/prometheus_query_preset_category/test_creating.py): pass
 
-이미 다른 카테고리가 사용 중인 이름으로 슈퍼관리자가 다시 생성하면, 이름 중복으로 거부된다. 저장소의 유일 제약이 막는 것이고 도메인 오류로 옮겨져 있지 않다
+when the superadmin creates a category again with a name another category already holds, it is rejected as a duplicate name. The unique constraint of the repository rejects it and it is not translated into a domain error
 
 Given
 
-- 이미 있는 카테고리 하나와, superadmin 한 명
-  - 카테고리 category-1
-  - 도메인 home-1
-  - public 에서 prometheus_query_preset_category 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: prometheus_query_preset_category 전체에 READ 허용
-    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+- one existing category and one superadmin
+  - Category category-1
+  - Domain home-1
+  - Prepare a user granted read permission on prometheus_query_preset_category in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - superadmin user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every prometheus_query_preset_category
+    - superadmin user-1: holds Role public-reader-1
 
 When
 
-- PrometheusQueryPresetCategoryAdapter.create: user-1이 이미 있는 이름 category-1(으)로 다시 생성
+- PrometheusQueryPresetCategoryAdapter.create: user-1 creates it again with the name category-1, which already exists
 
 Then
 
-- 거부된다
-  - 거부: UniqueConstraintViolationError
+- the call is rejected
+  - rejected: UniqueConstraintViolationError
 
 <a id="creating-a-user-who-is-not-the-superadmin-may-not-create-a-category"></a>
 
 #### [a-user-who-is-not-the-superadmin-may-not-create-a-category](/tests/scenario/bai_scenario/manager/prometheus_query_preset_category/test_creating.py): pass
 
-슈퍼관리자가 아닌 사용자가 카테고리를 생성하려 하면, 역할 부족으로 거부된다
+when a user who is not the superadmin tries to create a category, the role rejects it
 
 Given
 
-- 카테고리가 하나도 없고, user 한 명
-  - 도메인 home-1
-  - public 에서 prometheus_query_preset_category 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: prometheus_query_preset_category 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 public-reader-1 보유
+- no category and one user
+  - Domain home-1
+  - Prepare a user granted read permission on prometheus_query_preset_category in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every prometheus_query_preset_category
+    - regular user user-1: holds Role public-reader-1
 
 When
 
-- PrometheusQueryPresetCategoryAdapter.create: user-1이 이름 cpu(으)로 생성
+- PrometheusQueryPresetCategoryAdapter.create: user-1 creates it with the name cpu
 
 Then
 
-- 거부된다
-  - 거부: InsufficientPrivilege
+- the call is rejected
+  - rejected: InsufficientPrivilege
 
 <a id="creating-turning-enforcement-off-still-does-not-let-a-user-create-a-category"></a>
 
 #### [turning-enforcement-off-still-does-not-let-a-user-create-a-category](/tests/scenario/bai_scenario/manager/prometheus_query_preset_category/test_creating.py): pass
 
-권한 검사를 꺼도 카테고리 생성은 여전히 거부된다
+turning permission enforcement off still rejects creating a category
 
 Given
 
-- 카테고리가 하나도 없고, user 한 명
-  - 도메인 home-1
-  - public 에서 prometheus_query_preset_category 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: prometheus_query_preset_category 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 public-reader-1 보유
+- no category and one user
+  - Domain home-1
+  - Prepare a user granted read permission on prometheus_query_preset_category in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every prometheus_query_preset_category
+    - regular user user-1: holds Role public-reader-1
 
 When
 
-- PrometheusQueryPresetCategoryAdapter.create: user-1이 이름 cpu(으)로 생성
+- PrometheusQueryPresetCategoryAdapter.create: user-1 creates it with the name cpu
 
 Then
 
-- 거부된다
-  - 거부: InsufficientPrivilege
+- the call is rejected
+  - rejected: InsufficientPrivilege
 
 ### get
 
@@ -290,159 +291,193 @@ Then
 
 #### [a-user-granted-nothing-reads-a-category-by-id](/tests/scenario/bai_scenario/manager/prometheus_query_preset_category/test_reading.py): pass
 
-카테고리 하나가 있고 아무 권한도 없는 사용자가 id로 조회하면, 그 카테고리 전체가 반환된다
+with one category laid, when a user granted nothing reads it by id, the whole category comes back
 
 Given
 
-- 이미 있는 카테고리 하나와, user 한 명
-  - 카테고리 category-1
-  - 도메인 home-1
-  - public 에서 prometheus_query_preset_category 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: prometheus_query_preset_category 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 public-reader-1 보유
+- one existing category and one user
+  - Category category-1
+  - Domain home-1
+  - Prepare a user granted read permission on prometheus_query_preset_category in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every prometheus_query_preset_category
+    - regular user user-1: holds Role public-reader-1
 
 When
 
-- PrometheusQueryPresetCategoryAdapter.get: user-1이 category-1(으)로 조회
+- PrometheusQueryPresetCategoryAdapter.get: user-1 reads a category by category-1
 
 Then
 
-- 미리 만들어 둔 카테고리 전체가 반환된다
-  - id: 미리 만들어 둔 카테고리와 같다
+- the whole category seeded in advance comes back
+  - id: same as the category seeded in advance
   - name = 'category-1'
-  - description = '미리 만들어 둔 카테고리'
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - description = 'a category created in advance'
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
 <a id="reading-a-call-carrying-no-user-may-not-read-a-category"></a>
 
 #### [a-call-carrying-no-user-may-not-read-a-category](/tests/scenario/bai_scenario/manager/prometheus_query_preset_category/test_reading.py): pass
 
-카테고리 하나가 있고 사용자 컨텍스트 없이 id로 조회하면, 호출자를 알 수 없어 거부된다
+with one category laid, when it is read by id with no user context, the call is rejected because the caller is unknown
 
 Given
 
-- 이미 있는 카테고리 하나, 호출자 없음
-  - 카테고리 category-1
+- one existing category and no caller
+  - Category category-1
 
 When
 
-- PrometheusQueryPresetCategoryAdapter.get: 사용자 컨텍스트 없이 category-1 조회
+- PrometheusQueryPresetCategoryAdapter.get: reads category-1 with no user context
 
 Then
 
-- 거부된다
-  - 거부: UnreachableError
+- the call is rejected
+  - rejected: UnreachableError
 
 <a id="reading-an-id-nothing-answers-to-is-refused"></a>
 
 #### [an-id-nothing-answers-to-is-refused](/tests/scenario/bai_scenario/manager/prometheus_query_preset_category/test_reading.py): pass
 
-public 에서 읽을 수 있는 사용자가 존재하지 않는 id로 조회하면 거부된다. 권한을 물을 대상이 없으므로, 없는 것인지 닿지 못하는 것인지는 응답으로 드러나지 않는다
+when a user who can read in public reads a missing id, the call is rejected. There is no target to require permission for, so the answer does not reveal whether it does not exist or cannot be accessed
 
 Given
 
-- 이미 있는 카테고리 하나와, user 한 명
-  - 카테고리 category-1
-  - 도메인 home-1
-  - public 에서 prometheus_query_preset_category 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: prometheus_query_preset_category 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 public-reader-1 보유
+- one existing category and one user
+  - Category category-1
+  - Domain home-1
+  - Prepare a user granted read permission on prometheus_query_preset_category in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every prometheus_query_preset_category
+    - regular user user-1: holds Role public-reader-1
 
 When
 
-- PrometheusQueryPresetCategoryAdapter.get: user-1이 존재하지 않는 id(으)로 조회
+- PrometheusQueryPresetCategoryAdapter.get: user-1 reads a category by a missing id
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 ### partial_bulk_purge
+
+<a id="partial_bulk_purging-a-user-granted-hard-delete-purges-every-category-of-several"></a>
+
+#### [a-user-granted-hard-delete-purges-every-category-of-several](/tests/scenario/bai_scenario/manager/prometheus_query_preset_category/test_partial_bulk_purging.py): pass
+
+when a user granted hard delete on categories in global purges several categories in one call, every one comes back as it was before deletion and nothing failed
+
+Given
+
+- 2 categories and one regular user granted HARD_DELETE in global
+  - Category wanted-1
+  - Category other-1
+  - Domain home-1
+  - Prepare a user granted permission on categories in global
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role category-keeper-1: applies only within the scope it is granted in
+    - Role category-keeper-1: HARD_DELETE allowed on every prometheus_query_preset_category
+    - regular user user-1: holds Role category-keeper-1
+
+When
+
+- PrometheusQueryPresetCategoryAdapter.partial_bulk_purge: user-1 purges 2 categories in one call
+
+Then
+
+- every target category comes back as it was before deletion and nothing failed
+  - successes count = 2
+  - successes[0]: same as the whole target category
+  - successes[1]: same as the whole target category
+  - failed = []
 
 <a id="partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-categories"></a>
 
 #### [a-user-granted-nothing-purges-none-of-several-categories](/tests/scenario/bai_scenario/manager/prometheus_query_preset_category/test_partial_bulk_purging.py): pass
 
-아무 권한도 받지 않은 사용자가 카테고리 여럿을 한 번에 purge 하려 하면, 지워진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+when a user granted nothing tries to purge several categories in one call, none is deleted and every one comes back in the failed list for lack of permission
 
 Given
 
-- 카테고리 2개와, user 한 명
-  - 카테고리 wanted-1
-  - 카테고리 other-1
-  - 도메인 home-1
-  - public 에서 prometheus_query_preset_category 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: prometheus_query_preset_category 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 public-reader-1 보유
+- 2 categories and one user
+  - Category wanted-1
+  - Category other-1
+  - Domain home-1
+  - Prepare a user granted read permission on prometheus_query_preset_category in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every prometheus_query_preset_category
+    - regular user user-1: holds Role public-reader-1
 
 When
 
-- PrometheusQueryPresetCategoryAdapter.partial_bulk_purge: user-1이 카테고리 2개를 한 번에 purge 함
+- PrometheusQueryPresetCategoryAdapter.partial_bulk_purge: user-1 purges 2 categories in one call
 
 Then
 
-- 처리된 카테고리 없이 대상이 모두 실패 목록에 온다
+- no category is processed and every target comes back in the failed list
   - successes = []
   - failed count = 2
-  - failed[0].id: 대상 카테고리의 id와 같다
-  - failed[0].message: 'Insufficient permission'를 담은 이유
-  - failed[1].id: 대상 카테고리의 id와 같다
-  - failed[1].message: 'Insufficient permission'를 담은 이유
+  - failed[0].id: same as the id of the target category
+  - failed[0].message: a reason containing 'Insufficient permission'
+  - failed[1].id: same as the id of the target category
+  - failed[1].message: a reason containing 'Insufficient permission'
 
 <a id="partial_bulk_purging-purging-several-categories-answers-for-the-missing-one"></a>
 
 #### [purging-several-categories-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/prometheus_query_preset_category/test_partial_bulk_purging.py): pass
 
-슈퍼관리자가 카테고리 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 지워지기 전 모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+when the superadmin purges two categories and one missing id in one call, the two come back as they were before deletion and the missing id comes back in the failed list because there is no such target
 
 Given
 
-- 카테고리 2개와, superadmin 한 명
-  - 카테고리 wanted-1
-  - 카테고리 other-1
-  - 도메인 home-1
-  - public 에서 prometheus_query_preset_category 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: prometheus_query_preset_category 전체에 READ 허용
-    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+- 2 categories and one superadmin
+  - Category wanted-1
+  - Category other-1
+  - Domain home-1
+  - Prepare a user granted read permission on prometheus_query_preset_category in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - superadmin user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every prometheus_query_preset_category
+    - superadmin user-1: holds Role public-reader-1
 
 When
 
-- PrometheusQueryPresetCategoryAdapter.partial_bulk_purge: user-1이 카테고리 2개 와 없는 id 하나를 한 번에 purge 함
+- PrometheusQueryPresetCategoryAdapter.partial_bulk_purge: user-1 purges 2 categories and one missing id in one call
 
 Then
 
-- 대상 카테고리가 모두 지워지기 전 모습으로 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+- every target category comes back as it was before deletion, and the missing id comes back in the failed list because there is no such target
   - successes count = 2
+  - successes[0]: same as the whole target category
+  - successes[1]: same as the whole target category
   - failed count = 1
-  - successes[0]: 대상 카테고리 전체와 같다
-  - successes[1]: 대상 카테고리 전체와 같다
-  - failed[0].id: 요청에 넣은 없는 id와 같다
-  - failed[0].message: 'not found'를 담은 이유
+  - failed[0].id: same as the missing id in the request
+  - failed[0].message: a reason containing 'not found'
 
 ### purge
 
@@ -450,121 +485,121 @@ Then
 
 #### [the-superadmin-removes-a-category](/tests/scenario/bai_scenario/manager/prometheus_query_preset_category/test_purging.py): pass
 
-카테고리 하나가 있고 슈퍼관리자가 삭제하면, 삭제한 id를 담은 응답이 반환된다
+with one category laid, when the superadmin deletes it, the answer carries the id that was deleted
 
 Given
 
-- 이미 있는 카테고리 하나와, superadmin 한 명
-  - 카테고리 category-1
-  - 도메인 home-1
-  - public 에서 prometheus_query_preset_category 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: prometheus_query_preset_category 전체에 READ 허용
-    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+- one existing category and one superadmin
+  - Category category-1
+  - Domain home-1
+  - Prepare a user granted read permission on prometheus_query_preset_category in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - superadmin user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every prometheus_query_preset_category
+    - superadmin user-1: holds Role public-reader-1
 
 When
 
-- PrometheusQueryPresetCategoryAdapter.purge: user-1이 category-1 삭제
+- PrometheusQueryPresetCategoryAdapter.purge: user-1 deletes category-1
 
 Then
 
-- 삭제한 카테고리를 응답한다
-  - id: 미리 만들어 둔 카테고리와 같다
+- the response names the category that was deleted
+  - id: same as the category seeded in advance
 
 <a id="purging-turning-enforcement-off-lets-a-user-remove-a-category"></a>
 
 #### [turning-enforcement-off-lets-a-user-remove-a-category](/tests/scenario/bai_scenario/manager/prometheus_query_preset_category/test_purging.py): pass
 
-권한 검사를 끄면 아무 권한도 없는 사용자도 카테고리를 삭제할 수 있다
+turning permission enforcement off lets a user granted nothing delete a category
 
 Given
 
-- 이미 있는 카테고리 하나와, user 한 명
-  - 카테고리 category-1
-  - 도메인 home-1
-  - public 에서 prometheus_query_preset_category 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: prometheus_query_preset_category 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 public-reader-1 보유
+- one existing category and one user
+  - Category category-1
+  - Domain home-1
+  - Prepare a user granted read permission on prometheus_query_preset_category in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every prometheus_query_preset_category
+    - regular user user-1: holds Role public-reader-1
 
 When
 
-- PrometheusQueryPresetCategoryAdapter.purge: user-1이 category-1 삭제
+- PrometheusQueryPresetCategoryAdapter.purge: user-1 deletes category-1
 
 Then
 
-- 삭제한 카테고리를 응답한다
-  - id: 미리 만들어 둔 카테고리와 같다
+- the response names the category that was deleted
+  - id: same as the category seeded in advance
 
 <a id="purging-a-user-granted-nothing-may-not-remove-a-category"></a>
 
 #### [a-user-granted-nothing-may-not-remove-a-category](/tests/scenario/bai_scenario/manager/prometheus_query_preset_category/test_purging.py): pass
 
-같은 카테고리가 있고 아무 권한도 없는 사용자가 삭제하면, 권한 부족으로 거부된다
+with the same category laid, when a user granted nothing deletes it, the call is rejected for lack of permission
 
 Given
 
-- 이미 있는 카테고리 하나와, user 한 명
-  - 카테고리 category-1
-  - 도메인 home-1
-  - public 에서 prometheus_query_preset_category 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: prometheus_query_preset_category 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 public-reader-1 보유
+- one existing category and one user
+  - Category category-1
+  - Domain home-1
+  - Prepare a user granted read permission on prometheus_query_preset_category in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every prometheus_query_preset_category
+    - regular user user-1: holds Role public-reader-1
 
 When
 
-- PrometheusQueryPresetCategoryAdapter.purge: user-1이 category-1 삭제
+- PrometheusQueryPresetCategoryAdapter.purge: user-1 deletes category-1
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 <a id="purging-removing-an-id-nothing-answers-to-is-not-found-for-a-superadmin"></a>
 
 #### [removing-an-id-nothing-answers-to-is-not-found-for-a-superadmin](/tests/scenario/bai_scenario/manager/prometheus_query_preset_category/test_purging.py): pass
 
-슈퍼관리자가 존재하지 않는 id를 삭제하면, 대상을 찾을 수 없다는 이유로 거부된다
+when the superadmin deletes a missing id, the call is rejected because there is no such target
 
 Given
 
-- 이미 있는 카테고리 하나와, superadmin 한 명
-  - 카테고리 category-1
-  - 도메인 home-1
-  - public 에서 prometheus_query_preset_category 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: prometheus_query_preset_category 전체에 READ 허용
-    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+- one existing category and one superadmin
+  - Category category-1
+  - Domain home-1
+  - Prepare a user granted read permission on prometheus_query_preset_category in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - superadmin user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every prometheus_query_preset_category
+    - superadmin user-1: holds Role public-reader-1
 
 When
 
-- PrometheusQueryPresetCategoryAdapter.purge: user-1이 존재하지 않는 id 삭제
+- PrometheusQueryPresetCategoryAdapter.purge: user-1 deletes a missing id
 
 Then
 
-- 거부된다
-  - 거부: EntityNotFoundError
+- the call is rejected
+  - rejected: EntityNotFoundError
 
 ### search
 
@@ -572,31 +607,31 @@ Then
 
 #### [a-user-granted-nothing-counts-every-category](/tests/scenario/bai_scenario/manager/prometheus_query_preset_category/test_searching.py): pass
 
-카테고리 둘이 있고 아무 권한도 없는 사용자가 필터 없이 검색하면, 둘 다 집계된다
+with two categories laid, when a user granted nothing searches without a filter, both are counted
 
 Given
 
-- 카테고리 2개와, user 한 명
-  - 카테고리 wanted-1
-  - 카테고리 other-1
-  - 도메인 home-1
-  - public 에서 prometheus_query_preset_category 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: prometheus_query_preset_category 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 public-reader-1 보유
+- 2 categories and one user
+  - Category wanted-1
+  - Category other-1
+  - Domain home-1
+  - Prepare a user granted read permission on prometheus_query_preset_category in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every prometheus_query_preset_category
+    - regular user user-1: holds Role public-reader-1
 
 When
 
-- PrometheusQueryPresetCategoryAdapter.search: user-1이 필터 없이 전체 조회
+- PrometheusQueryPresetCategoryAdapter.search: user-1 searches every category without a filter
 
 Then
 
-- 미리 만들어 둔 카테고리가 모두, 그리고 그것만 집계된다
+- every category seeded in advance is counted, and only those
   - items = ['other-1', 'wanted-1']
   - total_count = 2
   - has_next_page = False
@@ -606,32 +641,32 @@ Then
 
 #### [filtering-by-name-keeps-only-the-category-of-that-name](/tests/scenario/bai_scenario/manager/prometheus_query_preset_category/test_searching.py): pass
 
-이름이 다른 카테고리 셋이 있을 때 이름 필터로 검색하면, 그 이름의 카테고리만 반환된다
+with three categories of different names, when they are searched with a filter on one name, only the category of that name comes back
 
 Given
 
-- 카테고리 3개와, user 한 명
-  - 카테고리 wanted-1
-  - 카테고리 other-1
-  - 카테고리 other-2
-  - 도메인 home-1
-  - public 에서 prometheus_query_preset_category 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: prometheus_query_preset_category 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 public-reader-1 보유
+- 3 categories and one user
+  - Category wanted-1
+  - Category other-1
+  - Category other-2
+  - Domain home-1
+  - Prepare a user granted read permission on prometheus_query_preset_category in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every prometheus_query_preset_category
+    - regular user user-1: holds Role public-reader-1
 
 When
 
-- PrometheusQueryPresetCategoryAdapter.search: user-1이 wanted-1 이름 필터로 조회
+- PrometheusQueryPresetCategoryAdapter.search: user-1 searches with a filter on the name wanted-1
 
 Then
 
-- 이름 필터에 맞는 하나만 집계된다
+- only the one matching the name filter is counted
   - items = ['wanted-1']
   - total_count = 1
   - has_next_page = False
@@ -641,40 +676,40 @@ Then
 
 #### [omitting-the-page-size-answers-ten-and-says-there-is-a-next-page](/tests/scenario/bai_scenario/manager/prometheus_query_preset_category/test_searching.py): pass
 
-카테고리 11개가 있을 때 크기 없이 검색하면, 10건까지 반환되고 다음 페이지가 있다고 응답한다
+with 11 categories laid, when they are searched without a page size, ten come back and the answer says there is a next page
 
 Given
 
-- 카테고리 11개와, user 한 명
-  - 카테고리 wanted-1
-  - 카테고리 other-1
-  - 카테고리 other-2
-  - 카테고리 other-3
-  - 카테고리 other-4
-  - 카테고리 other-5
-  - 카테고리 other-6
-  - 카테고리 other-7
-  - 카테고리 other-8
-  - 카테고리 other-9
-  - 카테고리 other-10
-  - 도메인 home-1
-  - public 에서 prometheus_query_preset_category 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 public-reader-1: prometheus_query_preset_category 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 public-reader-1 보유
+- 11 categories and one user
+  - Category wanted-1
+  - Category other-1
+  - Category other-2
+  - Category other-3
+  - Category other-4
+  - Category other-5
+  - Category other-6
+  - Category other-7
+  - Category other-8
+  - Category other-9
+  - Category other-10
+  - Domain home-1
+  - Prepare a user granted read permission on prometheus_query_preset_category in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every prometheus_query_preset_category
+    - regular user user-1: holds Role public-reader-1
 
 When
 
-- PrometheusQueryPresetCategoryAdapter.search: user-1이 필터 없이 전체 조회
+- PrometheusQueryPresetCategoryAdapter.search: user-1 searches every category without a filter
 
 Then
 
-- 한 페이지만 반환되고 다음 페이지가 있다고 응답한다
+- one page comes back and the response says there is a next page
   - items = 10
   - total_count = 11
   - has_next_page = True
@@ -684,19 +719,19 @@ Then
 
 #### [a-call-carrying-no-user-may-not-search-categories](/tests/scenario/bai_scenario/manager/prometheus_query_preset_category/test_searching.py): pass
 
-카테고리 하나가 있고 사용자 컨텍스트 없이 검색하면, 인증 실패로 거부된다
+with one category laid, when it is searched with no user context, the call is rejected for an authentication failure
 
 Given
 
-- 이미 있는 카테고리 하나, 호출자 없음
-  - 카테고리 category-1
+- one existing category and no caller
+  - Category category-1
 
 When
 
-- PrometheusQueryPresetCategoryAdapter.search: 사용자 컨텍스트 없이 전체 조회
+- PrometheusQueryPresetCategoryAdapter.search: searches every category with no user context
 
 Then
 
-- 거부된다
-  - 거부: UnreachableError
+- the call is rejected
+  - rejected: UnreachableError
 

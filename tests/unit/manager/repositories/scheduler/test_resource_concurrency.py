@@ -19,11 +19,13 @@ from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import AccessKey, KernelId, SessionId
 from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.resource_slot.row import ResourceAllocationRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 from .conftest import (
@@ -72,7 +74,11 @@ class TestReservedConcurrency:
             cpu_capacity=cpu_capacity,
             mem_capacity=Decimal("1048576"),
         )
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
 
         # Mix of single- and multi-kernel sessions.
         session_specs: list[list[tuple[str, Decimal, Decimal]]] = [
@@ -159,7 +165,11 @@ class TestReservedConcurrency:
             cpu_capacity=Decimal("4"),
             mem_capacity=Decimal("10240"),
         )
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
 
         async def one_cycle() -> None:
             session_id, kernel_ids = await create_pending_session_with_kernels(
@@ -222,7 +232,11 @@ class TestReservedConcurrency:
             cpu_capacity=Decimal("20"),
             mem_capacity=Decimal("1048576"),
         )
-        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        db_source = ScheduleDBSource(
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        )
 
         async def allocate_session(*, run: bool) -> tuple[SessionId, KernelId]:
             session_id, kernel_ids = await create_pending_session_with_kernels(

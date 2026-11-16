@@ -56,6 +56,7 @@ class TestLeaderElectionDependency:
             event_producer=mock_event_producer,
             sokovan_orchestrator=mock_orchestrator,
             retention_repository=MagicMock(),
+            project_repository=MagicMock(),
             valkey_live=MagicMock(),
         )
 
@@ -100,6 +101,7 @@ class TestLeaderElectionDependency:
             event_producer=MagicMock(),
             sokovan_orchestrator=mock_orchestrator,
             retention_repository=MagicMock(),
+            project_repository=MagicMock(),
             valkey_live=MagicMock(),
         )
 
@@ -139,6 +141,7 @@ class TestLeaderElectionDependency:
             event_producer=MagicMock(),
             sokovan_orchestrator=mock_orchestrator,
             retention_repository=MagicMock(),
+            project_repository=MagicMock(),
             valkey_live=MagicMock(),
         )
 
@@ -181,6 +184,7 @@ class TestLeaderElectionDependency:
             event_producer=MagicMock(),
             sokovan_orchestrator=mock_orchestrator,
             retention_repository=MagicMock(),
+            project_repository=MagicMock(),
             valkey_live=MagicMock(),
         )
 

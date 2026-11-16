@@ -1,9 +1,12 @@
 """Database source for retention cleanup.
 
-The single caller-facing operation is :meth:`sweep`: it reads every enabled
-policy and drains records past each category's age boundary, stamping
-``last_swept_at`` — all in one transaction. Categories map to purger specs via
-one :meth:`_catalog`, and each spec drains via the shared ``batch_purge``.
+The policy-driven operation is :meth:`sweep`: it reads every enabled policy and
+drains records past each category's age boundary, stamping ``last_swept_at`` — all
+in one transaction. Categories map to purger specs via one :meth:`_catalog`, and
+each spec drains via the shared ``batch_purge``.
+
+A category whose cleanup needs other repositories (``projects``) has no drain
+spec: the task that owns those dependencies reads its policy here and stamps it.
 """
 
 from __future__ import annotations
@@ -18,6 +21,7 @@ import sqlalchemy as sa
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.entity.deployment import DeploymentEntityType
 from ai.backend.common.data.entity.entity_share import EntityShareEntityType
+from ai.backend.common.data.entity.retention_policy import RetentionPolicyID
 from ai.backend.common.data.entity.role import RoleEntityType
 from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.data.entity.session_group import SessionGroupEntityType
@@ -65,7 +69,7 @@ from ai.backend.manager.models.scheduling_history.row import (
 )
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.session_group.row import SessionGroupRow
-from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.repositories.ops.v2.retention.provider import RetentionOpsProvider
 from ai.backend.manager.repositories.ops.v2.retention.write import (
     RetentionDrain,
@@ -259,9 +263,11 @@ class RetentionDBSource:
                 # replica_groups) in the same tick rather than the next one.
                 # Nothing else clears them: the application never hard-deletes a
                 # replica group, and the FK points the wrong way for a DB cascade.
+                # The boundary is deleted_at, set when the owning replica group is
+                # drained, so an active group is never collected for its age alone.
                 RetentionDrain(
                     SessionGroupRow,
-                    SessionGroupRow.created_at,
+                    SessionGroupRow.deleted_at,
                     threshold,
                     conditions=(~group_has_replica_group,),
                     entity=SessionGroupEntityType(),
@@ -312,6 +318,32 @@ class RetentionDBSource:
                 f"Retention category '{category.value}' has no cleanup wired in this repository."
             )
         return specs
+
+    async def enabled_policy(self, category: RetentionCategory) -> RetentionPolicyData | None:
+        """The enabled policy of ``category``, if one is."""
+        async with self._ops.read_ops() as r:
+            result = await r.search_in_global(
+                RetentionPolicySearcher(
+                    pagination=OffsetPagination(limit=1),
+                    conditions=[
+                        lambda: sa.and_(
+                            RetentionPolicyRow.category == category,
+                            RetentionPolicyRow.enabled == sa.true(),
+                        )
+                    ],
+                )
+            )
+        return result.items[0] if result.items else None
+
+    async def current_time(self) -> datetime:
+        """DB-sourced current time, consistent across servers."""
+        async with self._ops.read_ops() as r:
+            return await r.current_time()
+
+    async def record_sweep(self, policy_id: RetentionPolicyID, swept_at: datetime) -> None:
+        """Stamp a policy the cleanup outside the drain catalog ran for."""
+        async with self._ops.write_ops() as w:
+            await w.update_data(LastSweptAtUpdater(policy_id=policy_id, last_swept_at=swept_at))
 
     async def sweep(self) -> list[RetentionPurgeResult]:
         """Purge every enabled category once, each isolated by a savepoint.

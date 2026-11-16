@@ -9,76 +9,57 @@ generated:
   at: 2026-09-14
 status: draft
 ---
-# app_config_allow_list 어댑터의 현재 계약
+# app_config_allow_list adapter: current contract
 
-`app_config_allow_list` 항목은 등록된 `config_name` 값을 특정 `scope_type` 값의 스코프에서 사용할 수 있게 한다.
-각 `allow_list` 항목의 `rank` 값은 여러 스코프의 `app_config_fragment` 행을 병합할 때 적용할
-우선순위를 정한다.
+An `app_config_allow_list` entry makes a registered `config_name` value usable in the scopes of a given `scope_type` value. The `rank` value of each `allow_list` entry settles the precedence applied when merging `app_config_fragment` rows from several scopes.
 
-- `allow_list` 항목은 도메인·프로젝트·사용자 스코프에 자동으로 연결되지 않는다.
-- 생성과 전체 검색에는 슈퍼관리자 검사가 적용된다.
-- 개별 조회, 배치 조회, 수정, 완전 삭제에는 `allow_list` 엔티티에 대한 권한 검사가 적용된다.
-- 현재 기본 역할이 부여되는 스코프와 `allow_list` 항목 사이에 소유 관계가 없으므로,
-  일반 사용자는 개별 엔티티 권한 검사도 통과하지 못한다.
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
-`allow_list` 항목을 만들 때 RBAC 노드 자체는 생성된다. 즉 `allow_list` 항목은 RBAC 엔티티이지만,
-현재 도메인·프로젝트·사용자 소유 관계에는 연결되지 않는다.
+- An `allow_list` entry is not attached to a domain, project or user scope automatically.
+- Create and the unscoped search apply a superadmin check.
+- Get, batch get, update and purge apply the permission check on the `allow_list` entity.
+- No ownership relation exists today between the scopes that receive a default role and an `allow_list` entry, so a regular user fails the single-entity permission check too.
 
-`rank` 컬럼은 `fragment` 행이 아니라 `allow_list` 행에 있다. `fragment` 행을 작성할 수 있는
-사용자도 자기 `fragment` 행의 `rank` 값은 바꿀 수 없다. 실제 병합 계약은
-[app_config 어댑터](../app_config/KNOWLEDGE.md)가 다룬다.
+Creating an `allow_list` entry creates the RBAC node itself. The entry is an RBAC entity but is not attached to a domain, project or user ownership relation today.
 
-## 생성은 슈퍼관리자만 할 수 있다
+The `rank` column is on the `allow_list` row, not on the `fragment` row. A user who may write a `fragment` row cannot change the `rank` value of that row. The [app_config adapter](../app_config/KNOWLEDGE.md) covers the actual merge contract.
 
-`rank` 값을 생략하면 `scope_type` 값별 기본값을 사용한다. 100 단위의 간격은 슈퍼관리자가 기존
-기본값 사이에 별도 `rank` 값을 지정할 수 있게 한다.
+## Only superadmin can create
 
-등록되지 않은 `config_name` 값을 지정하면 전용 오류로 변환되어 거부된다. 중복 `allow_list` 항목은
-아직 전용 오류로 변환되지 않아 데이터베이스 제약 위반으로 거부된다.
+Omitting `rank` uses the default for that `scope_type` value. The gap of 100 lets superadmin place another `rank` value between the existing defaults.
 
-## 개별 조회는 엔티티 읽기 권한을 검사한다
+An unregistered `config_name` value is converted to a dedicated error and rejected. A duplicate `allow_list` entry is not yet converted to a dedicated error and is rejected by a database constraint violation.
 
-권한 검사가 데이터 조회보다 먼저 실행된다. 따라서 권한이 없는 사용자가 존재하지 않는 ID를
-요청하면 대상을 찾을 수 없어 거부되는 것이 아니라 권한 부족으로 거부된다.
+## Get checks the entity read permission
 
-## 배치 조회는 입력 위치마다 결과를 반환한다
+The permission check runs before the data read. A user without permission who requests a non-existent ID is therefore rejected for insufficient permission, not for a missing target.
 
-ID 하나의 권한 검사 실패가 배치 전체를 중단하지는 않는다. 존재하지 않는 ID에 `None`이
-반환되는지 권한 부족으로 거부되는지는 그 ID에 대한 권한 검사를 먼저 통과했는지에 따라 달라진다.
+## Batch get returns a result per input position
 
-## 전체 검색은 슈퍼관리자만 할 수 있다
+A failed permission check on one ID does not stop the whole batch. Whether a non-existent ID returns `None` or is rejected for insufficient permission depends on whether the permission check for that ID passed first.
 
-한 요청으로 심긴 항목은 생성 시각이 모두 같다. 기본 순서는 생성 시각 내림차순이고, 같은 값은
-ID 오름차순으로 끊으므로 커서 다음 페이지가 같은 항목을 다시 내놓거나 건너뛰지 않는다.
+## Only superadmin can run the unscoped search
 
-필터와 정렬은 검색 공통 계약이라 이 어댑터의 시나리오로 검증하지 않는다.
+Entries pre-stored in one request have the same creation time. The default order is creation time descending, ties broken by ID ascending, so the page after the cursor neither repeats nor skips an entry.
 
-## 수정할 수 있는 필드는 `rank` 하나뿐이다
+Filter and sort are the common search contract and are not verified by a scenario of this adapter.
 
-`config_name`과 `scope_type` 필드는 수정 요청 DTO에 없다. 이 두 필드를 바꾸려면 기존
-`allow_list` 항목을 삭제하고 새 `allow_list` 항목을 생성해야 한다.
+## `rank` is the only updatable field
 
-## 여럿 수정하기
+The `config_name` and `scope_type` fields are absent from the update request DTO. To change these two fields, delete the existing `allow_list` entry and create a new one.
 
-## 완전 삭제는 `allow_list` 행과 RBAC 노드를 제거한다
+## Updating several
 
-`allow_list` 행을 삭제하면 그 행을 참조하는 `fragment` 행도 외래 키 연쇄 삭제로 함께 삭제된다.
-`allow_list` 항목 자체의 RBAC 노드는 완전 삭제 과정에서 함께 삭제된다. soft delete와 복원 호출은
-없다.
+## Purge removes the `allow_list` row and the RBAC node
 
-현재 완전 삭제 과정은 데이터베이스가 연쇄 삭제한 `fragment` 행의 RBAC 노드까지는 삭제하지
-않는다. 이렇게 남는 노드는 보장하는 동작이 아니라 별도 수정이 필요한 한계다. 시나리오는 어댑터
-응답을 검증하며, 연쇄 삭제된 행과 남은 RBAC 노드는 직접 조회하지 않는다.
+Deleting an `allow_list` row also deletes the `fragment` rows that reference it, by foreign key cascade. The RBAC node of the entry itself is deleted during purge. There is no delete or restore call.
 
-## 여럿 완전 삭제하기
+The current purge does not delete the RBAC node of a `fragment` row deleted by the database cascade. The remaining node is a limitation that needs a separate fix, not guaranteed behavior. Scenarios verify the adapter response and do not read the cascaded rows or the remaining RBAC node directly.
 
-여럿 연산은 호출 전체를 거부하지 않는다. 처리한 항목은 처리된 목록에, 처리하지 못한 것은 ID와 이유를
-실패 목록에 싣는다. 여럿 완전 삭제는 항목마다 `fragment` 행을 먼저 지우고 각자의 savepoint 안에서
-처리한다.
+## Purging several
 
-## 이름
+A bulk operation does not reject the whole call. Processed entries go into the processed list, and the failure list contains the ID and the reason. Bulk purge deletes the `fragment` row of each entry first and processes each entry inside its own savepoint.
 
-단건 수정과 완전 삭제는 `update`, `purge`이고 엔티티 권한 검사만 한다. 옛 `admin_update`,
-`admin_purge` GQL mutation과 단수 경로(`/v2/app-config-allow-list`)의 REST 수정, 완전 삭제는
-deprecated이고, 같은 호출로 이어지되 슈퍼관리자 검사를 그대로 둔다. 새 쓰기 경로는
-`/v2/app-config-allow-lists` 아래에 있다.
+## Names
+
+Update and purge of one entry are `update` and `purge` and apply only the entity permission check. The old `admin_update` and `admin_purge` GQL mutations and the update and purge of the REST singular path (`/v2/app-config-allow-list`) are deprecated; they lead to the same call and keep the superadmin check. The new write paths sit under `/v2/app-config-allow-lists`.

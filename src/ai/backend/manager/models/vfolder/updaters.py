@@ -11,12 +11,13 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.types import VFolderMountPolicy
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.vfolder.types import (
     VFolderData,
     VFolderOperationStatus,
 )
 from ai.backend.manager.errors.storage import VFolderDeletionNotAllowed, VFolderFilterStatusFailed
-from ai.backend.manager.models.session.row import DEAD_SESSION_STATUSES, SessionRow
+from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.specs.types import GuardCheck, IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataUpdater, GuardedDataUpdater
 from ai.backend.manager.models.vfolder.row import VFolderRow
@@ -181,7 +182,7 @@ class VFolderTrashUpdater(GuardedDataUpdater[VFolderRow, VFolderData]):
                     sa.select(sa.literal(1))
                     .select_from(SessionRow)
                     .where(
-                        SessionRow.status.not_in(DEAD_SESSION_STATUSES),
+                        SessionRow.status.not_in(SessionStatus.terminal_statuses()),
                         SessionRow.vfolder_mounts.contains([{"vfid": self.mount_key}]),
                     )
                 )

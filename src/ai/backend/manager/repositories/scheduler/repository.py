@@ -53,11 +53,13 @@ from ai.backend.manager.data.resource.types import UserEnqueuePolicy
 from ai.backend.manager.data.resource_group.types import ResourceGroupData
 from ai.backend.manager.data.session.creation import ContainerUserInfo
 from ai.backend.manager.data.session.types import SessionInfo, SessionStatus
+from ai.backend.manager.data.session_group.types import SessionGroupData
 from ai.backend.manager.exceptions import ErrorStatusInfo
 from ai.backend.manager.models.kernel.searchers import KernelSearcher
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
 from ai.backend.manager.models.session.searchers import SessionInfoSearcher, SessionSearcher
 from ai.backend.manager.models.session.updaters import SessionStatusBatchUpdater
+from ai.backend.manager.models.session_group.searchers import SessionGroupSearcher
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.rbac.permission_check_repository import (
@@ -65,6 +67,7 @@ from ai.backend.manager.repositories.rbac.permission_check_repository import (
 )
 from ai.backend.manager.repositories.scheduler.types.session import SessionHistoryToCreate
 from ai.backend.manager.repositories.vfolder.mount import prepare_vfolder_mounts
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.types import UserScope
 from ai.backend.manager.views.sokovan.agent import AgentLimit, ResourceGroupResource
 from ai.backend.manager.views.sokovan.allocation import SessionAllocation
@@ -134,9 +137,10 @@ class SchedulerRepository:
         config_provider: ManagerConfigProvider,
         storage_manager: StorageSessionManager,
         permission_check: RbacPermissionCheckRepository,
+        key_provider_pool: KeyProviderPool,
     ) -> None:
         self._db = db
-        self._db_source = ScheduleDBSource(db, reconcile_ops_provider)
+        self._db_source = ScheduleDBSource(db, reconcile_ops_provider, key_provider_pool)
         self._cache_source = ScheduleCacheSource(valkey_stat)
         self._valkey_schedule = valkey_schedule
         self._config_provider = config_provider
@@ -507,6 +511,10 @@ class SchedulerRepository:
         self, resource_group_id: ResourceGroupID
     ) -> ResourceGroupName:
         return await self._db_source.get_resource_group_name_by_id(resource_group_id)
+
+    @scheduler_repository_resilience.apply()
+    async def search_session_groups(self, searcher: SessionGroupSearcher) -> list[SessionGroupData]:
+        return await self._db_source.search_session_groups(searcher)
 
     @scheduler_repository_resilience.apply()
     async def get_domain_id_by_name(self, name: DomainName) -> DomainID:

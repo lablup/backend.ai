@@ -26,6 +26,17 @@ class InvalidRoleNameTemplate(EntityError, web.HTTPBadRequest):
         )
 
 
+class RolePresetOwnerAssignNotAllowed(EntityError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/role-preset-owner-assign-not-allowed"
+    error_title = "Only a project role preset can be assigned to the owner."
+
+    @override
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            RolePresetEntityType(), ActionOperationType.UPDATE, ErrorDetail.INVALID_PARAMETERS
+        )
+
+
 class RolePresetCreateConflict(EntityError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/role-preset-create-conflict"
     error_title = "A role preset with this name already exists in the same scope."

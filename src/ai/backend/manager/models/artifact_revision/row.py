@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import uuid
 from datetime import datetime
 from typing import Any, override
 
@@ -10,7 +9,6 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.entity.artifact import ArtifactID
 from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
-from ai.backend.common.data.storage.registries.types import ModelData
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.artifact.types import (
     ArtifactStatus,
@@ -100,23 +98,4 @@ class ArtifactRevisionRow(Base):
             f"updated_at={updated_at_str}, "
             f"digest={self.digest}"
             f")"
-        )
-
-    @classmethod
-    def from_huggingface_model_data(
-        cls,
-        artifact_id: uuid.UUID,
-        model_data: ModelData,
-    ) -> ArtifactRevisionRow:
-        return cls(
-            artifact_id=artifact_id,
-            version=model_data.revision,
-            readme=model_data.readme,
-            size=model_data.size,
-            status=ArtifactStatus.SCANNED.value,
-            remote_status=None,
-            created_at=model_data.created_at,
-            updated_at=model_data.modified_at,
-            digest=model_data.sha,
-            verification_result=None,
         )

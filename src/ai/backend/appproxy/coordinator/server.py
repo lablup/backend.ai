@@ -722,6 +722,7 @@ async def ingress_service_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.worker_service_discovery,
         root_ctx.worker_client_pool,
         root_ctx.local_config.secrets,
+        root_ctx.traefik_worker_client,
     )
     yield
 
@@ -921,6 +922,7 @@ def build_root_app(
     root_ctx.traefik_etcd = infrastructure.traefik_etcd
     root_ctx.worker_service_discovery = dependency_resources.system.worker_service_discovery
     root_ctx.worker_client_pool = dependency_resources.components.worker_client_pool
+    root_ctx.traefik_worker_client = dependency_resources.components.traefik_worker_client
     root_ctx.cors_options = {
         "*": aiohttp_cors.ResourceOptions(  # type: ignore[no-untyped-call]
             allow_credentials=False, expose_headers="*", allow_headers="*"

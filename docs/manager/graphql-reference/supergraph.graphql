@@ -317,19 +317,16 @@ type AdminRefreshDeploymentRevisionsPayload
 }
 
 """
-Added in 26.4.2. Admin input for registering (overwriting) a user's SSH keypair.
+Added in 26.4.2. Admin input for registering (overwriting) a user's SSH public key. `sshPrivateKey` was removed in 26.10.0.
 """
 input AdminRegisterSSHKeypairInput
   @join__type(graph: STRAWBERRY)
 {
-  """Access key whose SSH keypair will be replaced."""
+  """Access key whose SSH public key will be replaced."""
   accessKey: String!
 
   """PEM-encoded SSH public key."""
   sshPublicKey: String!
-
-  """PEM-encoded SSH private key."""
-  sshPrivateKey: String!
 }
 
 """
@@ -5422,6 +5419,11 @@ input CreateRolePresetInput
   """
   autoAssign: Boolean! = false
 
+  """
+  Added in 26.10.0. Whether a personal project's owner is mapped to the role made from this preset. Allowed only on a project preset.
+  """
+  autoAssignToOwner: Boolean! = false
+
   """Permission entries carried by the preset."""
   permissions: [RolePermissionPresetEntryInput!]!
 }
@@ -6984,6 +6986,9 @@ type DeploymentOptionsInfo
 {
   """Handler-keyed scheduler policy (timeout + retry)."""
   handlerOptions: DeploymentHandlerOptionsInfo!
+
+  """Added in 26.10.0. How the designated agents are enforced."""
+  agentSelectionPolicy: SessionAgentSelectionPolicy!
 }
 
 """Added in 26.4.4. Deployment options payload input."""
@@ -6991,6 +6996,11 @@ input DeploymentOptionsInput
   @join__type(graph: STRAWBERRY)
 {
   handlerOptions: DeploymentHandlerOptionsInput!
+
+  """
+  Added in 26.10.0. How the designated agents are enforced. null keeps the stored policy.
+  """
+  agentSelectionPolicy: SessionAgentSelectionPolicy = null
 }
 
 """Added in 25.19.0. """
@@ -8430,6 +8440,11 @@ input EnqueueSessionInput
   """Network UUID to attach."""
   attachNetwork: ID = null
 
+  """
+  Added in 26.10.0. Session group UUID the session joins. The group must belong to the session's owner and project.
+  """
+  sessionGroupId: ID = null
+
   """User-defined tag."""
   tag: String = null
 
@@ -9471,6 +9486,10 @@ type HuggingFaceRegistry implements Node
   entityId: UUID!
   url: String!
   name: String!
+
+  """
+  Access token for the registry. Masked unless the caller is a superadmin.
+  """
   token: String
 }
 
@@ -11610,7 +11629,9 @@ type KeyPair implements Item
   rolling_count: Int
   user: UUID
   projects: [String]
-  ssh_public_key: String
+
+  """The public key of the owner's default SSH keypair."""
+  ssh_public_key: String @deprecated(reason: "Deprecated since 26.10.0. An SSH keypair belongs to the user, not to a keypair.")
   vfolders: [VirtualFolder]
   compute_sessions(status: String): [ComputeSession]
   concurrency_used: Int
@@ -11939,8 +11960,10 @@ type KeyPairV2 implements Node
   """Name of the resource policy assigned to this keypair."""
   resourcePolicy: String!
 
-  """The SSH public key associated with this keypair."""
-  sshPublicKey: String
+  """
+  The public key of the owner's default SSH keypair, the same for every keypair of one user.
+  """
+  sshPublicKey: String @deprecated(reason: "Deprecated since 26.10.0. An SSH keypair belongs to the user, not to a keypair.")
 
   """UUID of the user who owns this keypair."""
   userId: UUID!
@@ -13094,6 +13117,11 @@ input ModelDeploymentMetadataInput
   resourceGroupName: String!
   name: String = null
   tags: [String!] = null
+
+  """
+  Added in 26.10.0. UUIDs of the agents the route sessions are placed on. Each must belong to the resource group.
+  """
+  designatedAgentIds: [UUID!] = null
 }
 
 """
@@ -14301,9 +14329,9 @@ type Mutation
     """Agent ID to rescan GPU alloc map"""
     agent_id: String!
   ): RescanGPUAllocMaps @join__field(graph: GRAPHENE)
-  create_keypair(props: KeyPairInput!, user_id: String!): CreateKeyPair @join__field(graph: GRAPHENE)
-  modify_keypair(access_key: String!, props: ModifyKeyPairInput!): ModifyKeyPair @join__field(graph: GRAPHENE)
-  delete_keypair(access_key: String!): DeleteKeyPair @join__field(graph: GRAPHENE)
+  create_keypair(props: KeyPairInput!, user_id: String!): CreateKeyPair @join__field(graph: GRAPHENE) @deprecated(reason: "Deprecated since 26.10.0. Use `adminCreateKeypairV2` instead.")
+  modify_keypair(access_key: String!, props: ModifyKeyPairInput!): ModifyKeyPair @join__field(graph: GRAPHENE) @deprecated(reason: "Deprecated since 26.10.0. Use `adminUpdateKeypairV2` instead.")
+  delete_keypair(access_key: String!): DeleteKeyPair @join__field(graph: GRAPHENE) @deprecated(reason: "Deprecated since 26.10.0. Use `adminDeleteKeypairV2` instead.")
   rescan_images(
     """Added in 25.1.0."""
     project: String
@@ -14810,6 +14838,11 @@ type Mutation
 
   """Added in 25.16.0. Delete model deployment."""
   deleteModelDeployment(input: DeleteDeploymentInput!): DeleteDeploymentPayload @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Fully replace the ``options`` surface of a deployment. Replace semantics — the supplied payload is the complete new value, except an omitted agent selection policy, which keeps the stored one.
+  """
+  replaceDeploymentOptions(input: ReplaceDeploymentOptionsInput!): ReplaceDeploymentOptionsPayload @join__field(graph: STRAWBERRY)
 
   """
   Added in 25.16.0. Force syncs up-to-date replica information. In normal situations this will be automatically handled by Backend.AI schedulers.
@@ -15326,7 +15359,7 @@ type Mutation
   adminUpdateUserV2(userId: UUID!, input: UpdateUserV2Input!): UpdateUserV2Payload @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.2.0. Update the current user's information. Users can only update their own profile. Non-superadmins can set only fullName, password and allowedClientIp
+  Added in 26.2.0. Update the current user's information. Users can only update their own profile. Non-superadmins can set only fullName, password and allowedClientIp. Password changes require oldPassword
   """
   updateUserV2(input: UpdateUserV2Input!): UpdateUserV2Payload @join__field(graph: STRAWBERRY)
 
@@ -15390,7 +15423,7 @@ type Mutation
   """
   adminDeleteKeypairV2(accessKey: String!): AdminDeleteKeypairPayload @join__field(graph: STRAWBERRY)
 
-  """Added in 26.4.2. Admin registers (overwrites) a user's SSH keypair."""
+  """Added in 26.4.2. Admin registers (overwrites) a user's SSH public key."""
   adminRegisterSshKeypairV2(input: AdminRegisterSSHKeypairInput!): AdminRegisterSSHKeypairPayload @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Admin clears a user's SSH keypair."""
@@ -16655,6 +16688,10 @@ type ObjectStorage implements Node
   name: String!
   host: String!
   accessKey: String!
+
+  """
+  Secret key for authentication. Masked unless the caller is a superadmin.
+  """
   secretKey: String!
   endpoint: String!
   region: String!
@@ -22648,6 +22685,29 @@ input RejectRoleInvitationInput
 }
 
 """
+Added in 26.10.0. Input for the replaceDeploymentOptions mutation. Full-replace semantics — the supplied payload is the complete new value, except an omitted agent selection policy, which keeps the stored one.
+"""
+input ReplaceDeploymentOptionsInput
+  @join__type(graph: STRAWBERRY)
+{
+  deploymentId: UUID!
+  options: DeploymentOptionsInput!
+}
+
+"""
+Added in 26.10.0. Payload returned after replacing a deployment's options. Only the refreshed options surface is returned.
+"""
+type ReplaceDeploymentOptionsPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the deployment whose ``options`` were replaced."""
+  deploymentId: ID!
+
+  """The newly persisted ``options`` surface."""
+  options: DeploymentOptionsInfo!
+}
+
+"""
 Added in 26.4.4. Input for the replaceResourceGroupDefaultDeploymentOptions mutation. Full-replace semantics — the supplied payload is the complete new value.
 """
 input ReplaceResourceGroupDefaultDeploymentOptionsInput
@@ -23043,6 +23103,10 @@ type ReservoirRegistry implements Node
   name: String!
   endpoint: String!
   accessKey: String!
+
+  """
+  Secret key for authentication. Masked unless the caller is a superadmin.
+  """
   secretKey: String!
   apiVersion: String!
 
@@ -23937,6 +24001,7 @@ enum RetentionCategory
   SESSIONS @join__enumValue(graph: STRAWBERRY)
   USAGE_RECORDS @join__enumValue(graph: STRAWBERRY)
   USAGE_BUCKETS @join__enumValue(graph: STRAWBERRY)
+  PROJECTS @join__enumValue(graph: STRAWBERRY)
 }
 
 """
@@ -24746,6 +24811,11 @@ type RolePreset implements Node
   autoAssign: Boolean!
 
   """
+  Added in 26.10.0. Whether a personal project's owner is mapped to the role made from this preset. Allowed only on a project preset.
+  """
+  autoAssignToOwner: Boolean!
+
+  """
   Soft-delete flag. Set by the delete mutation and cleared by the restore mutation; archived rows are excluded from default searches.
   """
   deleted: Boolean! @deprecated(reason: "Deprecated since 26.10.0. Use `deletedAt`.")
@@ -24808,6 +24878,9 @@ input RolePresetFilter
 
   """Filter by auto-assign flag."""
   autoAssign: Boolean = null
+
+  """Added in 26.10.0. Filter by the assign-to-owner flag."""
+  autoAssignToOwner: Boolean = null
 
   """
   Filter by soft-delete flag. Searches exclude soft-deleted rows by default; set this explicitly to `true` to inspect archived presets.
@@ -25865,7 +25938,6 @@ type ScalingGroupNode implements Node
   is_public: Boolean @join__field(graph: GRAPHENE)
   created_at: DateTime @join__field(graph: GRAPHENE)
   wsproxy_addr: String @join__field(graph: GRAPHENE)
-  wsproxy_api_token: String @join__field(graph: GRAPHENE)
   driver: String @join__field(graph: GRAPHENE)
   driver_opts: JSONString @join__field(graph: GRAPHENE)
   scheduler: String @join__field(graph: GRAPHENE)
@@ -26967,6 +27039,9 @@ input SessionUses
 
   """Resource groups the session runs in."""
   resourceGroup: [UUID!] = null
+
+  """Added in 26.10.0. Vfolders the session's kernel groups mount."""
+  vfolder: [UUID!] = null
 }
 
 """Added in 26.3.0. Represents a compute session in Backend.AI."""
@@ -28420,7 +28495,7 @@ input UpdateAgentResourceGroupInput
   policy: ConflictingSessionCleanupPolicy = null
 
   """
-  When false, the change is rejected with a conflict error if the agent still has active sessions. When true, the group is changed anyway and the conflicting sessions are cleaned up per the policy.
+  When false, the change is rejected with a conflict error if the agent still has active sessions or unterminated sessions or deployments of other resource groups designate it. When true, the group is changed anyway, the active sessions are cleaned up per the policy, and those designations are removed.
   """
   force: Boolean! = false
 }
@@ -28648,6 +28723,11 @@ input UpdateDeploymentInput
   replicaCount: Int
   name: String
   preferredDomainName: String
+
+  """
+  Added in 26.10.0. Replaces the designated agent UUIDs; an empty list clears them. Each must belong to the deployment's resource group. Omit to leave unchanged.
+  """
+  designatedAgentIds: [UUID!]
 }
 
 """Added in 25.19.0. Payload for updating a model deployment."""
@@ -29691,6 +29771,11 @@ input UpdateRolePresetBodyInput
   Updated default value for the `auto_assign` flag of instantiated roles.
   """
   autoAssign: Boolean
+
+  """
+  Added in 26.10.0. Updated value for whether a personal project's owner is mapped to the role made from this preset. Allowed only on a project preset.
+  """
+  autoAssignToOwner: Boolean
 }
 
 """
@@ -29709,6 +29794,11 @@ input UpdateRolePresetInput
   Updated default value for the `auto_assign` flag of instantiated roles.
   """
   autoAssign: Boolean
+
+  """
+  Added in 26.10.0. Updated value for whether a personal project's owner is mapped to the role made from this preset. Allowed only on a project preset.
+  """
+  autoAssignToOwner: Boolean
 }
 
 """Added in 26.4.4. Payload returned after updating a role preset."""
@@ -29926,6 +30016,11 @@ input UpdateUserV2Input
 
   """New password."""
   password: String
+
+  """
+  Added in 26.10.0. Current password, required when changing your own password.
+  """
+  oldPassword: String
 
   """New full display name."""
   fullName: String
@@ -31606,6 +31701,11 @@ type VFolder implements Node
   Added in 26.10.0. The level the current user mounts this vfolder at: NONE without read access, READ_WRITE on a personal folder they own, otherwise their own mount policy or the folder's default (`accessControl.permission`).
   """
   mountPermission: VFolderMountPermission
+
+  """
+  Added in 26.10.0. The auto-mounts set on this vfolder, in every project or user they are set on.
+  """
+  vfolderAutoMounts(filter: VFolderAutoMountFilter = null, orderBy: [VFolderAutoMountOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderAutoMountConnection
 }
 
 """
@@ -31745,6 +31845,27 @@ input VFolderAutoMountFilter
   NOT: [VFolderAutoMountFilter!] = null
 }
 
+"""
+Added in 26.10.0. Filter selecting vfolders by the auto-mounts set on them. Each relation matches one auto-mount at a time.
+"""
+input VFolderAutoMountNestedFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  True for a vfolder that has at least one auto-mount, false for one that has none.
+  """
+  exists: Boolean = null
+
+  """At least one auto-mount matches."""
+  some: VFolderAutoMountFilter = null
+
+  """Every auto-mount matches; true when there is none."""
+  every: VFolderAutoMountFilter = null
+
+  """No auto-mount matches."""
+  none: VFolderAutoMountFilter = null
+}
+
 """Added in 26.10.0. One ordering rule for a vfolder auto-mount search."""
 input VFolderAutoMountOrderBy
   @join__type(graph: STRAWBERRY)
@@ -31786,7 +31907,7 @@ input VFolderAutoMountPermissionFilter
 }
 
 """
-Added in 26.10.0. Scope for the scoped vfolder auto-mount query. The items are OR'd, and every scope named is authorized before the read runs. At least one of `project` and `user` must be non-empty.
+Added in 26.10.0. Scope for the scoped vfolder auto-mount query. The items are OR'd, and every scope named is authorized before the read runs. At least one of `project`, `user` and `vfolder` must be non-empty.
 """
 input VFolderAutoMountScope
   @join__type(graph: STRAWBERRY)
@@ -31800,6 +31921,11 @@ input VFolderAutoMountScope
   Users whose own auto-mounts are being read; those of a personal project are not.
   """
   user: [UUIDScope!] = null
+
+  """
+  VFolders whose auto-mounts are being read, in every scope they are set on.
+  """
+  vfolder: [UUIDScope!] = null
 }
 
 """Added in 26.10.0. The one project or user an auto-mount is set on."""
@@ -31910,6 +32036,9 @@ input VFolderFilter
 
   """Added in 26.10.0. Filter by vfolder ID."""
   entityId: UUIDFilter = null
+
+  """Added in 26.10.0. Select vfolders by the auto-mounts set on them."""
+  autoMounts: VFolderAutoMountNestedFilter = null
   AND: [VFolderFilter!] = null
   OR: [VFolderFilter!] = null
   NOT: [VFolderFilter!] = null
@@ -32227,6 +32356,9 @@ input VFolderUsedBy
 
   """Model cards built on the vfolder."""
   modelCard: [UUID!] = null
+
+  """Added in 26.10.0. Sessions whose kernel groups mount the vfolder."""
+  session: [UUID!] = null
 }
 
 """Added in 25.16.0. VFS Storage configuration."""

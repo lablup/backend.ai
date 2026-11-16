@@ -27,6 +27,8 @@ status: draft
 A project sits under a domain, so creation is scope-shaped with the domain as the
 scope, and an operation naming an existing project is single-entity.
 
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
+
 ## The processor composition
 
 `backend.ai mgr ops list --concern organization --entity project` prints the wired

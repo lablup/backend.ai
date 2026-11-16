@@ -1,0 +1,1 @@
+@layer components{.dashboard-board-delete:not(:disabled):not([aria-disabled=true]){color:var(--color-error)}}.dashboard-edit-sider{top:var(--spacing-4);max-height:calc(100dvh - var(--webui-header-height) - var(--spacing-8));scrollbar-gutter:stable;align-self:flex-start;overflow-y:auto}

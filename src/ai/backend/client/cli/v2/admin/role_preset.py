@@ -42,6 +42,11 @@ def role_preset() -> None:
     help="Default auto-assign flag for roles instantiated from this preset.",
 )
 @click.option(
+    "--auto-assign-to-owner/--no-auto-assign-to-owner",
+    default=False,
+    help="Map a personal project's owner to the role made from this preset. Project scope only.",
+)
+@click.option(
     "--permissions",
     default=None,
     help='Permission entries as JSON or @file: [{"entity_type": "...", "permission": "..."}].',
@@ -50,6 +55,7 @@ def create(
     name: str,
     scope_type: str,
     auto_assign: bool,
+    auto_assign_to_owner: bool,
     permissions: str | None,
 ) -> None:
     """Create a new role preset."""
@@ -71,6 +77,7 @@ def create(
                     name=name,
                     scope_type=EntityType(scope_type),
                     auto_assign=auto_assign,
+                    auto_assign_to_owner=auto_assign_to_owner,
                     permissions=entries,
                 ),
             )
@@ -138,6 +145,11 @@ def get(role_preset_id: uuid.UUID, detail: bool) -> None:
     help="Filter by auto-assign flag.",
 )
 @click.option(
+    "--auto-assign-to-owner/--no-auto-assign-to-owner",
+    default=None,
+    help="Filter by the assign-to-owner flag.",
+)
+@click.option(
     "--deleted/--no-deleted",
     default=None,
     help="Filter by soft-delete flag (defaults to excluding soft-deleted rows).",
@@ -154,6 +166,7 @@ def search(
     name_contains: str | None,
     scope_type: str | None,
     auto_assign: bool | None,
+    auto_assign_to_owner: bool | None,
     deleted: bool | None,
     order_by: tuple[str, ...],
     label: tuple[EntityLabelTerm, ...],
@@ -169,11 +182,15 @@ def search(
 
     relations = entity_label_relations(label)
     filter_dto: RolePresetFilter | None = None
-    if relations or any(v is not None for v in (name_contains, scope_type, auto_assign, deleted)):
+    if relations or any(
+        v is not None
+        for v in (name_contains, scope_type, auto_assign, auto_assign_to_owner, deleted)
+    ):
         filter_dto = RolePresetFilter(
             name=StringFilter(contains=name_contains) if name_contains is not None else None,
             scope_type=StringFilter(equals=scope_type) if scope_type is not None else None,
             auto_assign=auto_assign,
+            auto_assign_to_owner=auto_assign_to_owner,
             deleted_at=NullableDateTimeFilter(is_null=not deleted) if deleted is not None else None,
             AND=[RolePresetFilter(labels=rel) for rel in relations] or None,
         )
@@ -208,10 +225,16 @@ def search(
     default=None,
     help="Updated default auto-assign flag for instantiated roles.",
 )
+@click.option(
+    "--auto-assign-to-owner/--no-auto-assign-to-owner",
+    default=None,
+    help="Update whether a personal project's owner is mapped to the role. Project scope only.",
+)
 def update(
     role_preset_id: uuid.UUID,
     name: str | None,
     auto_assign: bool | None,
+    auto_assign_to_owner: bool | None,
 ) -> None:
     """Update a role preset's mutable metadata."""
     from ai.backend.common.data.entity.role_preset import RolePresetID
@@ -222,7 +245,11 @@ def update(
         try:
             result = await registry.role_preset.update(
                 RolePresetID(role_preset_id),
-                UpdateRolePresetBody(name=name, auto_assign=auto_assign),
+                UpdateRolePresetBody(
+                    name=name,
+                    auto_assign=auto_assign,
+                    auto_assign_to_owner=auto_assign_to_owner,
+                ),
             )
             print_result(result)
         finally:

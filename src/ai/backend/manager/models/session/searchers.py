@@ -8,8 +8,8 @@ from typing import Any, override
 import sqlalchemy as sa
 
 from ai.backend.common.types import SessionId, VFolderID
-from ai.backend.manager.data.session.types import SessionEntityData, SessionInfo
-from ai.backend.manager.models.session.row import DEAD_SESSION_STATUSES, SessionRow
+from ai.backend.manager.data.session.types import SessionEntityData, SessionInfo, SessionStatus
+from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
 from ai.backend.manager.models.specs.searcher import Searcher
 
@@ -53,7 +53,7 @@ class LiveSessionsMountingVFolderSearcher(Searcher[SessionRow, SessionId]):
     @override
     def build_select(self) -> sa.sql.Select[Any]:
         return sa.select(SessionRow).where(
-            SessionRow.status.not_in(DEAD_SESSION_STATUSES)
+            SessionRow.status.not_in(SessionStatus.terminal_statuses())
             & SessionRow.vfolder_mounts.contains([{"vfid": str(self.vfolder_id)}])
         )
 

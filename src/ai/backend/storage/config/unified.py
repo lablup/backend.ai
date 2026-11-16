@@ -20,7 +20,9 @@ from ai.backend.common.configs import (
     PyroscopeConfig,
     ServiceDiscoveryConfig,
 )
+from ai.backend.common.configs.storage_status_report import StorageStatusReportConfig
 from ai.backend.common.configs.volume_status_check import VolumeStatusCheckConfig
+from ai.backend.common.configs.wheelhouse import WheelhouseConfig
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.entity.storage_volume import StorageVolumeName
 from ai.backend.common.data.storage.types import ArtifactStorageType, StorageBackendType
@@ -1652,6 +1654,18 @@ class StorageProxyUnifiedConfig(BaseConfigSchema):
             composite=CompositeType.FIELD,
         ),
     ]
+    wheelhouse: Annotated[
+        WheelhouseConfig,
+        Field(default_factory=WheelhouseConfig),
+        BackendAIConfigMeta(
+            description=(
+                "Plugin wheels loaded when the storage-proxy starts. Wheels run without "
+                "verification, so keep the path writable only by trusted operators."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            composite=CompositeType.FIELD,
+        ),
+    ]
     logging: Annotated[
         LoggingConfig,
         Field(default_factory=LoggingConfig),
@@ -1721,6 +1735,19 @@ class StorageProxyUnifiedConfig(BaseConfigSchema):
             composite=CompositeType.FIELD,
         ),
     ]
+    storage_status_report: Annotated[
+        StorageStatusReportConfig,
+        Field(
+            default_factory=StorageStatusReportConfig,
+            validation_alias=AliasChoices("storage-status-report", "storage_status_report"),
+            serialization_alias="storage-status-report",
+        ),
+        BackendAIConfigMeta(
+            description="Configuration for the periodic storage status report to the manager.",
+            added_version=NEXT_RELEASE_VERSION,
+            composite=CompositeType.FIELD,
+        ),
+    ]
     otel: Annotated[
         OTELConfig,
         Field(default_factory=OTELConfig),
@@ -1736,7 +1763,7 @@ class StorageProxyUnifiedConfig(BaseConfigSchema):
     ]
     etcd: Annotated[
         EtcdConfig,
-        Field(default_factory=EtcdConfig),
+        Field(),
         BackendAIConfigMeta(
             description=(
                 "etcd configuration for distributed key-value storage. etcd is used for "

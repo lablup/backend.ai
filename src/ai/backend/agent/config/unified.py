@@ -45,7 +45,9 @@ from ai.backend.common.configs import (
     ServiceDiscoveryConfig,
 )
 from ai.backend.common.configs.redis import RedisConfig
+from ai.backend.common.configs.storage_status_report import StorageStatusReportConfig
 from ai.backend.common.configs.volume_status_check import VolumeStatusCheckConfig
+from ai.backend.common.configs.wheelhouse import WheelhouseConfig
 from ai.backend.common.meta import (
     NEXT_RELEASE_VERSION,
     BackendAIConfigMeta,
@@ -661,7 +663,7 @@ class DebugConfig(BaseConfigSchema):
         BackendAIConfigMeta(
             description=(
                 "Logs the kernel configuration sent to containers at startup. "
-                "Shows environment variables, mount points, and execution settings. "
+                "Shows environment variable names (values masked), mount points, and execution settings. "
                 "Helpful for debugging container initialization or configuration issues."
             ),
             added_version="25.12.0",
@@ -923,9 +925,8 @@ class CommonAgentConfig(BaseConfigSchema):
         ),
     ]
     rpc_auth_manager_public_key: Annotated[
-        FilePath | None,
+        FilePath,
         Field(
-            default=None,
             validation_alias=AliasChoices(
                 "rpc-auth-manager-public-key", "rpc_auth_manager_public_key"
             ),
@@ -935,7 +936,8 @@ class CommonAgentConfig(BaseConfigSchema):
             description=(
                 "Path to the manager's public key file for authenticating RPC messages. "
                 "Used with ZeroMQ CURVE authentication to verify messages from the manager. "
-                "Part of the RPC security mechanism for preventing unauthorized access."
+                "Part of the RPC security mechanism for preventing unauthorized access. "
+                f"Required since {NEXT_RELEASE_VERSION}."
             ),
             added_version="25.12.0",
             secret=True,
@@ -945,9 +947,8 @@ class CommonAgentConfig(BaseConfigSchema):
         ),
     ]
     rpc_auth_agent_keypair: Annotated[
-        FilePath | None,
+        FilePath,
         Field(
-            default=None,
             validation_alias=AliasChoices("rpc-auth-agent-keypair", "rpc_auth_agent_keypair"),
             serialization_alias="rpc-auth-agent-keypair",
         ),
@@ -955,7 +956,8 @@ class CommonAgentConfig(BaseConfigSchema):
             description=(
                 "Path to the agent's keypair file for RPC authentication. "
                 "Contains both public and private keys used for ZeroMQ CURVE authentication. "
-                "The private key must be kept secure as it proves the agent's identity."
+                "The private key must be kept secure as it proves the agent's identity. "
+                f"Required since {NEXT_RELEASE_VERSION}."
             ),
             added_version="25.12.0",
             secret=True,
@@ -2391,6 +2393,18 @@ class AgentGlobalConfig(BaseConfigSchema):
             composite=CompositeType.FIELD,
         ),
     ]
+    wheelhouse: Annotated[
+        WheelhouseConfig,
+        Field(default_factory=WheelhouseConfig),
+        BackendAIConfigMeta(
+            description=(
+                "Plugin wheels loaded when the agent starts. Wheels run without "
+                "verification, so keep the path writable only by trusted operators."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            composite=CompositeType.FIELD,
+        ),
+    ]
     logging: Annotated[
         LoggingConfig,
         Field(default_factory=LoggingConfig),
@@ -2530,6 +2544,19 @@ class AgentGlobalConfig(BaseConfigSchema):
         ),
         BackendAIConfigMeta(
             description="Configuration for the periodic status checks of the volumes.",
+            added_version=NEXT_RELEASE_VERSION,
+            composite=CompositeType.FIELD,
+        ),
+    ]
+    storage_status_report: Annotated[
+        StorageStatusReportConfig,
+        Field(
+            default_factory=StorageStatusReportConfig,
+            validation_alias=AliasChoices("storage-status-report", "storage_status_report"),
+            serialization_alias="storage-status-report",
+        ),
+        BackendAIConfigMeta(
+            description="Configuration for the periodic storage status report to the manager.",
             added_version=NEXT_RELEASE_VERSION,
             composite=CompositeType.FIELD,
         ),

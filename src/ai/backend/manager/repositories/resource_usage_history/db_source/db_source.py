@@ -142,7 +142,7 @@ class ResourceUsageHistoryDBSource:
         Returns:
             Tuple of (created records data, number of kernels with updated observation times)
         """
-        async with self._db.begin_session() as db_sess:
+        async with self._db.begin_session_read_committed() as db_sess:
             # Step 1: Bulk create kernel usage records
             records = await self._add_usage_records(db_sess, creations)
 
@@ -202,7 +202,7 @@ class ResourceUsageHistoryDBSource:
             domain_delta_count=len(aggregation_result.domain_usage_deltas),
         )
 
-        async with self._db.begin_session() as db_sess:
+        async with self._db.begin_session_read_committed() as db_sess:
             # Step 1: Bulk create kernel usage records
             records = await self._add_usage_records(db_sess, creations)
 
@@ -506,7 +506,7 @@ class ResourceUsageHistoryDBSource:
         ):
             return
 
-        async with self._db.begin_session() as db_sess:
+        async with self._db.begin_session_read_committed() as db_sess:
             # Process user buckets
             await self._increment_user_usage_buckets(
                 db_sess, aggregation_result.user_usage_deltas, decay_unit_days
@@ -830,7 +830,7 @@ class ResourceUsageHistoryDBSource:
 
         entry_table = UsageBucketEntryRow.__table__
 
-        async with self._db.begin_session() as db_sess:
+        async with self._db.begin_session_read_committed() as db_sess:
             for slot_name, capacity in capacity_by_slot.items():
                 # Update entries across all bucket types for this scaling group
                 for bucket_row_cls in (

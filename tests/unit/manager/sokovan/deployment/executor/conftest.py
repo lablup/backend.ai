@@ -195,77 +195,12 @@ def _create_route_data(
 
 
 @pytest.fixture
-def pending_deployment() -> DeploymentWithHistory:
-    """Single PENDING deployment for check_pending tests."""
-    return DeploymentWithHistory(
-        deployment_info=_create_deployment_info(lifecycle=EndpointLifecycle.PENDING),
-        last_history=None,
-    )
-
-
-@pytest.fixture
-def pending_deployments_multiple() -> list[DeploymentWithHistory]:
-    """Multiple PENDING deployments."""
-    return [
-        DeploymentWithHistory(
-            deployment_info=_create_deployment_info(
-                lifecycle=EndpointLifecycle.PENDING, resource_group="sg-1"
-            ),
-            last_history=None,
-        ),
-        DeploymentWithHistory(
-            deployment_info=_create_deployment_info(
-                lifecycle=EndpointLifecycle.PENDING, resource_group="sg-2"
-            ),
-            last_history=None,
-        ),
-    ]
-
-
-@pytest.fixture
-def pending_deployment_no_revision() -> DeploymentWithHistory:
-    """PENDING deployment without target revision."""
-    return DeploymentWithHistory(
-        deployment_info=_create_deployment_info(
-            lifecycle=EndpointLifecycle.PENDING, has_revision=False
-        ),
-        last_history=None,
-    )
-
-
-@pytest.fixture
 def ready_deployment() -> DeploymentWithHistory:
     """READY deployment for scaling tests."""
     return DeploymentWithHistory(
         deployment_info=_create_deployment_info(
             lifecycle=EndpointLifecycle.READY,
             desired_replica_count=2,
-            replica_count=2,
-        ),
-        last_history=None,
-    )
-
-
-@pytest.fixture
-def ready_deployment_needs_scale_up() -> DeploymentWithHistory:
-    """READY deployment that needs scale up."""
-    return DeploymentWithHistory(
-        deployment_info=_create_deployment_info(
-            lifecycle=EndpointLifecycle.READY,
-            desired_replica_count=3,
-            replica_count=2,
-        ),
-        last_history=None,
-    )
-
-
-@pytest.fixture
-def ready_deployment_needs_scale_down() -> DeploymentWithHistory:
-    """READY deployment that needs scale down."""
-    return DeploymentWithHistory(
-        deployment_info=_create_deployment_info(
-            lifecycle=EndpointLifecycle.READY,
-            desired_replica_count=1,
             replica_count=2,
         ),
         last_history=None,
@@ -343,38 +278,3 @@ def proxy_targets_by_scaling_group(
         "sg-1": proxy_target_default,
         "sg-2": proxy_target_default,
     }
-
-
-# =============================================================================
-# Route Fixtures
-# =============================================================================
-
-
-@pytest.fixture
-def routes_matching_replicas() -> list[RouteData]:
-    """Routes matching target replica count."""
-    endpoint_id = uuid4()
-    return [
-        _create_route_data(endpoint_id=endpoint_id, status=RouteStatus.RUNNING),
-        _create_route_data(endpoint_id=endpoint_id, status=RouteStatus.RUNNING),
-    ]
-
-
-@pytest.fixture
-def routes_fewer_than_replicas() -> list[RouteData]:
-    """Routes fewer than target replica count."""
-    endpoint_id = uuid4()
-    return [
-        _create_route_data(endpoint_id=endpoint_id, status=RouteStatus.RUNNING),
-    ]
-
-
-@pytest.fixture
-def routes_more_than_replicas() -> list[RouteData]:
-    """Routes more than target replica count."""
-    endpoint_id = uuid4()
-    return [
-        _create_route_data(endpoint_id=endpoint_id, status=RouteStatus.RUNNING),
-        _create_route_data(endpoint_id=endpoint_id, status=RouteStatus.RUNNING),
-        _create_route_data(endpoint_id=endpoint_id, status=RouteStatus.RUNNING),
-    ]

@@ -1,31 +1,33 @@
 # BEP proposals: Guardrails
 
-> Process, status lifecycle, and number registry: `README.md`.
-> Full writing guide (structure, segmentation, context-for-ai): `/bep-guide` skill.
+> Process, status and number registry: `README.md`. Writing guide: the `/bep-guide` skill.
 
 ## Rules
 
-- **A BEP is a tech spec, not an implementation log.** Describe interfaces, contracts, and design decisions: not line-by-line code.
-- **Reserve a number first.** Add your entry to the BEP Number Registry in `README.md` before creating the document.
-- **Reference, do not expand.** For an implementation-level BEP, link the upstream motivation/spec BEP; do not rewrite it.
+- **A BEP is a tech spec.** Write interfaces, contracts and design decisions. Do not write code line by line.
+- **Reserve a number first.** Add the entry to the number registry in `README.md` before creating the document.
+- **Refer to the upstream BEP.** An implementation BEP links the motivation or spec BEP and does not rewrite it.
+- **Follow the structure of `BEP-0000-template.md`.** Goals, Non-goals, Design, Impact, Implementation Order, References.
+- **The template comments set the length limits, and `scripts/knowledge/check_bep_length.py` checks them.** They apply from BEP-1080.
 
-## What goes in the BEP vs. the PR
+## Goals section
 
-The boundary is **"does this need a structural design decision?"**: internal-only structural decisions still belong in the BEP.
+- The first line states what the BEP achieves. Do not write the problem, the background or the defects of the current code.
+- A row of the goals table is a capability the BEP provides. Write cleanup of existing code (removing duplication, migration) as a step of the implementation order, not as a goal.
+- The "Current" cell holds only the fact that the capability does not exist yet and the path that shows it. Do not list the problems of existing APIs.
 
-| In the BEP (tech spec) | In the PR (implementer's discretion) |
-|------------------------|--------------------------------------|
-| Component responsibilities and boundaries, layer placement | Exact dataclass fields / function signatures |
-| Observable contracts: state transitions, API / config field *meaning* | File / function / line anchors |
-| Design decisions and rationale (including internal ones) | Algorithm optimizations, data-structure choices |
-| The core flow across layers | Marker / storage locations, wiring details |
+## Do not write
 
-Symbol/file references in the "current design" section are status evidence (reader pointers), not implementation detail: they are allowed, but keep them minimal.
+- Open questions or a decision log. Settle them in the review and write the result into the design. An item the BEP does not settle goes in Non-goals.
+- A summary that repeats earlier sections.
 
-## Tech-spec BEP structure
+## BEP and PR boundary
 
-Implementation-level BEPs use this structure (detail and example in `/bep-guide`):
+The boundary is whether a structural design decision is needed. A structural decision belongs in the BEP even when its effect is internal.
 
-`Goal → Current design and scope by area (✅ exists / ➕ to add) → Implementation design → Decision Summary → Open Questions → References`
-
-The **by-area current-design table** (split by API / DB / Scheduler / …, each separating what exists from what is missing) distinguishes a tech-spec BEP. See `BEP-1055-preemption-scheduler-mechanics.md`.
+| BEP | PR |
+|---|---|
+| Component responsibilities and boundaries, layer placement | Dataclass fields, function signatures |
+| Observable contracts: meaning of state transitions, API and config fields | File, function and line locations |
+| Design decisions and rejected alternatives | Algorithm optimizations, data-structure choices |
+| The core flow across layers | Storage locations, wiring details |

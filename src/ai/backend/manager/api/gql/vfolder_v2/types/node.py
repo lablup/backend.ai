@@ -13,7 +13,12 @@ from ai.backend.common.data.entity.types import RuntimeEntityID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
 from ai.backend.common.dto.manager.v2.model_card.request import SearchModelCardsInput
 from ai.backend.common.dto.manager.v2.model_card.types import ModelCardUsage, ModelCardUses
+from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.dto.manager.v2.vfolder.response import VFolderNode
+from ai.backend.common.dto.manager.v2.vfolder_auto_mount.request import (
+    ScopedSearchVFolderAutoMountsInput,
+)
+from ai.backend.common.dto.manager.v2.vfolder_auto_mount.types import VFolderAutoMountScope
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.common_types import BinarySizeInfoGQL
@@ -40,6 +45,14 @@ from ai.backend.manager.api.gql.model_card.types import (
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.rbac.types.scope import PermissionBitGQL
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.api.gql.vfolder_auto_mount.resolver import (
+    build_vfolder_auto_mount_connection,
+)
+from ai.backend.manager.api.gql.vfolder_auto_mount.types import (
+    VFolderAutoMountConnectionGQL,
+    VFolderAutoMountFilterGQL,
+    VFolderAutoMountOrderByGQL,
+)
 from ai.backend.manager.api.gql.vfolder_v2.types.enum import (
     VFolderMountPermissionGQL,
     VFolderOperationStatusGQL,
@@ -256,6 +269,41 @@ class VFolderGQL(PydanticNodeMixin[VFolderNode]):
         if mount_permission is None:
             return None
         return VFolderMountPermissionGQL(mount_permission.value)
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "The auto-mounts set on this vfolder, in every project or user they are set on."
+            ),
+        )
+    )  # type: ignore[misc]
+    async def vfolder_auto_mounts(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: VFolderAutoMountFilterGQL | None = None,
+        order_by: list[VFolderAutoMountOrderByGQL] | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> VFolderAutoMountConnectionGQL | None:
+        payload = await info.context.adapters.vfolder_auto_mount.scoped_search(
+            ScopedSearchVFolderAutoMountsInput(
+                scope=VFolderAutoMountScope(vfolder=[UUIDScope(value=UUID(self.id))]),
+                filter=filter.to_pydantic() if filter else None,
+                order=[o.to_pydantic() for o in order_by] if order_by else None,
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+                limit=limit,
+                offset=offset,
+            )
+        )
+        return build_vfolder_auto_mount_connection(payload)
 
     @classmethod
     @override

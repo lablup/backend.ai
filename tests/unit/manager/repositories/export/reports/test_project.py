@@ -1016,6 +1016,75 @@ class TestProjectExportExecuteStreamingDB:
         row_ids = {str(r[0]) for r in rows}
         assert str(project_id2) in row_ids
 
+    @pytest.fixture
+    async def default_registry_project(
+        self,
+        db_engine: ExtendedAsyncSAEngine,
+        project_with_rg_and_registry: _ProjectWithRgAndRegistry,
+    ) -> _ProjectWithRgAndRegistry:
+        """The same project with its registry association marked as the default."""
+        async with db_engine.begin_session() as db_sess:
+            await db_sess.execute(
+                sa.update(AssociationContainerRegistriesGroupsRow)
+                .where(
+                    AssociationContainerRegistriesGroupsRow.project_id
+                    == project_with_rg_and_registry.project_id
+                )
+                .values(is_default=True)
+            )
+        return project_with_rg_and_registry
+
+    async def test_container_registry_is_null_without_default(
+        self,
+        db_engine: ExtendedAsyncSAEngine,
+        project_with_rg_and_registry: _ProjectWithRgAndRegistry,
+    ) -> None:
+        query = ExportAdapter().build_project_query(
+            report=PROJECT_REPORT,
+            fields=["id", "container_registry"],
+            filter=None,
+            order=None,
+            max_rows=1000,
+            statement_timeout_sec=60,
+        )
+
+        rows: list[Any] = []
+        async for partition in execute_streaming_export(db_engine, query):
+            rows.extend(partition)
+
+        assert [row[1] for row in rows] == [""]
+
+    @pytest.mark.parametrize(
+        "fields",
+        [
+            ["id", "container_registry"],
+            ["id", "container_registry", "container_registry_id"],
+        ],
+        ids=["alone", "with-registry-join"],
+    )
+    async def test_container_registry_reads_the_default_association(
+        self,
+        db_engine: ExtendedAsyncSAEngine,
+        default_registry_project: _ProjectWithRgAndRegistry,
+        fields: list[str],
+    ) -> None:
+        query = ExportAdapter().build_project_query(
+            report=PROJECT_REPORT,
+            fields=fields,
+            filter=None,
+            order=None,
+            max_rows=1000,
+            statement_timeout_sec=60,
+        )
+
+        rows: list[Any] = []
+        async for partition in execute_streaming_export(db_engine, query):
+            rows.extend(partition)
+
+        assert [json.loads(row[1]) for row in rows] == [
+            {"registry": "test-registry", "project": None}
+        ]
+
 
 class TestGlobalContainerRegistryExport:
     """Tests that global container registries appear in project export (BA-4708)."""

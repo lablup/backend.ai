@@ -15,7 +15,7 @@ from ai.backend.manager.api.adapters.prometheus_query_preset_category.adapter im
 )
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.prometheus_query_preset_category import (
     ACategoryAlone,
@@ -46,8 +46,14 @@ class ReadingById(When[ACategoryAndACaller, Adapter, CategoryNodeAnswer]):
 
     @override
     def describe(self, laid: ACategoryAndACaller) -> str:
-        called = "존재하지 않는 id" if self.named is not None else laid.category.name
-        return f"{laid.caller.username}이 {called}(으)로 조회"
+        if self.named is not None:
+            called_ko, called_en = "존재하지 않는 id", "a missing id"
+        else:
+            called_ko = called_en = laid.category.name
+        return Says(
+            f"{laid.caller.username}이 {called_ko}(으)로 조회합니다",
+            english=f"{laid.caller.username} reads a category by {called_en}",
+        )
 
     @override
     async def call(self, adapter: Adapter, laid: ACategoryAndACaller) -> CategoryNodeAnswer:
@@ -67,7 +73,10 @@ class ReadingAsNobody(When[ACategoryAlone, Adapter, CategoryNodeAnswer]):
 
     @override
     def describe(self, laid: ACategoryAlone) -> str:
-        return f"사용자 컨텍스트 없이 {laid.category.name} 조회"
+        return Says(
+            f"사용자 컨텍스트 없이 {laid.category.name} 조회합니다",
+            english=f"reads {laid.category.name} with no user context",
+        )
 
     @override
     async def call(self, adapter: Adapter, laid: ACategoryAlone) -> CategoryNodeAnswer:
@@ -87,7 +96,14 @@ class AUserGrantedNothingReadsIt(
 
     @override
     def describe(self) -> str:
-        return "카테고리 하나가 있고 아무 권한도 없는 사용자가 id로 조회하면, 그 카테고리 전체가 반환된다"
+        return Says(
+            "카테고리 하나가 있고 아무 권한도 없는 사용자가 id 로 조회하면, "
+            "그 카테고리 전체가 반환됩니다",
+            english=(
+                "with one category laid, when a user granted nothing reads it by id, "
+                "the whole category comes back"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ACategoryAndACaller]:
@@ -112,9 +128,15 @@ class AnUnknownIdIsNotFound(
 
     @override
     def describe(self) -> str:
-        return (
-            "public 에서 읽을 수 있는 사용자가 존재하지 않는 id로 조회하면 거부된다. 권한을 "
-            "물을 대상이 없으므로, 없는 것인지 닿지 못하는 것인지는 응답으로 드러나지 않는다"
+        return Says(
+            "public 에서 읽을 수 있는 사용자가 존재하지 않는 id 로 조회하면 거부됩니다. "
+            "권한을 요구할 대상이 없으므로, 없는 것인지 접근하지 못하는 것인지는 응답으로 "
+            "드러나지 않습니다",
+            english=(
+                "when a user who can read in public reads a missing id, the call is rejected. "
+                "There is no target to require permission for, so the answer does not reveal "
+                "whether it does not exist or cannot be accessed"
+            ),
         )
 
     @override
@@ -138,8 +160,13 @@ class NobodyMayNotRead(Scenario[TestSeedingSession, ACategoryAlone, Adapter, Cat
 
     @override
     def describe(self) -> str:
-        return (
-            "카테고리 하나가 있고 사용자 컨텍스트 없이 id로 조회하면, 호출자를 알 수 없어 거부된다"
+        return Says(
+            "카테고리 하나가 있고 사용자 컨텍스트 없이 id 로 조회하면, "
+            "호출자를 알 수 없어 거부됩니다",
+            english=(
+                "with one category laid, when it is read by id with no user context, "
+                "the call is rejected because the caller is unknown"
+            ),
         )
 
     @override

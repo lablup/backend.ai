@@ -11,14 +11,24 @@ from uuid import uuid4
 import pytest
 
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
+from ai.backend.common.dto.manager.query import UUIDFilter
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.dto.manager.v2.vfolder.request import (
     ScopedSearchVFoldersInput,
     SearchVFoldersInput,
     VFolderFilter,
 )
-from ai.backend.common.dto.manager.v2.vfolder.types import VFolderScope
+from ai.backend.common.dto.manager.v2.vfolder.types import (
+    VFolderScope,
+    VFolderUsage,
+    VFolderUsedBy,
+)
+from ai.backend.common.dto.manager.v2.vfolder_auto_mount.request import (
+    VFolderAutoMountFilter,
+    VFolderAutoMountNestedFilter,
+)
 from ai.backend.common.types import QuotaScopeID, VFolderMountPolicy, VFolderUsageMode
 from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, PartialBulkResult
 from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
@@ -107,6 +117,26 @@ class TestVFolderAdapterUserScopedSearch:
         mock_processors.vfolder.scoped_search.run.assert_called_once()
         action = mock_processors.vfolder.scoped_search.run.call_args[0][0]
         assert [item.scope_id() for item in action.searcher.scopes] == [user_id]
+
+    async def test_used_by_session_is_a_use_the_caller_must_read(
+        self,
+        adapter: VFolderAdapter,
+        mock_processors: MagicMock,
+        user_id: uuid.UUID,
+    ) -> None:
+        session_id = uuid4()
+
+        await adapter.scoped_search(
+            ScopedSearchVFoldersInput(
+                scope=VFolderScope(user=[UUIDScope(value=user_id)]),
+                usage=VFolderUsage(used_by=VFolderUsedBy(session=[session_id])),
+                limit=10,
+                offset=0,
+            )
+        )
+
+        action = mock_processors.vfolder.scoped_search.run.call_args[0][0]
+        assert [used.target for used in action.searcher.used_by] == [SessionID(session_id)]
 
     async def test_user_scope_returns_payload(
         self,
@@ -239,6 +269,31 @@ class TestVFolderAdapterConvertFilter:
         conditions = adapter._convert_vfolder_filter(f)
         sql = str(conditions[0]().compile(compile_kwargs={"literal_binds": True}))
         assert "vfolders.cloneable" in sql
+
+
+_SCOPE_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
+
+
+class TestVFolderAdapterConvertAutoMountsFilter:
+    @pytest.fixture
+    def adapter(self) -> VFolderAdapter:
+        return VFolderAdapter(MagicMock(), MagicMock(), MagicMock(), MagicMock(), MagicMock())
+
+    def test_some_correlates_the_vfolder_auto_mounts_without_a_deleted_at_condition(
+        self, adapter: VFolderAdapter
+    ) -> None:
+        conditions = adapter._convert_vfolder_filter(
+            VFolderFilter(
+                auto_mounts=VFolderAutoMountNestedFilter(
+                    some=VFolderAutoMountFilter(scope_id=UUIDFilter(equals=_SCOPE_ID))
+                )
+            )
+        )
+        assert len(conditions) == 1
+        sql = str(conditions[0]())
+        assert "vfolder_auto_mounts.vfolder_id = vfolders.id" in sql
+        assert "vfolder_auto_mounts.scope_id = :" in sql
+        assert "vfolder_auto_mounts.deleted_at" not in sql
 
 
 class TestVFolderAdapterGetFolderUsage:

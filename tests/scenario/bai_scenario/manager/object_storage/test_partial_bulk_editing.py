@@ -16,7 +16,7 @@ from ai.backend.common.dto.manager.v2.object_storage.request import (
 from ai.backend.common.dto.manager.v2.object_storage.response import ObjectStorageNode
 from ai.backend.manager.api.adapters.object_storage.adapter import ObjectStorageAdapter
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.object_storage import (
     EveryStorageIsProcessed,
     ManyStoragesAndACaller,
@@ -45,7 +45,16 @@ class EditingEveryHost(When[ManyStoragesAndACaller, ObjectStorageAdapter, Edited
 
     @override
     def describe(self, laid: ManyStoragesAndACaller) -> str:
-        return f"{laid.caller.username}이 object storage {len(laid.laid)}개의 호스트를 한 번에 수정"
+        return Says(
+            (
+                f"{laid.caller.username} 이 object storage {len(laid.laid)}개의 호스트를 한 번에 "
+                "수정합니다"
+            ),
+            english=(
+                f"{laid.caller.username} updates the host of {len(laid.laid)} object storages at "
+                "once"
+            ),
+        )
 
     @override
     async def call(self, adapter: ObjectStorageAdapter, laid: ManyStoragesAndACaller) -> Edited:
@@ -67,9 +76,15 @@ class TheSuperadminEditsSeveralStorages(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 object storage 여럿의 호스트를 한 번에 바꾸면, 모두 새 호스트로 오고 "
-            "실패한 것은 없다"
+        return Says(
+            (
+                "superadmin 이 object storage 여럿의 호스트를 한 번에 변경하면 모두 새 호스트로 "
+                "오고 실패한 것은 없습니다"
+            ),
+            english=(
+                "when the superadmin changes the hosts of several object storages at once, they "
+                "all come back with the new host and nothing failed"
+            ),
         )
 
     @override
@@ -95,9 +110,16 @@ class AUserGrantedNothingEditsNone(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 받지 않은 사용자가 object storage 여럿을 한 번에 고치려 하면, 고쳐진 것 "
-            "없이 모두 권한이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            (
+                "아무 권한도 받지 않은 사용자가 object storage 여럿을 한 번에 수정하려 하면 수정된 "
+                "것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다"
+            ),
+            english=(
+                "when a user granted nothing tries to update several object storages at once, "
+                "nothing is updated and every one comes back in the failed list because there "
+                "is no permission"
+            ),
         )
 
     @override

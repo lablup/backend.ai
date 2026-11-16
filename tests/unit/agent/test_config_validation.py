@@ -540,9 +540,10 @@ class TestResourceConfigValidation:
 
 class TestAgentUnifiedConfigValidation:
     @pytest.fixture
-    def default_raw_config(self) -> RawConfigT:
+    def default_raw_config(self, rpc_auth_key_config: dict[str, Path]) -> RawConfigT:
         return {
             "agent": {
+                **rpc_auth_key_config,
                 "backend": AgentBackend.KUBERNETES,
                 "rpc-listen-addr": HostPortPair(host="127.0.0.1", port=6001),
             },
@@ -555,6 +556,8 @@ class TestAgentUnifiedConfigValidation:
             "etcd": {
                 "namespace": "test",
                 "addr": HostPortPair(host="127.0.0.1", port=2379),
+                "user": "test",
+                "password": "test",
             },
         }
 
@@ -666,12 +669,14 @@ class TestAgentUnifiedConfigValidation:
     def test_docker_backend_validates_swarm_config(
         self,
         default_raw_config: RawConfigT,
+        rpc_auth_key_config: dict[str, Path],
     ) -> None:
         raw_config = default_raw_config.copy()
         # Valid Docker config with swarm-enabled
         raw_config["agent"] = {
             "backend": AgentBackend.DOCKER,
             "rpc-listen-addr": HostPortPair(host="127.0.0.1", port=6001),
+            **rpc_auth_key_config,
         }
         raw_config["container"] = {
             "scratch-type": ScratchType.HOSTDIR,
@@ -685,12 +690,14 @@ class TestAgentUnifiedConfigValidation:
     def test_docker_backend_with_swarm_disabled(
         self,
         default_raw_config: RawConfigT,
+        rpc_auth_key_config: dict[str, Path],
     ) -> None:
         raw_config = default_raw_config.copy()
         # Valid Docker config with swarm disabled
         raw_config["agent"] = {
             "backend": AgentBackend.DOCKER,
             "rpc-listen-addr": HostPortPair(host="127.0.0.1", port=6001),
+            **rpc_auth_key_config,
         }
         raw_config["container"] = {
             "scratch-type": ScratchType.HOSTDIR,
@@ -720,9 +727,10 @@ class TestAgentUnifiedConfigValidation:
 
 class TestAgentUnifiedConfigSingleAgentMode:
     @pytest.fixture
-    def default_raw_config(self) -> RawConfigT:
+    def default_raw_config(self, rpc_auth_key_config: dict[str, Path]) -> RawConfigT:
         return {
             "agent": {
+                **rpc_auth_key_config,
                 "backend": AgentBackend.DOCKER,
                 "rpc-listen-addr": HostPortPair(host="127.0.0.1", port=6001),
             },
@@ -734,6 +742,8 @@ class TestAgentUnifiedConfigSingleAgentMode:
             "etcd": {
                 "namespace": "test",
                 "addr": HostPortPair(host="127.0.0.1", port=2379),
+                "user": "test",
+                "password": "test",
             },
         }
 
@@ -777,9 +787,10 @@ class TestAgentUnifiedConfigSingleAgentMode:
 
 class TestMultipleAgentsConfigValidation:
     @pytest.fixture
-    def default_raw_config(self) -> RawConfigT:
+    def default_raw_config(self, rpc_auth_key_config: dict[str, Path]) -> RawConfigT:
         return {
             "agent": {
+                **rpc_auth_key_config,
                 "backend": AgentBackend.DOCKER,
                 "rpc-listen-addr": HostPortPair(host="127.0.0.1", port=6001),
                 "kernel-creation-concurrency": 4,
@@ -794,6 +805,8 @@ class TestMultipleAgentsConfigValidation:
             "etcd": {
                 "namespace": "test",
                 "addr": HostPortPair(host="127.0.0.1", port=2379),
+                "user": "test",
+                "password": "test",
             },
         }
 
@@ -930,12 +943,14 @@ class TestMultipleAgentsConfigValidation:
     def test_multiple_agents_validate_backend_specific_config(
         self,
         default_raw_config: RawConfigT,
+        rpc_auth_key_config: dict[str, Path],
     ) -> None:
         raw_config = {
             **default_raw_config,
             "agent": {
                 "backend": AgentBackend.KUBERNETES,
                 "rpc-listen-addr": HostPortPair(host="127.0.0.1", port=6001),
+                **rpc_auth_key_config,
             },
             "container": {
                 "scratch-type": "k8s-nfs",
@@ -1210,9 +1225,10 @@ class TestResourceAllocationModes:
     """Test the new resource allocation modes: SHARED, AUTO_SPLIT, and MANUAL."""
 
     @pytest.fixture
-    def default_raw_config(self) -> RawConfigT:
+    def default_raw_config(self, rpc_auth_key_config: dict[str, Path]) -> RawConfigT:
         return {
             "agent": {
+                **rpc_auth_key_config,
                 "backend": AgentBackend.DOCKER,
                 "rpc-listen-addr": HostPortPair(host="127.0.0.1", port=6001),
             },
@@ -1228,6 +1244,8 @@ class TestResourceAllocationModes:
             "etcd": {
                 "namespace": "test",
                 "addr": HostPortPair(host="127.0.0.1", port=2379),
+                "user": "test",
+                "password": "test",
             },
         }
 

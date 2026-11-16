@@ -35,7 +35,15 @@ from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.errors.storage import VFolderNotFound, VFolderPermissionError
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import (
+    Given,
+    Language,
+    Says,
+    Scenario,
+    Then,
+    When,
+    in_language,
+)
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.deployment_revision import (
     MOUNTED_AT,
@@ -79,15 +87,30 @@ class AddingARevision(When[RevisionsAndACaller, DeploymentAdapter, RevisionNode]
         left_out = [
             what
             for what, given in (
-                ("자원과 클러스터", self.slots is not None),
-                ("이미지", self.image),
-                ("런타임 변형", self.runtime),
-                ("모델 정의", self.definition),
+                (Says("자원과 클러스터", english="resources and cluster"), self.slots is not None),
+                (Says("이미지", english="the image"), self.image),
+                (Says("인퍼런스 런타임 종류", english="the runtime variant"), self.runtime),
+                (Says("모델 정의", english="the model definition"), self.definition),
             )
             if not given
         ]
-        without = f" ({', '.join(left_out)} 없이)" if left_out else ""
-        return f"{laid.caller.username}이 {laid.deployment.metadata.name}에 리비전을 더함{without}"
+        korean = (
+            f" ({', '.join(in_language(what, Language.KOREAN) for what in left_out)} 없이)"
+            if left_out
+            else ""
+        )
+        english = (
+            f" without {', '.join(in_language(what, Language.ENGLISH) for what in left_out)}"
+            if left_out
+            else ""
+        )
+        return Says(
+            f"{laid.caller.username} 이 {laid.deployment.metadata.name}에 리비전을 추가합니다{korean}",
+            english=(
+                f"{laid.caller.username} adds a revision to "
+                f"{laid.deployment.metadata.name}{english}"
+            ),
+        )
 
     @override
     async def call(self, adapter: DeploymentAdapter, laid: RevisionsAndACaller) -> RevisionNode:
@@ -146,9 +169,14 @@ class TheGrantedUserAddsTheFirst(
 
     @override
     def describe(self) -> str:
-        return (
-            "리비전 없는 배포에 생성 권한을 받은 사용자가 모든 설정을 주고 리비전을 더하면, "
-            "번호 1을 단 리비전이 준 설정 그대로 온다"
+        return Says(
+            "리비전 없는 배포에 생성 권한을 받은 사용자가 모든 설정을 주고 리비전을 추가하면, "
+            "번호 1을 단 리비전이 준 설정 그대로 옵니다",
+            english=(
+                "when a user granted create adds a revision with every setting to a deployment "
+                "that has no revision, the revision numbered 1 comes back with exactly the "
+                "settings that were given"
+            ),
         )
 
     @override
@@ -176,7 +204,13 @@ class TheNextOneIsNumberedOnePast(
 
     @override
     def describe(self) -> str:
-        return "리비전 하나가 딸린 배포에 리비전을 더하면, 번호 2를 단 리비전이 온다"
+        return Says(
+            "리비전 하나가 딸린 배포에 리비전을 추가하면, 번호 2를 단 리비전이 옵니다",
+            english=(
+                "adding a revision to a deployment that holds one revision brings back the "
+                "revision numbered 2"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, RevisionsAndACaller]:
@@ -203,9 +237,14 @@ class LeavingOutResourcesRunsOnOneNodeWithNoSlot(
 
     @override
     def describe(self) -> str:
-        return (
-            "프리셋도 필수 슬롯도 없이 자원과 클러스터를 빼고 리비전을 더하면, "
-            "노드 하나에 크기 1이고 자원 슬롯이 빈 리비전이 온다"
+        return Says(
+            "프리셋도 필수 슬롯도 없이 자원과 클러스터를 빼고 리비전을 추가하면, "
+            "노드 하나에 크기 1이고 자원 슬롯이 빈 리비전이 옵니다",
+            english=(
+                "adding a revision without resources and cluster when there is neither a preset "
+                "nor a required slot brings back a revision on one node with size 1 and no "
+                "resource slot"
+            ),
         )
 
     @override
@@ -231,9 +270,14 @@ class AMountBeyondTheFolderIsRefused(
 
     @override
     def describe(self) -> str:
-        return (
-            "남의 모델 폴더를 읽기 전용으로 빌린 사용자가 읽고 쓰기로 마운트하는 리비전을 "
-            "더하면, 폴더 권한을 넘는다는 이유로 거부된다"
+        return Says(
+            "남의 모델 vfolder 를 읽기 전용으로 빌린 사용자가 읽고 쓰기로 마운트하는 리비전을 "
+            "추가하면, vfolder 권한을 넘는다는 이유로 거부됩니다",
+            english=(
+                "when a user who borrowed another user's model vfolder as read-only adds a "
+                "revision that mounts it read-write, the call is rejected because it exceeds the "
+                "vfolder permission"
+            ),
         )
 
     @override
@@ -259,7 +303,13 @@ class NoImageAnywhereIsRefused(
 
     @override
     def describe(self) -> str:
-        return "프리셋 없이 이미지를 빼고 리비전을 더하면, 입력이 틀렸다는 이유로 거부된다"
+        return Says(
+            "프리셋 없이 이미지를 빼고 리비전을 추가하면, 입력이 틀렸다는 이유로 거부됩니다",
+            english=(
+                "adding a revision without an image and without a preset is rejected because the "
+                "input is wrong"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, RevisionsAndACaller]:
@@ -284,7 +334,14 @@ class NoRuntimeAnywhereIsRefused(
 
     @override
     def describe(self) -> str:
-        return "프리셋 없이 런타임 변형을 빼고 리비전을 더하면, 입력이 틀렸다는 이유로 거부된다"
+        return Says(
+            "프리셋 없이 인퍼런스 런타임 종류를 빼고 리비전을 추가하면, "
+            "입력이 틀렸다는 이유로 거부됩니다",
+            english=(
+                "adding a revision without a runtime variant and without a preset is rejected "
+                "because the input is wrong"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, RevisionsAndACaller]:
@@ -309,9 +366,14 @@ class NoModelDefinitionAnywhereIsRefused(
 
     @override
     def describe(self) -> str:
-        return (
-            "폴더 파일을 읽지 않는 런타임 변형으로 프리셋 없이 모델 정의를 빼고 리비전을 "
-            "더하면, 이름 없는 모델이 모델 정의 검증에서 거부된다"
+        return Says(
+            "vfolder 파일을 읽지 않는 인퍼런스 런타임 종류로 프리셋 없이 모델 정의를 빼고 "
+            "리비전을 추가하면, 이름 없는 모델이 모델 정의 검증에서 거부됩니다",
+            english=(
+                "adding a revision with a runtime variant that does not read vfolder files, "
+                "without a model definition and without a preset, is rejected in model definition "
+                "validation because a model has no name"
+            ),
         )
 
     @override
@@ -337,9 +399,13 @@ class AMissingRequiredSlotIsRefused(
 
     @override
     def describe(self) -> str:
-        return (
-            "모든 리비전이 채워야 하는 슬롯이 정해져 있고 그 슬롯을 빼고 리비전을 더하면, "
-            "입력이 틀렸다는 이유로 거부된다"
+        return Says(
+            "모든 리비전이 채워야 하는 슬롯이 정해져 있고 그 슬롯을 빼고 리비전을 추가하면, "
+            "입력이 틀렸다는 이유로 거부됩니다",
+            english=(
+                "when a slot every revision must fill is set and a revision is added without it, "
+                "the call is rejected because the input is wrong"
+            ),
         )
 
     @override
@@ -365,7 +431,13 @@ class AReadGrantDoesNotAdd(
 
     @override
     def describe(self) -> str:
-        return "배포 읽기 권한만 받은 사용자가 리비전을 더하면, 권한 부족으로 거부된다"
+        return Says(
+            "배포 읽기 권한만 받은 사용자가 리비전을 추가하면, 권한 부족으로 거부됩니다",
+            english=(
+                "when a user granted only read on the deployment adds a revision, the call is "
+                "rejected for lack of permission"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, RevisionsAndACaller]:
@@ -392,9 +464,14 @@ class TheSuperadminAddsToAnothers(
 
     @override
     def describe(self) -> str:
-        return (
-            "배포에도 자기 모델 폴더에도 권한을 받지 않은 슈퍼관리자가 남의 배포에 리비전을 "
-            "더하면, 리비전이 더해진다. 역할이 배포 권한과 폴더 권한을 함께 지나간다"
+        return Says(
+            "배포에도 자기 모델 vfolder 에도 권한을 받지 않은 superadmin 이 남의 배포에 리비전을 "
+            "추가하면, 리비전이 추가됩니다. 역할이 배포 권한과 vfolder 권한을 함께 지나갑니다",
+            english=(
+                "when a superadmin holding no grant on the deployment or on their own model "
+                "vfolder adds a revision to another user's deployment, the revision is added; the "
+                "role passes through both the deployment permission and the vfolder permission"
+            ),
         )
 
     @override
@@ -420,9 +497,14 @@ class AFolderTheCallerMayNotReadIsNotFound(
 
     @override
     def describe(self) -> str:
-        return (
-            "배포 생성 권한은 받았지만 모델 폴더를 읽을 권한이 없는 사용자가 그 폴더로 리비전을 "
-            "더하면, 폴더를 찾을 수 없다는 이유로 거부된다"
+        return Says(
+            "배포 생성 권한은 받았지만 모델 vfolder 를 읽을 권한이 없는 사용자가 그 vfolder 로 "
+            "리비전을 추가하면, vfolder 를 찾을 수 없다는 이유로 거부됩니다",
+            english=(
+                "when a user granted create on the deployment but not read on the model vfolder "
+                "adds a revision with that vfolder, the call is rejected because the vfolder is "
+                "not found"
+            ),
         )
 
     @override

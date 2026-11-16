@@ -20,13 +20,13 @@ from ai.backend.common.docker import (
     KernelFeatures,
     LabelName,
 )
+from ai.backend.common.errors.bgtask import BgtaskCancelledError, BgtaskFailedError
 from ai.backend.common.events.event_types.bgtask.broadcast import (
     BaseBgtaskDoneEvent,
     BaseBgtaskEvent,
 )
 from ai.backend.common.events.hub.propagators.cache import WithCachePropagator
 from ai.backend.common.events.types import EventCacheDomain, EventDomain
-from ai.backend.common.exception import BgtaskCancelledError, BgtaskFailedError
 from ai.backend.common.types import AgentId, ImageRegistry, SessionId
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.bgtask.types import ManagerBgtaskName

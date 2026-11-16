@@ -29,6 +29,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.agent.row import AgentRow
@@ -42,6 +43,7 @@ from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.views.sokovan.workload import PreemptionScopeKey
 from ai.backend.testutils.fixtures import DomainFixtureData
@@ -301,7 +303,9 @@ class TestFetchPreemptionCandidates:
         )
 
         fetch = await ScheduleDBSource(
-            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
         ).fetch_scheduling_fetch(test_scaling_group_id)
 
         assert fetch is not None
@@ -405,7 +409,9 @@ class TestFetchPreemptionCandidates:
         )
 
         fetch = await ScheduleDBSource(
-            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
         ).fetch_scheduling_fetch(test_scaling_group_id)
 
         assert fetch is not None
@@ -467,7 +473,9 @@ class TestFetchPreemptionCandidates:
         )
 
         fetch = await ScheduleDBSource(
-            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
         ).fetch_scheduling_fetch(test_scaling_group_id)
 
         assert fetch is not None
@@ -574,7 +582,9 @@ class TestFetchPreemptionCandidates:
         )
 
         fetch = await ScheduleDBSource(
-            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
         ).fetch_scheduling_fetch(test_scaling_group_id)
 
         assert fetch is not None
@@ -663,7 +673,9 @@ class TestFetchPreemptionCandidates:
         )
 
         fetch = await ScheduleDBSource(
-            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
         ).fetch_scheduling_fetch(test_scaling_group_id)
 
         assert fetch is not None
@@ -722,7 +734,9 @@ class TestFetchPreemptionCandidates:
             )
 
         fetch = await ScheduleDBSource(
-            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
         ).fetch_scheduling_fetch(test_scaling_group_id)
 
         assert fetch is not None
@@ -782,7 +796,9 @@ class TestFetchPreemptionCandidates:
         )
 
         fetch = await ScheduleDBSource(
-            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
         ).fetch_scheduling_fetch(test_scaling_group_id)
 
         assert fetch is not None
@@ -890,7 +906,9 @@ class TestFetchPreemptionCandidates:
         )
 
         fetch = await ScheduleDBSource(
-            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
         ).fetch_scheduling_fetch(test_scaling_group_id)
 
         assert fetch is not None
@@ -989,7 +1007,9 @@ class TestPreemptionVictimScope:
         )
 
         fetch = await ScheduleDBSource(
-            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
         ).fetch_scheduling_fetch(test_scaling_group_id)
 
         assert fetch is not None
@@ -1087,7 +1107,9 @@ class TestPreemptionVictimScope:
         )
 
         fetch = await ScheduleDBSource(
-            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
         ).fetch_scheduling_fetch(test_scaling_group_id)
 
         assert fetch is not None
@@ -1173,7 +1195,9 @@ class TestPreemptionVictimScope:
         )
 
         fetch = await ScheduleDBSource(
-            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+            db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
         ).fetch_scheduling_fetch(test_scaling_group_id)
 
         assert fetch is not None

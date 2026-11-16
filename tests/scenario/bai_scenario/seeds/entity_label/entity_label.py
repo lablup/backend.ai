@@ -11,6 +11,7 @@ from ai.backend.common.data.entity.types import RuntimeEntityID
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.entity_label.types import EntityLabelData
 from ai.backend.manager.models.entity_label.upserters import EntityLabelUpserter
+from ai.backend.testutils.scenario_steps import Says
 from bai_scenario.seeds.seeder import TestSeedFieldUpserter
 
 
@@ -23,7 +24,7 @@ class TestSeedDomainLabel(TestSeedFieldUpserter[DomainData, EntityLabelData]):
 
     @override
     def kind(self) -> str:
-        return f"라벨 {self.key}={self.value}"
+        return Says(f"라벨 {self.key}={self.value}", english=f"label {self.key}={self.value}")
 
     @override
     def owner_id(self, owner: DomainData) -> RuntimeEntityID:

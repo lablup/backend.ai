@@ -23,6 +23,7 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.filter_specs import StringMatchSpec
@@ -158,6 +159,7 @@ from ai.backend.manager.data.session.types import (
     SessionStatus,
     SessionTerminationStatus,
 )
+from ai.backend.manager.errors.auth import AuthenticationRequired
 from ai.backend.manager.errors.base.not_found import NotFoundError
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import (
@@ -338,11 +340,11 @@ class SessionAdapter(BaseAdapter):
     def _require_user_id() -> UUID:
         """Return the current user's UUID from request context.
 
-        Raises RuntimeError if called outside a request context.
+        Raises AuthenticationRequired if called outside a request context.
         """
         user = current_user()
         if user is None:
-            raise RuntimeError("SessionAdapter requires an authenticated user in context")
+            raise AuthenticationRequired()
         return user.user_id
 
     # -------------------------------------------------------------------------
@@ -458,6 +460,11 @@ class SessionAdapter(BaseAdapter):
             batch=batch_spec,
             tag=input.tag,
             callback_url=input.callback_url,
+            session_group_id=(
+                SessionGroupID(input.session_group_id)
+                if input.session_group_id is not None
+                else None
+            ),
             user_id=UserID(user_id),
             user_role=UserRole(user_role),
             access_key=AccessKey(access_key),
@@ -1057,6 +1064,10 @@ class SessionAdapter(BaseAdapter):
             *(
                 linked.resource_groups.uses(ResourceGroupID(entity_id))
                 for entity_id in (uses.resource_group or () if uses else ())
+            ),
+            *(
+                linked.vfolders.uses(VFolderUUID(entity_id))
+                for entity_id in (uses.vfolder or () if uses else ())
             ),
         ]
 

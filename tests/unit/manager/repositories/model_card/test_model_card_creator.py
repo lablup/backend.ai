@@ -27,7 +27,6 @@ from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
-from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.model_card.creators import (
     ModelCardCreator,
     ModelCardResourceRequirementCreator,
@@ -106,7 +105,6 @@ class TestModelCardCreatorResourceRequirements:
                 RoleRow,
                 UserRoleRow,
                 UserRow,
-                KeyPairRow,
                 ProjectRow,
                 AgentRow,
                 ContainerRegistryRow,

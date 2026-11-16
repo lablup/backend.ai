@@ -60,6 +60,7 @@ from ai.backend.common.dto.manager.v2.role_preset.types import (
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_added_field,
     gql_field,
     gql_pydantic_input,
 )
@@ -103,6 +104,17 @@ class CreateRolePresetInputGQL(PydanticInputMixin[CreateRolePresetInputDTO]):
         ),
         default=False,
     )
+    auto_assign_to_owner: bool = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Whether a personal project's "
+                "owner is mapped to the role made from this preset. Allowed only on a project "
+                "preset."
+            ),
+        ),
+        default=False,
+    )
     permissions: list[RolePermissionPresetEntryInputGQL] = gql_field(
         description="Permission entries carried by the preset.",
     )
@@ -125,6 +137,17 @@ class UpdateRolePresetInputGQL(PydanticInputMixin[UpdateRolePresetInputDTO]):
         description="Updated default value for the `auto_assign` flag of instantiated roles.",
         default=UNSET,
     )
+    auto_assign_to_owner: bool | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Updated value for whether a personal project's "
+                "owner is mapped to the role made from this preset. Allowed only on a project "
+                "preset."
+            ),
+        ),
+        default=UNSET,
+    )
 
 
 @gql_pydantic_input(
@@ -141,6 +164,17 @@ class UpdateRolePresetBodyInputGQL(PydanticInputMixin[UpdateRolePresetBodyDTO]):
     name: str | None = gql_field(description="Updated name.", default=UNSET)
     auto_assign: bool | None = gql_field(
         description="Updated default value for the `auto_assign` flag of instantiated roles.",
+        default=UNSET,
+    )
+    auto_assign_to_owner: bool | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Updated value for whether a personal project's "
+                "owner is mapped to the role made from this preset. Allowed only on a project "
+                "preset."
+            ),
+        ),
         default=UNSET,
     )
 

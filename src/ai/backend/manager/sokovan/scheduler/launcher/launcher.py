@@ -17,6 +17,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.data.entity.network import NetworkID
 from ai.backend.common.docker import ImageRef
+from ai.backend.common.kernel_creation_config import KernelCreationConfig
 from ai.backend.common.types import (
     AgentId,
     AutoPullBehavior,
@@ -25,7 +26,6 @@ from ai.backend.common.types import (
     ClusterSSHKeyPair,
     ClusterSSHPortMapping,
     ImageConfig,
-    KernelCreationConfig,
     KernelId,
     SessionId,
 )
@@ -350,6 +350,7 @@ class SessionLauncher:
                         "image": kernel_image_config,
                         "kernel_id": kernel_id_str,
                         "session_id": str(session.session_id),
+                        "session_name": session.name,
                         "owner_user_id": str(session.user_uuid),
                         "owner_project_id": None,  # TODO: Implement project-owned sessions
                         "network_id": str(session.session_id),

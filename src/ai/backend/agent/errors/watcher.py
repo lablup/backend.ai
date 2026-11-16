@@ -26,6 +26,19 @@ class InvalidWatcherTokenError(BackendAIError, web.HTTPForbidden):
         )
 
 
+class WatcherTokenNotConfiguredError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/agent/watcher-token-not-configured"
+    error_title = "The watcher token is not configured."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.WATCHER,
+            operation=ErrorOperation.SETUP,
+            error_detail=ErrorDetail.NOT_READY,
+        )
+
+
 class InvalidMountNameError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/agent/invalid-mount-name"
     error_title = "The volume name must point to a directory under the mount prefix."

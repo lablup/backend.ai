@@ -3,6 +3,7 @@ from typing import Any, Self
 
 from pydantic import Field, model_validator
 
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.typed_validators import CommaSeparatedStrList
 from ai.backend.common.types import BackendAISchema
 
@@ -12,8 +13,15 @@ class OpenIDProviderConfig(BackendAISchema):
         default=None,
         description=(
             "The OpenID Connect well-known configuration URL. "
-            "If provided, authorization_endpoint, token_endpoint, and jwks_uri "
+            "If provided, issuer, authorization_endpoint, token_endpoint, and jwks_uri "
             "are fetched automatically."
+        ),
+    )
+    issuer: str | None = Field(
+        default=None,
+        description=(
+            "The issuer identifier that ID tokens must carry in their iss claim. "
+            f"Required if well_known is not set. Added in {NEXT_RELEASE_VERSION}."
         ),
     )
     authorization_endpoint: str | None = Field(

@@ -13,7 +13,7 @@ from ai.backend.manager.api.adapters.resource_preset.adapter import ResourcePres
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.errors.resource import ResourcePresetNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.resource_preset import (
     APresetAndACaller,
@@ -39,8 +39,12 @@ class Purging(When[APresetAndACaller, ResourcePresetAdapter, UUID]):
 
     @override
     def describe(self, laid: APresetAndACaller) -> str:
-        target = "없는 id" if self.unknown else laid.preset.name
-        return f"{laid.caller.username}이 {target}을 purge 함"
+        target_ko = "없는 id" if self.unknown else laid.preset.name
+        target_en = "an unknown id" if self.unknown else laid.preset.name
+        return Says(
+            f"{laid.caller.username}이 {target_ko}을 purge 합니다",
+            english=f"{laid.caller.username} purges {target_en}",
+        )
 
     @override
     async def call(self, adapter: ResourcePresetAdapter, laid: APresetAndACaller) -> UUID:
@@ -59,7 +63,10 @@ class TheSuperadminPurgesAPreset(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 프리셋을 purge 하면 지운 프리셋의 id 가 온다"
+        return Says(
+            "superadmin 이 프리셋을 purge 하면 삭제한 프리셋의 id 가 반환됩니다",
+            english="when the superadmin purges a preset, the id of the deleted preset comes back",
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
@@ -84,7 +91,13 @@ class AUserGrantedNothingMayNotPurge(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 받지 않은 사용자가 프리셋을 purge 하려 하면 권한 부족으로 거부된다"
+        return Says(
+            "아무 권한도 받지 않은 사용자가 프리셋을 purge 하려 하면 권한 부족으로 거부됩니다",
+            english=(
+                "a user granted nothing trying to purge a preset is rejected for not enough "
+                "permission"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
@@ -109,7 +122,13 @@ class AnIdNothingAnswersToIsNotFound(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 없는 id 의 프리셋을 purge 하려 하면 대상이 없다는 것으로 거부된다"
+        return Says(
+            "superadmin 이 없는 id 의 프리셋을 purge 하려 하면 대상이 없다는 것으로 거부됩니다",
+            english=(
+                "when the superadmin tries to purge the preset of an unknown id, the call is "
+                "rejected as no such target"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, APresetAndACaller]:

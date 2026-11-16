@@ -25,11 +25,14 @@ from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
     Held,
+    Language,
     Refused,
     Same,
     SameAs,
+    Says,
     Then,
     Verdict,
+    in_language,
 )
 from bai_scenario.components.domain import WrittenByThisRun
 from bai_scenario.components.system import lay_a_caller, role_named
@@ -77,7 +80,11 @@ class ManyServicesAndSomeone(Given[Any, ManyServicesAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"서비스 {self.besides + 1}개와, {role_named(self.role)} 한 명"
+        who = role_named(self.role)
+        return Says(
+            f"서비스 {self.besides + 1}개와, {who} 한 명",
+            english=f"{self.besides + 1} services and one {in_language(who, Language.ENGLISH)}",
+        )
 
     @override
     async def lay(self, seeding: Any) -> ManyServicesAndACaller:
@@ -104,7 +111,13 @@ class ServicesOfTwoGroupsAndSomeone(Given[Any, ManyServicesAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"그룹이 다른 서비스 둘과, {role_named(self.role)} 한 명"
+        who = role_named(self.role)
+        return Says(
+            f"그룹이 다른 서비스 둘과, {who} 한 명",
+            english=(
+                f"two services in different groups and one {in_language(who, Language.ENGLISH)}"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> ManyServicesAndACaller:
@@ -130,8 +143,18 @@ class ServicesOfEveryStatusAndSomeone(Given[Any, ManyServicesAndACaller]):
 
     @override
     def describe(self) -> str:
-        listed = "·".join(STATUS_NAMES[one] for one in ServiceCatalogStatus)
-        return f"{listed} 상태의 서비스 하나씩과, {role_named(self.role)} 한 명"
+        listed_ko = ", ".join(str(STATUS_NAMES[one]) for one in ServiceCatalogStatus)
+        listed_en = ", ".join(
+            in_language(STATUS_NAMES[one], Language.ENGLISH) for one in ServiceCatalogStatus
+        )
+        who = role_named(self.role)
+        return Says(
+            f"{listed_ko} 상태의 서비스 하나씩과, {who} 한 명",
+            english=(
+                f"one service for each status: {listed_en}, "
+                f"and one {in_language(who, Language.ENGLISH)}"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> ManyServicesAndACaller:
@@ -161,7 +184,13 @@ def service_verdicts(
 ) -> list[Verdict]:
     """Every place of one service node, prefixed for a node inside a list."""
     seen: list[Verdict] = [
-        Held[UUID](f"{at}id", node.id, SameAs[UUID](laid.id, "심은 서비스")),
+        Held[UUID](
+            f"{at}id",
+            node.id,
+            SameAs[UUID](
+                laid.id, Says("미리 저장한 서비스", english="the service seeded in advance")
+            ),
+        ),
         Same(f"{at}service_group", node.service_group, laid.service_group),
         Same(f"{at}instance_id", node.instance_id, laid.instance_id),
         Same(f"{at}display_name", node.display_name, laid.instance_id),
@@ -184,7 +213,12 @@ class EveryLaidServiceComesWhole(Then[ManyServicesAndACaller, AdminSearchService
 
     @override
     def says(self) -> str:
-        return "심은 서비스가 모두 한 번씩, 통째로 집계된다"
+        return Says(
+            "미리 저장한 서비스가 모두 한 번씩 집계되어 전체가 반환됩니다",
+            english=(
+                "every service seeded in advance is counted once, and each whole service comes back"
+            ),
+        )
 
     @override
     def look(
@@ -219,8 +253,14 @@ class OnlyTheServicesOfStatuses(Then[ManyServicesAndACaller, AdminSearchServiceC
 
     @override
     def says(self) -> str:
-        listed = "·".join(STATUS_NAMES[one] for one in self.statuses)
-        return f"{listed} 상태의 서비스만 반환된다"
+        listed_ko = ", ".join(str(STATUS_NAMES[one]) for one in self.statuses)
+        listed_en = ", ".join(
+            in_language(STATUS_NAMES[one], Language.ENGLISH) for one in self.statuses
+        )
+        return Says(
+            f"{listed_ko} 상태의 서비스만 반환됩니다",
+            english=f"only the services with status {listed_en} come back",
+        )
 
     @override
     def look(
@@ -234,7 +274,13 @@ class OnlyTheServicesOfStatuses(Then[ManyServicesAndACaller, AdminSearchServiceC
             Held(
                 "items.id",
                 sorted(str(one.id) for one in payload.items),
-                SameAs(sorted(str(one.id) for one in expected), "그 상태로 심은 서비스"),
+                SameAs(
+                    sorted(str(one.id) for one in expected),
+                    Says(
+                        "그 상태로 미리 저장한 서비스",
+                        english="the services seeded in advance with that status",
+                    ),
+                ),
             ),
             Same(
                 "items.instance_id",
@@ -258,7 +304,10 @@ class OnlyTheNamedGroupIsLeft(Then[ManyServicesAndACaller, AdminSearchServiceCat
 
     @override
     def says(self) -> str:
-        return "골라낸 그룹의 서비스 하나만 남는다"
+        return Says(
+            "골라낸 그룹의 서비스 하나만 남습니다",
+            english="only the service of the picked group is left",
+        )
 
     @override
     def look(
@@ -271,7 +320,10 @@ class OnlyTheNamedGroupIsLeft(Then[ManyServicesAndACaller, AdminSearchServiceCat
             Held(
                 "items.id",
                 [str(one.id) for one in payload.items],
-                SameAs([str(laid.named.id)], "골라낸 서비스"),
+                SameAs(
+                    [str(laid.named.id)],
+                    Says("골라낸 서비스", english="the picked service"),
+                ),
             ),
             Same(
                 "items.service_group",
@@ -292,7 +344,10 @@ class TheFirstPageOfServices(Then[ManyServicesAndACaller, AdminSearchServiceCata
 
     @override
     def says(self) -> str:
-        return "기본 크기의 첫 페이지가 반환된다"
+        return Says(
+            "기본 크기의 첫 페이지가 반환됩니다",
+            english="the first page of the default size comes back",
+        )
 
     @override
     def look(

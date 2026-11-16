@@ -22,7 +22,7 @@ from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import BinarySize
 from ai.backend.manager.api.adapters.resource_preset.adapter import ResourcePresetAdapter
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.resource_preset import (
     EveryPresetComesBack,
@@ -55,11 +55,21 @@ class EditingEveryTarget(When[ManyPresetsAndACaller, ResourcePresetAdapter, Edit
     @override
     def describe(self, laid: ManyPresetsAndACaller) -> str:
         if self.slotless:
-            return (
-                f"{laid.caller.username}이 프리셋 {len(laid.laid)}개를 한 번에 고치며 "
-                "첫째의 자원을 필수 슬롯 없이 바꿈"
+            return Says(
+                f"{laid.caller.username}이 프리셋 {len(laid.laid)}개를 한 번에 수정하며 첫째의 "
+                "자원을 필수 슬롯 없이 변경합니다",
+                english=(
+                    f"{laid.caller.username} edits {len(laid.laid)} presets at once, changing "
+                    "the resources of the first without the intrinsic slots"
+                ),
             )
-        return f"{laid.caller.username}이 프리셋 {len(laid.laid)}개의 공유 메모리를 한 번에 바꿈"
+        return Says(
+            f"{laid.caller.username}이 프리셋 {len(laid.laid)}개의 공유 메모리를 한 번에 변경합니다",
+            english=(
+                f"{laid.caller.username} changes the shared memory of {len(laid.laid)} presets "
+                "at once"
+            ),
+        )
 
     @override
     async def call(self, adapter: ResourcePresetAdapter, laid: ManyPresetsAndACaller) -> Edited:
@@ -90,9 +100,13 @@ class TheSuperadminEditsSeveralPresets(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 프리셋 여럿의 공유 메모리를 한 번에 바꾸면, 모두 새 공유 메모리로 "
-            "오고 실패한 것은 없다"
+        return Says(
+            "superadmin 이 프리셋 여럿의 공유 메모리를 한 번에 변경하면, 모두 새 공유 메모리로 "
+            "오고 실패한 것은 없습니다",
+            english=(
+                "when the superadmin changes the shared memory of several presets at once, they "
+                "all come back with the new shared memory and nothing failed"
+            ),
         )
 
     @override
@@ -118,9 +132,13 @@ class AUserGrantedNothingEditsNone(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 "
-            "모두 권한이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 수정하려 하면, 수정된 것 없이 "
+            "모두 권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "a user granted nothing trying to edit several presets at once gets none edited "
+                "and every one in the failed list for not enough permission"
+            ),
         )
 
     @override
@@ -146,9 +164,13 @@ class SlotsWithoutTheIntrinsicOnesAreRefused(
 
     @override
     def describe(self) -> str:
-        return (
-            "프리셋 여럿을 고치며 하나의 자원을 필수 슬롯 없이 바꾸면, 요청 전체가 입력 "
-            "오류로 거부된다"
+        return Says(
+            "프리셋 여럿을 수정하며 하나의 자원을 필수 슬롯 없이 변경하면, 요청 전체가 입력 "
+            "오류로 거부됩니다",
+            english=(
+                "editing several presets with the resources of one changed without the intrinsic "
+                "slots rejects the whole request as invalid input"
+            ),
         )
 
     @override

@@ -112,7 +112,17 @@ def _record(
     summary: str = "",
     adapter: str = "WidgetAdapter",
 ) -> ScenarioRecord:
-    seen = (Line(says=f"{Refused.PREFIX}NotEnoughPermission"),) if refused else (Line("id = 1"),)
+    seen = (
+        (
+            Line(
+                says=Says(
+                    f"{Refused.PREFIX}NotEnoughPermission", english="rejected: NotEnoughPermission"
+                )
+            ),
+        )
+        if refused
+        else (Line("id = 1"),)
+    )
     return ScenarioRecord(
         summary=summary or f"{operation}-{'refused' if refused else 'answered'}",
         description=f"{summary or operation} {'is rejected' if refused else 'answers'}",
@@ -217,7 +227,7 @@ class TestMarkdownOperations:
     def test_the_korean_report_keeps_the_korean_words(self, report: Report) -> None:
         rendered = MarkdownFormat(Language.KOREAN).render_one(report.components[0])
 
-        assert "시나리오: 미완 6 / 7" in rendered
+        assert "시나리오: 미완성 6 / 7" in rendered
         assert "- 직접 구현 (3)" in rendered
         assert "representative success" not in rendered
 
@@ -361,13 +371,14 @@ class TestBilingualReport:
         assert "Reads a widget" in MarkdownFormat().render_one(component)
         assert "위젯을 읽는다" in MarkdownFormat(Language.KOREAN).render_one(component)
 
-    def test_a_sentence_without_english_falls_back_to_korean_in_both_reports(
+    def test_a_sentence_without_english_is_refused_in_the_english_report(
         self, manager: pathlib.Path
     ) -> None:
         record = replace(_record("get"), description=Says("위젯을 읽는다"))
         component = Report.of([record], AdapterWiring(manager)).components[0]
 
-        assert "위젯을 읽는다" in MarkdownFormat().render_one(component)
+        with pytest.raises(ValueError, match="Korean"):
+            MarkdownFormat().render_one(component)
         assert "위젯을 읽는다" in MarkdownFormat(Language.KOREAN).render_one(component)
 
     def test_a_split_report_writes_one_file_per_language(self) -> None:

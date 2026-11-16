@@ -1,19 +1,19 @@
-# Fair Share Scheduler CLI Guide
+# Fair share scheduler CLI guide
 
-This guide covers the Backend.AI fair share scheduler CLI commands for viewing fair share factors.
+This guide covers the Backend.AI fair share scheduler CLI commands for getting fair share factors.
 
 ## Overview
 
-The fair share scheduler ensures equitable resource allocation across users, projects, and domains based on their historical usage patterns. It calculates a **fair share factor** for each entity that influences scheduling priority:
+The fair share scheduler distributes resources fairly across users, projects, and domains based on their past usage. It calculates a **fair share factor** for each entity; the factor influences scheduling priority:
 
 - **Lower fair share factor** = Higher priority (less historical usage)
 - **Higher fair share factor** = Lower priority (more historical usage)
 
-**Note**: All fair share commands require **superadmin privileges**.
+**Note**: All fair share commands require the **superadmin** role.
 
 ## Quick Start
 
-### 1. View Domain Fair Shares
+### 1. List Domain Fair Shares
 
 List all domain fair shares in a resource group:
 
@@ -21,7 +21,7 @@ List all domain fair shares in a resource group:
 ./backend.ai fair-share domain list --resource-group default
 ```
 
-### 2. View Project Fair Shares
+### 2. List Project Fair Shares
 
 List project fair shares filtered by domain:
 
@@ -29,7 +29,7 @@ List project fair shares filtered by domain:
 ./backend.ai fair-share project list --resource-group default --domain-name default
 ```
 
-### 3. View User Fair Shares
+### 3. List User Fair Shares
 
 List user fair shares for a specific project:
 
@@ -221,7 +221,7 @@ Created: 2024-01-15T10:30:00
 
 ### JSON Format
 
-Use `--json` flag for machine-readable output:
+Use the `--json` flag for machine-readable output:
 
 ```bash
 ./backend.ai fair-share domain list --resource-group default --json
@@ -229,9 +229,9 @@ Use `--json` flag for machine-readable output:
 
 ## Tips
 
-1. **Start with domain level**: Domain fair shares give a high-level view of resource distribution
+1. **Start with the domain level**: Domain fair shares give a high-level view of resource distribution
 2. **Use JSON for automation**: The `--json` flag provides structured output for scripts
-3. **Filter by resource group**: Always specify `--resource-group` to view data for the correct resource pool
+3. **Filter by resource group**: Always specify `--resource-group` to view data for the correct resource group
 4. **Sort by fair share factor**: Use `--order-by fair_share_factor --order ASC` to find highest priority entities
 
 ## Troubleshooting
@@ -241,14 +241,14 @@ Use `--json` flag for machine-readable output:
 - No sessions have been scheduled in this resource group
 
 **Permission denied:**
-- Fair share commands require superadmin privileges
-- Verify your user account has superadmin role
+- Fair share commands require the superadmin role
+- Verify that your user account has the superadmin role
 
 **Unexpected fair share values:**
 - Fair share factors are relative to other entities in the same resource group
 - High usage by one entity affects all other entities' relative factors
 
-## Related Commands
+## Related commands
 
 - `./backend.ai resource-usage domain list`: View resource usage history
 - `./backend.ai session list`: View current and past sessions

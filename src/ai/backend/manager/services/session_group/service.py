@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from ai.backend.common.data.entity.session_group import SessionGroupEntityType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, PartialBulkResult
 from ai.backend.manager.actions.v2.ops.result import EntityOpsResult
 from ai.backend.manager.data.session_group.types import SessionGroupData
-from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.errors.session_group import SessionGroupNotFound
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.services.session_group.actions.bulk_get import BulkGetSessionGroupsAction
 from ai.backend.manager.services.session_group.actions.get import GetSessionGroupAction
@@ -25,9 +24,8 @@ class SessionGroupService:
         """Read one session group by its id; a deployment's group is not found."""
         found = (await self._repository.search_in_global(action.to_searcher())).items
         if not found:
-            raise EntityNotFoundError(
+            raise SessionGroupNotFound(
                 f"Session group {action.session_group_id} not found",
-                entity_type=SessionGroupEntityType(),
                 operation=ActionOperationType.GET,
             )
         return EntityOpsResult(data=found[0])

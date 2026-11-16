@@ -145,6 +145,7 @@ class RenameFileActionResult:
 @dataclass
 class DeleteFilesAction(VFolderFileAction):
     user_uuid: uuid.UUID
+    keypair_resource_policy: Mapping[str, Any]
 
     files: list[str]
     recursive: bool
@@ -168,6 +169,7 @@ class DeleteFilesActionResult:
 @dataclass
 class DeleteFilesAsyncAction(VFolderFileAction):
     user_uuid: uuid.UUID
+    keypair_resource_policy: Mapping[str, Any]
 
     files: list[str]
     recursive: bool
@@ -215,6 +217,7 @@ class MoveFileActionResult:
 @dataclass
 class MkdirAction(VFolderDirectoryAction):
     user_id: uuid.UUID
+    keypair_resource_policy: Mapping[str, Any]
 
     path: str | list[str]
     parents: bool

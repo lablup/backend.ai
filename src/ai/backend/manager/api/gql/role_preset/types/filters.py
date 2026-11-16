@@ -91,6 +91,13 @@ class RolePresetFilterGQL(PydanticInputMixin[RolePresetFilterDTO]):
     name: StringFilter | None = gql_field(description="Filter by name.", default=None)
     scope_type: StringFilter | None = gql_field(description="Filter by scope type.", default=None)
     auto_assign: bool | None = gql_field(description="Filter by auto-assign flag.", default=None)
+    auto_assign_to_owner: bool | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by the assign-to-owner flag.",
+        ),
+        default=None,
+    )
     deleted: bool | None = gql_field(
         description=(
             "Filter by soft-delete flag. Searches exclude soft-deleted rows by default; "

@@ -190,6 +190,50 @@ class TestListSessionTemplates:
         )
         assert isinstance(result.root, list)
 
+    async def test_owner_sees_their_template(
+        self,
+        user_registry: BackendAIClientRegistry,
+        domain_fixture: DomainFixtureData,
+        group_name_fixture: str,
+    ) -> None:
+        created = await user_registry.template.create_session_template(
+            CreateSessionTemplateRequest(
+                domain=domain_fixture.domain_name,
+                group=group_name_fixture,
+                payload=_session_template_payload("owned-by-user"),
+            ),
+        )
+
+        result = await user_registry.template.list_session_templates(
+            ListSessionTemplatesRequest(),
+        )
+
+        assert created.root[0].id in [item.id for item in result.root]
+
+    @pytest.mark.parametrize("list_all", [False, True], ids=["default", "asking-for-all"])
+    async def test_user_does_not_see_a_project_they_are_not_in(
+        self,
+        user_registry: BackendAIClientRegistry,
+        task_template_id_in_a_project_nobody_joined: str,
+        list_all: bool,
+    ) -> None:
+        result = await user_registry.template.list_session_templates(
+            ListSessionTemplatesRequest(all=list_all),
+        )
+
+        assert task_template_id_in_a_project_nobody_joined not in [item.id for item in result.root]
+
+    async def test_superadmin_asking_for_all_sees_every_template(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        task_template_id_in_a_project_nobody_joined: str,
+    ) -> None:
+        result = await admin_registry.template.list_session_templates(
+            ListSessionTemplatesRequest(all=True),
+        )
+
+        assert task_template_id_in_a_project_nobody_joined in [item.id for item in result.root]
+
 
 class TestUpdateSessionTemplate:
     async def test_admin_updates_session_template(

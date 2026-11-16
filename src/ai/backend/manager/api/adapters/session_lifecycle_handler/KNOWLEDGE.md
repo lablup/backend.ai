@@ -1,7 +1,7 @@
 ---
 name: session-lifecycle-handler-adapter-scenarios
 type: reference
-description: what the session lifecycle handler adapter guarantees: the single list call, the handlers registered on the schedule coordinator with the name and description each handler defines, and no permission check of its own
+description: what the session lifecycle handler adapter guarantees: the single list call, the handlers registered on the sokovan coordinator with the name and description each handler defines, and no permission check of its own
 scope: src/ai/backend/manager/api/adapters/session_lifecycle_handler
 keywords: [session lifecycle handler, scenario, adapter, handler options, schedule coordinator]
 generated:
@@ -12,20 +12,18 @@ updated:
   at: 2026-10-22
 status: draft
 ---
-# session_lifecycle_handler 어댑터 — 시나리오
+# session_lifecycle_handler adapter: Knowledge
 
-규칙은 상위 디렉터리의 `AGENTS.md`에 있다. 여기 적힌 내용과 실행 결과가 어긋나면 이 문서 쪽을 먼저
-의심한다.
+The rules are in `AGENTS.md` in the parent directory. When this document and a run result disagree, doubt this document first.
 
-어댑터가 제공하는 호출은 목록 조회 하나다.
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
-이 호출은 스케줄 코디네이터에 등록된 세션 처리기를 반환한다.
+The adapter provides one call, the list get.
 
-리소스 그룹의 기본 세션 옵션은 처리기별 설정을 처리기 이름으로 가리킨다. 그 옵션을 교체하는 요청에
-코디네이터에 등록되지 않은 이름이 있으면 거부된다. 이 호출은 같은 코디네이터의 처리기를 반환하므로,
-여기서 받은 이름은 그 교체 요청에서 거부되지 않는다.
+That call returns the session lifecycle handlers registered on the sokovan coordinator.
 
-어댑터는 권한을 검사하지 않는다. 슈퍼관리자 검사는 REST handler의 미들웨어와 GQL resolver가 한다.
-그래서 권한이 있는 경우와 없는 경우의 짝을 이 문서에 두지 않는다.
+The default session options of a resource group refer to a per-handler setting by handler name. A request that replaces those options is rejected when it contains a name not registered on the sokovan coordinator. This call returns the handlers of the same sokovan coordinator, so a name obtained here is not rejected by that replacement request.
 
-## 목록 조회
+The adapter runs no permission check. The REST handler middleware and the GQL resolver run the superadmin check. This document therefore does not pair the with-permission and without-permission cases.
+
+## List get

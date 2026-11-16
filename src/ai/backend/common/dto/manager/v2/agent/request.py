@@ -138,8 +138,10 @@ class UpdateAgentResourceGroupBody(BaseRequestModel):
         default=False,
         description=(
             "When false, the change is rejected with a conflict error if the agent "
-            "still has active sessions. When true, the group is changed anyway and "
-            "the conflicting sessions are cleaned up per the policy."
+            "still has active sessions or unterminated sessions or deployments of "
+            "other resource groups designate it. When true, the group is changed "
+            "anyway, the active sessions are cleaned up per the policy, and those "
+            "designations are removed."
         ),
     )
 

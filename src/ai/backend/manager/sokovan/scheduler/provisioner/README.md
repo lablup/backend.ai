@@ -4,13 +4,13 @@
 
 ## Overview
 
-Provisioner is a package that provides the core plugin system for session scheduling. It contains four plugin types that comprise the entire provisioning pipeline for allocating pending sessions to appropriate agents.
+Provisioner is the package that provides the core plugin system for session scheduling. It has four plugin types that form the provisioning pipeline which places pending sessions on appropriate agents.
 
 **Key Responsibilities:**
-- **Resource Constraint Validation**: Verify sessions meet system constraints
-- **Priority Determination**: Decide scheduling order
-- **Agent Selection**: Select optimal agents
-- **Resource Allocation**: Perform actual resource allocation
+- **Resource Constraint Validation**: verify that sessions meet the system constraints
+- **Priority Determination**: decide the scheduling order
+- **Agent Selection**: select the optimal agents
+- **Resource Allocation**: perform the resource allocation
 
 ## Architecture
 
@@ -95,87 +95,87 @@ provisioner/
 
 ### 1. Validators
 
-Validates resource constraints before sessions are scheduled.
+Validates the resource constraints before sessions are scheduled.
 
-**Execution Point:** First stage of the scheduling pipeline
+**Execution Point:** first stage of the scheduling pipeline
 
 **Behavior:**
-- All Validators execute sequentially
-- If any fails, the session is excluded from scheduling
-- Failure reasons are recorded and communicated to users
+- All Validators run in sequence.
+- If one fails, the session is excluded from scheduling.
+- The failure reasons are recorded and communicated to users.
 
 **Key Implementations:**
 | Validator | Description |
 |-----------|-------------|
-| KeypairResourceLimitValidator | Per-user (keypair) resource quota validation |
-| GroupResourceLimitValidator | Per-group resource quota validation |
-| DomainResourceLimitValidator | Per-domain resource quota validation |
-| UserResourceLimitValidator | Per-user resource quota validation |
-| ConcurrencyValidator | Concurrent session count limit validation |
-| DependenciesValidator | Inter-session dependency validation |
-| PendingSessionCountLimitValidator | Pending session count limit validation |
-| PendingSessionResourceLimitValidator | Pending session resource limit validation |
-| ReservedBatchSessionValidator | Reserved batch session validation |
+| KeypairResourceLimitValidator | resource quota validation per keypair |
+| GroupResourceLimitValidator | resource quota validation per project |
+| DomainResourceLimitValidator | resource quota validation per domain |
+| UserResourceLimitValidator | resource quota validation per user |
+| ConcurrencyValidator | concurrent session count limit validation |
+| DependenciesValidator | inter-session dependency validation |
+| PendingSessionCountLimitValidator | pending session count limit validation |
+| PendingSessionResourceLimitValidator | pending session resource limit validation |
+| ReservedBatchSessionValidator | reserved batch session validation |
 
-→ Details: [validators/README.md](./validators/README.md)
+Details: [validators/README.md](./validators/README.md)
 
 ### 2. Sequencers
 
-Determines scheduling order for sessions that passed validation.
+Determines the scheduling order of the sessions that passed validation.
 
-**Execution Point:** After Validators pass
+**Execution Point:** after the Validators pass
 
 **Behavior:**
-- Uses Sequencer configured per scaling group
-- Receives session list and returns sorted by priority
+- uses the Sequencer configured for the resource group
+- receives the session list and returns it sorted by priority
 
 **Key Implementations:**
 | Sequencer | Description |
 |-----------|-------------|
-| FIFOSequencer | Earlier created sessions first (First-In-First-Out) |
-| LIFOSequencer | Later created sessions first (Last-In-First-Out) |
-| DRFSequencer | Resource fairness-based priority (Dominant Resource Fairness) |
+| FIFOSequencer | earlier created sessions first (First-In-First-Out) |
+| LIFOSequencer | later created sessions first (Last-In-First-Out) |
+| DRFSequencer | priority from resource fairness (Dominant Resource Fairness) |
 
-→ Details: [sequencers/README.md](./sequencers/README.md)
+Details: [sequencers/README.md](./sequencers/README.md)
 
 ### 3. Selectors
 
 Selects the optimal agent to run a session.
 
-**Execution Point:** Executed for each session in Sequencer-sorted order
+**Execution Point:** for each session in the order the Sequencer returns them
 
 **Behavior:**
-- Uses Selector configured per scaling group
-- Selects agent from agent list that meets session requirements
-- On selection failure, session is deferred to next scheduling cycle
+- uses the Selector configured for the resource group
+- selects an agent that meets the session requirements from the agent list
+- on selection failure, defers the session to the next scheduling cycle
 
 **Key Implementations:**
 | Selector | Description |
 |----------|-------------|
-| ConcentratedSelector | Maximize utilization by concentrating resources |
-| DispersedSelector | Ensure high availability by dispersing resources |
-| RoundRobinSelector | Sequential agent rotation |
+| ConcentratedSelector | maximize utilization by concentrating resources |
+| DispersedSelector | ensure high availability by dispersing resources |
+| RoundRobinSelector | sequential agent rotation |
 
-→ Details: [selectors/README.md](./selectors/README.md)
+Details: [selectors/README.md](./selectors/README.md)
 
 ### 4. Allocators
 
-Actually allocates resources on the agent selected by Selector.
+Allocates the resources on the agent selected by the Selector.
 
-**Execution Point:** Immediately after Selector selects an agent
+**Execution Point:** immediately after the Selector selects an agent
 
 **Behavior:**
-- Atomic allocation via database transactions
-- Changes session status to SCHEDULED
-- Creates kernel records
-- Updates agent's occupied_slots
+- atomic allocation through database transactions
+- changes the session status to SCHEDULED
+- creates the kernel rows
+- updates the agent's occupied_slots
 
 **Key Implementations:**
 | Allocator | Description |
 |-----------|-------------|
-| RepositoryAllocator | DB transaction-based resource allocation |
+| RepositoryAllocator | resource allocation through a DB transaction |
 
-→ Details: [allocators/README.md](./allocators/README.md)
+Details: [allocators/README.md](./allocators/README.md)
 
 ## Scheduling Pipeline Flow
 
@@ -271,7 +271,7 @@ class CustomSelector(AgentSelector):
 
 ## Configuration
 
-Each plugin is configured per scaling group:
+Each plugin is configured per resource group:
 
 ```python
 # In scaling group configuration
@@ -283,7 +283,7 @@ scaling_group_config = {
 }
 ```
 
-## Related Documents
+## Related documents
 
 - [Scheduler README](../README.md) - Overall scheduler architecture
 - [validators/README.md](./validators/README.md) - Validator details

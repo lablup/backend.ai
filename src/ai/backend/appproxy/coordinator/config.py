@@ -291,13 +291,14 @@ class ClientIPStrategyConfig(BaseSchema):
 
 class TraefikConfig(BaseSchema):
     etcd: Annotated[
-        EtcdConfig,
-        Field(default_factory=lambda: EtcdConfig(namespace="traefik")),
+        EtcdConfig | None,
+        Field(default=None),
         BackendAIConfigMeta(
             description=(
                 "Configuration for the etcd connection used by Traefik integration. "
                 "Traefik uses etcd as its configuration backend to dynamically update routing rules. "
-                "The namespace should be set to 'traefik' to isolate Traefik's configuration keys."
+                "The namespace should be set to 'traefik' to isolate Traefik's configuration keys. "
+                "Required when enable_traefik is enabled."
             ),
             added_version="25.9.0",
             composite=CompositeType.FIELD,
@@ -827,18 +828,6 @@ class ServerConfig(BaseSchema):
             composite=CompositeType.FIELD,
         ),
     ]
-    etcd: Annotated[
-        EtcdConfig,
-        Field(default_factory=EtcdConfig),
-        BackendAIConfigMeta(
-            description=(
-                "etcd connection configuration for distributed coordination and configuration management. "
-                "Used for service discovery (if etcd-based) and Traefik integration."
-            ),
-            added_version="25.9.0",
-            composite=CompositeType.FIELD,
-        ),
-    ]
     pyroscope: Annotated[
         PyroscopeConfig,
         Field(default_factory=PyroscopeConfig),
@@ -873,9 +862,9 @@ def load(config_path: Path | None = None, log_level: LogLevel = LogLevel.NOTSET)
                 server_config.profiling.pyroscope_config.application_name = (
                     f"proxy-coordinator-{server_config.proxy_coordinator.bind_addr.port}"
                 )
-        if (
-            server_config.proxy_coordinator.enable_traefik
-            and not server_config.proxy_coordinator.traefik
+        if server_config.proxy_coordinator.enable_traefik and (
+            server_config.proxy_coordinator.traefik is None
+            or server_config.proxy_coordinator.traefik.etcd is None
         ):
             raise ConfigValidationError("Traefik enabled but configuration is not populated")
         if server_config.debug.enabled:

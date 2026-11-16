@@ -5,9 +5,11 @@ from __future__ import annotations
 import logging
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, override
+from uuid import UUID
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
+from ai.backend.common.types import SessionId
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
 from ai.backend.manager.defs import LockID
@@ -105,6 +107,7 @@ class SweepStaleKernelsKernelHandler(KernelLifecycleHandler):
                 result.failures.append(
                     KernelTransitionInfo(
                         kernel_id=kernel_id,
+                        session_id=SessionId(UUID(kernel_info.session.session_id)),
                         from_status=kernel_info.lifecycle.status,
                         reason=KernelLifecycleEventReason.STALE_KERNEL,
                     )
@@ -114,6 +117,7 @@ class SweepStaleKernelsKernelHandler(KernelLifecycleHandler):
                 result.successes.append(
                     KernelTransitionInfo(
                         kernel_id=kernel_id,
+                        session_id=SessionId(UUID(kernel_info.session.session_id)),
                         from_status=kernel_info.lifecycle.status,
                         reason=None,
                     )

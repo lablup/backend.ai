@@ -29,9 +29,11 @@ generated:
 status: stable
 ---
 
-# Search field declarations — Knowledge
+# Search field declarations: Knowledge
 
 > The rules are in `AGENTS.md` in the same directory.
+
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
 This package replaces the condition functions and order methods written by hand per entity, one per field and operation, with one declaration per field. Filters, orders and permissions (field caps) all read the same list of fields.
 
@@ -76,7 +78,7 @@ This package replaces the condition functions and order methods written by hand 
 ## Cost is settled by column kind and index
 
 - A partial match on a large text column reaches no index and becomes a full scan; one search reads the whole table. A short string is not held to the same bar, since even scanned in full the per-row comparison is cheap.
-- The single boundary at 1024 comes from counting the schema. Declared lengths cluster at 16, 20, 32, 64, 128, 255, 256, 500, 512 and 1024, and the next one up is `16 * 1024`. Everything at 1024 or below is a single-line value — a name, a path, a URL, a description — and is what users actually search by partial match. Anything larger is `sa.Text` or a script.
+- The single boundary at 1024 comes from counting the schema. Declared lengths cluster at 16, 20, 32, 64, 128, 255, 256, 500, 512 and 1024, and the next one up is `16 * 1024`. Everything at 1024 or below is a single-line value (a name, a path, a URL, a description) and is what users actually search by partial match. Anything larger is `sa.Text` or a script.
 - A boundary at 256 would close partial matching on `endpoints.name` and `model_cards.name`, both 512. A rule that closes name search removes a feature rather than saving cost.
 - Two bands would leave 257 through 1023 with no rule, and columns do sit there (`endpoints.name`, `model_cards.name` and `groups.description` are all 512), so the boundary has to be single.
 - A to-many aggregate runs its subquery again for every outer row. `ToManyCorrelation` having no `order` is not an inability to express it but the decision not to open aggregates. A to-one is one row per outer row, so it stays open.
@@ -91,7 +93,7 @@ This package replaces the condition functions and order methods written by hand 
 | common DTOs | Fields only. Generic bases such as `EnumFilter[E]` and `ToManyFilter[F]` carry no logic either |
 
 - The branches live in the adapter so that models do not import API DTOs.
-- They used to exist three times — in the DTO, the adapter and the GQL type — and now exist once, in the adapter.
+- They used to exist three times (in the DTO, the adapter and the GQL type) and now exist once, in the adapter.
 
 ## Operations reject None
 
@@ -147,9 +149,9 @@ The reason the filters are open differs from the reason the orders are not.
 
 | Exposed value | Implementation | Exposed in |
 |---|---|---|
-| `UserV2OrderField.PROJECT_NAME` | `UserOrders.by_project_name` — `MIN(projects.name)` scalar subquery | 26.2.0 |
-| `ProjectV2OrderField.USER_USERNAME` | `ProjectOrders.by_user_username` — `MIN(users.username)` | 26.2.0 |
-| `ProjectV2OrderField.USER_EMAIL` | `ProjectOrders.by_user_email` — `MIN(users.email)` | 26.2.0 |
+| `UserV2OrderField.PROJECT_NAME` | `UserOrders.by_project_name`: `MIN(projects.name)` scalar subquery | 26.2.0 |
+| `ProjectV2OrderField.USER_USERNAME` | `ProjectOrders.by_user_username`: `MIN(users.username)` | 26.2.0 |
+| `ProjectV2OrderField.USER_EMAIL` | `ProjectOrders.by_user_email`: `MIN(users.email)` | 26.2.0 |
 
 - All three fold M:N children with `MIN` to order by them. That is the shape being banned.
 - The rule is not loosened to fit them. What already shipped is a migration target, not a counterexample to the rule.
@@ -162,7 +164,7 @@ This is about child rows an entity owns. Filters reaching into another entity ar
 
 | Service | Opens for a to-many order | Predicate order |
 |---|---|---|
-| Hasura | Aggregates only — "array relationships only supporting aggregates for sorting" | None |
+| Hasura | Aggregates only: "array relationships only supporting aggregates for sorting" | None |
 | Prisma | `_count` alone | None |
 | Hasura ndc-spec | `OrderByTarget: aggregate`, split out behind the `relationships.order_by_aggregate` capability | None |
 | OData | `$orderby` takes a field path or a sortable function. The `any` / `all` lambdas are for `$filter` | None |
@@ -195,7 +197,7 @@ This is about child rows an entity owns. Filters reaching into another entity ar
 - Which table the column sits on does not decide whether it is a usage. `roles.role_preset_id` sits on the searched row and is one.
 - An id inside a JSON value (`extra_mounts`, `vfolder_mounts`) is not a foreign key and is not a usage. It becomes one after it is normalized into rows with a foreign key.
 
-## A condition naming an entity the caller cannot read refuses the search
+## A condition naming an entity the caller cannot read rejects the search
 
 | Input | Check | Effect on the result |
 |---|---|---|
@@ -204,7 +206,7 @@ This is about child rows an entity owns. Filters reaching into another entity ar
 | filter | None | Narrows |
 
 - Results only come from rows the scopes allow, so a row reached through a usage is still left out when the caller cannot read it.
-- Search APIs with a permission model (GitHub search `repo:`, GCP Cloud Asset scopes) refuse a condition target the caller cannot read and limit results to what the caller can read. This follows them.
+- Search APIs with a permission model (GitHub search `repo:`, GCP Cloud Asset scopes) reject a condition target the caller cannot read and limit results to what the caller can read. This follows them.
 - The named entity's permission is checked before the query, so SQL carries only the usage condition.
 - used_by exists only on searches and means nothing to other scope actions such as create, so it started as a separate validator. BA-8024 merged it into the scope validator, which now reads both in one database round trip.
 - A global search does not check the named entities: the SUPERADMIN gate answers for the unscoped read.
@@ -272,7 +274,7 @@ The tables below state, for each entity package under `models/`, which scopes it
 | Kind | Applies to | Written by | Row condition |
 |---|---|---|---|
 | Whole type | An entity whose whole type is public | `CreatedInPublic` | None |
-| Per row | An entity switched per row — container registry, image, resource preset | The creator's `created_in`, and the switching action | A column (`container_registries.is_global`, `resource_presets.scaling_group_name`) |
+| Per row | An entity switched per row: container registry, image, resource preset | The creator's `created_in`, and the switching action | A column (`container_registries.is_global`, `resource_presets.scaling_group_name`) |
 
 - Public owns and governs the row either way. What differs is whether a row condition applies.
 - The row condition's source is the column. Recovery and query conditions read it (BEP-1077 5.8).

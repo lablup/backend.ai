@@ -28,6 +28,7 @@ from ai.backend.testutils.scenario_steps import (
     Refused,
     Same,
     SameAs,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -44,7 +45,7 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-EDITED = "한 번에 고친 설명"
+EDITED = Says("한 번에 수정한 설명", english="the description edited in one call")
 
 type Edited = PartialBulkPayload[ProjectNode]
 type ProjectStep = Scenario[TestSeedingSession, ManyProjectsAndACaller, ProjectAdapter, Edited]
@@ -60,7 +61,13 @@ class EditingEveryTarget(When[ManyProjectsAndACaller, ProjectAdapter, Edited]):
 
     @override
     def describe(self, laid: ManyProjectsAndACaller) -> str:
-        return f"{laid.caller.username}이 프로젝트 {len(laid.targets)}개의 설명을 한 번에 고침"
+        return Says(
+            f"{laid.caller.username}이 프로젝트 {len(laid.targets)}개의 설명을 한 번에 수정합니다",
+            english=(
+                f"{laid.caller.username} edits the description of {len(laid.targets)} projects "
+                "in one call"
+            ),
+        )
 
     @override
     async def call(self, adapter: ProjectAdapter, laid: ManyProjectsAndACaller) -> Edited:
@@ -85,7 +92,10 @@ class EveryTargetIsEdited(Then[ManyProjectsAndACaller, Edited]):
 
     @override
     def says(self) -> str:
-        return "대상 프로젝트가 모두 새 설명으로 오고, 실패한 것은 없다"
+        return Says(
+            "대상 프로젝트가 모두 새 설명으로 오고, 실패한 것은 없습니다",
+            english="every target project comes back with the new description and nothing failed",
+        )
 
     @override
     def look(self, laid: ManyProjectsAndACaller, answered: Answered[Edited]) -> list[Verdict]:
@@ -117,9 +127,14 @@ class FlippingTheActiveFlagOfEach(When[ManyProjectsAndACaller, ProjectAdapter, E
 
     @override
     def describe(self, laid: ManyProjectsAndACaller) -> str:
-        return (
+        return Says(
             f"{laid.caller.username}이 둘째 프로젝트를 soft delete 한 뒤, 첫째는 활성 플래그를 "
-            "내리고 둘째는 올리며 둘의 설명을 바꾸고, 없는 id 하나의 활성 플래그를 내림"
+            "내리고 둘째는 올리며 둘의 설명을 변경하고, 없는 id 하나의 활성 플래그를 내립니다",
+            english=(
+                f"{laid.caller.username} soft deletes the second project and then, in one call, "
+                "clears the active flag of the first, raises it for the second, changes both "
+                "descriptions, and clears the active flag of a missing id"
+            ),
         )
 
     @override
@@ -155,9 +170,14 @@ class EachFlagIsFlipped(Then[ManyProjectsAndACaller, Edited]):
 
     @override
     def says(self) -> str:
-        return (
+        return Says(
             "둘 다 새 설명으로 오고 첫째는 비활성, 둘째는 활성이며, 없는 id 는 대상이 없다는 "
-            "이유로 실패 목록에 온다"
+            "이유로 실패 목록에 옵니다",
+            english=(
+                "both come back with the new description, the first inactive and the second "
+                "active, and the missing id comes back in the failed list because no target "
+                "answers to it"
+            ),
         )
 
     @override
@@ -176,7 +196,14 @@ class EachFlagIsFlipped(Then[ManyProjectsAndACaller, Edited]):
         verdicts.append(Same("failed count", len(payload.failed), 1))
         for failure in payload.failed:
             verdicts += [
-                Held[UUID]("failed[0].id", failure.id, SameAs(self.missing, "요청에 넣은 없는 id")),
+                Held[UUID](
+                    "failed[0].id",
+                    failure.id,
+                    SameAs(
+                        self.missing,
+                        Says("요청에 넣은 없는 id", english="the missing id given in the request"),
+                    ),
+                ),
                 Held("failed[0].message", failure.message, Mentions("not found")),
             ]
         return verdicts
@@ -195,10 +222,16 @@ class TheActiveFlagSoftDeletesOrRestoresEach(
 
     @override
     def describe(self) -> str:
-        return (
-            "활성 플래그와 설명을 섞어 프로젝트 여럿을 한 번에 고치면, 플래그를 내린 것은 soft "
-            "delete 되고 올린 것은 restore 되며 둘 다 새 설명으로 오고, 없는 id 는 대상이 "
-            "없다는 이유로 실패 목록에 온다"
+        return Says(
+            "활성 플래그와 설명을 섞어 프로젝트 여럿을 한 번에 수정하면, 플래그를 내린 것은 "
+            "soft delete 되고 올린 것은 restore 되며 둘 다 새 설명으로 오고, 없는 id 는 "
+            "대상이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when several projects are edited in one call with a mix of active flags and "
+                "descriptions, the one whose flag is cleared is soft deleted and the one whose "
+                "flag is raised is restored, both come back with the new description, and the "
+                "missing id comes back in the failed list because no target answers to it"
+            ),
         )
 
     @override
@@ -226,7 +259,14 @@ class TheSuperadminEditsSeveralProjects(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 프로젝트 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다"
+        return Says(
+            "superadmin 이 프로젝트 여럿의 설명을 한 번에 변경하면, 모두 새 설명으로 오고 "
+            "실패한 것은 없습니다",
+            english=(
+                "when the superadmin changes the description of several projects in one call, "
+                "all come back with the new description and nothing failed"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyProjectsAndACaller]:
@@ -251,9 +291,13 @@ class AUserGrantedNothingEditsNone(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 받지 않은 사용자가 프로젝트 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 "
-            "모두 권한이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "아무 권한도 받지 않은 사용자가 프로젝트 여럿을 한 번에 수정하려 하면, 수정된 것 "
+            "없이 모두 권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when a user granted nothing tries to edit several projects in one call, none "
+                "is edited and all come back in the failed list for lack of permission"
+            ),
         )
 
     @override

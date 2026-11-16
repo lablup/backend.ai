@@ -1,28 +1,28 @@
-# Backend.AI App Proxy
+# Backend.AI app proxy
 
 ## Purpose
 
-The App Proxy provides dynamic routing and load balancing for service ports of computing sessions. Through a Coordinator-Worker architecture, it efficiently routes traffic to session services (Jupyter, SSH, TensorBoard, etc.) and supports load balancing across multiple session replicas.
+The app proxy provides dynamic routing and load balancing for the service ports of sessions. Through an app proxy coordinator and app proxy worker architecture, it routes traffic to session services (Jupyter, SSH, TensorBoard, and so on) and balances load across the replicas of a session.
 
 ## Key Responsibilities
 
 ### 1. Dynamic Service Routing
 - Route HTTP/WebSocket traffic to session services
-- Dynamically manage service port mappings
+- Manage service port mappings dynamically
 - Support port-based and subdomain-based proxying
-- Automatic cleanup of routing rules on session termination
+- Clean up routing rules automatically on session termination
 
 ### 2. Load Balancing
-- Distribute traffic across multiple session replicas
+- Distribute traffic across the replicas of a session
 - Round-robin and weighted balancing
-- Load distribution across worker nodes
+- Distribute load across worker nodes
 - Automatic failover and health checks
 
 ### 3. Service Discovery and Registration
-- Register service routes from Manager
-- etcd-based distributed service discovery
-- Automatic worker node registration and deregistration
-- Real-time routing table synchronization
+- Register service routes from the manager
+- Distributed service discovery based on etcd
+- Register and deregister worker nodes automatically
+- Synchronize the routing table in real time
 
 ### 4. SSL/TLS Termination
 - Handle SSL termination for HTTPS traffic
@@ -103,37 +103,37 @@ appproxy/
 ## Core Concepts
 
 ### Circuit
-A circuit represents a routing rule from client to session service:
+A circuit represents a routing rule from the client to a session service:
 - **Circuit Key**: Unique identifier (session ID + service name)
 - **Frontend**: Client entry point (port or subdomain)
 - **Backend**: Proxy implementation (HTTP, H2, TCP, Traefik)
 - **Target**: Actual service location (Agent host:port)
 - **Status**: HEALTHY, UNHEALTHY, PENDING
 
-Circuit Lifecycle:
-1. Manager registers circuit on session creation
-2. Coordinator deploys circuit to workers
-3. Worker activates proxy rules
-4. Client traffic routes through circuit
-5. Circuit automatically deregistered on session termination
+Circuit lifecycle:
+1. The manager registers the circuit when it creates a session
+2. The app proxy coordinator deploys the circuit to app proxy workers
+3. The app proxy worker activates the proxy rules
+4. Client traffic routes through the circuit
+5. The circuit is deregistered automatically on session termination
 
 ### Frontend Types
 
 #### Port-based Frontend
-- Assign unique port per service (e.g., 30001, 30002)
+- Assign a unique port per service (for example, 30001, 30002)
 - Requires port forwarding in NAT environments
 - Simple and direct access
 - Requires firewall rule management
 
 #### Subdomain-based Frontend
-- Assign subdomain per service (e.g., `session-123.backend.ai`)
+- Assign a subdomain per service (for example, `session-123.backend.ai`)
 - Secure connection via SSL certificate
 - Only ports 80/443 exposed
 - Requires wildcard DNS
 
 ### Backend Types
 
-Backends handle actual proxy implementation:
+A backend handles the actual proxy implementation:
 
 #### HTTP Backend
 - Standard HTTP/1.1 proxy
@@ -150,7 +150,7 @@ Backends handle actual proxy implementation:
 #### TCP Backend
 - Raw TCP proxy
 - Protocol-independent
-- Used for SSH, databases, etc.
+- Used for SSH, databases, and so on
 - Minimal overhead
 
 #### Traefik Backend
@@ -158,13 +158,13 @@ Backends handle actual proxy implementation:
 - Traefik integration
 - Advanced routing rules
 - Middleware chains
-- Both AppProxy plugins are required: the Rust/WASM plugin in [backend.ai-appproxy-worker-traefik](https://github.com/lablup/backend.ai-appproxy-worker-traefik) handles cookie/JWT authentication; the [Go plugin in this repository](../../../../third-party-plugins/appproxy-traefik-plugin-go/) tracks circuit/session access and WebSocket activity.
+- Both app proxy plugins are required: the Rust/WASM plugin in [backend.ai-appproxy-worker-traefik](https://github.com/lablup/backend.ai-appproxy-worker-traefik) handles cookie/JWT authentication; the [Go plugin in this repository](../../../../third-party-plugins/appproxy-traefik-plugin-go/) tracks circuit access, session access and WebSocket activity.
 - See [Traefik Integration Guide](../../../../docs/app-proxy/traefik-integration.md) for detailed configuration
 
 ### Load Balancing Strategies
 
 #### Round Robin
-- Select workers sequentially
+- Select app proxy workers in order
 - Equal traffic distribution
 - Simple and predictable
 - Default strategy
@@ -176,55 +176,55 @@ Backends handle actual proxy implementation:
 - Dynamic weight adjustment possible
 
 #### Least Connections
-- Select worker with fewest current connections
+- Select the worker with the fewest current connections
 - Effective for long-lived connections
 - Balances worker load
 - Requires real-time metrics
 
-## Coordinator Details
+## App proxy coordinator details
 
 ### Circuit Management
-Coordinator manages the full lifecycle of circuits:
+The app proxy coordinator manages the full lifecycle of circuits:
 - Circuit registration and deregistration
-- Circuit deployment to workers
+- Circuit deployment to app proxy workers
 - Circuit status monitoring
 - Automatic redeployment on failure
 
-### Worker Management
-Worker registration and status tracking:
+### App proxy worker management
+App proxy worker registration and status tracking:
 - Automatic worker registration and deregistration
 - Periodic heartbeat reception
-- Worker capacity and load monitoring
-- Select target workers for circuit deployment
+- App proxy worker capacity and load monitoring
+- Select target app proxy workers for circuit deployment
 
 ### Health Check
-Coordinator periodically checks worker status:
+The app proxy coordinator checks worker status periodically:
 - **Interval**: 5 seconds (default)
 - **Timeout**: 2 seconds
 - **Retries**: 3 attempts
 - **Recovery**: Automatic circuit redeployment
 
-## Worker Details
+## App proxy worker details
 
 ### Proxy Handling
-Worker handles actual traffic proxying:
-1. Receive client request
-2. Look up routing rule by circuit key
-3. Select appropriate backend
-4. Forward request to target
-5. Stream response
+The app proxy worker handles the actual traffic proxying:
+1. Receive the client request
+2. Look up the routing rule by circuit key
+3. Select the appropriate backend
+4. Forward the request to the target
+5. Stream the response
 6. Record metrics
 
 ### Frontend Handling
 
 #### Port-based
-Worker dynamically allocates service-specific ports from specified port range.
+The app proxy worker allocates service-specific ports dynamically from the specified port range.
 
 #### Subdomain-based
-Worker handles subdomain requests with wildcard SSL certificate.
+The app proxy worker handles subdomain requests with a wildcard SSL certificate.
 
 ### Backend Selection
-Backend is automatically selected based on service type:
+The backend is selected automatically based on the service type:
 - **HTTP services**: HTTP or H2 backend
 - **WebSocket**: HTTP backend (with upgrade support)
 - **SSH/DB**: TCP backend
@@ -232,34 +232,34 @@ Backend is automatically selected based on service type:
 
 ## Communication Protocols
 
-### Manager → Coordinator
+### Manager → app proxy coordinator
 - **Protocol**: gRPC or REST
 - **Port**: 6120 (default)
 - **Authentication**: API key
 - **Operations**:
-  - Register/deregister circuits
+  - Register and deregister circuits
   - Query worker information
   - Check health status
 
-### Client → Worker
+### Client → app proxy worker
 - **Protocol**: HTTP/HTTPS, WebSocket/WSS
 - **Port**: 6130 (default) or dynamic ports
 - **Operations**:
-  - Access services (Jupyter, SSH, etc.)
+  - Access services (Jupyter, SSH, and so on)
   - WebSocket connections
-  - File download/upload
+  - File download and upload
 
-### Worker → Coordinator
+### App proxy worker → app proxy coordinator
 - **Protocol**: REST API
 - **Operations**:
-  - Worker registration and heartbeat
+  - App proxy worker registration and heartbeat
   - Circuit status updates
   - Metrics reporting
 
-### Worker → Agent
+### App proxy worker → Agent
 - **Protocol**: HTTP/WebSocket or TCP
 - **Operations**:
-  - Forward traffic to actual service ports
+  - Forward traffic to the actual service ports
   - Access container services
 
 ## Service Access Flow
@@ -295,7 +295,7 @@ Client → Worker Pool → Agent (Single Container)
          ├─ Worker 2
          └─ Worker N
 ```
-Mitigate network bottlenecks by distributing traffic across workers
+Distribute traffic across workers to mitigate network bottlenecks
 
 ### Multiple Session Replicas
 ```
@@ -304,7 +304,7 @@ Client → Worker → Agent Pool
                   ├─ Agent 2 (Container Replica 2)
                   └─ Agent N (Container Replica N)
 ```
-Provide high availability through load balancing across session replicas
+Provide high availability by balancing load across the replicas of a session
 
 ## Configuration
 
@@ -312,84 +312,84 @@ See `configs/app-proxy-coordinator/halfstack.toml` and `configs/app-proxy-worker
 
 ### Key Configuration Items
 
-**Coordinator**:
+**App proxy coordinator**:
 - PostgreSQL database connection
-- Worker health check interval
+- App proxy worker health check interval
 - etcd connection information
 
-**Worker**:
-- Coordinator connection information
+**App proxy worker**:
+- App proxy coordinator connection information
 - Frontend mode (port or subdomain)
 - Backend timeout settings
 
 ## Infrastructure Dependencies
 
-App Proxy consists of Coordinator and Worker, each with different infrastructure dependencies.
+The app proxy consists of the app proxy coordinator and the app proxy worker, each with different infrastructure dependencies.
 
-### Coordinator Infrastructure
+### App proxy coordinator infrastructure
 
 #### PostgreSQL (Database)
 - **Purpose**:
   - Store circuit routing rules
-  - Manage worker registration information
+  - Manage app proxy worker registration information
   - Store health check status
-- **Halfstack Port**: 8101 (shared with Manager)
+- **Halfstack Port**: 8101 (shared with the manager)
 - **Key Tables**:
   - `circuits` - Circuit routing information
-  - `workers` - Worker registration and status
+  - `workers` - App proxy worker registration and status
 - **Schema Management**: Alembic migrations
 
 #### etcd (Service Discovery)
 - **Purpose**:
-  - Worker auto-discovery
+  - App proxy worker auto-discovery
   - Distributed configuration management
   - Circuit synchronization
 - **Halfstack Port**: 8121
 - **Key Paths**:
-  - `/appproxy/workers/{worker_id}` - Worker information
+  - `/appproxy/workers/{worker_id}` - App proxy worker information
   - `/appproxy/circuits/{circuit_key}` - Circuit configuration
 
-### Worker Infrastructure
+### App proxy worker infrastructure
 
-#### Coordinator Connection
+#### App proxy coordinator connection
 - **Purpose**:
   - Receive circuit deployments
-  - Send heartbeats
+  - Send heartbeat signals
   - Report metrics
 - **Protocol**: REST API
-- **Halfstack Port**: 6120 (Coordinator)
+- **Halfstack Port**: 6120 (app proxy coordinator)
 
 ### Observability Infrastructure
 
 #### Prometheus (Metrics Collection)
-- **Coordinator Endpoint**: `http://localhost:6120/metrics`
-- **Worker Endpoint**: `http://localhost:6130/metrics`
+- **App proxy coordinator endpoint**: `http://localhost:6120/metrics`
+- **App proxy worker endpoint**: `http://localhost:6130/metrics`
 - **Key Metrics**:
-  - Coordinator: Circuit/Worker management metrics
-  - Worker: Proxy request and performance metrics
-- **Service Discovery**: Automatic registration via Manager HTTP SD
+  - App proxy coordinator: circuit and worker management metrics
+  - App proxy worker: proxy request and performance metrics
+- **Service Discovery**: Automatic registration via the manager HTTP service discovery
 
 #### Loki (Log Aggregation)
 - **Purpose**:
-  - Circuit creation/deletion events
-  - Worker registration/deregistration events
+  - Circuit creation and deletion events
+  - App proxy worker registration and deregistration events
   - Proxy request logs
   - Health check and error logs
 - **Log Labels**:
-  - `component` - coordinator or worker
+  - `component` - app proxy coordinator or app proxy worker
   - `circuit_key` - Circuit identifier
-  - `worker_id` - Worker identifier
+  - `worker_id` - App proxy worker identifier
 
 #### Tempo (Distributed Tracing)
 - **Purpose**:
-  - Trace full requests through Circuit → Worker → Agent
+  - Trace full requests through Circuit → App proxy worker → Agent
   - Analyze proxy latency
   - Identify performance bottlenecks
 - **Trace Transmission**: OpenTelemetry SDK
 
 ### Halfstack Configuration
 
-**Recommended**: Use the `./scripts/install-dev.sh` script for development environment setup.
+**Recommended**: Use the `./scripts/install-dev.sh` script to set up the development environment.
 
 #### Starting Development Environment
 ```bash
@@ -412,8 +412,8 @@ App Proxy consists of Coordinator and Worker, each with different infrastructure
 ## Metrics and Monitoring
 
 ### Logs
-- Circuit creation/deletion events
-- Worker registration/deregistration events
+- Circuit creation and deletion events
+- App proxy worker registration and deregistration events
 - Proxy request tracking
 - Health check results
 - Errors and warnings
@@ -422,11 +422,11 @@ App Proxy consists of Coordinator and Worker, each with different infrastructure
 
 See [README.md](./README.md) for development setup instructions.
 
-## Related Documentation
+## Related documents
 
-- [Coordinator README](./coordinator/README.md) - Coordinator details
-- [Worker README](./worker/README.md) - Worker details
+- [App proxy coordinator README](./coordinator/README.md) - app proxy coordinator details
+- [App proxy worker README](./worker/README.md) - app proxy worker details
 - [Traefik Integration Guide](../../../../docs/app-proxy/traefik-integration.md) - Traefik mode configuration and setup
-- [Manager Component](../manager/README.md) - API gateway
-- [Agent Component](../agent/README.md) - Container management
-- [Overall Architecture](../README.md) - System-wide architecture
+- [Manager component](../manager/README.md) - API gateway
+- [Agent component](../agent/README.md) - Container management
+- [Overall architecture](../README.md) - System-wide architecture

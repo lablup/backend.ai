@@ -18,11 +18,14 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
+    Language,
     Refused,
+    Says,
     Scenario,
     Then,
     Verdict,
     When,
+    in_language,
 )
 from bai_scenario.components.project import (
     ManyProjectsAndACaller,
@@ -41,7 +44,7 @@ class Editing(When[ManyProjectsAndACaller, ProjectAdapter, ProjectNode]):
     """미리 만든 프로젝트를 고친다. `soft_deleted`면 그 전에 soft delete 한다."""
 
     asked: UpdateProjectInput
-    changing: str
+    changing: Says
     soft_deleted: bool = False
 
     @override
@@ -51,8 +54,19 @@ class Editing(When[ManyProjectsAndACaller, ProjectAdapter, ProjectNode]):
     @override
     def describe(self, laid: ManyProjectsAndACaller) -> str:
         (project,) = laid.targets
-        before = " soft delete 한 뒤" if self.soft_deleted else ""
-        return f"{laid.caller.username}이 {project.name}을{before} {self.changing}을 고침"
+        changing = in_language(self.changing, Language.ENGLISH)
+        if self.soft_deleted:
+            return Says(
+                f"{laid.caller.username}이 {project.name}을 soft delete 한 뒤 "
+                f"{self.changing}를 수정합니다",
+                english=(
+                    f"{laid.caller.username} soft deletes {project.name} and then edits {changing}"
+                ),
+            )
+        return Says(
+            f"{laid.caller.username}이 {project.name}의 {self.changing}를 수정합니다",
+            english=f"{laid.caller.username} edits {changing} of {project.name}",
+        )
 
     @override
     async def call(self, adapter: ProjectAdapter, laid: ManyProjectsAndACaller) -> ProjectNode:
@@ -74,7 +88,10 @@ class TheProjectNode(Then[ManyProjectsAndACaller, ProjectNode]):
 
     @override
     def says(self) -> str:
-        return "미리 만든 프로젝트 전체가 온다"
+        return Says(
+            "미리 저장한 프로젝트 전체가 응답으로 옵니다",
+            english="the whole project seeded in advance comes back",
+        )
 
     @override
     def look(self, laid: ManyProjectsAndACaller, answered: Answered[ProjectNode]) -> list[Verdict]:
@@ -97,8 +114,13 @@ class ClearingTheActiveFlagSoftDeletes(
 
     @override
     def describe(self) -> str:
-        return (
-            "활성 플래그를 내리는 수정은 프로젝트를 soft delete 하고, 답이 비활성 상태를 실어 온다"
+        return Says(
+            "활성 플래그를 내리는 수정은 프로젝트를 soft delete 하고, 응답이 비활성 상태를 "
+            "담아 옵니다",
+            english=(
+                "an edit that clears the active flag soft deletes the project and the response "
+                "carries the inactive state"
+            ),
         )
 
     @override
@@ -107,7 +129,10 @@ class ClearingTheActiveFlagSoftDeletes(
 
     @override
     def when(self) -> When[ManyProjectsAndACaller, ProjectAdapter, ProjectNode]:
-        return Editing(UpdateProjectInput(is_active=False), changing="활성 플래그")
+        return Editing(
+            UpdateProjectInput(is_active=False),
+            changing=Says("활성 플래그", english="the active flag"),
+        )
 
     @override
     def then(self) -> Then[ManyProjectsAndACaller, ProjectNode]:
@@ -126,9 +151,13 @@ class RaisingTheActiveFlagRestores(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "soft delete 된 프로젝트의 활성 플래그를 올리는 수정은 그 프로젝트를 restore 하고, "
-            "답이 활성 상태를 실어 온다"
+            "응답이 활성 상태를 담아 옵니다",
+            english=(
+                "an edit that raises the active flag of a soft-deleted project restores the "
+                "project and the response carries the active state"
+            ),
         )
 
     @override
@@ -138,7 +167,9 @@ class RaisingTheActiveFlagRestores(
     @override
     def when(self) -> When[ManyProjectsAndACaller, ProjectAdapter, ProjectNode]:
         return Editing(
-            UpdateProjectInput(is_active=True), changing="활성 플래그", soft_deleted=True
+            UpdateProjectInput(is_active=True),
+            changing=Says("활성 플래그", english="the active flag"),
+            soft_deleted=True,
         )
 
     @override

@@ -1,160 +1,123 @@
 ---
 name: deployment-adapter-scenarios
 type: reference
-description: what the deployment adapter guarantees; its own calls, its revisions, and the partial bulk writes of its auto-scaling rules and access tokens
+description: what the deployment adapter guarantees; its own calls, its revisions, and the partial bulk writes of its auto-scaling rules and deployment tokens
 scope: src/ai/backend/manager/api/adapters/deployment
-keywords: [deployment, scenario, adapter, rbac, project, revision, auto-scaling rule, access token, partial bulk]
+keywords: [deployment, scenario, adapter, rbac, project, revision, auto-scaling rule, deployment token, partial bulk]
 generated:
   by: claude-code/opus-5
   at: 2026-09-11
 status: draft
 ---
-# deployment 어댑터 — 시나리오
+# deployment adapter: Knowledge
 
-규칙은 상위 디렉터리의 `AGENTS.md`에 있다. 여기 적힌 것과 실행 결과가 어긋나면 문장을 먼저
-의심한다.
+The rules are in `AGENTS.md` in the parent directory. When this document and a run result disagree, doubt the sentence first.
 
-deployment는 프로젝트 스코프에 생긴다. 만드는 권한은 프로젝트에 걸리고, 만들어진 뒤에는
-그 deployment 자체에 걸린다. 전역 훑기와 전체 리비전 새로 고침만 전역 역할이 지킨다.
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
-deployment가 소유하는 행 — 리비전, 복제본과 경로, 접근 토큰, 배포 정책, 자동 확장 규칙 —
-은 이 절에 적지 않는다. 그것들은 자기 스코프를 갖지 않고 소유 deployment로 인가되므로,
-필드마다 절을 따로 둔다.
+A deployment is created in a project scope. The create permission applies to the project, and after creation it applies to the deployment itself. Only the global browse and the full revision refresh are protected by a global role.
 
-## 만들기
+The rows a deployment owns (revisions, replicas and routes, deployment tokens, the deployment policy, auto-scaling rules) are not written in this section. They have no scope of their own and are authorized by the owning deployment, so each field has its own section.
 
-집행을 끄는 줄이 도메인과 반대 결과를 갖는다. 이 문은 역할이 아니라 권한 그래프가 지키므로
-스위치가 통한다. 도메인 쪽 같은 줄과 짝을 이루는 자리다.
+## Create
 
-만들기는 배포 정책 행을 함께 쓴다. 전략을 고르는 갈래가 셋이라 각각을 줄로 둔다 — 순차
-설정을 준 경우, 청록 설정을 준 경우, 어느 설정도 주지 않고 전략 이름만 준 경우.
+The scenario that disables enforcement has the opposite result to the domain one. The permission graph protects this call rather than a role, so the switch applies. It is the scenario paired with the same scenario in the domain document.
 
-리비전 보관 개수는 요청이 정하지 못한다. 만들기가 값을 못박는다.
+Create writes the deployment policy row together. There are three branches for choosing the strategy, one row each: a rolling setting given, a blue-green setting given, and only a strategy name given with neither setting.
 
-이름이 공백뿐인 요청과 복제 수가 음수인 요청은 줄로 두지 않는다. 요청 타입이 이미 막으므로
-어댑터가 보장하는 것이 아니다.
+The request cannot decide the revision retention count. Create sets the value.
 
-답의 기본 배포 전략은 요청이 무엇을 골랐든 순차로 온다. 고른 전략은 배포 정책 쪽에 실린다.
+A request whose name is only whitespace and a request with a negative replica count are not rows. The request type already blocks them, so the adapter does not guarantee them.
 
-## 읽기
+The default deployment strategy in the response is rolling whatever the request chose. The chosen strategy is carried on the deployment policy side.
 
-없는 id가 슈퍼관리자와 그렇지 않은 사람에게 다른 것으로 거부된다. 권한 검사가 먼저 도는데
-없는 행에는 걸린 권한도 없으므로, 그 검사를 지나가는 슈퍼관리자만 대상 없음을 본다. 아래
-절의 없는 id 줄도 모두 같다.
+## Read
 
-현재 리비전 조회는 읽기 두 번을 이어 붙인 것이다. deployment를 읽을 권한만 있고 리비전을
-읽을 수 없는 사람은 없으므로, 두 번째 문이 따로 무엇을 막지 않는다는 것을 줄로 둔다.
+A missing id is rejected differently for superadmin and for anyone else. The permission check runs first and a missing row has no granted permission either, so only superadmin, who passes that check, sees the missing target. Every missing id row in the sections below is the same.
 
-## 훑기
+The current revision read joins two reads. No one holds permission to read the deployment but not its revisions, so a row pins that the second call blocks nothing extra.
 
-훑는 문이 셋이다. 전역 훑기는 역할이 지킨다. 프로젝트 훑기는 그 프로젝트에, 내 것 훑기는
-부르는 사람 자신의 스코프에 걸린 읽기 권한이 지킨다. 내 것 훑기도 범위만 좁히지 않는다.
-훑기에 따로 걸리는 권한은 없다. 훑기와 읽기가 같은 비트를 본다.
+## Browse
 
-## 수정하기
+There are three browse calls. A role protects the global browse. The read permission on that project protects the project browse, and the read permission on the caller's own scope protects the own browse. The own browse does not merely narrow the scope either. The browse has no separate permission. Browse and read look at the same bit.
 
-이름이 공백뿐인 요청은 줄로 두지 않는다. 만들기와 같이 요청 타입이 막는다.
+## Update
 
-요청 타입이 선호 도메인 이름과 배포 전략을 받지만 수정 경로가 그 둘을 쓰지 않는다. 지금은
-조용히 버려진다. 줄을 적기 전에 버릴 것인지 쓸 것인지 정한다.
+A request whose name is only whitespace is not a row. The request type blocks it, as in create.
 
-## 옵션 갈아끼우기
+The request type accepts the preferred domain name and the deployment strategy, but the update path uses neither. They are dropped silently today. Before writing the row, settle whether to drop or to use them.
 
-옵션은 배포 단계를 도는 처리기가 얼마나 기다리고 몇 번까지 다시 하는지다. 만들 때 리소스
-그룹의 기본값을 베껴 두므로 비어 있는 적이 없고, 리소스 그룹 쪽이 나중에 바뀌어도 따라
-움직이지 않는다. 이미 있는 deployment의 값을 바꾸는 문이 이것뿐인 이유다.
+## Replacing the options
 
-갈아끼우기는 합치지 않는다. 부분 수정으로 읽히기 쉬운 자리라 주지 않은 것이 사라진다는 줄을
-따로 둔다.
+The options are how long the processor that runs the deployment stage waits and how many times it retries. Create copies the default values of the resource group, so they are never empty, and a later change on the resource group side does not move them. So this is the only call that changes the values of an existing deployment.
 
-처리기 이름은 살아 있는 등록 목록에 대고 본다. 시나리오가 이름을 리터럴로 적지 않고 등록된
-것에서 읽는다.
+The replacement does not merge. It reads easily as a partial update, so a row states that what is not sent disappears.
 
-답이 deployment 전체가 아니라 갈아끼운 옵션만이다. 다른 호출과 검사 범위가 다르다.
+The processor name is checked against the live registry. A scenario does not write the name as a literal but reads it from the registered entries.
 
-## 리비전 활성화
+The response is only the replaced options, not the whole deployment. The checked range differs from other calls.
 
-활성화는 리비전이 그 deployment의 것인지 보지 않는다. 다른 deployment의 리비전 id를 주면
-어떻게 되어야 하는지 정하고 줄을 적는다.
+## Activating a revision
 
-전체 새로 고침은 일부만 성공하는 것이 설계다. 하나가 실패해도 나머지가 돈다는 것을 줄로 둔다.
+Activation does not check that the revision belongs to that deployment. Settle what should happen when the id of another deployment's revision is sent, then write the row.
 
-## 복제 맞추기
+The full refresh is designed for partial success. A row pins that the rest run even when one fails.
 
-맞추기는 요청 안에서 끝나지 않는다. 답은 시작했다는 것뿐이고, 복제본이 실제로 뜨는 것은
-다른 자리에서 본다.
+## Matching the replica count
 
-## 지우기
+Matching does not finish within the request. The response only says it started, and whether the replicas actually start is checked elsewhere.
 
-수정 권한만 가진 사람을 줄로 두는 이유는, 지우기가 수정과 다른 문이라는 것을 못박기
-위해서다. 소유한 행을 지우는 요청 중에도 이 문을 쓰는 것과 수정 문을 쓰는 것이 갈린다.
+## Delete
 
-이 어댑터에는 hard-delete가 없다. 지우기는 지우는 중이라고 표시하고 나머지는 뒤에서 돈다.
-완전히 지우는 문이 생기면 권한도 따로 걸리므로 그때 줄을 더한다.
+A row with a user who holds only update permission pins that delete is a different call from update. Among the requests that delete an owned row, some use this call and some use the update call.
 
-## 리비전
+This adapter has no purge. Delete marks the deployment as deleting and the rest runs later. When a purge call appears it carries its own permission, so the row is added then.
 
-리비전은 deployment가 소유하는 행이다. 자기 스코프가 없고 소유 deployment의 권한으로 열린다.
-더하기는 deployment에 생성 권한을, 읽기와 훑기는 읽기 권한을 요구한다. 현재 리비전 조회,
-활성화, 전체 새로 고침은 위 절에 있다 — 리비전을 고르지만 쓰는 것은 deployment의 현재
-리비전이다.
+## Revisions
 
-리비전 하나는 여러 겹을 포개 만들어진다. 모델 마운트 경로의 기본값, 런타임 변형의 기본값,
-리비전 프리셋, 모델 폴더 안의 설정 파일, 그리고 요청. 뒤가 앞을 덮는다. 요청의 하위 설정은
-전부 생략할 수 있고, 생략한 자리는 앞 겹이 채운다.
+A revision is a row the deployment owns. It has no scope of its own and opens under the permission of the owning deployment. Add requires create permission on the deployment, and read and browse require read permission. The current revision read, activation and the full refresh are in the sections above: they choose a revision but what they write is the current revision of the deployment.
 
-### 더하기
+One revision is built by stacking several layers: the defaults of the model mount path, the defaults of the inference runtime variant, the revision preset, the config file inside the model vfolder, and the request. A later layer overrides an earlier one. Every nested setting of the request may be omitted, and an earlier layer fills an omitted place.
 
-답은 더해진 리비전뿐이다. 다음 넷은 답에 드러나지 않거나 심을 수 없어 줄로 두지 않는다.
+### Add
 
-- 자동 활성은 deployment의 배포 중 리비전을 바꾼다.
-- 보관 개수를 넘으면 오래된 리비전이 지워진다. 현재 리비전과 배포 중 리비전은 세지 않고 남긴다.
-- 마운트 권한을 대지 않으면 부른 사람이 모델 폴더에 가진 권한이 붙는다. 답의 마운트 설정에
-  권한 칸이 없다.
-- 폴더 파일을 읽는 런타임 변형이면 폴더 안의 정의 파일이 한 겹이 된다. 변형의 write spec이
-  그 성질을 받지 않아 심을 수 없다.
+The response is the added revision only. The following four are not rows because they do not appear in the response or cannot be seeded.
 
-모델 정의는 마운트 경로 기본값이 모델 하나를 늘 넣으므로 비지 않는다. 이름을 채우는 겹이 없으면
-그 모델이 검증에서 막힌다.
+- Auto-activation changes the deploying revision of the deployment.
+- Exceeding the retention count deletes the older revisions. The current revision and the deploying revision are not counted and are kept.
+- Without naming a mount permission, the permission the caller holds on the model vfolder is attached. The mount setting in the response has no permission slot.
+- For an inference runtime variant that reads vfolder files, the definition file inside the vfolder becomes a layer. The write spec of the variant does not accept that property, so it cannot be seeded.
 
-마운트 권한은 두 겹으로 갇힌다. 모델 폴더는 부른 사람이 그 폴더에 가진 권한을 넘지 못하고,
-덧붙인 폴더는 그 폴더 자체의 권한을 넘지 못한다. 첫 번째 중 넘는 쪽만 줄로 둔다. 두 번째는
-덧붙인 폴더 seed가 생길 때 더한다.
+The model definition is never empty because the mount path default always includes one model. Without a layer that fills the name, the validation blocks that model.
 
-모델 폴더 권한은 부른 사람이 그 폴더에 가진 권한 비트로 읽는다. 읽기는 읽기 전용, 수정은
-읽고 쓰기, hard-delete는 삭제까지로 마운트된다. 읽기가 없으면 폴더를 찾을 수 없다는 이유로
-막힌다. 슈퍼관리자는 권한을 받지 않아도 폴더에 모든 비트를 가진다. 폴더 읽기 권한이 없는
-사람을 보는 줄 말고는, 권한 검사를 지나는 더하기 줄이 모두 폴더 읽기 권한을 갖는다.
+The mount permission is bounded by two layers. The model vfolder cannot exceed the permission the caller holds on that vfolder, and an attached vfolder cannot exceed the permission of that vfolder itself. Only the exceeding side of the first is a row. The second is added when the attached vfolder seed exists.
 
-자원 슬롯을 채우는 겹은 프리셋과 폴더 안의 설정 파일뿐이다. 런타임 변형은 모델 정의만 준다.
+The model vfolder permission is read from the permission bits the caller holds on that vfolder. Read mounts as read-only, update as read and write, and purge as delete too. Without read, the call is blocked for a missing vfolder. Superadmin holds every bit on the vfolder without a granted permission. Except the row that looks at a user without vfolder read permission, every add row that passes the permission checks holds vfolder read permission.
 
-보관 개수는 만들기가 못박은 값이다.
+Only the preset and the config file inside the vfolder fill the resource slots. The inference runtime variant gives the model definition only.
 
-### 읽기
+The retention count is the value create sets.
 
-리비전을 읽는 문은 소유 deployment를 먼저 찾고 그 deployment의 권한을 본다. 그 찾기는 없는
-id와 볼 수 없는 id를 한 가지로 거부한다. 모든 검사를 지나가는 슈퍼관리자만 대상 없음을 본다.
+### Read
 
-### 훑기
+The call that reads a revision finds the owning deployment first and checks the permission of that deployment. That lookup gives the same rejection for a missing id and an unreadable id. Only superadmin, who passes every check, sees the missing target.
 
-자원 슬롯 훑기는 리비전 하나를 가리키는데도 전역 역할이 지킨다. 그 리비전을 읽을 수 있는
-사람이 슬롯은 못 본다는 뜻이라, 짝을 두어 못박는다.
+### Browse
 
-## 자동 확장 규칙
+The resource slot browse refers to one revision yet a global role protects it. A user who can read that revision cannot see the slots, so a pair pins it.
 
-규칙은 deployment가 소유하는 행이다. 수정은 소유 deployment의 수정 권한을, purge 는 단건과 여럿
-모두 영구 삭제 권한을 요구한다.
+## Auto-scaling rules
 
-### 여럿 수정하기
+A rule is a row the deployment owns. Update requires the update permission on the owning deployment, and purge requires the purge permission, for both the single and the bulk call.
 
-### 여럿 purge
+### Updating several
 
-## 접근 토큰
+### Purging several
 
-토큰은 deployment가 소유하는 행이다. purge 는 단건과 여럿 모두 소유 deployment의 영구 삭제 권한을
-요구한다.
+## Deployment tokens
 
-### 여럿 purge
+A token is a row the deployment owns. Purge requires the purge permission on the owning deployment, for both the single and the bulk call.
 
-여럿 연산은 호출 전체를 거부하지 않는다. 처리한 행은 처리된 목록에, 처리하지 못한 것은 id 와
-이유를 실패 목록에 싣는다.
+### Purging several
+
+A bulk operation does not reject the whole call. Processed rows go into the processed list, and failures carry the id and the reason in the failure list.

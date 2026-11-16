@@ -1,6 +1,6 @@
 ---
 name: bai-cli
-description: ./bai v2 CLI usage for testing/verifying API endpoints and managing resources — entity-command reference, login/config, search patterns, testing workflow (REST API client, NOT the v1 backend.ai CLI)
+description: ./bai (v2) CLI usage for testing/verifying API endpoints and managing resources: entity-command reference, login/config, search patterns, testing workflow (REST API client, not the v1 backend.ai CLI)
 tags:
   - cli
   - bai
@@ -10,17 +10,17 @@ tags:
 
 # ./bai CLI Usage Guide
 
-Guide for testing and verifying API endpoints and managing resources with the Backend.AI **v2 CLI** (`./bai`).
+Guide for testing and verifying API endpoints and managing resources with the Backend.AI `./bai` CLI.
 
 **IMPORTANT:**
 - `./bai` is the v2 REST API CLI. It is separate from the legacy v1 CLI (`backend.ai` / `./backend.ai`).
-- Do NOT use v1 CLI commands. Do all testing and verification with `./bai`.
+- Do not use v1 CLI commands. Do all testing and verification with `./bai`.
 - **Before running a `./bai` command, confirm the command exists in the Entity-Command Reference below.** No guessing or fabrication, no searching the CLI source.
 - Verify the command tree with `--help` (works without a server): `./bai {entity} --help`, `./bai admin {entity} --help`, `./bai my {entity} --help`.
 
 ### v1 → v2 terminology
 
-| v1 (legacy, do NOT use) | v2 (`./bai`) |
+| v1 (legacy, do not use) | v2 (`./bai`) |
 |--------------------------|-------------|
 | `group` | `project` |
 | `backend.ai vfolder list` | `./bai vfolder my-search` |
@@ -33,31 +33,31 @@ Guide for testing and verifying API endpoints and managing resources with the Ba
 
 Syntax: `./bai [admin|my] {entity} [{sub-entity}] {command} [options]`
 
-Each entity is marked by access level — **user** (user-facing) / **admin** (superadmin only) / **my** (own resources).
+Each entity is marked by access level: **user** (user-facing), **admin** (superadmin only) or **my** (own resources).
 "(empty group)" is a placeholder group with no commands (example: `./bai agent` is empty and the actual commands are under `./bai admin agent`).
 Check options with `--help`.
 
 ### Core
 
-- **domain**: user(get) · admin(search, create, update, delete, purge)
-- **user**: user(get, create, update, delete, search) · admin(create, delete, search)
-- **project**: user(get, assign-users, unassign-users · sub role: search) · admin(search, create, update, delete, purge)
-- **agent**: user(empty group) · admin(search, total-resources, update-resource-group)
-- **image**: user(empty group) · admin(search, forget, purge, update · sub alias: create, remove, search)
+- **domain**: user(get) | admin(search, create, update, delete, purge)
+- **user**: user(get, create, update, delete, search) | admin(create, delete, search)
+- **project**: user(get, assign-users, unassign-users | sub role: search) | admin(search, create, update, delete, purge)
+- **agent**: user(empty group) | admin(search, total-resources, update-resource-group)
+- **image**: user(empty group) | admin(search, forget, purge, update | sub alias: create, remove, search)
 - **entity-label**: user(upsert, purge, search)
-- **session**: user(compute-schedule, enqueue, exclude-idle-checks, include-idle-checks, get, logs, project-search, start-service, shutdown-service, terminate, update) · admin(search · sub kernel: search) · my(search)
-- **system-session-environ**: user(create, delete, purge, restore, scoped-search, update, value-sources) · admin(search)
+- **session**: user(compute-schedule, enqueue, exclude-idle-checks, include-idle-checks, get, logs, project-search, start-service, shutdown-service, terminate, update) | admin(search | sub kernel: search) | my(search)
+- **system-session-environ**: user(create, delete, purge, restore, scoped-search, update, value-sources) | admin(search)
 
-### Compute & Serving
+### Compute and Serving
 
-- **deployment**: user(create, get, update, delete, project-search, chat) · admin(search) · my(search)
+- **deployment**: user(create, get, update, delete, project-search, chat) | admin(search) | my(search)
   - user sub: access-token(create, get, search, delete, bulk-delete), auto-scaling-rule(create, get, search, update, delete, bulk-delete), replica(search), revision(add, get, current, activate, search), revision-preset(get, search), options(get, replace), chat-cache(show, clear), chat-config(set, show, clear), chat-history(show, clear), policy(empty group)
   - admin sub: policy(search), replica(search), revision(search, refresh), revision-preset(create, get, search, update, delete)
-- **model-card**: user(project-search, get, deploy, available-presets) · admin(search, get, create, update, delete, bulk-delete, scan)
-- **service-catalog**: user(empty group) · admin(search)
-- **runtime-variant**: user(get, search) · admin(get, search, create, update, delete, bulk-delete)
-- **runtime-variant-preset**: user(get, search) · admin(get, search, create, update, delete)
-- **scheduling-history**: sub session / kernel / deployment / route / replica-group — each (search, search-scoped)
+- **model-card**: user(project-search, get, deploy, available-presets) | admin(search, get, create, update, delete, bulk-delete, scan)
+- **service-catalog**: user(empty group) | admin(search)
+- **runtime-variant**: user(get, search) | admin(get, search, create, update, delete, bulk-delete)
+- **runtime-variant-preset**: user(get, search) | admin(get, search, create, update, delete)
+- **scheduling-history**: sub session / kernel / deployment / route / replica-group, each (search, search-scoped)
 - **scheduling-handler**: admin(list)
 - **session-lifecycle-handler**: admin(list)
 
@@ -69,15 +69,15 @@ Check options with `--help`.
 - **object-storage**: user(create, get, search, update, delete)
 - **storage-host**: my(permissions)
 
-### Registries & Artifacts
+### Registries and Artifacts
 
-- **container-registry**: user(empty group) · admin(search, create, update, delete)
-- **artifact**: user(get, update, delete, restore · sub revision: get, approve, reject, cancel-import, cleanup) · admin(search)
+- **container-registry**: user(empty group) | admin(search, create, update, delete)
+- **artifact**: user(get, update, delete, restore | sub revision: get, approve, reject, cancel-import, cleanup) | admin(search)
 - **artifact-registry**: user(get)
-- **huggingface-registry**: user(create, get, search, update, delete) — no admin variant
+- **huggingface-registry**: user(create, get, search, update, delete), no admin variant
 - **reservoir-registry**: user(create, get, search, update, delete)
 
-### Access Control & Auth
+### Access Control and Auth
 
 - **entity-type**: user(list)
 - **rbac**: sub assignment(assign, revoke, search), entity(search), permission(search),
@@ -86,44 +86,44 @@ Check options with `--help`.
 - **role**: my(search)
 - **role-preset**: admin(create, get, search, update, delete, purge, restore, permission-add, permission-remove, permission-search)
 - **invitation**: admin(search)
-- **keypair**: admin(create, get, search, update, delete · sub ssh: register, get, delete) · my(issue, revoke, search, update, switch-main)
-- **login-history**: admin(search) · my(search)
-- **login-session**: admin(search, revoke) · my(search, revoke)
-- **login-client-type**: user(get) · admin(search, create, update, delete)
+- **keypair**: admin(create, get, search, update, delete | sub ssh: register, get, delete) | my(issue, revoke, search, update, switch-main)
+- **login-history**: admin(search) | my(search)
+- **login-session**: admin(search, revoke) | my(search, revoke)
+- **login-client-type**: user(get) | admin(search, create, update, delete)
 
 ### Resource Management
 
-- **resource-group**: user(empty group) · admin(search, get, create, update, delete, resource-info, default-options, default-session-options, allow-domains, allowed-domains, allow-projects, allowed-projects, allow-for-domain, allowed-for-domain, allow-for-project, allowed-for-project)
-- **resource-allocation**: user(project-usage, resource-group-usage) · admin(domain-usage, effective) · my(concurrency, effective, keypair-usage, user-usage)
+- **resource-group**: user(empty group) | admin(search, get, create, update, delete, resource-info, default-options, default-session-options, allow-domains, allowed-domains, allow-projects, allowed-projects, allow-for-domain, allowed-for-domain, allow-for-project, allowed-for-project)
+- **resource-allocation**: user(project-usage, resource-group-usage) | admin(domain-usage, effective) | my(concurrency, effective, keypair-usage, user-usage)
 - **resource-preset**: admin(search, get, create, update, delete, check-availability)
-- **resource-policy**: admin(sub keypair / project / user — each create, get, search, update, delete) · my(keypair, user)
+- **resource-policy**: admin(sub keypair / project / user, each create, get, search, update, delete) | my(keypair, user)
 - **resource-slot**: sub slot-type(search, create, update, delete), agent-resource(search), allocation(search)
 - **resource-usage**: sub domain(search), project(search), user(search)
 
-### Monitoring & Audit
+### Monitoring and Audit
 
 - **audit-log**: user(search)
-- **fair-share**: sub domain / project / user — each (get, search)
-- **idle-checker-assignment**: user(scoped-search, update, purge) · admin(create, search)
+- **fair-share**: sub domain / project / user, each (get, search)
+- **idle-checker-assignment**: user(scoped-search, update, purge) | admin(create, search)
 - **notification**: sub channel(get, search, delete), rule(get, search, delete)
-- **prometheus-query-definition**: user(get, search, execute) · admin(create, update, delete, preview)
-- **prometheus-query-definition-category**: user(get, search) · admin(create, delete)
-- **app-config**: my(get) · public(get) — the merged view; `public` is an app-config-only group for the pre-login read, needing no credentials
+- **prometheus-query-definition**: user(get, search, execute) | admin(create, update, delete, preview)
+- **prometheus-query-definition-category**: user(get, search) | admin(create, delete)
+- **app-config**: my(get) | public(get), the merged view. `public` is an app-config-only group for the pre-login read, needing no credentials
 - **app-config-definition**: admin(create, get, search, purge)
 - **app-config-allow-list**: admin(create, get, search, update, purge)
-- **app-config-fragment**: user(get, update, purge, bulk-purge) · my(get, update) · admin(search)
+- **app-config-fragment**: user(get, update, purge, bulk-purge) | my(get, update) | admin(search)
 - **idle-checker**: admin(create, search, update, purge)
-- **export**: admin(list-reports, get-report, audit-logs, keypairs, projects, sessions, sessions-by-project, users, users-by-domain) · my(keypairs, sessions)
+- **export**: admin(list-reports, get-report, audit-logs, keypairs, projects, sessions, sessions-by-project, users, users-by-domain) | my(keypairs, sessions)
 
 ### Utilities (not entities)
 
-`login`, `logout`, `config`, `profile`, `gql` — single commands at the root.
+`login`, `logout`, `config`, `profile` and `gql` are single commands at the root.
 
 > When adding a new CLI command, update this Reference as well (see "Adding a new entity" in `client/cli/v2/AGENTS.md`).
 
 ---
 
-## Setup (Webserver session — recommended)
+## Setup (Webserver session, recommended)
 
 ```bash
 ./bai config set endpoint http://127.0.0.1:8090
@@ -134,7 +134,7 @@ Check options with `--help`.
 ./bai config show
 ```
 
-Non-interactive environments (CI, Claude Code):
+Non-interactive environments, such as continuous integration (CI) and Claude Code:
 
 ```bash
 BACKEND_USER=admin@lablup.com BACKEND_PASSWORD=wJalrXUt ./bai login
@@ -175,7 +175,7 @@ A profile holds one endpoint, one account and its session. Passwords are not sto
 | Profile folder | `~/.backend.ai/profiles/<name>/{config.toml, credentials.toml, session/}` |
 | Selection precedence | `--profile` > `BACKEND_PROFILE` > `current-profile` > files directly under `~/.backend.ai/` |
 | `config`, `login`, `logout` | Read and write the files of the selected profile |
-| `BACKEND_ENDPOINT` etc. | Override the values of the selected profile |
+| `BACKEND_ENDPOINT` and others | Override the values of the selected profile |
 
 To use different profiles in several shells at once, select with `BACKEND_PROFILE` or `--profile`.
 
@@ -185,31 +185,31 @@ To use different profiles in several shells at once, select with `BACKEND_PROFIL
 ./bai [admin|my] {entity} [{sub-entity}] {command} [options]
 ```
 
-- `admin` — superadmin-only operations
-- `my` — self-service (the current user's own resources)
+- `admin`: superadmin-only operations
+- `my`: self-service (the current user's own resources)
 - Entity names are **singular** (domain, user, agent)
-- A sub-entity is a Click sub-group (revision, channel, role, etc.)
+- A sub-entity is a Click sub-group (revision, channel, role and so on)
 
-The standard 6 operations: `create`, `get`, `search`, `update`, `delete`, `purge` (only some, depending on the entity).
-Special operations: `enqueue`/`terminate` (session), `revision add`/`revision activate` (deployment), `login`/`logout`.
+The standard 6 operations: `create`, `get`, `search`, `update`, `delete` and `purge` (only some, depending on the entity).
+Special operations: `enqueue` and `terminate` (session), `revision add` and `revision activate` (deployment), `login` and `logout`.
 
 ## CLI input style
 
 - **Default:** an individual `--option` flag per field.
 - **Secondary:** a JSON string or an `@file` path for complex nested structures (example: `--initial-revision`, `--config`).
-- Do NOT use raw JSON as a positional argument for create/update (with some admin command exceptions: `admin domain create`).
-- For get/delete/purge, use the entity identifier (UUID, name) as a positional argument.
+- Do not use raw JSON as a positional argument for create or update (with some admin command exceptions: `admin domain create`).
+- For get, delete and purge, use the entity identifier (UUID, name) as a positional argument.
 
 ## Search patterns
 
 ```bash
-# admin search — whole system (superadmin only)
+# admin search: whole system (superadmin only)
 ./bai admin {entity} search --limit 5
 
-# project-scoped search — the scope ID is a positional argument (not an option)
+# project-scoped search: the scope ID is a positional argument (not an option)
 ./bai {entity} project-search {project_id} --limit 5
 
-# self-service search — own resources
+# self-service search: own resources
 ./bai my {entity} search --limit 5
 ```
 
@@ -248,7 +248,7 @@ Multi-sort with `field:direction`:
 ## Common commands
 
 ```bash
-# admin search + filter (superadmin only)
+# admin search and filter (superadmin only)
 ./bai admin domain search --limit 5 --name-contains default
 ./bai admin user search --status active --order-by created_at:desc
 ./bai admin agent search --limit 10
@@ -277,7 +277,7 @@ Multi-sort with `field:direction`:
 
 ### After modifying server code
 
-For local development, restart the service first — see the `/local-dev` skill.
+For local development, restart the service first. See `/local-dev`.
 
 ```bash
 # 1. confirm basic connectivity
@@ -294,7 +294,7 @@ For local development, restart the service first — see the `/local-dev` skill.
 # after switching to a regular user, the same command → should fail with 403
 ```
 
-After commands, verify the runtime behavior with the Grafana MCP — see `/observability`.
+After commands, verify the runtime behavior with the Grafana MCP. See `/observability`.
 To catch errors not surfaced in the CLI response, check Loki (`{service_name="manager"} |= "error"`);
 to check the request count, look at Prometheus (`backendai_api_request_count`).
 
@@ -338,15 +338,15 @@ done
 
 ## When a CLI command is unavailable
 
-If the CLI command for an entity/operation is not in the Reference above:
+If the CLI command for an entity or operation is not in the Reference above:
 
 1. That command is **not implemented**.
 2. **Report to the user**: "{entity} {operation} is not provided via the CLI. It needs to be implemented."
 3. As a temporary workaround, try `./bai gql` for operations available via GraphQL.
-4. Do NOT guess CLI options or fabricate commands — it wastes time and causes errors.
+4. Do not guess CLI options or fabricate commands. It wastes time and causes errors.
 
-## Related skills
+## Related documents
 
-- `/local-dev` — restart local services before CLI testing
-- `/observability` — check logs/metrics with the Grafana MCP after CLI testing
-- `/cli-sdk-guide` — implement new CLI commands
+- `/local-dev` - restart local services before CLI testing
+- `/observability` - check logs and metrics with the Grafana MCP after CLI testing
+- `/cli-sdk-guide` - implement new CLI commands

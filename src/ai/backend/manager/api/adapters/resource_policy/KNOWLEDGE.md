@@ -9,132 +9,100 @@ generated:
   at: 2026-09-11
 status: draft
 ---
-# resource_policy 어댑터 — 시나리오
+# resource_policy adapter: Knowledge
 
-규칙은 상위 디렉터리의 `AGENTS.md`에 있다. 여기 적힌 내용과 실행 결과가 어긋나면 문장 쪽을 먼저
-의심한다.
+The rules are in `AGENTS.md` in the parent directory. When this document and a run result disagree, doubt the sentence first.
 
-어댑터 하나가 프로젝트 정책, 키페어 정책, 사용자 정책 세 종류를 다룬다. 정책 종류마다 절을
-하나씩 두고, 같은 호출이라도 절마다 따로 적는다. 아래 문단들은 프로젝트 정책·키페어 정책·사용자
-정책 절에 공통이다.
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
-정책은 어느 스코프에도 속하지 않게 만들어지므로 개별 정책에 권한을 부여할 수 없다. 생성과 전체
-검색은 호출한 사용자가 슈퍼관리자인지 검사하고, 이름으로 조회·수정·삭제하는 호출은 권한 검사를
-거치지만 권한 그래프의 어느 역할도 정책에 권한이 없으므로 결국 슈퍼관리자만 통과한다.
+One adapter handles three kinds of policy: project policy, keypair policy and user resource policy. Each kind has one section, and the same call is written separately per section. The paragraphs below are common to the project policy, keypair policy and user resource policy sections.
 
-조회는 정책을 이름으로 지정한다. 단건 수정과 삭제는 id 를 받고, 이름을 받는 옛 REST 경로와 GQL
-mutation 은 이름으로 id 찾기를 먼저 부르고 같은 호출로 잇는다. 아래 수정·삭제 표는 이 길로 부른다.
-이름으로 정책을 찾는 단계가 먼저 실행되고, 권한이 없는
-사용자는 그 이름이 존재하는지와 무관하게 같은 이유("찾을 수 없음")로 거부된다. 슈퍼관리자가
-존재하지 않는 이름을 지정하면 권한 부족이 아니라 대상을 찾을 수 없어 거부된다. 권한 없는 사용자는
-수정·삭제가 실행되기 전에 이 단계에서 거부되므로, 수정·삭제도 조회와 같은 이유로 거부된다.
+A policy is created outside every scope, so no permission can be granted on an individual policy. Create and the unscoped search check whether the calling user is superadmin, and the get, update and delete by name pass a permission check, but no role in the permission graph has a permission on a policy, so only superadmin passes in the end.
 
-이름 중복과 아직 사용 중인 정책의 삭제는 spec이 아니라 데이터베이스 제약이 막는다. spec이 그
-위반을 별도 오류로 구분하지 않아 저장소가 제약 위반을 그대로 전파하므로, 그 요청은 정책 고유의
-오류가 아니라 저장소의 제약 위반 오류로 거부된다. 이름이 공백뿐인 요청은 어느 절에도 시나리오로
-두지 않는다. 요청 타입이 이미 막으므로 어댑터가 보장하는 것이 아니기 때문이다.
+Get specifies the policy by name. Single update and delete take an id, and the old REST path and GQL mutation that take a name call find-an-id-by-name first and lead to the same call. The update and delete tables below call through that path. The step that finds a policy by name runs first, and a user without permission is rejected for the same reason ("not found") regardless of whether the name exists. When superadmin specifies a non-existent name, the call is rejected for a missing target, not for insufficient permission. A user without permission is rejected at this step before update or delete runs, so update and delete are rejected for the same reason as get.
 
-## 프로젝트 정책
+A duplicate name and the deletion of a policy still in use are blocked by a database constraint, not by the spec. The spec does not distinguish that violation as a separate error and the repository propagates the constraint violation as it is, so the request is rejected with the constraint violation error of the repository, not with a policy-specific error. A request whose name is only whitespace is not a scenario in any section. The request type already blocks it, so the adapter does not guarantee it.
 
-프로젝트 정책·키페어 정책·사용자 정책 중 가장 단순하다. 생성할 때 생략하거나 수정할 때 비울 수
-있는 항목이 없고, 자기 정책을 조회하는 호출도 없다. 한 사용자가 여러 프로젝트에 속하므로 어느
-프로젝트의 정책이 자기 것인지 정해져 있지 않다.
+## Project policy
 
-### 생성
+It is the simplest of the project policy, keypair policy and user resource policy. It has no entry that may be omitted on create or emptied on update, and no call that gets one's own policy. One user belongs to several projects, so which project's policy is the user's own is not decided yet.
 
-`max_quota_scope_size` 값은 사람이 읽기 쉬운 표기("1g")로 받고, 정확한 바이트 수와 읽기 쉬운
-표기 둘 다로 응답한다.
+### Create
 
-### 이름으로 조회
+The `max_quota_scope_size` value is accepted in a human-readable notation ("1g") and returned in both the exact byte count and the human-readable notation.
 
-### 검색
+### Get by name
 
-모니터 역할은 검색은 통과하고 생성은 통과하지 못한다. 슈퍼관리자 검사가 모니터 역할에는 읽기만
-허용하기 때문이다.
+### Search
 
-### 수정
+A monitor role passes the search and does not pass create. The superadmin check allows a monitor role for reads only.
 
-비울 수 없는 항목을 비우는 요청은 지정하지 않은 것으로 취급되어 값이 그대로 남는다. 오류로
-거부되리라 기대하기 쉬우므로 시나리오로 둔다.
+### Update
 
-### 삭제
+A request that empties an entry that cannot be emptied is treated as unspecified, and the value stays. One can easily expect a rejection, so it is a scenario.
 
-이 어댑터에는 soft delete가 없다. 삭제하면 행이 바로 사라지고, 되살리는 호출도 없다.
+### Delete
 
-### 여럿 수정
+This adapter has no delete that keeps the row. Deleting makes the row disappear at once and there is no call that brings it back.
 
-### 여럿 삭제
+### Bulk update
 
-정책을 사용하는 프로젝트로는 사용자를 만들 때 함께 만들어지는 개인 프로젝트를 쓴다. 개인
-프로젝트는 이름이 `default`인 프로젝트 정책을 참조하므로, 사용자를 미리 만들어 두는 시나리오는
-그 정책을 먼저 만들어야 한다.
+### Bulk delete
 
-## 키페어 정책
+For a project that uses the policy, the scenario uses the personal project created together with a user. A personal project references the project policy with the name `default`, so a scenario that prepares a user first must create that policy first.
 
-프로젝트 정책·키페어 정책·사용자 정책 중 가장 복잡하다. 생성할 때 생략할 수 있는 항목은
-`max_pending_session_count`·`max_priority`·`max_pending_session_resource_slots` 값뿐이고, 수정할
-때 비울 수 있는 항목도 이 셋뿐이다. `max_priority` 값에는 세션이 가질 수 있는 우선순위 범위
-제약이 있다. 자기 정책 조회는 호출자의 키페어를 거쳐 정책을 찾는다.
+## Keypair policy
 
-### 생성
+It is the most complex of the project policy, keypair policy and user resource policy. The only entries that may be omitted on create are the `max_pending_session_count`, `max_priority` and `max_pending_session_resource_slots` values, and the only entries that may be emptied on update are the same three. The `max_priority` value has a range constraint on the priority a session may have. The own policy get finds the policy through the keypair of the caller.
 
-범위 밖 `max_priority` 값도 이름 중복처럼 데이터베이스 제약이 막으므로 저장소의 제약 위반
-오류로 거부된다.
+### Create
 
-`is_default` 컬럼은 어느 호출로도 설정할 수 없다. 생성하면 false로 저장되고 응답에도 포함되지
-않는다. 기본 정책이 하나뿐이어야 한다는 규칙은 이 어댑터로는 확인할 수 없다.
+An out-of-range `max_priority` value is blocked by a database constraint like a duplicate name and is rejected with the constraint violation error of the repository.
 
-### 이름으로 조회
+The `is_default` column cannot be set by any call. Create stores it as false and the response does not include it. The rule that there must be one default policy cannot be checked through this adapter.
 
-### 검색
+### Get by name
 
-### 수정
+### Search
 
-값을 비우라는 요청은 항목에 따라 다르게 처리된다. 비울 수 있는 항목은 비워지고, 비울 수 없는
-항목은 요청에 없던 것으로 취급되어 그대로 남는다. "비울 수 있는 항목을 비운다"와 "비울 수 없는
-항목을 비우려 한다"를 나란히 둔다.
+### Update
 
-### 삭제
+A request that empties a value is handled differently per entry. An entry that can be emptied is emptied, and an entry that cannot is treated as absent from the request and stays. "empty an entry that can be emptied" and "try to empty an entry that cannot be emptied" stand side by side.
 
-### 여럿 수정
+### Delete
 
-### 여럿 삭제
+### Bulk update
 
-### 자기 정책 조회
+### Bulk delete
 
-요청 본문이 없고, 호출자 정보만으로 정책을 찾는다. 호출자의 활성 키페어 중 기본 키페어가 있으면
-그것, 없으면 가장 먼저 만든 것에 할당된 정책을 찾는다.
+### Getting one's own policy
 
-자기 정책 조회는 범위를 자기 정책으로 좁힌 뒤에도 권한을 검사한다. 접근할 수 있는 정책이 자기
-것 하나뿐이어도 권한이 없으면 거부된다.
+The request has no body and the policy is found from caller information only. The call finds the policy assigned to the default access key among the caller's active keypairs, or, without one, to the keypair created first.
 
-사용자를 만들 때 함께 생성된 키페어가 기본 키페어이고, 그 키페어의 활성 여부는 사용자의 활성
-여부를 따른다. 기본 키페어가 비활성인 상황과 활성 키페어가 없는 상황은 비활성 사용자로
-구성한다.
+The own policy get checks permission even after narrowing the scope to one's own policy. A user without permission is rejected even though the only accessible policy is their own.
 
-## 사용자 정책
+The keypair created together with a user is the default access key, and whether that keypair is active follows whether the user is active. The situation where the default access key is inactive and the situation with no active keypair are built with an inactive user.
 
-생성할 때 생략할 수 있는 항목은 `max_concurrent_logins` 값뿐이고, 수정할 때 비울 수 있는 항목도
-그것뿐이다. 자기 정책 조회는 사용자 행이 가리키는 정책을 그대로 읽는다.
+## User resource policy
 
-### 생성
+The only entry that may be omitted on create is the `max_concurrent_logins` value, and the only entry that may be emptied on update is the same. The own policy get reads the policy the user row references as it is.
 
-`max_quota_scope_size` 값은 사람이 읽기 쉬운 표기("1g")로 받고, 정확한 바이트 수와 읽기 쉬운
-표기 둘 다로 응답한다.
+### Create
 
-### 이름으로 조회
+The `max_quota_scope_size` value is accepted in a human-readable notation ("1g") and returned in both the exact byte count and the human-readable notation.
 
-### 검색
+### Get by name
 
-### 수정
+### Search
 
-### 삭제
+### Update
 
-### 여럿 수정
+### Delete
 
-### 여럿 삭제
+### Bulk update
 
-### 자기 정책 조회
+### Bulk delete
 
-요청 본문이 없고, 호출자 정보만으로 정책을 찾는다. 사용자 행은 정책 이름을 비워 둘 수 없으므로
-사용자가 있으면 정책도 반드시 있다. 그래서 대상을 찾을 수 없어 거부되는 시나리오가 없다.
+### Getting one's own policy
+
+The request has no body and the policy is found from caller information only. A user row cannot store an empty policy name, so a policy always exists when the user exists. There is therefore no scenario rejected for a missing target.

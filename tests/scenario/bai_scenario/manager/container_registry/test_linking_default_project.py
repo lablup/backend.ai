@@ -18,6 +18,7 @@ from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
     Same,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -46,7 +47,14 @@ class LinkingProjectAsDefault(When[ARegistryToAllowAndACaller, ContainerRegistry
 
     @override
     def describe(self, laid: ARegistryToAllowAndACaller) -> str:
-        return f"{laid.caller.username}이 프로젝트와 레지스트리 사이에 association을 만들며 default로 지정한다"
+        return Says(
+            f"{laid.caller.username}이 프로젝트와 컨테이너 레지스트리 사이에 association 을 "
+            "만들며 default 로 지정합니다",
+            english=(
+                f"{laid.caller.username} creates an association between the project and the "
+                "container registry and makes it the default"
+            ),
+        )
 
     @override
     async def call(
@@ -62,7 +70,10 @@ class LinkingProjectAsDefault(When[ARegistryToAllowAndACaller, ContainerRegistry
 class TheLinkIsWritten(Then[ARegistryToAllowAndACaller, None]):
     @override
     def says(self) -> str:
-        return "반환값이 없고 예외도 발생하지 않는다"
+        return Says(
+            "반환값이 없고 예외도 발생하지 않습니다",
+            english="nothing is returned and no exception is raised",
+        )
 
     @override
     def look(self, laid: ARegistryToAllowAndACaller, answered: Answered[None]) -> list[Verdict]:
@@ -81,9 +92,14 @@ class LinkingWithCreateOnBothScopes(
 
     @override
     def describe(self) -> str:
-        return (
-            "레지스트리와 프로젝트 양쪽에 생성 권한을 받은 사용자는 "
-            "프로젝트와 레지스트리 사이에 association을 만들며 default로 지정할 수 있다"
+        return Says(
+            "컨테이너 레지스트리와 프로젝트 양쪽에 생성 권한을 받은 사용자는 프로젝트와 "
+            "컨테이너 레지스트리 사이에 association 을 만들며 default 로 지정할 수 있습니다",
+            english=(
+                "a user granted create permission on both the container registry and the "
+                "project can create an association between the project and the container "
+                "registry and make it the default"
+            ),
         )
 
     @override
@@ -109,9 +125,16 @@ class LinkingWithoutProjectPermissionIsRefused(
 
     @override
     def describe(self) -> str:
-        return (
-            "레지스트리에만 권한을 받고 프로젝트에는 받지 못한 사용자가 association을 만들며 default로 지정하려 하면, "
-            "관계 연산은 지정한 스코프 모두의 권한을 검사하므로 권한 부족으로 거부된다"
+        return Says(
+            "컨테이너 레지스트리에만 권한을 받고 프로젝트에는 받지 못한 사용자가 association 을 "
+            "만들며 default 로 지정하려 하면, 관계 연산은 지정한 스코프 모두의 권한을 검사하므로 "
+            "권한 부족으로 거부됩니다",
+            english=(
+                "when a user granted permission on the container registry but not the project "
+                "tries to create an association and make it the default, the relation "
+                "operation checks permission on every named scope, so it is rejected for lack "
+                "of permission"
+            ),
         )
 
     @override
@@ -137,9 +160,16 @@ class ProjectWithAnotherDefaultIsRefused(
 
     @override
     def describe(self) -> str:
-        return (
-            "다른 레지스트리를 이미 default로 가진 프로젝트에 association을 만들며 default로 지정하려 하면 "
-            "프로젝트당 default 레지스트리는 하나뿐이므로 거부되고, 기존 default 레지스트리는 유지된다"
+        return Says(
+            "다른 컨테이너 레지스트리를 이미 default 로 가진 프로젝트에 association 을 만들며 "
+            "default 로 지정하려 하면 프로젝트당 default 컨테이너 레지스트리는 하나뿐이므로 "
+            "거부되고, 기존 default 컨테이너 레지스트리는 유지됩니다",
+            english=(
+                "when a project that already has another container registry as its default is "
+                "made to create an association and designate it as the default, it is rejected "
+                "because a project has only one default container registry, and the existing "
+                "default container registry stays"
+            ),
         )
 
     @override
@@ -165,9 +195,15 @@ class AlreadyAllowedPairIsRefused(
 
     @override
     def describe(self) -> str:
-        return (
-            "레지스트리와 association이 이미 있는 프로젝트에 association을 만들며 default로 지정하려 하면 "
-            "기존 association은 그대로 남아 default로 지정할 수 없으므로 거부된다"
+        return Says(
+            "컨테이너 레지스트리와 association 이 이미 있는 프로젝트에 association 을 만들며 "
+            "default 로 지정하려 하면 기존 association 은 그대로 남아 default 로 지정할 수 없으므로 "
+            "거부됩니다",
+            english=(
+                "when a project that already has an association with the container registry is "
+                "made to create an association and designate it as the default, it is rejected "
+                "because the existing association stays and it cannot be made the default"
+            ),
         )
 
     @override

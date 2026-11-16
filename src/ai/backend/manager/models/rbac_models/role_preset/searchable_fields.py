@@ -91,6 +91,11 @@ class _RolePresetOwnFields(RowDataConverter[RolePresetRow, RolePresetData]):
         BoolConditions(RolePresetRow.auto_assign),
         ColumnOrder(RolePresetRow.auto_assign),
     )
+    auto_assign_to_owner = SearchableField(
+        RolePresetRow.auto_assign_to_owner,
+        BoolConditions(RolePresetRow.auto_assign_to_owner),
+        ColumnOrder(RolePresetRow.auto_assign_to_owner),
+    )
     deleted_at = SearchableField(
         RolePresetRow.deleted_at,
         DateTimeConditions(RolePresetRow.deleted_at),
@@ -116,6 +121,7 @@ class _RolePresetOwnFields(RowDataConverter[RolePresetRow, RolePresetData]):
             scope_type=self.scope_type.read(row),
             scope_id=self.scope_id.read(row),
             auto_assign=self.auto_assign.read(row),
+            auto_assign_to_owner=self.auto_assign_to_owner.read(row),
             deleted_at=self.deleted_at.read(row),
             created_at=self.created_at.read(row),
             updated_at=self.updated_at.read(row),

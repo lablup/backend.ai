@@ -2,38 +2,38 @@
 
 [배경](/src/ai/backend/manager/api/adapters/app_config/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/app_config/adapter.py)
 
-시나리오: 미완 1 / 2
+시나리오: 미완성 1 / 2
 
 - 직접 구현 (2)
-  - my_app_configs: 성공 있음 11 · 실패 있음 1 (scope)
-  - public_app_configs: 성공 있음 5 · 실패 없음 (anonymous_scope): SCENARIO-GAP
+  - my_app_configs: 성공 있음 11 · 거부 있음 1 (scope)
+  - public_app_configs: 성공 있음 5 · 거부 없음 (anonymous_scope): SCENARIO-GAP
 
 **my_app_configs**
 
 | 시나리오 | 판정 |
 |---|---|
-| [같은 이름을 두 번 지정해 조회하면, 같은 값이 두 번 반환된다](#reading_mine-a-name-asked-twice-is-answered-twice) | 성공 |
-| [정의만 있고 허용 목록 항목도 조각도 없는 이름을 읽기 권한을 받은 사용자가 조회하면, 그 이름이 응답에서 빠지지 않고 빈 설정으로 반환된다](#reading_mine-a-name-holding-no-fragment-answers-an-empty-config) | 성공 |
-| [정의조차 없는 이름을 읽기 권한을 받은 사용자가 조회하면, 정의가 없다고 거부되지 않고 빈 설정으로 반환된다. 이 조회는 정의를 확인하지 않고 조각만 본다](#reading_mine-a-name-nothing-registers-answers-an-empty-config) | 성공 |
-| [공개 스코프에만 조각이 있는 이름을 조회하면, 그 조각의 값이 그대로 반환된다](#reading_mine-a-public-fragment-alone-answers-its-own-value) | 성공 |
-| [도메인 허용 목록 항목의 순위를 사용자 항목보다 크게 두면, 같은 조각들에서 겹치는 키의 우선순위가 도메인으로 뒤바뀐다. 순위는 허용 목록 항목에 있고 값의 소유자는 바꿀 수 없다](#reading_mine-a-rank-the-admin-flipped-lets-the-domains-fragment-override-mine) | 성공 |
-| [다른 도메인이 같은 이름에 조각을 두었어도, 자기 설정을 조회하면 자기 도메인 조각의 값만 반환된다](#reading_mine-another-domains-fragment-does-not-merge-into-mine) | 성공 |
-| [같은 도메인의 다른 사용자가 같은 이름에 조각을 두었어도, 자기 설정을 조회하면 자기 조각의 값만 반환된다](#reading_mine-another-users-fragment-does-not-merge-into-mine) | 성공 |
-| [같은 이름에 도메인 조각과 자기 조각이 모두 있고 허용 목록 항목이 기본 순위이면, 겹치는 키는 자기 값이 남고 겹치지 않는 키는 양쪽 모두 남는다](#reading_mine-my-own-fragment-overrides-the-domains) | 성공 |
-| [이름 셋을 한 번에 조회하면, 각각의 병합 결과가 요청한 순서대로 반환된다](#reading_mine-several-names-answer-one-each-in-request-order) | 성공 |
-| [같은 이름에 공개 조각과 도메인 조각이 모두 있고 허용 목록 항목이 기본 순위이면, 겹치는 키는 도메인 값이 남는다](#reading_mine-the-domains-fragment-overrides-the-public-one) | 성공 |
-| [권한 검사를 끄면 아무 권한도 없는 사용자도 자기 설정을 조회할 수 있다](#reading_mine-turning-enforcement-off-lets-a-user-granted-nothing-read) | 성공 |
-| [아무 권한도 없는 사용자가 자기 설정을 조회하면, 스코프 권한 검사에서 권한 부족으로 거부된다](#reading_mine-a-user-granted-nothing-may-not-read-their-own-config) | 거부 |
+| [같은 이름을 두 번 지정해 조회하면, 같은 값이 두 번 반환됩니다](#reading_mine-a-name-asked-twice-is-answered-twice) | 성공 |
+| [정의만 있고 허용 목록 항목도 조각도 없는 이름을 읽기 권한을 받은 사용자가 조회하면, 그 이름이 응답에서 빠지지 않고 빈 설정으로 반환됩니다](#reading_mine-a-name-holding-no-fragment-answers-an-empty-config) | 성공 |
+| [정의조차 없는 이름을 읽기 권한을 받은 사용자가 조회하면, 정의가 없다고 거부되지 않고 빈 설정으로 반환됩니다. 이 조회는 정의를 확인하지 않고 조각만 봅니다](#reading_mine-a-name-nothing-registers-answers-an-empty-config) | 성공 |
+| [공개 스코프에만 조각이 있는 이름을 조회하면, 그 조각의 값이 그대로 반환됩니다](#reading_mine-a-public-fragment-alone-answers-its-own-value) | 성공 |
+| [도메인 허용 목록 항목의 순위를 사용자 항목보다 크게 두면, 같은 조각들에서 겹치는 키의 우선순위가 도메인으로 뒤바뀝니다. 순위는 허용 목록 항목에 있고 값의 소유자는 변경할 수 없습니다](#reading_mine-a-rank-the-admin-flipped-lets-the-domains-fragment-override-mine) | 성공 |
+| [다른 도메인이 같은 이름에 조각을 두었어도, 자기 설정을 조회하면 자기 도메인 조각의 값만 반환됩니다](#reading_mine-another-domains-fragment-does-not-merge-into-mine) | 성공 |
+| [같은 도메인의 다른 사용자가 같은 이름에 조각을 두었어도, 자기 설정을 조회하면 자기 조각의 값만 반환됩니다](#reading_mine-another-users-fragment-does-not-merge-into-mine) | 성공 |
+| [같은 이름에 도메인 조각과 자기 조각이 모두 있고 허용 목록 항목이 기본 순위이면, 겹치는 키는 자기 값이 남고 겹치지 않는 키는 양쪽 모두 남습니다](#reading_mine-my-own-fragment-overrides-the-domains) | 성공 |
+| [이름 셋을 한 번에 조회하면, 각각의 병합 결과가 요청한 순서대로 반환됩니다](#reading_mine-several-names-answer-one-each-in-request-order) | 성공 |
+| [같은 이름에 공개 조각과 도메인 조각이 모두 있고 허용 목록 항목이 기본 순위이면, 겹치는 키는 도메인 값이 남습니다](#reading_mine-the-domains-fragment-overrides-the-public-one) | 성공 |
+| [권한 검사를 비활성화하면 아무 권한도 없는 사용자도 자기 설정을 조회할 수 있습니다](#reading_mine-turning-enforcement-off-lets-a-user-granted-nothing-read) | 성공 |
+| [아무 권한도 없는 사용자가 자기 설정을 조회하면, 스코프 권한 검사에서 권한 부족으로 거부됩니다](#reading_mine-a-user-granted-nothing-may-not-read-their-own-config) | 거부 |
 
 **public_app_configs**
 
 | 시나리오 | 판정 |
 |---|---|
-| [공개·도메인·사용자 조각이 모두 있는 이름을 로그인 없이 조회하면, 공개 조각의 값만 반환된다. 도메인과 사용자 조각은 섞이지 않는다](#reading_public-a-caller-not-signed-in-reads-the-public-value-only) | 성공 |
-| [사용자 조각만 있는 이름을 로그인 없이 조회하면, 빈 설정이 반환된다](#reading_public-a-name-holding-no-public-fragment-answers-an-empty-config) | 성공 |
-| [정의조차 없는 이름을 로그인 없이 조회하면, 공개 조각이 없는 이름과 같은 빈 설정이 반환된다. 이 조회로는 어떤 이름이 등록돼 있는지 알 수 없다](#reading_public-a-name-nothing-registers-answers-an-empty-config-too) | 성공 |
-| [같은 조각 셋을 아무 권한도 없는 사용자가 로그인한 채 공개 조회로 조회해도, 공개 조각의 값만 반환된다. 이 조회는 호출자를 아예 보지 않는다](#reading_public-a-signed-in-user-granted-nothing-gets-the-same-public-answer) | 성공 |
-| [이름 셋을 한 번에 로그인 없이 조회하면, 각각의 공개 값이 요청한 순서대로 반환된다](#reading_public-several-names-answer-one-each-in-request-order) | 성공 |
+| [공개, 도메인, 사용자 조각이 모두 있는 이름을 로그인 없이 조회하면, 공개 조각의 값만 반환됩니다. 도메인과 사용자 조각은 섞이지 않습니다](#reading_public-a-caller-not-signed-in-reads-the-public-value-only) | 성공 |
+| [사용자 조각만 있는 이름을 로그인 없이 조회하면, 빈 설정이 반환됩니다](#reading_public-a-name-holding-no-public-fragment-answers-an-empty-config) | 성공 |
+| [정의조차 없는 이름을 로그인 없이 조회하면, 공개 조각이 없는 이름과 같은 빈 설정이 반환됩니다. 이 조회로는 어떤 이름이 등록되었는지 알 수 없습니다](#reading_public-a-name-nothing-registers-answers-an-empty-config-too) | 성공 |
+| [같은 조각 셋을 아무 권한도 없는 사용자가 로그인한 채 공개 조회로 조회해도, 공개 조각의 값만 반환됩니다. 이 조회는 호출자를 아예 보지 않습니다](#reading_public-a-signed-in-user-granted-nothing-gets-the-same-public-answer) | 성공 |
+| [이름 셋을 한 번에 로그인 없이 조회하면, 각각의 공개 값이 요청한 순서대로 반환됩니다](#reading_public-several-names-answer-one-each-in-request-order) | 성공 |
 
 ### my_app_configs
 
@@ -41,7 +41,7 @@
 
 #### [a-name-asked-twice-is-answered-twice](/tests/scenario/bai_scenario/manager/app_config/test_reading_mine.py): pass
 
-같은 이름을 두 번 지정해 조회하면, 같은 값이 두 번 반환된다
+같은 이름을 두 번 지정해 조회하면, 같은 값이 두 번 반환됩니다
 
 Given
 
@@ -49,25 +49,25 @@ Given
   - 도메인 home-1
   - 자기 스코프에서 설정에 대한 READ 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 own-scope-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 own-scope-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 own-scope-1: app_config 전체에 READ 허용
     - 일반 사용자 user-1: 역할 own-scope-1 보유
   - 공개 스코프에 허용된 설정 이름 준비
-    - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-    - 허용 목록 항목 entry-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-  - 공개 설정 조각 public-fragment-1: 값 {'theme': 'light', 'menu': {'home': True, 'docs': True}}
+    - 설정 정의 config-1: 이 이름의 설정을 등록했습니다
+    - 허용 목록 항목 entry-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
+  - 공개 스코프별 앱 설정 public-fragment-1: 값 {'theme': 'light', 'menu': {'home': True, 'docs': True}}
 
 When
 
-- AppConfigAdapter.my_app_configs: user-1이 config-1, config-1의 자기 설정을 조회
+- AppConfigAdapter.my_app_configs: user-1이 config-1, config-1의 자기 설정을 조회합니다
 
 Then
 
-- 요청한 이름마다 병합된 설정이 반환된다
+- 요청한 이름마다 병합된 설정이 반환됩니다
   - app_configs = 2
   - app_configs[0].config_name: 요청한 이름와 같다
   - app_configs[0].config = {'theme': 'light', 'menu': {'home': True, 'docs': True}}
@@ -78,31 +78,31 @@ Then
 
 #### [a-name-holding-no-fragment-answers-an-empty-config](/tests/scenario/bai_scenario/manager/app_config/test_reading_mine.py): pass
 
-정의만 있고 허용 목록 항목도 조각도 없는 이름을 읽기 권한을 받은 사용자가 조회하면, 그 이름이 응답에서 빠지지 않고 빈 설정으로 반환된다
+정의만 있고 허용 목록 항목도 조각도 없는 이름을 읽기 권한을 받은 사용자가 조회하면, 그 이름이 응답에서 빠지지 않고 빈 설정으로 반환됩니다
 
 Given
 
-- 어느 스코프에도 허용되지 않은 스코프에 허용된 설정 이름 하나와, 자기 스코프에서 설정 읽기 권한을 받은 사용자 한 명
+- 어느 스코프에도 허용되지 않은 설정 이름 하나와, 자기 스코프에서 설정 읽기 권한을 받은 사용자 한 명
   - 도메인 home-1
   - 자기 스코프에서 설정에 대한 READ 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 own-scope-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 own-scope-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 own-scope-1: app_config 전체에 READ 허용
     - 일반 사용자 user-1: 역할 own-scope-1 보유
   - 어느 스코프에도 허용되지 않은 설정 이름 준비
-    - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
+    - 설정 정의 config-1: 이 이름의 설정을 등록했습니다
 
 When
 
-- AppConfigAdapter.my_app_configs: user-1이 config-1의 자기 설정을 조회
+- AppConfigAdapter.my_app_configs: user-1이 config-1의 자기 설정을 조회합니다
 
 Then
 
-- 요청한 이름마다 병합된 설정이 반환된다
+- 요청한 이름마다 병합된 설정이 반환됩니다
   - app_configs = 1
   - app_configs[0].config_name: 요청한 이름와 같다
   - app_configs[0].config = {}
@@ -111,7 +111,7 @@ Then
 
 #### [a-name-nothing-registers-answers-an-empty-config](/tests/scenario/bai_scenario/manager/app_config/test_reading_mine.py): pass
 
-정의조차 없는 이름을 읽기 권한을 받은 사용자가 조회하면, 정의가 없다고 거부되지 않고 빈 설정으로 반환된다. 이 조회는 정의를 확인하지 않고 조각만 본다
+정의조차 없는 이름을 읽기 권한을 받은 사용자가 조회하면, 정의가 없다고 거부되지 않고 빈 설정으로 반환됩니다. 이 조회는 정의를 확인하지 않고 조각만 봅니다
 
 Given
 
@@ -119,21 +119,21 @@ Given
   - 도메인 home-1
   - 자기 스코프에서 설정에 대한 READ 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 own-scope-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 own-scope-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 own-scope-1: app_config 전체에 READ 허용
     - 일반 사용자 user-1: 역할 own-scope-1 보유
 
 When
 
-- AppConfigAdapter.my_app_configs: user-1이 unregistered의 자기 설정을 조회
+- AppConfigAdapter.my_app_configs: user-1이 unregistered 의 자기 설정을 조회합니다
 
 Then
 
-- 요청한 이름마다 병합된 설정이 반환된다
+- 요청한 이름마다 병합된 설정이 반환됩니다
   - app_configs = 1
   - app_configs[0].config_name: 요청한 이름와 같다
   - app_configs[0].config = {}
@@ -142,7 +142,7 @@ Then
 
 #### [a-public-fragment-alone-answers-its-own-value](/tests/scenario/bai_scenario/manager/app_config/test_reading_mine.py): pass
 
-공개 스코프에만 조각이 있는 이름을 조회하면, 그 조각의 값이 그대로 반환된다
+공개 스코프에만 조각이 있는 이름을 조회하면, 그 조각의 값이 그대로 반환됩니다
 
 Given
 
@@ -150,25 +150,25 @@ Given
   - 도메인 home-1
   - 자기 스코프에서 설정에 대한 READ 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 own-scope-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 own-scope-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 own-scope-1: app_config 전체에 READ 허용
     - 일반 사용자 user-1: 역할 own-scope-1 보유
   - 공개 스코프에 허용된 설정 이름 준비
-    - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-    - 허용 목록 항목 entry-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-  - 공개 설정 조각 public-fragment-1: 값 {'theme': 'light', 'menu': {'home': True, 'docs': True}}
+    - 설정 정의 config-1: 이 이름의 설정을 등록했습니다
+    - 허용 목록 항목 entry-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
+  - 공개 스코프별 앱 설정 public-fragment-1: 값 {'theme': 'light', 'menu': {'home': True, 'docs': True}}
 
 When
 
-- AppConfigAdapter.my_app_configs: user-1이 config-1의 자기 설정을 조회
+- AppConfigAdapter.my_app_configs: user-1이 config-1의 자기 설정을 조회합니다
 
 Then
 
-- 요청한 이름마다 병합된 설정이 반환된다
+- 요청한 이름마다 병합된 설정이 반환됩니다
   - app_configs = 1
   - app_configs[0].config_name: 요청한 이름와 같다
   - app_configs[0].config = {'theme': 'light', 'menu': {'home': True, 'docs': True}}
@@ -177,35 +177,35 @@ Then
 
 #### [a-rank-the-admin-flipped-lets-the-domains-fragment-override-mine](/tests/scenario/bai_scenario/manager/app_config/test_reading_mine.py): pass
 
-도메인 허용 목록 항목의 순위를 사용자 항목보다 크게 두면, 같은 조각들에서 겹치는 키의 우선순위가 도메인으로 뒤바뀐다. 순위는 허용 목록 항목에 있고 값의 소유자는 바꿀 수 없다
+도메인 허용 목록 항목의 순위를 사용자 항목보다 크게 두면, 같은 조각들에서 겹치는 키의 우선순위가 도메인으로 뒤바뀝니다. 순위는 허용 목록 항목에 있고 값의 소유자는 변경할 수 없습니다
 
 Given
 
-- 도메인·사용자 스코프에 허용된 설정 이름 하나와, 자기 스코프에서 설정 읽기 권한을 받은 사용자 한 명
+- 도메인, 사용자 스코프에 허용된 설정 이름 하나와, 자기 스코프에서 설정 읽기 권한을 받은 사용자 한 명
   - 도메인 home-1
   - 자기 스코프에서 설정에 대한 READ 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 own-scope-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 own-scope-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 own-scope-1: app_config 전체에 READ 허용
     - 일반 사용자 user-1: 역할 own-scope-1 보유
-  - 도메인·사용자 스코프에 허용된 설정 이름 준비
-    - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-    - 허용 목록 항목 entry-1: 도메인 스코프에서 이 이름의 설정을 지정할 수 있다, 순위 400
-    - 허용 목록 항목 entry-2: 사용자 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-  - 설정 조각 domain-fragment-1: 값 {'theme': 'dark', 'menu': {'docs': False, 'billing': True}}
-  - 설정 조각 own-fragment-1: 값 {'theme': 'solar', 'menu': {'home': False}}
+  - 도메인, 사용자 스코프에 허용된 설정 이름 준비
+    - 설정 정의 config-1: 이 이름의 설정을 등록했습니다
+    - 허용 목록 항목 entry-1: 도메인 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위 400
+    - 허용 목록 항목 entry-2: 사용자 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
+  - 스코프별 앱 설정 domain-fragment-1: 값 {'theme': 'dark', 'menu': {'docs': False, 'billing': True}}
+  - 스코프별 앱 설정 own-fragment-1: 값 {'theme': 'solar', 'menu': {'home': False}}
 
 When
 
-- AppConfigAdapter.my_app_configs: user-1이 config-1의 자기 설정을 조회
+- AppConfigAdapter.my_app_configs: user-1이 config-1의 자기 설정을 조회합니다
 
 Then
 
-- 요청한 이름마다 병합된 설정이 반환된다
+- 요청한 이름마다 병합된 설정이 반환됩니다
   - app_configs = 1
   - app_configs[0].config_name: 요청한 이름와 같다
   - app_configs[0].config = {'theme': 'dark', 'menu': {'home': False, 'docs': False, 'billing': True}}
@@ -214,7 +214,7 @@ Then
 
 #### [another-domains-fragment-does-not-merge-into-mine](/tests/scenario/bai_scenario/manager/app_config/test_reading_mine.py): pass
 
-다른 도메인이 같은 이름에 조각을 두었어도, 자기 설정을 조회하면 자기 도메인 조각의 값만 반환된다
+다른 도메인이 같은 이름에 조각을 두었어도, 자기 설정을 조회하면 자기 도메인 조각의 값만 반환됩니다
 
 Given
 
@@ -222,27 +222,27 @@ Given
   - 도메인 home-1
   - 자기 스코프에서 설정에 대한 READ 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 own-scope-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 own-scope-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 own-scope-1: app_config 전체에 READ 허용
     - 일반 사용자 user-1: 역할 own-scope-1 보유
   - 도메인 스코프에 허용된 설정 이름 준비
-    - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-    - 허용 목록 항목 entry-1: 도메인 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-  - 설정 조각 domain-fragment-1: 값 {'theme': 'dark', 'menu': {'docs': False, 'billing': True}}
+    - 설정 정의 config-1: 이 이름의 설정을 등록했습니다
+    - 허용 목록 항목 entry-1: 도메인 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
+  - 스코프별 앱 설정 domain-fragment-1: 값 {'theme': 'dark', 'menu': {'docs': False, 'billing': True}}
   - 도메인 away-1
-  - 설정 조각 other-domains-fragment-1: 값 {'theme': 'elsewhere'}
+  - 스코프별 앱 설정 other-domains-fragment-1: 값 {'theme': 'elsewhere'}
 
 When
 
-- AppConfigAdapter.my_app_configs: user-1이 config-1의 자기 설정을 조회
+- AppConfigAdapter.my_app_configs: user-1이 config-1의 자기 설정을 조회합니다
 
 Then
 
-- 요청한 이름마다 병합된 설정이 반환된다
+- 요청한 이름마다 병합된 설정이 반환됩니다
   - app_configs = 1
   - app_configs[0].config_name: 요청한 이름와 같다
   - app_configs[0].config = {'theme': 'dark', 'menu': {'docs': False, 'billing': True}}
@@ -251,7 +251,7 @@ Then
 
 #### [another-users-fragment-does-not-merge-into-mine](/tests/scenario/bai_scenario/manager/app_config/test_reading_mine.py): pass
 
-같은 도메인의 다른 사용자가 같은 이름에 조각을 두었어도, 자기 설정을 조회하면 자기 조각의 값만 반환된다
+같은 도메인의 다른 사용자가 같은 이름에 조각을 두었어도, 자기 설정을 조회하면 자기 조각의 값만 반환됩니다
 
 Given
 
@@ -259,30 +259,30 @@ Given
   - 도메인 home-1
   - 자기 스코프에서 설정에 대한 READ 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 own-scope-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 own-scope-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 own-scope-1: app_config 전체에 READ 허용
     - 일반 사용자 user-1: 역할 own-scope-1 보유
   - 사용자 스코프에 허용된 설정 이름 준비
-    - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-    - 허용 목록 항목 entry-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-  - 설정 조각 own-fragment-1: 값 {'theme': 'solar', 'menu': {'home': False}}
+    - 설정 정의 config-1: 이 이름의 설정을 등록했습니다
+    - 허용 목록 항목 entry-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
+  - 스코프별 앱 설정 own-fragment-1: 값 {'theme': 'solar', 'menu': {'home': False}}
   - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 설정 조각 anothers-fragment-1: 값 {'theme': 'theirs', 'secret': 1}
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 스코프별 앱 설정 anothers-fragment-1: 값 {'theme': 'theirs', 'secret': 1}
 
 When
 
-- AppConfigAdapter.my_app_configs: user-1이 config-1의 자기 설정을 조회
+- AppConfigAdapter.my_app_configs: user-1이 config-1의 자기 설정을 조회합니다
 
 Then
 
-- 요청한 이름마다 병합된 설정이 반환된다
+- 요청한 이름마다 병합된 설정이 반환됩니다
   - app_configs = 1
   - app_configs[0].config_name: 요청한 이름와 같다
   - app_configs[0].config = {'theme': 'solar', 'menu': {'home': False}}
@@ -291,35 +291,35 @@ Then
 
 #### [my-own-fragment-overrides-the-domains](/tests/scenario/bai_scenario/manager/app_config/test_reading_mine.py): pass
 
-같은 이름에 도메인 조각과 자기 조각이 모두 있고 허용 목록 항목이 기본 순위이면, 겹치는 키는 자기 값이 남고 겹치지 않는 키는 양쪽 모두 남는다
+같은 이름에 도메인 조각과 자기 조각이 모두 있고 허용 목록 항목이 기본 순위이면, 겹치는 키는 자기 값이 남고 겹치지 않는 키는 양쪽 모두 남습니다
 
 Given
 
-- 도메인·사용자 스코프에 허용된 설정 이름 하나와, 자기 스코프에서 설정 읽기 권한을 받은 사용자 한 명
+- 도메인, 사용자 스코프에 허용된 설정 이름 하나와, 자기 스코프에서 설정 읽기 권한을 받은 사용자 한 명
   - 도메인 home-1
   - 자기 스코프에서 설정에 대한 READ 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 own-scope-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 own-scope-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 own-scope-1: app_config 전체에 READ 허용
     - 일반 사용자 user-1: 역할 own-scope-1 보유
-  - 도메인·사용자 스코프에 허용된 설정 이름 준비
-    - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-    - 허용 목록 항목 entry-1: 도메인 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-    - 허용 목록 항목 entry-2: 사용자 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-  - 설정 조각 domain-fragment-1: 값 {'theme': 'dark', 'menu': {'docs': False, 'billing': True}}
-  - 설정 조각 own-fragment-1: 값 {'theme': 'solar', 'menu': {'home': False}}
+  - 도메인, 사용자 스코프에 허용된 설정 이름 준비
+    - 설정 정의 config-1: 이 이름의 설정을 등록했습니다
+    - 허용 목록 항목 entry-1: 도메인 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
+    - 허용 목록 항목 entry-2: 사용자 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
+  - 스코프별 앱 설정 domain-fragment-1: 값 {'theme': 'dark', 'menu': {'docs': False, 'billing': True}}
+  - 스코프별 앱 설정 own-fragment-1: 값 {'theme': 'solar', 'menu': {'home': False}}
 
 When
 
-- AppConfigAdapter.my_app_configs: user-1이 config-1의 자기 설정을 조회
+- AppConfigAdapter.my_app_configs: user-1이 config-1의 자기 설정을 조회합니다
 
 Then
 
-- 요청한 이름마다 병합된 설정이 반환된다
+- 요청한 이름마다 병합된 설정이 반환됩니다
   - app_configs = 1
   - app_configs[0].config_name: 요청한 이름와 같다
   - app_configs[0].config = {'theme': 'solar', 'menu': {'docs': False, 'billing': True, 'home': False}}
@@ -328,7 +328,7 @@ Then
 
 #### [several-names-answer-one-each-in-request-order](/tests/scenario/bai_scenario/manager/app_config/test_reading_mine.py): pass
 
-이름 셋을 한 번에 조회하면, 각각의 병합 결과가 요청한 순서대로 반환된다
+이름 셋을 한 번에 조회하면, 각각의 병합 결과가 요청한 순서대로 반환됩니다
 
 Given
 
@@ -336,31 +336,31 @@ Given
   - 도메인 home-1
   - 자기 스코프에서 설정에 대한 READ 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 own-scope-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 own-scope-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 own-scope-1: app_config 전체에 READ 허용
     - 일반 사용자 user-1: 역할 own-scope-1 보유
   - 공개 스코프에 허용된 설정 이름 준비
-    - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-    - 허용 목록 항목 entry-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-    - 설정 정의 config-2: 이 이름의 설정이 등록돼 있다
-    - 허용 목록 항목 entry-2: 공개 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-    - 설정 정의 config-3: 이 이름의 설정이 등록돼 있다
-    - 허용 목록 항목 entry-3: 공개 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-  - 공개 설정 조각 public-fragment-1: 값 {'n': 1}
-  - 공개 설정 조각 public-fragment-2: 값 {'n': 2}
-  - 공개 설정 조각 public-fragment-3: 값 {'n': 3}
+    - 설정 정의 config-1: 이 이름의 설정을 등록했습니다
+    - 허용 목록 항목 entry-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
+    - 설정 정의 config-2: 이 이름의 설정을 등록했습니다
+    - 허용 목록 항목 entry-2: 공개 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
+    - 설정 정의 config-3: 이 이름의 설정을 등록했습니다
+    - 허용 목록 항목 entry-3: 공개 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
+  - 공개 스코프별 앱 설정 public-fragment-1: 값 {'n': 1}
+  - 공개 스코프별 앱 설정 public-fragment-2: 값 {'n': 2}
+  - 공개 스코프별 앱 설정 public-fragment-3: 값 {'n': 3}
 
 When
 
-- AppConfigAdapter.my_app_configs: user-1이 config-1, config-2, config-3의 자기 설정을 조회
+- AppConfigAdapter.my_app_configs: user-1이 config-1, config-2, config-3의 자기 설정을 조회합니다
 
 Then
 
-- 요청한 이름마다 병합된 설정이 반환된다
+- 요청한 이름마다 병합된 설정이 반환됩니다
   - app_configs = 3
   - app_configs[0].config_name: 요청한 이름와 같다
   - app_configs[0].config = {'n': 1}
@@ -373,35 +373,35 @@ Then
 
 #### [the-domains-fragment-overrides-the-public-one](/tests/scenario/bai_scenario/manager/app_config/test_reading_mine.py): pass
 
-같은 이름에 공개 조각과 도메인 조각이 모두 있고 허용 목록 항목이 기본 순위이면, 겹치는 키는 도메인 값이 남는다
+같은 이름에 공개 조각과 도메인 조각이 모두 있고 허용 목록 항목이 기본 순위이면, 겹치는 키는 도메인 값이 남습니다
 
 Given
 
-- 공개·도메인 스코프에 허용된 설정 이름 하나와, 자기 스코프에서 설정 읽기 권한을 받은 사용자 한 명
+- 공개, 도메인 스코프에 허용된 설정 이름 하나와, 자기 스코프에서 설정 읽기 권한을 받은 사용자 한 명
   - 도메인 home-1
   - 자기 스코프에서 설정에 대한 READ 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 own-scope-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 own-scope-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 own-scope-1: app_config 전체에 READ 허용
     - 일반 사용자 user-1: 역할 own-scope-1 보유
-  - 공개·도메인 스코프에 허용된 설정 이름 준비
-    - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-    - 허용 목록 항목 entry-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-    - 허용 목록 항목 entry-2: 도메인 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-  - 공개 설정 조각 public-fragment-1: 값 {'theme': 'light', 'menu': {'home': True, 'docs': True}}
-  - 설정 조각 domain-fragment-1: 값 {'theme': 'dark', 'menu': {'docs': False, 'billing': True}}
+  - 공개, 도메인 스코프에 허용된 설정 이름 준비
+    - 설정 정의 config-1: 이 이름의 설정을 등록했습니다
+    - 허용 목록 항목 entry-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
+    - 허용 목록 항목 entry-2: 도메인 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
+  - 공개 스코프별 앱 설정 public-fragment-1: 값 {'theme': 'light', 'menu': {'home': True, 'docs': True}}
+  - 스코프별 앱 설정 domain-fragment-1: 값 {'theme': 'dark', 'menu': {'docs': False, 'billing': True}}
 
 When
 
-- AppConfigAdapter.my_app_configs: user-1이 config-1의 자기 설정을 조회
+- AppConfigAdapter.my_app_configs: user-1이 config-1의 자기 설정을 조회합니다
 
 Then
 
-- 요청한 이름마다 병합된 설정이 반환된다
+- 요청한 이름마다 병합된 설정이 반환됩니다
   - app_configs = 1
   - app_configs[0].config_name: 요청한 이름와 같다
   - app_configs[0].config = {'theme': 'dark', 'menu': {'home': True, 'docs': False, 'billing': True}}
@@ -410,7 +410,7 @@ Then
 
 #### [turning-enforcement-off-lets-a-user-granted-nothing-read](/tests/scenario/bai_scenario/manager/app_config/test_reading_mine.py): pass
 
-권한 검사를 끄면 아무 권한도 없는 사용자도 자기 설정을 조회할 수 있다
+권한 검사를 비활성화하면 아무 권한도 없는 사용자도 자기 설정을 조회할 수 있습니다
 
 Given
 
@@ -418,22 +418,22 @@ Given
   - 도메인 home-1
   - 설정 권한이 하나도 없는 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
   - 공개 스코프에 허용된 설정 이름 준비
-    - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-    - 허용 목록 항목 entry-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-  - 공개 설정 조각 public-fragment-1: 값 {'theme': 'light', 'menu': {'home': True, 'docs': True}}
+    - 설정 정의 config-1: 이 이름의 설정을 등록했습니다
+    - 허용 목록 항목 entry-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
+  - 공개 스코프별 앱 설정 public-fragment-1: 값 {'theme': 'light', 'menu': {'home': True, 'docs': True}}
 
 When
 
-- AppConfigAdapter.my_app_configs: user-1이 config-1의 자기 설정을 조회
+- AppConfigAdapter.my_app_configs: user-1이 config-1의 자기 설정을 조회합니다
 
 Then
 
-- 요청한 이름마다 병합된 설정이 반환된다
+- 요청한 이름마다 병합된 설정이 반환됩니다
   - app_configs = 1
   - app_configs[0].config_name: 요청한 이름와 같다
   - app_configs[0].config = {'theme': 'light', 'menu': {'home': True, 'docs': True}}
@@ -442,7 +442,7 @@ Then
 
 #### [a-user-granted-nothing-may-not-read-their-own-config](/tests/scenario/bai_scenario/manager/app_config/test_reading_mine.py): pass
 
-아무 권한도 없는 사용자가 자기 설정을 조회하면, 스코프 권한 검사에서 권한 부족으로 거부된다
+아무 권한도 없는 사용자가 자기 설정을 조회하면, 스코프 권한 검사에서 권한 부족으로 거부됩니다
 
 Given
 
@@ -450,22 +450,22 @@ Given
   - 도메인 home-1
   - 설정 권한이 하나도 없는 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
   - 공개 스코프에 허용된 설정 이름 준비
-    - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-    - 허용 목록 항목 entry-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-  - 공개 설정 조각 public-fragment-1: 값 {'theme': 'light', 'menu': {'home': True, 'docs': True}}
+    - 설정 정의 config-1: 이 이름의 설정을 등록했습니다
+    - 허용 목록 항목 entry-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
+  - 공개 스코프별 앱 설정 public-fragment-1: 값 {'theme': 'light', 'menu': {'home': True, 'docs': True}}
 
 When
 
-- AppConfigAdapter.my_app_configs: user-1이 config-1의 자기 설정을 조회
+- AppConfigAdapter.my_app_configs: user-1이 config-1의 자기 설정을 조회합니다
 
 Then
 
-- 거부된다
+- 거부됩니다
   - 거부: NotEnoughPermission
 
 ### public_app_configs
@@ -474,34 +474,34 @@ Then
 
 #### [a-caller-not-signed-in-reads-the-public-value-only](/tests/scenario/bai_scenario/manager/app_config/test_reading_public.py): pass
 
-공개·도메인·사용자 조각이 모두 있는 이름을 로그인 없이 조회하면, 공개 조각의 값만 반환된다. 도메인과 사용자 조각은 섞이지 않는다
+공개, 도메인, 사용자 조각이 모두 있는 이름을 로그인 없이 조회하면, 공개 조각의 값만 반환됩니다. 도메인과 사용자 조각은 섞이지 않습니다
 
 Given
 
-- 공개·도메인·사용자 스코프에 허용된 설정 이름 하나와, 설정 권한이 하나도 없는 사용자 한 명
+- 공개, 도메인, 사용자 스코프에 허용된 설정 이름 하나와, 설정 권한이 하나도 없는 사용자 한 명
   - 도메인 home-1
   - 설정 권한이 하나도 없는 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 공개·도메인·사용자 스코프에 허용된 설정 이름 준비
-    - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-    - 허용 목록 항목 entry-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-    - 허용 목록 항목 entry-2: 도메인 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-    - 허용 목록 항목 entry-3: 사용자 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-  - 공개 설정 조각 public-fragment-1: 값 {'theme': 'light', 'menu': {'home': True}}
-  - 설정 조각 domain-fragment-1: 값 {'theme': 'dark'}
-  - 설정 조각 own-fragment-1: 값 {'theme': 'solar'}
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 공개, 도메인, 사용자 스코프에 허용된 설정 이름 준비
+    - 설정 정의 config-1: 이 이름의 설정을 등록했습니다
+    - 허용 목록 항목 entry-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
+    - 허용 목록 항목 entry-2: 도메인 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
+    - 허용 목록 항목 entry-3: 사용자 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
+  - 공개 스코프별 앱 설정 public-fragment-1: 값 {'theme': 'light', 'menu': {'home': True}}
+  - 스코프별 앱 설정 domain-fragment-1: 값 {'theme': 'dark'}
+  - 스코프별 앱 설정 own-fragment-1: 값 {'theme': 'solar'}
 
 When
 
-- AppConfigAdapter.public_app_configs: 로그인하지 않은 호출자가 config-1의 공개 설정을 조회
+- AppConfigAdapter.public_app_configs: 로그인하지 않은 호출자가 config-1의 공개 설정을 조회합니다
 
 Then
 
-- 요청한 이름마다 병합된 설정이 반환된다
+- 요청한 이름마다 병합된 설정이 반환됩니다
   - app_configs = 1
   - app_configs[0].config_name: 요청한 이름와 같다
   - app_configs[0].config = {'theme': 'light', 'menu': {'home': True}}
@@ -510,7 +510,7 @@ Then
 
 #### [a-name-holding-no-public-fragment-answers-an-empty-config](/tests/scenario/bai_scenario/manager/app_config/test_reading_public.py): pass
 
-사용자 조각만 있는 이름을 로그인 없이 조회하면, 빈 설정이 반환된다
+사용자 조각만 있는 이름을 로그인 없이 조회하면, 빈 설정이 반환됩니다
 
 Given
 
@@ -518,22 +518,22 @@ Given
   - 도메인 home-1
   - 설정 권한이 하나도 없는 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
   - 사용자 스코프에 허용된 설정 이름 준비
-    - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-    - 허용 목록 항목 entry-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-  - 설정 조각 own-fragment-1: 값 {'theme': 'solar'}
+    - 설정 정의 config-1: 이 이름의 설정을 등록했습니다
+    - 허용 목록 항목 entry-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
+  - 스코프별 앱 설정 own-fragment-1: 값 {'theme': 'solar'}
 
 When
 
-- AppConfigAdapter.public_app_configs: 로그인하지 않은 호출자가 config-1의 공개 설정을 조회
+- AppConfigAdapter.public_app_configs: 로그인하지 않은 호출자가 config-1의 공개 설정을 조회합니다
 
 Then
 
-- 요청한 이름마다 병합된 설정이 반환된다
+- 요청한 이름마다 병합된 설정이 반환됩니다
   - app_configs = 1
   - app_configs[0].config_name: 요청한 이름와 같다
   - app_configs[0].config = {}
@@ -542,7 +542,7 @@ Then
 
 #### [a-name-nothing-registers-answers-an-empty-config-too](/tests/scenario/bai_scenario/manager/app_config/test_reading_public.py): pass
 
-정의조차 없는 이름을 로그인 없이 조회하면, 공개 조각이 없는 이름과 같은 빈 설정이 반환된다. 이 조회로는 어떤 이름이 등록돼 있는지 알 수 없다
+정의조차 없는 이름을 로그인 없이 조회하면, 공개 조각이 없는 이름과 같은 빈 설정이 반환됩니다. 이 조회로는 어떤 이름이 등록되었는지 알 수 없습니다
 
 Given
 
@@ -550,18 +550,18 @@ Given
   - 도메인 home-1
   - 설정 권한이 하나도 없는 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
 
 When
 
-- AppConfigAdapter.public_app_configs: 로그인하지 않은 호출자가 unregistered의 공개 설정을 조회
+- AppConfigAdapter.public_app_configs: 로그인하지 않은 호출자가 unregistered 의 공개 설정을 조회합니다
 
 Then
 
-- 요청한 이름마다 병합된 설정이 반환된다
+- 요청한 이름마다 병합된 설정이 반환됩니다
   - app_configs = 1
   - app_configs[0].config_name: 요청한 이름와 같다
   - app_configs[0].config = {}
@@ -570,34 +570,34 @@ Then
 
 #### [a-signed-in-user-granted-nothing-gets-the-same-public-answer](/tests/scenario/bai_scenario/manager/app_config/test_reading_public.py): pass
 
-같은 조각 셋을 아무 권한도 없는 사용자가 로그인한 채 공개 조회로 조회해도, 공개 조각의 값만 반환된다. 이 조회는 호출자를 아예 보지 않는다
+같은 조각 셋을 아무 권한도 없는 사용자가 로그인한 채 공개 조회로 조회해도, 공개 조각의 값만 반환됩니다. 이 조회는 호출자를 아예 보지 않습니다
 
 Given
 
-- 공개·도메인·사용자 스코프에 허용된 설정 이름 하나와, 설정 권한이 하나도 없는 사용자 한 명
+- 공개, 도메인, 사용자 스코프에 허용된 설정 이름 하나와, 설정 권한이 하나도 없는 사용자 한 명
   - 도메인 home-1
   - 설정 권한이 하나도 없는 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 공개·도메인·사용자 스코프에 허용된 설정 이름 준비
-    - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-    - 허용 목록 항목 entry-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-    - 허용 목록 항목 entry-2: 도메인 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-    - 허용 목록 항목 entry-3: 사용자 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-  - 공개 설정 조각 public-fragment-1: 값 {'theme': 'light', 'menu': {'home': True}}
-  - 설정 조각 domain-fragment-1: 값 {'theme': 'dark'}
-  - 설정 조각 own-fragment-1: 값 {'theme': 'solar'}
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 공개, 도메인, 사용자 스코프에 허용된 설정 이름 준비
+    - 설정 정의 config-1: 이 이름의 설정을 등록했습니다
+    - 허용 목록 항목 entry-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
+    - 허용 목록 항목 entry-2: 도메인 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
+    - 허용 목록 항목 entry-3: 사용자 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
+  - 공개 스코프별 앱 설정 public-fragment-1: 값 {'theme': 'light', 'menu': {'home': True}}
+  - 스코프별 앱 설정 domain-fragment-1: 값 {'theme': 'dark'}
+  - 스코프별 앱 설정 own-fragment-1: 값 {'theme': 'solar'}
 
 When
 
-- AppConfigAdapter.public_app_configs: user-1가 config-1의 공개 설정을 조회
+- AppConfigAdapter.public_app_configs: user-1가 config-1의 공개 설정을 조회합니다
 
 Then
 
-- 요청한 이름마다 병합된 설정이 반환된다
+- 요청한 이름마다 병합된 설정이 반환됩니다
   - app_configs = 1
   - app_configs[0].config_name: 요청한 이름와 같다
   - app_configs[0].config = {'theme': 'light', 'menu': {'home': True}}
@@ -606,7 +606,7 @@ Then
 
 #### [several-names-answer-one-each-in-request-order](/tests/scenario/bai_scenario/manager/app_config/test_reading_public.py): pass
 
-이름 셋을 한 번에 로그인 없이 조회하면, 각각의 공개 값이 요청한 순서대로 반환된다
+이름 셋을 한 번에 로그인 없이 조회하면, 각각의 공개 값이 요청한 순서대로 반환됩니다
 
 Given
 
@@ -614,28 +614,28 @@ Given
   - 도메인 home-1
   - 설정 권한이 하나도 없는 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
   - 공개 스코프에 허용된 설정 이름 준비
-    - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-    - 허용 목록 항목 entry-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-    - 설정 정의 config-2: 이 이름의 설정이 등록돼 있다
-    - 허용 목록 항목 entry-2: 공개 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-    - 설정 정의 config-3: 이 이름의 설정이 등록돼 있다
-    - 허용 목록 항목 entry-3: 공개 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-  - 공개 설정 조각 public-fragment-1: 값 {'n': 1}
-  - 공개 설정 조각 public-fragment-2: 값 {'n': 2}
-  - 공개 설정 조각 public-fragment-3: 값 {'n': 3}
+    - 설정 정의 config-1: 이 이름의 설정을 등록했습니다
+    - 허용 목록 항목 entry-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
+    - 설정 정의 config-2: 이 이름의 설정을 등록했습니다
+    - 허용 목록 항목 entry-2: 공개 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
+    - 설정 정의 config-3: 이 이름의 설정을 등록했습니다
+    - 허용 목록 항목 entry-3: 공개 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
+  - 공개 스코프별 앱 설정 public-fragment-1: 값 {'n': 1}
+  - 공개 스코프별 앱 설정 public-fragment-2: 값 {'n': 2}
+  - 공개 스코프별 앱 설정 public-fragment-3: 값 {'n': 3}
 
 When
 
-- AppConfigAdapter.public_app_configs: 로그인하지 않은 호출자가 config-1, config-2, config-3의 공개 설정을 조회
+- AppConfigAdapter.public_app_configs: 로그인하지 않은 호출자가 config-1, config-2, config-3의 공개 설정을 조회합니다
 
 Then
 
-- 요청한 이름마다 병합된 설정이 반환된다
+- 요청한 이름마다 병합된 설정이 반환됩니다
   - app_configs = 3
   - app_configs[0].config_name: 요청한 이름와 같다
   - app_configs[0].config = {'n': 1}

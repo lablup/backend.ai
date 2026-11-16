@@ -9,25 +9,22 @@ generated:
   at: 2026-09-10
 status: draft
 ---
-# 세션 어댑터 — 시나리오
+# session adapter: Knowledge
 
-규칙은 상위 디렉터리의 `AGENTS.md`에 있다.
+The rules are in `AGENTS.md` in the parent directory.
 
-세션은 자기가 속한 프로젝트를 이름으로 댄다. 그래서 세션 권한은 프로젝트 스코프에 앉고, 그
-역할을 주는 일이 곧 그 사람을 프로젝트 명부에 올리는 일이 된다.
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
-## 조회
+A session refers to the project it belongs to by name. The session permission therefore is on the project scope, and granting that role is the same as adding the user to the project member list.
 
-필터 없는 전체 조회는 슈퍼관리자 역할로 막힌다. 스코프 권한으로 막히는 조회는 스코프를
-받는 검색이다.
+## Get
 
-## 여럿 종료하기
+The full get without a filter is blocked by the superadmin role. The get blocked by a scope permission is the search that takes a scope.
 
-여럿 종료는 호출 전체를 거부하지 않는다. 처리한 세션은 끝난 상태(취소됨, 종료 중, 강제 종료됨,
-건너뜀)와 함께 처리된 목록에, 거부된 세션은 id 와 이유를 실패 목록에 싣는다. 이미 끝났거나 없는
-세션은 건너뜀으로 처리된 목록에 온다.
+## Bulk terminate
 
-## 종료하기 (옛 이름)
+Bulk terminate does not reject the whole call. Processed sessions enter the processed list with the finished status (cancelled, terminating, force-terminated, skipped), and failures are recorded in the failure list with the id and the reason. A session already finished or missing enters the processed list as skipped.
 
-옛 종료는 여럿 종료와 같은 처리를 부르고 답을 끝난 상태별 목록으로 나눈다. 거부된 세션이
-하나라도 있으면 호출 전체를 거부한다.
+## Terminate (old name)
+
+The old terminate calls the same processing as bulk terminate and splits the response into lists by finished status. When even one session is rejected, the whole call is rejected.

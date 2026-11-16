@@ -9,26 +9,24 @@ generated:
   at: 2026-10-16
 status: draft
 ---
-# 모델 카드 어댑터 — 시나리오
+# model card adapter: Knowledge
 
-규칙은 상위 디렉터리의 `AGENTS.md`에 있다.
+The rules are in `AGENTS.md` in the parent directory.
 
-## 조회
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
-## 수정
+## Get
 
-카드는 프로젝트에 놓인 폴더 위에 얹는다. 카드를 만든 사람과 부르는 사람은 다르다. 권한은 카드가
-놓인 프로젝트에서 받는다. 수정은 고친 카드를 최소 자원 요구와 함께 읽어 답하므로 읽기 권한도
-필요하다.
+## Update
+
+A card is attached to a vfolder placed in a project. The user who created the card and the caller differ. The permission comes from the project the card is placed in. Update reads the updated card together with the minimum resource requirements and responds with it, so it needs the read permission too.
 
 ## purge
 
-purge 는 카드 행을 지운다. 옵션을 주면 카드가 얹힌 폴더를 휴지통으로 옮긴다.
+Purge deletes the card row. With the option, it moves the card's vfolder into the trash.
 
-## 여럿 수정하기
+## Bulk update
 
-## 여럿 purge
+## Bulk purge
 
-여럿 연산은 호출 전체를 거부하지 않는다. 처리한 카드는 처리된 목록에, 처리하지 못한 것은 id 와
-이유를 실패 목록에 싣는다. purge 된 카드의 최소 자원 요구는 카드와 함께 지워져 처리된 목록에
-싣지 않는다.
+A bulk operation does not reject the whole call. Processed cards go into the processed list, and failures carry the id and the reason in the failure list. The minimum resource requirements of a purged card are deleted with the card and are not in the processed list.

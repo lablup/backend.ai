@@ -2,15 +2,15 @@
 
 ## Overview
 
-The Metric Repository provides the data access layer for metric-related operations in Backend.AI. It handles metric queries for container utilization metrics and serves as a foundation for potential future database-backed metric storage.
+The Metric Repository provides the data access layer for metric operations in Backend.AI. It handles metric queries for container utilization metrics and is the base for potential future database-backed metric storage.
 
 ## Current Implementation
 
 ### MetricRepository
 
-- Queries metric backend for kernel live stats (gauge/diff/rate metrics)
+- Queries the metric backend for kernel live stats (gauge/diff/rate metrics)
 - Delegates metric queries to `PrometheusClient`
-- Instantiated through the repository factory
+- The repository factory instantiates it
 
 ### PrometheusClient
 

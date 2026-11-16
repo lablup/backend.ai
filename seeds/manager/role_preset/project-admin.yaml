@@ -48,6 +48,8 @@ items:
       session:                          [read, update, create, soft_delete, hard_delete]
       session_group:                    [read, update, create, soft_delete, hard_delete]
       session_template:                 [read, update, create, soft_delete, hard_delete]
+      storage_backend:                  []
+      storage_backend_type:             []
       storage_namespace:                []
       storage_volume:                   []
       system_session_environ:           [read, update, create, soft_delete, hard_delete]

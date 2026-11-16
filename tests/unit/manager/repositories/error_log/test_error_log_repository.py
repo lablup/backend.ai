@@ -19,7 +19,6 @@ from ai.backend.manager.data.error_log.types import (
     ErrorLogData,
     ErrorLogSeverity,
 )
-from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy.row import (
     DeploymentAutoScalingPolicyRow,
@@ -33,7 +32,6 @@ from ai.backend.manager.models.error_log.creators import ErrorLogCreator
 from ai.backend.manager.models.error_log.row import ErrorLogRow
 from ai.backend.manager.models.error_log.searchers import ErrorLogSearcher
 from ai.backend.manager.models.image.row import ImageRow
-from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
@@ -76,9 +74,7 @@ class TestErrorLogOps:
                 RoleRow,
                 UserRoleRow,
                 UserRow,
-                KeyPairRow,
                 ProjectRow,
-                AgentRow,
                 VFolderRow,
                 ContainerRegistryRow,
                 ImageRow,

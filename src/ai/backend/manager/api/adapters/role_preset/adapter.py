@@ -171,6 +171,7 @@ class RolePresetAdapter(BaseAdapter):
             name=input.name,
             scope_type=input.scope_type,
             auto_assign=input.auto_assign,
+            auto_assign_to_owner=input.auto_assign_to_owner,
         )
         permission_creators = [
             RolePermissionPresetCreator(
@@ -497,6 +498,11 @@ class RolePresetAdapter(BaseAdapter):
                 if input.auto_assign is not None
                 else OptionalState.nop()
             ),
+            auto_assign_to_owner=(
+                OptionalState.update(input.auto_assign_to_owner)
+                if input.auto_assign_to_owner is not None
+                else OptionalState.nop()
+            ),
         )
 
     def _to_partial_bulk_payload(
@@ -531,6 +537,9 @@ class RolePresetAdapter(BaseAdapter):
             *self.apply_string_filter(filter_.name, fields.name.filter),
             *self.apply_string_filter(filter_.scope_type, fields.scope_type.filter),
             *self.apply_bool_filter(filter_.auto_assign, fields.auto_assign.filter),
+            *self.apply_bool_filter(
+                filter_.auto_assign_to_owner, fields.auto_assign_to_owner.filter
+            ),
             *self._deleted_conditions(filter_.deleted),
             *self.apply_nullable_datetime_filter(filter_.deleted_at, fields.deleted_at.filter),
             *self.apply_to_many_filter(
@@ -657,6 +666,7 @@ class RolePresetAdapter(BaseAdapter):
             scope_type=RolePresetAdapter._scope_type_or_global_entity_name(data),
             role_name_template=data.role_name_template,
             auto_assign=data.auto_assign,
+            auto_assign_to_owner=data.auto_assign_to_owner,
             deleted=data.deleted_at is not None,
             deleted_at=data.deleted_at,
             created_at=data.created_at,

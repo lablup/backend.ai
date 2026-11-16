@@ -17,7 +17,7 @@ from ai.backend.manager.api.adapters.huggingface_registry.adapter import (
 )
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.huggingface_registry import (
     EveryTargetIsPurged,
     ManyRegistriesAndACaller,
@@ -46,8 +46,16 @@ class PurgingEveryTarget(When[ManyRegistriesAndACaller, HuggingFaceRegistryAdapt
 
     @override
     def describe(self, laid: ManyRegistriesAndACaller) -> str:
-        besides = " 와 없는 id 하나" if self.missing is not None else ""
-        return f"{laid.caller.username}이 레지스트리 {len(laid.laid)}개{besides}를 한 번에 purge 함"
+        besides_ko = "와 존재하지 않는 id 하나" if self.missing is not None else ""
+        besides_en = " and one id that does not exist" if self.missing is not None else ""
+        return Says(
+            f"{laid.caller.username}이 허깅 페이스 레지스트리 {len(laid.laid)}개{besides_ko}를 "
+            "한 번에 purge 합니다",
+            english=(
+                f"{laid.caller.username} purges {len(laid.laid)} HuggingFace registries"
+                f"{besides_en} at once"
+            ),
+        )
 
     @override
     async def call(
@@ -72,9 +80,13 @@ class AUserGrantedPurgePurgesSeveral(
 
     @override
     def describe(self) -> str:
-        return (
-            "레지스트리 purge 권한을 받은 사용자가 여럿을 한 번에 purge 하면, 모두의 id 가 처리된 "
-            "목록에 오고 실패한 것은 없다"
+        return Says(
+            "허깅 페이스 레지스트리 purge 권한을 받은 사용자가 여럿을 한 번에 purge 하면, 모두의 "
+            "id 가 처리된 목록에 오고 실패한 것은 없습니다",
+            english=(
+                "when a user granted permission to purge HuggingFace registries purges several "
+                "at once, every id comes back in the processed list and none failed"
+            ),
         )
 
     @override
@@ -102,10 +114,16 @@ class PurgingAnswersForTheMissingOne(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 레지스트리 둘과 없는 id 하나를 한 번에 purge 하면, 둘의 id 는 처리된 "
-            "목록에, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다. 슈퍼관리자는 검사를 모두 "
-            "통과하므로 대상 없음이 그대로 드러난다"
+        return Says(
+            "superadmin 이 허깅 페이스 레지스트리 둘과 존재하지 않는 id 하나를 한 번에 purge 하면, "
+            "둘의 id 는 처리된 목록에, 존재하지 않는 id 는 대상이 없다는 이유로 실패 목록에 옵니다. "
+            "superadmin 은 검사를 모두 통과하므로 대상 없음이 그대로 드러납니다",
+            english=(
+                "when the superadmin purges two HuggingFace registries and one id that does not "
+                "exist at once, the two ids come back in the processed list and the id that does "
+                "not exist comes back in the failed list because there is no such target. The "
+                "superadmin passes every check, so the missing target is revealed as it is"
+            ),
         )
 
     @override
@@ -131,9 +149,14 @@ class AUserGrantedNothingPurgesNone(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 받지 않은 사용자가 레지스트리 여럿을 한 번에 purge 하려 하면, purge 된 것 "
-            "없이 모두 권한이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "아무 권한도 받지 않은 사용자가 허깅 페이스 레지스트리 여럿을 한 번에 purge 하려 하면, "
+            "purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when a user granted nothing tries to purge several HuggingFace registries at "
+                "once, nothing is purged and all come back in the failed list because there is "
+                "no permission"
+            ),
         )
 
     @override

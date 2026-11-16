@@ -9,77 +9,52 @@ generated:
   at: 2026-09-11
 status: draft
 ---
-# audit_log 어댑터 — 시나리오
+# audit_log adapter: Knowledge
 
-규칙은 상위 디렉터리의 `AGENTS.md`에 있다. 여기 적힌 내용과 실행 결과가 어긋나면 문장 쪽을 먼저
-의심한다.
+The rules are in `AGENTS.md` in the parent directory. When this document and a run result disagree, doubt the sentence first.
 
-`audit_log` 엔티티는 소유자가 고정되어 있지 않다. 동작이 실행될 때마다 그 동작이 다룬 엔티티를
-대상으로 한 행씩 자동으로 기록되므로, 기록마다 소유자가 다르고 전역 동작의 기록은 소유자가 없다.
-그래서 이 어댑터에는 쓰기가 없고 전체 검색, 여러 id 조회, 범위 지정 검색, 기록 하나의 범위 검색뿐이다.
-시나리오가 전제하는
-기록은 어댑터로 만들 수 없으므로, 기록을 남기는 쓰기 경로로 직접 미리 만들어 둔다.
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
-권한 검사 방식은 셋이다. 전체 검색은 호출한 사용자가 슈퍼관리자인지 검사하고, 읽기이므로 모니터 역할
-사용자도 통과한다. 범위 지정 검색은 지정한 엔티티마다 부여된 읽기 권한을 검사하고, 하나라도 볼 수
-없으면 요청 전체를 거부한다. 여러 id 조회와 기록 하나의 범위 검색은 기록의 소유자 중 하나라도 읽을 수
-있는지를 기록마다 검사한다. 기록의 소유자는 기록이 대상으로 한 엔티티, 기록에 남은 범위 엔티티들,
-기록을 실행한 사용자다. 거부 이유가 방식마다 다르므로 짝이 되는 시나리오를 따로 적는다.
+An `audit_log` entity has no fixed owner. Each executed operation records one row automatically for the entity it handled, so the owner differs per record and a record of a global operation has no owner. This adapter therefore has no write: only the unscoped search, the get by several ids, the scoped search and the scope search of one record. A scenario cannot create the records it assumes through the adapter, so they are prepared through the write path that records them.
 
-범위를 지정하는 방법은 둘이다. 기록의 대상 엔티티로 지정하거나, 기록의 `triggered_by` 사용자로
-지정한다. 엔티티로 지정하면 그 엔티티에 부여된 권한을, 사용자로 지정하면 그 사용자에 부여된 권한을
-검사한다.
+Permission is checked in three ways. The unscoped search checks whether the calling user is superadmin, and since it is a read, a user with the monitor role passes too. The scoped search checks the read permission granted on each named entity and rejects the whole request when even one is unreadable. The get by several ids and the scope search of one record check, per record, whether any of its owners is readable. The owners of a record are the entity the record is about, the scope entities recorded in it, and the user who ran it. The rejection reason differs per way, so the paired scenarios are written separately.
 
-## 전체 검색
+A scope can be named in two ways: as the target entity of the record, or as the `triggered_by` user. Naming an entity checks the permission granted on that entity; naming a user checks the permission granted on that user.
 
-"모니터 역할 사용자가 검색한다"는 전체 검색이 읽기에 한해 모니터 역할 사용자를 통과시킨다는 것을
-확인한다. "모니터 역할 사용자가 권한 없이 조회한다", "모니터 역할 사용자가 권한 없이 지정해
-검색한다"와 짝이고 결과가 반대다.
+## Unscoped search
 
-응답의 `client_ip` 값은 기록될 때 마스킹 정책을 거친 값 그대로다. 조회할 때 다시 마스킹하지
-않으므로, 정책이 어떤 값을 남기는지는 마스킹 정책 쪽 시나리오가 다룬다.
+The scenario "a monitor role user searches" checks that the unscoped search passes a monitor role user for reads. It is paired with "a monitor role user gets without permission" and "a monitor role user searches by scope without permission", with the opposite result.
 
-## 여러 id로 조회
+The `client_ip` value in the response is the value that passed the masking policy when recorded, as it is. The read does not mask it again, so the masking policy document covers what value the policy keeps.
 
-id마다 그 기록의 소유자 중 하나라도 읽을 수 있는지 검사하고, 항목마다 따로 응답한다. 볼 수 없는
-기록은 그 항목만 거부되고 나머지는 반환된다. 범위 지정 검색과 달리 부분 성공이 있다.
+## Getting by several ids
 
-기록의 대상 엔티티를 읽을 수 없어도, 기록이 남긴 범위나 기록을 실행한 사용자를 통해 읽을 수 있다.
-범위 지정 검색에서 그 기록이 보이는 조건과 같다.
+The adapter checks, per id, whether any owner of that record is readable, and responds per entry. An unreadable record is rejected in that entry only and the rest are returned. Unlike the scoped search, it has partial success.
 
-없는 id는 누가 조회하든 빈 항목이다. 가리키는 엔티티가 없으므로 권한을 검사할 대상이 없다.
+A record is readable through the scope it recorded or the user who ran it even when its target entity is unreadable. This is the same condition under which the record appears in the scoped search.
 
-모니터 역할 사용자는 여기서 통과하지 않는다. 전체 검색과 달리 이 조회는 권한 그래프를 검사한다.
+A missing id is an empty entry for every caller. No entity is referenced, so there is no target on which to check permission.
 
-## 범위 지정 검색
+A monitor role user does not pass here. Unlike the unscoped search, this read checks the permission graph.
 
-부분 성공은 없다. 지정한 엔티티 전부를 검색 전에 인가하므로, 볼 수 없는 엔티티가 하나라도 있으면
-나머지를 반환하는 대신 요청 전체를 거부한다. 항목마다 따로 응답하는 여러 id 조회와 다르므로 "볼 수
-없는 엔티티가 하나라도 섞이면 전부 거부된다"를 따로 둔다.
+## Scoped search
 
-엔티티를 지정하면 그 엔티티를 대상으로 한 기록과, 그 엔티티를 스코프로 삼아 실행된 동작의 기록이
-함께 반환된다. 프로젝트를 지정하면 그 프로젝트 안에서 실행된 동작의 기록도 함께 반환된다는 뜻이고,
-"지정한 엔티티 안에서 실행된 동작의 기록도 반환된다"가 그것을 확인한다.
+There is no partial success. Every named entity is authorized before the search, so when even one entity is unreadable the adapter rejects the whole request instead of returning the rest. This differs from the get by several ids, which responds per entry, so "the request is rejected entirely when even one unreadable entity is mixed in" is written separately.
 
-자기 기록만 조회하는 호출은 따로 없다. 자기가 실행한 기록도 호출자 자신의 사용자 엔티티에 부여된
-읽기 권한으로 조회하므로, 그 권한이 없으면 자기 기록도 볼 수 없다.
+Naming an entity returns both the records about that entity and the records of operations run with that entity as their scope. Naming a project therefore also returns the records of operations run inside that project, and "records of operations run inside the named entity are also returned" checks it.
 
-모니터 역할로 통과하는 검사는 슈퍼관리자 검사뿐이다. 범위 지정 검색은 권한 그래프를 검사하므로 모니터
-역할 사용자도 권한을 받아야 한다.
+There is no separate call that reads only one's own records. A record the user ran is read with the read permission granted on the caller's own user entity, so without that permission the user cannot see even their own records.
 
-지정한 엔티티가 실제로 있는지는 따로 확인하지 않는다. 권한 검사가 먼저 실행되고, 없는 엔티티에는
-아무도 권한을 갖지 않는다. 대상을 찾을 수 없어 거부되는 경우가 아니다. 슈퍼관리자는 그 검사를
-지나가므로 없는 엔티티를 지정해도 거부되지 않고, 검색이 돌아 빈 페이지가 온다.
+The only check a monitor role passes is the superadmin check. The scoped search checks the permission graph, so a monitor role user also needs the permission.
 
-아무것도 지정하지 않은 요청은 시나리오로 두지 않는다. 요청 타입이 이미 거부하므로 어댑터가 보장하는
-것이 아니다.
+The adapter does not check separately whether the named entity exists. The permission check runs first, and no one has a permission on a missing entity. This is not a rejection for a missing target. Superadmin passes that check, so naming a missing entity is not rejected and the search runs and returns an empty page.
 
-## 기록 하나의 범위 검색
+A request that names nothing is not a scenario. The request type already rejects it, so the adapter does not guarantee it.
 
-기록을 읽을 수 있으면 그 기록의 범위는 모두 읽는다. 범위 하나를 통해 기록에 닿았더라도, 그 기록에
-남은 다른 범위까지 반환된다. 범위 행에는 권한 검사가 따로 없다.
+## The scope search of one record
 
-권한은 여러 id 조회와 같은 기준으로 검사한다. 기록 하나만 지정하므로 부분 성공은 없고, 소유자 중
-아무것도 읽을 수 없으면 요청이 거부된다.
+When a record is readable, all its scopes are read. Even when the record was accessed through one scope, the other scopes recorded in it are returned too. Scope rows have no permission check of their own.
 
-모니터 역할 사용자는 여기서 통과하지 않는다. 전체 검색과 달리 이 검색은 권한 그래프를 검사한다.
+Permission is checked on the same basis as the get by several ids. Only one record is named, so there is no partial success, and the request is rejected when none of the owners is readable.
+
+A monitor role user does not pass here. Unlike the unscoped search, this search checks the permission graph.

@@ -84,6 +84,12 @@ class ResourceGroupProxyTarget:
 
 
 @dataclass(frozen=True)
+class ResourceGroupProxyConnectionInfo:
+    addr: str
+    api_token: str | None
+
+
+@dataclass(frozen=True)
 class SlotTypeInfo:
     """Global slot-type registry from `resource_slot_types`.
 

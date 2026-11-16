@@ -29,6 +29,7 @@ from ai.backend.testutils.scenario_steps import (
     Refused,
     Same,
     SameAs,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -62,12 +63,24 @@ class LoadingByIds(When[TwoDefinitionsAndACaller, AppConfigDefinitionAdapter, Lo
     @override
     def describe(self, laid: TwoDefinitionsAndACaller) -> str:
         if self.nothing:
-            return f"{laid.caller.username}이 빈 ID 목록으로 조회"
+            return Says(
+                f"{laid.caller.username} 이 빈 ID 목록으로 조회합니다",
+                english=f"{laid.caller.username} reads with an empty id list",
+            )
         if self.duplicate_first:
-            return f"{laid.caller.username}이 첫 번째 설정 정의의 ID를 두 번 조회"
-        return (
-            f"{laid.caller.username}이 {laid.first.config_name}, {laid.second.config_name}, "
-            "존재하지 않는 ID를 한 번에 조회"
+            return Says(
+                f"{laid.caller.username} 이 첫 번째 설정 정의의 ID 를 두 번 조회합니다",
+                english=(
+                    f"{laid.caller.username} reads the id of the first config definition twice"
+                ),
+            )
+        return Says(
+            f"{laid.caller.username} 이 {laid.first.config_name}, {laid.second.config_name}, "
+            "존재하지 않는 ID 를 한 번에 조회합니다",
+            english=(
+                f"{laid.caller.username} reads {laid.first.config_name}, "
+                f"{laid.second.config_name} and a missing id at once"
+            ),
         )
 
     @override
@@ -90,7 +103,10 @@ class EveryIdIsRefused(Then[TwoDefinitionsAndACaller, Loaded]):
 
     @override
     def says(self) -> str:
-        return "있는 둘도 없는 ID도 그 항목만 거부된다"
+        return Says(
+            "있는 둘도 없는 ID 도 그 항목만 거부됩니다",
+            english=("both existing items and the missing id are rejected for that item alone"),
+        )
 
     @override
     def look(self, laid: TwoDefinitionsAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
@@ -115,7 +131,12 @@ class TwoNodesOneMissing(Then[TwoDefinitionsAndACaller, Loaded]):
 
     @override
     def says(self) -> str:
-        return "있는 둘은 노드로 반환되고, 없는 ID에 해당하는 항목은 비어 있다"
+        return Says(
+            "있는 둘은 노드로 반환되고, 없는 ID 에 해당하는 항목은 비어 있습니다",
+            english=(
+                "the two existing items come back as nodes and the item for the missing id is empty"
+            ),
+        )
 
     @override
     def look(self, laid: TwoDefinitionsAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
@@ -130,12 +151,24 @@ class TwoNodesOneMissing(Then[TwoDefinitionsAndACaller, Loaded]):
             Held[object](
                 "items[0].ID",
                 getattr(items[0], "id", items[0]),
-                SameAs[object](laid.first.id, "미리 만들어 둔 첫째 설정 정의"),
+                SameAs[object](
+                    laid.first.id,
+                    Says(
+                        "미리 저장한 첫째 설정 정의",
+                        english="the first config definition made in advance",
+                    ),
+                ),
             ),
             Held[object](
                 "items[1].ID",
                 getattr(items[1], "id", items[1]),
-                SameAs[object](laid.second.id, "미리 만들어 둔 둘째 설정 정의"),
+                SameAs[object](
+                    laid.second.id,
+                    Says(
+                        "미리 저장한 둘째 설정 정의",
+                        english="the second config definition made in advance",
+                    ),
+                ),
             ),
             Same("items[2]", items[2], None),
         ]
@@ -147,7 +180,7 @@ class NothingIsAnswered(Then[TwoDefinitionsAndACaller, Loaded]):
 
     @override
     def says(self) -> str:
-        return "빈 응답이 반환된다"
+        return Says("빈 응답이 반환됩니다", english="an empty answer comes back")
 
     @override
     def look(self, laid: TwoDefinitionsAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
@@ -163,7 +196,10 @@ class TheDuplicateIdKeepsBothPositions(Then[TwoDefinitionsAndACaller, Loaded]):
 
     @override
     def says(self) -> str:
-        return "중복 ID의 두 항목에 같은 설정 정의가 반환된다"
+        return Says(
+            "중복 ID 의 두 항목에 같은 설정 정의가 반환됩니다",
+            english="the same config definition comes back for both items of the duplicate id",
+        )
 
     @override
     def look(self, laid: TwoDefinitionsAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
@@ -173,17 +209,21 @@ class TheDuplicateIdKeepsBothPositions(Then[TwoDefinitionsAndACaller, Loaded]):
         seen: list[Verdict] = [Same("items", len(items), 2)]
         if len(items) != 2:
             return seen
+        repeated = Says(
+            "미리 저장한 첫 번째 설정 정의",
+            english="the first config definition made in advance",
+        )
         return [
             *seen,
             Held[object](
                 "items[0].ID",
                 getattr(items[0], "id", items[0]),
-                SameAs[object](laid.first.id, "미리 만들어 둔 첫 번째 설정 정의"),
+                SameAs[object](laid.first.id, repeated),
             ),
             Held[object](
                 "items[1].ID",
                 getattr(items[1], "id", items[1]),
-                SameAs[object](laid.first.id, "미리 만들어 둔 첫 번째 설정 정의"),
+                SameAs[object](laid.first.id, repeated),
             ),
         ]
 
@@ -198,9 +238,14 @@ class APlainUserIsRefusedPerId(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 아닌 사용자가 설정 정의 둘과 없는 ID 하나를 한 번에 조회하면, 요청 전체가 "
-            "막히는 것이 아니라 세 항목 모두 그 항목만 권한 부족으로 거부된다"
+        return Says(
+            "superadmin 이 아닌 사용자가 설정 정의 둘과 없는 ID 하나를 한 번에 조회하면, 요청 전체가 "
+            "막히는 것이 아니라 세 항목 모두 그 항목만 권한 부족으로 거부됩니다",
+            english=(
+                "when a user who is not the superadmin reads two config definitions and one "
+                "missing id at once, the whole request is not blocked; all three items are "
+                "rejected for that item alone for lack of permission"
+            ),
         )
 
     @override
@@ -226,9 +271,14 @@ class TheSuperadminSeesBoth(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 설정 정의 둘과 없는 ID 하나를 한 번에 조회하면, 둘은 노드로 반환되고 없는 ID에 "
-            "해당하는 항목은 비어 있다. 권한 검사를 통과하는 사용자만 빈 항목을 본다"
+        return Says(
+            "superadmin 이 설정 정의 둘과 없는 ID 하나를 한 번에 조회하면, 둘은 노드로 반환되고 "
+            "없는 ID 에 해당하는 항목은 비어 있습니다. 권한 검사를 통과하는 사용자만 빈 항목을 봅니다",
+            english=(
+                "when the superadmin reads two config definitions and one missing id at once, "
+                "the two come back as nodes and the item for the missing id is empty. Only a "
+                "user who passes the permission check sees an empty item"
+            ),
         )
 
     @override
@@ -254,7 +304,14 @@ class DuplicateIdsKeepTheirPositions(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 같은 설정 정의 ID를 두 번 조회하면, 입력 순서를 보존해 같은 노드가 두 번 반환된다"
+        return Says(
+            "superadmin 이 같은 설정 정의 ID 를 두 번 조회하면, 입력 순서를 보존해 같은 노드가 "
+            "두 번 반환됩니다",
+            english=(
+                "when the superadmin reads the same config definition id twice, the same node "
+                "comes back twice, keeping the input order"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, TwoDefinitionsAndACaller]:
@@ -279,7 +336,10 @@ class AnEmptyListAnswersEmpty(
 
     @override
     def describe(self) -> str:
-        return "빈 ID 목록을 주면 빈 응답이 반환된다"
+        return Says(
+            "빈 ID 목록을 주면 빈 응답이 반환됩니다",
+            english="an empty id list answers empty",
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, TwoDefinitionsAndACaller]:

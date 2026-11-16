@@ -12,21 +12,21 @@ Scenario: complete
 
 | scenario | verdict |
 |---|---|
-| [설정 키가 쓰기 제공자일 때 평문 비밀 키 둘을 재암호화하면, 둘을 스캔해 둘을 다시 썼다는 응답과 함께 둘 다 그 키로 암호화되고 평문은 없는 상태가 반환된다](#reencrypting-reencrypting-moves-plaintext-secrets-onto-the-config-key) | answered |
-| [설정 키가 쓰기 제공자이고 비밀 키 둘이 이미 그 키로 암호화돼 있을 때 재암호화하면, 둘을 스캔해 둘을 다시 썼다는 응답이 반환되고 상태는 그대로 그 키로 암호화된 것 둘이다](#reencrypting-reencrypting-rewrites-secrets-already-on-the-config-key) | answered |
-| [쓰기 제공자가 평문일 때 평문 비밀 키 둘을 재암호화하면, 둘을 스캔해 둘을 다시 썼다는 응답이 반환되고 상태는 그대로 평문 둘이다. 다시 쓴 수는 값이 바뀌었는지가 아니라 행을 다시 썼는지를 센다](#reencrypting-reencrypting-with-a-plain-writer-rewrites-plaintext-secrets-as-plaintext) | answered |
-| [쓰기 제공자가 평문이고 설정 키 제공자는 읽기 전용일 때 그 키로 암호화된 비밀 키를 재암호화하면, 하나를 스캔해 하나를 다시 썼다는 응답이 반환되고 상태는 평문뿐이다](#reencrypting-reencrypting-with-a-plain-writer-turns-an-encrypted-secret-back-to-plaintext) | answered |
-| [슈퍼관리자가 아닌 사용자가 재암호화를 실행하면 역할 부족으로 거부된다](#reencrypting-a-user-who-is-not-the-superadmin-may-not-reencrypt-secrets) | rejected |
-| [모니터 역할이 재암호화를 실행하면 역할 부족으로 거부된다. 상태는 조회할 수 있지만 재암호화는 쓰기 연산이라 통과하지 못한다](#reencrypting-the-monitor-may-not-reencrypt-secrets) | rejected |
+| [when the config key is the write provider and two plaintext secret keys are re-encrypted, the response says both were scanned and rewritten, and the status shows both on that key with no plaintext left](#reencrypting-reencrypting-moves-plaintext-secrets-onto-the-config-key) | answered |
+| [when the config key is the write provider and two secret keys are already on that key, re-encrypting scans and rewrites both, and the status still shows the two on that key](#reencrypting-reencrypting-rewrites-secrets-already-on-the-config-key) | answered |
+| [when the write provider is plaintext and two plaintext secret keys are re-encrypted, the response says both were scanned and rewritten, and the status still shows two plaintext entries. The rewritten count counts rewritten rows, not changed values](#reencrypting-reencrypting-with-a-plain-writer-rewrites-plaintext-secrets-as-plaintext) | answered |
+| [when the write provider is plaintext and the config key provider is read-only, re-encrypting the secret key encrypted with that key scans and rewrites one, and the status holds only plaintext](#reencrypting-reencrypting-with-a-plain-writer-turns-an-encrypted-secret-back-to-plaintext) | answered |
+| [when a user who is not the superadmin runs a re-encryption, it is rejected for lack of the role](#reencrypting-a-user-who-is-not-the-superadmin-may-not-reencrypt-secrets) | rejected |
+| [when the monitor role runs a re-encryption, it is rejected for lack of the role: it can read the status, but re-encryption is a write and does not pass](#reencrypting-the-monitor-may-not-reencrypt-secrets) | rejected |
 
 **admin_secret_status**
 
 | scenario | verdict |
 |---|---|
-| [설정 키로 암호화된 비밀 키와 평문 비밀 키가 섞여 있을 때 상태를 조회하면, 그 키로 암호화된 수와 평문인 수가 두 항목으로 따로 반환된다](#status-secrets-on-different-keys-are-counted-apart) | answered |
-| [모니터 역할이 상태를 조회하면 슈퍼관리자와 같은 응답이 반환된다. 슈퍼관리자 검사는 모니터의 읽기를 허용한다](#status-the-monitor-reads-the-secret-status-like-the-superadmin) | answered |
-| [쓰기 제공자가 평문일 때 슈퍼관리자가 상태를 조회하면, 쓰기 제공자는 평문이고 집계는 호출자까지 포함해 평문 비밀 키를 가진 수 한 항목이다](#status-the-superadmin-reads-a-status-counting-the-plaintext-secrets) | answered |
-| [슈퍼관리자가 아닌 사용자가 상태를 조회하면 역할 부족으로 거부된다](#status-a-user-who-is-not-the-superadmin-may-not-read-the-secret-status) | rejected |
+| [when secrets encrypted with the config key and plaintext secrets are mixed, reading the status returns the encrypted count and the plaintext count as two separate entries](#status-secrets-on-different-keys-are-counted-apart) | answered |
+| [when the monitor role reads the status, the same response as the superadmin's comes back, because the superadmin check allows the monitor to read](#status-the-monitor-reads-the-secret-status-like-the-superadmin) | answered |
+| [when the write provider is plaintext and the superadmin reads the status, the write provider is plaintext and the count is one entry for the secrets held in plaintext, including the caller's](#status-the-superadmin-reads-a-status-counting-the-plaintext-secrets) | answered |
+| [when a user who is not the superadmin reads the status, it is rejected for lack of the role](#status-a-user-who-is-not-the-superadmin-may-not-read-the-secret-status) | rejected |
 
 ### admin_reencrypt_secrets
 
@@ -34,28 +34,28 @@ Scenario: complete
 
 #### [reencrypting-moves-plaintext-secrets-onto-the-config-key](/tests/scenario/bai_scenario/manager/secret/test_reencrypting.py): pass
 
-설정 키가 쓰기 제공자일 때 평문 비밀 키 둘을 재암호화하면, 둘을 스캔해 둘을 다시 썼다는 응답과 함께 둘 다 그 키로 암호화되고 평문은 없는 상태가 반환된다
+when the config key is the write provider and two plaintext secret keys are re-encrypted, the response says both were scanned and rewritten, and the status shows both on that key with no plaintext left
 
 Given
 
-- 슈퍼관리자 한 명, 평문 비밀 키를 가진 사용자 1명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+- one superadmin, 1 users holding a plaintext secret key
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
 
 When
 
-- SecretAdapter.admin_reencrypt_secrets: user-1이 비밀 키 전부를 재암호화
+- SecretAdapter.admin_reencrypt_secrets: user-1 re-encrypts every secret key
 
 Then
 
-- 모두 스캔해 모두 다시 쓰고, 전부 쓰기 제공자로 옮겨진 상태가 반환된다
+- every secret key is scanned and rewritten, and the status that comes back has all of them moved to the write provider
   - scanned = 2
   - reencrypted = 2
   - status.write_provider_type = 'config'
@@ -65,28 +65,28 @@ Then
 
 #### [reencrypting-rewrites-secrets-already-on-the-config-key](/tests/scenario/bai_scenario/manager/secret/test_reencrypting.py): pass
 
-설정 키가 쓰기 제공자이고 비밀 키 둘이 이미 그 키로 암호화돼 있을 때 재암호화하면, 둘을 스캔해 둘을 다시 썼다는 응답이 반환되고 상태는 그대로 그 키로 암호화된 것 둘이다
+when the config key is the write provider and two secret keys are already on that key, re-encrypting scans and rewrites both, and the status still shows the two on that key
 
 Given
 
-- 슈퍼관리자 한 명, 설정 키로 암호화된 비밀 키를 가진 사용자 1명
-  - 도메인 home-1
-  - 암호화된 비밀 키를 가진 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다, 비밀 키는 암호화돼 있다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다, 비밀 키는 암호화돼 있다
+- one superadmin, 1 users holding a secret key encrypted with the config key
+  - Domain home-1
+  - Prepare one user holding an encrypted secret key
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project, and their secret key is encrypted
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project, and their secret key is encrypted
 
 When
 
-- SecretAdapter.admin_reencrypt_secrets: user-1이 비밀 키 전부를 재암호화
+- SecretAdapter.admin_reencrypt_secrets: user-1 re-encrypts every secret key
 
 Then
 
-- 모두 스캔해 모두 다시 쓰고, 전부 쓰기 제공자로 옮겨진 상태가 반환된다
+- every secret key is scanned and rewritten, and the status that comes back has all of them moved to the write provider
   - scanned = 2
   - reencrypted = 2
   - status.write_provider_type = 'config'
@@ -96,28 +96,28 @@ Then
 
 #### [reencrypting-with-a-plain-writer-rewrites-plaintext-secrets-as-plaintext](/tests/scenario/bai_scenario/manager/secret/test_reencrypting.py): pass
 
-쓰기 제공자가 평문일 때 평문 비밀 키 둘을 재암호화하면, 둘을 스캔해 둘을 다시 썼다는 응답이 반환되고 상태는 그대로 평문 둘이다. 다시 쓴 수는 값이 바뀌었는지가 아니라 행을 다시 썼는지를 센다
+when the write provider is plaintext and two plaintext secret keys are re-encrypted, the response says both were scanned and rewritten, and the status still shows two plaintext entries. The rewritten count counts rewritten rows, not changed values
 
 Given
 
-- 슈퍼관리자 한 명, 평문 비밀 키를 가진 사용자 1명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+- one superadmin, 1 users holding a plaintext secret key
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
 
 When
 
-- SecretAdapter.admin_reencrypt_secrets: user-1이 비밀 키 전부를 재암호화
+- SecretAdapter.admin_reencrypt_secrets: user-1 re-encrypts every secret key
 
 Then
 
-- 모두 스캔해 모두 다시 쓰고, 전부 쓰기 제공자로 옮겨진 상태가 반환된다
+- every secret key is scanned and rewritten, and the status that comes back has all of them moved to the write provider
   - scanned = 2
   - reencrypted = 2
   - status.write_provider_type = 'plain'
@@ -127,25 +127,25 @@ Then
 
 #### [reencrypting-with-a-plain-writer-turns-an-encrypted-secret-back-to-plaintext](/tests/scenario/bai_scenario/manager/secret/test_reencrypting.py): pass
 
-쓰기 제공자가 평문이고 설정 키 제공자는 읽기 전용일 때 그 키로 암호화된 비밀 키를 재암호화하면, 하나를 스캔해 하나를 다시 썼다는 응답이 반환되고 상태는 평문뿐이다
+when the write provider is plaintext and the config key provider is read-only, re-encrypting the secret key encrypted with that key scans and rewrites one, and the status holds only plaintext
 
 Given
 
-- 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 암호화된 비밀 키를 가진 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다, 비밀 키는 암호화돼 있다
+- one superadmin
+  - Domain home-1
+  - Prepare one user holding an encrypted secret key
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project, and their secret key is encrypted
 
 When
 
-- SecretAdapter.admin_reencrypt_secrets: user-1이 비밀 키 전부를 재암호화
+- SecretAdapter.admin_reencrypt_secrets: user-1 re-encrypts every secret key
 
 Then
 
-- 모두 스캔해 모두 다시 쓰고, 전부 쓰기 제공자로 옮겨진 상태가 반환된다
+- every secret key is scanned and rewritten, and the status that comes back has all of them moved to the write provider
   - scanned = 1
   - reencrypted = 1
   - status.write_provider_type = 'plain'
@@ -155,51 +155,51 @@ Then
 
 #### [a-user-who-is-not-the-superadmin-may-not-reencrypt-secrets](/tests/scenario/bai_scenario/manager/secret/test_reencrypting.py): pass
 
-슈퍼관리자가 아닌 사용자가 재암호화를 실행하면 역할 부족으로 거부된다
+when a user who is not the superadmin runs a re-encryption, it is rejected for lack of the role
 
 Given
 
-- 일반 사용자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one regular user
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- SecretAdapter.admin_reencrypt_secrets: user-1이 비밀 키 전부를 재암호화
+- SecretAdapter.admin_reencrypt_secrets: user-1 re-encrypts every secret key
 
 Then
 
-- 거부된다
-  - 거부: InsufficientPrivilege
+- the call is rejected
+  - rejected: InsufficientPrivilege
 
 <a id="reencrypting-the-monitor-may-not-reencrypt-secrets"></a>
 
 #### [the-monitor-may-not-reencrypt-secrets](/tests/scenario/bai_scenario/manager/secret/test_reencrypting.py): pass
 
-모니터 역할이 재암호화를 실행하면 역할 부족으로 거부된다. 상태는 조회할 수 있지만 재암호화는 쓰기 연산이라 통과하지 못한다
+when the monitor role runs a re-encryption, it is rejected for lack of the role: it can read the status, but re-encryption is a write and does not pass
 
 Given
 
-- 모니터 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 모니터 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one monitor
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - monitor user-1: has their own keypair and personal project
 
 When
 
-- SecretAdapter.admin_reencrypt_secrets: user-1이 비밀 키 전부를 재암호화
+- SecretAdapter.admin_reencrypt_secrets: user-1 re-encrypts every secret key
 
 Then
 
-- 거부된다
-  - 거부: InsufficientPrivilege
+- the call is rejected
+  - rejected: InsufficientPrivilege
 
 ### admin_secret_status
 
@@ -207,29 +207,29 @@ Then
 
 #### [secrets-on-different-keys-are-counted-apart](/tests/scenario/bai_scenario/manager/secret/test_status.py): pass
 
-설정 키로 암호화된 비밀 키와 평문 비밀 키가 섞여 있을 때 상태를 조회하면, 그 키로 암호화된 수와 평문인 수가 두 항목으로 따로 반환된다
+when secrets encrypted with the config key and plaintext secrets are mixed, reading the status returns the encrypted count and the plaintext count as two separate entries
 
 Given
 
-- 슈퍼관리자 한 명, 설정 키로 암호화된 비밀 키를 가진 사용자 1명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 암호화된 비밀 키를 가진 사용자 한 명 준비
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다, 비밀 키는 암호화돼 있다
+- one superadmin, 1 users holding a secret key encrypted with the config key
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Prepare one user holding an encrypted secret key
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project, and their secret key is encrypted
 
 When
 
-- SecretAdapter.admin_secret_status: user-1이 비밀 상태를 조회
+- SecretAdapter.admin_secret_status: user-1 reads the secret status
 
 Then
 
-- 미리 만들어 둔 비밀 키가 암호화 키별로 집계되어 반환된다
+- the secret keys seeded in advance come back counted per encryption key
   - write_provider_type = 'config'
   - counts = [('keypairs.secret_key', 'config', 'k1', 1), ('keypairs.secret_key', 'plain', None, 1)]
 
@@ -237,28 +237,28 @@ Then
 
 #### [the-monitor-reads-the-secret-status-like-the-superadmin](/tests/scenario/bai_scenario/manager/secret/test_status.py): pass
 
-모니터 역할이 상태를 조회하면 슈퍼관리자와 같은 응답이 반환된다. 슈퍼관리자 검사는 모니터의 읽기를 허용한다
+when the monitor role reads the status, the same response as the superadmin's comes back, because the superadmin check allows the monitor to read
 
 Given
 
-- 모니터 한 명, 평문 비밀 키를 가진 사용자 1명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 모니터 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+- one monitor, 1 users holding a plaintext secret key
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - monitor user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
 
 When
 
-- SecretAdapter.admin_secret_status: user-1이 비밀 상태를 조회
+- SecretAdapter.admin_secret_status: user-1 reads the secret status
 
 Then
 
-- 미리 만들어 둔 비밀 키가 암호화 키별로 집계되어 반환된다
+- the secret keys seeded in advance come back counted per encryption key
   - write_provider_type = 'plain'
   - counts = [('keypairs.secret_key', 'plain', None, 2)]
 
@@ -266,28 +266,28 @@ Then
 
 #### [the-superadmin-reads-a-status-counting-the-plaintext-secrets](/tests/scenario/bai_scenario/manager/secret/test_status.py): pass
 
-쓰기 제공자가 평문일 때 슈퍼관리자가 상태를 조회하면, 쓰기 제공자는 평문이고 집계는 호출자까지 포함해 평문 비밀 키를 가진 수 한 항목이다
+when the write provider is plaintext and the superadmin reads the status, the write provider is plaintext and the count is one entry for the secrets held in plaintext, including the caller's
 
 Given
 
-- 슈퍼관리자 한 명, 평문 비밀 키를 가진 사용자 1명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+- one superadmin, 1 users holding a plaintext secret key
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
 
 When
 
-- SecretAdapter.admin_secret_status: user-1이 비밀 상태를 조회
+- SecretAdapter.admin_secret_status: user-1 reads the secret status
 
 Then
 
-- 미리 만들어 둔 비밀 키가 암호화 키별로 집계되어 반환된다
+- the secret keys seeded in advance come back counted per encryption key
   - write_provider_type = 'plain'
   - counts = [('keypairs.secret_key', 'plain', None, 2)]
 
@@ -295,24 +295,24 @@ Then
 
 #### [a-user-who-is-not-the-superadmin-may-not-read-the-secret-status](/tests/scenario/bai_scenario/manager/secret/test_status.py): pass
 
-슈퍼관리자가 아닌 사용자가 상태를 조회하면 역할 부족으로 거부된다
+when a user who is not the superadmin reads the status, it is rejected for lack of the role
 
 Given
 
-- 일반 사용자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one regular user
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- SecretAdapter.admin_secret_status: user-1이 비밀 상태를 조회
+- SecretAdapter.admin_secret_status: user-1 reads the secret status
 
 Then
 
-- 거부된다
-  - 거부: InsufficientPrivilege
+- the call is rejected
+  - rejected: InsufficientPrivilege
 

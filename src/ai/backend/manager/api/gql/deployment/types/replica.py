@@ -66,6 +66,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteStatus,
     RouteTrafficStatus,
 )
+from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound
 
 from .revision import ModelRevision
 
@@ -326,7 +327,7 @@ class ModelReplica(PydanticNodeMixin[ReplicaNodeDTO]):
             DeploymentRevisionID(UUID(str(self.revision_id)))
         )
         if result is None:
-            raise ValueError(f"Revision not found: {self.revision_id}")
+            raise DeploymentRevisionNotFound(f"Revision not found: {self.revision_id}")
         return result
 
     @gql_added_field(

@@ -24,8 +24,6 @@ class KeyPairSecrets:
 
     access_key: AccessKey
     secret_key: SecretValue
-    ssh_public_key: str
-    ssh_private_key: str
 
 
 @dataclass
@@ -45,8 +43,6 @@ class KeyPairData(FieldData):
 
     resource_policy_name: str
     rate_limit: int
-    ssh_public_key: str | None
-    ssh_private_key: str | None
 
     last_used: datetime | None = None
     num_queries: int = 0

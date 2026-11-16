@@ -22,6 +22,7 @@ from ai.backend.common.config import (
     ModelServiceConfig,
 )
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.auto_scaling_rule import AutoScalingRuleID
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_policy import DeploymentPolicyID
@@ -184,7 +185,7 @@ from ai.backend.common.schema.deployment import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.common.tristate.unset import Unset
 from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
 from ai.backend.manager.api.adapter_options.deployment.options import (
-    deployment_options_from_input,
+    deployment_handler_options_from_input,
     deployment_options_to_info,
 )
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
@@ -231,6 +232,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus as ManagerRouteTrafficStatus,
 )
 from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetValueData
+from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.errors.base.field import FieldNotFoundError
 from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound
@@ -732,6 +734,7 @@ class DeploymentAdapter(BaseAdapter):
             ),
             model_revision=model_revision_creator,
             policy=policy,
+            designated_agents=frozenset(AgentUUID(a) for a in meta.designated_agent_ids or []),
         )
         action_result = await self._deployment.create_deployment.run(
             CreateDeploymentAction(
@@ -865,12 +868,20 @@ class DeploymentAdapter(BaseAdapter):
         deployment_id: DeploymentID,
     ) -> UpdateDeploymentPayload:
         """Update deployment metadata and configuration."""
+        designated_agents: OptionalState[frozenset[AgentUUID]]
+        if isinstance(input.designated_agent_ids, Unset) or input.designated_agent_ids is None:
+            designated_agents = OptionalState.nop()
+        else:
+            designated_agents = OptionalState.update(
+                frozenset(AgentUUID(a) for a in input.designated_agent_ids)
+            )
         updater = DeploymentUpdater(
             deployment_id=deployment_id,
             name=OptionalState.from_unset(input.name),
             tag=self._convert_tag_state(input.tags),
             replica_count=OptionalState.from_unset(input.replica_count),
             open_to_public=OptionalState.from_unset(input.open_to_public),
+            designated_agents=designated_agents,
         )
         action_result = await self._deployment.update_deployment.run(
             UpdateDeploymentAction(deployment_id=deployment_id, updater=updater)
@@ -884,15 +895,13 @@ class DeploymentAdapter(BaseAdapter):
     ) -> ReplaceDeploymentOptionsPayload:
         """Fully replace the ``options`` surface of a deployment.
 
-        Accepts the REST/GQL DTO input, converts to the domain
-        :class:`DeploymentOptions` (duplicate or unknown handler names
-        are rejected inside :func:`deployment_options_from_input`
-        against the coordinator's live registration), dispatches the
-        :class:`ReplaceDeploymentOptionsAction`, and returns only the
-        refreshed options surface (the repository path uses ``UPDATE ...
-        RETURNING`` and does not read the surrounding deployment node).
+        Converts the handler options to the domain
+        :class:`DeploymentHandlerOptions` (duplicate or unknown handler names
+        are rejected inside :func:`deployment_handler_options_from_input`),
+        passes the agent selection policy apart, and returns only the
+        refreshed options surface.
         """
-        options = deployment_options_from_input(
+        handler_options = deployment_handler_options_from_input(
             input.options,
             valid_handler_names=frozenset(
                 h.name() for h in self._deployment_coordinator.registered_handlers()
@@ -901,7 +910,12 @@ class DeploymentAdapter(BaseAdapter):
         action_result = await self._deployment.replace_deployment_options.run(
             ReplaceDeploymentOptionsAction(
                 deployment_id=deployment_id,
-                options=options,
+                handler_options=handler_options,
+                agent_selection_policy=(
+                    AgentSelectionPolicy(input.options.agent_selection_policy.value)
+                    if input.options.agent_selection_policy is not None
+                    else None
+                ),
             )
         )
         return ReplaceDeploymentOptionsPayload(

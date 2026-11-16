@@ -20,7 +20,7 @@ from ai.backend.manager.api.adapters.retention_policy.adapter import RetentionPo
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.retention import RetentionPolicyConflict
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Configured, Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.retention_policy import (
     APolicyAndACaller,
@@ -50,8 +50,21 @@ class Creating(When[ACaller, RetentionPolicyAdapter, RetentionPolicyNode]):
 
     @override
     def describe(self, laid: ACaller) -> str:
-        state = "" if self.enabled else " 비활성으로"
-        return f"{laid.caller.username}이 {self.category.value} 카테고리 정책을{state} 생성"
+        if self.enabled:
+            return Says(
+                f"{laid.caller.username} 이 {self.category.value} 카테고리 정책을 생성합니다",
+                english=(
+                    f"{laid.caller.username} creates a policy for the {self.category.value} "
+                    "category"
+                ),
+            )
+        return Says(
+            f"{laid.caller.username} 이 {self.category.value} 카테고리 정책을 비활성으로 생성합니다",
+            english=(
+                f"{laid.caller.username} creates an inactive policy for the "
+                f"{self.category.value} category"
+            ),
+        )
 
     @override
     async def call(self, adapter: RetentionPolicyAdapter, laid: ACaller) -> RetentionPolicyNode:
@@ -76,7 +89,14 @@ class CreatingTheLaidCategoryAgain(
 
     @override
     def describe(self, laid: APolicyAndACaller) -> str:
-        return f"{laid.caller.username}이 이미 있는 {laid.policy.category.value} 카테고리 정책을 다시 생성"
+        return Says(
+            f"{laid.caller.username} 이 이미 있는 {laid.policy.category.value} 카테고리 정책을 "
+            "다시 생성합니다",
+            english=(
+                f"{laid.caller.username} creates the policy of the {laid.policy.category.value} "
+                "category again"
+            ),
+        )
 
     @override
     async def call(
@@ -103,9 +123,13 @@ class TheSuperadminMakesOneNeverSwept(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 카테고리와 보존 일수만 지정해 생성하면, 활성 여부는 참이고 마지막 정리 시각은 "
-            "비어 있는 노드가 반환된다"
+        return Says(
+            "superadmin 이 카테고리와 보존 일수만 지정해 생성하면, 활성 여부는 참이고 마지막 "
+            "정리 시각은 비어 있는 노드가 반환됩니다",
+            english=(
+                "when the superadmin creates a policy with only a category and retention days, "
+                "the node comes back with enabled true and an empty last sweep time"
+            ),
         )
 
     @override
@@ -135,7 +159,10 @@ class AnInactiveOneIsMadeInactive(
 
     @override
     def describe(self) -> str:
-        return "활성 여부를 거짓으로 지정해 생성하면 비활성 상태가 담긴 노드가 반환된다"
+        return Says(
+            "활성 여부를 거짓으로 지정해 생성하면 비활성 상태가 담긴 노드가 반환됩니다",
+            english=("creating a policy with enabled false brings back a node that is not enabled"),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ACaller]:
@@ -165,7 +192,14 @@ class EachCategoryIsAccepted(
 
     @override
     def describe(self) -> str:
-        return f"슈퍼관리자가 {self.category.value} 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다"
+        return Says(
+            f"superadmin 이 {self.category.value} 카테고리의 정책을 생성하면 그 카테고리가 담긴 "
+            "노드가 반환됩니다",
+            english=(
+                f"when the superadmin creates a policy of the {self.category.value} category, the "
+                "node comes back with that category"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ACaller]:
@@ -190,7 +224,14 @@ class ASecondPolicyForACategoryIsRefused(
 
     @override
     def describe(self) -> str:
-        return "어떤 카테고리의 정책이 이미 있을 때 같은 카테고리로 다시 생성하면, 카테고리 중복으로 거부된다"
+        return Says(
+            "어떤 카테고리의 정책이 이미 있을 때 같은 카테고리로 다시 생성하면, 카테고리 중복으로 "
+            "거부됩니다",
+            english=(
+                "when a policy of a category already exists, creating it again for the same "
+                "category is rejected as a duplicate"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, APolicyAndACaller]:
@@ -215,7 +256,12 @@ class AUserWhoIsNotTheSuperadminMayNotCreate(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 정책을 생성하면 역할 부족으로 거부된다"
+        return Says(
+            "superadmin 이 아닌 사용자가 정책을 생성하면 역할 부족으로 거부됩니다",
+            english=(
+                "a user who is not the superadmin creating a policy is rejected for lack of role"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ACaller]:
@@ -240,7 +286,14 @@ class TheMonitorMayNotCreate(
 
     @override
     def describe(self) -> str:
-        return "모니터 역할이 정책을 생성하면 역할 부족으로 거부된다. 모니터는 슈퍼관리자 검사에서 읽기만 통과한다"
+        return Says(
+            "모니터 역할이 정책을 생성하면 역할 부족으로 거부됩니다. 모니터는 superadmin 검사에서 "
+            "읽기만 통과합니다",
+            english=(
+                "a monitor role creating a policy is rejected for lack of role. A monitor passes "
+                "the superadmin check for reads only"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ACaller]:
@@ -265,7 +318,13 @@ class EnforcementOffStillNeedsTheSuperadmin(
 
     @override
     def describe(self) -> str:
-        return "권한 검사를 꺼도 슈퍼관리자가 아니면 정책을 생성하지 못한다"
+        return Says(
+            "권한 검사를 꺼도 superadmin 이 아니면 정책을 생성하지 못합니다",
+            english=(
+                "turning permission checks off still does not let a user who is not the "
+                "superadmin create a policy"
+            ),
+        )
 
     @override
     def config(self) -> Mapping[str, Any]:

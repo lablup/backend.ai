@@ -29,9 +29,9 @@ class Concern(enum.StrEnum):
 
     APP_CONFIG = "app_config"
     ARTIFACT_REGISTRY = "artifact_registry"
+    AUTO_GENERATED_FILE = "auto_generated_file"
     CONTAINER_REGISTRY = "container_registry"
     DEPLOYMENT = "deployment"
-    DOTFILE = "dotfile"
     ENTITY_LABEL = "label"
     METRIC = "metric"
     NOTIFICATION_CENTER = "notification_center"
@@ -51,12 +51,12 @@ class Concern(enum.StrEnum):
                 return "the domain storing the settings the frontend builds its screens from"
             case Concern.ARTIFACT_REGISTRY:
                 return "the domain pulling artifacts in from outside and storing them"
+            case Concern.AUTO_GENERATED_FILE:
+                return "the domain of the files an entity of any kind places in its sessions"
             case Concern.CONTAINER_REGISTRY:
                 return "the domain reading the images a session runs from"
             case Concern.DEPLOYMENT:
                 return "the domain creating and running the deployments that serve a model"
-            case Concern.DOTFILE:
-                return "the domain of the dotfiles an entity of any kind places in its sessions"
             case Concern.ENTITY_LABEL:
                 return "the domain of the labels an entity of any kind is tagged with"
             case Concern.METRIC:

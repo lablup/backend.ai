@@ -12,75 +12,50 @@ updated:
   at: 2026-10-16
 status: draft
 ---
-# runtime_variant_preset 어댑터 — 시나리오
+# runtime_variant_preset adapter: Knowledge
 
-규칙은 상위 디렉터리의 `AGENTS.md`에 있다. 여기 적힌 내용과 실행 결과가 어긋나면 문장을 먼저
-검토한다.
+The rules are in `AGENTS.md` in the parent directory. When this document and a run result disagree, review the sentence first.
 
-`runtime_variant_preset` 엔티티는 `runtime_variant` 하나를 컬럼으로 참조하지만 그 스코프 안에서
-생성되지는 않는다. 행은 global 과 public 양쪽에 소속된다. 생성은 호출한 사용자가 슈퍼관리자인지
-검사한다. 수정과 삭제에 필요한 프리셋별 권한은 global 에서만 나오므로 슈퍼관리자만 통과한다. 조회와
-검색은 public 에서 READ 를 검사한다. 모든 계정이 public 소속 역할을 자동으로 받으므로 로그인한
-사용자는 모두 읽을 수 있다.
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
-`runtime_variant` 어댑터의 시나리오는 `../runtime_variant/KNOWLEDGE.md`에 있다.
+A `runtime_variant_preset` entity references one `runtime_variant` by a column but is not created inside its scope. A row belongs to both global and public. Create checks whether the calling user is superadmin. The per-preset permission that update and delete need comes from global only, so only superadmin passes. Get and search check READ in public. Every account automatically receives the public membership role, so every signed-in user can read.
 
-## 생성
+The scenarios of the `runtime_variant` adapter are in `../runtime_variant/KNOWLEDGE.md`.
 
-`rank` 값은 요청에서 정할 수 없다. 생성 시 같은 `runtime_variant`에서 가장 큰 `rank` 값에 100을
-더하며, 첫 프리셋의 `rank` 값은 100이 된다. 같은 `runtime_variant`에 프리셋을 하나 더 생성하는
-시나리오에서 이 간격을 검사한다.
+## Create
 
-`ui_type` 값은 요청에 별도 필드로 없으며 `ui_option` 필드에서 읽는다. `ui_option` 필드를 지정하면
-`ui_type` 값이 응답에 포함되고, 필수 항목만 지정해 생성하는 시나리오처럼 `ui_option` 필드를 생략하면
-`ui_type` 값도 비어 있다.
+The `rank` value cannot be set in the request. Create adds 100 to the largest `rank` value under the same `runtime_variant`, and the `rank` value of the first preset becomes 100. The scenario that creates one more preset under the same `runtime_variant` checks this gap.
 
-`value_type` 값이 `flag`이면 `preset_target` 값이 `args`여야 하고 `default_value` 값은 `value_type`
-값에 맞아야 한다는 규칙은 생성 시나리오에 두지 않는다. 받아들이는 쪽도 거부하는 쪽도 생성 요청
-타입이 판단하며, 요청 타입의 단위 테스트가 `value_type` 값마다 검사한다.
+The `ui_type` value has no separate field in the request and is read from the `ui_option` field. Specifying the `ui_option` field includes the `ui_type` value in the response, and if the `ui_option` field is omitted, as in the scenario that creates with only the required entries, the `ui_type` value is empty too.
 
-존재하지 않는 `runtime_variant_id` 값으로 생성하는 시나리오는 아직 포함하지 않는다. 프리셋의
-`runtime_variant` 컬럼에 외래 키가 마이그레이션에는 있지만 ORM에는 없다. 따라서 마이그레이션으로
-만든 데이터베이스에서는 요청이 거부되지만 스키마를 한 번에 만든 데이터베이스에서는 생성된다. 올바른
-동작을 정한 뒤 시나리오를 작성한다.
+The rule that a `value_type` value of `flag` requires the `preset_target` value to be `args` and the `default_value` value to match the `value_type` value is not in the create scenarios. The create request type decides both acceptance and rejection, and the unit tests of the request type check it per `value_type` value.
 
-## 조회
+The scenario that creates with a non-existent `runtime_variant_id` value is not included yet. The `runtime_variant` column of a preset has a foreign key in the migration but not in the ORM. A database built by the migration therefore rejects the request, while a database whose schema was created in one step creates the row. Write the scenario after settling the correct behavior.
 
-조회는 public 에서 READ 를 검사한다. public 조회 권한만 받은 사용자의 조회가 성공하는 시나리오로
-이를 검증한다. 반면 생성 요청은 슈퍼관리자가 아니면 거부된다. 존재하지 않는 ID와 닿을 수 없는 ID는
-같은 이유로 거부된다.
+## Get
 
-여러 ID를 한 번에 조회할 때는 ID 조건을 지정한 검색으로 실행한다. ID마다 개별 조회하는 방식이
-아니므로 존재하지 않는 ID가 있어도 요청 전체를 거부하지 않고 해당 위치에 빈 항목을 반환한다.
+Get checks READ in public. The scenario in which get succeeds for a user with only the public get permission verifies it. A create request, on the other hand, is rejected for anyone who is not superadmin. A non-existent ID and an unreachable ID are rejected for the same reason.
 
-인증되지 않은 호출은 시나리오로 두지 않는다. 시나리오는 언제나 미리 만들어 둔 사용자로 호출한다.
+The get of several IDs at once runs as a search with an ID condition. It is not a separate get per ID, so a non-existent ID does not reject the whole request and the response returns an empty entry at that position.
 
-## 검색
+An unauthenticated call is not a scenario. A scenario always calls as a user prepared beforehand.
 
-`runtime_version` 필터는 `added_version` 값 이상이고 `deprecated_version` 값 미만인 프리셋만
-반환한다. `added_version` 값이 비어 있으면 하한 제한이 없고, `deprecated_version` 값이 비어 있으면
-상한 제한이 없다. `runtime_version` 필터로 검색하는 시나리오에서는 `added_version` 값과
-`deprecated_version` 값이 모두 있는 경우, `added_version` 값만 있는 경우, `deprecated_version`
-값만 있는 경우, 어느 쪽도 없는 경우를 함께 검사한다.
+## Search
 
-## 수정
+The `runtime_version` filter returns only the presets whose `added_version` value is at most the `runtime_version` value and whose `deprecated_version` value is above it. An empty `added_version` value has no lower bound, and an empty `deprecated_version` value has no upper bound. The scenario that searches with the `runtime_version` filter checks together the case with both the `added_version` and `deprecated_version` values, the case with only `added_version`, the case with only `deprecated_version` and the case with neither.
 
-수정 요청에는 `preset_target` 값이나 `value_type` 값이 빠질 수 있어 요청 타입만으로는 저장된 값과의
-조합을 검증할 수 없다. 서비스가 저장된 행과 요청을 합쳐 같은 규칙을 검사하는데, 그 검사는 시나리오로
-두지 않는다. 어댑터와 데이터베이스가 결과를 바꾸지 않고, 서비스의 단위 테스트가 검사한다.
+## Update
 
-`value_type` 값만 바꾸는 요청은 저장된 `default_value` 값을 다시 검사하지 않는다. 현재는
-`default_value` 값이 새 `value_type` 값과 어긋난 상태로 수정된다. 이를 거부할지 정한 뒤 시나리오를
-작성한다.
+An update request may omit the `preset_target` or `value_type` value, so the request type alone cannot validate the combination with the stored value. The service combines the stored row and the request and checks the same rule, and that check is not a scenario. The adapter and the database do not change the result, and the service unit tests check it.
 
-## 여럿 수정하기
+A request that changes only the `value_type` value does not validate the stored `default_value` value again. Today the preset is updated with the `default_value` value disagreeing with the new `value_type` value. Write the scenario after settling whether to reject it.
 
-여럿 수정도 단건 수정과 같은 검사를 프리셋마다 한다. 검사에 걸린 프리셋은 그 이유로 실패 목록에
-오고 나머지는 수정된다.
+## Bulk update
 
-## purge
+A bulk update runs the same check as the single update per preset. A preset caught by the check enters the failure list with that reason and the rest are updated.
 
-여럿 연산은 호출 전체를 거부하지 않는다. 처리한 프리셋은 처리된 목록에, 처리하지 못한 것은 ID와
-이유를 실패 목록에 싣는다.
+## Purge
 
-이 어댑터는 soft delete를 지원하지 않는다.
+A bulk operation does not reject the whole call. Processed presets go into the processed list, and failures are recorded in the failure list with the ID and the reason.
+
+This adapter has no delete that keeps the row.

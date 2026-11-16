@@ -19,7 +19,7 @@ from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Configured, Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.retention_policy import (
     APolicyAndACaller,
@@ -52,15 +52,33 @@ class Editing(When[APolicyAndACaller, RetentionPolicyAdapter, RetentionPolicyNod
 
     @override
     def describe(self, laid: APolicyAndACaller) -> str:
-        target = (
+        target_ko = (
             "존재하지 않는 id" if self.unknown else f"{laid.policy.category.value} 카테고리 정책"
         )
-        changing = []
+        target_en = (
+            "an id nothing answers to"
+            if self.unknown
+            else f"the policy of the {laid.policy.category.value} category"
+        )
+        changing_ko = []
+        changing_en = []
         if self.days is not None:
-            changing.append("보존 일수")
+            changing_ko.append("보존 일수")
+            changing_en.append("retention days")
         if self.enabled is not None:
-            changing.append("활성 여부")
-        return f"{laid.caller.username}이 {target}의 {' 및 '.join(changing) or '아무것도'} 수정"
+            changing_ko.append("활성 여부")
+            changing_en.append("enabled flag")
+        if not changing_ko:
+            return Says(
+                f"{laid.caller.username} 이 {target_ko}에서 값을 지정하지 않고 수정합니다",
+                english=f"{laid.caller.username} edits {target_en} without giving a value",
+            )
+        return Says(
+            f"{laid.caller.username} 이 {target_ko}의 {' 및 '.join(changing_ko)} 변경을 요청합니다",
+            english=(
+                f"{laid.caller.username} edits the {' and '.join(changing_en)} of {target_en}"
+            ),
+        )
 
     @override
     async def call(
@@ -90,9 +108,13 @@ class MovingToATakenCategory(
     @override
     def describe(self, laid: ManyPoliciesAndACaller) -> str:
         other = next(one for one in laid.laid if one.id != laid.named.id)
-        return (
-            f"{laid.caller.username}이 {laid.named.category.value} 카테고리 정책의 카테고리를 "
-            f"{other.category.value}(으)로 수정"
+        return Says(
+            f"{laid.caller.username} 이 {laid.named.category.value} 카테고리 정책의 카테고리를 "
+            f"{other.category.value} 로 수정합니다",
+            english=(
+                f"{laid.caller.username} changes the category of the "
+                f"{laid.named.category.value} policy to {other.category.value}"
+            ),
         )
 
     @override
@@ -119,7 +141,14 @@ class TheDaysChangeAndTheRestStays(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 보존 일수만 수정하면, 일수는 새 값이 되고 카테고리와 활성 여부는 그대로 유지된다"
+        return Says(
+            "superadmin 이 보존 일수만 수정하면, 일수는 새 값이 되고 카테고리와 활성 여부는 "
+            "그대로 유지됩니다",
+            english=(
+                "when the superadmin edits only the retention days, the days become the new "
+                "value and the category and enabled flag stay"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, APolicyAndACaller]:
@@ -146,7 +175,13 @@ class DisablingIt(
 
     @override
     def describe(self) -> str:
-        return "활성 정책의 활성 여부를 끄면 비활성 상태가 담긴 노드가 반환된다"
+        return Says(
+            "활성 정책의 활성 여부를 끄면 비활성 상태가 담긴 노드가 반환됩니다",
+            english=(
+                "turning off the enabled flag of an active policy brings back a node that is "
+                "not enabled"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, APolicyAndACaller]:
@@ -173,7 +208,10 @@ class AnEmptyEditChangesNothing(
 
     @override
     def describe(self) -> str:
-        return "값을 하나도 지정하지 않고 수정하면 아무것도 바뀌지 않은 노드가 반환된다"
+        return Says(
+            "값을 하나도 지정하지 않고 수정하면 아무것도 바뀌지 않은 노드가 반환됩니다",
+            english=("editing without giving any value brings back a node that changed nothing"),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, APolicyAndACaller]:
@@ -200,9 +238,14 @@ class MovingToATakenCategoryIsRefused(
 
     @override
     def describe(self) -> str:
-        return (
-            "정책 둘 중 한쪽의 카테고리를 다른 쪽 카테고리로 바꾸면, 카테고리 중복으로 거부된다. "
-            "생성할 때와 달리 저장소의 제약 위반이 그대로 전파된다"
+        return Says(
+            "정책 둘 중 한쪽의 카테고리를 다른 쪽 카테고리로 바꾸면, 카테고리 중복으로 거부됩니다. "
+            "생성할 때와 달리 저장소의 제약 위반이 그대로 전파됩니다",
+            english=(
+                "when the category of one of two policies is changed to the category of the "
+                "other, the call is rejected as a duplicate. Unlike at creation, the constraint "
+                "violation from the repository propagates as it is"
+            ),
         )
 
     @override
@@ -228,7 +271,13 @@ class TheSuperadminEditingAnUnknownIdIsNotFound(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 존재하지 않는 id를 수정하면 대상을 찾을 수 없다는 이유로 거부된다"
+        return Says(
+            "superadmin 이 존재하지 않는 id 를 수정하면 대상을 찾을 수 없다는 이유로 거부됩니다",
+            english=(
+                "when the superadmin edits an id nothing answers to, the call is rejected as "
+                "not found"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, APolicyAndACaller]:
@@ -253,7 +302,13 @@ class AUserGrantedNothingMayNotEdit(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 없는 사용자가 정책을 수정하면 권한 부족으로 거부된다"
+        return Says(
+            "아무 권한도 없는 사용자가 정책을 수정하면 권한 부족으로 거부됩니다",
+            english=(
+                "when a user granted nothing edits a policy, the call is rejected for lack of "
+                "permission"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, APolicyAndACaller]:
@@ -281,7 +336,10 @@ class EnforcementOffLetsAnyoneEdit(
 
     @override
     def describe(self) -> str:
-        return "권한 검사를 끄면 아무 권한도 없는 사용자도 정책을 수정할 수 있다"
+        return Says(
+            "권한 검사를 끄면 아무 권한도 없는 사용자도 정책을 수정할 수 있습니다",
+            english=("turning permission checks off lets a user granted nothing edit a policy"),
+        )
 
     @override
     def config(self) -> Mapping[str, Any]:

@@ -13,13 +13,15 @@ generated:
   at: 2026-10-15
 updated:
   by: claude-code/opus-5.5
-  at: 2026-10-22
+  at: 2026-10-23
 status: draft
 ---
 
-# Session group service — Knowledge
+# Session group service: Knowledge
 
 > Rules: `../AGENTS.md`. Placement policy: `proposals/BEP-1064-session-group-placement.md`.
+
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
 A session group holds the placement policy of its member sessions. It is owned by a
 project and a user. A deployment makes one with every replica group, and that group is
@@ -40,13 +42,16 @@ shape, operation, gate and backing.
 | `global_search` | Not left out: the superadmin sees every group |
 | `update` | `SessionGroupUpdater` carries the condition as a `GuardCheck`; a held group is refused as in use (409) |
 | `purge` | The purger's guard rides on the DELETE; a held group is refused as in use (409) |
+| session `enqueue` | `EnqueueSessionAction.to_held_session_group_searcher` carries the condition; the owner's held group is refused as in use (409), any other group answers not found |
 
 - The condition is `SessionGroupSearchableFields.linked.replica_groups.not_exists()`, one
   declaration every path reads.
 - A read answers a held group as not found, not a denial: the caller may hold READ on it
   through the project, so the permission is not what keeps it out.
-- The update and the purge refuse a held group as in use: only a caller holding UPDATE or
+- The update and the purge reject a held group as in use: only a caller holding UPDATE or
   PURGE on the group reaches the guard, and the deployment manages the group it references.
+- The enqueue refuses a held group as in use only to its owner in its project; to anyone
+  else the group answers not found, since the enqueue checks no permission on the group.
 
 ## The reads by id keep a service
 
@@ -59,7 +64,7 @@ shape, operation, gate and backing.
 - `bulk_get_ids` is partial: the gate answers per id, and the service answers each id
   that passed with the group or empty.
 - An id the graph has no node for cannot be checked, so to anyone but a superadmin it is
-  a denial rather than an empty slot.
+  a denial rather than an empty entry.
 
 ## The update runs against ops
 
@@ -67,7 +72,7 @@ shape, operation, gate and backing.
   them at every placement, so members placed afterwards follow the new policy.
 - The guard rides on the UPDATE statement, so the generic update needs no service method.
 - Ops reads the row without its guards when there is nothing to set. The update input
-  therefore refuses a call that names neither field.
+  therefore rejects a call that names neither field.
 
 ## The searches run against ops
 

@@ -35,7 +35,6 @@ from ai.backend.appproxy.common.types import (
 )
 from ai.backend.common import config
 from ai.backend.common.configs import (
-    EtcdConfig,
     OTELConfig,
     PyroscopeConfig,
     ServiceDiscoveryConfig,
@@ -777,7 +776,9 @@ class ProxyWorkerConfig(BaseSchema):
             description=(
                 "The protocol to use for proxied connections. 'http' for HTTP/1.1 traffic, "
                 "'h2' for HTTP/2 traffic (requires http2 config), 'tcp' for raw TCP proxying. "
-                "'grpc' is not directly supported; use 'h2' instead for gRPC traffic."
+                "'grpc' is not directly supported; use 'h2' instead for gRPC traffic. "
+                "An 'h2' worker cannot check credentials or client addresses, so it serves only "
+                "circuits that are open to public and have no 'allowed_client_ips'."
             ),
             added_version="25.9.0",
             example=ConfigExample(local="http", prod="http"),
@@ -933,12 +934,11 @@ class ProxyWorkerConfig(BaseSchema):
         Field(default_factory=list),
         BackendAIConfigMeta(
             description=(
-                "CIDR blocks (or bare IP addresses) of load balancers / reverse proxies that sit "
-                "in front of this worker and may be trusted to set the 'X-Forwarded-For' header. "
-                "Client-IP allowlist checks honor 'X-Forwarded-For' only when the immediate peer "
-                "matches one of these networks; otherwise the direct connection address is used, so "
-                "a directly-exposed worker cannot be spoofed by a forged header. Leave empty when "
-                "clients connect directly to the worker."
+                "CIDR blocks (or bare IP addresses) of load balancers / reverse proxies in front "
+                "of this worker, trusted to set 'X-Forwarded-For', 'X-Forwarded-Host' and "
+                "'X-Forwarded-Proto'. Leave empty when clients connect directly to the worker; "
+                "the worker then ignores these headers and uses the connection address, the "
+                "'Host' header and its TLS configuration."
             ),
             added_version="26.4.5",
             example=ConfigExample(local="[]", prod='["10.0.0.0/8"]'),
@@ -996,6 +996,25 @@ class ProxyWorkerConfig(BaseSchema):
                 if not self.http2:
                     raise ValueError("http2 config must be set when protocol = 'h2'")
         return self
+
+    def served_wildcard_domain(self) -> str | None:
+        match self.frontend_mode:
+            case FrontendServerMode.PORT:
+                return None
+            case FrontendServerMode.WILDCARD_DOMAIN:
+                if self.wildcard_domain is None:
+                    return None
+                return self.wildcard_domain.domain
+            case FrontendServerMode.TRAEFIK:
+                if self.traefik is None:
+                    return None
+                match self.traefik.frontend_mode:
+                    case FrontendMode.PORT:
+                        return None
+                    case FrontendMode.WILDCARD_DOMAIN:
+                        if self.traefik.wildcard_domain is None:
+                            return None
+                        return self.traefik.wildcard_domain.domain
 
 
 class ServerConfig(BaseSchema):
@@ -1109,18 +1128,6 @@ class ServerConfig(BaseSchema):
             description=(
                 "Service discovery configuration for locating the coordinator and other Backend.AI "
                 "components. Supports Redis-based or etcd-based service registration and discovery."
-            ),
-            added_version="25.9.0",
-            composite=CompositeType.FIELD,
-        ),
-    ]
-    etcd: Annotated[
-        EtcdConfig,
-        Field(default_factory=EtcdConfig),
-        BackendAIConfigMeta(
-            description=(
-                "etcd connection configuration for distributed coordination. "
-                "Used for service discovery (if etcd-based) and shared configuration management."
             ),
             added_version="25.9.0",
             composite=CompositeType.FIELD,

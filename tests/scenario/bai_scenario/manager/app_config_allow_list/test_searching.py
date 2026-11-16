@@ -21,7 +21,7 @@ from ai.backend.manager.api.adapters.app_config_allow_list.adapter import (
 )
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.app_config_allow_list import (
     EntriesLaidAcross,
@@ -50,7 +50,10 @@ class SearchingEverything(When[ManyEntriesAndACaller, AppConfigAllowListAdapter,
 
     @override
     def describe(self, laid: ManyEntriesAndACaller) -> str:
-        return f"{laid.caller.username}이 필터 없이 검색"
+        return Says(
+            f"{laid.caller.username}이 필터 없이 검색합니다",
+            english=f"{laid.caller.username} searches every entry without a filter",
+        )
 
     @override
     async def call(
@@ -70,7 +73,13 @@ class SearchingAfterTheFirst(When[ManyEntriesAndACaller, AppConfigAllowListAdapt
 
     @override
     def describe(self, laid: ManyEntriesAndACaller) -> str:
-        return f"{laid.caller.username}이 기본 순서 첫 항목의 커서 뒤로 한 건 검색"
+        return Says(
+            f"{laid.caller.username}이 기본 순서 첫 항목의 커서 뒤로 한 건 검색합니다",
+            english=(
+                f"{laid.caller.username} searches for one entry after the cursor of the "
+                "first item in the default order"
+            ),
+        )
 
     @override
     async def call(
@@ -93,7 +102,14 @@ class TheSuperadminCountsEveryOne(
 
     @override
     def describe(self) -> str:
-        return "설정 이름 둘에 allow_list 넷이 있고 슈퍼관리자가 필터 없이 검색하면, 네 allow_list가 모두 반환된다"
+        return Says(
+            "설정 이름 둘에 allow_list 넷이 있고 superadmin 이 필터 없이 검색하면, "
+            "네 allow_list 가 모두 반환됩니다",
+            english=(
+                "with four allow_lists across two config names, when the superadmin searches "
+                "without a filter, all four allow_lists come back"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyEntriesAndACaller]:
@@ -122,7 +138,17 @@ class AForwardCursorAnswersTheNextOne(
 
     @override
     def describe(self) -> str:
-        return "생성 시각이 모두 같은 allow_list 넷이 있고 슈퍼관리자가 기본 순서 첫 항목의 커서 뒤로 한 건을 검색하면, 바로 다음 allow_list 하나와 앞뒤 페이지가 모두 있다고 응답한다"
+        return Says(
+            "생성 시각이 모두 같은 allow_list 넷이 있고 superadmin 이 기본 순서 첫 항목의 "
+            "커서 뒤로 한 건을 검색하면, 바로 다음 allow_list 하나와 앞뒤 페이지가 모두 있다고 "
+            "응답합니다",
+            english=(
+                "with four allow_lists that all share the same creation time, when the "
+                "superadmin searches for one entry after the cursor of the first item in the "
+                "default order, the answer is the allow_list right after it and says there "
+                "are pages both before and after"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyEntriesAndACaller]:
@@ -147,7 +173,13 @@ class APlainUserMayNotSearch(
 
     @override
     def describe(self) -> str:
-        return "일반 사용자가 allow_list를 검색하면, 슈퍼관리자 권한이 없어 거부된다"
+        return Says(
+            "일반 사용자가 allow_list 를 검색하면, superadmin 권한이 없어 거부됩니다",
+            english=(
+                "when a plain user searches allow_lists, "
+                "the call is rejected because the user is not the superadmin"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyEntriesAndACaller]:

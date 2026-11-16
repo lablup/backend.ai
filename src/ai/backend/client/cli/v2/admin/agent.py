@@ -130,9 +130,10 @@ def search(
     is_flag=True,
     default=False,
     help=(
-        "Change the group even if the agent still has active sessions; "
-        "they are cleaned up per the policy. Without this flag, the change "
-        "is rejected when such sessions exist."
+        "Change the group even if the agent still has active sessions or "
+        "unterminated sessions or deployments of other resource groups designate "
+        "it; the sessions are cleaned up per the policy and the designations are "
+        "removed. Without this flag, the change is rejected in those cases."
     ),
 )
 def update_resource_group(

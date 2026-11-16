@@ -31,6 +31,7 @@ class RolePresetCreator(
     name: str
     scope_type: EntityType
     auto_assign: bool = False
+    auto_assign_to_owner: bool = False
     role_name_template: str | None = None
 
     @override
@@ -56,6 +57,7 @@ class RolePresetCreator(
             role_name_template=self.role_name_template,
             scope_type=self.scope_type,
             auto_assign=self.auto_assign,
+            auto_assign_to_owner=self.auto_assign_to_owner,
         )
 
     @override

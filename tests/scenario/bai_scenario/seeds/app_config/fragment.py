@@ -20,6 +20,7 @@ from ai.backend.manager.models.app_config_fragment.upserters import (
     AppConfigFragmentUpserter,
     PublicAppConfigFragmentUpserter,
 )
+from ai.backend.testutils.scenario_steps import Says
 from bai_scenario.seeds.seeder import Naming, TestSeedRowFrom, TestSeedRowFromTwo
 
 
@@ -35,11 +36,11 @@ class TestSeedFragmentOf[Owner](
 
     @override
     def kind(self) -> str:
-        return "설정 조각"
+        return Says("스코프별 앱 설정", english="app config fragment")
 
     @override
     def detail(self) -> str:
-        return f"값 {dict(self.config)!r}"
+        return Says(f"값 {dict(self.config)!r}", english=f"value {dict(self.config)!r}")
 
     @override
     def name(self, naming: Naming) -> str:
@@ -65,11 +66,11 @@ class TestSeedPublicFragment(TestSeedRowFrom[AppConfigAllowListData, AppConfigFr
 
     @override
     def kind(self) -> str:
-        return "공개 설정 조각"
+        return Says("공개 스코프별 앱 설정", english="public app config fragment")
 
     @override
     def detail(self) -> str:
-        return f"값 {dict(self.config)!r}"
+        return Says(f"값 {dict(self.config)!r}", english=f"value {dict(self.config)!r}")
 
     @override
     def name(self, naming: Naming) -> str:

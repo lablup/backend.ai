@@ -13,9 +13,11 @@ from ai.backend.common.dto.clients.prometheus.response import (
     LabelValueResponse,
     PrometheusResponse,
 )
+from ai.backend.common.errors.prometheus import (
+    PrometheusConnectionError,
+)
 from ai.backend.common.exception import (
     FailedToGetMetric,
-    PrometheusConnectionError,
 )
 from ai.backend.common.types import KernelId
 from ai.backend.manager.clients.prometheus.fixed_query_builder import (

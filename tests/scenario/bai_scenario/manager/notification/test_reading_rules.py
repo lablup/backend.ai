@@ -17,7 +17,7 @@ from ai.backend.manager.api.adapters.notification.adapter import NotificationAda
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.notification import (
     ARuleAndACaller,
@@ -49,8 +49,16 @@ class ReadingById(When[ARuleAndACaller, NotificationAdapter, NotificationRuleNod
 
     @override
     def describe(self, laid: ARuleAndACaller) -> str:
-        target = "존재하지 않는 id" if self.unknown else f"규칙 {laid.rule.name}"
-        return f"{laid.caller.username}이 {target} 조회"
+        if self.unknown:
+            target_ko = "존재하지 않는 id"
+            target_en = "an unknown id"
+        else:
+            target_ko = f"규칙 {laid.rule.name}"
+            target_en = f"the rule {laid.rule.name}"
+        return Says(
+            f"{laid.caller.username}이 {target_ko} 조회합니다",
+            english=f"{laid.caller.username} gets {target_en}",
+        )
 
     @override
     async def call(
@@ -71,7 +79,14 @@ class ReadingManyByIds(When[ManyRulesAndACaller, NotificationAdapter, LoadedRule
 
     @override
     def describe(self, laid: ManyRulesAndACaller) -> str:
-        return f"{laid.caller.username}이 미리 만들어 둔 {len(laid.laid)}개와 없는 id 하나를 한 번에 조회"
+        return Says(
+            f"{laid.caller.username}이 미리 저장한 {len(laid.laid)}개와 없는 id 하나를 "
+            "한 번에 조회합니다",
+            english=(
+                f"{laid.caller.username} batch-loads the {len(laid.laid)} rules created "
+                "in advance and one unknown id"
+            ),
+        )
 
     @override
     async def call(self, adapter: NotificationAdapter, laid: ManyRulesAndACaller) -> LoadedRules:
@@ -93,7 +108,12 @@ class ReadingTheLaidByIds(When[ManyRulesAndACaller, NotificationAdapter, LoadedR
 
     @override
     def describe(self, laid: ManyRulesAndACaller) -> str:
-        return f"{laid.caller.username}이 미리 만들어 둔 {len(laid.laid)}개를 한 번에 조회"
+        return Says(
+            f"{laid.caller.username}이 미리 저장한 {len(laid.laid)}개를 한 번에 조회합니다",
+            english=(
+                f"{laid.caller.username} batch-loads the {len(laid.laid)} rules created in advance"
+            ),
+        )
 
     @override
     async def call(self, adapter: NotificationAdapter, laid: ManyRulesAndACaller) -> LoadedRules:
@@ -111,7 +131,10 @@ class ReadingNoIds(When[ManyRulesAndACaller, NotificationAdapter, LoadedRules]):
 
     @override
     def describe(self, laid: ManyRulesAndACaller) -> str:
-        return f"{laid.caller.username}이 빈 id 목록으로 조회"
+        return Says(
+            f"{laid.caller.username}이 빈 id 목록으로 조회합니다",
+            english=f"{laid.caller.username} batch-loads with an empty id list",
+        )
 
     @override
     async def call(self, adapter: NotificationAdapter, laid: ManyRulesAndACaller) -> LoadedRules:
@@ -131,7 +154,10 @@ class TheSuperadminReadsARule(
 
     @override
     def describe(self) -> str:
-        return "규칙 하나가 있고 슈퍼관리자가 id로 조회하면, 그 규칙 전체가 반환된다"
+        return Says(
+            "규칙 하나가 있고 superadmin 이 id 로 조회하면, 그 규칙 전체가 응답으로 옵니다",
+            english=("with one rule, when the superadmin gets it by id, the whole rule comes back"),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ARuleAndACaller]:
@@ -156,7 +182,13 @@ class AUserGrantedNothingMayNotRead(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 없는 사용자가 id로 조회하면 권한 부족으로 거부된다"
+        return Says(
+            "아무 권한도 없는 사용자가 id 로 조회하면 권한 부족으로 거부됩니다",
+            english=(
+                "when a user granted nothing gets a rule by id, "
+                "it is rejected for not enough permission"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ARuleAndACaller]:
@@ -181,7 +213,13 @@ class TheSuperadminReadingAnUnknownIdIsNotFound(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 존재하지 않는 id로 조회하면 대상을 찾을 수 없다는 이유로 거부된다"
+        return Says(
+            "superadmin 이 존재하지 않는 id 로 조회하면 대상을 찾을 수 없다는 이유로 거부됩니다",
+            english=(
+                "when the superadmin gets an id nothing answers to, "
+                "it is rejected because no target is found"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ARuleAndACaller]:
@@ -208,9 +246,14 @@ class TheSuperadminLoadsLaidAndMissing(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 미리 만들어 둔 규칙 둘과 없는 id 하나를 한 번에 조회하면, "
-            "요청한 순서대로 반환되고 없는 id에 해당하는 항목은 비어 있다"
+        return Says(
+            "superadmin 이 미리 저장한 규칙 둘과 없는 id 하나를 한 번에 조회하면, "
+            "요청한 순서대로 반환되고 없는 id 에 해당하는 항목은 비어 있습니다",
+            english=(
+                "when the superadmin batch-loads two rules created in advance and one "
+                "unknown id, they come back in the order asked and the item for the "
+                "unknown id is empty"
+            ),
         )
 
     @override
@@ -236,9 +279,13 @@ class AUserGrantedNothingIsRefusedPerItem(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "아무 권한도 없는 사용자가 규칙 둘을 한 번에 조회하면, "
-            "호출은 거부되지 않고 항목마다 권한 부족 거부가 담긴다"
+            "호출은 거부되지 않고 항목마다 권한 부족 거부가 담깁니다",
+            english=(
+                "when a user granted nothing batch-loads two rules, the call is not "
+                "rejected and each item carries a rejection for not enough permission"
+            ),
         )
 
     @override
@@ -264,7 +311,13 @@ class ABatchLoadOfNothingAnswersNothing(
 
     @override
     def describe(self) -> str:
-        return "빈 id 목록으로 조회하면 하위 계층을 부르지 않고 빈 응답이 반환된다"
+        return Says(
+            "빈 id 목록으로 조회하면 하위 계층을 호출하지 않고 빈 응답이 반환됩니다",
+            english=(
+                "a batch load with an empty id list brings an empty response without "
+                "calling the lower layer"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyRulesAndACaller]:

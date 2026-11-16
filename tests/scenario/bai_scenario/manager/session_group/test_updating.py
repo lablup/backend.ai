@@ -22,6 +22,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -59,10 +60,20 @@ class UpdatingTheUsersGroup(When[Laid, SessionGroupAdapter, SessionGroupNode]):
     @override
     def describe(self, laid: Laid) -> str:
         if isinstance(self.enforcement, Unset):
-            return f"{laid.caller.username}이 사용자가 만든 세션 그룹의 방향만 퍼뜨리기로 바꾼다"
-        return (
-            f"{laid.caller.username}이 사용자가 만든 세션 그룹의 방향을 퍼뜨리기로, "
-            "강제 수준을 선호로 바꾼다"
+            return Says(
+                f"{laid.caller.username} 이 사용자가 생성한 세션 그룹의 방향만 퍼뜨리기로 변경합니다",
+                english=(
+                    f"{laid.caller.username} changes only the direction of the session group the "
+                    "user created to spread"
+                ),
+            )
+        return Says(
+            f"{laid.caller.username} 이 사용자가 생성한 세션 그룹의 방향을 퍼뜨리기로, "
+            "강제 수준을 선호로 변경합니다",
+            english=(
+                f"{laid.caller.username} changes the direction of the session group the user "
+                "created to spread and its enforcement to preferred"
+            ),
         )
 
     @override
@@ -88,9 +99,13 @@ class UpdatingTheDeploymentGroup(When[Laid, SessionGroupAdapter, SessionGroupNod
 
     @override
     def describe(self, laid: Laid) -> str:
-        return (
-            f"{laid.caller.username}이 배포의 replica group이 가진 세션 그룹의 방향을 퍼뜨리기로, "
-            "강제 수준을 선호로 바꾼다"
+        return Says(
+            f"{laid.caller.username} 이 배포의 replica group 이 가진 세션 그룹의 방향을 "
+            "퍼뜨리기로, 강제 수준을 선호로 변경합니다",
+            english=(
+                f"{laid.caller.username} changes the direction of the session group held by the "
+                "deployment's replica group to spread and its enforcement to preferred"
+            ),
         )
 
     @override
@@ -140,9 +155,14 @@ class AnOwnerChangesBothItems(
 
     @override
     def describe(self) -> str:
-        return (
-            "자기 스코프에서 세션 그룹 수정 권한을 받은 사용자가 자기가 만든 세션 그룹의 방향과 "
-            "강제 수준을 바꾸면, 두 항목이 바뀐 그 세션 그룹이 온다"
+        return Says(
+            "자기 스코프에서 세션 그룹 수정 권한을 받은 사용자가 자기가 생성한 세션 그룹의 방향과 "
+            "강제 수준을 변경하면, 두 항목이 변경된 그 세션 그룹이 옵니다",
+            english=(
+                "when a user granted session group update in their own scope changes the direction "
+                "and the enforcement of the session group they created, that session group comes "
+                "back with both items changed"
+            ),
         )
 
     @override
@@ -158,7 +178,10 @@ class AnOwnerChangesBothItems(
         return TheUpdatedGroupNode(
             started=self.started,
             enforcement=_PREFERRED,
-            said="두 항목이 바뀐 세션 그룹 전체가 온다",
+            said=Says(
+                "두 항목이 변경된 세션 그룹 전체가 옵니다",
+                english=("the whole session group with both items changed comes back"),
+            ),
         )
 
 
@@ -174,9 +197,14 @@ class AnOwnerChangesOnlyTheDirection(
 
     @override
     def describe(self) -> str:
-        return (
-            "자기 스코프에서 세션 그룹 수정 권한을 받은 사용자가 자기가 만든 세션 그룹의 방향만 "
-            "바꾸면, 강제 수준은 그대로인 그 세션 그룹이 온다"
+        return Says(
+            "자기 스코프에서 세션 그룹 수정 권한을 받은 사용자가 자기가 생성한 세션 그룹의 방향만 "
+            "변경하면, 강제 수준은 그대로인 그 세션 그룹이 옵니다",
+            english=(
+                "when a user granted session group update in their own scope changes only the "
+                "direction of the session group they created, that session group comes back with "
+                "the enforcement left as it was"
+            ),
         )
 
     @override
@@ -192,7 +220,13 @@ class AnOwnerChangesOnlyTheDirection(
         return TheUpdatedGroupNode(
             started=self.started,
             enforcement=SessionGroupPlacementEnforcementEnum.STRICT,
-            said="방향만 바뀌고 강제 수준은 그대로인 세션 그룹 전체가 온다",
+            said=Says(
+                "방향만 변경되고 강제 수준은 그대로인 세션 그룹 전체가 옵니다",
+                english=(
+                    "the whole session group with only the direction changed and the enforcement "
+                    "left as it was comes back"
+                ),
+            ),
         )
 
 
@@ -206,9 +240,14 @@ class AnOwnerGrantedOnlyReadMayNotUpdate(
 
     @override
     def describe(self) -> str:
-        return (
-            "자기 스코프에서 세션 그룹 읽기 권한만 받은 사용자가 자기가 만든 세션 그룹의 정책을 "
-            "바꾸면, 권한 부족으로 거부된다"
+        return Says(
+            "자기 스코프에서 세션 그룹 읽기 권한만 받은 사용자가 자기가 생성한 세션 그룹의 정책을 "
+            "변경하면, 권한 부족으로 거부됩니다",
+            english=(
+                "when a user granted only session group read in their own scope changes the "
+                "policy of the session group they created, the call is rejected for lack of "
+                "permission"
+            ),
         )
 
     @override
@@ -234,9 +273,14 @@ class ADeploymentsGroupIsRefusedAsInUse(
 
     @override
     def describe(self) -> str:
-        return (
-            "자기 스코프에서 세션 그룹 수정 권한을 받은 사용자가 자기 배포의 replica group이 가진 세션 그룹 정책을 "
-            "바꾸면, 권한이 아니라 사용 중이라는 것으로 거부된다"
+        return Says(
+            "자기 스코프에서 세션 그룹 수정 권한을 받은 사용자가 자기 배포의 replica group 이 가진 "
+            "세션 그룹 정책을 변경하면, 권한이 아니라 사용 중이라는 것으로 거부됩니다",
+            english=(
+                "when a user granted session group update in their own scope changes the policy of "
+                "the session group held by their own deployment's replica group, the call is "
+                "rejected as in use rather than for permission"
+            ),
         )
 
     @override

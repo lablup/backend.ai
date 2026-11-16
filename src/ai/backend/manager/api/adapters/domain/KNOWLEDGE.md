@@ -9,78 +9,60 @@ generated:
   at: 2026-09-28
 status: draft
 ---
-# 도메인 어댑터 — 시나리오
+# domain adapter: Knowledge
 
-규칙은 상위 디렉터리의 `AGENTS.md`에 있다. 여기 적힌 것과 실행 결과가 어긋나면 문장을 먼저
-의심한다.
+The rules are in `AGENTS.md` in the parent directory. When this document and a run result disagree, doubt the sentence first.
 
-도메인에는 권한 그래프로 권한을 줄 수 없다. 어느 스코프에도 속하지 않게 만들어지고 자기 아래
-하위 엔티티를 갖지 않는다. 그래서 생성과 전체 조회는 전역 superadmin 역할이 지키고, 개별
-도메인을 읽고 고치는 문은 권한 그래프가 지킨다. 두 문이 서로 다른 것으로 거부하므로 짝을 따로
-적는다. 권한을 받은 사용자가 나오는 곳은 리소스 그룹 범위의 조회뿐이다.
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
-공통 계약(대상 존재, 일괄 구성, 페이지)은 프레임워크 계약 테스트가 확인한다. 여기에는 연산마다
-대표 성공과 대표 실패, 그리고 도메인 규칙이 만드는 차이만 적는다.
+A domain cannot be granted permission through the permission graph. It is created outside every scope and has no child entity under it. A global superadmin role protects create and the unscoped search, and the permission graph protects the calls that read and update one domain. The two reject for different reasons, so the pairs are written separately. A user granted a permission appears only in a read within a resource group scope.
 
-## 만들기
+Framework contract tests check the common contract (target existence, bulk composition, page). This document records the representative success and representative failure of each operation and the differences the domain rules make.
 
-집행을 끄는 줄이 따로 있는 이유는, 이 문이 권한 그래프가 아니라 역할이라 집행 스위치와
-무관하다는 것을 못박기 위해서다.
+## Create
 
-만들기는 리소스 그룹을 연결하지 않는다. 연결은 리소스 그룹 쪽 허용 목록 호출이 하고, 그
-시나리오는 리소스 그룹 어댑터 문서에 있다.
+The scenario that disables enforcement stands on its own, to make explicit that a role protects this call rather than the permission graph, so the enforcement switch does not apply.
 
-레거시 GQL `CreateDomainNode`·`ModifyDomainNode`는 도메인 만들기·수정과 리소스 그룹 연결을 따로
-부른다. 연결이 실패하면 만들기·수정만 반영된 도메인이 남는다.
+Create does not link a resource group. The allowed list call on the resource group side links it, and that scenario is in the resource group adapter document.
 
-## 읽기
+The legacy GQL `CreateDomainNode` and `ModifyDomainNode` call domain create or update and the resource group link separately. When the link fails, a domain with only the create or update applied remains.
 
-없는 대상과 권한 없음이 서로 다른 것으로 거부되어야 한다. 하나로 뭉치면 어느 쪽으로 막혔는지
-호출자가 알 수 없다.
+## Read
 
-## 여럿 읽기
+A missing target and a lack of permission must be rejected as different things. If the two are merged into one, the caller cannot distinguish which one blocked it.
 
-여럿 읽기는 호출 전체를 거부하지 않고 자리마다 답한다.
+## Reading several
 
-## 이름으로 id 찾기
+Reading several does not reject the whole call and responds per entry.
 
-두 호출 모두 인증만 본다. 권한은 그 id를 받는 호출이 본다. 그래서 권한이 없어도 이름이
-있는지는 드러나며, 설계상 허용한다. 다른 엔티티의 REST handler와 GQL resolver는 도메인 이름을
-id로 풀 때 이 호출을 먼저 부른다. GQL은 여럿 찾기를 이름 → id 로더로 써서 id로 여럿 읽기로
-잇는다.
+## Finding an id by name
 
-## 수정하기
+Both calls check authentication only. The call that receives the id checks the permission. A user without permission therefore sees whether a name exists, and the design allows it. The REST handler and GQL resolver of another entity call this first when resolving a domain name to an id. GQL uses finding several by name as a name-to-id loader and joins it to reading several by id.
 
-수정도 리소스 그룹을 더하거나 빼지 않는다. 만들기와 같이 리소스 그룹 쪽 허용 목록 호출이 한다.
+## Update
 
-수정의 활성 플래그는 deprecated 다. 내리면 soft delete, 올리면 restore 를 부르고, 이미 그 상태면
-부르지 않는다. 나머지 필드는 수정으로 반영한다. 상태는 노드에 실리지 않아 시나리오는 활성 플래그로
-본다.
+Update also does not add or remove a resource group. As in create, the allowed list call on the resource group side does the linking.
 
-## soft delete, restore, purge
+The active flag of update is deprecated. Deactivating it calls delete, activating it calls restore, and it is not called when the state is already that. The update applies the other fields. The status is not carried on the node, so scenarios read it through the active flag.
 
-soft delete 와 restore 는 지금 상태를 보지 않는다. 이미 그 상태여도 했다는 답이 온다. purge 도
-soft delete 되었는지를 보지 않는다. 딸린 것이 없으면 활성 도메인도 purge 된다.
+## Delete, restore and purge
 
-soft delete 는 활성 플래그를 내리고 상태를 삭제로 바꾼다. restore 는 둘을 되돌린다.
+Delete and restore do not look at the current state. The call responds that it was done even when the state is already that. Purge does not check whether the domain is deleted either. A domain with nothing attached is purged even when it is active.
 
-단건 수정, soft delete, restore 는 id 를 받는다. 이름을 받는 옛 REST 경로와 GQL mutation 은
-이름으로 id 찾기를 먼저 부르고 같은 호출로 잇는다. 위 표의 이름으로 부르는 행이 그 길이다. purge 는
-이름을 받는다.
+Delete deactivates the active flag and changes the status to deleted. Restore reverts both.
 
-## 여럿 수정하기
+A single update, delete and restore take an id. The old REST path and GQL mutation that take a name call find-an-id-by-name first and lead to the same call. The call that takes a name is that path. Purge takes a name.
 
-여럿 수정은 항목마다 단건 수정과 같은 기준으로 soft delete 와 restore 를 부른다. 실패는 항목마다
-실패 목록에 싣는다.
+## Updating several
 
-## 여럿 soft delete, restore
+Updating several calls delete and restore by the same rule as the single update, per entry. A failure enters the failure list per entry.
 
-여럿 연산은 호출 전체를 거부하지 않는다. 처리한 도메인은 처리된 목록에, 처리하지 못한 것은 id 와
-이유를 실패 목록에 싣는다. 여럿 purge 는 없다.
+## Deleting and restoring several
+
+A bulk operation does not reject the whole call. Processed domains go into the processed list, and failures carry the id and the reason in the failure list. There is no bulk purge.
 
 ## search
 
-## 리소스 그룹 범위에서 search
+## search in a resource group scope
 
-리소스 그룹 이름으로 묻는 GQL resolver는 리소스 그룹 adapter의 이름으로 id 찾기를 먼저 부르고,
-얻은 id를 범위로 넘긴다. 도메인 adapter는 리소스 그룹 이름을 풀지 않는다.
+The GQL resolver that takes a resource group name calls find-an-id-by-name of the resource group adapter first and passes the obtained id as the scope. The domain adapter does not resolve a resource group name.

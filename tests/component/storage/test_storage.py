@@ -4,38 +4,11 @@ import uuid
 
 import pytest
 
-from ai.backend.client.v2.exceptions import PermissionDeniedError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.dto.manager.storage.request import (
     GetPresignedDownloadURLReq,
     GetPresignedUploadURLReq,
-    VFSListFilesReq,
 )
-from ai.backend.common.dto.manager.storage.response import (
-    ListVFSStorageResponse,
-    ObjectStorageAllBucketsResponse,
-    ObjectStorageBucketsResponse,
-    ObjectStorageListResponse,
-)
-
-# ── Object Storage ──────────────────────────────────────────────────
-
-
-class TestListObjectStorages:
-    async def test_admin_lists_object_storages(
-        self,
-        admin_registry: BackendAIClientRegistry,
-    ) -> None:
-        result = await admin_registry.storage.list_object_storages()
-        assert isinstance(result, ObjectStorageListResponse)
-        assert isinstance(result.storages, list)
-
-    async def test_user_cannot_list_object_storages(
-        self,
-        user_registry: BackendAIClientRegistry,
-    ) -> None:
-        with pytest.raises(PermissionDeniedError):
-            await user_registry.storage.list_object_storages()
 
 
 class TestGetPresignedUploadURL:
@@ -64,72 +37,3 @@ class TestGetPresignedDownloadURL:
                     key="test-file.txt",
                 ),
             )
-
-
-class TestGetAllBuckets:
-    async def test_admin_gets_all_buckets(
-        self,
-        admin_registry: BackendAIClientRegistry,
-    ) -> None:
-        result = await admin_registry.storage.get_all_buckets()
-        assert isinstance(result, ObjectStorageAllBucketsResponse)
-        assert isinstance(result.buckets_by_storage, dict)
-
-
-class TestGetBuckets:
-    async def test_get_buckets_with_nonexistent_storage(
-        self,
-        admin_registry: BackendAIClientRegistry,
-    ) -> None:
-        result = await admin_registry.storage.get_buckets(str(uuid.uuid4()))
-        assert isinstance(result, ObjectStorageBucketsResponse)
-        assert result.buckets == []
-
-
-# ── VFS Storage ─────────────────────────────────────────────────────
-
-
-class TestListVFSStorages:
-    async def test_admin_lists_vfs_storages(
-        self,
-        admin_registry: BackendAIClientRegistry,
-    ) -> None:
-        result = await admin_registry.storage.list_vfs_storages()
-        assert isinstance(result, ListVFSStorageResponse)
-        assert isinstance(result.storages, list)
-
-    async def test_user_cannot_list_vfs_storages(
-        self,
-        user_registry: BackendAIClientRegistry,
-    ) -> None:
-        with pytest.raises(PermissionDeniedError):
-            await user_registry.storage.list_vfs_storages()
-
-
-class TestGetVFSStorage:
-    async def test_get_vfs_storage_not_found(
-        self,
-        admin_registry: BackendAIClientRegistry,
-    ) -> None:
-        with pytest.raises(Exception):
-            await admin_registry.storage.get_vfs_storage("nonexistent-storage")
-
-
-class TestListVFSFiles:
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "Storage proxy is unavailable in component test environment."
-            " Even though the server handler reads JSON body via BodyParam"
-            " (which works for GET), the VFS storage lookup fails because"
-            " no storage proxy is configured."
-        ),
-    )
-    async def test_list_vfs_files_not_found(
-        self,
-        admin_registry: BackendAIClientRegistry,
-    ) -> None:
-        await admin_registry.storage.list_vfs_files(
-            "nonexistent-storage",
-            VFSListFilesReq(directory="/"),
-        )

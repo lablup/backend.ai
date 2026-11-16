@@ -9,7 +9,7 @@ import os
 import sys
 import zipfile
 from collections.abc import Iterable, Iterator
-from importlib.metadata import EntryPoint, entry_points
+from importlib.metadata import EntryPoint, distributions, entry_points
 from pathlib import Path
 
 log = logging.getLogger(__spec__.name)
@@ -24,7 +24,6 @@ def scan_entrypoints(
         blocklist = set()
     existing_names: dict[str, EntryPoint] = {}
 
-    prepare_wheelhouse()
     for entrypoint in itertools.chain(
         scan_entrypoint_from_buildscript(group_name),
         scan_entrypoint_from_package_metadata(group_name),
@@ -220,10 +219,14 @@ def scan_entrypoint_from_plugin_checkouts(group_name: str) -> Iterator[EntryPoin
     yield from entrypoints.values()
 
 
-def prepare_wheelhouse(base_dir: Path | None = None) -> None:
-    if base_dir is None:
-        base_dir = Path.cwd()
-    for whl_path in (base_dir / "wheelhouse").glob("*.whl"):
+def scan_entrypoint_from_wheelhouse(group_name: str, wheelhouse_path: Path) -> Iterator[EntryPoint]:
+    for whl_path in wheelhouse_path.glob("*.whl"):
+        for distribution in distributions(path=[os.fsdecode(whl_path)]):
+            yield from distribution.entry_points.select(group=group_name)
+
+
+def prepare_wheelhouse(wheelhouse_path: Path) -> None:
+    for whl_path in wheelhouse_path.glob("*.whl"):
         extracted_path = whl_path.with_suffix("")  # strip the extension
         log.debug("prepare_wheelhouse(): loading %s", whl_path)
         if not extracted_path.exists():

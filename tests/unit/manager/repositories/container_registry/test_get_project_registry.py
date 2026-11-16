@@ -14,6 +14,9 @@ from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.errors.image import ContainerRegistryNotFound
 from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.association_container_registries_groups.row import (
+    AssociationContainerRegistriesGroupsRow,
+)
 
 # ORM cluster registration: configure_mappers() (triggered when this isolated
 # test registers a domain-cluster row) resolves string relationships against the
@@ -46,7 +49,7 @@ _ORM_CLUSTER = (
 
 @dataclass
 class _ProjectWithRegistry:
-    """A project (group) linked to a container registry via container_registry JSON."""
+    """A project (group) whose default registry is a container registry."""
 
     project_id: uuid.UUID
     registry_id: uuid.UUID
@@ -63,21 +66,14 @@ class _ProjectWithRegistry:
 
 @dataclass
 class _ProjectWithoutRegistry:
-    """A project (group) with no container_registry JSON configured."""
+    """A project (group) with no registry linked."""
 
     project_id: uuid.UUID
 
 
 @dataclass
-class _ProjectWithInvalidRegistry:
-    """A project (group) with invalid container_registry JSON (missing keys)."""
-
-    project_id: uuid.UUID
-
-
-@dataclass
-class _ProjectWithOrphanedRegistry:
-    """A project (group) whose container_registry config points to a non-existent registry."""
+class _ProjectWithNonDefaultRegistry:
+    """A project (group) allowed on a registry that is not its default registry."""
 
     project_id: uuid.UUID
 
@@ -100,6 +96,7 @@ class TestGetProjectRegistry:
                 UserRow,
                 ProjectRow,
                 ContainerRegistryRow,
+                AssociationContainerRegistriesGroupsRow,
             ],
         ):
             yield database_connection
@@ -141,7 +138,7 @@ class TestGetProjectRegistry:
         sample_domain: DomainFixtureData,
         sample_resource_policy: str,
     ) -> _ProjectWithRegistry:
-        """Pre-created project with valid container_registry config linked to a ContainerRegistryRow."""
+        """Pre-created project whose default registry is a ContainerRegistryRow."""
         registry_name = "harbor-" + str(uuid.uuid4())[:8] + ".example.com"
         registry_project = "project-" + str(uuid.uuid4())[:8]
         registry_type = ContainerRegistryType.HARBOR2
@@ -171,13 +168,14 @@ class TestGetProjectRegistry:
                 domain_name=sample_domain.domain_name,
                 total_resource_slots=ResourceSlot(),
                 resource_policy=sample_resource_policy,
-                container_registry={
-                    "registry": registry_name,
-                    "project": registry_project,
-                },
             )
             session.add(group)
             await session.flush()
+            session.add(
+                AssociationContainerRegistriesGroupsRow(
+                    registry_id=registry.id, project_id=group.id, is_default=True
+                )
+            )
             project_id = group.id
             registry_id = registry.id
             await session.commit()
@@ -203,14 +201,13 @@ class TestGetProjectRegistry:
         sample_domain: DomainFixtureData,
         sample_resource_policy: str,
     ) -> _ProjectWithoutRegistry:
-        """Pre-created project with no container_registry configured."""
+        """Pre-created project with no registry linked."""
         async with db_with_cleanup.begin_session() as session:
             group = ProjectRow(
                 name=f"test-group-no-reg-{str(uuid.uuid4())[:8]}",
                 domain_name=sample_domain.domain_name,
                 total_resource_slots=ResourceSlot(),
                 resource_policy=sample_resource_policy,
-                container_registry=None,
             )
             session.add(group)
             await session.flush()
@@ -220,53 +217,40 @@ class TestGetProjectRegistry:
         return _ProjectWithoutRegistry(project_id=project_id)
 
     @pytest.fixture
-    async def project_with_invalid_registry(
+    async def project_with_non_default_registry(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         sample_domain: DomainFixtureData,
         sample_resource_policy: str,
-    ) -> _ProjectWithInvalidRegistry:
-        """Pre-created project with empty container_registry dict (missing required keys)."""
+    ) -> _ProjectWithNonDefaultRegistry:
+        """Pre-created project allowed on a registry without it being the default registry."""
+        registry_name = "allowed-" + str(uuid.uuid4())[:8] + ".example.com"
         async with db_with_cleanup.begin_session() as session:
+            registry = ContainerRegistryRow(
+                id=ContainerRegistryID(uuid.uuid4()),
+                url=f"https://{registry_name}",
+                registry_name=registry_name,
+                type=ContainerRegistryType.HARBOR2,
+                project="project-" + str(uuid.uuid4())[:8],
+            )
+            session.add(registry)
             group = ProjectRow(
-                name=f"test-group-invalid-{str(uuid.uuid4())[:8]}",
+                name=f"test-group-allowed-{str(uuid.uuid4())[:8]}",
                 domain_name=sample_domain.domain_name,
                 total_resource_slots=ResourceSlot(),
                 resource_policy=sample_resource_policy,
-                container_registry={},
             )
             session.add(group)
             await session.flush()
-            project_id = group.id
-            await session.commit()
-
-        return _ProjectWithInvalidRegistry(project_id=project_id)
-
-    @pytest.fixture
-    async def project_with_orphaned_registry(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        sample_domain: DomainFixtureData,
-        sample_resource_policy: str,
-    ) -> _ProjectWithOrphanedRegistry:
-        """Pre-created project whose container_registry config points to a non-existent registry."""
-        async with db_with_cleanup.begin_session() as session:
-            group = ProjectRow(
-                name=f"test-group-orphan-{str(uuid.uuid4())[:8]}",
-                domain_name=sample_domain.domain_name,
-                total_resource_slots=ResourceSlot(),
-                resource_policy=sample_resource_policy,
-                container_registry={
-                    "registry": "non-existent-registry",
-                    "project": "non-existent-project",
-                },
+            session.add(
+                AssociationContainerRegistriesGroupsRow(
+                    registry_id=registry.id, project_id=group.id, is_default=False
+                )
             )
-            session.add(group)
-            await session.flush()
             project_id = group.id
             await session.commit()
 
-        return _ProjectWithOrphanedRegistry(project_id=project_id)
+        return _ProjectWithNonDefaultRegistry(project_id=project_id)
 
     @pytest.fixture
     async def project_with_minimal_registry(
@@ -295,13 +279,14 @@ class TestGetProjectRegistry:
                 domain_name=sample_domain.domain_name,
                 total_resource_slots=ResourceSlot(),
                 resource_policy=sample_resource_policy,
-                container_registry={
-                    "registry": registry_name,
-                    "project": registry_project,
-                },
             )
             session.add(group)
             await session.flush()
+            session.add(
+                AssociationContainerRegistriesGroupsRow(
+                    registry_id=registry.id, project_id=group.id, is_default=True
+                )
+            )
             project_id = group.id
             registry_id = registry.id
             await session.commit()
@@ -325,7 +310,7 @@ class TestGetProjectRegistry:
         repository: ContainerRegistryRepository,
         project_with_registry: _ProjectWithRegistry,
     ) -> None:
-        """Test successful fetch of registry info from a project with valid config."""
+        """Test successful fetch of the project's default registry."""
         # When
         scope_id = ProjectScope(project_id=project_with_registry.project_id)
         result = await repository.get_project_registry(scope_id)
@@ -357,28 +342,18 @@ class TestGetProjectRegistry:
         repository: ContainerRegistryRepository,
         project_without_registry: _ProjectWithoutRegistry,
     ) -> None:
-        """Test ContainerRegistryNotFound when project has no container_registry config."""
+        """Test ContainerRegistryNotFound when no registry is linked to the project."""
         scope_id = ProjectScope(project_id=project_without_registry.project_id)
         with pytest.raises(ContainerRegistryNotFound):
             await repository.get_project_registry(scope_id)
 
-    async def test_get_project_registry_invalid_registry_config(
+    async def test_get_project_registry_not_default(
         self,
         repository: ContainerRegistryRepository,
-        project_with_invalid_registry: _ProjectWithInvalidRegistry,
+        project_with_non_default_registry: _ProjectWithNonDefaultRegistry,
     ) -> None:
-        """Test ContainerRegistryNotFound when config is empty dict (missing required keys)."""
-        scope_id = ProjectScope(project_id=project_with_invalid_registry.project_id)
-        with pytest.raises(ContainerRegistryNotFound):
-            await repository.get_project_registry(scope_id)
-
-    async def test_get_project_registry_registry_row_not_found(
-        self,
-        repository: ContainerRegistryRepository,
-        project_with_orphaned_registry: _ProjectWithOrphanedRegistry,
-    ) -> None:
-        """Test ContainerRegistryNotFound when config points to non-existent registry."""
-        scope_id = ProjectScope(project_id=project_with_orphaned_registry.project_id)
+        """Test ContainerRegistryNotFound when the project's registry is not its default."""
+        scope_id = ProjectScope(project_id=project_with_non_default_registry.project_id)
         with pytest.raises(ContainerRegistryNotFound):
             await repository.get_project_registry(scope_id)
 

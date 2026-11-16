@@ -1,7 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import NotRequired, TypedDict
+from typing import NotRequired, TypedDict, override
+
+from pydantic import ConfigDict
+
+from ai.backend.appproxy.coordinator.errors.ingress import TraefikAppliedIngressRevisionInvalidError
+from ai.backend.common.exception import BackendAIError
+from ai.backend.common.types import BackendAISchema, SchemaValidationFailureInfo
 
 
 class HttpRouterConfig(TypedDict):
@@ -92,3 +98,16 @@ class IngressRoutingConfigs:
     auth_plugin_middleware: AuthPluginMiddlewareConfig | None = None
     tcp_router: TcpRouterConfig | None = None
     tcp_service: TcpServiceConfig | None = None
+
+
+class AppliedIngressRevision(BackendAISchema):
+    model_config = ConfigDict(frozen=True)
+
+    revision: int
+
+    @override
+    @classmethod
+    def build_validation_error(cls, info: SchemaValidationFailureInfo) -> BackendAIError:
+        return TraefikAppliedIngressRevisionInvalidError(
+            extra_msg=info.summary, extra_data={"errors": info.errors}
+        )

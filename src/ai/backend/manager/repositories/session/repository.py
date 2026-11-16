@@ -22,9 +22,11 @@ from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import AccessKey, AgentId, KernelId, SessionId
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.image.types import ImageData
+from ai.backend.manager.data.resource.types import ResourceGroupProxyConnectionInfo
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.data.session.types import (
     SessionData,
+    SessionEntityData,
     SessionRoutingInfo,
 )
 from ai.backend.manager.data.user.types import SessionOwnerContext, UserData
@@ -112,7 +114,7 @@ class SessionRepository:
         self,
         id_or_name_prefix: str,
         owner_access_key: AccessKey,
-    ) -> list[SessionRow]:
+    ) -> list[SessionEntityData]:
         return await self._db_source.match_sessions(id_or_name_prefix, owner_access_key)
 
     @session_repository_resilience.apply()
@@ -200,11 +202,11 @@ class SessionRepository:
         return await self._db_source.get_group_name_by_domain_and_id(domain_name, group_id)
 
     @session_repository_resilience.apply()
-    async def get_resource_group_wsproxy_addr(
+    async def resource_group_proxy_connection_info(
         self,
         resource_group_name: str,
-    ) -> str | None:
-        return await self._db_source.get_resource_group_wsproxy_addr(resource_group_name)
+    ) -> ResourceGroupProxyConnectionInfo | None:
+        return await self._db_source.resource_group_proxy_connection_info(resource_group_name)
 
     @session_repository_resilience.apply()
     async def get_session_by_id(
@@ -218,7 +220,7 @@ class SessionRepository:
         self,
         updater: SessionUpdater,
         session_name: str | None = None,
-    ) -> SessionRow | None:
+    ) -> SessionData:
         return await self._db_source.update_session(updater, session_name)
 
     @session_repository_resilience.apply()
@@ -273,7 +275,6 @@ class SessionRepository:
         kernel_loading_strategy: KernelLoadingStrategy = KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         allow_stale: bool = False,
     ) -> SessionRow:
-        """Get session with group information eagerly loaded"""
         return await self._db_source.get_session_with_group(
             session_id, kernel_loading_strategy, allow_stale
         )
